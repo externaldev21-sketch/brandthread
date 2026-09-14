@@ -478,23 +478,15 @@ export default function AnimatedGradientBackground({
 }: {
   style?: StyleProp<ViewStyle>;
 }) {
-  const { width, height } = useWindowDimensions();
-  const { theme } = useAppTheme();
-  const palette = createBackgroundPalette(theme);
-
   return (
-    <View pointerEvents="none" style={[styles.root, { backgroundColor: palette.base }, style]}>
+    <View pointerEvents="none" style={[styles.root, { backgroundColor: '#0A0A0B' }, style]}>
       <LinearGradient
-        colors={[palette.anchorStart, palette.base, palette.deepHue, palette.anchorEnd]}
-        locations={[0, 0.32, 0.68, 1]}
+        colors={['#0A0A0B', '#0D0D0F', '#0A0A0B']}
+        locations={[0, 0.5, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.baseGradient}
       />
-      <SilkRibbonField width={width} height={height} palette={palette} />
-      <LightTrail top={height * 0.26} duration={18000} delay={7000} palette={palette} />
-      <LightTrail top={height * 0.72} duration={24000} delay={13000} reverse palette={palette} />
-      <ParticleField width={width} height={height} palette={palette} />
     </View>
   );
 }

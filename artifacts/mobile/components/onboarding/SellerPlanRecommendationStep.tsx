@@ -29,8 +29,11 @@ export function SellerPlanRecommendationStep({
       <Text style={styles.title}>We recommend {SELLER_PLANS.find((plan) => plan.id === recommendation.planId)?.name}</Text>
       <Text style={styles.reason}>{recommendation.reason}</Text>
       <Text style={styles.guidance}>This is guidance, not a gate. Pick any plan, and change it before subscribing.</Text>
+      <View style={[styles.trialBadge, { borderColor: theme.accent }]}>
+        <Text style={[styles.trialBadgeText, { color: theme.accentLight }]}>5-day free trial</Text>
+      </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.planRow}>
+      <View style={styles.planRow}>
         {SELLER_PLANS.map((plan) => {
           const selected = selectedPlanId === plan.id;
           const recommended = recommendation.planId === plan.id;
@@ -44,12 +47,12 @@ export function SellerPlanRecommendationStep({
               onPress={() => onSelect(plan.id)}
               style={[
                 styles.card,
-                selected && { borderColor: theme.accent, backgroundColor: theme.accentDim },
+                selected && { borderColor: theme.accent },
               ]}
             >
               <View style={styles.badgeRow}>
                 {recommended && (
-                  <View style={[styles.badge, { backgroundColor: theme.secondaryDim }]}>
+                  <View style={[styles.badge, { borderColor: theme.accent }]}>
                     <Feather name="star" size={10} color={theme.secondary} />
                     <Text style={[styles.badgeText, { color: theme.secondary }]}>RECOMMENDED</Text>
                   </View>
@@ -70,7 +73,7 @@ export function SellerPlanRecommendationStep({
             </TouchableOpacity>
           );
         })}
-      </ScrollView>
+      </View>
 
       <TouchableOpacity onPress={onContinue} activeOpacity={0.86} style={[styles.continue, { backgroundColor: theme.accent }]}>
         <Text style={[styles.continueText, { color: theme.onAccent }]}>
@@ -87,10 +90,12 @@ const styles = StyleSheet.create({
   title: { color: '#FFF', fontSize: 30, lineHeight: 36, fontFamily: 'Inter_700Bold', letterSpacing: -0.7 },
   reason: { color: 'rgba(255,255,255,0.72)', fontSize: 14, lineHeight: 21, fontFamily: 'Inter_500Medium', marginTop: 10 },
   guidance: { color: 'rgba(255,255,255,0.45)', fontSize: 12, lineHeight: 18, fontFamily: 'Inter_400Regular', marginTop: 8 },
-  planRow: { gap: 12, paddingVertical: 22, paddingRight: 24 },
-  card: { width: 270, minHeight: 390, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.11)', backgroundColor: 'rgba(255,255,255,0.045)', padding: 18 },
+  trialBadge: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, marginTop: 14 },
+  trialBadgeText: { fontSize: 11, fontFamily: 'Inter_700Bold', letterSpacing: 0.3 },
+  planRow: { gap: 12, paddingVertical: 22 },
+  card: { width: '100%', minHeight: 360, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.11)', backgroundColor: 'rgba(255,255,255,0.045)', padding: 18 },
   badgeRow: { minHeight: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  badge: { flexDirection: 'row', gap: 5, alignItems: 'center', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4 },
+  badge: { flexDirection: 'row', gap: 5, alignItems: 'center', borderRadius: 20, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4 },
   badgeText: { fontSize: 9, fontFamily: 'Inter_700Bold', letterSpacing: 0.5 },
   planName: { color: '#FFF', fontSize: 24, fontFamily: 'Inter_700Bold', marginTop: 10 },
   tagline: { color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 17, fontFamily: 'Inter_400Regular', marginTop: 3 },

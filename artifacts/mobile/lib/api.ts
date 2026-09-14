@@ -1003,6 +1003,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       get: (id: string) => get<any>(`/api/public/products/${encodeURIComponent(id)}`),
       related: (productId: string, limit?: number) =>
         get<any[]>(`/api/public/products/${encodeURIComponent(productId)}/related${limit ? `?limit=${limit}` : ''}`),
+      /** Product-backed rows that meet the platform qualified high-demand criteria.
+       *  Returns an empty array when nothing qualifies — no fallback list. */
+      highDemand: (limit = 6) =>
+        get<any[]>(`/api/public/products/high-demand?limit=${encodeURIComponent(String(limit))}`),
     },
     public: {
       search: (opts: { q: string; sort?: string; minPriceCents?: number; maxPriceCents?: number; category?: string; limit?: number }) => {

@@ -123,14 +123,16 @@ vi.mock('@/components/BrandthreadUI', () => {
 });
 
 vi.mock('@/lib/theme', () => ({
-  BG: '#07070F',
+  BG: '#0A0A0B',
   SCREEN_BG: 'transparent',
-  CARD: '#12121F',
-  CARD_ELEVATED: '#18182E',
+  CARD: '#18181B',
+  CARD_ELEVATED: '#222226',
   BORDER: '#303044',
-  FG: '#F4F4FF',
+  FG: '#F7F7FA',
   MUTED: '#AAAABC',
   SUBTLE: '#77778A',
+  ACCENT: '#5B5CFF',
+  ACCENT_LIGHT: '#8B8CFF',
   ON_DARK: '#FFFFFF',
   SUCCESS: '#10B981',
   SUCCESS_DIM: '#103D31',

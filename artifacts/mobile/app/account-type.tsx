@@ -7,7 +7,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 
-const BG     = '#07070F';
+const BG     = '#0A0A0B';
 const getCards = (theme: AppThemePreset): {
   type: AccountType;
   icon: 'shopping-bag' | 'star';

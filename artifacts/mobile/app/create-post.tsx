@@ -39,8 +39,8 @@ import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeTask } from '@/lib/setupStore';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
-const BG     = '#07070F';
-const CARD   = '#12121F';
+const BG     = '#0A0A0B';
+const CARD   = '#18181B';
 const BORDER = 'rgba(255,255,255,0.07)';
 const FG     = '#F4F4FF';
 const MUTED  = 'rgba(244,244,255,0.50)';

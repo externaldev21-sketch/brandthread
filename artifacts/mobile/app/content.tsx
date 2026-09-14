@@ -15,8 +15,8 @@ import {
 } from '@/services/socialService';
 import { useColors } from '@/hooks/useColors';
 
-const BG     = '#07070F';
-const CARD   = '#12121F';
+const BG     = '#0A0A0B';
+const CARD   = '#18181B';
 const BORDER = 'rgba(255,255,255,0.07)';
 const FG     = '#F4F4FF';
 const MUTED  = 'rgba(244,244,255,0.50)';
@@ -357,7 +357,7 @@ const s = StyleSheet.create({
   title:   { flex: 1, fontSize: 22, fontFamily: 'Inter_700Bold', color: FG },
   analyticsBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   createBtn:{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: GREEN, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9 },
-  createText:{ fontSize: 13, fontFamily: 'Inter_700Bold', color: '#07070F' },
+  createText:{ fontSize: 13, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
   statsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 12 },
   statCard: { backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 16, paddingVertical: 10, alignItems: 'center', minWidth: 84 },
   statValue:{ fontSize: 20, fontFamily: 'Inter_700Bold' },
@@ -375,7 +375,7 @@ const s = StyleSheet.create({
   filterTextActive: { color: GREEN },
   postCard:  { flexDirection: 'row', gap: 12, backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, padding: 14, marginBottom: 10 },
   moreBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', marginRight: -8 },
-  postThumb: { width: 56, height: 56, borderRadius: 12, backgroundColor: '#12121F', alignItems: 'center', justifyContent: 'center' },
+  postThumb: { width: 56, height: 56, borderRadius: 12, backgroundColor: '#18181B', alignItems: 'center', justifyContent: 'center' },
   postTopRow:{ flexDirection: 'row', alignItems: 'center', gap: 8 },
   statusBadge:{ borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1 },
   statusText:{ fontSize: 9, fontFamily: 'Inter_700Bold' },

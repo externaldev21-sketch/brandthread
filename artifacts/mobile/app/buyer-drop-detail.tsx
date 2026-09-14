@@ -14,8 +14,13 @@ import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK, ON_DARK_MUTED,
-  SUCCESS, RED, RED_DIM, FONT, FS, SP, RADIUS,
+  SUCCESS, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import {
+  ClaimedRemainingLabel,
+  TimeRemainingLabel,
+  URGENCY_UNITS_THRESHOLD,
+} from '@/components/CommerceSignal';
 
 const { width: W } = Dimensions.get('window');
 const HERO_H = Math.max(470, Math.min(590, W * 1.38));
@@ -43,8 +48,11 @@ interface DropDetail {
   type: 'pre-order' | 'pre-made';
   status: string;
   releaseAt?: string | null;
+  endsAt?: string | null;
   estimatedShipDate?: string | null;
   orderCount?: number;
+  claimedUnits?: number;
+  remainingUnits?: number;
   createdAt: string;
   seller?: { displayName?: string; brandName?: string; verified?: boolean } | null;
   products?: DropProduct[];
@@ -257,6 +265,21 @@ export default function BuyerDropDetail() {
             <Text style={styles.dropName}>{drop.name ?? dropName}</Text>
             <Countdown releaseAt={drop.releaseAt} />
 
+            {/* Demand signals — only shown when server supplies non-zero values */}
+            {((drop.claimedUnits ?? 0) > 0 || (drop.remainingUnits ?? 0) > 0 || !!drop.endsAt) && (
+              <View style={{ marginTop: SP.sm, gap: 5 }}>
+                <ClaimedRemainingLabel
+                  claimedUnits={drop.claimedUnits ?? 0}
+                  remainingUnits={drop.remainingUnits ?? 0}
+                  urgent={(drop.remainingUnits ?? 0) > 0 && (drop.remainingUnits ?? 0) <= URGENCY_UNITS_THRESHOLD}
+                  accent={theme.accent}
+                />
+                {!!drop.endsAt && (
+                  <TimeRemainingLabel endsAt={drop.endsAt} accent={theme.accent} />
+                )}
+              </View>
+            )}
+
             <View style={styles.actionRow}>
               {!countdown.isLive ? (
                 <TouchableOpacity
@@ -274,7 +297,7 @@ export default function BuyerDropDetail() {
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
-                  style={[styles.primaryButton, { backgroundColor: RED }]}
+                  style={[styles.primaryButton, { backgroundColor: theme.accent }]}
                   onPress={() => scrollRef.current?.scrollTo({ y: HERO_H - 24, animated: true })}
                   testID="shop-live-drop-button"
                 >
@@ -317,7 +340,12 @@ export default function BuyerDropDetail() {
               <Text style={styles.collectionEyebrow}>{countdown.isLive ? 'AVAILABLE NOW' : 'PREVIEW THE COLLECTION'}</Text>
               <Text style={styles.collectionTitle}>{products.length} {products.length === 1 ? 'piece' : 'pieces'}</Text>
             </View>
-            {countdown.isLive && <View style={styles.stockPill}><View style={styles.stockDot} /><Text style={styles.stockText}>LIMITED</Text></View>}
+            {countdown.isLive && (
+              <View style={[styles.stockPill, { backgroundColor: `${theme.accent}20`, borderColor: `${theme.accent}44` }]}>
+                <View style={[styles.stockDot, { backgroundColor: theme.accent }]} />
+                <Text style={[styles.stockText, { color: theme.accent }]}>LIMITED</Text>
+              </View>
+            )}
           </View>
 
           {products.length ? (
@@ -368,8 +396,8 @@ const styles = StyleSheet.create({
   timerNumber: { color: ON_DARK, fontFamily: FONT.light, fontSize: 42, lineHeight: 48, letterSpacing: -1.8, fontVariant: ['tabular-nums'] },
   timerLabel: { color: ON_DARK_MUTED, fontFamily: FONT.semibold, fontSize: 8, letterSpacing: 1.25 },
   timerRule: { height: 2, marginTop: 13, width: 58 },
-  livePanel: { backgroundColor: RED_DIM, borderWidth: 1, borderColor: `${RED}66`, borderRadius: RADIUS.md, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 13 },
-  livePulse: { width: 10, height: 10, borderRadius: 5, backgroundColor: RED },
+  livePanel: { backgroundColor: 'rgba(255,59,48,0.12)', borderWidth: 1, borderColor: 'rgba(255,59,48,0.4)', borderRadius: RADIUS.md, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 13 },
+  livePulse: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FF3B30' },
   liveTitle: { color: ON_DARK, fontFamily: FONT.extrabold, fontSize: FS.md, letterSpacing: 1.3 },
   liveSub: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
   actionRow: { flexDirection: 'row', marginTop: SP.lg },
@@ -383,9 +411,9 @@ const styles = StyleSheet.create({
   collectionHeader: { paddingHorizontal: SP.md, paddingTop: SP.xl, paddingBottom: SP.md, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
   collectionEyebrow: { color: SUBTLE, fontFamily: FONT.semibold, fontSize: 9, letterSpacing: 1.4 },
   collectionTitle: { color: FG, fontFamily: FONT.bold, fontSize: FS.xxl, marginTop: 4, letterSpacing: -0.5 },
-  stockPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: RED_DIM },
-  stockDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: RED },
-  stockText: { color: RED, fontFamily: FONT.bold, fontSize: 9, letterSpacing: 1 },
+  stockPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, paddingVertical: 6, borderRadius: RADIUS.pill, borderWidth: 1 },
+  stockDot: { width: 6, height: 6, borderRadius: 3 },
+  stockText: { fontFamily: FONT.bold, fontSize: 9, letterSpacing: 1 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: SP.md },
   productTile: { width: (W - SP.md * 2 - 10) / 2, borderRadius: RADIUS.sm, overflow: 'hidden', backgroundColor: CARD },
   productMedia: { height: (W - SP.md * 2 - 10) * 0.68, justifyContent: 'flex-end' },

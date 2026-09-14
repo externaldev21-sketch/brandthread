@@ -17,8 +17,8 @@ import { PostAnalyticsResponse, useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 
 // ─── Design Tokens ─────────────────────────────────────────────────────────────
-const BG        = '#07070F';
-const CARD      = '#12121F';
+const BG        = '#0A0A0B';
+const CARD      = '#18181B';
 const BORDER    = 'rgba(255,255,255,0.07)';
 const FG        = '#F4F4FF';
 const MUTED     = 'rgba(244,244,255,0.50)';

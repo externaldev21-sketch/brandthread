@@ -30,7 +30,7 @@ export function DesignSystemBrowser() {
       <aside className="border-b border-border bg-sidebar md:sticky md:top-0 md:h-screen md:border-b-0 md:border-r">
         <div className="p-6">
           <p className="text-2xl font-extrabold uppercase tracking-[-.02em]">{DESIGN_SYSTEM.title}</p>
-          <p className="mt-1 font-mono text-[9px] uppercase tracking-[.2em] text-primary">The definitive thread</p>
+          <p className="mt-1 text-[9px] font-bold uppercase tracking-[.2em] text-primary">The definitive system</p>
         </div>
         <WovenDivider className="px-5" />
         <div className="p-5">
@@ -47,12 +47,12 @@ export function DesignSystemBrowser() {
       <main className="min-w-0 px-5 py-8 sm:px-9 lg:px-14">
         <div className="mx-auto max-w-6xl">
           <header className="mb-8">
-            <p className="font-mono text-[10px] uppercase tracking-[.2em] text-primary">Brandthread / Woven system</p>
+            <p className="text-[10px] font-bold uppercase tracking-[.2em] text-primary">Brandthread / Design system</p>
             <h1 className="mt-2 text-4xl font-extrabold uppercase tracking-[-.025em] sm:text-6xl">{active.name}</h1>
             <p className="mt-3 max-w-2xl text-lg text-muted-foreground">{active.description}</p>
             <WovenDivider variant="section" className="mt-6" />
           </header>
-          <Suspense fallback={<ThreadLoader label="Threading preview" />}><Page /></Suspense>
+          <Suspense fallback={<ThreadLoader label="Loading preview" />}><Page /></Suspense>
         </div>
       </main>
     </div>

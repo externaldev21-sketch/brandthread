@@ -6,7 +6,7 @@ import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
-const BG       = '#07070F';
+const BG       = '#0A0A0B';
 export default function SplashScreen() {
   const { theme } = useAppTheme();
   const router = useRouter();

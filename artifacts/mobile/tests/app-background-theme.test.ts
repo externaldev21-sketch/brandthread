@@ -18,7 +18,7 @@ function routeFiles(directory: string): string[] {
 
 describe('app background theme', () => {
   it('keeps buyer and seller screens on the onboarding background', () => {
-    expect(BG).toBe('#07070F');
+    expect(BG).toBe('#0A0A0B');
     expect(colors.dark.background).toBe(BG);
     expect(SCREEN_BG).toBe('transparent');
   });
@@ -45,10 +45,10 @@ describe('app background theme', () => {
       name: id,
       accent,
       accentLight,
-      accentDim: '',
+      accentDim: 'rgba(255,255,255,0.055)',
       onAccent: '#FFFFFF',
       secondary,
-      secondaryDim: '',
+      secondaryDim: 'rgba(255,255,255,0.055)',
       primaryGradient: [hueBase, accent, accentLight],
       heroGradient: [hueBase, accent, accentLight],
       glowGradient: ['', ''],
@@ -70,8 +70,9 @@ describe('app background theme', () => {
     expect(chromePalette.particlePrimary).toBe(chrome.accentLight);
 
     const backgroundSource = readFileSync(resolve(process.cwd(), 'components/branding/AnimatedGradientBackground.tsx'), 'utf8');
-    expect(backgroundSource).not.toContain("from '@/lib/theme'");
-    expect(backgroundSource).toContain('colors={[palette.anchorStart, palette.base, palette.deepHue, palette.anchorEnd]}');
+    expect(backgroundSource).toContain("colors={['#0A0A0B', '#0D0D0F', '#0A0A0B']}");
+    expect(backgroundSource).not.toContain('<SilkRibbonField');
+    expect(backgroundSource).not.toContain('<ParticleField');
   });
 
   it('keeps buyer and seller navigation scenes transparent', () => {

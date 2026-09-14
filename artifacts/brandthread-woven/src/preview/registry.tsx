@@ -20,8 +20,8 @@ export type PreviewEntry = {
 export type NavGroup = { name: string; entries: PreviewEntry[] };
 
 export const DESIGN_SYSTEM = {
-  title: 'Brandthread Woven',
-  description: 'A fashion-commerce system built from thread, tension, tags, stitches, and editorial product imagery.',
+  title: 'Brandthread',
+  description: 'A true-black fashion-commerce system with bold sans typography and one confident blue-violet accent.',
 } as const;
 
 export const OVERVIEW_ENTRY: PreviewEntry = {
@@ -35,19 +35,19 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     name: 'Foundations',
     entries: [
-      { id: 'colors', name: 'Color', description: 'Neutral charcoal, ember signature accent, and seller-scoped brand color.', Page: ColorsPage },
-      { id: 'type', name: 'Typography', description: 'Condensed, confident editorial hierarchy.', Page: FontsPage },
+      { id: 'colors', name: 'Color', description: 'True black, neutral graphite, and one saturated blue-violet accent.', Page: ColorsPage },
+      { id: 'type', name: 'Typography', description: 'Bold, confident sans-serif hierarchy.', Page: FontsPage },
       { id: 'layout', name: 'Layout', description: 'Tighter radii, deliberate spacing, full-bleed media.', Page: LayoutPage },
     ],
   },
   {
-    name: 'Woven signatures',
+    name: 'Primitives',
     entries: [
-      { id: 'woven-divider', name: 'Woven Divider', description: 'Stitched section separators.', Page: WovenDividerDemo },
-      { id: 'thread-loader', name: 'Thread Loader', description: 'A line threads through the interface while work completes.', Page: ThreadLoaderDemo },
-      { id: 'stitched-avatar', name: 'Stitched Avatar', description: 'Identity framed by a subtle sewn ring.', Page: StitchedAvatarDemo },
-      { id: 'hang-tag', name: 'Hang-Tag Badge', description: 'Drop and live status as garment tags.', Page: HangTagBadgeDemo },
-      { id: 'thread-tabs', name: 'Thread Tab Indicator', description: 'Navigation pulled toward the active destination.', Page: ThreadTabIndicatorDemo },
+      { id: 'woven-divider', name: 'Divider', description: 'A restrained separator for dense information.', Page: WovenDividerDemo },
+      { id: 'thread-loader', name: 'Loader', description: 'A simple accent progress indicator.', Page: ThreadLoaderDemo },
+      { id: 'stitched-avatar', name: 'Avatar', description: 'Clean circular identity presentation.', Page: StitchedAvatarDemo },
+      { id: 'hang-tag', name: 'Status Badge', description: 'Compact status and urgency labels.', Page: HangTagBadgeDemo },
+      { id: 'thread-tabs', name: 'Tab Indicator', description: 'A clean accent marker for active navigation.', Page: ThreadTabIndicatorDemo },
     ],
   },
 ];

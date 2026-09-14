@@ -219,6 +219,7 @@ export const drops = pgTable('drops', {
   type: text('type').notNull(), // 'pre-order' | 'pre-made'
   status: text('status').notNull().default('draft'), // 'draft' | 'active' | 'closed' | 'fulfilled'
   releaseAt: timestamp('release_at'),             // when the drop goes live to buyers (countdown)
+  endsAt: timestamp('ends_at', { withTimezone: true }),
   scheduledBroadcastAt: timestamp('scheduled_broadcast_at'), // when the follower notification should be sent
   estimatedShipDate: timestamp('estimated_ship_date'),
   totalCollectedCents: integer('total_collected_cents').notNull().default(0),

@@ -42,21 +42,38 @@ export function getOnAccentTextStyle(theme: AppThemePreset): TextStyle {
   };
 }
 
+const CANONICAL_ACCENT = '#5B5CFF';
+const CANONICAL_ACCENT_LIGHT = '#8B8CFF';
+const canonicalPreset = (id: AppThemeId, name: string): AppThemePreset => ({
+  id,
+  name,
+  accent: CANONICAL_ACCENT,
+  accentLight: CANONICAL_ACCENT_LIGHT,
+  accentDim: 'rgba(255,255,255,0.055)',
+  onAccent: '#FFFFFF',
+  secondary: CANONICAL_ACCENT,
+  secondaryDim: 'rgba(255,255,255,0.055)',
+  primaryGradient: [CANONICAL_ACCENT, CANONICAL_ACCENT],
+  heroGradient: ['#0A0A0B', '#18181B'],
+  glowGradient: ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.01)'],
+  shadowColor: CANONICAL_ACCENT,
+});
+
 export const APP_THEME_PRESETS: readonly AppThemePreset[] = [
-  { id: 'purple', name: 'Purple', accent: '#8B5CF6', accentLight: '#A78BFA', accentDim: 'rgba(139,92,246,0.18)', onAccent: '#FFFFFF', secondary: '#A78BFA', secondaryDim: 'rgba(139,92,246,0.10)', primaryGradient: ['#6D28D9', '#8B5CF6', '#A78BFA'], heroGradient: ['#4C1D95', '#8B5CF6', '#A78BFA'], glowGradient: ['rgba(139,92,246,0.24)', 'rgba(167,139,250,0.04)'], shadowColor: '#8B5CF6' },
-  { id: 'olive', name: 'Olive', accent: '#71823C', accentLight: '#ADBE73', accentDim: 'rgba(113,130,60,0.20)', onAccent: '#FFFFFF', secondary: '#ADBE73', secondaryDim: 'rgba(113,130,60,0.11)', primaryGradient: ['#465326', '#71823C', '#ADBE73'], heroGradient: ['#30391D', '#71823C', '#ADBE73'], glowGradient: ['rgba(113,130,60,0.24)', 'rgba(173,190,115,0.04)'], shadowColor: '#71823C' },
-  { id: 'navy', name: 'Navy', accent: '#3A6098', accentLight: '#7F9DCC', accentDim: 'rgba(58,96,152,0.22)', onAccent: '#FFFFFF', secondary: '#7F9DCC', secondaryDim: 'rgba(58,96,152,0.12)', primaryGradient: ['#213B63', '#3A6098', '#7F9DCC'], heroGradient: ['#172A48', '#3A6098', '#7F9DCC'], glowGradient: ['rgba(58,96,152,0.26)', 'rgba(127,157,204,0.04)'], shadowColor: '#3A6098' },
-  { id: 'champagne', name: 'Champagne', accent: '#B58C5A', accentLight: '#E6C99F', accentDim: 'rgba(181,140,90,0.20)', onAccent: '#07070F', secondary: '#E6C99F', secondaryDim: 'rgba(181,140,90,0.11)', primaryGradient: ['#7C5C36', '#D4AE7C', '#F2DFC0'], heroGradient: ['#5D4329', '#B58C5A', '#E6C99F'], glowGradient: ['rgba(181,140,90,0.24)', 'rgba(230,201,159,0.04)'], shadowColor: '#B58C5A' },
-  { id: 'black', name: 'Black', accent: '#565D67', accentLight: '#A5ADB8', accentDim: 'rgba(165,173,184,0.16)', onAccent: '#FFFFFF', secondary: '#A5ADB8', secondaryDim: 'rgba(165,173,184,0.09)', primaryGradient: ['#0B0C0F', '#424852', '#111318'], heroGradient: ['#050506', '#3C4149', '#0A0B0D'], glowGradient: ['rgba(165,173,184,0.16)', 'rgba(0,0,0,0.02)'], shadowColor: '#A5ADB8' },
-  { id: 'silver', name: 'Chrome', accent: '#C7CDD5', accentLight: '#F8FAFC', accentDim: 'rgba(199,205,213,0.18)', onAccent: '#07080A', secondary: '#7D8793', secondaryDim: 'rgba(125,135,147,0.16)', primaryGradient: ['#17191D', '#727A84', '#F8FAFC', '#AAB1BA', '#34383E'], heroGradient: ['#090A0C', '#545B64', '#F3F5F7', '#777F89', '#111317'], glowGradient: ['rgba(248,250,252,0.24)', 'rgba(125,135,147,0.10)', 'rgba(0,0,0,0.02)'], shadowColor: '#DDE2E8' },
-  { id: 'black-gold', name: 'Black & Gold', accent: '#C89B3C', accentLight: '#F1D276', accentDim: 'rgba(200,155,60,0.20)', onAccent: '#07070F', secondary: '#F1D276', secondaryDim: 'rgba(200,155,60,0.11)', primaryGradient: ['#17130B', '#C89B3C', '#F1D276', '#5A431C'], heroGradient: ['#090806', '#8A682A', '#F1D276'], glowGradient: ['rgba(200,155,60,0.24)', 'rgba(241,210,118,0.04)'], shadowColor: '#C89B3C' },
-  { id: 'emerald-gold', name: 'Emerald Gold', accent: '#D2AE38', accentLight: '#F3DA85', accentDim: 'rgba(210,174,56,0.20)', onAccent: '#07070F', secondary: '#F3DA85', secondaryDim: 'rgba(210,174,56,0.11)', primaryGradient: ['#063E35', '#D2AE38', '#F3DA85'], heroGradient: ['#032B25', '#9C812C', '#F3DA85'], glowGradient: ['rgba(210,174,56,0.24)', 'rgba(6,78,59,0.05)'], shadowColor: '#D2AE38' },
-  { id: 'leopard-red', name: 'Leopard Red', accent: '#B9342F', accentLight: '#E46F5A', accentDim: 'rgba(185,52,47,0.20)', onAccent: '#FFFFFF', secondary: '#E46F5A', secondaryDim: 'rgba(185,52,47,0.11)', primaryGradient: ['#5D1715', '#B9342F', '#E46F5A'], heroGradient: ['#32100E', '#B9342F', '#E46F5A'], glowGradient: ['rgba(185,52,47,0.24)', 'rgba(228,111,90,0.04)'], shadowColor: '#B9342F' },
-  { id: 'maroon', name: 'Maroon', accent: '#8B2938', accentLight: '#C95867', accentDim: 'rgba(139,41,56,0.22)', onAccent: '#FFFFFF', secondary: '#C95867', secondaryDim: 'rgba(139,41,56,0.12)', primaryGradient: ['#511720', '#8B2938', '#C95867'], heroGradient: ['#361015', '#8B2938', '#C95867'], glowGradient: ['rgba(139,41,56,0.25)', 'rgba(201,88,103,0.04)'], shadowColor: '#8B2938' },
-  { id: 'gold', name: 'Gold', accent: '#D09A25', accentLight: '#F5D87A', accentDim: 'rgba(208,154,37,0.20)', onAccent: '#07070F', secondary: '#F5D87A', secondaryDim: 'rgba(208,154,37,0.11)', primaryGradient: ['#7B5714', '#D09A25', '#F5D87A'], heroGradient: ['#4D350D', '#D09A25', '#F5D87A'], glowGradient: ['rgba(208,154,37,0.24)', 'rgba(245,216,122,0.04)'], shadowColor: '#D09A25' },
+  canonicalPreset('purple', 'Blue Violet'),
+  canonicalPreset('olive', 'Blue Violet'),
+  canonicalPreset('navy', 'Blue Violet'),
+  canonicalPreset('champagne', 'Blue Violet'),
+  canonicalPreset('black', 'Blue Violet'),
+  canonicalPreset('silver', 'Blue Violet'),
+  canonicalPreset('black-gold', 'Blue Violet'),
+  canonicalPreset('emerald-gold', 'Blue Violet'),
+  canonicalPreset('leopard-red', 'Blue Violet'),
+  canonicalPreset('maroon', 'Blue Violet'),
+  canonicalPreset('gold', 'Blue Violet'),
 ] as const;
 
-export const DEFAULT_THEME = APP_THEME_PRESETS.find((theme) => theme.id === 'silver')!;
+export const DEFAULT_THEME = APP_THEME_PRESETS.find((theme) => theme.id === 'purple')!;
 const getTheme = (id: unknown): AppThemePreset =>
   typeof id === 'string'
     ? APP_THEME_PRESETS.find((theme) => theme.id === id) ?? DEFAULT_THEME

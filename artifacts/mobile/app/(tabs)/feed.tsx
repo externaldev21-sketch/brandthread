@@ -31,9 +31,215 @@ import { FeedSkeleton } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { formatCents } from '@/lib/money';
+import {
+  ClaimedRemainingLabel,
+  TimeRemainingLabel,
+  UrgencyBar,
+  HighDemandSectionHead,
+  URGENCY_UNITS_THRESHOLD,
+  type CommerceSignalData,
+} from '@/components/CommerceSignal';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const THREAD_PAGE_SIZE = 30;
+
+// ─── Buyer demand page — sentinel and type guard ──────────────────────────────
+// The sentinel is the first element in displayItems when buyerMode=true.
+// It is never stored in the DB and is never passed through the regular feed
+// pipeline. getItemLayout is uniform (length: SCREEN_H) for all items including
+// the sentinel so snapping works with zero per-index special cases.
+
+const DEMAND_PAGE_SENTINEL: { _isDemandPage: true; id: string } = {
+  _isDemandPage: true,
+  id: '__buyer_demand_page__',
+};
+
+type BuyerDemandPageItem = typeof DEMAND_PAGE_SENTINEL;
+
+function isDemandPageItem(item: FeedItem): item is BuyerDemandPageItem {
+  return (item as BuyerDemandPageItem)._isDemandPage === true;
+}
+
+// ─── High Demand page (full-screen) ──────────────────────────────────────────
+// Rendered at scroll index 0 only when buyerMode=true.
+// Data from publicProducts.highDemand(6) — only qualified product-backed rows.
+// Empty array = nothing qualifies → show empty state; no ordinary-product fallback.
+
+interface HighDemandProduct {
+  id: string;
+  productId: string;
+  brand: string;
+  name: string;
+  imageUri?: string;
+  initials: string;
+  commerce: CommerceSignalData;
+}
+
+function BuyerHighDemandPage() {
+  const { theme } = useAppTheme();
+  const { push } = useThreadPull();
+  const api = useApi();
+  const insets = useSafeAreaInsets();
+
+  const [items, setItems]       = useState<HighDemandProduct[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
+
+  // api.publicProducts.highDemand(limit) → PublicProduct[]
+  // Direct array response — no {items} wrapper.
+  // Only qualified product-backed rows; empty = nothing qualifies.
+  // No fallback fetch — empty array shows the empty state.
+  const fetchDemand = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const rows = await api.publicProducts.highDemand(6);
+      const safe = Array.isArray(rows) ? rows : [];
+      setItems(safe.map((p: any): HighDemandProduct => ({
+        id:        `hd_${p.id}`,
+        productId: p.id,
+        brand:     p.sellerDisplayName ?? 'Seller',
+        name:      p.name,
+        imageUri:  (p.images ?? [])[0] ?? undefined,
+        initials:  (p.name ?? 'P')[0].toUpperCase(),
+        commerce: {
+          currentPriceCents: p.currentPriceCents ?? (p.variants ?? [])[0]?.priceCents ?? null,
+          claimedUnits:      typeof p.claimedUnits  === 'number' ? p.claimedUnits  : 0,
+          remainingUnits:    typeof p.remainingUnits === 'number' ? p.remainingUnits : 0,
+          demandCount:       typeof p.demandCount    === 'number' ? p.demandCount    : null,
+          endsAt:            p.endsAt ?? null,
+        },
+      })));
+    } catch {
+      setError('Could not load high-demand products. Check your connection.');
+    } finally {
+      setLoading(false);
+    }
+  }, [api]);
+
+  useEffect(() => { fetchDemand(); }, [fetchDemand]);
+
+  const topPad = insets.top + 20;
+
+  return (
+    <View style={{ width: SCREEN_W, height: SCREEN_H, backgroundColor: BG }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingTop: topPad, paddingHorizontal: 20, paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <HighDemandSectionHead
+          title="High Demand"
+          subtitle="Products moving fast across the platform"
+          style={{ marginBottom: 20 }}
+        />
+
+        {loading ? (
+          <View style={{ gap: 12 }}>
+            {[0, 1, 2].map(i => (
+              <View key={i} style={hdStyles.skelRow}>
+                <View style={hdStyles.skelAvatar} />
+                <View style={{ flex: 1, gap: 8 }}>
+                  <View style={[hdStyles.skelLine, { width: '65%' }]} />
+                  <View style={[hdStyles.skelLine, { width: '45%' }]} />
+                </View>
+                <View style={[hdStyles.skelLine, { width: 48 }]} />
+              </View>
+            ))}
+          </View>
+        ) : error ? (
+          <View style={{ alignItems: 'center', gap: 12, paddingTop: 40 }}>
+            <Feather name="alert-circle" size={28} color={MUTED} />
+            <Text style={{ fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center' }}>{error}</Text>
+            <TouchableOpacity
+              onPress={() => { Haptics.selectionAsync(); fetchDemand(); }}
+              style={{ borderWidth: 1, borderColor: theme.accent, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+            >
+              <Feather name="refresh-cw" size={12} color={theme.accent} />
+              <Text style={{ fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.accent }}>Try again</Text>
+            </TouchableOpacity>
+          </View>
+        ) : items.length === 0 ? (
+          <View style={{ alignItems: 'center', gap: 10, paddingTop: 40 }}>
+            <Feather name="trending-up" size={28} color={SUBTLE} />
+            <Text style={{ fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center' }}>
+              No high-demand products right now
+            </Text>
+          </View>
+        ) : (
+          <View style={{ gap: 12 }}>
+            {items.map(item => {
+              const isUrgent =
+                (item.commerce.remainingUnits ?? 0) > 0 &&
+                (item.commerce.remainingUnits ?? 0) <= URGENCY_UNITS_THRESHOLD;
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[hdStyles.row, { borderColor: isUrgent ? `${theme.accent}44` : BORDER }]}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    push((`/thread-product-detail?productId=${encodeURIComponent(item.productId)}&productName=${encodeURIComponent(item.name)}`) as never);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.name} by ${item.brand}`}
+                >
+                  {item.imageUri ? (
+                    <CachedImage source={{ uri: item.imageUri }} style={hdStyles.avatar} contentFit="cover" />
+                  ) : (
+                    <View style={[hdStyles.avatar, { backgroundColor: theme.accentDim, alignItems: 'center', justifyContent: 'center' }]}>
+                      <Text style={{ fontSize: 13, fontFamily: FONT.bold, color: ON_DARK }}>{item.initials}</Text>
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={hdStyles.name} numberOfLines={1}>{item.name}</Text>
+                    <Text style={hdStyles.brand} numberOfLines={1}>{item.brand}</Text>
+                    <ClaimedRemainingLabel
+                      claimedUnits={item.commerce.claimedUnits ?? 0}
+                      remainingUnits={item.commerce.remainingUnits ?? 0}
+                      urgent={isUrgent}
+                      accent={theme.accent}
+                      style={{ marginTop: 3 }}
+                    />
+                    {!!item.commerce.endsAt && (
+                      <TimeRemainingLabel endsAt={item.commerce.endsAt} accent={theme.accent} />
+                    )}
+                  </View>
+                  <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                    {item.commerce.currentPriceCents != null && (
+                      <Text style={[hdStyles.price, isUrgent && { color: theme.accent }]}>
+                        {formatCents(item.commerce.currentPriceCents)}
+                      </Text>
+                    )}
+                    {isUrgent && (
+                      <UrgencyBar
+                        claimedUnits={item.commerce.claimedUnits ?? 0}
+                        remainingUnits={item.commerce.remainingUnits ?? 0}
+                        accentColor={theme.accent}
+                        style={{ width: 64 }}
+                      />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
+const hdStyles = StyleSheet.create({
+  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.xs, borderWidth: 1, backgroundColor: CARD },
+  avatar:   { width: 44, height: 44, borderRadius: RADIUS.xs, overflow: 'hidden' },
+  name:     { fontSize: 13, fontFamily: FONT.semibold, color: FG },
+  brand:    { fontSize: 11, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  price:    { fontSize: 13, fontFamily: FONT.bold, color: FG },
+  skelRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.xs, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
+  skelAvatar: { width: 44, height: 44, borderRadius: RADIUS.xs, backgroundColor: SURFACE },
+  skelLine: { height: 10, borderRadius: 4, backgroundColor: SURFACE },
+});
 
 // ─── Feed item display type ───────────────────────────────────────────────────
 
@@ -77,6 +283,9 @@ interface LiveStreamFeedItem {
   viewerCount: number;
   productTags: { productName: string; priceCents: number }[];
 }
+
+// Union of all possible displayable items in the FlatList
+type FeedItem = SpotlightItem | LiveStreamFeedItem | BuyerDemandPageItem;
 
 function LiveStreamPage({ stream, onJoin }: { stream: LiveStreamFeedItem; onJoin: () => void }) {
   const { theme } = useAppTheme();
@@ -414,7 +623,7 @@ function SpotlightPage({
           hitSlop={{ top: 6, bottom: 10, left: 10, right: 10 }}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            Share.share({ message: `Check out ${item.productName} by ${item.creator} — ${item.productPrice} 🔥 on Brandthread` });
+            Share.share({ message: `Check out ${item.productName} by ${item.creator} — ${item.productPrice} on Brandthread` });
           }}
         >
           <Feather name="share-2" size={27} color="#FFFFFF" />
@@ -478,7 +687,7 @@ function SpotlightPage({
          )}
          <Text style={styles.caption} numberOfLines={2}>
            {item.caption}
-            {item.caption.length > 86 && <Text style={[styles.moreText, { color: theme.onAccent }]}> …more</Text>}
+            {item.caption.length > 86 && <Text style={[styles.moreText, { color: theme.onAccent }]}> more</Text>}
          </Text>
 
         <View style={styles.soundRow}>
@@ -622,8 +831,12 @@ function ShopProductSheet({
 }
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
+// buyerMode = false: standard seller/shared feed — no demand sentinel.
+// buyerMode = true:  buyer feed — [DEMAND_PAGE_SENTINEL, ...contentItems].
+//   Index 0 renders BuyerHighDemandPage; indices 1+ are regular SpotlightPage/LiveStreamPage items.
+//   getItemLayout is uniform (length: SCREEN_H, offset: SCREEN_H * index) for all items.
 
-export default function FeedScreen() {
+export default function FeedScreen({ buyerMode = false }: { buyerMode?: boolean }) {
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
   const insets = useSafeAreaInsets();
@@ -679,7 +892,7 @@ export default function FeedScreen() {
       // Keep the current feed visible when a pull-to-refresh or social
       // notification fails; only the first load needs an empty state.
       if (initial) setSellerFeedPosts([]);
-      setFeedError('We couldn’t load Thread. Check your connection and try again.');
+      setFeedError('Could not load Thread. Check your connection and try again.');
     } finally {
       if (feedGenerationRef.current !== generation) return;
       if (initial) setFeedLoading(false);
@@ -783,7 +996,8 @@ export default function FeedScreen() {
     return result;
   }, [sellerFeedPosts, activeLiveStreams, feedTab]);
 
-  const displayItems = searchQuery.trim()
+  // filteredContentItems: regular spotlight/live items after search filter
+  const filteredContentItems = searchQuery.trim()
     ? allItems.filter(item => {
         const q = searchQuery.toLowerCase();
         if (isLiveStreamItem(item)) {
@@ -795,6 +1009,18 @@ export default function FeedScreen() {
           item.productName.toLowerCase().includes(q);
       })
     : allItems;
+
+  // displayItems: sentinel at index 0 only when buyerMode=true.
+  // Seller mode: if (!buyerMode) — sentinel never enters the array.
+  // getItemLayout stays uniform (length: SCREEN_H, offset: SCREEN_H * index) for all items.
+  const displayItems: FeedItem[] = useMemo(() => {
+    if (!buyerMode) return filteredContentItems as FeedItem[];
+    return [DEMAND_PAGE_SENTINEL, ...filteredContentItems] as FeedItem[];
+  }, [buyerMode, filteredContentItems]);
+
+  // buyerOffset: used to compute correct isActive for video playback when the
+  // demand sentinel sits at index 0.
+  const buyerOffset = buyerMode ? 1 : 0;
 
   function update(id: string, patch: Partial<EngagementState> | ((e: EngagementState) => Partial<EngagementState>)) {
     setEngagements(prev => {
@@ -870,7 +1096,7 @@ export default function FeedScreen() {
           ? { ...engagement, following: wasFollowing }
           : engagement,
       ])));
-      Alert.alert('Couldn’t update follow', 'Check your connection and try again.');
+      Alert.alert('Could not update follow', 'Check your connection and try again.');
     });
   }, [engagements, feedTab, loadFeed, sellerFeedPosts]);
 
@@ -965,7 +1191,7 @@ export default function FeedScreen() {
           ) : feedError && displayItems.length === 0 ? (
             <View style={{ width: SCREEN_W, height: SCREEN_H, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 40 }}>
               <Feather name="alert-circle" size={40} color={MUTED} />
-              <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center' }}>Couldn’t load Thread</Text>
+              <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center' }}>Could not load Thread</Text>
               <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' }}>{feedError}</Text>
               <TouchableOpacity onPress={() => void loadFeed(true)}>
                 <Text style={{ color: PURPLE, fontFamily: FONT.semibold }}>Try again</Text>
@@ -990,11 +1216,15 @@ export default function FeedScreen() {
             </View>
           ) : !feedHasMore && sellerFeedPosts.length > 0 ? (
             <View style={styles.feedFooter}>
-              <Text style={styles.feedFooterText}>You’re all caught up</Text>
+              <Text style={styles.feedFooterText}>You're all caught up</Text>
             </View>
           ) : null
         }
         renderItem={({ item, index }) => {
+          // Buyer demand page — full-screen at index 0 in buyer mode
+          if (isDemandPageItem(item as FeedItem)) {
+            return <BuyerHighDemandPage />;
+          }
           if ((item as any)._isLive) {
             const live = item as unknown as LiveStreamFeedItem;
             return (
@@ -1008,10 +1238,14 @@ export default function FeedScreen() {
             );
           }
           const spotlight = item as SpotlightItem;
+          // Offset activeIndex comparison by buyerOffset so video playback is correct
+          // when the demand sentinel occupies index 0.
+          const contentIndex = index - buyerOffset;
+          const activeContentIndex = activeIndex - buyerOffset;
           return (
             <SpotlightPage
               item={spotlight}
-              isActive={index === activeIndex && !showNotifs}
+              isActive={contentIndex === activeContentIndex && !showNotifs}
               engagement={engagements[spotlight.id] ?? initialEngagement(spotlight)}
               onLike={handleLike}
               onDoubleTapLike={handleDoubleTapLike}
@@ -1034,7 +1268,7 @@ export default function FeedScreen() {
               style={styles.searchInput}
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholder="Search creators, products…"
+              placeholder="Search creators, products..."
               placeholderTextColor={SUBTLE}
               autoFocus
               returnKeyType="search"
@@ -1129,9 +1363,9 @@ export default function FeedScreen() {
             <View style={styles.commentsHandle} />
             <Text style={styles.commentsTitle}>Notifications</Text>
             <View style={{ gap: 14, paddingTop: 4 }}>
-              <Text style={styles.notifRow}>❤️ NXGEN liked your comment on Ripstop Cargo Trousers</Text>
-              <Text style={styles.notifRow}>👤 Meridian Co. started following you</Text>
-              <Text style={styles.notifRow}>💬 @street.era replied to your comment</Text>
+              <Text style={styles.notifRow}>NXGEN liked your comment on Ripstop Cargo Trousers</Text>
+              <Text style={styles.notifRow}>Meridian Co. started following you</Text>
+              <Text style={styles.notifRow}>@street.era replied to your comment</Text>
             </View>
           </View>
         </View>

@@ -20,7 +20,7 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 type Step = 'email' | 'code' | 'done';
 
 // ─── Design tokens (exact match to onboarding / splash / welcome) ────────────
-const BG       = '#07070F';
+const BG       = '#0A0A0B';
 const FG       = '#FFFFFF';
 const MUTED    = 'rgba(255,255,255,0.5)';
 const MUTED2   = 'rgba(255,255,255,0.28)';

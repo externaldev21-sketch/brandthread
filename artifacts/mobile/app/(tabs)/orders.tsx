@@ -954,7 +954,7 @@ export default function OrdersScreen() {
       {/* Bulk action bar */}
       {selectedIds.length > 0 && (
         <View style={[s.bulkBar, { paddingBottom: insets.bottom + SP.sm }]}>
-          <LinearGradient colors={['#12121F', '#07070F']} style={s.bulkBarInner}>
+          <LinearGradient colors={['#18181B', '#0A0A0B']} style={s.bulkBarInner}>
             <Text style={s.bulkCount}>{selectedIds.length} selected</Text>
             <View style={s.bulkActions}>
               <TouchableOpacity style={s.bulkBtn} onPress={handleBulkMarkProcessing}>

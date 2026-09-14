@@ -1,11 +1,35 @@
 /**
  * Discover — curated shopping home for buyers.
- * Hero drops, For You picks, Dropping Soon, and Trending brands.
+ *
+ * Four independent sections, each with its own loading / error / data state:
+ *
+ *   High Demand  — publicProducts.highDemand(6)
+ *                  Only qualified product-backed rows. Empty = nothing qualifies.
+ *                  NEVER sourced from trending posts; trending posts have no
+ *                  productId and no demand fields.
+ *
+ *   For You      — publicProducts.list({ limit: 8 })
+ *                  General product catalogue.
+ *
+ *   Drops        — publicDrops.list()
+ *                  Live and upcoming drops.
+ *
+ *   Trending     — publicTrending.get(20)
+ *                  Engagement-ranked posts. Posts only — no commerce signals.
+ *                  Navigates to seller profile via brandId, not to product detail.
+ *
+ * Urgency accent is always theme.accent — never the error color constants.
  */
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  ActivityIndicator, Animated, Platform, RefreshControl, ScrollView, StyleSheet,
-  Text, TouchableOpacity, View,
+  Animated,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -13,327 +37,378 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import {
-  BG, SURFACE, CARD, CARD_ELEVATED,
+  BG, SURFACE, CARD,
   BORDER,
-  FG, MUTED, SUBTLE, ON_DARK, ON_DARK_MUTED,
-  SUCCESS, RED,
-  FONT, FS, SP, RADIUS
+  FG, MUTED, SUBTLE, ON_DARK,
+  FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useAuth } from '@clerk/expo';
 import { formatCents } from '@/lib/money';
+import { CachedImage } from '@/components/CachedImage';
+import {
+  CommerceSignalRow,
+  ClaimedRemainingLabel,
+  TimeRemainingLabel,
+  UrgencyBar,
+  HighDemandSectionHead,
+  UpcomingCountdown,
+  LivePulseDot,
+  URGENCY_UNITS_THRESHOLD,
+  type CommerceSignalData,
+} from '@/components/CommerceSignal';
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+// ─── API-backed types ──────────────────────────────────────────────────────────
 
-const HERO_DROP = {
-  brand: 'Vault Studio',
-  handle: '@vaultstudio',
-  initials: 'VS',
-  brandColor: '#0F766E',
-  name: 'Canvas Cargo Jacket',
-  tag: 'DROPPING TODAY',
-  price: '$189',
-  units: 50,
-  remaining: 14,
-  countdown: { h: 2, m: 14, s: 37 },
-};
-
-type ForYouItem = {
+interface LiveProduct {
   id: string;
-  /** Real DB product UUID — set for API-backed items so the detail screen
-   *  loads the live product with correct variant IDs for checkout. */
-  productId?: string;
-  brand: string; name: string; price: string;
-  originalPrice: string | null; color: string; initials: string; tag: string;
-};
+  name: string;
+  sellerDisplayName?: string;
+  images?: string[] | null;
+  currentPriceCents?: number | null;
+  claimedUnits?: number;
+  remainingUnits?: number;
+  demandCount?: number | null;
+  endsAt?: string | null;
+  tags?: string[];
+  variants?: Array<{ priceCents?: number }>;
+}
 
-const FOR_YOU: ForYouItem[] = [
-  { id: 'y1', brand: 'NxGen Drops',  name: 'Archive Hoodie Vol.3',   price: '$135', originalPrice: null,  color: '#B45309', initials: 'NX', tag: 'Archive' },
-  { id: 'y2', brand: 'Coldform',     name: 'Raw Denim Jacket',        price: '$310', originalPrice: '$380', color: '#065F46', initials: 'CF', tag: 'Archive' },
-  { id: 'y3', brand: 'Atlas Goods',  name: 'Waxed Field Jacket',      price: '$260', originalPrice: null,  color: '#1D4ED8', initials: 'AG', tag: 'Limited' },
-  { id: 'y4', brand: 'Softwear__',   name: 'Oversized Crewneck',      price: '$88',  originalPrice: null,  color: '#BE185D', initials: 'SW', tag: 'New' },
-];
+interface LiveDrop {
+  id: string;
+  name: string;
+  type: string;
+  releaseAt?: string | null;
+  endsAt?: string | null;
+  isLive?: boolean;
+  isUpcoming?: boolean;
+  isEnded?: boolean;
+  currentPriceCents?: number | null;
+  claimedUnits?: number;
+  remainingUnits?: number;
+  demandCount?: number | null;
+  seller?: { displayName?: string; brandName?: string };
+  products?: { images?: string[] }[];
+}
 
-const UNFOLLOWED_BRAND_POOL: ForYouItem[] = [
-  { id: 'u1',  brand: 'Fernweh Supply',  name: 'Selvedge Trucker Jacket', price: '$225', originalPrice: null,  color: '#0F766E', initials: 'FS', tag: 'New' },
-  { id: 'u2',  brand: 'Northloom',       name: 'Brushed Fleece Half-Zip', price: '$142', originalPrice: null,  color: '#0891B2', initials: 'NL', tag: 'Archive' },
-  { id: 'u3',  brand: 'Palisade',        name: 'Wide-Leg Twill Trouser',  price: '$168', originalPrice: '$210', color: '#9F1239', initials: 'PL', tag: 'Sale' },
-  { id: 'u4',  brand: 'Grainhouse',      name: 'Heavyweight Canvas Tote', price: '$64',  originalPrice: null,  color: '#B45309', initials: 'GH', tag: 'New' },
-  { id: 'u5',  brand: 'Late Bloom Co.',  name: 'Cropped Utility Vest',    price: '$118', originalPrice: null,  color: '#BE185D', initials: 'LB', tag: 'Limited' },
-  { id: 'u6',  brand: 'Static Age',      name: 'Distressed Denim Set',    price: '$196', originalPrice: null,  color: '#334155', initials: 'SA', tag: 'Archive' },
-  { id: 'u7',  brand: 'Overtone',        name: 'Merino Crewneck',         price: '$105', originalPrice: null,  color: '#065F46', initials: 'OT', tag: 'New' },
-  { id: 'u8',  brand: 'Rowhouse',        name: 'Waxed Chore Coat',        price: '$275', originalPrice: '$340', color: '#78350F', initials: 'RH', tag: 'Sale' },
-  { id: 'u9',  brand: 'Field & Fray',    name: 'Ripstop Cargo Shorts',    price: '$92',  originalPrice: null,  color: '#166534', initials: 'FF', tag: 'Limited' },
-  { id: 'u10', brand: 'Amber Route',     name: 'Suede Trucker Cap',       price: '$54',  originalPrice: null,  color: '#92400E', initials: 'AR', tag: 'New' },
-  { id: 'u11', brand: 'Hollow Point',    name: 'Boiled Wool Overshirt',   price: '$210', originalPrice: null,  color: '#1E293B', initials: 'HP', tag: 'Archive' },
-  { id: 'u12', brand: 'Faint Signal',    name: 'Mesh Panel Runner',       price: '$78',  originalPrice: '$98',  color: '#3730A3', initials: 'FSg', tag: 'Sale' },
-];
+// ─── Section-level error state ────────────────────────────────────────────────
 
-function shuffle<T>(arr: T[]): T[] {
-  const copy = [...arr];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
+interface SectionErrorProps {
+  message: string;
+  onRetry: () => void;
+}
+
+function SectionError({ message, onRetry }: SectionErrorProps) {
+  const { theme } = useAppTheme();
+  return (
+    <View style={se.wrap}>
+      <Feather name="alert-circle" size={22} color={MUTED} />
+      <Text style={se.msg}>{message}</Text>
+      <TouchableOpacity
+        onPress={() => { Haptics.selectionAsync(); onRetry(); }}
+        style={[se.btn, { borderColor: theme.accent }]}
+        activeOpacity={0.75}
+        accessibilityRole="button"
+        accessibilityLabel="Retry"
+      >
+        <Feather name="refresh-cw" size={12} color={theme.accent} />
+        <Text style={[se.btnText, { color: theme.accent }]}>Try again</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const se = StyleSheet.create({
+  wrap:    { paddingHorizontal: 20, paddingVertical: 20, alignItems: 'center', gap: 10 },
+  msg:     { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center' },
+  btn:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
+  btnText: { fontFamily: FONT.semibold, fontSize: FS.sm },
+});
+
+// ─── Section header ───────────────────────────────────────────────────────────
+
+function SectionHead({
+  title, sub, action, onAction,
+}: {
+  title: string; sub?: string; action?: string; onAction?: () => void;
+}) {
+  const { theme } = useAppTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 14 }}>
+      <View style={{ flex: 1, marginRight: 12 }}>
+        <Text style={{ fontSize: 18, fontFamily: FONT.bold, color: FG, letterSpacing: -0.3 }} numberOfLines={1}>
+          {title}
+        </Text>
+        {sub && (
+          <Text style={{ fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 }} numberOfLines={1}>
+            {sub}
+          </Text>
+        )}
+      </View>
+      {action && (
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => { Haptics.selectionAsync(); onAction?.(); }}
+          accessibilityRole="button"
+          accessibilityLabel={`${action}, ${title}`}
+          style={{ minHeight: 44, justifyContent: 'center' }}
+        >
+          <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.accent }}>
+            {action}
+          </Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+// ─── High Demand product row ──────────────────────────────────────────────────
+// Uses publicProducts.highDemand() — only qualified product-backed rows.
+// Always navigates to thread-product-detail via real productId.
+// Trending posts are NEVER mixed in here.
+
+interface HighDemandRowItem {
+  id: string;
+  productId: string;  // real productId — guaranteed from highDemand()
+  brand: string;
+  name: string;
+  imageUri?: string;
+  initials: string;
+  colorHex: string;
+  commerce: CommerceSignalData;
+}
+
+function HighDemandRow({ item }: { item: HighDemandRowItem }) {
+  const { push } = useThreadPull();
+  const { theme } = useAppTheme();
+
+  const isUrgent =
+    (item.commerce.remainingUnits ?? 0) > 0 &&
+    (item.commerce.remainingUnits ?? 0) <= URGENCY_UNITS_THRESHOLD;
+
+  function handlePress() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    push((`/thread-product-detail?productId=${encodeURIComponent(item.productId)}&productName=${encodeURIComponent(item.name)}`) as never);
   }
-  return copy;
-}
-
-const DROPPING_SOON = [
-  { id: 'd1', brand: 'Meridian Co.',  name: 'Essential Tee — Sage',   price: '$48',  color: '#0F766E', initials: 'MC', inHours: 0,  live: true  },
-  { id: 'd2', brand: 'NxGen Drops',   name: 'Cargo Trouser S/S',      price: '$134', color: '#B45309', initials: 'NX', inHours: 4,  live: false },
-  { id: 'd3', brand: 'Rawthread',     name: 'Boxy Flannel Shirt',     price: '$96',  color: '#92400E', initials: 'RT', inHours: 9,  live: false },
-  { id: 'd4', brand: 'Vault Studio',  name: 'Fleece Zip Jacket',      price: '$220', color: '#0F766E', initials: 'VS', inHours: 23, live: false },
-];
-
-const TRENDING = [
-  { id: 't1', rank: 1, brand: 'NxGen Drops',  name: 'Archive Hoodie Vol.3',   price: '$135', color: '#B45309', initials: 'NX', hype: '🔥 Hot'    },
-  { id: 't2', rank: 2, brand: 'Vault Studio',  name: 'Canvas Cargo Jacket',    price: '$189', color: '#0F766E', initials: 'VS', hype: '⚡ Live'   },
-  { id: 't3', rank: 3, brand: 'Atlas Goods',   name: 'Utility Vest — Slate',   price: '$220', color: '#1D4ED8', initials: 'AG', hype: '⏳ Limited' },
-  { id: 't4', rank: 4, brand: 'Coldform',      name: 'Raw Denim Jacket',       price: '$310', color: '#065F46', initials: 'CF', hype: '💎 Grail'  },
-];
-
-// ─── Countdown hook ───────────────────────────────────────────────────────────
-
-function useCountdown(initial: { h: number; m: number; s: number }) {
-  const [time, setTime] = useState(initial);
-  useEffect(() => {
-    const id = setInterval(() => {
-      setTime(prev => {
-        let { h, m, s } = prev;
-        s--;
-        if (s < 0) { s = 59; m--; }
-        if (m < 0) { m = 59; h--; }
-        if (h < 0) return { h: 0, m: 0, s: 0 };
-        return { h, m, s };
-      });
-    }, 1000);
-    return () => clearInterval(id);
-  }, []);
-  return time;
-}
-
-function pad(n: number) { return String(n).padStart(2, '0'); }
-
-// ─── Live pulse dot ───────────────────────────────────────────────────────────
-
-function LiveDot({ color }: { color: string }) {
-  const scale = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(scale, { toValue: 1.6, duration: 700, useNativeDriver: true }),
-        Animated.timing(scale, { toValue: 1,   duration: 700, useNativeDriver: true }),
-      ]),
-    ).start();
-  }, [scale]);
-  return (
-    <View style={{ width: 10, height: 10, alignItems: 'center', justifyContent: 'center' }}>
-      <Animated.View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: color, opacity: 0.35, transform: [{ scale }], position: 'absolute' }} />
-      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
-    </View>
-  );
-}
-
-// ─── Hero card ────────────────────────────────────────────────────────────────
-
-function HeroCard() {
-  const router  = useRouter();
-  const { push } = useThreadPull();
-  const time    = useCountdown(HERO_DROP.countdown);
-  const [saved, setSaved] = useState(false);
-  const soldPct = Math.round(((HERO_DROP.units - HERO_DROP.remaining) / HERO_DROP.units) * 100);
-
-  const card    = CARD;
-  const border  = BORDER;
-  const fg      = FG;
-  const muted   = MUTED;
-  const divider = BORDER;
-
-  return (
-    <View style={[s.hero, { backgroundColor: card, borderColor: border }]}>
-      <View style={[s.heroVisual, { backgroundColor: HERO_DROP.brandColor }]}>
-        <View style={s.heroTagRow}>
-          <LiveDot color={ON_DARK} />
-          <Text style={s.heroTag}>{HERO_DROP.tag}</Text>
-        </View>
-        <View style={s.heroBrandRow}>
-          <View style={s.heroBrandAvatar}>
-            <Text style={[s.heroBrandInitials, { color: HERO_DROP.brandColor }]}>{HERO_DROP.initials}</Text>
-          </View>
-          <View>
-            <Text style={s.heroBrandName}>{HERO_DROP.brand}</Text>
-            <Text style={s.heroBrandHandle}>{HERO_DROP.handle}</Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={{ padding: 18 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
-          <Text style={[s.heroProductName, { color: fg }]}>{HERO_DROP.name}</Text>
-          <Text style={[s.heroPrice, { color: fg }]}>{HERO_DROP.price}</Text>
-        </View>
-
-        <View style={[s.countdown, { borderColor: divider }]}>
-          {[{ label: 'HRS', val: time.h }, { label: 'MIN', val: time.m }, { label: 'SEC', val: time.s }].map(({ label, val }, i) => (
-            <React.Fragment key={label}>
-              {i > 0 && <View style={[s.countdownDivider, { backgroundColor: divider }]} />}
-              <View style={s.countdownBlock}>
-                <Text style={[s.countdownNum, { color: fg }]}>{pad(val)}</Text>
-                <Text style={[s.countdownLabel, { color: muted }]}>{label}</Text>
-              </View>
-            </React.Fragment>
-          ))}
-        </View>
-
-        <View style={s.stockRow}>
-          <View style={[s.stockBar, { backgroundColor: divider }]}>
-            <View style={[s.stockFill, { width: `${soldPct}%` as any, backgroundColor: HERO_DROP.brandColor }]} />
-          </View>
-          <Text style={[s.stockText, { color: muted }]}>{HERO_DROP.remaining} left of {HERO_DROP.units}</Text>
-        </View>
-
-        <View style={s.heroActions}>
-          <TouchableOpacity
-            style={[s.heroShopBtn, { backgroundColor: HERO_DROP.brandColor }]}
-            activeOpacity={0.85}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); push('/thread-product-detail?productId=prod_canvas_cargo&productName=Canvas+Cargo+Jacket' as never); }}
-            accessibilityRole="button"
-            accessibilityLabel={`Shop ${HERO_DROP.name} for ${HERO_DROP.price}`}
-          >
-            <Feather name="shopping-bag" size={15} color={ON_DARK} />
-            <Text style={s.heroShopText}>Shop Drop — {HERO_DROP.price}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.heroSaveBtn, { borderColor: border }]}
-            activeOpacity={0.8}
-            onPress={() => { setSaved(v => !v); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
-            accessibilityRole="button"
-            accessibilityLabel={saved ? `Remove ${HERO_DROP.name} from saved items` : `Save ${HERO_DROP.name}`}
-            accessibilityState={{ selected: saved }}
-          >
-            <Feather name="bookmark" size={18} color={saved ? HERO_DROP.brandColor : muted} />
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-// ─── For-You card ─────────────────────────────────────────────────────────────
-
-function ForYouCard({ item }: { item: ForYouItem }) {
-  const router = useRouter();
-  const { push } = useThreadPull();
-  const [saved, setSaved] = useState(false);
-  const card   = CARD;
-  const border = BORDER;
-  const fg     = FG;
-  const muted  = MUTED;
 
   return (
     <TouchableOpacity
-      style={[fy.card, { backgroundColor: card, borderColor: border }]}
-      activeOpacity={0.85}
+      style={[hd.row, { borderColor: isUrgent ? `${theme.accent}44` : BORDER }]}
+      activeOpacity={0.8}
+      onPress={handlePress}
       accessibilityRole="button"
-      accessibilityLabel={`${item.name} by ${item.brand}, ${item.price}`}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        // Use real DB UUID when available (API-backed item), else fall back to the item's id
-        const pid = encodeURIComponent(item.productId ?? item.id);
-        const name = encodeURIComponent(item.name);
-        push((`/thread-product-detail?productId=${pid}&productName=${name}`) as never);
-      }}
+      accessibilityLabel={`${item.name} by ${item.brand}`}
     >
-      <View style={[fy.visual, { backgroundColor: item.color }]}>
-        <View style={fy.visualIcon}>
-          <Feather name="shopping-bag" size={20} color={item.color} />
+      {item.imageUri ? (
+        <CachedImage source={{ uri: item.imageUri }} style={hd.avatar} contentFit="cover" />
+      ) : (
+        <View style={[hd.avatar, { backgroundColor: item.colorHex, alignItems: 'center', justifyContent: 'center' }]}>
+          <Text style={hd.initials}>{item.initials}</Text>
         </View>
-        {item.tag && (
-          <View style={fy.tagPill}>
-            <Text style={fy.tagText}>{item.tag}</Text>
-          </View>
-        )}
-        <TouchableOpacity
-          style={fy.saveBtn}
-          onPress={() => { setSaved(v => !v); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel={saved ? `Remove ${item.name} from saved items` : `Save ${item.name}`}
-          accessibilityState={{ selected: saved }}
-        >
-          <Feather name="bookmark" size={14} color={saved ? FG : MUTED} />
-        </TouchableOpacity>
+      )}
+      <View style={{ flex: 1 }}>
+        <Text style={hd.name} numberOfLines={1}>{item.name}</Text>
+        <Text style={hd.brand} numberOfLines={1}>{item.brand}</Text>
+        <CommerceSignalRow
+          claimedUnits={item.commerce.claimedUnits}
+          remainingUnits={item.commerce.remainingUnits}
+          demandCount={item.commerce.demandCount}
+          endsAt={item.commerce.endsAt}
+          accent={theme.accent}
+          style={{ marginTop: 3 }}
+        />
       </View>
-      <View style={fy.body}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 3 }}>
-          <View style={[fy.dot, { backgroundColor: item.color }]}>
-            <Text style={fy.dotText}>{item.initials[0]}</Text>
-          </View>
-          <Text style={[fy.brand, { color: muted }]} numberOfLines={1}>{item.brand}</Text>
-        </View>
-        <Text style={[fy.name, { color: fg }]} numberOfLines={2}>{item.name}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-          <Text style={[fy.price, { color: item.color }]}>{item.price}</Text>
-          {item.originalPrice && (
-            <Text style={[fy.original, { color: muted }]}>{item.originalPrice}</Text>
-          )}
-        </View>
-      </View>
+      {item.commerce.currentPriceCents != null && (
+        <Text style={[hd.price, isUrgent && { color: theme.accent }]}>
+          {formatCents(item.commerce.currentPriceCents)}
+        </Text>
+      )}
     </TouchableOpacity>
   );
 }
 
-const fy = StyleSheet.create({
-  card:      { width: 158, borderRadius: 6, borderWidth: 1, overflow: 'hidden' },
-  visual:    { height: 130, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  visualIcon:{ width: 40, height: 40, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: BG },
-  tagPill:   { position: 'absolute', top: 8, left: 8, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 4, backgroundColor: BG },
-  tagText:   { fontSize: 9, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: 0.5, textTransform: 'uppercase' },
-  saveBtn:   { position: 'absolute', top: 0, right: 0, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  body:      { padding: 11 },
-  dot:       { width: 15, height: 15, borderRadius: 3, alignItems: 'center', justifyContent: 'center' },
-  dotText:   { fontSize: 7, fontFamily: 'Inter_700Bold', color: ON_DARK },
-  brand:     { fontSize: 10, fontFamily: 'Inter_500Medium', flex: 1 },
-  name:      { fontSize: 12, fontFamily: 'Inter_700Bold', lineHeight: 16 },
-  price:     { fontSize: 14, fontFamily: 'Inter_700Bold' },
-  original:  { fontSize: 11, fontFamily: 'Inter_400Regular', textDecorationLine: 'line-through' },
+const hd = StyleSheet.create({
+  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.xs, borderWidth: 1, backgroundColor: CARD },
+  avatar:   { width: 44, height: 44, borderRadius: RADIUS.xs, overflow: 'hidden' },
+  initials: { fontSize: 13, fontFamily: FONT.bold, color: ON_DARK },
+  name:     { fontSize: 13, fontFamily: FONT.semibold, color: FG },
+  brand:    { fontSize: 11, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  price:    { fontSize: 13, fontFamily: FONT.bold, color: FG },
 });
 
-// ─── Dropping-soon row ────────────────────────────────────────────────────────
+// ─── Product card (For You) ───────────────────────────────────────────────────
 
-function DroppingRow({ item }: { item: typeof DROPPING_SOON[0] }) {
-  const router = useRouter();
+interface ProductCardItem {
+  id: string;
+  productId?: string;
+  brand: string;
+  name: string;
+  imageUri?: string;
+  initials: string;
+  colorHex: string;
+  tag?: string;
+  commerce: CommerceSignalData;
+}
+
+function ProductCard({ item }: { item: ProductCardItem }) {
   const { push } = useThreadPull();
-  const card   = CARD;
-  const border = BORDER;
-  const fg     = FG;
-  const muted  = MUTED;
+  const { theme } = useAppTheme();
+  const [saved, setSaved] = useState(false);
+
+  const isUrgent =
+    (item.commerce.remainingUnits ?? 0) > 0 &&
+    (item.commerce.remainingUnits ?? 0) <= URGENCY_UNITS_THRESHOLD;
+
+  function handlePress() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const pid = encodeURIComponent(item.productId ?? item.id);
+    push((`/thread-product-detail?productId=${pid}&productName=${encodeURIComponent(item.name)}`) as never);
+  }
 
   return (
     <TouchableOpacity
-      style={[dr.row, { backgroundColor: card, borderColor: border }]}
-      activeOpacity={0.8}
-      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); push(('/thread-product-detail?productId=prod_ripstop_cargo&productName=' + encodeURIComponent(item.name)) as never); }}
+      style={[pc.card, { borderColor: isUrgent ? `${theme.accent}44` : BORDER }]}
+      activeOpacity={0.86}
       accessibilityRole="button"
-      accessibilityLabel={`${item.name} by ${item.brand}, ${item.price}${item.live ? ', live now' : `, dropping in ${item.inHours} hours`}`}
+      accessibilityLabel={`${item.name} by ${item.brand}`}
+      onPress={handlePress}
     >
-      <View style={[dr.avatar, { backgroundColor: item.color }]}>
-        <Text style={dr.initials}>{item.initials}</Text>
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[dr.name, { color: fg }]}>{item.name}</Text>
-        <Text style={[dr.brand, { color: muted }]}>{item.brand}</Text>
-      </View>
-      <View style={{ alignItems: 'flex-end', gap: 4 }}>
-        <Text style={[dr.price, { color: fg }]}>{item.price}</Text>
-        {item.live ? (
-          <View style={dr.liveRow}>
-            <LiveDot color={RED} />
-            <Text style={dr.liveText}>Live now</Text>
-          </View>
+      <View style={[pc.visual, { backgroundColor: item.colorHex }]}>
+        {item.imageUri ? (
+          <CachedImage source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
         ) : (
-          <Text style={[dr.eta, { color: muted }]}>in {item.inHours}h</Text>
+          <View style={[StyleSheet.absoluteFill, pc.visualFallback]}>
+            <Text style={pc.initials}>{item.initials}</Text>
+          </View>
+        )}
+        {item.tag && (
+          <View style={pc.tag}>
+            <Text style={pc.tagText}>{item.tag}</Text>
+          </View>
+        )}
+      </View>
+      <View style={pc.body}>
+        <Text style={pc.brand} numberOfLines={1}>{item.brand}</Text>
+        <Text style={pc.name} numberOfLines={2}>{item.name}</Text>
+        {item.commerce.currentPriceCents != null && (
+          <Text style={[pc.price, isUrgent && { color: theme.accent }]}>
+            {formatCents(item.commerce.currentPriceCents)}
+          </Text>
+        )}
+        <ClaimedRemainingLabel
+          claimedUnits={item.commerce.claimedUnits ?? 0}
+          remainingUnits={item.commerce.remainingUnits ?? 0}
+          urgent={isUrgent}
+          accent={theme.accent}
+          style={{ marginTop: 4 }}
+        />
+        {!!item.commerce.endsAt && (
+          <TimeRemainingLabel endsAt={item.commerce.endsAt} accent={theme.accent} />
+        )}
+        {isUrgent && (
+          <UrgencyBar
+            claimedUnits={item.commerce.claimedUnits ?? 0}
+            remainingUnits={item.commerce.remainingUnits ?? 0}
+            accentColor={theme.accent}
+          />
+        )}
+      </View>
+      <TouchableOpacity
+        style={pc.save}
+        onPress={() => { setSaved(v => !v); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        accessibilityRole="button"
+        accessibilityLabel={saved ? 'Remove from saved' : 'Save product'}
+      >
+        <Feather name="bookmark" size={16} color={saved ? theme.accent : MUTED} />
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+}
+
+const pc = StyleSheet.create({
+  card:        { width: 158, borderRadius: RADIUS.sm, overflow: 'hidden', backgroundColor: CARD, borderWidth: 1 },
+  visual:      { height: 130, position: 'relative' },
+  visualFallback: { alignItems: 'center', justifyContent: 'center' },
+  initials:    { fontSize: 22, fontFamily: FONT.bold, color: ON_DARK },
+  tag:         { position: 'absolute', top: 8, left: 8, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.65)' },
+  tagText:     { fontSize: 9, fontFamily: FONT.bold, color: ON_DARK, letterSpacing: 0.5 },
+  body:        { padding: 10, gap: 3 },
+  brand:       { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
+  name:        { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
+  price:       { fontSize: FS.sm, fontFamily: FONT.bold, color: FG, marginTop: 2 },
+  save:        { position: 'absolute', top: 8, right: 8, width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
+});
+
+// ─── Drop row ─────────────────────────────────────────────────────────────────
+
+interface DropRowItem {
+  id: string;
+  dropId: string;
+  brand: string;
+  name: string;
+  imageUri?: string;
+  initials: string;
+  colorHex: string;
+  isLive?: boolean;
+  releaseAt?: string | null;
+  endsAt?: string | null;
+  commerce: CommerceSignalData;
+}
+
+function DropRow({ item }: { item: DropRowItem }) {
+  const router = useRouter();
+  const { theme } = useAppTheme();
+  const isUrgentUnits =
+    (item.commerce.remainingUnits ?? 0) > 0 &&
+    (item.commerce.remainingUnits ?? 0) <= URGENCY_UNITS_THRESHOLD;
+
+  function handlePress() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push((`/buyer-drop-detail?dropId=${encodeURIComponent(item.dropId)}&dropName=${encodeURIComponent(item.name)}`) as never);
+  }
+
+  return (
+    <TouchableOpacity
+      style={[dr.row, { borderColor: item.isLive ? `${theme.accent}55` : BORDER }]}
+      activeOpacity={0.8}
+      onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.name} by ${item.brand}${item.isLive ? ', live now' : ''}`}
+    >
+      {item.imageUri ? (
+        <CachedImage source={{ uri: item.imageUri }} style={dr.avatar} contentFit="cover" />
+      ) : (
+        <View style={[dr.avatar, { backgroundColor: item.colorHex, alignItems: 'center', justifyContent: 'center' }]}>
+          <Text style={dr.initials}>{item.initials}</Text>
+        </View>
+      )}
+      <View style={{ flex: 1 }}>
+        <Text style={dr.name} numberOfLines={1}>{item.name}</Text>
+        <Text style={dr.brand} numberOfLines={1}>{item.brand}</Text>
+        <ClaimedRemainingLabel
+          claimedUnits={item.commerce.claimedUnits ?? 0}
+          remainingUnits={item.commerce.remainingUnits ?? 0}
+          urgent={isUrgentUnits}
+          accent={theme.accent}
+          style={{ marginTop: 3 }}
+        />
+      </View>
+      <View style={{ alignItems: 'flex-end', gap: 5 }}>
+        {item.commerce.currentPriceCents != null && (
+          <Text style={dr.price}>{formatCents(item.commerce.currentPriceCents)}</Text>
+        )}
+        {item.isLive ? (
+          <View style={dr.liveRow}>
+            <LivePulseDot color={theme.accent} />
+            <Text style={[dr.liveText, { color: theme.accent }]}>Live now</Text>
+          </View>
+        ) : item.releaseAt ? (
+          <UpcomingCountdown releaseAt={item.releaseAt} />
+        ) : null}
+        {!!item.endsAt && item.isLive && (
+          <TimeRemainingLabel endsAt={item.endsAt} accent={theme.accent} />
         )}
       </View>
     </TouchableOpacity>
@@ -341,260 +416,437 @@ function DroppingRow({ item }: { item: typeof DROPPING_SOON[0] }) {
 }
 
 const dr = StyleSheet.create({
-  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: 6, borderWidth: 1 },
-  avatar:   { width: 40, height: 40, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-  initials: { fontSize: 13, fontFamily: 'Inter_700Bold', color: ON_DARK },
-  name:     { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  brand:    { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  price:    { fontSize: 13, fontFamily: 'Inter_700Bold' },
+  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.xs, borderWidth: 1, backgroundColor: CARD },
+  avatar:   { width: 44, height: 44, borderRadius: RADIUS.xs, overflow: 'hidden' },
+  initials: { fontSize: 13, fontFamily: FONT.bold, color: ON_DARK },
+  name:     { fontSize: 13, fontFamily: FONT.semibold, color: FG },
+  brand:    { fontSize: 11, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  price:    { fontSize: 13, fontFamily: FONT.bold, color: FG },
   liveRow:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  liveText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: RED },
-  eta:      { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  liveText: { fontSize: 11, fontFamily: FONT.semibold },
 });
 
-// ─── Trending item type ───────────────────────────────────────────────────────
-// Shared by both the static TRENDING fallback and the live API data.
-// brandId is present for live items and used for seller-profile navigation.
+// ─── Trending post row ────────────────────────────────────────────────────────
+// Trending items are engagement-ranked posts. They carry no productId and no
+// product demand fields. We show brand/caption, navigate to seller profile via
+// brandId. No commerce signals displayed here.
 
-type TrendingItem = {
+interface TrendingRowItem {
   id: string;
   rank: number;
   brand: string;
+  brandId?: string;
   name: string;
-  price: string;
-  color: string;
   initials: string;
-  hype: string;
-  brandId?: string; // seller clerkId — present for live items, absent in static fallback
-};
+  colorHex: string;
+}
 
-// ─── Trending row ─────────────────────────────────────────────────────────────
-
-function TrendingRow({ item }: { item: TrendingItem }) {
-  const router  = useRouter();
-  const { push } = useThreadPull();
-  const card    = CARD;
-  const border  = BORDER;
-  const fg      = FG;
-  const muted   = MUTED;
+function TrendingRow({ item }: { item: TrendingRowItem }) {
+  const router = useRouter();
   const { theme } = useAppTheme();
-  const primary = theme.accent;
 
   function handlePress() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (item.brandId) {
-      // Live item: navigate to the seller's storefront/profile
-      router.push((`/seller-profile?sellerId=${encodeURIComponent(item.brandId)}`) as never);
-    } else {
-      // Static fallback: navigate by name (demo behaviour)
-      push((`/thread-product-detail?productId=${encodeURIComponent(item.id)}&productName=${encodeURIComponent(item.name)}`) as never);
+      // Trending posts navigate to seller profile via brandId — they have no productId
+      router.push((`/seller-profile?id=${encodeURIComponent(item.brandId)}`) as never);
     }
   }
 
   return (
     <TouchableOpacity
-      style={[tr.row, { backgroundColor: card, borderColor: border }]}
+      style={[tr.row, { borderColor: BORDER }]}
       activeOpacity={0.8}
       onPress={handlePress}
       accessibilityRole="button"
-      accessibilityLabel={`#${item.rank}, ${item.name} by ${item.brand}, ${item.price}, ${item.hype}`}
+      accessibilityLabel={`#${item.rank}, ${item.name} by ${item.brand}`}
     >
-      <Text style={[tr.rank, { color: primary }]}>#{item.rank}</Text>
-      <View style={[tr.avatar, { backgroundColor: item.color }]}>
+      <Text style={[tr.rank, { color: theme.accent }]}>#{item.rank}</Text>
+      <View style={[tr.avatar, { backgroundColor: item.colorHex, alignItems: 'center', justifyContent: 'center' }]}>
         <Text style={tr.initials}>{item.initials}</Text>
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[tr.name, { color: fg }]}>{item.name}</Text>
-        <Text style={[tr.brand, { color: muted }]}>{item.brand}</Text>
-      </View>
-      <View style={{ alignItems: 'flex-end', gap: 4 }}>
-        <Text style={[tr.price, { color: item.color }]}>{item.price}</Text>
-        <Text style={[tr.hype, { color: primary }]}>{item.hype}</Text>
+        <Text style={tr.name} numberOfLines={1}>{item.name}</Text>
+        <Text style={tr.brand} numberOfLines={1}>{item.brand}</Text>
+        {/* No commerce signals — trending posts have no product demand data */}
       </View>
     </TouchableOpacity>
   );
 }
 
 const tr = StyleSheet.create({
-  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: 6, borderWidth: 1 },
-  rank:     { fontSize: 14, fontFamily: 'Inter_700Bold', width: 28 },
-  avatar:   { width: 40, height: 40, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-  initials: { fontSize: 13, fontFamily: 'Inter_700Bold', color: ON_DARK },
-  name:     { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  brand:    { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  price:    { fontSize: 13, fontFamily: 'Inter_700Bold' },
-  hype:     { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.xs, borderWidth: 1, backgroundColor: CARD },
+  rank:     { fontSize: 14, fontFamily: FONT.bold, width: 28 },
+  avatar:   { width: 44, height: 44, borderRadius: RADIUS.xs, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  initials: { fontSize: 13, fontFamily: FONT.bold, color: ON_DARK },
+  name:     { fontSize: 13, fontFamily: FONT.semibold, color: FG },
+  brand:    { fontSize: 11, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
 });
 
-// ─── Section header ───────────────────────────────────────────────────────────
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
 
-function SectionHead({ title, sub, action, onAction }: { title: string; sub?: string; action?: string; onAction?: () => void }) {
-  const fg       = FG;
-  const muted    = MUTED;
-  const { theme } = useAppTheme();
-  const primary  = theme.accent;
-
+function SkeletonRow() {
+  const opacity = useRef(new Animated.Value(0.35)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.7, duration: 700, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.35, duration: 700, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 14 }}>
-      <View>
-        <Text style={{ fontSize: 18, fontFamily: 'Inter_700Bold', color: fg, letterSpacing: -0.3 }}>{title}</Text>
-        {sub && <Text style={{ fontSize: 11, fontFamily: 'Inter_400Regular', color: muted, marginTop: 2 }}>{sub}</Text>}
+    <Animated.View style={[skRow.row, { opacity }]}>
+      <View style={skRow.avatar} />
+      <View style={{ flex: 1, gap: 8 }}>
+        <View style={[skRow.line, { width: '65%' }]} />
+        <View style={[skRow.line, { width: '45%' }]} />
       </View>
-      {action && (
-        <TouchableOpacity activeOpacity={0.7} onPress={() => { Haptics.selectionAsync(); onAction?.(); }} accessibilityRole="button" accessibilityLabel={`${action}, ${title}`} style={{ minHeight: 44, justifyContent: 'center' }}>
-          <Text style={{ fontSize: 13, fontFamily: 'Inter_600SemiBold', color: primary }}>{action}</Text>
-        </TouchableOpacity>
-      )}
-    </View>
+      <View style={[skRow.line, { width: 44 }]} />
+    </Animated.View>
   );
 }
+const skRow = StyleSheet.create({
+  row:    { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.xs, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
+  avatar: { width: 44, height: 44, borderRadius: RADIUS.xs, backgroundColor: SURFACE },
+  line:   { height: 10, borderRadius: 4, backgroundColor: SURFACE },
+});
+
+function SkeletonCard() {
+  const opacity = useRef(new Animated.Value(0.35)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.7, duration: 700, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.35, duration: 700, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
+  return (
+    <Animated.View style={[skCard.card, { opacity }]}>
+      <View style={skCard.visual} />
+      <View style={{ padding: 10, gap: 8 }}>
+        <View style={[skRow.line, { width: '60%' }]} />
+        <View style={[skRow.line, { width: '85%' }]} />
+        <View style={[skRow.line, { width: '40%' }]} />
+      </View>
+    </Animated.View>
+  );
+}
+const skCard = StyleSheet.create({
+  card:   { width: 158, borderRadius: RADIUS.xs, overflow: 'hidden', backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+  visual: { height: 130, backgroundColor: SURFACE },
+});
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function DiscoverScreen() {
-  const insets  = useSafeAreaInsets();
-  const router  = useRouter();
-  const api     = useApi();
+  const insets    = useSafeAreaInsets();
+  const router    = useRouter();
+  const api       = useApi();
   const { theme } = useAppTheme();
   const { isSignedIn } = useAuth();
 
-  const bg      = BG;
-  const fg      = FG;
-  const muted   = MUTED;
-  const border  = BORDER;
-  const primary = theme.accent;
-  const topPad  = Platform.OS === 'web' ? 67 : insets.top;
+  const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
-  const [discoverItems, setDiscoverItems] = useState<ForYouItem[]>(() => shuffle(UNFOLLOWED_BRAND_POOL).slice(0, 4));
+  // ─ Each section has independent loading, error, and data ─────────────────
+
   const [refreshing, setRefreshing] = useState(false);
-  // API-backed products replace the hardcoded FOR_YOU list when available
-  const [liveForYou, setLiveForYou] = useState<ForYouItem[]>([]);
-  const [forYouLoading, setForYouLoading] = useState(true);
-  // Real trending data from /api/public/trending
-  const [liveTrending, setLiveTrending] = useState<TrendingItem[]>([]);
 
-  function fetchTrending() {
-    api.publicTrending.get(20)
-      .then((data) => {
-        const rows = Array.isArray(data?.trending) ? data.trending : [];
-        const items: TrendingItem[] = rows.map((t) => ({
-          id:       t.id,
-          rank:     t.rank,
-          brand:    t.brand,
-          brandId:  t.brandId,   // seller clerkId — used for correct navigation
-          name:     t.caption ? t.caption.slice(0, 60) : 'Trending Post',
-          price:    `${t.likesCount} ♥`,
-          color:    theme.accent,
-          initials: (t.brand ?? 'B').slice(0, 2).toUpperCase(),
-          hype:     t.hype ?? '✨ Fresh',
-        }));
-        setLiveTrending(items);
-      })
-      .catch(() => {
-        setLiveTrending([]);
-        /* fallback to hardcoded TRENDING */
-      });
-  }
+  // High Demand — publicProducts.highDemand(6) only.
+  // Never sourced from trending posts. Empty array = nothing qualifies.
+  const [highDemandItems,   setHighDemandItems]   = useState<HighDemandRowItem[]>([]);
+  const [highDemandLoading, setHighDemandLoading] = useState(true);
+  const [highDemandError,   setHighDemandError]   = useState<string | null>(null);
 
-  useEffect(() => { fetchTrending(); }, []);
+  const [forYouItems,    setForYouItems]    = useState<ProductCardItem[]>([]);
+  const [forYouLoading,  setForYouLoading]  = useState(true);
+  const [forYouError,    setForYouError]    = useState<string | null>(null);
+
+  const [dropsItems,   setDropsItems]   = useState<DropRowItem[]>([]);
+  const [dropsLoading, setDropsLoading] = useState(true);
+  const [dropsError,   setDropsError]   = useState<string | null>(null);
+
+  const [trendingItems,   setTrendingItems]   = useState<TrendingRowItem[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState(true);
+  const [trendingError,   setTrendingError]   = useState<string | null>(null);
+
+  // ─ Fetch High Demand ────────────────────────────────────────────────────
+  // publicProducts.highDemand(limit) → any[] (direct array, no wrapper)
+  // Only qualified product-backed rows. Empty = nothing meets criteria.
+  // No fallback to publicProducts.list() — empty array shows empty state.
+  const fetchHighDemand = useCallback(async () => {
+    setHighDemandLoading(true);
+    setHighDemandError(null);
+    try {
+      const rows = await api.publicProducts.highDemand(6);
+      const safe = Array.isArray(rows) ? rows : [];
+      setHighDemandItems(safe.map((p: any): HighDemandRowItem => {
+        const firstImg = (p.images ?? [])[0] ?? undefined;
+        const fallbackPrice = (p.variants ?? [])[0]?.priceCents ?? null;
+        return {
+          id:        `hd_${p.id}`,
+          productId: p.id,  // real productId — thread-product-detail navigation
+          brand:     p.sellerDisplayName ?? 'Seller',
+          name:      p.name,
+          imageUri:  firstImg,
+          initials:  (p.name ?? 'P')[0].toUpperCase(),
+          colorHex:  theme.accent,
+          commerce: {
+            currentPriceCents: p.currentPriceCents ?? fallbackPrice,
+            claimedUnits:      typeof p.claimedUnits  === 'number' ? p.claimedUnits  : 0,
+            remainingUnits:    typeof p.remainingUnits === 'number' ? p.remainingUnits : 0,
+            demandCount:       typeof p.demandCount    === 'number' ? p.demandCount    : null,
+            endsAt:            p.endsAt ?? null,
+          },
+        };
+      }));
+    } catch {
+      // Do NOT reset highDemandItems — keep previous data visible if available
+      setHighDemandError('Could not load high demand products. Check your connection and try again.');
+    } finally {
+      setHighDemandLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme.accent]);
+
+  // ─ Fetch For You products ─────────────────────────────────────────────
+  // publicProducts.list returns any[] directly — no {items} wrapper.
+  const fetchProducts = useCallback(async () => {
+    setForYouLoading(true);
+    setForYouError(null);
+    try {
+      const rows = await api.publicProducts.list({ limit: 8 });
+      const safe: LiveProduct[] = Array.isArray(rows) ? rows : [];
+      setForYouItems(safe.map((row, i): ProductCardItem => {
+        const firstImg = (row.images ?? [])[0] ?? undefined;
+        const fallbackPrice = (row.variants ?? [])[0]?.priceCents ?? null;
+        return {
+          id:         `fy_${i}`,
+          productId:  row.id,
+          brand:      row.sellerDisplayName ?? 'Seller',
+          name:       row.name,
+          imageUri:   firstImg,
+          initials:   (row.name ?? 'P')[0].toUpperCase(),
+          colorHex:   theme.accent,
+          tag:        (row.tags as string[] | undefined)?.[0],
+          commerce: {
+            currentPriceCents: row.currentPriceCents ?? fallbackPrice,
+            claimedUnits:      row.claimedUnits  ?? 0,
+            remainingUnits:    row.remainingUnits ?? 0,
+            demandCount:       row.demandCount   ?? null,
+            endsAt:            row.endsAt ?? null,
+          },
+        };
+      }));
+    } catch {
+      // Do NOT reset forYouItems — keep previous data visible if available
+      setForYouError('Could not load products. Check your connection and try again.');
+    } finally {
+      setForYouLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme.accent]);
+
+  // ─ Fetch Drops ────────────────────────────────────────────────────────
+  const fetchDrops = useCallback(async () => {
+    setDropsLoading(true);
+    setDropsError(null);
+    try {
+      const rows = await (api as any).publicDrops?.list?.() ?? [];
+      const safe: LiveDrop[] = Array.isArray(rows)
+        ? rows
+        : Array.isArray((rows as any)?.drops) ? (rows as any).drops : [];
+      const filtered = safe
+        .filter(d => !d.isEnded)
+        .sort((a, b) => (b.isLive ? 1 : 0) - (a.isLive ? 1 : 0))
+        .slice(0, 6);
+      setDropsItems(filtered.map((d): DropRowItem => {
+        const firstImg = (d.products ?? []).flatMap(p => p.images ?? []).find(Boolean);
+        const sellerName = d.seller?.brandName ?? d.seller?.displayName ?? 'Brand';
+        return {
+          id:        d.id,
+          dropId:    d.id,
+          brand:     sellerName,
+          name:      d.name,
+          imageUri:  firstImg,
+          initials:  sellerName.slice(0, 2).toUpperCase(),
+          colorHex:  theme.accent,
+          isLive:    d.isLive,
+          releaseAt: d.releaseAt,
+          endsAt:    d.endsAt,
+          commerce: {
+            currentPriceCents: d.currentPriceCents ?? null,
+            claimedUnits:      d.claimedUnits  ?? 0,
+            remainingUnits:    d.remainingUnits ?? 0,
+            demandCount:       d.demandCount   ?? null,
+            endsAt:            d.endsAt,
+          },
+        };
+      }));
+    } catch {
+      // Do NOT reset dropsItems — keep previous data visible if available
+      setDropsError('Could not load drops. Check your connection and try again.');
+    } finally {
+      setDropsLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme.accent]);
+
+  // ─ Fetch Trending posts ───────────────────────────────────────────────
+  // publicTrending.get(limit: number) → { trending: TrendingItem[] }
+  // TrendingItem = post: id, rank, brand, brandId, caption.
+  // Posts have NO productId and NO product demand fields.
+  // We display brand/caption under "Trending" only — never in High Demand.
+  // finalScore/organicScore are NOT mapped to demandCount (they are post metrics, not demand signals).
+  const fetchTrending = useCallback(async () => {
+    setTrendingLoading(true);
+    setTrendingError(null);
+    try {
+      // Correct signature: get(limit: number) — not get({ limit })
+      const data = await api.publicTrending.get(20);
+      const rows: any[] = Array.isArray(data?.trending)
+        ? data.trending.map((t: any) => ({ ...t, caption: t.caption ?? undefined }))
+        : [];
+      setTrendingItems(rows.map((t, i): TrendingRowItem => ({
+        id:       t.id,
+        rank:     t.rank ?? i + 1,
+        brand:    t.brand ?? 'Brand',
+        brandId:  t.brandId,
+        // Navigate to seller-profile via brandId — trending posts have no productId
+        name:     t.caption ? String(t.caption).slice(0, 60) : (t.brand ?? 'Trending'),
+        initials: (t.brand ?? 'B').slice(0, 2).toUpperCase(),
+        colorHex: theme.accent,
+        // No commerce fields — trending posts are not product demand rows
+      })));
+    } catch {
+      // Do NOT reset trendingItems — keep previous data visible if available
+      setTrendingError('Could not load trending. Check your connection and try again.');
+    } finally {
+      setTrendingLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme.accent]);
 
   useEffect(() => {
-    api.publicProducts.list({ limit: 8 })
-      .then((rows) => {
-        const safeRows = Array.isArray(rows) ? rows : [];
-        const items: ForYouItem[] = safeRows.map((row: any, i: number) => {
-          const firstVariant = (row.variants ?? [])[0];
-          const price = firstVariant ? formatCents(firstVariant.priceCents) : '$0.00';
-          return {
-            id:            `live_${i}`,
-            productId:     row.id,   // real DB UUID — used for navigation + checkout
-            brand:         row.sellerDisplayName ?? 'Seller',
-            name:          row.name,
-            price,
-            originalPrice: null,
-            color:         theme.accent,
-            initials:      (row.name ?? 'P')[0].toUpperCase(),
-            tag:           (row.tags as string[] | undefined)?.[0] ?? 'New',
-          };
-        });
-        setLiveForYou(items);
-        setForYouLoading(false);
-      })
-      .catch(() => {
-        setLiveForYou([]);
-        setForYouLoading(false);
-        /* silent — fall back to static FOR_YOU */
-      });
-  }, []);
+    fetchHighDemand();
+    fetchProducts();
+    fetchDrops();
+    fetchTrending();
+  }, [fetchHighDemand, fetchProducts, fetchDrops, fetchTrending]);
 
-  const forYouItems = liveForYou.length > 0 ? liveForYou : FOR_YOU;
-
-  function handleRefresh() {
+  const handleRefresh = useCallback(() => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Reshuffle discover pool immediately; re-fetch live trending in parallel.
-    setDiscoverItems(shuffle(UNFOLLOWED_BRAND_POOL).slice(0, 4));
-    fetchTrending();
-    setTimeout(() => setRefreshing(false), 500);
-  }
+    Promise.all([fetchHighDemand(), fetchProducts(), fetchDrops(), fetchTrending()])
+      .finally(() => setRefreshing(false));
+  }, [fetchHighDemand, fetchProducts, fetchDrops, fetchTrending]);
 
   return (
     <ScrollView
-      style={[s.container, { backgroundColor: bg }]}
+      style={{ flex: 1, backgroundColor: BG }}
       contentContainerStyle={{ paddingBottom: 110 }}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={primary} colors={[primary]} />
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          tintColor={theme.accent}
+          colors={[theme.accent]}
+        />
       }
     >
       {/* ─ Header ─ */}
       <View style={[s.header, { paddingTop: topPad + 16, paddingHorizontal: 20 }]}>
         <View>
-          <Text style={[s.greeting, { color: muted }]}>What's dropping ✦</Text>
-          <Text style={[s.pageTitle, { color: fg }]}>Discover</Text>
+          <Text style={[s.greeting, { color: MUTED }]}>What's dropping</Text>
+          <Text style={[s.pageTitle, { color: FG }]}>Discover</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <TouchableOpacity
-            style={[s.headerBtn, { backgroundColor: CARD, borderColor: border }]}
+            style={[s.headerBtn, { backgroundColor: CARD, borderColor: BORDER }]}
             activeOpacity={0.75}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/search' as never); }}
             accessibilityRole="button"
             accessibilityLabel="Search products and brands"
           >
-            <Feather name="search" size={18} color={muted} />
+            <Feather name="search" size={18} color={MUTED} />
           </TouchableOpacity>
           {isSignedIn && (
             <TouchableOpacity
-              style={[s.headerBtn, { backgroundColor: CARD, borderColor: border }]}
+              style={[s.headerBtn, { backgroundColor: CARD, borderColor: BORDER }]}
               activeOpacity={0.75}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/inbox' as never); }}
               accessibilityRole="button"
-              accessibilityLabel="Notifications, unread items"
+              accessibilityLabel="Notifications"
             >
-              <Feather name="bell" size={18} color={muted} />
-              <View style={[s.notifDot, { backgroundColor: RED }]} />
+              <Feather name="bell" size={18} color={MUTED} />
             </TouchableOpacity>
           )}
         </View>
       </View>
 
-      {/* ─ Hero drop ─ */}
-      <View style={{ paddingHorizontal: 20, marginBottom: 28 }}>
-        <HeroCard />
+      {/* ─ High Demand — publicProducts.highDemand(6) only, no trending posts ─ */}
+      <View style={{ paddingHorizontal: 20, marginBottom: 32 }}>
+        <HighDemandSectionHead
+          title="High Demand"
+          subtitle="Products moving fast across the platform"
+          style={{ marginBottom: 14 }}
+        />
+        {highDemandLoading ? (
+          <View style={{ gap: 10 }}>
+            {[0, 1, 2].map(i => <SkeletonRow key={i} />)}
+          </View>
+        ) : highDemandError ? (
+          <SectionError
+            message={highDemandError}
+            onRetry={fetchHighDemand}
+          />
+        ) : highDemandItems.length === 0 ? (
+          <View style={s.emptyRow}>
+            <Feather name="trending-up" size={22} color={SUBTLE} />
+            <Text style={s.emptyText}>No high-demand products right now</Text>
+          </View>
+        ) : (
+          <View style={{ gap: 10 }}>
+            {highDemandItems.slice(0, 6).map(item => (
+              <HighDemandRow key={item.id} item={item} />
+            ))}
+          </View>
+        )}
       </View>
 
       {/* ─ For You ─ */}
       <View style={{ paddingHorizontal: 20, marginBottom: 4 }}>
         <SectionHead
           title="For You"
-          sub="Picked from brands in your style"
+          sub="Products from across the platform"
           action="See all"
           onAction={() => router.push('/(buyer)/' as never)}
         />
       </View>
       {forYouLoading ? (
-        <View style={{ paddingHorizontal: 20, height: 180, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={primary} size="small" />
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 20, gap: 12, paddingBottom: 4 }}
+          style={{ marginBottom: 32 }}
+          scrollEnabled={false}
+        >
+          {[0, 1, 2].map(i => <SkeletonCard key={i} />)}
+        </ScrollView>
+      ) : forYouError ? (
+        <View style={{ marginBottom: 32 }}>
+          <SectionError message={forYouError} onRetry={fetchProducts} />
+        </View>
+      ) : forYouItems.length === 0 ? (
+        <View style={[s.emptyRow, { marginBottom: 32 }]}>
+          <Feather name="package" size={24} color={SUBTLE} />
+          <Text style={s.emptyText}>No products available right now</Text>
         </View>
       ) : (
         <ScrollView
@@ -603,52 +855,54 @@ export default function DiscoverScreen() {
           contentContainerStyle={{ paddingHorizontal: 20, gap: 12, paddingBottom: 4 }}
           style={{ marginBottom: 32 }}
         >
-          {forYouItems.map(item => <ForYouCard key={item.id} item={item} />)}
+          {forYouItems.map(item => <ProductCard key={item.id} item={item} />)}
         </ScrollView>
       )}
 
-      {/* ─ Discover — brands you don't follow, reshuffled on pull-to-refresh ─ */}
+      {/* ─ Drops ─ */}
       <View style={{ paddingHorizontal: 20, marginBottom: 4 }}>
         <SectionHead
-          title="Discover new brands"
-          sub="Not following yet · pull to refresh"
-          action="See all"
-          onAction={() => router.push('/(buyer)/' as never)}
-        />
-      </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 20, gap: 12, paddingBottom: 4 }}
-        style={{ marginBottom: 32 }}
-      >
-        {discoverItems.map(item => <ForYouCard key={item.id} item={item} />)}
-      </ScrollView>
-
-      {/* ─ Dropping Soon ─ */}
-      <View style={{ paddingHorizontal: 20, marginBottom: 4 }}>
-        <SectionHead
-          title="Dropping Soon"
-          sub="From brands you follow"
+          title="Drops"
+          sub={dropsItems.some(d => d.isLive) ? 'Live now and coming up' : 'Coming up'}
           action="All drops"
           onAction={() => router.push('/(buyer)/' as never)}
         />
       </View>
       <View style={{ paddingHorizontal: 20, gap: 10, marginBottom: 32 }}>
-        {DROPPING_SOON.map(item => <DroppingRow key={item.id} item={item} />)}
+        {dropsLoading ? (
+          [0, 1, 2].map(i => <SkeletonRow key={i} />)
+        ) : dropsError ? (
+          <SectionError message={dropsError} onRetry={fetchDrops} />
+        ) : dropsItems.length === 0 ? (
+          <View style={s.emptyRow}>
+            <Feather name="calendar" size={22} color={SUBTLE} />
+            <Text style={s.emptyText}>No upcoming drops right now</Text>
+          </View>
+        ) : (
+          dropsItems.map(item => <DropRow key={item.id} item={item} />)
+        )}
       </View>
 
-      {/* ─ Trending Near You ─ */}
+      {/* ─ Trending — engagement-ranked posts, separate from High Demand ─ */}
       <View style={{ paddingHorizontal: 20, marginBottom: 4 }}>
         <SectionHead
-          title="Trending Near You"
-          sub={liveTrending.length > 0 ? 'Real-time engagement across the platform' : 'Most saved this week'}
+          title="Trending"
+          sub="Real-time engagement across the platform"
         />
       </View>
-      <View style={{ paddingHorizontal: 20, gap: 10 }}>
-        {(liveTrending.length > 0 ? liveTrending : TRENDING).map(item => (
-          <TrendingRow key={item.id} item={item} />
-        ))}
+      <View style={{ paddingHorizontal: 20, gap: 10, marginBottom: 32 }}>
+        {trendingLoading ? (
+          [0, 1, 2].map(i => <SkeletonRow key={i} />)
+        ) : trendingError ? (
+          <SectionError message={trendingError} onRetry={fetchTrending} />
+        ) : trendingItems.length === 0 ? (
+          <View style={s.emptyRow}>
+            <Feather name="activity" size={22} color={SUBTLE} />
+            <Text style={s.emptyText}>No trending posts right now</Text>
+          </View>
+        ) : (
+          trendingItems.slice(0, 10).map(item => <TrendingRow key={item.id} item={item} />)
+        )}
       </View>
     </ScrollView>
   );
@@ -657,40 +911,10 @@ export default function DiscoverScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  container: { flex: 1 },
-  header:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  greeting:  { fontSize: 12, fontFamily: 'Inter_500Medium', letterSpacing: 0.3 },
-  pageTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', letterSpacing: -0.6 },
+  header:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 },
+  greeting:  { fontSize: 12, fontFamily: FONT.medium, letterSpacing: 0.3 },
+  pageTitle: { fontSize: 28, fontFamily: FONT.bold, letterSpacing: -0.6 },
   headerBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  notifDot:  { position: 'absolute', top: 9, right: 9, width: 7, height: 7, borderRadius: 4 },
-
-  hero: { borderRadius: 6, overflow: 'hidden', borderWidth: 1 },
-  heroVisual: { padding: 18, minHeight: 150, justifyContent: 'space-between' },
-
-  heroBrandRow:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  heroBrandAvatar:   { width: 34, height: 34, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: BG },
-  heroBrandInitials: { fontSize: 12, fontFamily: 'Inter_700Bold' },
-  heroBrandName:     { fontSize: 14, fontFamily: 'Inter_700Bold', color: ON_DARK },
-  heroBrandHandle:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: ON_DARK_MUTED, marginTop: 1 },
-  heroTagRow:        { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
-  heroTag:           { fontSize: 10, fontFamily: 'Inter_700Bold', color: ON_DARK, letterSpacing: 0.8, textTransform: 'uppercase' },
-
-  heroProductName: { flex: 1, fontSize: 20, fontFamily: 'Inter_700Bold', letterSpacing: -0.3, lineHeight: 25, marginRight: 12 },
-  heroPrice:       { fontSize: 20, fontFamily: 'Inter_700Bold', letterSpacing: -0.3 },
-
-  countdown:        { flexDirection: 'row', alignItems: 'center', gap: 0, marginBottom: 14, borderTopWidth: 1, borderBottomWidth: 1, paddingVertical: 10 },
-  countdownBlock:   { flex: 1, alignItems: 'center' },
-  countdownNum:     { fontSize: 18, fontFamily: 'Inter_700Bold', letterSpacing: -0.3, fontVariant: ['tabular-nums'] },
-  countdownLabel:   { fontSize: 9, fontFamily: 'Inter_600SemiBold', letterSpacing: 1, marginTop: 2 },
-  countdownDivider: { width: 1, height: 24 },
-
-  stockRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
-  stockBar:  { flex: 1, height: 3, borderRadius: 0, overflow: 'hidden' },
-  stockFill: { height: 3 },
-  stockText: { fontSize: 11, fontFamily: 'Inter_500Medium' },
-
-  heroActions:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  heroShopBtn:  { flex: 1, borderRadius: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13 },
-  heroShopText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: ON_DARK },
-  heroSaveBtn:  { width: 46, height: 46, borderRadius: 6, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  emptyRow:  { paddingHorizontal: 20, paddingVertical: 24, alignItems: 'center', gap: 10 },
+  emptyText: { color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.sm },
 });

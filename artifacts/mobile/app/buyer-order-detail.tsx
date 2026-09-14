@@ -21,7 +21,9 @@ import {
   ORANGE, ORANGE_DIM,
   RED, RED_DIM,
   GOLD,
+  ACCENT, ACCENT_LIGHT,
   FONT, FS, SP, RADIUS, COMP, ICON,
+  SHADOW_PURPLE,
 } from '@/lib/theme';
 import {
   BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
@@ -114,6 +116,24 @@ function fulfillmentStatusLabel(fs: string): string {
   }
 }
 
+// ─── Order timeline steps ─────────────────────────────────────────────────────
+
+const ORDER_STEPS: Array<{ key: OrderStatus; title: string; description: string }> = [
+  { key: 'new',           title: 'Order Placed',    description: 'Your order has been received.' },
+  { key: 'processing',    title: 'Processing',      description: 'The seller is preparing your order.' },
+  { key: 'ready_to_ship', title: 'Ready to Ship',   description: 'Packed and waiting for pickup.' },
+  { key: 'shipped',       title: 'Shipped',          description: 'On its way to you.' },
+  { key: 'delivered',     title: 'Delivered',        description: 'Your order has been delivered.' },
+];
+
+// Terminal statuses shown separately, not in the main progress timeline
+const TERMINAL_STATUSES: OrderStatus[] = ['cancelled', 'refunded', 'disputed'];
+
+function getOrderStepIndex(status: OrderStatus): number {
+  const idx = ORDER_STEPS.findIndex(s => s.key === status);
+  return idx >= 0 ? idx : 0;
+}
+
 // ─── Section Card ─────────────────────────────────────────────────────────────
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
@@ -150,7 +170,166 @@ const row = StyleSheet.create({
   mono:  { fontFamily: 'Inter_400Regular', letterSpacing: 0.5, fontSize: FS.xs },
 });
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
+// ─── Vertical Connected-Dot Timeline ─────────────────────────────────────────
+
+function OrderTimeline({ status }: { status: OrderStatus }) {
+  // For terminal statuses don't show the progress steps
+  if (TERMINAL_STATUSES.includes(status)) return null;
+
+  const currentIdx = getOrderStepIndex(status);
+
+  return (
+    <View style={tl.container}>
+      {ORDER_STEPS.map((step, idx) => {
+        const isCompleted = idx < currentIdx;
+        const isActive    = idx === currentIdx;
+        const isFuture    = idx > currentIdx;
+        const isLast      = idx === ORDER_STEPS.length - 1;
+
+        return (
+          <View key={step.key} style={tl.row}>
+            {/* Left: dot + line */}
+            <View style={tl.dotCol}>
+              {/* Dot */}
+              {isCompleted && (
+                <View style={tl.dotCompleted}>
+                  <Feather name="check" size={9} color={ON_DARK} />
+                </View>
+              )}
+              {isActive && (
+                <View style={tl.dotActive}>
+                  <View style={tl.dotActiveInner} />
+                </View>
+              )}
+              {isFuture && (
+                <View style={tl.dotFuture} />
+              )}
+              {/* Connector line */}
+              {!isLast && (
+                <View style={[tl.line, isCompleted && tl.lineCompleted, isActive && tl.lineActive]} />
+              )}
+            </View>
+
+            {/* Right: text */}
+            <View style={tl.textCol}>
+              <Text style={[tl.stepTitle, isCompleted && tl.stepTitleCompleted, isActive && tl.stepTitleActive, isFuture && tl.stepTitleFuture]}>
+                {step.title}
+              </Text>
+              {(isCompleted || isActive) && (
+                <Text style={[tl.stepDesc, isActive && tl.stepDescActive]}>
+                  {step.description}
+                </Text>
+              )}
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+const tl = StyleSheet.create({
+  container: {
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SP.md,
+  },
+  dotCol: {
+    alignItems: 'center',
+    width: 20,
+  },
+  // Completed: filled solid SUCCESS circle with check
+  dotCompleted: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: SUCCESS,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  // Active: glowing ACCENT ring + inner fill
+  dotActive: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: ACCENT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+    shadowColor: ACCENT,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  dotActiveInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: ON_DARK,
+  },
+  // Future: empty ring
+  dotFuture: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: BORDER,
+    backgroundColor: 'transparent',
+    zIndex: 1,
+  },
+  // Connecting line between dots
+  line: {
+    width: 2,
+    flex: 1,
+    minHeight: 20,
+    backgroundColor: BORDER,
+    marginVertical: 2,
+  },
+  lineCompleted: {
+    backgroundColor: SUCCESS + '88',
+  },
+  lineActive: {
+    backgroundColor: ACCENT + '44',
+  },
+  // Text
+  textCol: {
+    flex: 1,
+    paddingBottom: SP.md,
+    paddingTop: 1,
+  },
+  stepTitle: {
+    fontSize: FS.sm,
+    fontFamily: FONT.bold,
+    color: SUBTLE,
+  },
+  stepTitleCompleted: {
+    color: MUTED,
+  },
+  stepTitleActive: {
+    color: ON_DARK,
+    fontSize: FS.base,
+  },
+  stepTitleFuture: {
+    color: SUBTLE,
+    fontFamily: FONT.regular,
+  },
+  stepDesc: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: SUBTLE,
+    marginTop: 2,
+    lineHeight: 17,
+  },
+  stepDescActive: {
+    color: MUTED,
+  },
+});
 
 // ─── API → BuyerOrderView adapter (detail) ────────────────────────────────────
 
@@ -279,6 +458,7 @@ export function BuyerTrackingAlertCard({
     </View>
   );
 }
+
 export default function BuyerOrderDetailScreen() {
   const colors = useColors();
   const { theme } = useAppTheme();
@@ -571,7 +751,7 @@ export default function BuyerOrderDetailScreen() {
   if (visibleLoading) {
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={PURPLE} size="large" />
+        <ActivityIndicator color={ACCENT} size="large" />
       </View>
     );
   }
@@ -612,6 +792,8 @@ export default function BuyerOrderDetailScreen() {
     );
   }
 
+  const isTerminal = TERMINAL_STATUSES.includes(order.status);
+
   return (
     <BrandthreadScreen>
       {/* Header */}
@@ -624,7 +806,7 @@ export default function BuyerOrderDetailScreen() {
       <View style={styles.refreshStatus} accessibilityLiveRegion="polite">
         {isFetching ? (
           <>
-            <ActivityIndicator color={PURPLE} size="small" />
+            <ActivityIndicator color={ACCENT} size="small" />
             <Text style={styles.refreshStatusText}>Updating order status…</Text>
           </>
         ) : lastUpdatedAt !== null ? (
@@ -639,14 +821,14 @@ export default function BuyerOrderDetailScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           paddingTop: SP.md,
-          paddingBottom: Math.max(insets.bottom, SP.md) + SP.xxl,
+          paddingBottom: Math.max(insets.bottom, SP.md) + COMP.buttonH + SP.xl,
         }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handlePullRefresh}
-            tintColor={PURPLE}
-            colors={[PURPLE]}
+            tintColor={ACCENT}
+            colors={[ACCENT]}
           />
         }
       >
@@ -681,6 +863,16 @@ export default function BuyerOrderDetailScreen() {
             )}
           </GradientCard>
         </View>
+
+        {/* ── Order Progress Timeline ───────────────────────────────────────── */}
+        {!isTerminal && (
+          <View style={{ marginBottom: SP.md }}>
+            <Text style={[sc.title, { paddingHorizontal: SP.md }]}>Order Progress</Text>
+            <BrandthreadCard style={{ marginHorizontal: SP.md }}>
+              <OrderTimeline status={order.status} />
+            </BrandthreadCard>
+          </View>
+        )}
 
         {returnRequest && (
           <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
@@ -839,11 +1031,8 @@ export default function BuyerOrderDetailScreen() {
           </View>
         )}
 
-        {/* ── Actions ──────────────────────────────────────────────────────── */}
+        {/* ── Contextual secondary actions ─────────────────────────────────── */}
         <View style={{ paddingHorizontal: SP.md, gap: SP.sm, marginBottom: SP.md }}>
-          <Text style={[sc.title, { paddingHorizontal: 0 }]}>Actions</Text>
-
-          {/* Cancellation disappears immediately once the order ships or is delivered. */}
           {canBuyerCancel(order.status, order.createdAt) && (
             <SecondaryButton
               label={cancelling ? 'Cancelling…' : 'Cancel Order'}
@@ -856,14 +1045,8 @@ export default function BuyerOrderDetailScreen() {
               disabled={cancelling}
             />
           )}
-
-          <PrimaryButton
-            label="Contact Seller"
-            icon="message-circle"
-            onPress={handleContactSeller}
-          />
           <SecondaryButton
-            label={returnRequest ? "Return Request Submitted" : "Request Return"}
+            label={returnRequest ? 'Return Request Submitted' : 'Request Return'}
             icon="refresh-ccw"
             onPress={handleRequestReturn}
             disabled={!!returnRequest}
@@ -898,31 +1081,45 @@ export default function BuyerOrderDetailScreen() {
 
       </ScrollView>
 
-      {/* ── Review CTA ──────────────────────────────────────────────────── */}
-      {order.status === 'delivered' && !reviewSubmitted && (
-        <View style={{ paddingHorizontal: SP.md, paddingVertical: SP.sm }}>
+      {/* ── Bottom Action Area ───────────────────────────────────────────────── */}
+      <View style={[styles.actionBar, { paddingBottom: Math.max(insets.bottom, SP.md) }]}>
+        {/* Review CTA or submitted confirmation */}
+        {order.status === 'delivered' && reviewSubmitted && (
+          <View style={styles.reviewDoneRow}>
+            <Feather name="check-circle" size={ICON.sm} color={SUCCESS} />
+            <Text style={styles.reviewDoneText}>Review submitted — thank you!</Text>
+          </View>
+        )}
+        {order.status === 'delivered' && !reviewSubmitted && (
           <TouchableOpacity
-            style={{ backgroundColor: CARD, borderRadius: RADIUS.md, padding: SP.md, borderWidth: 1, borderColor: BORDER, flexDirection: 'row', alignItems: 'center', gap: SP.sm }}
+            style={styles.reviewCTA}
             onPress={() => setShowReviewModal(true)}
             activeOpacity={0.8}
           >
             <Feather name="star" size={ICON.sm} color={GOLD} />
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: FG }}>Leave a Review</Text>
-              <Text style={{ fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 }}>Share your experience with {order.sellerName}</Text>
+              <Text style={styles.reviewCTATitle}>Leave a Review</Text>
+              <Text style={styles.reviewCTASub}>Share your experience with {order.sellerName}</Text>
             </View>
             <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
           </TouchableOpacity>
-        </View>
-      )}
-      {reviewSubmitted && (
-        <View style={{ paddingHorizontal: SP.md, paddingVertical: SP.sm }}>
-          <View style={{ backgroundColor: CARD, borderRadius: RADIUS.md, padding: SP.md, borderWidth: 1, borderColor: BORDER, flexDirection: 'row', alignItems: 'center', gap: SP.sm }}>
-            <Feather name="check-circle" size={ICON.sm} color={SUCCESS} />
-            <Text style={{ fontSize: FS.sm, fontFamily: FONT.medium, color: SUCCESS }}>Review submitted — thank you!</Text>
-          </View>
-        </View>
-      )}
+        )}
+
+        {/* Help Center */}
+        <SecondaryButton
+          label="Help Center"
+          icon="help-circle"
+          onPress={() => Alert.alert('Help Center', 'Visit help.brandthread.com for support with your order.')}
+          small
+        />
+
+        {/* Primary action: contact seller */}
+        <PrimaryButton
+          label="Contact Seller"
+          icon="message-circle"
+          onPress={handleContactSeller}
+        />
+      </View>
 
       {/* ── Cancel Confirmation Modal ─────────────────────────────────────── */}
       <Modal visible={showCancelModal} transparent animationType="slide" onRequestClose={() => setShowCancelModal(false)}>
@@ -1168,6 +1365,51 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     color: SUBTLE,
     textAlign: 'center',
     lineHeight: 18,
+  },
+  // Bottom action bar
+  actionBar: {
+    borderTopWidth: 1,
+    borderTopColor: BORDER,
+    backgroundColor: BG,
+    paddingHorizontal: SP.md,
+    paddingTop: SP.sm,
+    gap: SP.sm,
+  },
+  reviewCTA: {
+    backgroundColor: CARD,
+    borderRadius: RADIUS.md,
+    padding: SP.md,
+    borderWidth: 1,
+    borderColor: BORDER,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+  },
+  reviewCTATitle: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    color: FG,
+  },
+  reviewCTASub: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: MUTED,
+    marginTop: 2,
+  },
+  reviewDoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    backgroundColor: SUCCESS_DIM,
+    borderRadius: RADIUS.md,
+    padding: SP.sm,
+    borderWidth: 1,
+    borderColor: SUCCESS + '40',
+  },
+  reviewDoneText: {
+    fontSize: FS.sm,
+    fontFamily: FONT.medium,
+    color: SUCCESS,
   },
   });
 };

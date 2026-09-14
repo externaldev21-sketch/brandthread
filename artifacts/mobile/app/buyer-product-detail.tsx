@@ -34,6 +34,14 @@ import {
   GRAD_SUCCESS_G,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
+import {
+  ClaimedRemainingLabel,
+  TimeRemainingLabel,
+  UrgencyBar,
+  DemandBadge,
+  URGENCY_UNITS_THRESHOLD,
+  HIGH_DEMAND_THRESHOLD,
+} from '@/components/CommerceSignal';
 
 function useChrome() {
   const colors = useColors();
@@ -455,6 +463,14 @@ export default function BuyerProductDetailScreen() {
   const [reserveLoading,  setReserveLoading]  = useState(false);
   const [sizeChartOpen,   setSizeChartOpen]   = useState(false);
 
+  // ── Buyer demand signals ─────────────────────────────────────────────────
+  // Populated from server-supplied fields on publicProducts.get() response only.
+  // Values are never fabricated — zero means the server did not supply them.
+  const [demandClaimedUnits,   setDemandClaimedUnits]   = useState<number>(0);
+  const [demandRemainingUnits, setDemandRemainingUnits] = useState<number>(0);
+  const [demandCount,          setDemandCount]          = useState<number | null>(null);
+  const [demandEndsAt,         setDemandEndsAt]         = useState<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -479,6 +495,14 @@ export default function BuyerProductDetailScreen() {
                   ? row.sellerVacationMessage ?? 'This seller is currently away and is not accepting purchases.'
                   : null,
               );
+              // Populate demand signals from server-supplied fields only.
+              // Never fabricate these values.
+              if (!cancelled) {
+                setDemandClaimedUnits(typeof row.claimedUnits  === 'number' ? row.claimedUnits  : 0);
+                setDemandRemainingUnits(typeof row.remainingUnits === 'number' ? row.remainingUnits : 0);
+                setDemandCount(typeof row.demandCount === 'number' ? row.demandCount : null);
+                setDemandEndsAt(row.endsAt ?? null);
+              }
               // Adapt the product and check payment readiness together as soon
               // as the product supplies the seller ID. A payment-status failure
               // is non-fatal: Buy Now performs its own safety check on tap.
@@ -803,6 +827,30 @@ export default function BuyerProductDetailScreen() {
             {hasDiscount && <Text style={s.comparePrice}>{fmtPrice(variantCompare!)}</Text>}
             {hasDiscount && <Text style={s.savings}>Save {fmtPrice(savingsAmt)}</Text>}
           </View>
+
+          {/* ── Buyer demand signals (server-supplied values only) ── */}
+          {(demandClaimedUnits > 0 || demandRemainingUnits > 0 || !!demandEndsAt ||
+            (demandCount != null && demandCount >= HIGH_DEMAND_THRESHOLD)) && (
+            <View style={{ marginBottom: SP.md, gap: 6 }}>
+              {demandCount != null && demandCount >= HIGH_DEMAND_THRESHOLD && (
+                <DemandBadge demandCount={demandCount} accent={theme.accent} />
+              )}
+              <ClaimedRemainingLabel
+                claimedUnits={demandClaimedUnits}
+                remainingUnits={demandRemainingUnits}
+                urgent={demandRemainingUnits > 0 && demandRemainingUnits <= URGENCY_UNITS_THRESHOLD}
+                accent={theme.accent}
+              />
+              {!!demandEndsAt && (
+                <TimeRemainingLabel endsAt={demandEndsAt} accent={theme.accent} />
+              )}
+              <UrgencyBar
+                claimedUnits={demandClaimedUnits}
+                remainingUnits={demandRemainingUnits}
+                accentColor={theme.accent}
+              />
+            </View>
+          )}
 
           {/* Pre-order info */}
           {product.isPreOrder && (

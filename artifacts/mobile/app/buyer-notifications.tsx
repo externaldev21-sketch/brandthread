@@ -348,7 +348,11 @@ export default function BuyerNotifications() {
         <TouchableOpacity
           style={[
             styles.notifRow,
-            !notif.isRead && { backgroundColor: theme.accentDim },
+            !notif.isRead && {
+              backgroundColor: CARD,
+              borderLeftWidth: 2,
+              borderLeftColor: theme.accent,
+            },
           ]}
           onPress={() => handleTap(notif)}
           onLongPress={() => handleLongPress(notif)}

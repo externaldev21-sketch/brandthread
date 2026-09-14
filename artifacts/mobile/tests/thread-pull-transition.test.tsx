@@ -67,6 +67,16 @@ describe('ThreadPullTransitionContext', () => {
     };
   });
 
+  it('keeps the compatibility API without rendering decorative transition layers', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(resolve(process.cwd(), 'contexts/ThreadPullTransitionContext.tsx'), 'utf8');
+    expect(source).not.toContain('Animated.View');
+    expect(source).not.toContain('strands');
+    expect(source).not.toContain('seamTranslateX');
+    expect(source).not.toContain('threadTranslateX');
+  });
+
   function TestComponent({ onMount }: { onMount: (hook: any) => void }) {
     const hook = useThreadPull();
     React.useEffect(() => {

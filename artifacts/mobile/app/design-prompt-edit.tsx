@@ -42,7 +42,7 @@ const RECENT_PROJECTS = [
   'Streetwear Lookbook',
 ];
 
-const CARD_ELEVATED_HEX = '#18182E';
+const CARD_ELEVATED_HEX = '#222226';
 
 export default function DesignPromptEditScreen() {
   const { theme } = useAppTheme();

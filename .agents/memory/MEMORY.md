@@ -1,6 +1,6 @@
-- [Brandthread theme](brandthread-theme.md) — dark-only surfaces remain; runtime accents are user-scoped. Retired light/Vault palettes stay retired.
-- [Brandthread Woven system](brandthread-woven-system.md) — the thread/weaving language is definitive; future UI refines this system instead of adding another style.
-- [Runtime app themes](runtime-app-themes.md) — one user-scoped provider themes buyer/seller chrome; only the focused scene runs the background animator.
+- [Brandthread theme](brandthread-theme.md) — true-black buyer/seller chrome uses one #5B5CFF accent; no accent-wash panels or decorative thread motifs.
+- [Brandthread design system](brandthread-woven-system.md) — Inter hierarchy and clean primitives replace the retired Woven/thread/stitch presentation.
+- [Runtime app themes](runtime-app-themes.md) — legacy theme IDs remain compatible but all resolve to the canonical blue-violet accent and neutral shell.
 - [Onboarding value-first contract](onboarding-value-first.md) — defaults stay editable; seller personalization and one optional, durable AI success precede plan commitment.
 - [Seller trial reminder delivery](seller-trial-reminder-delivery.md) — create on day four of an exact five-day trial; leases, retries, preferences, and per-token dedupe protect delivery.
 - [Transparent navigation isolation](transparent-navigation-isolation.md) — every root scene needs an opaque plane; only the focused scene animates, and inactive tab scenes detach.

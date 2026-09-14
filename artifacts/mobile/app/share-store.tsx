@@ -103,7 +103,7 @@ export default function ShareStoreScreen() {
               value={storeUrl}
               size={200}
               backgroundColor="#FFFFFF"
-              color="#07070F"
+              color="#FFFFFF"
             />
           </View>
 
@@ -117,7 +117,7 @@ export default function ShareStoreScreen() {
           activeOpacity={0.85}
           onPress={copyLink}
         >
-          <Feather name={copied ? 'check' : 'copy'} size={17} color="#07070F" />
+          <Feather name={copied ? 'check' : 'copy'} size={17} color="#FFFFFF" />
           <Text style={s.copyBtnText}>{copied ? 'Link Copied!' : 'Copy Link'}</Text>
         </TouchableOpacity>
 
@@ -156,7 +156,7 @@ const s = StyleSheet.create({
 
   copyBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', borderRadius: 16, paddingVertical: 16, marginBottom: 12 },
   copyBtnDone: {},
-  copyBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#07070F' },
+  copyBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
 
   shareBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', borderRadius: 16, borderWidth: 1, paddingVertical: 16, marginBottom: 24 },
   shareBtnText:{ fontSize: 15, fontFamily: 'Inter_600SemiBold' },

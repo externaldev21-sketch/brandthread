@@ -1,10 +1,10 @@
 ---
-name: Brandthread Woven system
-description: The definitive visual-system identity and rules for future Brandthread UI
+name: Brandthread design system
+description: The clean app-wide visual language that replaced the decorative Woven presentation
 ---
 
-**Rule:** Brandthread Woven is the visual authority for buyer and seller UI. Use neutral charcoal surfaces, one user-scoped accent with ember fallback, condensed editorial hierarchy, stitched dividers and avatars, thread loaders and tabs, hang-tag live/drop badges, full-bleed commerce media, and selective asymmetric grids.
+**Rule:** The Brandthread design-system artifact remains the visual authority, but thread/weaving decoration is retired. Dividers are solid, avatars use clean circular borders, loaders are simple spinners, badges are pills, and tab indicators are plain accent bars.
 
-**Why:** The user explicitly requested one recognizable app-wide identity tied literally to the Brandthread name and asked that future work refine it rather than introduce new visual languages.
+**Why:** Decorative stitched rings, hang-tag silhouettes, thread loaders, tension lines, and Thread Pull motion conflicted with the requested premium, direct interface.
 
-**How to apply:** Shared product-agnostic primitives and tokens belong in the Brandthread Woven design-system artifact. Preserve seller accent ownership and use glass only for functional UI. Extend Thread Pull to major section routes, not every push or modal.
+**How to apply:** Keep compatibility export names when removing decoration so existing imports do not break. New buyer and seller UI should use the clean primitives, true-black/graphite surfaces, bold Inter hierarchy, and canonical accent. Navigation is direct; do not add decorative seam or thread transitions.

@@ -37,9 +37,9 @@ import { Sample, SampleReview, SampleStatus } from '@/services/manufacturerTypes
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, ON_DARK,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM,
-  SUCCESS, RED, ORANGE,
-  GRAD_PRIMARY, GRAD_CARD_GLOW,
+  ACCENT, ACCENT_LIGHT,
+  SUCCESS, SUCCESS_DIM, RED, ORANGE,
+  GRAD_CARD_GLOW,
   FONT, FS, SP, RADIUS, COMP, ICON,
   SHADOW_PURPLE,
 } from '@/lib/theme';
@@ -48,7 +48,7 @@ import { useColors } from '@/hooks/useColors';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SAMPLE_STATUSES: SampleStatus[] = [
-  'requested', 'awaiting_payment', 'paid', 'in_development',
+  'requested', 'awaiting_payment', 'paid', 'in_development', 'revision_requested',
   'shipped', 'delivered', 'review_needed', 'approved',
 ];
 
@@ -64,6 +64,21 @@ const STATUS_LABELS: Record<string, string> = {
   approved: 'Approved',
   rejected: 'Rejected',
   cancelled: 'Cancelled',
+};
+
+// Step descriptions for the timeline
+const STATUS_DESCRIPTIONS: Record<string, string> = {
+  requested: 'Sample request submitted to manufacturer.',
+  awaiting_payment: 'Payment required before production begins.',
+  paid: 'Payment confirmed. Ready to start.',
+  in_development: 'Manufacturer is building the sample.',
+  shipped: 'Sample is on its way to you.',
+  delivered: 'Sample has been delivered.',
+  review_needed: 'Your review is needed to proceed.',
+  approved: 'Sample approved.',
+  revision_requested: 'The manufacturer is applying requested changes.',
+  rejected: 'The sample was rejected.',
+  cancelled: 'The sample order was cancelled.',
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -153,6 +168,189 @@ interface RatingState {
   printRating: number;
   packagingRating: number;
 }
+
+// ─── Vertical Connected-Dot Timeline ─────────────────────────────────────────
+
+function SampleTimeline({
+  currentStatus,
+  imageUris,
+}: {
+  currentStatus: string;
+  imageUris: string[];
+}) {
+  const normalizedStatus = currentStatus === 'pending_payment' ? 'awaiting_payment' : currentStatus;
+  const isTerminal = normalizedStatus === 'rejected' || normalizedStatus === 'cancelled';
+  const timelineStatuses = isTerminal
+    ? (['requested', normalizedStatus] as SampleStatus[])
+    : SAMPLE_STATUSES;
+  const currentIdx = timelineStatuses.indexOf(normalizedStatus as SampleStatus);
+
+  return (
+    <View style={tl.container}>
+      {timelineStatuses.map((st, idx) => {
+        const isCompleted = idx < currentIdx;
+        const isActive    = idx === currentIdx;
+        const isFuture    = idx > currentIdx;
+        const isLast      = idx === timelineStatuses.length - 1;
+        // Show the first sample image on the active step when available
+        const showImage   = isActive && imageUris.length > 0;
+
+        return (
+          <View key={st} style={tl.row}>
+            {/* Left: dot + connector line */}
+            <View style={tl.dotCol}>
+              {isCompleted && (
+                <View style={tl.dotCompleted}>
+                  <Feather name="check" size={9} color={ON_DARK} />
+                </View>
+              )}
+              {isActive && (
+                <View style={tl.dotActive}>
+                  <View style={tl.dotActiveInner} />
+                </View>
+              )}
+              {isFuture && (
+                <View style={tl.dotFuture} />
+              )}
+              {!isLast && (
+                <View style={[tl.line, isCompleted && tl.lineCompleted, isActive && tl.lineActive]} />
+              )}
+            </View>
+
+            {/* Right: label + description + optional image */}
+            <View style={[tl.textCol, isLast && { paddingBottom: 0 }]}>
+              <Text style={[
+                tl.stepTitle,
+                isCompleted && tl.stepTitleCompleted,
+                isActive && tl.stepTitleActive,
+                isFuture && tl.stepTitleFuture,
+              ]}>
+                {STATUS_LABELS[st] ?? st}
+              </Text>
+              {(isCompleted || isActive) && STATUS_DESCRIPTIONS[st] && (
+                <Text style={[tl.stepDesc, isActive && tl.stepDescActive]}>
+                  {STATUS_DESCRIPTIONS[st]}
+                </Text>
+              )}
+              {showImage && (
+                <Image
+                  source={{ uri: imageUris[0] }}
+                  style={tl.activeImage}
+                  resizeMode="cover"
+                />
+              )}
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+const tl = StyleSheet.create({
+  container: {
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SP.md,
+  },
+  dotCol: {
+    alignItems: 'center',
+    width: 20,
+  },
+  dotCompleted: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: SUCCESS,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  dotActive: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: ACCENT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+    shadowColor: ACCENT,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  dotActiveInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: ON_DARK,
+  },
+  dotFuture: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: BORDER,
+    backgroundColor: 'transparent',
+    zIndex: 1,
+  },
+  line: {
+    width: 2,
+    flex: 1,
+    minHeight: 20,
+    backgroundColor: BORDER,
+    marginVertical: 2,
+  },
+  lineCompleted: {
+    backgroundColor: SUCCESS + '88',
+  },
+  lineActive: {
+    backgroundColor: ACCENT + '44',
+  },
+  textCol: {
+    flex: 1,
+    paddingBottom: SP.md,
+    paddingTop: 1,
+  },
+  stepTitle: {
+    fontSize: FS.sm,
+    fontFamily: FONT.bold,
+    color: SUBTLE,
+  },
+  stepTitleCompleted: {
+    color: MUTED,
+  },
+  stepTitleActive: {
+    color: ON_DARK,
+    fontSize: FS.base,
+  },
+  stepTitleFuture: {
+    color: SUBTLE,
+    fontFamily: FONT.regular,
+  },
+  stepDesc: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: SUBTLE,
+    marginTop: 2,
+    lineHeight: 17,
+  },
+  stepDescActive: {
+    color: MUTED,
+  },
+  activeImage: {
+    width: 120,
+    height: 120,
+    borderRadius: RADIUS.md,
+    marginTop: SP.sm,
+    backgroundColor: CARD,
+  },
+});
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
@@ -457,6 +655,23 @@ export default function SampleDetailScreen() {
   const canReview = sample.status === 'review_needed' || sample.status === 'delivered';
   const currentStatusIdx = SAMPLE_STATUSES.indexOf(sample.status as SampleStatus);
 
+  // Derive primary bottom action
+  const isPendingPayment = sample.status === 'pending_payment';
+  const primaryLabel = isPendingPayment
+    ? (sample.manufacturerPayoutReady !== true ? 'Manufacturer payout setup required' : 'Pay Securely')
+    : (canReview && !sample.review)
+      ? 'Write Review'
+      : 'Message Manufacturer';
+  const primaryIcon = (isPendingPayment
+    ? (sample.manufacturerPayoutReady !== true ? 'alert-circle' : 'lock')
+    : (canReview && !sample.review) ? 'star' : 'message-square') as 'alert-circle' | 'lock' | 'star' | 'message-square';
+  const primaryAction = isPendingPayment
+    ? handlePaySecurely
+    : (canReview && !sample.review)
+      ? () => setReviewMode(true)
+      : handleMessage;
+  const primaryDisabled = isPendingPayment && sample.manufacturerPayoutReady !== true;
+
   return (
     <BrandthreadScreen>
       <BrandthreadHeader
@@ -468,13 +683,15 @@ export default function SampleDetailScreen() {
         <ScrollView
           ref={reviewSectionRef}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + COMP.buttonH + 24 }]}
+          contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + COMP.buttonH + 72 }]}
         >
           {/* ── HEADER BADGES ────────────────────────────────────── */}
           <View style={s.badgeRow}>
             <StatusBadge label={STATUS_LABELS[sample.status] ?? sample.status} variant={statusVariant(sample.status)} />
             <StatusBadge label={TYPE_LABELS[sample.type] ?? sample.type} variant="neutral" />
           </View>
+
+          {/* ── PAYMENT REQUIRED ─────────────────────────────────── */}
           {sample.status === 'pending_payment' && (
             <BrandthreadCard style={s.section} elevated>
               <Text style={s.paymentTitle}>Payment required</Text>
@@ -484,60 +701,16 @@ export default function SampleDetailScreen() {
                   : 'Pay securely to send this sample into production. Funds are routed to the manufacturer through Stripe.'}
               </Text>
               {!!paymentError && <Text style={s.paymentError}>{paymentError}</Text>}
-              <PrimaryButton
-                label={sample.manufacturerPayoutReady !== true ? 'Manufacturer payout setup required' : 'Pay securely'}
-                onPress={handlePaySecurely}
-                loading={paying}
-                disabled={sample.manufacturerPayoutReady !== true}
-                icon={sample.manufacturerPayoutReady !== true ? 'alert-circle' : 'lock'}
-              />
-              {sample.manufacturerPayoutReady !== true && (
-                <TouchableOpacity onPress={handleMessage} style={{ marginTop: SP.sm }}>
-                  <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.semibold, textAlign: 'center' }}>
-                    Message manufacturer
-                  </Text>
-                </TouchableOpacity>
-              )}
             </BrandthreadCard>
           )}
 
           {/* ── STATUS TIMELINE ──────────────────────────────────── */}
           <SectionHeader title="Progress" style={s.sectionHeader} />
           <BrandthreadCard style={s.section}>
-            {SAMPLE_STATUSES.map((st, idx) => {
-              const isCompleted = idx < currentStatusIdx;
-              const isCurrent = idx === currentStatusIdx;
-              const isFuture = idx > currentStatusIdx;
-              return (
-                <View key={st} style={s.timelineRow}>
-                  <View style={s.timelineLeft}>
-                    <View style={[
-                      s.timelineDot,
-                      isCurrent && s.timelineDotCurrent,
-                      isCompleted && s.timelineDotCompleted,
-                    ]}>
-                      {isCompleted
-                        ? <Feather name="check" size={10} color={ON_DARK} />
-                        : isCurrent
-                          ? null
-                          : null
-                      }
-                    </View>
-                    {idx < SAMPLE_STATUSES.length - 1 && (
-                      <View style={[s.timelineLine, isCompleted && s.timelineLineCompleted]} />
-                    )}
-                  </View>
-                  <Text style={[
-                    s.timelineLabel,
-                    isCurrent && s.timelineLabelCurrent,
-                    isCompleted && s.timelineLabelCompleted,
-                    isFuture && s.timelineLabelFuture,
-                  ]}>
-                    {STATUS_LABELS[st]}
-                  </Text>
-                </View>
-              );
-            })}
+            <SampleTimeline
+              currentStatus={sample.status}
+              imageUris={sample.imageUris}
+            />
           </BrandthreadCard>
 
           {/* ── DETAILS ──────────────────────────────────────────── */}
@@ -606,7 +779,7 @@ export default function SampleDetailScreen() {
             </ScrollView>
           ) : (
             <TouchableOpacity onPress={handleAddImage} disabled={imageUploading} activeOpacity={0.75}>
-              <GradientCard style={[s.section, s.imagePlaceholder]}>
+              <GradientCard style={[s.section, s.imagePlaceholder]} colors={GRAD_CARD_GLOW}>
                 <Feather name="camera" size={ICON.xl} color={colors.accentForeground} style={{ marginBottom: SP.sm }} />
                 <Text style={s.imagePlaceholderText}>No images yet</Text>
                 <Text style={s.imagePlaceholderSub}>Tap to add a sample progress photo</Text>
@@ -678,9 +851,9 @@ export default function SampleDetailScreen() {
                   <View style={s.chipRow}>
                     {(
                       [
-                        { key: 'approved', label: 'Approve ✓', variant: 'success' },
-                        { key: 'revision_requested', label: 'Request Revision ↺', variant: 'warning' },
-                        { key: 'rejected', label: 'Reject ✗', variant: 'error' },
+                        { key: 'approved', label: 'Approve', variant: 'success' },
+                        { key: 'revision_requested', label: 'Request Revision', variant: 'warning' },
+                        { key: 'rejected', label: 'Reject', variant: 'error' },
                       ] as const
                     ).map(opt => (
                       <TouchableOpacity
@@ -792,15 +965,8 @@ export default function SampleDetailScreen() {
         </ScrollView>
 
         {/* ── ACTION BAR ───────────────────────────────────────────── */}
-        <View style={[s.actionBar, { paddingBottom: insets.bottom + SP.sm }]}>
-          {(sample.status === 'delivered' || sample.status === 'review_needed') && !sample.review && (
-            <PrimaryButton
-              label="Write Review"
-              onPress={() => { setReviewMode(true); }}
-              icon="star"
-              style={s.actionBtn}
-            />
-          )}
+        <View style={[s.actionBar, { paddingBottom: Math.max(insets.bottom, SP.md) }]}>
+          {/* Contextual: revision request button when review/delivered */}
           {(sample.status === 'review_needed' || sample.status === 'delivered') && (
             <SecondaryButton
               label="Request Revision"
@@ -809,10 +975,23 @@ export default function SampleDetailScreen() {
               style={s.actionBtn}
             />
           )}
+
+          {/* Help Center — always secondary */}
           <SecondaryButton
-            label="Message Manufacturer"
-            onPress={handleMessage}
-            icon="message-square"
+            label="Help Center"
+            icon="help-circle"
+            onPress={() => Alert.alert('Help Center', 'Visit help.brandthread.com for support with your sample order.')}
+            style={s.actionBtn}
+            small
+          />
+
+          {/* Primary action: context-driven */}
+          <PrimaryButton
+            label={primaryLabel}
+            onPress={primaryAction}
+            icon={primaryIcon}
+            loading={paying && isPendingPayment}
+            disabled={primaryDisabled}
             style={s.actionBtn}
           />
         </View>
@@ -859,7 +1038,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.xs,
-    backgroundColor: PURPLE,
+    backgroundColor: ACCENT,
     paddingHorizontal: SP.md,
     paddingVertical: SP.sm,
     borderRadius: RADIUS.sm,
@@ -877,66 +1056,6 @@ const s = StyleSheet.create({
     gap: SP.sm,
     paddingHorizontal: SP.md,
     marginBottom: SP.sm,
-  },
-
-  // Timeline
-  timelineRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: SP.sm,
-    minHeight: 32,
-  },
-  timelineLeft: {
-    alignItems: 'center',
-    width: 20,
-  },
-  timelineDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
-  },
-  timelineDotCurrent: {
-    backgroundColor: PURPLE,
-    borderColor: PURPLE,
-  },
-  timelineDotCompleted: {
-    backgroundColor: SUCCESS,
-    borderColor: SUCCESS,
-  },
-  timelineLine: {
-    width: 2,
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    marginVertical: 2,
-    minHeight: 14,
-  },
-  timelineLineCompleted: {
-    backgroundColor: SUCCESS + '66',
-  },
-  timelineLabel: {
-    fontSize: FS.sm,
-    fontFamily: FONT.regular,
-    color: SUBTLE,
-    paddingTop: 2,
-    flex: 1,
-    lineHeight: 20,
-  },
-  timelineLabelCurrent: {
-    color: PURPLE_LIGHT,
-    fontFamily: FONT.semibold,
-  },
-  timelineLabelCompleted: {
-    color: MUTED,
-    fontFamily: FONT.medium,
-  },
-  timelineLabelFuture: {
-    color: SUBTLE,
   },
 
   // InfoRow
@@ -1120,7 +1239,7 @@ const s = StyleSheet.create({
   },
   chipActive: {
     borderColor: BORDER_ACTIVE,
-    backgroundColor: PURPLE_DIM,
+    backgroundColor: 'transparent',
   },
   chipText: {
     fontSize: FS.sm,
@@ -1128,7 +1247,7 @@ const s = StyleSheet.create({
     color: MUTED,
   },
   chipTextActive: {
-    color: PURPLE_LIGHT,
+    color: ACCENT_LIGHT,
     fontFamily: FONT.semibold,
   },
 

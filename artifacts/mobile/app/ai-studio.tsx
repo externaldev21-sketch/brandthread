@@ -214,7 +214,7 @@ export default function AIStudioScreen() {
           activeOpacity={0.75}
           style={[
             styles.toolRow,
-            { backgroundColor: selected === tool.label ? '#18182E' : colors.card, borderColor: selected === tool.label ? colors.primary : colors.border },
+            { backgroundColor: colors.card, borderColor: selected === tool.label ? colors.primary : colors.border },
           ]}
         >
           <View style={[styles.toolIcon, { backgroundColor: selected === tool.label ? colors.accent : colors.secondary }]}>

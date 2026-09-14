@@ -22,7 +22,7 @@ export default function BootScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#07070F',
+    backgroundColor: '#0A0A0B',
     alignItems: 'center',
     justifyContent: 'center',
   },

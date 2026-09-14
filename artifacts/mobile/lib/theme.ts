@@ -4,24 +4,23 @@
  * Single source of truth for all colors, spacing, typography, and animation tokens.
  * Every Seller screen must import from here — no local color redefinitions.
  *
- * Design language: premium fashion operating system — dark, precise, alive.
- * Default finish is chrome on deep black. Runtime themes override these
- * fallback accents through AppThemeContext/useColors.
+ * Design language: true black, bold sans type, and one saturated blue-violet.
+ * Legacy aliases remain for compatibility but resolve to the same accent.
  */
 
 // ─── Backgrounds ─────────────────────────────────────────────────────────────
-export const BG            = '#07070F';   // deep application background
+export const BG            = '#0A0A0B';
 // Transparent route surface used by screen roots so the shared animated shell
 // remains visible. Keep BG opaque for cards, inputs, modals, and other
 // semantic dark surfaces.
 export const SCREEN_BG      = 'transparent';
-export const SURFACE       = '#0C0C17';   // slightly lifted surface (tabs, sheets)
-export const CARD          = '#12121F';   // standard card background
-export const CARD_ELEVATED = '#18182E';   // elevated card (hero, featured)
+export const SURFACE       = '#111113';
+export const CARD          = '#18181B';
+export const CARD_ELEVATED = '#222226';
 export const OVERLAY       = 'rgba(0,0,0,0.72)'; // modal overlay
-export const SURFACE_GLASS = 'rgba(12, 12, 23, 0.65)'; // glassy tabs/sheets
-export const CARD_GLASS    = 'rgba(18, 18, 31, 0.45)'; // glassy card
-export const CARD_ELEVATED_GLASS = 'rgba(24, 24, 46, 0.65)'; // glassy elevated
+export const SURFACE_GLASS = 'rgba(17, 17, 19, 0.72)';
+export const CARD_GLASS    = 'rgba(24, 24, 27, 0.58)';
+export const CARD_ELEVATED_GLASS = 'rgba(34, 34, 38, 0.72)';
 export const SKELETON_GLASS = 'rgba(255,255,255,0.05)'; // translucent shimmer
 export const SELLER_DASHBOARD_GLASS = 'rgba(16, 16, 16, 0.54)'; // neutral graphite dashboard panels
 export const SELLER_DASHBOARD_GLASS_ELEVATED = 'rgba(26, 26, 26, 0.68)'; // neutral elevated dashboard panels
@@ -30,30 +29,34 @@ export const SELLER_DASHBOARD_GLASS_ELEVATED = 'rgba(26, 26, 26, 0.68)'; // neut
 // ─── Borders ─────────────────────────────────────────────────────────────────
 export const BORDER          = 'rgba(255,255,255,0.07)';
 export const BORDER_SUBTLE   = 'rgba(255,255,255,0.04)';
-export const BORDER_ACTIVE   = 'rgba(199,205,213,0.48)';
-export const BORDER_FOCUS    = 'rgba(248,250,252,0.58)';
+export const BORDER_ACTIVE   = '#5B5CFF';
+export const BORDER_FOCUS    = '#5B5CFF';
 
 // ─── Text ─────────────────────────────────────────────────────────────────────
-export const FG      = '#F4F4FF';                       // primary foreground
-export const MUTED   = 'rgba(244,244,255,0.50)';        // secondary text
-export const SUBTLE  = 'rgba(244,244,255,0.28)';        // tertiary / placeholder
+export const FG      = '#F7F7FA';
+export const MUTED   = 'rgba(247,247,250,0.58)';
+export const SUBTLE  = 'rgba(247,247,250,0.34)';
 export const ON_DARK = '#FFFFFF';                        // on gradient/colored bg
 export const ON_DARK_MUTED = 'rgba(255,255,255,0.72)';   // secondary text on gradient/colored bg
 
-// ─── Brand Accents ────────────────────────────────────────────────────────────
-export const PURPLE        = '#C7CDD5';   // legacy primary fallback: chrome
-export const PURPLE_LIGHT  = '#F8FAFC';   // legacy highlight fallback
-export const PURPLE_DIM    = 'rgba(199,205,213,0.18)';
-export const CYAN          = '#7D8793';   // legacy tonal companion fallback
-export const CYAN_LIGHT    = '#E7EBEF';
-export const CYAN_DIM      = 'rgba(125,135,147,0.16)';
+// ─── Brand Accent ─────────────────────────────────────────────────────────────
+export const ACCENT        = '#5B5CFF';
+export const ACCENT_LIGHT  = '#8B8CFF';
+// No colored panel wash: compatibility dim tokens resolve to neutral graphite.
+export const ACCENT_DIM    = 'rgba(255,255,255,0.055)';
+export const PURPLE        = ACCENT;
+export const PURPLE_LIGHT  = ACCENT_LIGHT;
+export const PURPLE_DIM    = ACCENT_DIM;
+export const CYAN          = ACCENT;
+export const CYAN_LIGHT    = ACCENT_LIGHT;
+export const CYAN_DIM      = ACCENT_DIM;
 
 // ─── Semantic Colors ──────────────────────────────────────────────────────────
 export const SUCCESS        = '#10B981';   // completion, available, shipped
 export const SUCCESS_DIM    = 'rgba(16,185,129,0.15)';
 export const GREEN_BRIGHT   = '#39FF88';   // revenue highlight ONLY (not UI chrome)
-export const BLUE           = '#3B82F6';   // info, processing
-export const BLUE_DIM       = 'rgba(59,130,246,0.15)';
+export const BLUE           = ACCENT;      // info and processing use the brand accent
+export const BLUE_DIM       = ACCENT_DIM;
 export const ORANGE         = '#F97316';   // warning, draft
 export const ORANGE_DIM     = 'rgba(249,115,22,0.15)';
 export const RED            = '#F87171';   // error, returns, disputed
@@ -61,23 +64,23 @@ export const RED_DIM        = 'rgba(248,113,113,0.15)';
 export const GOLD           = '#F59E0B';   // premium, pro
 
 // ─── Gradients ────────────────────────────────────────────────────────────────
-export const GRAD_PRIMARY   = ['#17191D', '#727A84', '#F8FAFC', '#AAB1BA', '#34383E'] as const;
-export const GRAD_HERO      = ['#090A0C', '#545B64', '#F3F5F7', '#777F89', '#111317'] as const;
-export const GRAD_CARD_GLOW = ['rgba(248,250,252,0.16)', 'rgba(125,135,147,0.04)'] as const;
+export const GRAD_PRIMARY   = [ACCENT, ACCENT] as const;
+export const GRAD_HERO      = ['#0A0A0B', '#18181B'] as const;
+export const GRAD_CARD_GLOW = ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.01)'] as const;
 export const GRAD_SUCCESS_G = ['#10B981', '#34D399'] as const;
 export const GRAD_REVENUE   = ['#39FF88', '#10B981'] as const;
-export const GRAD_DARK_FADE = ['rgba(7,7,15,0)', 'rgba(7,7,15,1)'] as const;
-export const GRAD_TAB_BAR   = ['rgba(7,7,15,0.96)', 'rgba(12,12,23,1)'] as const;
+export const GRAD_DARK_FADE = ['rgba(10,10,11,0)', 'rgba(10,10,11,1)'] as const;
+export const GRAD_TAB_BAR   = ['rgba(10,10,11,0.96)', 'rgba(17,17,19,1)'] as const;
 
 // ─── Typography ───────────────────────────────────────────────────────────────
 export const FONT = {
-  thin:     'Inter_100Thin'     as const,
-  light:    'Inter_300Light'    as const,
+  thin:     'Inter_400Regular'  as const,
+  light:    'Inter_400Regular'  as const,
   regular:  'Inter_400Regular'  as const,
   medium:   'Inter_500Medium'   as const,
   semibold: 'Inter_600SemiBold' as const,
   bold:     'Inter_700Bold'     as const,
-  extrabold:'Inter_800ExtraBold'as const,
+  extrabold:'Inter_700Bold'     as const,
 } as const;
 
 export const FS = {
@@ -115,7 +118,7 @@ export const RADIUS = {
 
 // ─── Shadows ──────────────────────────────────────────────────────────────────
 export const SHADOW_PURPLE = {
-  shadowColor: '#DDE2E8',
+  shadowColor: ACCENT,
   shadowOffset: { width: 0, height: 4 },
   shadowOpacity: 0.35,
   shadowRadius: 16,

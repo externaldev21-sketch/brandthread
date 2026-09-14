@@ -3,8 +3,8 @@
  * Mounted at /api/public — no requireAuth middleware.
  */
 import { Router } from "express";
-import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, boosts } from "@workspace/db";
-import { eq, and, asc, desc, ne, inArray, or, ilike, sql, count, gte, lte, isNull } from "drizzle-orm";
+import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, boosts, orders, orderItems } from "@workspace/db";
+import { eq, and, asc, desc, ne, inArray, notInArray, or, ilike, sql, count, gte, lte, isNull, isNotNull } from "drizzle-orm";
 import { computeTrendingForToday, isCacheFresh } from "../jobs/computeTrending";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -178,6 +178,93 @@ router.get("/products", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to fetch public products");
     res.status(500).json({ error: "Failed to fetch products" });
+  }
+});
+
+// GET /api/public/products/high-demand
+// Product-backed demand only: real reservation demand, optionally qualified by
+// low remaining inventory. This must remain above /products/:id.
+router.get("/products/high-demand", async (req, res) => {
+  const parsedLimit = parseNonNegativeInteger(req.query.limit, "limit", 6);
+  if (typeof parsedLimit !== "number" || parsedLimit < 1) {
+    return res.status(400).json({
+      error: typeof parsedLimit === "number" ? "limit must be at least 1" : parsedLimit.error,
+    });
+  }
+  const lim = Math.min(parsedLimit, 24);
+
+  try {
+    const activeProducts = await db.select().from(products)
+      .where(and(eq(products.status, "active"), isNull(products.deletedAt)));
+    if (activeProducts.length === 0) return res.json([]);
+
+    const productIds = activeProducts.map((product) => product.id);
+    const ownerIds = [...new Set(activeProducts.map((product) => product.ownerId))];
+    const dropIds = [...new Set(activeProducts.map((product) => product.dropId).filter((id): id is string => Boolean(id)))];
+    const [variantRows, sellerRows, dropRows, paidClaimRows] = await Promise.all([
+      db.select().from(productVariants).where(inArray(productVariants.productId, productIds)),
+      db.select({
+        clerkId: users.clerkId,
+        displayName: users.displayName,
+        verified: users.verified,
+        verificationStatus: users.verificationStatus,
+        activeStanding: users.activeStanding,
+        policyRestricted: users.policyRestricted,
+      }).from(users).where(inArray(users.clerkId, ownerIds)),
+      dropIds.length > 0
+        ? db.select({ id: drops.id, endsAt: drops.endsAt }).from(drops).where(inArray(drops.id, dropIds))
+        : Promise.resolve([]),
+      db.select({
+        productId: productVariants.productId,
+        claimedUnits: sql<number>`coalesce(sum(${orderItems.quantity}), 0)::int`,
+      })
+        .from(orderItems)
+        .innerJoin(productVariants, eq(orderItems.variantId, productVariants.id))
+        .innerJoin(orders, eq(orderItems.orderId, orders.id))
+        .where(and(
+          inArray(productVariants.productId, productIds),
+          isNotNull(orders.paidAt),
+          notInArray(orders.status, ["cancelled", "refund_pending", "refunded"]),
+        ))
+        .groupBy(productVariants.productId),
+    ]);
+
+    const variantsByProduct: Record<string, typeof variantRows> = {};
+    for (const variant of variantRows) (variantsByProduct[variant.productId] ??= []).push(variant);
+    const sellerMap = new Map(sellerRows.map((seller) => [seller.clerkId, seller]));
+    const dropEndMap = new Map(dropRows.map((drop) => [drop.id, drop.endsAt]));
+    const paidClaimsMap = new Map(paidClaimRows.map((row) => [row.productId, Number(row.claimedUnits)]));
+
+    const qualified = activeProducts
+      .map((product) => {
+        const variants = variantsByProduct[product.id] ?? [];
+        const remainingUnits = variants.reduce((sum, variant) => sum + Math.max(0, variant.stock), 0);
+        const claimedUnits = Math.max(0, paidClaimsMap.get(product.id) ?? 0);
+        const seller = sellerMap.get(product.ownerId);
+        return {
+          ...product,
+          variants,
+          claimedUnits,
+          remainingUnits,
+          endsAt: product.preOrderClosingDate ?? (product.dropId ? dropEndMap.get(product.dropId) : null) ?? null,
+          sellerDisplayName: seller?.displayName ?? null,
+          sellerVerified: seller ? deriveSellerVerified(seller) : false,
+        };
+      })
+      .filter((product) =>
+        product.demandCount >= 50 ||
+        (product.demandCount > 0 && product.remainingUnits > 0 && product.remainingUnits <= 10))
+      .sort((a, b) =>
+        b.demandCount - a.demandCount ||
+        a.remainingUnits - b.remainingUnits ||
+        b.updatedAt.getTime() - a.updatedAt.getTime() ||
+        a.id.localeCompare(b.id))
+      .slice(0, lim);
+
+    return res.json(qualified);
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch high-demand products");
+    return res.status(500).json({ error: "Failed to fetch high-demand products" });
   }
 });
 

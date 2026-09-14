@@ -47,7 +47,7 @@ import { recommendSellerPlan, SELLER_PLANS, type SellerPlanDefinition } from '@/
 // ─── Local palette constants ──────────────────────────────────────────────────
 // (plans.tsx predates the theme migration; keep these local so the screen is
 //  self-contained and doesn't depend on the retired useColors hook)
-const CARD_ELEVATED = '#12121F';
+const CARD_ELEVATED = '#18181B';
 const BORDER_ACTIVE = PURPLE;
 
 // ─── Plan catalogue ───────────────────────────────────────────────────────────

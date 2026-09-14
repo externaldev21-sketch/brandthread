@@ -17,9 +17,7 @@ export function ThreadTabIndicator({ tabs, activeId, onChange, className = '' }:
         aria-hidden="true"
         className="absolute top-0 h-px bg-primary shadow-[0_0_9px_hsl(var(--primary))] transition-transform duration-300 motion-reduce:transition-none"
         style={{ width: `${width}%`, transform: `translateX(${activeIndex * 100}%)` }}
-      >
-        <span className="absolute right-0 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full border border-primary bg-background" />
-      </span>
+      />
       {tabs.map((tab) => {
         const active = tab.id === activeId;
         return (

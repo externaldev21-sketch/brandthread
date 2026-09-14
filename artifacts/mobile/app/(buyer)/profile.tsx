@@ -4,7 +4,6 @@ import {
   StyleSheet, Dimensions, Modal, Animated, Share,
   RefreshControl, Image, Linking, Alert,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -14,13 +13,13 @@ import {
   BG, SCREEN_BG, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE,
   FONT, FS, SP, RADIUS, COMP, ICON, OVERLAY,
-  RED, RED_DIM,
+  RED, RED_DIM, SURFACE, ACCENT,
 } from '@/lib/theme';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   getMyProfile, getMyPosts, getMyReposts, getSavedItems,
   getPrivacySettings, archivePost, deletePost,
-  subscribeSocial, MY_USER_ID, MY_COLOR,
+  subscribeSocial,
 } from '@/services/socialService';
 import { useApi } from '@/lib/api';
 import { loadBuyerProfile } from '@/lib/buyerProfile';
@@ -31,8 +30,8 @@ import type {
 } from '@/services/socialTypes';
 
 const { width } = Dimensions.get('window');
-const GRID_GAP = SP.xs;
-const CELL_SIZE = (width - SP.md * 2 - GRID_GAP * 2) / 3;
+const GRID_GAP = 1;
+const CELL_SIZE = (width - GRID_GAP * 2) / 3;
 
 const TABS = ['Posts', 'Tagged', 'Reposts', 'Saved'] as const;
 type Tab = typeof TABS[number];
@@ -241,7 +240,6 @@ export default function ProfileScreen() {
       postMediaColor2: post.mediaColors?.[1] ?? '#0d0d1a',
       postType: post.type,
     });
-    // Navigate to the full post detail viewer
     router.push(`/buyer-post-viewer?${params.toString()}` as never);
   };
 
@@ -292,235 +290,228 @@ export default function ProfileScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} />}
       >
-        {loading ? <View style={styles.emptyState}><Text style={styles.emptyDesc}>Loading profile…</Text></View> : loadError ? <View style={styles.emptyState}><Text style={styles.emptyTitle}>Couldn't load profile</Text><TouchableOpacity style={[styles.emptyAction, { borderColor: theme.accent }]} onPress={loadData}><Text style={[styles.emptyActionText, { color: theme.accent }]}>Try again</Text></TouchableOpacity></View> : <>
-        {/* Hero Row */}
-        <View style={styles.heroRow}>
-          <TouchableOpacity onPress={() => router.push('/buyer-story-create' as any)} style={styles.avatarWrap}>
-            {/* Purple ring when user has an active story */}
-            {hasActiveStory ? (
-              <LinearGradient
-                colors={[...theme.primaryGradient]}
-                start={{ x: 0, y: 1 }} end={{ x: 1, y: 0 }}
-                style={styles.storyRing}
-              >
-                {avatarUri ? (
-                  <Image source={{ uri: avatarUri }} style={[styles.avatar, { resizeMode: 'cover', margin: 3 }]} />
-                ) : (
-                  <LinearGradient colors={[...theme.primaryGradient]} style={[styles.avatar, { margin: 3 }]}>
-                    <Text style={[styles.avatarText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>{avatarInitials}</Text>
-                  </LinearGradient>
-                )}
-              </LinearGradient>
-            ) : avatarUri ? (
-              <Image source={{ uri: avatarUri }} style={[styles.avatar, { resizeMode: 'cover' }]} />
-            ) : (
-              <LinearGradient colors={[...theme.primaryGradient]} style={styles.avatar}>
-                <Text style={[styles.avatarText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>{avatarInitials}</Text>
-              </LinearGradient>
-            )}
-            <View style={styles.avatarBadge}>
-              <Feather name="plus-circle" size={20} color={theme.accent} />
-            </View>
-          </TouchableOpacity>
-
-          <View style={styles.statsRow}>
-            <TouchableOpacity style={styles.statCol}>
-              <Text style={styles.statNum}>{posts.length}</Text>
-              <Text style={styles.statLabel}>Posts</Text>
-            </TouchableOpacity>
-            <View style={styles.statDivider} />
-            <TouchableOpacity style={styles.statCol} onPress={() => router.push('/connections?type=followers' as any)}>
-              <Text style={styles.statNum}>{profile?.friendsCount ?? 0}</Text>
-              <Text style={styles.statLabel}>Followers</Text>
-            </TouchableOpacity>
-            <View style={styles.statDivider} />
-            <TouchableOpacity style={styles.statCol} onPress={() => router.push('/connections?type=following' as any)}>
-              <Text style={styles.statNum}>{profile?.followingBrandsCount ?? 0}</Text>
-              <Text style={styles.statLabel}>Following</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Name Section */}
-        <View style={styles.nameSection}>
-            <Text style={styles.profileName}>{displayName}</Text>
-          {profile?.pronouns ? <Text style={styles.pronouns}>({profile.pronouns})</Text> : null}
-          <Text style={styles.handleYear}>
-            {displayHandle}{joinedYear ? ` · Joined ${joinedYear}` : ''}
-          </Text>
-          {profile?.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
-          {profile?.website ? (
-            <TouchableOpacity onPress={() => { const url = profile.website.startsWith('http') ? profile.website : 'https://' + profile.website; Linking.openURL(url); }}>
-              <Text style={[styles.website, { color: theme.secondary }]}>{profile.website}</Text>
-            </TouchableOpacity>
-          ) : null}
-          {profile?.location ? (
-            <View style={styles.locationRow}>
-              <Feather name="map-pin" size={12} color={MUTED} />
-              <Text style={styles.locationText}>{profile.location}</Text>
-            </View>
-          ) : null}
-          <View style={[styles.privacyBadge, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
-            <Feather name={isPrivate ? 'lock' : 'globe'} size={12} color={theme.accent} />
-            <Text style={[styles.privacyBadgeText, { color: theme.accent }]}>{isPrivate ? 'Private' : 'Public'}</Text>
-          </View>
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/(buyer)/edit-profile')}>
-            <Text style={styles.actionBtnText}>Edit Profile</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/(buyer)/inbox' as never)}>
-            <Text style={styles.actionBtnText}>Messages</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn} onPress={handleShareProfile}>
-            <Text style={styles.actionBtnText}>Share Profile</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Story Highlights Row — real highlights from highlightsService + New button */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.highlightsRow}>
-          {/* New / Manage button */}
-          <TouchableOpacity
-            style={styles.highlightNew}
-            onPress={() => router.push('/buyer-highlights-manager' as any)}
-          >
-            <View style={styles.highlightCircle}>
-              <Feather name="plus" size={22} color={theme.accent} />
-            </View>
-            <Text style={styles.highlightLabel}>New</Text>
-          </TouchableOpacity>
-          {/* Saved highlights */}
-          {highlights.map(h => (
-            <TouchableOpacity
-              key={h.id}
-              style={styles.highlight}
-              onPress={() => router.push('/buyer-highlights-manager' as any)}
-            >
-              <View style={[styles.highlightCircleGrad, { backgroundColor: h.coverColor }]}>
-                <Text style={styles.highlightEmoji}>{h.emoji}</Text>
-              </View>
-              <Text style={styles.highlightLabel} numberOfLines={1}>{h.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Tab Bar */}
-        <View style={styles.tabBar}>
-          {TABS.map(tab => (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.tabPill, activeTab === tab && [styles.tabPillActive, { backgroundColor: theme.accentDim, borderColor: theme.accent }]]}
-              onPress={() => setActiveTab(tab)}
-            >
-              <Feather name={profileTabIcon(tab)} size={18} color={activeTab === tab ? theme.accent : MUTED} />
-              <Text style={[styles.tabText, activeTab === tab && [styles.tabTextActive, { color: theme.accent }]]}>{tab}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Tab Content */}
-        {activeTab === 'Posts' && (
-          <View style={styles.gridContainer}>
-            {posts.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Feather name="image" size={32} color={MUTED} />
-                <Text style={styles.emptyTitle}>No posts yet</Text>
-                <Text style={styles.emptyDesc}>Your posts will appear here.</Text>
-                <TouchableOpacity style={[styles.emptyAction, { borderColor: theme.accent }]} onPress={() => router.push('/create-post?accountType=buyer' as any)}>
-                  <Text style={[styles.emptyActionText, { color: theme.accent }]}>Create Post</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.grid}>
-                {posts.map(post => (
-                  <TouchableOpacity
-                    key={post.id}
-                    style={styles.gridCell}
-                    onPress={() => handlePostTap(post)}
-                    onLongPress={() => handlePostLongPress(post)}
-                  >
-                    <LinearGradient
-                      colors={(post.mediaColors?.length >= 2 ? post.mediaColors : ['#1a1a2e', '#0d0d1a']) as [string, string]}
-                      style={styles.gridCellInner}
-                    >
-                      <Feather name={postTypeIcon(post.type)} size={ICON.md} color={MUTED} />
-                      {post.caption ? (
-                        <Text style={styles.gridCaption} numberOfLines={1}>{post.caption}</Text>
-                      ) : null}
-                    </LinearGradient>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
-
-        {activeTab === 'Tagged' && (
+        {loading ? (
           <View style={styles.emptyState}>
-            <Feather name="tag" size={32} color={MUTED} />
-            <Text style={styles.emptyTitle}>No tagged posts</Text>
-            <Text style={styles.emptyDesc}>Posts that tag you will appear here.</Text>
-            <TouchableOpacity style={[styles.emptyAction, { borderColor: theme.accent }]} onPress={() => router.push('/(buyer)/discover')}>
-              <Text style={[styles.emptyActionText, { color: theme.accent }]}>Discover</Text>
+            <Text style={styles.emptyDesc}>Loading profile…</Text>
+          </View>
+        ) : loadError ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>Couldn't load profile</Text>
+            <TouchableOpacity style={[styles.emptyAction, { borderColor: theme.accent }]} onPress={loadData}>
+              <Text style={[styles.emptyActionText, { color: theme.accent }]}>Try again</Text>
             </TouchableOpacity>
           </View>
-        )}
-
-        {activeTab === 'Reposts' && (
-          <View>
-            {reposts.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Feather name="repeat" size={32} color={MUTED} />
-                <Text style={styles.emptyTitle}>No reposts yet</Text>
-                <Text style={styles.emptyDesc}>Posts you repost will appear here.</Text>
-              </View>
-            ) : (
-              reposts.map(rp => (
-                <View key={rp.id} style={styles.repostRow}>
-                  <View style={styles.repostHeader}>
-                    <Feather name="repeat" size={12} color={MUTED} />
-                    <Text style={styles.repostMeta}>You reposted</Text>
+        ) : (
+          <>
+            {/* ── Centered Avatar ── */}
+            <View style={styles.avatarSection}>
+              <TouchableOpacity onPress={() => router.push('/buyer-story-create' as any)} style={styles.avatarWrap}>
+                {avatarUri ? (
+                  <Image source={{ uri: avatarUri }} style={[styles.avatar, hasActiveStory && styles.avatarActive]} resizeMode="cover" />
+                ) : (
+                  <View style={[styles.avatar, styles.avatarPlaceholder, hasActiveStory && styles.avatarActive]}>
+                    <Text style={styles.avatarText}>{avatarInitials}</Text>
                   </View>
-                  <Text style={styles.repostAuthor}>{rp.originalAuthorName}</Text>
-                  <Text style={styles.repostHandle}>{rp.originalAuthorHandle}</Text>
-                  <Text style={styles.repostCaption} numberOfLines={2}>{rp.originalCaption}</Text>
+                )}
+                <View style={styles.avatarBadge}>
+                  <Feather name="plus" size={12} color={FG} />
                 </View>
-              ))
-            )}
-          </View>
-        )}
+              </TouchableOpacity>
+            </View>
 
-        {activeTab === 'Saved' && (
-          <View>
-            {savedItems.length === 0 ? (
+            {/* ── Name / Handle / Bio ── */}
+            <View style={styles.nameSection}>
+              <Text style={styles.profileName}>{displayName}</Text>
+              {profile?.pronouns ? <Text style={styles.pronouns}>({profile.pronouns})</Text> : null}
+              <Text style={styles.handleYear}>
+                {displayHandle}{joinedYear ? ` · Joined ${joinedYear}` : ''}
+              </Text>
+              {profile?.bio ? (
+                <Text style={styles.bio} numberOfLines={2}>{profile.bio}</Text>
+              ) : null}
+              {profile?.website ? (
+                <TouchableOpacity onPress={() => { const url = profile.website.startsWith('http') ? profile.website : 'https://' + profile.website; Linking.openURL(url); }}>
+                  <Text style={[styles.website, { color: theme.secondary }]}>{profile.website}</Text>
+                </TouchableOpacity>
+              ) : null}
+              {profile?.location ? (
+                <View style={styles.locationRow}>
+                  <Feather name="map-pin" size={12} color={MUTED} />
+                  <Text style={styles.locationText}>{profile.location}</Text>
+                </View>
+              ) : null}
+            </View>
+
+            {/* ── Stats Row ── */}
+            <View style={styles.statsRow}>
+              <TouchableOpacity style={styles.statCol}>
+                <Text style={styles.statNum}>{posts.length}</Text>
+                <Text style={styles.statLabel}>Posts</Text>
+              </TouchableOpacity>
+              <View style={styles.statDivider} />
+              <TouchableOpacity style={styles.statCol} onPress={() => router.push('/connections?type=followers' as any)}>
+                <Text style={styles.statNum}>{profile?.friendsCount ?? 0}</Text>
+                <Text style={styles.statLabel}>Followers</Text>
+              </TouchableOpacity>
+              <View style={styles.statDivider} />
+              <TouchableOpacity style={styles.statCol} onPress={() => router.push('/connections?type=following' as any)}>
+                <Text style={styles.statNum}>{profile?.followingBrandsCount ?? 0}</Text>
+                <Text style={styles.statLabel}>Following</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* ── Action Buttons ── */}
+            <View style={styles.actionRow}>
+              <TouchableOpacity style={[styles.actionBtn, styles.actionBtnPrimary]} onPress={() => router.push('/(buyer)/edit-profile')}>
+                <Text style={[styles.actionBtnText, styles.actionBtnPrimaryText]}>Edit Profile</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/(buyer)/inbox' as never)}>
+                <Text style={styles.actionBtnText}>Messages</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionIconBtn} onPress={handleShareProfile}>
+                <Feather name="share-2" size={ICON.sm} color={FG} />
+              </TouchableOpacity>
+            </View>
+
+            {/* ── Story Highlights Row ── */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.highlightsRow}>
+              <TouchableOpacity
+                style={styles.highlightNew}
+                onPress={() => router.push('/buyer-highlights-manager' as any)}
+              >
+                <View style={styles.highlightCircle}>
+                  <Feather name="plus" size={20} color={MUTED} />
+                </View>
+                <Text style={styles.highlightLabel}>New</Text>
+              </TouchableOpacity>
+              {highlights.map(h => (
+                <TouchableOpacity
+                  key={h.id}
+                  style={styles.highlight}
+                  onPress={() => router.push('/buyer-highlights-manager' as any)}
+                >
+                  <View style={[styles.highlightCircleColored, { backgroundColor: h.coverColor }]}>
+                    <Text style={styles.highlightEmoji}>{h.emoji}</Text>
+                  </View>
+                  <Text style={styles.highlightLabel} numberOfLines={1}>{h.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* ── Tab Bar ── */}
+            <View style={styles.tabBar}>
+              {TABS.map(tab => (
+                <TouchableOpacity
+                  key={tab}
+                  style={[styles.tabItem, activeTab === tab && styles.tabItemActive]}
+                  onPress={() => setActiveTab(tab)}
+                >
+                  <Feather name={profileTabIcon(tab)} size={16} color={activeTab === tab ? FG : MUTED} />
+                  <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
+                  {activeTab === tab && <View style={[styles.tabUnderline, { backgroundColor: theme.accent }]} />}
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* ── Tab Content ── */}
+            {activeTab === 'Posts' && (
+              <View style={styles.gridContainer}>
+                {posts.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Feather name="image" size={32} color={MUTED} />
+                    <Text style={styles.emptyTitle}>No posts yet</Text>
+                    <Text style={styles.emptyDesc}>Your posts will appear here.</Text>
+                    <TouchableOpacity style={[styles.emptyAction, { borderColor: theme.accent }]} onPress={() => router.push('/create-post?accountType=buyer' as any)}>
+                      <Text style={[styles.emptyActionText, { color: theme.accent }]}>Create Post</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.grid}>
+                    {posts.map(post => (
+                      <TouchableOpacity
+                        key={post.id}
+                        style={styles.gridCell}
+                        onPress={() => handlePostTap(post)}
+                        onLongPress={() => handlePostLongPress(post)}
+                      >
+                        <View style={[styles.gridCellInner, { backgroundColor: CARD }]}>
+                          <Feather name={postTypeIcon(post.type)} size={ICON.md} color={MUTED} />
+                          {post.caption ? (
+                            <Text style={styles.gridCaption} numberOfLines={1}>{post.caption}</Text>
+                          ) : null}
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
+
+            {activeTab === 'Tagged' && (
               <View style={styles.emptyState}>
-                <Feather name="bookmark" size={32} color={MUTED} />
-                <Text style={styles.emptyTitle}>Nothing saved yet</Text>
-                <Text style={styles.emptyDesc}>Items you save will appear here.</Text>
-                <TouchableOpacity style={[styles.emptyAction, { borderColor: theme.accent }]} onPress={() => router.push('/buyer-saved' as any)}>
-              <Text style={[styles.emptyActionText, { color: theme.accent }]}>View Saved</Text>
+                <Feather name="tag" size={32} color={MUTED} />
+                <Text style={styles.emptyTitle}>No tagged posts</Text>
+                <Text style={styles.emptyDesc}>Posts that tag you will appear here.</Text>
+                <TouchableOpacity style={[styles.emptyAction, { borderColor: theme.accent }]} onPress={() => router.push('/(buyer)/discover')}>
+                  <Text style={[styles.emptyActionText, { color: theme.accent }]}>Discover</Text>
                 </TouchableOpacity>
               </View>
-            ) : (
-              <View style={styles.savedGrid}>
-                {savedItems.map(item => (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={styles.savedTile}
-                    onPress={() => router.push('/buyer-saved' as any)}
-                  >
-                    <Feather name={savedTypeIcon(item.type)} size={ICON.md} color={item.accentColor || theme.accent} />
-                    <Text style={styles.savedTitle} numberOfLines={2}>{item.title}</Text>
-                    {item.subtitle ? <Text style={styles.savedSubtitle} numberOfLines={1}>{item.subtitle}</Text> : null}
-                  </TouchableOpacity>
-                ))}
+            )}
+
+            {activeTab === 'Reposts' && (
+              <View>
+                {reposts.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Feather name="repeat" size={32} color={MUTED} />
+                    <Text style={styles.emptyTitle}>No reposts yet</Text>
+                    <Text style={styles.emptyDesc}>Posts you repost will appear here.</Text>
+                  </View>
+                ) : (
+                  reposts.map(rp => (
+                    <View key={rp.id} style={styles.repostRow}>
+                      <View style={styles.repostHeader}>
+                        <Feather name="repeat" size={12} color={MUTED} />
+                        <Text style={styles.repostMeta}>You reposted</Text>
+                      </View>
+                      <Text style={styles.repostAuthor}>{rp.originalAuthorName}</Text>
+                      <Text style={styles.repostHandle}>{rp.originalAuthorHandle}</Text>
+                      <Text style={styles.repostCaption} numberOfLines={2}>{rp.originalCaption}</Text>
+                    </View>
+                  ))
+                )}
               </View>
             )}
-          </View>
+
+            {activeTab === 'Saved' && (
+              <View>
+                {savedItems.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Feather name="bookmark" size={32} color={MUTED} />
+                    <Text style={styles.emptyTitle}>Nothing saved yet</Text>
+                    <Text style={styles.emptyDesc}>Items you save will appear here.</Text>
+                    <TouchableOpacity style={[styles.emptyAction, { borderColor: theme.accent }]} onPress={() => router.push('/buyer-saved' as any)}>
+                      <Text style={[styles.emptyActionText, { color: theme.accent }]}>View Saved</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.savedGrid}>
+                    {savedItems.map(item => (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={styles.savedTile}
+                        onPress={() => router.push('/buyer-saved' as any)}
+                      >
+                        <Feather name={savedTypeIcon(item.type)} size={ICON.md} color={item.accentColor || theme.accent} />
+                        <Text style={styles.savedTitle} numberOfLines={2}>{item.title}</Text>
+                        {item.subtitle ? <Text style={styles.savedSubtitle} numberOfLines={1}>{item.subtitle}</Text> : null}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
+          </>
         )}
-        </>}
       </ScrollView>
 
       {/* ── Profile Menu Sheet ── */}
@@ -559,58 +550,100 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: SCREEN_BG },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },
   topBarLeft: { flexDirection: 'row', alignItems: 'center', gap: SP.xs },
-  topHandle: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, marginLeft: SP.xs },
+  topHandle: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
   topBarRight: { flexDirection: 'row', alignItems: 'center', gap: SP.xs },
   iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
 
-  heroRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, marginTop: SP.md, gap: SP.lg },
+  // Centered avatar
+  avatarSection: { alignItems: 'center', paddingTop: SP.lg, paddingBottom: SP.md },
   avatarWrap: { position: 'relative' },
-  storyRing: { borderRadius: 43, padding: 3 },
-  avatar: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontFamily: FONT.bold, fontSize: FS.lg, color: '#FFFFFF' },
-  avatarBadge: { position: 'absolute', bottom: -2, right: -2, backgroundColor: BG, borderRadius: 12, padding: 1 },
-  statsRow: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
-  statCol: { alignItems: 'center', flex: 1 },
-  statNum: { fontFamily: FONT.bold, fontSize: FS.lg, color: FG },
-  statLabel: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
-  statDivider: { width: 1, height: 24, backgroundColor: BORDER },
+  avatar: { width: 96, height: 96, borderRadius: 48 },
+  avatarActive: { borderWidth: 2, borderColor: ACCENT },
+  avatarPlaceholder: { backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontFamily: FONT.bold, fontSize: FS.xl, color: FG },
+  avatarBadge: {
+    position: 'absolute', bottom: 0, right: 0,
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: CARD, borderWidth: 1.5, borderColor: BG,
+    alignItems: 'center', justifyContent: 'center',
+  },
 
-  nameSection: { paddingHorizontal: SP.md, marginTop: SP.md, gap: 4 },
-  profileName: { fontFamily: FONT.bold, fontSize: FS.md, color: FG },
+  // Centered name/bio
+  nameSection: { alignItems: 'center', paddingHorizontal: SP.lg, gap: 3 },
+  profileName: { fontFamily: FONT.bold, fontSize: FS.lg, color: FG, textAlign: 'center' },
   pronouns: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED },
-  handleYear: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE },
-  bio: { fontFamily: FONT.regular, fontSize: FS.base, color: FG, marginTop: 4 },
-  website: { fontFamily: FONT.regular, fontSize: FS.sm },
+  handleYear: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
+  bio: { fontFamily: FONT.regular, fontSize: FS.sm, color: FG, textAlign: 'center', lineHeight: 19, marginTop: 2 },
+  website: { fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 2 },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   locationText: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
-  privacyBadge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 4, marginTop: SP.xs, gap: 4 },
-  privacyBadgeText: { fontFamily: FONT.medium, fontSize: FS.xs },
 
+  // Stats — horizontal centered
+  statsRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: SP.md, marginTop: SP.md, gap: 0,
+  },
+  statCol: { alignItems: 'center', flex: 1 },
+  statNum: { fontFamily: FONT.bold, fontSize: FS.md, color: FG },
+  statLabel: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
+  statDivider: { width: 1, height: 22, backgroundColor: BORDER, marginHorizontal: SP.xs },
+
+  // Action buttons
   actionRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, marginTop: SP.md, gap: SP.sm },
-  actionBtn: { flex: 1, height: 40, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
-  actionBtnText: { fontFamily: FONT.medium, fontSize: FS.sm, color: FG },
-  actionIconBtn: { width: 44, height: 44, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  actionBtn: {
+    flex: 1, height: 38,
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center',
+  },
+  actionBtnPrimary: { backgroundColor: 'transparent', borderColor: ACCENT },
+  actionBtnText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
+  actionBtnPrimaryText: { color: ACCENT },
+  actionIconBtn: {
+    width: 38, height: 38,
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center',
+  },
 
+  // Highlights
   highlightsRow: { paddingHorizontal: SP.md, paddingVertical: SP.md, gap: SP.md },
-  highlight: { alignItems: 'center', gap: 6 },
-  highlightNew: { alignItems: 'center', gap: 6 },
-  highlightCircle: { width: 60, height: 60, borderRadius: 30, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  highlightCircleGrad: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
+  highlight: { alignItems: 'center', gap: 5 },
+  highlightNew: { alignItems: 'center', gap: 5 },
+  highlightCircle: {
+    width: 58, height: 58, borderRadius: 29,
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  highlightCircleColored: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' },
   highlightEmoji: { fontSize: 22 },
   highlightLabel: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
 
-  tabBar: { flexDirection: 'row', marginTop: SP.sm, borderTopWidth: 1, borderBottomWidth: 1, borderColor: BORDER },
-  tabPill: { flex: 1, paddingVertical: 11, backgroundColor: BG, borderBottomWidth: 2, borderBottomColor: 'transparent', alignItems: 'center', gap: 3 },
-  tabPillActive: {},
-  tabText: { fontFamily: FONT.medium, fontSize: 10, color: MUTED },
-  tabTextActive: {},
+  // Text tabs
+  tabBar: {
+    flexDirection: 'row',
+    borderTopWidth: 1, borderBottomWidth: 1, borderColor: BORDER,
+    marginTop: SP.xs,
+  },
+  tabItem: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 4, paddingVertical: 11, position: 'relative',
+    borderBottomWidth: 2, borderBottomColor: 'transparent',
+  },
+  tabItemActive: {},
+  tabUnderline: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    height: 2, borderRadius: 1,
+  },
+  tabText: { fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED },
+  tabTextActive: { color: FG, fontFamily: FONT.semibold },
 
-  gridContainer: { marginTop: SP.md },
+  // Grid
+  gridContainer: { marginTop: SP.xs },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
-  gridCell: { width: CELL_SIZE + (SP.md * 2 / 3), height: CELL_SIZE + (SP.md * 2 / 3), overflow: 'hidden' },
+  gridCell: { width: CELL_SIZE, height: CELL_SIZE, overflow: 'hidden' },
   gridCellInner: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xs },
   gridCaption: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, position: 'absolute', bottom: SP.xs, left: SP.xs, right: SP.xs },
 
+  // Reposts
   repostRow: { backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, marginHorizontal: SP.md, marginVertical: SP.xs, padding: SP.md },
   repostHeader: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
   repostMeta: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
@@ -618,22 +651,24 @@ const styles = StyleSheet.create({
   repostHandle: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, marginTop: 2 },
   repostCaption: { fontFamily: FONT.regular, fontSize: FS.sm, color: SUBTLE, marginTop: SP.xs },
 
+  // Saved
   savedGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: SP.md, gap: SP.sm, marginTop: SP.sm },
   savedTile: { width: SAVED_TILE, aspectRatio: 1, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, padding: SP.sm, justifyContent: 'space-between' },
   savedTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, marginTop: SP.xs },
   savedSubtitle: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
 
+  // Empty
   emptyState: { alignItems: 'center', paddingHorizontal: SP.lg, paddingVertical: SP.xl },
   emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: FG, marginTop: SP.md },
   emptyDesc: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', marginTop: SP.sm },
-  emptyAction: { backgroundColor: CARD, borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: SP.lg, paddingVertical: SP.sm, marginTop: SP.md },
+  emptyAction: { backgroundColor: 'transparent', borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: SP.lg, paddingVertical: SP.sm, marginTop: SP.md },
   emptyActionText: { fontFamily: FONT.medium, fontSize: FS.sm },
 
   // Bottom sheet
   backdrop: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },
   sheet: { backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, paddingTop: SP.sm, paddingHorizontal: SP.md },
   sheetHandle: { width: 36, height: 4, backgroundColor: BORDER, borderRadius: 2, alignSelf: 'center', marginBottom: SP.md },
-  sheetTitle: { fontFamily: FONT.semibold, fontSize: FS.base, color: MUTED, paddingVertical: SP.sm, paddingHorizontal: SP.xs, marginBottom: SP.xs },
+  sheetTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, color: MUTED, paddingVertical: SP.sm, paddingHorizontal: SP.xs, marginBottom: SP.xs },
   sheetRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: 14, paddingHorizontal: SP.xs, borderRadius: RADIUS.md },
   sheetRowText: { fontFamily: FONT.medium, fontSize: FS.base, color: FG },
   sheetDivider: { height: 1, backgroundColor: BORDER, marginVertical: SP.xs },

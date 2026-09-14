@@ -10,7 +10,7 @@ export type StitchedAvatarProps = {
 export function StitchedAvatar({ src, alt, initials, size = 56, status = 'none', className = '' }: StitchedAvatarProps) {
   return (
     <span
-      className={`relative inline-grid place-items-center rounded-full border border-dashed border-primary p-[3px] ${className}`}
+      className={`relative inline-grid place-items-center rounded-full border border-border p-[3px] ${className}`}
       style={{ width: size, height: size }}
     >
       <span className="grid h-full w-full place-items-center overflow-hidden rounded-full bg-muted text-sm font-bold uppercase text-foreground">

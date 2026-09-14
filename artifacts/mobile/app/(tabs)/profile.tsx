@@ -6,7 +6,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -16,6 +15,10 @@ import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { reportNetworkError } from '@/lib/networkNotice';
+import {
+  BG, SCREEN_BG, CARD, BORDER, FG, MUTED, SUBTLE,
+  FONT, FS, SP, RADIUS, ICON, SURFACE, ACCENT, ACCENT_LIGHT,
+} from '@/lib/theme';
 
 // ─── Profile data shape ──────────────────────────────────────────────────────
 
@@ -40,16 +43,6 @@ interface SocialCounts {
   following: number;
   likes:     number;
 }
-
-// ─── Design tokens ─────────────────────────────────────────────────────────
-
-const BG     = '#07070F';
-const SCREEN_BG = 'transparent';
-const CARD   = '#12121F';
-const CARD_GLASS = 'rgba(18, 18, 31, 0.45)';
-const BORDER = 'rgba(255,255,255,0.07)';
-const FG     = '#F4F4FF';
-const MUTED  = 'rgba(244,244,255,0.50)';
 
 const QUICK_ACTIONS: { icon: keyof typeof Feather.glyphMap; label: string; route: string }[] = [
   { icon: 'video',      label: 'Create Post',   route: '/create-post' },
@@ -166,11 +159,6 @@ export default function ProfileScreen() {
     router.push(route as never);
   }
 
-  function openSettings() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    nav('/settings');
-  }
-
   function openProfileEditor() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setBrandNameInput(profile?.brandName ?? profile?.displayName ?? '');
@@ -249,37 +237,33 @@ export default function ProfileScreen() {
       contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 120 }}
       showsVerticalScrollIndicator={false}
     >
-      {/* Header */}
-      <View style={s.header}>
+      {/* ── Top bar: brand name + icons ── */}
+      <View style={s.topBar}>
         <TouchableOpacity
-          style={s.headerProfileTrigger}
+          style={s.topBarTitle}
           onPress={openProfileEditor}
           activeOpacity={0.75}
           accessibilityRole="button"
           accessibilityLabel="Edit brand name and bio"
-          accessibilityHint="Opens the quick profile editor"
           testID="profile-edit-header"
         >
-          <Text style={s.headerTitle} numberOfLines={1}>
+          <Text style={s.brandNameTitle} numberOfLines={1}>
             {profile?.brandName || profile?.displayName || 'My Brand'}
           </Text>
-          <Text style={s.headerSub} numberOfLines={2}>
-            {profile?.bio || 'Manage your brand, grow your audience, and scale your empire.'}
-          </Text>
         </TouchableOpacity>
-        <View style={s.headerIcons}>
-          <TouchableOpacity style={s.headerIconBtn} onPress={() => nav('/notifications-settings')} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel="Notification settings">
-            <Feather name="bell" size={18} color={FG} />
+        <View style={s.topBarIcons}>
+          <TouchableOpacity style={s.iconBtn} onPress={() => nav('/notifications-settings')} accessibilityRole="button" accessibilityLabel="Notification settings">
+            <Feather name="bell" size={ICON.md} color={FG} />
           </TouchableOpacity>
-          <TouchableOpacity style={s.headerIconBtn} onPress={() => nav('/settings')} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel="Seller settings">
-            <Feather name="settings" size={18} color={FG} />
+          <TouchableOpacity style={s.iconBtn} onPress={() => nav('/settings')} accessibilityRole="button" accessibilityLabel="Seller settings">
+            <Feather name="settings" size={ICON.md} color={FG} />
           </TouchableOpacity>
         </View>
       </View>
 
       {loadError && (
         <View style={s.loadError}>
-          <Feather name="wifi-off" size={16} color={theme.accentLight} />
+          <Feather name="wifi-off" size={16} color={MUTED} />
           <View style={{ flex: 1 }}>
             <Text style={s.loadErrorTitle}>Some profile details couldn't load</Text>
             <Text style={s.loadErrorText}>Your available information is still shown.</Text>
@@ -290,179 +274,143 @@ export default function ProfileScreen() {
         </View>
       )}
 
-      {/* Profile card */}
-      <View style={s.profileCard}>
-        {/* Avatar — story ring when active stories exist */}
-        <View style={s.avatarSection}>
-          {/* Tapping avatar views own stories (if any) or opens story creator */}
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              if (myStoryIds.length > 0) {
-                router.push({
-                  pathname: '/buyer-story-viewer' as any,
-                  params: { storyId: myStoryIds[0], allStoryIds: myStoryIds.join(',') },
-                });
-              } else {
-                router.push('/create-post' as any);
-              }
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={myStoryIds.length > 0 ? 'View your active story' : 'Create your first story'}
-          >
-            {/* Gradient ring when active story */}
-            {myStoryIds.length > 0 ? (
-              <LinearGradient
-                colors={[theme.accentLight, theme.accent, theme.secondary]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[s.avatarGlow, { shadowColor: theme.accent }]}
-              >
-                <View style={s.avatarRing}>
-                  <View style={s.avatar}>
-                    {profile?.profileImageUrl ? (
-                      <Image source={{ uri: profile.profileImageUrl }} style={s.avatarImage} accessibilityLabel="Brand avatar" />
-                    ) : (
-                      <Text style={[s.avatarText, { color: theme.accentLight }]}>{avatarInitials}</Text>
-                    )}
-                  </View>
-                </View>
-              </LinearGradient>
-            ) : (
-              <View style={[s.avatarGlow, { backgroundColor: theme.accentDim, shadowColor: theme.accent }]}>
-                <View style={s.avatarRing}>
-                  <View style={s.avatar}>
-                    {profile?.profileImageUrl ? (
-                      <Image source={{ uri: profile.profileImageUrl }} style={s.avatarImage} accessibilityLabel="Brand avatar" />
-                    ) : (
-                      <Text style={[s.avatarText, { color: theme.accentLight }]}>{avatarInitials}</Text>
-                    )}
-                  </View>
-                </View>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          {/* Camera button — change avatar photo */}
-          <TouchableOpacity
-            style={s.cameraBtn}
-            activeOpacity={0.8}
-            disabled={uploadingAvatar}
-            accessibilityRole="button"
-            accessibilityLabel={uploadingAvatar ? 'Uploading brand photo' : 'Change brand photo'}
-            accessibilityState={{ disabled: uploadingAvatar, busy: uploadingAvatar }}
-            onPress={async () => {
-              const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-              if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo access to update your brand avatar.'); return; }
-              const result = await ImagePicker.launchImageLibraryAsync({
-                allowsEditing: true,
-                aspect: [1, 1],
-                quality: 0.85,
-                mediaTypes: ['images'],
+      {/* ── Centered avatar + name + stats ── */}
+      <View style={s.profileCenter}>
+        {/* Avatar */}
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            if (myStoryIds.length > 0) {
+              router.push({
+                pathname: '/buyer-story-viewer' as any,
+                params: { storyId: myStoryIds[0], allStoryIds: myStoryIds.join(',') },
               });
-              if (result.canceled || !result.assets[0]) return;
-              setUploadingAvatar(true);
-              try {
-                const updated = await api.seller.uploadAvatar(result.assets[0]);
-                setProfile((current) => current ? { ...current, profileImageUrl: updated.profileImageUrl } : current);
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              } catch (error) {
-                reportNetworkError(error);
-                Alert.alert('Could not update photo', 'Check your connection and try again.');
-              } finally {
-                setUploadingAvatar(false);
-              }
-            }}
-          >
-            <Feather name={uploadingAvatar ? "loader" : "camera"} size={12} color={FG} />
-          </TouchableOpacity>
-
-          {/* Add Story "+" badge */}
-          <TouchableOpacity
-            style={[s.addStoryBtn, { backgroundColor: theme.accent }]}
-            activeOpacity={0.85}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            } else {
               router.push('/create-post' as any);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Create story"
-          >
-            <Feather name="plus" size={12} color={theme.onAccent} />
-          </TouchableOpacity>
-        </View>
+            }
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={myStoryIds.length > 0 ? 'View your active story' : 'Create your first story'}
+          style={s.avatarWrap}
+        >
+          <View style={[s.avatar, myStoryIds.length > 0 && s.avatarActive]}>
+            {profile?.profileImageUrl ? (
+              <Image source={{ uri: profile.profileImageUrl }} style={s.avatarImage} accessibilityLabel="Brand avatar" />
+            ) : (
+              <Text style={s.avatarText}>{avatarInitials}</Text>
+            )}
+          </View>
+        </TouchableOpacity>
 
-        {/* Name + verified + plan */}
-        <View style={s.nameBlock}>
-          <TouchableOpacity
-            style={s.nameRow}
-            onPress={openProfileEditor}
-            activeOpacity={0.75}
-            accessibilityRole="button"
-            accessibilityLabel="Edit brand name and bio"
-            accessibilityHint="Opens the quick profile editor"
-            testID="profile-edit-details"
-          >
+        {/* Camera button */}
+        <TouchableOpacity
+          style={s.cameraBtn}
+          activeOpacity={0.8}
+          disabled={uploadingAvatar}
+          accessibilityRole="button"
+          accessibilityLabel={uploadingAvatar ? 'Uploading brand photo' : 'Change brand photo'}
+          accessibilityState={{ disabled: uploadingAvatar, busy: uploadingAvatar }}
+          onPress={async () => {
+            const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo access to update your brand avatar.'); return; }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.85,
+              mediaTypes: ['images'],
+            });
+            if (result.canceled || !result.assets[0]) return;
+            setUploadingAvatar(true);
+            try {
+              const updated = await api.seller.uploadAvatar(result.assets[0]);
+              setProfile((current) => current ? { ...current, profileImageUrl: updated.profileImageUrl } : current);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch (error) {
+              reportNetworkError(error);
+              Alert.alert('Could not update photo', 'Check your connection and try again.');
+            } finally {
+              setUploadingAvatar(false);
+            }
+          }}
+        >
+          <Feather name={uploadingAvatar ? "loader" : "camera"} size={12} color={FG} />
+        </TouchableOpacity>
+
+        {/* Brand name */}
+        <TouchableOpacity
+          onPress={openProfileEditor}
+          activeOpacity={0.75}
+          accessibilityRole="button"
+          accessibilityLabel="Edit brand name and bio"
+          testID="profile-edit-details"
+        >
+          <View style={s.nameRow}>
             <Text style={s.brandName} numberOfLines={1}>
               {profile?.brandName || profile?.displayName || 'My Brand'}
             </Text>
-            <Feather name="check-circle" size={17} color={colors.primary} />
-            <View style={[s.editProfileIcon, { backgroundColor: theme.accentDim }]}>
-              <Feather name="edit-3" size={13} color={colors.primary} />
-            </View>
-          </TouchableOpacity>
-          {profile?.brandName && profile?.displayName && profile.brandName !== profile.displayName && (
-            <Text style={s.brandHandle} numberOfLines={1}>
-              @{profile.displayName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)}
-            </Text>
-          )}
-          {profile?.subscriptionPlanId || profile?.subscriptionStatus === 'active' ? (
-            <View style={[s.planPill, { backgroundColor: theme.accentDim }]}>
-              <Text style={[s.planText, { color: theme.accentLight }]}>
-                {profile?.subscriptionPlanId
-                  ? `${profile.subscriptionPlanId.charAt(0).toUpperCase()}${profile.subscriptionPlanId.slice(1)} Plan`
-                  : 'Active Plan'}
-              </Text>
-            </View>
-          ) : (
-            <View style={[s.planPill, { backgroundColor: theme.accentDim }]}>
-              <Text style={[s.planText, { color: theme.accentLight }]}>Free Plan</Text>
-            </View>
-          )}
-
-          {/* Stats */}
-          <View style={s.statsRow}>
-            {([
-              { label: 'Following', value: socialCounts.following > 0 ? socialCounts.following.toLocaleString() : '—' },
-              { label: 'Followers', value: socialCounts.followers > 0 ? socialCounts.followers.toLocaleString() : '—' },
-              { label: 'Likes',     value: socialCounts.likes.toLocaleString() },
-            ] as { label: string; value: string }[]).map((st, i) => (
-              <React.Fragment key={st.label}>
-                {i > 0 && <View style={s.statDivider} />}
-                <TouchableOpacity style={s.statItem} activeOpacity={0.7}>
-                  <Text style={s.statValue}>{st.value}</Text>
-                  <Text style={s.statLabel}>{st.label}</Text>
-                </TouchableOpacity>
-              </React.Fragment>
-            ))}
+            <Feather name="check-circle" size={16} color={colors.primary} />
           </View>
+        </TouchableOpacity>
+
+        {/* Handle */}
+        {profile?.brandName && profile?.displayName && profile.brandName !== profile.displayName && (
+          <Text style={s.brandHandle} numberOfLines={1}>
+            @{profile.displayName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)}
+          </Text>
+        )}
+
+        {/* Plan pill */}
+        {(profile?.subscriptionPlanId || profile?.subscriptionStatus === 'active') ? (
+          <View style={s.planPill}>
+            <Text style={[s.planText, { color: theme.accentLight }]}>
+              {profile?.subscriptionPlanId
+                ? `${profile.subscriptionPlanId.charAt(0).toUpperCase()}${profile.subscriptionPlanId.slice(1)} Plan`
+                : 'Active Plan'}
+            </Text>
+          </View>
+        ) : (
+          <View style={s.planPill}>
+            <Text style={[s.planText, { color: MUTED }]}>Free Plan</Text>
+          </View>
+        )}
+
+        {/* Bio */}
+        {profile?.bio ? (
+          <Text style={s.bio} numberOfLines={2}>{profile.bio}</Text>
+        ) : null}
+
+        {/* Stats */}
+        <View style={s.statsRow}>
+          {([
+            { label: 'Following', value: socialCounts.following > 0 ? socialCounts.following.toLocaleString() : '—' },
+            { label: 'Followers', value: socialCounts.followers > 0 ? socialCounts.followers.toLocaleString() : '—' },
+            { label: 'Likes',     value: socialCounts.likes.toLocaleString() },
+          ] as { label: string; value: string }[]).map((st, i) => (
+            <React.Fragment key={st.label}>
+              {i > 0 && <View style={s.statDivider} />}
+              <TouchableOpacity style={s.statItem} activeOpacity={0.7}>
+                <Text style={s.statValue}>{st.value}</Text>
+                <Text style={s.statLabel}>{st.label}</Text>
+              </TouchableOpacity>
+            </React.Fragment>
+          ))}
         </View>
       </View>
 
-      {/* Quick Actions */}
+      {/* ── Quick Actions ── */}
       <View style={s.quickRow}>
         {QUICK_ACTIONS.map((qa) => (
           <TouchableOpacity key={qa.label} style={s.quickItem} activeOpacity={0.75} onPress={() => nav(qa.route)} accessibilityRole="button" accessibilityLabel={qa.label}>
-            <View style={[s.quickIconBox, { backgroundColor: theme.accentDim }]}>
-              <Feather name={qa.icon} size={18} color={colors.primary} />
+            <View style={s.quickIconBox}>
+              <Feather name={qa.icon} size={18} color={FG} />
             </View>
             <Text style={s.quickLabel}>{qa.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      {/* Content Tabs */}
+      {/* ── Content Tabs ── */}
       <View style={s.tabsBar}>
         {CONTENT_TABS.map((tab, i) => {
           const active = activeTab === i;
@@ -470,15 +418,16 @@ export default function ProfileScreen() {
           return (
             <TouchableOpacity
               key={tab}
-              style={[s.tabItem, active && [s.tabItemActive, { borderBottomColor: theme.accent }]]}
+              style={[s.tabItem, active && s.tabItemActive]}
               activeOpacity={0.75}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setActiveTab(i); }}
               accessibilityRole="tab"
               accessibilityLabel={`${tab} tab`}
               accessibilityState={{ selected: active }}
             >
-              <Feather name={icons[i]} size={13} color={active ? colors.primary : MUTED} />
-              <Text style={[s.tabLabel, active && [s.tabLabelActive, { color: theme.accentLight }]]}>{tab}</Text>
+              <Feather name={icons[i]} size={13} color={active ? FG : MUTED} />
+              <Text style={[s.tabLabel, active && s.tabLabelActive]}>{tab}</Text>
+              {active && <View style={[s.tabUnderline, { backgroundColor: theme.accent }]} />}
             </TouchableOpacity>
           );
         })}
@@ -506,7 +455,7 @@ export default function ProfileScreen() {
         </View>
       ) : (
       <View style={s.grid}>
-        {/* Create Post tile — always first */}
+        {/* Create Post tile */}
         <TouchableOpacity
           style={s.gridTile}
           activeOpacity={0.85}
@@ -523,13 +472,13 @@ export default function ProfileScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Real seller posts — filtered by tab */}
+        {/* Real seller posts */}
         {sellerPosts
           .filter(p => {
             if (activeTab === 0) return !p.isDraft && !p.isArchived;
             if (activeTab === 1) return p.isDraft && !p.isArchived;
             if (activeTab === 2) return !p.isDraft && !p.isArchived && !!p.scheduledAt;
-            return false; // Analytics tab has no grid items
+            return false;
           })
           .map(post => (
             <TouchableOpacity
@@ -539,21 +488,21 @@ export default function ProfileScreen() {
               accessibilityRole="button"
               accessibilityLabel={`${post.contentType} post, ${post.caption || 'no caption'}, created ${new Date(post.createdAt).toLocaleDateString()}`}
             >
-              <LinearGradient colors={['#1F3A5F', '#0A1828']} style={s.gridInner}>
-                <View style={[s.gridMenuBtn, { opacity: 0.7 }]}>
-                  <Feather name={post.contentType === 'video' ? 'video' : 'image'} size={11} color="#FFF" />
+              <View style={s.gridInner}>
+                <View style={s.gridTypeIcon}>
+                  <Feather name={post.contentType === 'video' ? 'video' : 'image'} size={11} color={MUTED} />
                 </View>
                 <Text style={s.gridCaption} numberOfLines={3}>{post.caption || '(No caption)'}</Text>
                 <View style={s.gridStatRow}>
-                  <Feather name="clock" size={10} color="#FFFFFF99" />
+                  <Feather name="clock" size={10} color={MUTED} />
                   <Text style={s.gridStat}>{new Date(post.createdAt).toLocaleDateString()}</Text>
                 </View>
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
           ))
         }
 
-        {/* Empty state for tabs when no posts */}
+        {/* Empty state */}
         {activeTab !== 3 && sellerPosts.filter(p => {
           if (activeTab === 0) return !p.isDraft && !p.isArchived;
           if (activeTab === 1) return p.isDraft && !p.isArchived;
@@ -574,6 +523,7 @@ export default function ProfileScreen() {
     </ScrollView>
     )}
 
+      {/* ── Profile Editor Modal ── */}
       <Modal
         visible={profileEditorVisible}
         transparent
@@ -649,13 +599,13 @@ export default function ProfileScreen() {
                 <Text style={s.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[s.saveButton, { backgroundColor: theme.accent }, savingProfile && s.saveButtonDisabled]}
+                style={[s.saveButton, { borderColor: theme.accent }, savingProfile && s.saveButtonDisabled]}
                 onPress={saveProfileDetails}
                 disabled={savingProfile}
                 activeOpacity={0.8}
                 testID="profile-edit-save"
               >
-                <Text style={[s.saveButtonText, { color: theme.onAccent }]}>{savingProfile ? 'Saving…' : 'Save changes'}</Text>
+                <Text style={[s.saveButtonText, { color: theme.accent }]}>{savingProfile ? 'Saving…' : 'Save changes'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -669,108 +619,163 @@ export default function ProfileScreen() {
 
 const s = StyleSheet.create({
   root: { flex: 1 },
-   loadingScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-   loadingText: { color: MUTED, fontSize: 13, fontFamily: 'Inter_500Medium' },
-   loadError: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 20, marginBottom: 16, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD_GLASS },
-   loadErrorTitle: { color: FG, fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-   loadErrorText: { color: MUTED, fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
-   loadRetry: { fontSize: 12, fontFamily: 'Inter_700Bold' },
+  loadingScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  loadingText: { color: MUTED, fontSize: FS.sm, fontFamily: FONT.medium },
+  loadError: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    marginHorizontal: SP.md, marginBottom: SP.md, padding: 12,
+    borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
+    backgroundColor: CARD,
+  },
+  loadErrorTitle: { color: FG, fontSize: FS.xs, fontFamily: FONT.semibold },
+  loadErrorText:  { color: MUTED, fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
+  loadRetry:      { fontSize: FS.xs, fontFamily: FONT.bold },
 
-  // Header
-  header:         { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 20, gap: 12 },
-  headerProfileTrigger: { flex: 1 },
-  headerTitle:    { fontSize: 22, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 4 },
-  headerSub:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 17, maxWidth: 220 },
-  headerIcons:    { flexDirection: 'row', gap: 8, marginTop: 2 },
-  headerIconBtn:  { width: 44, height: 44, borderRadius: 10, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD_GLASS, alignItems: 'center', justifyContent: 'center' },
+  // Top bar
+  topBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: SP.md, marginBottom: SP.md,
+  },
+  topBarTitle: { flex: 1 },
+  brandNameTitle: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
+  topBarIcons: { flexDirection: 'row', gap: SP.xs },
+  iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
 
-  // Profile card
-  profileCard:    { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 20, marginBottom: 20, gap: 16 },
-
-  // Avatar
-  avatarSection:  { position: 'relative' },
-  avatarGlow:     { width: 88, height: 88, borderRadius: 44, padding: 3, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 14, elevation: 12 },
-  avatarRing:     { flex: 1, borderRadius: 42, overflow: 'hidden', backgroundColor: SCREEN_BG, padding: 3 },
-  avatar:         { flex: 1, borderRadius: 39, backgroundColor: '#18182E', alignItems: 'center', justifyContent: 'center' },
-  avatarText:     { fontSize: 30, fontFamily: 'Inter_700Bold' },
-   avatarImage:    { width: '100%', height: '100%', borderRadius: 39 },
-  cameraBtn:      { position: 'absolute', bottom: -9, right: -11, width: 44, height: 44, borderRadius: 22, backgroundColor: '#333', borderWidth: 2, borderColor: BG, alignItems: 'center', justifyContent: 'center' },
-  addStoryBtn:    { position: 'absolute', bottom: -9, left: -11, width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: BG, alignItems: 'center', justifyContent: 'center' },
-
-  // Name
-  nameBlock:      { flex: 1, paddingTop: 4 },
-  nameRow:        { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 },
-  brandName:      { fontSize: 18, fontFamily: 'Inter_700Bold', color: FG },
-  editProfileIcon:{ width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginLeft: 2 },
-  brandHandle:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 8 },
-  planPill:       { alignSelf: 'flex-start', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 14 },
-  planText:       { fontSize: 11, fontFamily: 'Inter_700Bold' },
+  // Centered profile
+  profileCenter: { alignItems: 'center', paddingHorizontal: SP.md, paddingBottom: SP.lg },
+  avatarWrap: { marginBottom: SP.sm, position: 'relative' },
+  avatar: {
+    width: 96, height: 96, borderRadius: 48,
+    backgroundColor: CARD,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  avatarActive: { borderWidth: 2, borderColor: ACCENT },
+  avatarImage: { width: '100%', height: '100%', borderRadius: 48 },
+  avatarText: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
+  cameraBtn: {
+    position: 'absolute', bottom: SP.sm, right: -SP.md,
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: CARD, borderWidth: 1.5, borderColor: BG,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  brandName: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
+  brandHandle: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginBottom: SP.xs },
+  planPill: {
+    borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER,
+    paddingHorizontal: 10, paddingVertical: 3, marginBottom: SP.sm,
+  },
+  planText: { fontSize: FS.xs, fontFamily: FONT.semibold },
+  bio: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 19, marginBottom: SP.md },
 
   // Stats
-  statsRow:       { flexDirection: 'row', alignItems: 'center', gap: 0 },
-  statDivider:    { width: 1, height: 28, backgroundColor: BORDER, marginHorizontal: 14 },
-  statItem:       { alignItems: 'flex-start' },
-  statValue:      { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
-  statLabel:      { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 1 },
+  statsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: SP.xs },
+  statDivider: { width: 1, height: 26, backgroundColor: BORDER, marginHorizontal: SP.md },
+  statItem: { alignItems: 'center' },
+  statValue: { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
+  statLabel: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
 
   // Quick actions
-  quickRow:       { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 16, paddingVertical: 4, backgroundColor: CARD_GLASS, borderTopWidth: 1, borderBottomWidth: 1, borderColor: BORDER, marginBottom: 24 },
-  quickItem:      { alignItems: 'center', paddingVertical: 14, gap: 6 },
-  quickIconBox:   { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  quickLabel:     { fontSize: 11, fontFamily: 'Inter_500Medium', color: FG, textAlign: 'center' },
+  quickRow: {
+    flexDirection: 'row', justifyContent: 'space-around',
+    paddingHorizontal: SP.md, paddingVertical: SP.xs,
+    borderTopWidth: 1, borderBottomWidth: 1, borderColor: BORDER,
+    marginBottom: SP.lg,
+  },
+  quickItem: { alignItems: 'center', paddingVertical: SP.md, gap: 6 },
+  quickIconBox: {
+    width: 44, height: 44, borderRadius: RADIUS.sm,
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  quickLabel: { fontSize: 11, fontFamily: FONT.medium, color: MUTED, textAlign: 'center' },
 
-  // Performance grid
-  analyticsSection: { padding: 20, gap: 8 },
-  analyticsTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: FG },
-  analyticsSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 8 },
-  perfGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  perfCard:       { width: '48.5%', backgroundColor: CARD_GLASS, borderRadius: 14, borderWidth: 1, borderColor: BORDER, padding: 14 },
-  perfLabel:      { fontSize: 11, fontFamily: 'Inter_500Medium', color: MUTED, marginBottom: 6 },
-  perfValue:      { fontSize: 18, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.3 },
-  neutralAnalyticsState: { alignItems: 'center', borderWidth: 1, borderColor: BORDER, borderRadius: 14, backgroundColor: CARD_GLASS, padding: 20, marginTop: 8, gap: 7 },
-  neutralAnalyticsTitle: { color: FG, fontFamily: 'Inter_600SemiBold', fontSize: 14 },
-  neutralAnalyticsText: { color: MUTED, fontFamily: 'Inter_400Regular', fontSize: 12, textAlign: 'center', lineHeight: 17 },
+  // Analytics
+  analyticsSection: { padding: SP.md, gap: SP.sm },
+  analyticsTitle: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
+  analyticsSubtitle: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginBottom: SP.sm },
+  perfGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
+  perfCard: {
+    width: '48.5%', backgroundColor: CARD, borderRadius: RADIUS.md,
+    borderWidth: 1, borderColor: BORDER, padding: SP.md,
+  },
+  perfLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: 6 },
+  perfValue: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG, letterSpacing: -0.3 },
+  neutralAnalyticsState: {
+    alignItems: 'center', borderWidth: 1, borderColor: BORDER,
+    borderRadius: RADIUS.md, padding: SP.md, marginTop: SP.sm, gap: 7,
+  },
+  neutralAnalyticsTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
+  neutralAnalyticsText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'center', lineHeight: 17 },
 
   // Content tabs
-  tabsBar:        { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, marginBottom: 1 },
-  tabItem:        { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabItemActive:  {},
-  tabLabel:       { fontSize: 12, fontFamily: 'Inter_500Medium', color: MUTED },
-  tabLabelActive: { color: FG, fontFamily: 'Inter_600SemiBold' },
+  tabsBar: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, marginBottom: 1 },
+  tabItem: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 5, paddingVertical: 12, position: 'relative',
+  },
+  tabItemActive: {},
+  tabUnderline: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, borderRadius: 1 },
+  tabLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
+  tabLabelActive: { color: FG, fontFamily: FONT.semibold },
 
   // Grid
-  grid:           { flexDirection: 'row', flexWrap: 'wrap' },
-  gridTile:       { width: '33.333%', aspectRatio: 0.78, padding: 1 },
-  createTile:     { flex: 1, backgroundColor: CARD_GLASS, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12 },
-  createPlus:     { width: 40, height: 40, borderRadius: 20, borderWidth: 1.5, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  createTitle:    { fontSize: 12, fontFamily: 'Inter_700Bold', color: FG, textAlign: 'center' },
-  createSub:      { fontSize: 10, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center', lineHeight: 14 },
-  gridInner:      { flex: 1, padding: 8, justifyContent: 'space-between' },
-  gridMenuBtn:    { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
-  gridCaption:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#FFF', lineHeight: 14, marginTop: 4 },
-  gridStatRow:    { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  gridStat:       { fontSize: 10, fontFamily: 'Inter_500Medium', color: '#FFFFFF99' },
-  emptyState:     { width: '100%', alignItems: 'center', padding: 24, gap: 8 },
-  emptyText:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  gridTile: { width: '33.333%', aspectRatio: 0.78, padding: 1 },
+  createTile: {
+    flex: 1, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center', gap: SP.sm, padding: 12,
+  },
+  createPlus: {
+    width: 40, height: 40, borderRadius: 20,
+    borderWidth: 1, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  createTitle: { fontSize: 12, fontFamily: FONT.bold, color: FG, textAlign: 'center' },
+  createSub: { fontSize: 10, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 14 },
+  gridInner: { flex: 1, backgroundColor: CARD, padding: SP.sm, justifyContent: 'space-between' },
+  gridTypeIcon: {
+    position: 'absolute', top: 6, right: 6,
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center',
+  },
+  gridCaption: { fontSize: 11, fontFamily: FONT.semibold, color: FG, lineHeight: 14, marginTop: SP.md },
+  gridStatRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  gridStat: { fontSize: 10, fontFamily: FONT.medium, color: MUTED },
+  emptyState: { width: '100%', alignItems: 'center', padding: SP.lg, gap: SP.sm },
+  emptyText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' },
 
-  // Quick profile editor
+  // Profile editor sheet
   sheetModal:       { flex: 1, justifyContent: 'flex-end' },
   sheetBackdrop:    { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.68)' },
-  sheet:            { backgroundColor: CARD_GLASS, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: BORDER, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 26 },
-  sheetHandle:      { width: 38, height: 4, borderRadius: 2, backgroundColor: 'rgba(244,244,255,0.25)', alignSelf: 'center', marginBottom: 18 },
-  sheetHeader:      { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 22 },
-  sheetTitle:       { color: FG, fontFamily: 'Inter_700Bold', fontSize: 20, marginBottom: 4 },
-  sheetSubtitle:    { color: MUTED, fontFamily: 'Inter_400Regular', fontSize: 13 },
-  sheetClose:       { width: 34, height: 34, borderRadius: 17, backgroundColor: '#18182E', alignItems: 'center', justifyContent: 'center' },
-  inputLabel:       { color: FG, fontFamily: 'Inter_600SemiBold', fontSize: 13, marginBottom: 8 },
-  bioLabelRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18 },
-  characterCount:   { color: MUTED, fontFamily: 'Inter_400Regular', fontSize: 11, marginBottom: 8 },
-  textInput:        { minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: BORDER, backgroundColor: SCREEN_BG, color: FG, fontFamily: 'Inter_400Regular', fontSize: 15, paddingHorizontal: 14, paddingVertical: 12 },
-  bioInput:         { minHeight: 96, maxHeight: 128 },
-  sheetActions:     { flexDirection: 'row', gap: 10, marginTop: 24 },
-  cancelButton:     { flex: 1, minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  cancelButtonText: { color: FG, fontFamily: 'Inter_600SemiBold', fontSize: 14 },
-  saveButton:       { flex: 1.45, minHeight: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  sheet: {
+    backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
+    borderTopWidth: 1, borderColor: BORDER, paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: 26,
+  },
+  sheetHandle: { width: 38, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: SP.lg },
+  sheetHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: SP.lg },
+  sheetTitle: { color: FG, fontFamily: FONT.bold, fontSize: FS.lg, marginBottom: 4 },
+  sheetSubtitle: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm },
+  sheetClose: { width: 34, height: 34, borderRadius: 17, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
+  inputLabel: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, marginBottom: SP.sm },
+  bioLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.md },
+  characterCount: { color: MUTED, fontFamily: FONT.regular, fontSize: 11, marginBottom: SP.sm },
+  textInput: {
+    minHeight: 48, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
+    backgroundColor: SURFACE, color: FG, fontFamily: FONT.regular, fontSize: FS.base,
+    paddingHorizontal: SP.md, paddingVertical: 12,
+  },
+  bioInput: { minHeight: 96, maxHeight: 128 },
+  sheetActions: { flexDirection: 'row', gap: 10, marginTop: SP.lg },
+  cancelButton: {
+    flex: 1, minHeight: 48, borderRadius: RADIUS.md,
+    borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center',
+  },
+  cancelButtonText: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
+  saveButton: {
+    flex: 1.45, minHeight: 48, borderRadius: RADIUS.md,
+    borderWidth: 1, alignItems: 'center', justifyContent: 'center',
+  },
   saveButtonDisabled: { opacity: 0.6 },
-  saveButtonText:   { fontFamily: 'Inter_700Bold', fontSize: 14 },
+  saveButtonText: { fontFamily: FONT.bold, fontSize: FS.sm },
 });

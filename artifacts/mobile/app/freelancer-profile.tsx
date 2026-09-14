@@ -530,7 +530,7 @@ const styles = StyleSheet.create({
   notPayableText: { color: ORANGE, fontSize: FS.xs, fontFamily: FONT.medium, flex: 1 },
   modalOverlay: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },
   modalSheet: {
-    backgroundColor: '#0C0C17', borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
+    backgroundColor: '#111113', borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
     padding: SP.md + 4, paddingBottom: SP.xl,
     borderWidth: 1, borderColor: BORDER,
   },

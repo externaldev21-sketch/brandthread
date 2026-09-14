@@ -15,7 +15,7 @@ describe('navigation scene isolation', () => {
     expect(rootLayout.slice(layoutStart, stackOptions)).toContain(
       '<IsolatedStackScene>{children}</IsolatedStackScene>',
     );
-    expect(rootLayout).toContain("style={{ flex: 1, backgroundColor: '#07070F' }}");
+    expect(rootLayout).toContain("style={{ flex: 1, backgroundColor: '#0A0A0B' }}");
     expect(rootLayout).toContain('{isFocused ? <AnimatedGradientBackground /> : null}');
   });
 

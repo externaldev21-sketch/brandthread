@@ -59,7 +59,7 @@ function IsolatedStackScene({ children }: { children: React.ReactNode }) {
   const isFocused = useIsFocused();
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#07070F' }}>
+    <View style={{ flex: 1, backgroundColor: '#0A0A0B' }}>
       {isFocused ? <AnimatedGradientBackground /> : null}
       {children}
     </View>
@@ -81,7 +81,7 @@ if (Platform.OS !== 'web') {
       name:       'Brandthread',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#DDE2E8',
+      lightColor: '#5B5CFF',
     });
     Notifications.setNotificationChannelAsync('orders', {
       name:       'Orders',
@@ -89,7 +89,7 @@ if (Platform.OS !== 'web') {
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       sound: 'order-received.wav',
-      lightColor: '#DDE2E8',
+      lightColor: '#5B5CFF',
     });
   }
 }
@@ -99,7 +99,7 @@ SplashScreen.preventAutoHideAsync();
 // On web, the document body is white by default — paint it dark so the
 // pre-render moment matches the app instead of flashing a white screen.
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
-  document.body.style.backgroundColor = '#07070F';
+  document.body.style.backgroundColor = '#0A0A0B';
 }
 
 // ─── DEV design-preview bypass (web + dev builds only) ───────────────────────
@@ -561,7 +561,7 @@ function RootLayoutNav() {
           onPress={() => router.back()}
           style={{ marginTop: 8, minHeight: 44, paddingHorizontal: 22, borderRadius: 10, backgroundColor: '#F5F5F7', alignItems: 'center', justifyContent: 'center' }}
         >
-          <Text style={{ color: '#07070F', fontFamily: 'Inter_600SemiBold', fontSize: 14 }}>Go back</Text>
+          <Text style={{ color: '#FFFFFF', fontFamily: 'Inter_600SemiBold', fontSize: 14 }}>Go back</Text>
         </Pressable>
       </View>
     );

@@ -42,7 +42,7 @@ function Bubble({ msg, prevMsg, isDark, currentUserId }: {
   currentUserId: string | null | undefined;
 }) {
   const colors = useColors();
-  const fg       = isDark ? '#F4F4FF' : '#07070F';
+  const fg       = isDark ? '#F7F7FA' : '#0A0A0B';
   const cardBg   = isDark ? '#1D1A15' : '#EDE7D9';
   const mutedFg  = isDark ? '#8C8577' : '#8080A0';
 
@@ -133,7 +133,7 @@ export default function ChatScreen() {
   const bg      = isDark ? '#121110' : '#F4F3FA';
   const headerBg = isDark ? '#1B1917' : '#FFFFFF';
   const border  = isDark ? '#1A1A28' : '#E3DCC9';
-  const fg      = isDark ? '#F4F4FF' : '#07070F';
+  const fg      = isDark ? '#F7F7FA' : '#0A0A0B';
   const muted   = isDark ? '#8C8577' : '#8080A0';
   const inputBg = isDark ? '#1D1A15' : '#FFFFFF';
 

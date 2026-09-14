@@ -101,7 +101,7 @@ const TEMPLATES = [
   { label: 'T-Shirt',      colors: ['#0EA5E9', '#1D4ED8'] as [string,string] },
   { label: 'Hoodie',       colors: ['#0EA5E9', '#6366F1'] as [string,string] },
   { label: 'Product Card', colors: ['#0F766E', '#3B82F6'] as [string,string] },
-  { label: 'Story Reel',   colors: ['#22D3EE', '#0EA5E9'] as [string,string] },
+  { label: 'Story Reel',   colors: ['#5B5CFF', '#5B5CFF'] as [string,string] },
   { label: 'Lookbook',     colors: ['#F97316', '#F59E0B'] as [string,string] },
 ];
 
