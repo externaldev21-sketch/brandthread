@@ -31,14 +31,14 @@ describe('app background theme', () => {
     expect(colors.dark.info).toBe('#D4D4D8');
   });
 
-  it('isolates every root stack scene on its own animated background plane', () => {
+  it('isolates every root stack scene on an opaque background plane', () => {
     const rootLayout = readFileSync(appPath('_layout.tsx'), 'utf8');
 
-    expect(rootLayout).toContain("import AnimatedGradientBackground from '@/components/branding/AnimatedGradientBackground'");
     expect(rootLayout).toContain('screenLayout={({ children }) => (');
     expect(rootLayout).toContain('<IsolatedStackScene>{children}</IsolatedStackScene>');
-    expect(rootLayout).toContain('{isFocused ? <AnimatedGradientBackground /> : null}');
-    expect(rootLayout).toContain("contentStyle: { backgroundColor: 'transparent' }");
+    expect(rootLayout).not.toContain('AnimatedGradientBackground');
+    expect(rootLayout).toContain('contentStyle: OPAQUE_SCREEN_CONTENT');
+    expect(rootLayout).not.toContain("contentStyle: { backgroundColor: 'transparent' }");
     expect(rootLayout).toContain('<NavigationThemeProvider value={TRANSPARENT_NAVIGATION_THEME}>');
 
     for (const route of ['sign-in.tsx', 'onboarding.tsx', 'splash.tsx', 'forgot-password.tsx', 'account-type.tsx']) {
@@ -89,8 +89,8 @@ describe('app background theme', () => {
     const sellerHome = readFileSync(appPath('(tabs)/index.tsx'), 'utf8');
     const buyerInbox = readFileSync(appPath('(buyer)/inbox.tsx'), 'utf8');
 
-    expect(sellerLayout).toContain("sceneStyle: { backgroundColor: 'transparent' }");
-    expect(buyerLayout).toContain("sceneStyle: { backgroundColor: 'transparent' }");
+    expect(sellerLayout).toContain("sceneStyle: { backgroundColor: '#0A0A0B' }");
+    expect(buyerLayout).toContain("sceneStyle: { backgroundColor: '#0A0A0B' }");
     expect(sellerLayout).toContain('detachInactiveScreens');
     expect(buyerLayout).toContain('detachInactiveScreens');
     expect(sellerLayout).toContain('freezeOnBlur: true');

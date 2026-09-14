@@ -3,8 +3,8 @@ name: Transparent navigation isolation
 description: Preventing retained transparent Expo Router scenes from painting or receiving touches through the active route
 ---
 
-**Rule:** Every root stack scene must own an opaque dark isolation plane beneath its transparent route content. Ordinary full pages use card presentation; retained modal/full-screen-modal routes must declare an explicit opaque content surface. Render the animated background only for the focused root scene. Detach and freeze inactive buyer and seller tab scenes.
+**Rule:** Root stack content and every buyer/seller tab scene must be opaque near-black. Ordinary full pages use card presentation; retained modal/full-screen-modal routes must declare an explicit opaque content surface. Do not mount a shared full-screen background inside each route scene. Detach and freeze inactive buyer and seller tabs as an additional native optimization.
 
-**Why:** A single background behind a transparent retained stack lets prior routes remain visible beneath pushed screens. Mounting one full animator per retained route fixes the bleed but creates unbounded animation work as stack depth grows.
+**Why:** Transparent nested tab scenes remain mounted on Expo web even when native detachment options are enabled, so prior tabs can show through. Per-route background mounts also coexist during transitions and add unnecessary full-screen layers.
 
-**How to apply:** Classify each route individually. Use card presentation for settings, details, editors, and workflows that replace the prior page. Reserve modal presentation for genuine immersive or overlay flows, and require an opaque content style even when their inner root is transparent. Use replacement for ownership transfers and `dismissTo` when a completed multi-route flow must unwind to an existing root.
+**How to apply:** Keep root Stack `contentStyle`, its scene wrapper, both Tabs `sceneStyle` values, and the seller tab bar opaque. Classify each route individually: cards for full pages, modals only for genuine immersive/overlay flows with opaque content. Use replacement for ownership transfers and `dismissTo` when a completed flow must unwind to an existing root.

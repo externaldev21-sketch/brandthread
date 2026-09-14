@@ -12,7 +12,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { Keyboard, Platform, Pressable, Text, View } from 'react-native';
 import { Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
-import { DarkTheme, ThemeProvider as NavigationThemeProvider, useIsFocused } from '@react-navigation/native';
+import { DarkTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import * as SplashScreen from 'expo-splash-screen';
 import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useUser } from '@clerk/expo';
 import { tokenCache } from '@/lib/tokenCache';
@@ -45,7 +45,6 @@ import { createNotificationResponseHandler } from '@/lib/notificationNavigation'
 import { useCanUseMarketing } from '@/contexts/CookieConsentContext';
 import { setMarketingPixelConsent, trackMarketingPixelEvent } from '@/lib/marketingPixels';
 import { captureNotificationEvent, flushNotificationEvents } from '@/lib/notificationEventOutbox';
-import AnimatedGradientBackground from '@/components/branding/AnimatedGradientBackground';
 
 const TRANSPARENT_NAVIGATION_THEME = {
   ...DarkTheme,
@@ -58,11 +57,8 @@ const TRANSPARENT_NAVIGATION_THEME = {
 const OPAQUE_SCREEN_CONTENT = { backgroundColor: '#0A0A0B' } as const;
 
 function IsolatedStackScene({ children }: { children: React.ReactNode }) {
-  const isFocused = useIsFocused();
-
   return (
     <View style={{ flex: 1, backgroundColor: '#0A0A0B' }}>
-      {isFocused ? <AnimatedGradientBackground /> : null}
       {children}
     </View>
   );
@@ -584,7 +580,7 @@ function RootLayoutNav() {
           animation: 'slide_from_right',
           animationDuration: 220,
           gestureEnabled: true,
-          contentStyle: { backgroundColor: 'transparent' },
+          contentStyle: OPAQUE_SCREEN_CONTENT,
         }}
       >
         {/* Boot: "/" renders BootScreen until AuthGate redirects */}

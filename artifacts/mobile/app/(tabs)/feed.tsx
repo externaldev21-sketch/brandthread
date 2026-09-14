@@ -861,11 +861,15 @@ export default function FeedScreen({ buyerMode = false }: { buyerMode?: boolean 
   const api = useApi();
   const feedCursorRef = useRef(createThreadFeedCursor());
   const feedGenerationRef = useRef(0);
+  const feedLoadKeyRef = useRef<string | null>(null);
   const feedLoadingMoreRef = useRef(false);
   const feedHasMoreRef = useRef(true);
 
   // Load published seller posts and subscribe to real-time changes
   const loadFeed = useCallback(async (initial = false) => {
+    const loadKey = feedTab;
+    if (feedLoadKeyRef.current === loadKey) return;
+    feedLoadKeyRef.current = loadKey;
     const generation = feedGenerationRef.current + 1;
     feedGenerationRef.current = generation;
     const initialCursor = createThreadFeedCursor();
@@ -894,9 +898,11 @@ export default function FeedScreen({ buyerMode = false }: { buyerMode?: boolean 
       if (initial) setSellerFeedPosts([]);
       setFeedError('Could not load Thread. Check your connection and try again.');
     } finally {
-      if (feedGenerationRef.current !== generation) return;
-      if (initial) setFeedLoading(false);
-      else setFeedRefreshing(false);
+      if (feedLoadKeyRef.current === loadKey) feedLoadKeyRef.current = null;
+      if (feedGenerationRef.current === generation) {
+        if (initial) setFeedLoading(false);
+        else setFeedRefreshing(false);
+      }
     }
   }, [feedTab]);
 

@@ -233,7 +233,7 @@ export default function TabLayout() {
         screenOptions={{
           freezeOnBlur: true,
           headerShown: false,
-          sceneStyle: { backgroundColor: 'transparent' },
+          sceneStyle: { backgroundColor: '#0A0A0B' },
         }}
       >
         {/* Visible tabs */}
@@ -260,7 +260,7 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   bar: {
     flexDirection:   'row',
-    backgroundColor: 'transparent',
+    backgroundColor: '#0A0A0B',
     borderTopWidth:  StyleSheet.hairlineWidth,
     borderTopColor:  'rgba(255,255,255,0.07)',
     paddingTop:      8,

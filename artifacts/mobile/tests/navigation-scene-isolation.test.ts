@@ -6,7 +6,7 @@ const read = (relativePath: string) =>
   readFileSync(resolve(process.cwd(), relativePath), 'utf8');
 
 describe('navigation scene isolation', () => {
-  it('gives every root-stack scene an opaque background plane behind transparent content', () => {
+  it('gives every root-stack scene one opaque background plane', () => {
     const rootLayout = read('app/_layout.tsx');
     const layoutStart = rootLayout.indexOf('screenLayout={({ children }) => (');
     const stackOptions = rootLayout.indexOf('screenOptions={{', layoutStart);
@@ -16,7 +16,10 @@ describe('navigation scene isolation', () => {
       '<IsolatedStackScene>{children}</IsolatedStackScene>',
     );
     expect(rootLayout).toContain("style={{ flex: 1, backgroundColor: '#0A0A0B' }}");
-    expect(rootLayout).toContain('{isFocused ? <AnimatedGradientBackground /> : null}');
+    expect(rootLayout).toContain('contentStyle: OPAQUE_SCREEN_CONTENT');
+    expect(rootLayout).not.toContain("contentStyle: { backgroundColor: 'transparent' }");
+    expect(rootLayout).not.toContain('AnimatedGradientBackground');
+    expect(rootLayout).not.toContain('useIsFocused');
   });
 
   it('removes inactive buyer and seller tabs from the native view hierarchy', () => {
@@ -24,6 +27,8 @@ describe('navigation scene isolation', () => {
       const source = read(layout);
       expect(source).toContain('detachInactiveScreens');
       expect(source).toContain('freezeOnBlur: true');
+      expect(source).toContain("sceneStyle: { backgroundColor: '#0A0A0B' }");
+      expect(source).not.toContain("sceneStyle: { backgroundColor: 'transparent' }");
     }
   });
 
