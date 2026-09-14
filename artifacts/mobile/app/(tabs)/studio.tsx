@@ -10,7 +10,7 @@ import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions, Alert, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -128,6 +128,15 @@ export default function StudioScreen() {
   // Plan upsell state
   const [upsellVisible,  setUpsellVisible]  = useState(false);
   const [upsellFeature,  setUpsellFeature]  = useState('');
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        setUpsellVisible(false);
+        setUpsellFeature('');
+      };
+    }, []),
+  );
 
   // load design projects
   const loadProjects = useCallback(() => {

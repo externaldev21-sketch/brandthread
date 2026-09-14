@@ -19,8 +19,20 @@ describe('seller shell regressions', () => {
     const studio = read('app/(tabs)/studio.tsx');
     expect(studio).not.toContain('SellerTutorialOverlay');
     expect(studio).not.toContain('if (planLoading) return');
+    expect(studio).toContain('setUpsellVisible(false)');
     expect(studio.indexOf('router.push(tool.route as never)')).toBeLessThan(
       studio.indexOf('void markFeatureOpened(tool.id).catch'),
     );
+  });
+
+  it('fully unmounts the paywall portal while it is closed', () => {
+    const modal = read('components/PlanUpsellModal.tsx');
+    expect(modal).toContain('if (!visible) return null');
+    expect(modal).toMatch(/<Modal\s+visible\s+transparent/);
+  });
+
+  it('ties every Growth paywall host to its route focus', () => {
+    const manufacturerHub = read('app/manufacturer-hub.tsx');
+    expect(manufacturerHub).toContain('return () => setUpsellVisible(false)');
   });
 });

@@ -165,17 +165,21 @@ export default function ManufacturerHub() {
 
   const { hasPlan, loading: planLoading, error: planError, retry: retryPlan } = useSubscriptionPlan();
   const [upsellVisible, setUpsellVisible] = useState(false);
+  const hasGrowthAccess = hasPlan('growth');
 
   useEffect(() => {
     if (tab === 'messages') setActiveTab('messages');
   }, [tab]);
 
-  // Show upsell immediately if the seller doesn't have Growth access
-  useEffect(() => {
-    if (!planLoading && !planError && !hasPlan('growth')) {
-      setUpsellVisible(true);
-    }
-  }, [planLoading, planError, hasPlan]);
+  // Native modals use a global portal, so the gate must follow route focus.
+  useFocusEffect(
+    useCallback(() => {
+      if (!planLoading && !planError && !hasGrowthAccess) {
+        setUpsellVisible(true);
+      }
+      return () => setUpsellVisible(false);
+    }, [hasGrowthAccess, planError, planLoading]),
+  );
 
   const handleTabPress = (tab: Tab) => {
     Haptics.selectionAsync();

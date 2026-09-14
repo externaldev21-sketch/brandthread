@@ -67,9 +67,13 @@ export default function PlanUpsellModal({
   // original plain-text list.
   const isGrowth = requiredPlan !== 'pro';
 
+  // React Native modals render through a global portal. Do not leave even a
+  // hidden portal mounted after a gated screen loses focus.
+  if (!visible) return null;
+
   return (
     <Modal
-      visible={visible}
+      visible
       transparent
       animationType="slide"
       onRequestClose={handleClose}
