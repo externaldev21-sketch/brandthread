@@ -89,6 +89,8 @@ export function AccountTypeStep({
           return (
             <TouchableOpacity
               key={c.type}
+              testID={`onboarding-account-type-${c.type}`}
+              accessibilityLabel={`${c.type === 'buyer' ? 'Buyer' : 'Seller'} account type`}
               activeOpacity={0.85}
               onPress={() => {
                 onSelect(c.type);
@@ -162,6 +164,8 @@ export function AccountTypeStep({
         style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}
       >
         <TouchableOpacity
+          testID="onboarding-account-type-continue"
+          accessibilityLabel="Continue from account type"
           activeOpacity={0.88}
           onPress={onContinue}
           disabled={!selected || saving}

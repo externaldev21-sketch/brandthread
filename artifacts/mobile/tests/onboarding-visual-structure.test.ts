@@ -98,7 +98,7 @@ describe('onboarding visual structure', () => {
 
   it('uses one immediate native-driver transition for every onboarding step', () => {
     const onboarding = read('app/onboarding.tsx');
-    expect(onboarding).toContain('function transitionTo(next: number, dir: 1 | -1)');
+    expect(onboarding).toContain('function transitionTo(next: number, dir: 1 | -1, initiatedAt = performance.now())');
     expect(onboarding).toContain('transitionProgress.setValue(0);\n    setStep(next);\n    requestAnimationFrame');
     expect(onboarding).toContain('duration: 230');
     expect(onboarding).toContain('useNativeDriver: true');
@@ -120,11 +120,23 @@ describe('onboarding visual structure', () => {
     expect(onboarding).toContain('brandNameInputRef.current?.focus()');
     expect(onboarding).toContain('}, 260);');
   });
-
   it('does not navigate backward from the root account-type step', () => {
     const onboarding = read('app/onboarding.tsx');
     expect(onboarding).toContain('if (step === 0) return;');
     expect(onboarding).toContain('{!isAccountTypeStep && (');
     expect(onboarding).not.toContain("if (step === 0) { router.back(); return; }");
+  });
+
+  it('keeps the native beta transition probe development-only and release-required', () => {
+    const onboarding = read('app/onboarding.tsx');
+    const packageJson = read('package.json');
+    const deviceCheck = read('tests/onboarding-transitions.device.mjs');
+    const betaGuide = read('docs/mobile-beta-validation.md');
+
+    expect(onboarding).toContain("__DEV__ && (deviceFlow === 'buyer' || deviceFlow === 'seller')");
+    expect(deviceCheck).toContain("NATIVE_ONBOARDING_REQUIRED === '1'");
+    expect(deviceCheck).toContain('appium/start_recording_screen');
+    expect(packageJson).toContain('"test:onboarding:native:ci"');
+    expect(betaGuide).toContain('pnpm run test:onboarding:native:ci');
   });
 });

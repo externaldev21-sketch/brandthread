@@ -607,7 +607,13 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
           </LinearGradient>
         </TouchableOpacity>
 
-        <TouchableOpacity style={sn.skipBtn} onPress={onSkip} activeOpacity={0.7}>
+        <TouchableOpacity
+          testID="onboarding-notifications-skip"
+          accessibilityLabel="Not now"
+          style={sn.skipBtn}
+          onPress={onSkip}
+          activeOpacity={0.7}
+        >
           <Text style={sn.skipText}>Not now</Text>
         </TouchableOpacity>
       </Animated.View>
@@ -1846,14 +1852,34 @@ export default function OnboardingScreen() {
   const api = useApi();
 
   const router  = useRouter();
-  const { postAuth, referralCode: referralCodeParam } = useLocalSearchParams<{ postAuth?: string; referralCode?: string }>();
+  const {
+    postAuth,
+    referralCode: referralCodeParam,
+    deviceFlow,
+    deviceStep,
+    deviceProbe,
+  } = useLocalSearchParams<{
+    postAuth?: string;
+    referralCode?: string;
+    deviceFlow?: string;
+    deviceStep?: string;
+    deviceProbe?: string;
+  }>();
   const insets  = useSafeAreaInsets();
+  const deviceProbeEnabled = __DEV__ && deviceProbe === '1';
+  const deviceProbeFlow: Flow | null = __DEV__ && (deviceFlow === 'buyer' || deviceFlow === 'seller')
+    ? deviceFlow
+    : null;
+  const parsedDeviceStep = Number(deviceStep);
+  const deviceProbeStep = deviceProbeFlow && Number.isInteger(parsedDeviceStep)
+    ? Math.max(0, parsedDeviceStep)
+    : 0;
 
-  const [flow, setFlow]           = useState<Flow | null>(null);
-  const [selectedFlow, setSelectedFlow] = useState<AccountType | null>(null);
+  const [flow, setFlow]           = useState<Flow | null>(deviceProbeFlow);
+  const [selectedFlow, setSelectedFlow] = useState<AccountType | null>(deviceProbeFlow);
   // Step 0 = AccountType for both paths (v6 ordering)
-  const [step, setStep]           = useState(0);
-  const [ready, setReady]         = useState(false);
+  const [step, setStep]           = useState(deviceProbeStep);
+  const [ready, setReady]         = useState(deviceProbeEnabled);
 
   // Buyer data
   const [firstName, setFirstName]         = useState('');
@@ -1881,6 +1907,27 @@ export default function OnboardingScreen() {
   const firstNameInputRef = useRef<TextInput>(null);
   const brandNameInputRef = useRef<TextInput>(null);
   const restoredDraft = useRef(false);
+  const transitionSequence = useRef(0);
+  const transitionInitiatedAt = useRef(0);
+  const [deviceTransitionMetric, setDeviceTransitionMetric] = useState('idle');
+  const [deviceFocusMetric, setDeviceFocusMetric] = useState('idle');
+  const recordDeviceFocus = useCallback(() => {
+    if (!deviceProbeEnabled) return;
+    const focusDelayMs = Math.round(performance.now() - transitionInitiatedAt.current);
+    setDeviceFocusMetric(`${flow}-${step};delay=${focusDelayMs};focused=1`);
+  }, [deviceProbeEnabled, flow, step]);
+
+  // Appium reuses the mounted route while changing probe query parameters.
+  // Reset synchronously to the requested real onboarding screen between cases.
+  useEffect(() => {
+    if (!deviceProbeEnabled) return;
+    setFlow(deviceProbeFlow);
+    setSelectedFlow(deviceProbeFlow);
+    setStep(deviceProbeStep);
+    setReady(true);
+    setDeviceTransitionMetric('idle');
+    setDeviceFocusMetric('idle');
+  }, [deviceProbeEnabled, deviceProbeFlow, deviceProbeStep]);
 
   // Clerk may take longer than local storage to initialize in a web preview.
   useEffect(() => {
@@ -1892,6 +1939,7 @@ export default function OnboardingScreen() {
 
   // ── Restore draft for the active account ─────────────────────────────────────
   useEffect(() => {
+    if (deviceProbeEnabled) return;
     if (!authLoaded || (isSignedIn && !userLoaded)) return;
     if (isSignedIn && !user?.id) return;
     if (restoredDraft.current) return;
@@ -1943,7 +1991,7 @@ export default function OnboardingScreen() {
       }
     }
     init();
-  }, [authLoaded, userLoaded, isSignedIn, postAuth, user?.id]);
+  }, [authLoaded, userLoaded, isSignedIn, postAuth, user?.id, deviceProbeEnabled]);
 
   // ── Persist draft ───────────────────────────────────────────────────────────
   const saveDraft = useCallback(async (overrides?: Record<string, unknown>) => {
@@ -2025,18 +2073,29 @@ export default function OnboardingScreen() {
   }, [isSignedIn, ready, flow]);
 
   // ── Navigation helpers ──────────────────────────────────────────────────────
-  function transitionTo(next: number, dir: 1 | -1) {
+  function transitionTo(next: number, dir: 1 | -1, initiatedAt = performance.now()) {
+    const sequence = ++transitionSequence.current;
+    transitionInitiatedAt.current = initiatedAt;
     transitionProgress.stopAnimation();
     transitionDirection.current = dir;
     transitionProgress.setValue(0);
     setStep(next);
     requestAnimationFrame(() => {
+      const firstFrameMs = Math.round(performance.now() - initiatedAt);
+      const animationStartedAt = performance.now();
       Animated.timing(transitionProgress, {
         toValue: 1,
         duration: 230,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
-      }).start();
+      }).start(({ finished }) => {
+        if (deviceProbeEnabled && sequence === transitionSequence.current) {
+          const animationMs = Math.round(performance.now() - animationStartedAt);
+          setDeviceTransitionMetric(
+            `${flow ?? selectedFlow ?? 'choose'}-${next};firstFrame=${firstFrameMs};animation=${animationMs};phases=${finished ? 1 : 0}`,
+          );
+        }
+      });
     });
   }
 
@@ -2054,6 +2113,7 @@ export default function OnboardingScreen() {
 
   function continueFromAccountType() {
     if (!selectedFlow) return;
+    const initiatedAt = performance.now();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     // After AccountType (step 0), go to path-specific Auth (step 1)
     const next = selectedFlow === 'buyer'
@@ -2064,7 +2124,7 @@ export default function OnboardingScreen() {
       [ONBOARDING_KEY, 'false'],
     ]).catch(() => {});
     setFlow(selectedFlow);
-    transitionTo(next, 1);
+    transitionTo(next, 1, initiatedAt);
   }
 
   // ── Finish handlers ─────────────────────────────────────────────────────────
@@ -2247,17 +2307,27 @@ export default function OnboardingScreen() {
     if (flow === 'buyer') {
       // Step 1: Buyer Auth — bold Sign up screen
       if (step === BUYER_STEP_INDEX.AUTH) return (
-        <BuyerAuthStep
-          signUp={signUp}
-          startGoogleOAuth={startGoogleOAuth}
-          startAppleOAuth={startAppleOAuth}
-          onAuthComplete={handleAuthComplete}
-          onDevClear={devReset}
-          username={username}
-          onUsernameChange={setUsername}
-          referralCode={referralCode}
-          onReferralCodeChange={setReferralCode}
-        />
+        <>
+          <BuyerAuthStep
+            signUp={signUp}
+            startGoogleOAuth={startGoogleOAuth}
+            startAppleOAuth={startAppleOAuth}
+            onAuthComplete={handleAuthComplete}
+            onDevClear={devReset}
+            username={username}
+            onUsernameChange={setUsername}
+            referralCode={referralCode}
+            onReferralCodeChange={setReferralCode}
+          />
+          {deviceProbeEnabled && (
+            <TouchableOpacity
+              testID="onboarding-device-auth-complete"
+              accessibilityLabel="Complete auth device probe"
+              style={sm.deviceProbeControl}
+              onPress={handleAuthComplete}
+            />
+          )}
+        </>
       );
 
       // Step 2: Name
@@ -2270,6 +2340,8 @@ export default function OnboardingScreen() {
               <Text style={sm.label}>First name</Text>
               <TextInput
                 ref={firstNameInputRef}
+                testID="onboarding-first-name-input"
+                onFocus={recordDeviceFocus}
                 style={sm.input}
                 placeholder="Alex"
                 placeholderTextColor={MUTED2}
@@ -2326,19 +2398,29 @@ export default function OnboardingScreen() {
     if (flow === 'seller') {
       // Step 1: Seller Auth — single-column labeled form
       if (step === SELLER_STEP_INDEX.AUTH) return (
-        <SellerAuthStep
-          signUp={signUp}
-          startGoogleOAuth={startGoogleOAuth}
-          startAppleOAuth={startAppleOAuth}
-          onAuthComplete={handleAuthComplete}
-          onDevClear={devReset}
-          username={username}
-          onUsernameChange={setUsername}
-          referralCode={referralCode}
-          onReferralCodeChange={setReferralCode}
-          onFirstNamePrefill={setFirstName}
-          onLastNamePrefill={setLastName}
-        />
+        <>
+          <SellerAuthStep
+            signUp={signUp}
+            startGoogleOAuth={startGoogleOAuth}
+            startAppleOAuth={startAppleOAuth}
+            onAuthComplete={handleAuthComplete}
+            onDevClear={devReset}
+            username={username}
+            onUsernameChange={setUsername}
+            referralCode={referralCode}
+            onReferralCodeChange={setReferralCode}
+            onFirstNamePrefill={setFirstName}
+            onLastNamePrefill={setLastName}
+          />
+          {deviceProbeEnabled && (
+            <TouchableOpacity
+              testID="onboarding-device-auth-complete"
+              accessibilityLabel="Complete auth device probe"
+              style={sm.deviceProbeControl}
+              onPress={handleAuthComplete}
+            />
+          )}
+        </>
       );
 
       // Step 2: Name (pre-filled from auth form)
@@ -2351,6 +2433,8 @@ export default function OnboardingScreen() {
               <Text style={sm.label}>First name</Text>
               <TextInput
                 ref={firstNameInputRef}
+                testID="onboarding-first-name-input"
+                onFocus={recordDeviceFocus}
                 style={sm.input}
                 placeholder="Alex"
                 placeholderTextColor={MUTED2}
@@ -2374,6 +2458,8 @@ export default function OnboardingScreen() {
               <Text style={sm.label}>Brand name</Text>
               <TextInput
                 ref={brandNameInputRef}
+                testID="onboarding-brand-name-input"
+                onFocus={recordDeviceFocus}
                 style={sm.input}
                 placeholder="e.g. Noir Collective"
                 placeholderTextColor={MUTED2}
@@ -2569,9 +2655,23 @@ export default function OnboardingScreen() {
             }),
           }],
         },
-      ]}>
+      ]} testID={`onboarding-step-${flow ?? 'choose'}-${step}`} accessibilityLabel={`Onboarding ${flow ?? 'choose'} step ${step}`}>
         {renderStep()}
       </Animated.View>
+      {deviceProbeEnabled && (
+        <View pointerEvents="none" style={sm.deviceProbeMetric}>
+          <View
+            accessible
+            testID="onboarding-transition-metric"
+            accessibilityLabel={deviceTransitionMetric}
+          />
+          <View
+            accessible
+            testID="onboarding-focus-metric"
+            accessibilityLabel={deviceFocusMetric}
+          />
+        </View>
+      )}
 
       {/* Footer Continue button */}
       {showFooter && (
@@ -2588,6 +2688,8 @@ export default function OnboardingScreen() {
 }
 
 const sm = StyleSheet.create({
+  deviceProbeControl: { position: 'absolute', right: 0, bottom: 0, width: 2, height: 2, opacity: 0.01 },
+  deviceProbeMetric: { position: 'absolute', width: 1, height: 1, opacity: 0.01 },
   header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 8, gap: 10, zIndex: 3 },
   progressOverlay: {
     position: 'absolute',

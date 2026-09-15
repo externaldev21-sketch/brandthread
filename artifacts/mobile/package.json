@@ -14,6 +14,8 @@
     "test:navigation:web": "node tests/navigation-scene-isolation.web.mjs",
     "test:navigation:native": "vitest run tests/navigation-scene-isolation.native.test.tsx tests/navigation-scene-isolation.test.ts && node tests/navigation-scene-isolation.device.mjs",
     "test:navigation:native:ci": "NATIVE_GESTURE_REQUIRED=1 pnpm run test:navigation:native",
+    "test:onboarding:native": "node tests/onboarding-transitions.device.mjs",
+    "test:onboarding:native:ci": "NATIVE_ONBOARDING_REQUIRED=1 pnpm run test:onboarding:native",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "verify:app-identity": "node scripts/verify-app-identity.js",
     "verify:apple-auth": "node scripts/verify-apple-auth.js",
