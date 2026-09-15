@@ -7,7 +7,7 @@ Path selection precedes Clerk account creation. Buyer and seller use the same st
 
 **Why:** The user explicitly requires buyers and sellers to choose their path first but see one identical account-creation experience; divergence starts only after account creation.
 
-**How to apply:** Keep Account Type at index 0 and shared Auth at index 1. Preserve later questions, migrate older drafts to equivalent screens, keep buyer Style and seller Goals skippable, persist only the pre-auth role as ephemeral pending state, and move durable drafts under the signed-in Clerk user.
+**How to apply:** Keep Account Type at index 0 and shared Auth at index 1. Keep Google and Apple as one-tap options on that shared form, independent of manual-field validity. Preserve later questions, migrate older drafts to equivalent screens, keep buyer Style and seller Goals skippable, persist only the pre-auth role as ephemeral pending state, and move durable drafts under the signed-in Clerk user.
 
 For a brand-new local session, the first-run path is a brief auto-advancing logo-only splash, then Account Type, then the shared Clerk account form.
 

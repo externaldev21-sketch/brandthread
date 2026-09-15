@@ -68,6 +68,12 @@ describe('onboarding visual structure', () => {
     expect(onboarding).toContain('formLastName');
     expect(onboarding).toContain('confirmPassword');
     expect(onboarding).toContain('passwordsMatch');
+    expect(onboarding).toContain('Continue with Google');
+    expect(onboarding).toContain('Continue with Apple');
+    expect(onboarding).toContain('<Text style={ssa.divText}>or</Text>');
+    expect(onboarding).toContain('disabled={!!oauthLoading || loading}');
+    expect(onboarding).not.toContain('disabled={!!oauthLoading || loading || !isUsernameValid}');
+    expect(onboarding).toContain("oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 14");
   });
 
   it('thread explainer screen exists and routes buyers to the feed', () => {

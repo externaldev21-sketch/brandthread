@@ -1527,15 +1527,15 @@ function SharedAuthStep({
         {/* OAuth options below the main CTA */}
         <View style={ssa.divider}>
           <View style={ssa.divLine} />
-          <Text style={ssa.divText}>or continue with</Text>
+          <Text style={ssa.divText}>or</Text>
           <View style={ssa.divLine} />
         </View>
 
         <TouchableOpacity
-          style={[ssa.oauthBtn, !isUsernameValid && { opacity: 0.45 }]}
+          style={ssa.oauthBtn}
           onPress={() => handleOAuth(startGoogleOAuth, 'Google')}
           activeOpacity={0.85}
-          disabled={!!oauthLoading || loading || !isUsernameValid}
+          disabled={!!oauthLoading || loading}
         >
           {oauthLoading === 'Google' ? <ActivityIndicator color={theme.accentLight} size="small" /> : <>
             <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: 'Inter_700Bold', fontSize: 11, color: FG, lineHeight: 13 }}>G</Text></View>
@@ -1545,10 +1545,10 @@ function SharedAuthStep({
 
         {Platform.OS === 'ios' && (
           <TouchableOpacity
-            style={[ssa.oauthBtn, ssa.appleBtn, !isUsernameValid && { opacity: 0.45 }]}
+            style={[ssa.oauthBtn, ssa.appleBtn]}
             onPress={() => handleOAuth(startAppleOAuth, 'Apple')}
             activeOpacity={0.85}
-            disabled={!!oauthLoading || loading || !isUsernameValid}
+            disabled={!!oauthLoading || loading}
           >
             {oauthLoading === 'Apple' ? <ActivityIndicator color={theme.accentLight} size="small" /> : <>
               <Ionicons name="logo-apple" size={20} color={FG} />
@@ -1650,7 +1650,7 @@ const ssa = StyleSheet.create({
   divider:   { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 14 },
   divLine:   { flex: 1, height: 1, backgroundColor: BORDER },
   divText:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED },
-  oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, paddingVertical: 13, backgroundColor: CARD, marginBottom: 9 },
+  oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, paddingVertical: 16, backgroundColor: CARD, marginBottom: 9 },
   appleBtn:  { backgroundColor: SCREEN_BG, borderColor: BORDER },
   oauthText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
   legal:     { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED2, textAlign: 'center', lineHeight: 18, marginTop: 12 },
