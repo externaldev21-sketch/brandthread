@@ -152,10 +152,14 @@ export class ObjectStorageService {
   async createObjectEntityFromBuffer(
     contents: Buffer,
     contentType: string,
+    objectPath = `/objects/uploads/${randomUUID()}`,
   ): Promise<string> {
     const privateObjectDir = this.getPrivateObjectDir();
-    const objectId = randomUUID();
-    const fullPath = `${privateObjectDir}/uploads/${objectId}`;
+    if (!objectPath.startsWith('/objects/')) {
+      throw new Error('Invalid private object path');
+    }
+    const entityId = objectPath.slice('/objects/'.length);
+    const fullPath = `${privateObjectDir.replace(/\/$/, '')}/${entityId}`;
     const { bucketName, objectName } = parseObjectPath(fullPath);
     const file = objectStorageClient.bucket(bucketName).file(objectName);
     await file.save(contents, {
@@ -163,7 +167,7 @@ export class ObjectStorageService {
       contentType,
       metadata: { cacheControl: 'private, max-age=0' },
     });
-    return `/objects/uploads/${objectId}`;
+    return objectPath;
   }
 
   async deleteObjectEntity(objectPath: string): Promise<void> {

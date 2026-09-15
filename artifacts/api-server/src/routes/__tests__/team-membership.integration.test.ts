@@ -11,7 +11,14 @@ import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
-import { db, designStudioAssets, designStudioProjects, teamMembers, users } from "@workspace/db";
+import {
+  db,
+  designStudioAssets,
+  designStudioObjectCleanup,
+  designStudioProjects,
+  teamMembers,
+  users,
+} from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 
 const testState = vi.hoisted(() => ({
@@ -30,17 +37,26 @@ vi.mock("../../middlewares/requireAuth", () => ({
 }));
 
 const storedDesignBytes = vi.hoisted(() => new Map<string, Buffer>());
+const designStorageState = vi.hoisted(() => ({
+  failDeletes: false,
+  afterWrite: null as null | (() => Promise<void>),
+  lastWrittenPath: "",
+}));
 vi.mock("../../lib/objectStorage", () => ({
+  ObjectNotFoundError: class ObjectNotFoundError extends Error {},
   ObjectStorageService: class {
-    async createObjectEntityFromBuffer(bytes: Buffer, contentType: string) {
-      const path = `/design-test/${storedDesignBytes.size}-${contentType.replace("/", "-")}`;
+    async createObjectEntityFromBuffer(bytes: Buffer, contentType: string, requestedPath?: string) {
+      const path = requestedPath ?? `/design-test/${storedDesignBytes.size}-${contentType.replace("/", "-")}`;
       storedDesignBytes.set(path, Buffer.from(bytes));
+      designStorageState.lastWrittenPath = path;
+      await designStorageState.afterWrite?.();
       return path;
     }
     async getObjectEntityDownloadURL(path: string) {
       return `https://objects.test${path}`;
     }
     async deleteObjectEntity(path: string) {
+      if (designStorageState.failDeletes) throw new Error("storage unavailable");
       storedDesignBytes.delete(path);
     }
   },
@@ -50,6 +66,7 @@ import teamRouter from "../team";
 import { requireRole, teamContext } from "../../middlewares/requireRole";
 import { requireAuth } from "../../middlewares/requireAuth";
 import designStudioRouter from "../design-studio";
+import { runDesignStudioObjectCleanup } from "../../jobs/designStudioObjectCleanup";
 import { DESIGN_STUDIO_ASSET_MIME_TYPES } from "../../lib/designStudioAssetTypes";
 
 const suffix = crypto.randomBytes(4).toString("hex");
@@ -500,6 +517,145 @@ describe("authenticated team membership discovery", () => {
     for (const asset of stored) expect(storedDesignBytes.has(asset.objectPath)).toBe(false);
     expect(await db.select().from(designStudioAssets).where(eq(designStudioAssets.projectId, projectId)))
       .toHaveLength(0);
+  });
+
+  it("durably retries superseded thumbnail cleanup without leaving a broken asset reference", async () => {
+    const projectId = `design-cleanup-replace-${crypto.randomUUID()}`;
+    await db.insert(designStudioProjects).values({
+      id: projectId,
+      ownerId: olderOwnerId,
+      snapshot: { id: projectId, name: "Replace", canvas: { width: 1, height: 1 }, layers: [] },
+    });
+    const memberships = await getMemberships(memberId);
+    const selected = memberships.body.memberships.find(m => m.ownerId === olderOwnerId)!;
+    const png = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      "base64",
+    );
+    const upload = () => fetch(`${baseUrl}/api/design-studio/projects/${projectId}/assets/thumbnail`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "image/png",
+        "X-Store-Context": selected.id,
+        "X-Design-Width": "1",
+        "X-Design-Height": "1",
+        "X-Design-Format": "png",
+        "X-Design-Lossless": "true",
+      },
+      body: png,
+    });
+
+    const first = await upload();
+    const firstPath = ((await first.json()) as { asset: { objectPath: string } }).asset.objectPath;
+    designStorageState.failDeletes = true;
+    expect((await upload()).status).toBe(201);
+
+    expect(await db.select().from(designStudioAssets)
+      .where(eq(designStudioAssets.objectPath, firstPath))).toHaveLength(0);
+    expect(await db.select().from(designStudioObjectCleanup)
+      .where(eq(designStudioObjectCleanup.objectPath, firstPath))).toHaveLength(1);
+    expect(storedDesignBytes.has(firstPath)).toBe(true);
+
+    designStorageState.failDeletes = false;
+    await runDesignStudioObjectCleanup(new Date(Date.now() + 2 * 60 * 1000));
+    expect(storedDesignBytes.has(firstPath)).toBe(false);
+    expect(await db.select().from(designStudioObjectCleanup)
+      .where(eq(designStudioObjectCleanup.objectPath, firstPath))).toHaveLength(0);
+    await db.delete(designStudioProjects).where(eq(designStudioProjects.id, projectId));
+  });
+
+  it("keeps durable cleanup intent when an upload cannot commit its asset row", async () => {
+    const projectId = `design-cleanup-rollback-${crypto.randomUUID()}`;
+    await db.insert(designStudioProjects).values({
+      id: projectId,
+      ownerId: olderOwnerId,
+      snapshot: { id: projectId, name: "Rollback", canvas: { width: 1, height: 1 }, layers: [] },
+    });
+    const memberships = await getMemberships(memberId);
+    const selected = memberships.body.memberships.find(m => m.ownerId === olderOwnerId)!;
+    designStorageState.failDeletes = true;
+    designStorageState.afterWrite = async () => {
+      await db.delete(designStudioProjects).where(eq(designStudioProjects.id, projectId));
+      designStorageState.afterWrite = null;
+    };
+    const response = await fetch(`${baseUrl}/api/design-studio/projects/${projectId}/assets/source`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "image/png",
+        "X-Store-Context": selected.id,
+        "X-Design-Width": "1",
+        "X-Design-Height": "1",
+        "X-Design-Format": "png",
+        "X-Design-Lossless": "true",
+      },
+      body: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+        "base64",
+      ),
+    });
+    expect(response.status).toBe(500);
+    const orphanPath = designStorageState.lastWrittenPath;
+    expect(await db.select().from(designStudioObjectCleanup)
+      .where(eq(designStudioObjectCleanup.objectPath, orphanPath))).toHaveLength(1);
+    expect(storedDesignBytes.has(orphanPath)).toBe(true);
+
+    designStorageState.failDeletes = false;
+    await runDesignStudioObjectCleanup(new Date(Date.now() + 2 * 60 * 1000));
+    expect(storedDesignBytes.has(orphanPath)).toBe(false);
+    expect(await db.select().from(designStudioObjectCleanup)
+      .where(eq(designStudioObjectCleanup.objectPath, orphanPath))).toHaveLength(0);
+  });
+
+  it("reclaims an upload paused in storage while its project is permanently deleted", async () => {
+    const projectId = `design-cleanup-race-${crypto.randomUUID()}`;
+    await db.insert(designStudioProjects).values({
+      id: projectId,
+      ownerId: olderOwnerId,
+      snapshot: { id: projectId, name: "Race", canvas: { width: 1, height: 1 }, layers: [] },
+    });
+    const memberships = await getMemberships(memberId);
+    const selected = memberships.body.memberships.find(m => m.ownerId === olderOwnerId)!;
+    let signalWritten!: () => void;
+    let releaseUpload!: () => void;
+    const written = new Promise<void>(resolve => { signalWritten = resolve; });
+    const release = new Promise<void>(resolve => { releaseUpload = resolve; });
+    designStorageState.afterWrite = async () => {
+      signalWritten();
+      await release;
+      designStorageState.afterWrite = null;
+    };
+
+    const uploadPromise = fetch(`${baseUrl}/api/design-studio/projects/${projectId}/assets/source`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "image/png",
+        "X-Store-Context": selected.id,
+        "X-Design-Width": "1",
+        "X-Design-Height": "1",
+        "X-Design-Format": "png",
+        "X-Design-Lossless": "true",
+      },
+      body: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+        "base64",
+      ),
+    });
+    await written;
+    const uploadedPath = designStorageState.lastWrittenPath;
+    const deletePromise = fetch(`${baseUrl}/api/design-studio/projects/${projectId}`, {
+      method: "DELETE",
+      headers: { "X-Store-Context": selected.id },
+    });
+    await new Promise(resolve => setTimeout(resolve, 50));
+    releaseUpload();
+
+    expect((await deletePromise).status).toBe(200);
+    expect((await uploadPromise).status).toBe(500);
+    expect(storedDesignBytes.has(uploadedPath)).toBe(false);
+    expect(await db.select().from(designStudioAssets)
+      .where(eq(designStudioAssets.projectId, projectId))).toHaveLength(0);
+    expect(await db.select().from(designStudioObjectCleanup)
+      .where(eq(designStudioObjectCleanup.objectPath, uploadedPath))).toHaveLength(0);
   });
 
   it("rejects a membership that belongs to a different caller", async () => {

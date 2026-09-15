@@ -9,9 +9,10 @@ import { db, designStudioAssets, designStudioProjects } from "@workspace/db";
 const storedObjects = vi.hoisted(() => new Map<string, { bytes: Buffer; contentType: string }>());
 
 vi.mock("../../lib/objectStorage", () => ({
+  ObjectNotFoundError: class ObjectNotFoundError extends Error {},
   ObjectStorageService: class {
-    async createObjectEntityFromBuffer(bytes: Buffer, contentType: string) {
-      const path = `/private/design-studio/${crypto.randomUUID()}`;
+    async createObjectEntityFromBuffer(bytes: Buffer, contentType: string, requestedPath?: string) {
+      const path = requestedPath ?? `/private/design-studio/${crypto.randomUUID()}`;
       storedObjects.set(path, { bytes: Buffer.from(bytes), contentType });
       return path;
     }

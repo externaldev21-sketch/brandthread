@@ -1031,6 +1031,17 @@ export const designStudioAssets = pgTable('design_studio_assets', {
   }).onDelete('cascade'),
 }));
 
+export const designStudioObjectCleanup = pgTable('design_studio_object_cleanup', {
+  objectPath:    text('object_path').primaryKey(),
+  attemptCount:  integer('attempt_count').notNull().default(0),
+  nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).defaultNow().notNull(),
+  claimedAt:     timestamp('claimed_at', { withTimezone: true }),
+  lastError:     text('last_error'),
+  createdAt:     timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  dueIdx: index('design_studio_object_cleanup_due_idx').on(table.nextAttemptAt),
+}));
+
 export const storefrontCustomDomains = pgTable('storefront_custom_domains', {
   id:           uuid('id').primaryKey().defaultRandom(),
   storefrontId: uuid('storefront_id').notNull().references(() => storefronts.id, { onDelete: 'cascade' }),

@@ -5,6 +5,7 @@ import { startTrendingJob }       from "./jobs/computeTrending";
 import { startTeamInviteReminderJob } from "./jobs/teamInviteReminder";
 import { startScheduledDropBroadcastJob } from "./jobs/scheduledDropBroadcasts";
 import { startSellerTrialReminderJob } from "./jobs/sellerTrialReminder";
+import { startDesignStudioObjectCleanupJob } from "./jobs/designStudioObjectCleanup";
 import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
 
 const rawPort = process.env["PORT"];
@@ -41,4 +42,5 @@ app.listen(port, (err) => {
   startTeamInviteReminderJob();
   startScheduledDropBroadcastJob();
   startSellerTrialReminderJob();
+  startDesignStudioObjectCleanupJob();
 });

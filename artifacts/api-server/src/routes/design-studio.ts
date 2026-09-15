@@ -1,11 +1,14 @@
 import express, { Router } from "express";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   db,
   designStudioAssets,
+  designStudioObjectCleanup,
   designStudioProjects,
 } from "@workspace/db";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { runDesignStudioObjectCleanup } from "../jobs/designStudioObjectCleanup";
 
 const router = Router();
 const storage = new ObjectStorageService();
@@ -279,26 +282,44 @@ router.put("/projects/:projectId", express.json({ limit: MAX_PROJECT_BYTES }), a
 });
 
 router.delete("/projects/:projectId", async (req, res) => {
-  const assets = await db.select({ objectPath: designStudioAssets.objectPath })
-    .from(designStudioAssets).where(and(
-      eq(designStudioAssets.projectId, req.params.projectId),
-      eq(designStudioAssets.ownerId, ownerId(req)),
-    ));
-  try {
-    await Promise.all(assets.map(asset => storage.deleteObjectEntity(asset.objectPath)));
-  } catch (error) {
-    req.log.error({ err: error, projectId: req.params.projectId }, "Design Studio object cleanup failed");
-    res.status(503).json({ error: "Unable to remove all project files. Please retry." });
-    return;
-  }
-  const deleted = await db.delete(designStudioProjects).where(and(
-    eq(designStudioProjects.id, req.params.projectId),
-    eq(designStudioProjects.ownerId, ownerId(req)),
-  )).returning({ id: designStudioProjects.id });
+  const deleted = await db.transaction(async tx => {
+    const [project] = await tx.select({ id: designStudioProjects.id })
+      .from(designStudioProjects)
+      .where(and(
+        eq(designStudioProjects.id, req.params.projectId),
+        eq(designStudioProjects.ownerId, ownerId(req)),
+      ))
+      .for("update")
+      .limit(1);
+    if (!project) return [];
+
+    const assets = await tx.select({ objectPath: designStudioAssets.objectPath })
+      .from(designStudioAssets).where(and(
+        eq(designStudioAssets.projectId, req.params.projectId),
+        eq(designStudioAssets.ownerId, ownerId(req)),
+      ));
+    const removed = await tx.delete(designStudioProjects).where(and(
+      eq(designStudioProjects.id, req.params.projectId),
+      eq(designStudioProjects.ownerId, ownerId(req)),
+    )).returning({ id: designStudioProjects.id });
+    if (removed.length > 0 && assets.length > 0) {
+      const objectPaths = [...new Set(assets.map(asset => asset.objectPath))];
+      await tx.insert(designStudioObjectCleanup)
+        .values(objectPaths.map(objectPath => ({ objectPath })))
+        .onConflictDoUpdate({
+          target: designStudioObjectCleanup.objectPath,
+          set: { nextAttemptAt: new Date(), claimedAt: null, lastError: null },
+        });
+    }
+    return removed;
+  });
   if (deleted.length === 0) {
     res.status(404).json({ error: "Project not found" });
     return;
   }
+  await runDesignStudioObjectCleanup().catch(error => {
+    req.log.warn({ err: error, projectId: req.params.projectId }, "Design Studio object cleanup deferred");
+  });
   res.json({ deleted: true });
 });
 
@@ -389,53 +410,100 @@ router.post(
       return;
     }
 
-    // Store the exact verified request bytes. No decoder, resize, or encoder runs here.
-    const objectPath = await storage.createObjectEntityFromBuffer(bytes, mimeType);
-    let assetId: string | null = null;
+    // Reserve durable cleanup intent before writing storage. If this process
+    // stops after the upload but before the asset row commits, the object is
+    // still reclaimed after the reservation becomes due.
+    const reservedObjectPath = `/objects/uploads/${randomUUID()}`;
+    const reservationExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
+    await db.insert(designStudioObjectCleanup).values({
+      objectPath: reservedObjectPath,
+      nextAttemptAt: reservationExpiresAt,
+    });
+    let objectPath = reservedObjectPath;
+    let asset: typeof designStudioAssets.$inferSelect;
     try {
-      const [asset] = await db.insert(designStudioAssets).values({
-        projectId: project.id,
-        ownerId: ownerId(req),
-        kind,
-        objectPath,
-        width: actual.width,
-        height: actual.height,
-        mimeType,
-        format,
-        lossless,
-        quality,
-        byteSize: bytes.length,
-      }).returning();
-      assetId = asset.id;
-      if (kind === "thumbnail" || kind === "master") {
-        const sameKind = await db.select({
-          id: designStudioAssets.id,
-          objectPath: designStudioAssets.objectPath,
-        }).from(designStudioAssets).where(and(
-          eq(designStudioAssets.projectId, project.id),
-          eq(designStudioAssets.ownerId, ownerId(req)),
-          eq(designStudioAssets.kind, kind),
-        )).orderBy(desc(designStudioAssets.createdAt));
-        const previous = sameKind.filter(row => row.id !== asset.id);
-        const superseded = kind === "thumbnail"
-          ? previous
-          : previous.slice(RETAINED_MASTERS_PER_PROJECT - 1);
-        for (const old of superseded) {
-          await storage.deleteObjectEntity(old.objectPath);
-          await db.delete(designStudioAssets).where(eq(designStudioAssets.id, old.id));
+      // Store the exact verified request bytes. No decoder, resize, or encoder runs here.
+      objectPath = await storage.createObjectEntityFromBuffer(bytes, mimeType, reservedObjectPath);
+      asset = await db.transaction(async tx => {
+        if (objectPath !== reservedObjectPath) {
+          await tx.delete(designStudioObjectCleanup)
+            .where(eq(designStudioObjectCleanup.objectPath, reservedObjectPath));
+          await tx.insert(designStudioObjectCleanup).values({
+            objectPath,
+            nextAttemptAt: reservationExpiresAt,
+          }).onConflictDoNothing();
         }
-      }
-      res.status(201).json({
-        asset: {
-          ...asset,
-          downloadUrl: await storage.getObjectEntityDownloadURL(objectPath),
-        },
+
+        const [inserted] = await tx.insert(designStudioAssets).values({
+          projectId: project.id,
+          ownerId: ownerId(req),
+          kind,
+          objectPath,
+          width: actual.width,
+          height: actual.height,
+          mimeType,
+          format,
+          lossless,
+          quality,
+          byteSize: bytes.length,
+        }).returning();
+        if (kind === "thumbnail" || kind === "master") {
+          const sameKind = await tx.select({
+            id: designStudioAssets.id,
+            objectPath: designStudioAssets.objectPath,
+          }).from(designStudioAssets).where(and(
+            eq(designStudioAssets.projectId, project.id),
+            eq(designStudioAssets.ownerId, ownerId(req)),
+            eq(designStudioAssets.kind, kind),
+          )).orderBy(desc(designStudioAssets.createdAt));
+          const previous = sameKind.filter(row => row.id !== inserted.id);
+          const superseded = kind === "thumbnail"
+            ? previous
+            : previous.slice(RETAINED_MASTERS_PER_PROJECT - 1);
+          if (superseded.length > 0) {
+            await tx.delete(designStudioAssets)
+              .where(inArray(designStudioAssets.id, superseded.map(row => row.id)));
+            await tx.insert(designStudioObjectCleanup)
+              .values([...new Set(superseded.map(row => row.objectPath))].map(path => ({
+                objectPath: path,
+                nextAttemptAt: new Date(),
+              })))
+              .onConflictDoUpdate({
+                target: designStudioObjectCleanup.objectPath,
+                set: { nextAttemptAt: new Date(), claimedAt: null, lastError: null },
+              });
+          }
+        }
+        await tx.delete(designStudioObjectCleanup)
+          .where(eq(designStudioObjectCleanup.objectPath, objectPath));
+        return inserted;
       });
     } catch (error) {
-      if (assetId) await db.delete(designStudioAssets).where(eq(designStudioAssets.id, assetId)).catch(() => {});
-      await storage.deleteObjectEntity(objectPath).catch(() => {});
+      await db.transaction(async tx => {
+        if (objectPath !== reservedObjectPath) {
+          await tx.delete(designStudioObjectCleanup)
+            .where(eq(designStudioObjectCleanup.objectPath, reservedObjectPath));
+        }
+        await tx.insert(designStudioObjectCleanup).values({
+          objectPath,
+          nextAttemptAt: new Date(),
+        }).onConflictDoUpdate({
+          target: designStudioObjectCleanup.objectPath,
+          set: { nextAttemptAt: new Date(), claimedAt: null },
+        });
+      });
+      await runDesignStudioObjectCleanup().catch(() => {});
       throw error;
     }
+    await runDesignStudioObjectCleanup().catch(error => {
+      req.log.warn({ err: error, projectId: project.id }, "Superseded Design Studio cleanup deferred");
+    });
+    res.status(201).json({
+      asset: {
+        ...asset,
+        downloadUrl: await storage.getObjectEntityDownloadURL(objectPath),
+      },
+    });
   },
 );
 
