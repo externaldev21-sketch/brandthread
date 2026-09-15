@@ -47,3 +47,17 @@ type = "unspecified"
 title = "Brandthread full source archive"
 description = "Complete Brandthread source workspace for sharing with Claude. Includes app artifacts, API server, shared libraries, scripts, assets, package manifests, and project configuration. Excludes dependencies, build output, Git history, logs, screenshots, agent metadata, and secret/env files."
 logical_id = "ff040822-ae9a-4cee-93f8-9479b3c27f83"
+
+[[outputs]]
+id = "5Ztu2WEFZEJ9AFls3fQUq"
+uri = "file://attached_assets/brandthread-expo-go-qr-large.png"
+type = "image"
+title = "Brandthread Expo Go QR"
+description = "Large QR code for opening the current Brandthread SDK 57 development build in Expo Go."
+logical_id = "25bbec15-f4a2-42a8-953f-62abda26bf74"
+content_hash = "sha256:76bf841ff64ef05f2c9edbbf31a82d580ae9318d9b80f03f1bded4e43d4c8b4f"
+size = 2220
+mtime_ms = 1789432584846
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/25bbec15-f4a2-42a8-953f-62abda26bf74/043829e2-1706-4aa6-9340-8882b9fd9920"
+storage_version_token = "1789432589115725"
+content_type = "image/png"
