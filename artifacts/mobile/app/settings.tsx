@@ -8,6 +8,9 @@ import * as Haptics from 'expo-haptics';
 import { useAuth, useUser } from '@clerk/expo';
 import { useRole } from '@/contexts/RoleContext';
 import { SETTINGS_CATALOG, SettingsCatalogGroup, SettingsCatalogItem } from '@/services/settingsCatalog';
+import PlanUpsellModal from '@/components/PlanUpsellModal';
+import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
+import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
 
 
 interface SettingsItem {
@@ -88,7 +91,9 @@ export default function SettingsScreen() {
   const { signOut } = useAuth();
   const { user } = useUser();
   const { role, isLoaded: isRoleLoaded } = useRole();
+  const { hasPlan, loading: planLoading, error: planError, retry: retryPlan } = useSubscriptionPlan();
   const [query, setQuery]       = useState('');
+  const [upsellFeature, setUpsellFeature] = useState<string | null>(null);
 
   const topPad = Platform.OS === 'web' ? 24 : insets.top;
   const profileName = user?.fullName || user?.username || 'Your Brandthread profile';
@@ -100,6 +105,16 @@ export default function SettingsScreen() {
 
   async function handleItem(item: SettingsItem | SettingsCatalogItem) {
     haptic();
+    if (
+      GROWTH_PLAN_ENFORCEMENT_ENABLED &&
+      'requiresGrowth' in item &&
+      item.requiresGrowth &&
+      (planLoading || !!planError || !hasPlan('growth'))
+    ) {
+      if (planError) retryPlan();
+      setUpsellFeature(item.label);
+      return;
+    }
     if (item.action === 'sign-out') {
       Alert.alert('Sign out', 'Are you sure you want to sign out?', [
         { text: 'Cancel', style: 'cancel' },
@@ -236,6 +251,16 @@ export default function SettingsScreen() {
 
         <Text style={[styles.versionText, { color: colors.mutedForeground }]}>Brandthread v1.0.0</Text>
       </ScrollView>
+      <PlanUpsellModal
+        visible={upsellFeature !== null}
+        featureName={upsellFeature ?? ''}
+        requiredPlan="growth"
+        onClose={() => setUpsellFeature(null)}
+        onUpgrade={() => {
+          setUpsellFeature(null);
+          router.push('/subscription' as never);
+        }}
+      />
     </View>
   );
 }

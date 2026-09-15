@@ -59,7 +59,7 @@ const aiTools = (theme: ReturnType<typeof useAppTheme>['theme']): AITool[] => [
   { icon: 'upload',      label: 'Upload Sketch',       route: '/design-sketch-upload',    accent: theme.accent },
   { icon: 'image',       label: 'Mockup to Model',     route: '/design-mockup-model',     accent: theme.secondary },
   { icon: 'edit',        label: 'Edit with Prompt',    route: '/design-prompt-edit',      accent: ORANGE },
-  { icon: 'refresh-cw',  label: 'Replace BG',          route: '/design-bg-replace',       accent: SUCCESS },
+  { icon: 'refresh-cw',  label: 'Replace BG',          route: '/design-bg-removal?mode=replace', accent: SUCCESS },
 ];
 
 // ─── Filter chips ─────────────────────────────────────────────────────────────

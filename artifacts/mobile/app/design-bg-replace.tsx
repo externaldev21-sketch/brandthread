@@ -59,7 +59,13 @@ const BG_TABS: { key: BgTab; label: string }[] = [
   { key: 'ai',       label: 'AI Scene' },
 ];
 
-export default function DesignBgReplaceScreen() {
+export default function DesignBgReplaceScreen({
+  embedded = false,
+  onSelectRemove,
+}: {
+  embedded?: boolean;
+  onSelectRemove?: () => void;
+} = {}) {
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const s = createStyles(theme);
@@ -126,7 +132,19 @@ export default function DesignBgReplaceScreen() {
 
   return (
     <BrandthreadScreen>
-      <BrandthreadHeader title="Replace Background" onBack={() => router.back()} />
+      <BrandthreadHeader title="Background Tools" onBack={() => router.back()} />
+      {embedded && (
+        <View style={s.modeWrap}>
+          <View style={s.modeRow}>
+            <TouchableOpacity style={s.modeButton} onPress={onSelectRemove} activeOpacity={0.8}>
+              <Text style={s.modeText}>Remove</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.modeButton, s.modeButtonActive]} activeOpacity={0.8}>
+              <Text style={[s.modeText, s.modeTextActive]}>Replace</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
 
         {/* Source Image */}
@@ -291,6 +309,12 @@ export default function DesignBgReplaceScreen() {
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   return StyleSheet.create({
+  modeWrap:           { paddingHorizontal: SP.md, marginBottom: SP.sm },
+  modeRow:            { flexDirection: 'row', padding: 4, gap: 4, backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER },
+  modeButton:         { flex: 1, minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.sm },
+  modeButtonActive:   { backgroundColor: PURPLE_DIM, borderWidth: 1, borderColor: BORDER_ACTIVE },
+  modeText:           { color: MUTED, fontFamily: FONT.medium, fontSize: FS.sm },
+  modeTextActive:     { color: PURPLE_LIGHT, fontFamily: FONT.semibold },
   scroll:             { paddingBottom: 40 },
   ph:                 { paddingHorizontal: SP.md },
   sectionHdr:         { marginTop: SP.lg, marginBottom: SP.sm },

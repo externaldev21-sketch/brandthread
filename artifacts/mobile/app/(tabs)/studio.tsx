@@ -20,7 +20,7 @@ import { DesignProject, PROJECT_TYPE_LABELS, PROJECT_STATUS_LABELS } from '@/ser
 import { BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, ORANGE, ORANGE_DIM, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, SectionHeader, EmptyState, GuidedTip, NewFeatureBadge, StatusBadge, LockBadge } from '@/components/BrandthreadUI';
-import { GROWTH_STUDIO_TOOLS, type GrowthTool, type GrowthToolId } from '@/lib/growthTools';
+import { GROWTH_PLAN_ENFORCEMENT_ENABLED, GROWTH_STUDIO_TOOLS, type GrowthTool, type GrowthToolId } from '@/lib/growthTools';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
@@ -182,6 +182,7 @@ export default function StudioScreen() {
 
     // Gate Growth-only tools for Starter sellers
     if (
+      GROWTH_PLAN_ENFORCEMENT_ENABLED &&
       GROWTH_REQUIRED_TOOLS.has(tool.id) &&
       (planLoading || !!planError || !hasPlan('growth'))
     ) {
@@ -266,7 +267,12 @@ export default function StudioScreen() {
         {/* Responsive grid — pixel widths, no percentages */}
         <View style={[s.toolGrid, { paddingHorizontal: H_PAD }]}>
           {STUDIO_TOOLS.map((tool) => {
-            const isLocked = !planLoading && !planError && GROWTH_REQUIRED_TOOLS.has(tool.id) && !hasPlan('growth');
+            const isLocked =
+              GROWTH_PLAN_ENFORCEMENT_ENABLED &&
+              !planLoading &&
+              !planError &&
+              GROWTH_REQUIRED_TOOLS.has(tool.id) &&
+              !hasPlan('growth');
             const toolAccent = tool.id === 'ai-design' ? theme.accentLight : tool.accent;
             const toolAccentDim = tool.id === 'ai-design' ? theme.accentDim : tool.accentDim;
             return (

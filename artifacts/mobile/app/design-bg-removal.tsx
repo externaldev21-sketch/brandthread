@@ -17,7 +17,7 @@ import {
   Alert, ActivityIndicator, Image, Modal, FlatList,
   Platform, Dimensions,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -43,6 +43,7 @@ import {
   getProducts, updateProduct,
 } from '@/services/productService';
 import type { Product, ProductMedia } from '@/services/productTypes';
+import DesignBgReplaceScreen from './design-bg-replace';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -69,7 +70,20 @@ interface ProcessingError {
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
-export default function DesignBgRemovalScreen() {
+export default function DesignBackgroundScreen() {
+  const params = useLocalSearchParams<{ mode?: string }>();
+  const [mode, setMode] = useState<'remove' | 'replace'>(
+    params.mode === 'replace' ? 'replace' : 'remove',
+  );
+
+  if (mode === 'replace') {
+    return <DesignBgReplaceScreen embedded onSelectRemove={() => setMode('remove')} />;
+  }
+
+  return <DesignBgRemovalScreen onSelectReplace={() => setMode('replace')} />;
+}
+
+function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => void }) {
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
   const s = createStyles(theme);
@@ -515,6 +529,15 @@ export default function DesignBgRemovalScreen() {
         </View>
       </View>
 
+      <View style={s.modeRow}>
+        <TouchableOpacity style={[s.modeButton, s.modeButtonActive]} activeOpacity={0.8}>
+          <Text style={[s.modeText, s.modeTextActive]}>Remove</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={s.modeButton} onPress={onSelectReplace} activeOpacity={0.8}>
+          <Text style={s.modeText}>Replace</Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         style={s.scroll}
         contentContainerStyle={[s.scrollContent, { paddingBottom: insets.bottom + 48 }]}
@@ -775,6 +798,11 @@ function RecentResultRow({
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const { accent: PURPLE, accentDim: PURPLE_DIM } = theme;
   return StyleSheet.create({
+  modeRow:          { flexDirection: 'row', marginHorizontal: SP.md, marginBottom: SP.sm, padding: 4, gap: 4, backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER },
+  modeButton:       { flex: 1, minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.sm },
+  modeButtonActive: { backgroundColor: PURPLE_DIM, borderWidth: 1, borderColor: BORDER_ACTIVE },
+  modeText:         { color: MUTED, fontFamily: FONT.medium, fontSize: FS.sm },
+  modeTextActive:   { color: theme.accentLight, fontFamily: FONT.semibold },
   root:             { flex: 1 },
   scroll:           { flex: 1 },
   scrollContent:    { padding: SP.md, gap: SP.lg },

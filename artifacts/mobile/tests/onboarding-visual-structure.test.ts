@@ -120,4 +120,11 @@ describe('onboarding visual structure', () => {
     expect(onboarding).toContain('brandNameInputRef.current?.focus()');
     expect(onboarding).toContain('}, 260);');
   });
+
+  it('does not navigate backward from the root account-type step', () => {
+    const onboarding = read('app/onboarding.tsx');
+    expect(onboarding).toContain('if (step === 0) return;');
+    expect(onboarding).toContain('{!isAccountTypeStep && (');
+    expect(onboarding).not.toContain("if (step === 0) { router.back(); return; }");
+  });
 });

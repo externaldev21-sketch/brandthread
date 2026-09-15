@@ -24,6 +24,12 @@ export interface GrowthTool {
   accentDim: string;
 }
 
+/**
+ * Temporary testing bypass. Keep all plan definitions and entitlement data
+ * intact; set this back to true to restore Growth-plan enforcement.
+ */
+export const GROWTH_PLAN_ENFORCEMENT_ENABLED = false;
+
 export type GrowthToolId = (typeof GROWTH_STUDIO_TOOLS)[number]['id'];
 
 /**

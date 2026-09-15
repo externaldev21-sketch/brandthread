@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, orders, customers, productVariants, drops, products, orderItems, users, notificationDeliveries, notificationEvents } from "@workspace/db";
-import { sql, gte, and, eq } from "drizzle-orm";
+import { db, orders, customers, productVariants, drops, products, orderItems, users, storefrontVisits, notificationDeliveries, notificationEvents } from "@workspace/db";
+import { sql, gte, lt, and, eq } from "drizzle-orm";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { buildCustomerAnalyticsResponse } from "./analyticsCustomers";
 
@@ -103,6 +103,88 @@ router.get("/dashboard", async (req, res) => {
       preOrderHeldCents:      preOrderHeld[0]?.total    ?? 0,
       preMadeAvailableCents:  preMadeAvailable[0]?.total ?? 0,
     },
+  });
+});
+
+// GET /api/analytics/home?range=live|today|yesterday|week
+router.get("/home", async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  const range = ["live", "today", "yesterday", "week"].includes(String(req.query.range))
+    ? String(req.query.range)
+    : "today";
+  const now = new Date();
+  const today = daysAgo(0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const weekStart = daysAgo(6);
+  const liveStart = new Date(now.getTime() - 60 * 60 * 1000);
+
+  const start = range === "live" ? liveStart : range === "yesterday" ? yesterday : range === "week" ? weekStart : today;
+  const end = range === "live" ? now : range === "yesterday" ? today : tomorrow;
+  const step = range === "live" ? "10 minutes" : range === "week" ? "1 day" : "4 hours";
+
+  const [salesRow, visitorRow, fulfillRow, captureRow] = await Promise.all([
+    db.select({
+      totalCents: sql<number>`coalesce(sum(${orders.totalCents}), 0)::int`,
+      orderCount: sql<number>`count(*)::int`,
+    }).from(orders).where(and(
+      eq(orders.ownerId, ownerId),
+      gte(orders.createdAt, start),
+      lt(orders.createdAt, end),
+      sql`${orders.status} != 'cancelled'`,
+      sql`${orders.paidAt} IS NOT NULL`,
+    )),
+    db.select({ count: sql<number>`count(*)::int` }).from(storefrontVisits).where(and(
+      eq(storefrontVisits.sellerId, ownerId),
+      gte(storefrontVisits.createdAt, start),
+      lt(storefrontVisits.createdAt, end),
+    )),
+    db.select({ count: sql<number>`count(*)::int` }).from(orders).where(and(
+      eq(orders.ownerId, ownerId),
+      sql`${orders.status} IN ('pending', 'processing')`,
+      sql`${orders.paidAt} IS NOT NULL`,
+    )),
+    db.select({ count: sql<number>`count(*)::int` }).from(orders).where(and(
+      eq(orders.ownerId, ownerId),
+      sql`${orders.status} != 'cancelled'`,
+      sql`${orders.stripePaymentIntentId} IS NOT NULL`,
+      sql`${orders.paidAt} IS NULL`,
+    )),
+  ]);
+
+  const bucketRows = await db.execute(sql`
+    SELECT series.bucket,
+           coalesce(sum(o.total_cents), 0)::int AS total_cents,
+           count(o.id)::int AS order_count
+    FROM generate_series(
+      ${start}::timestamp,
+      ${end}::timestamp - ${sql.raw(`interval '${step}'`)},
+      ${sql.raw(`interval '${step}'`)}
+    ) AS series(bucket)
+    LEFT JOIN orders o
+      ON o.owner_id = ${ownerId}
+      AND o.created_at >= series.bucket
+      AND o.created_at < series.bucket + ${sql.raw(`interval '${step}'`)}
+      AND o.status != 'cancelled'
+      AND o.paid_at IS NOT NULL
+    GROUP BY series.bucket
+    ORDER BY series.bucket
+  `);
+
+  res.json({
+    range,
+    totalCents: salesRow[0]?.totalCents ?? 0,
+    orderCount: salesRow[0]?.orderCount ?? 0,
+    visitorCount: visitorRow[0]?.count ?? 0,
+    toFulfill: fulfillRow[0]?.count ?? 0,
+    toCapture: captureRow[0]?.count ?? 0,
+    buckets: ((bucketRows as any).rows ?? []).map((row: any) => ({
+      bucket: row.bucket,
+      totalCents: Number(row.total_cents ?? 0),
+      orderCount: Number(row.order_count ?? 0),
+    })),
   });
 });
 

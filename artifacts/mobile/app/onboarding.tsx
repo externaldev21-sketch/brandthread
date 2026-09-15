@@ -2047,7 +2047,7 @@ export default function OnboardingScreen() {
   }
 
   function goBack() {
-    if (step === 0) { router.back(); return; }
+    if (step === 0) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     transitionTo(step - 1, -1);
   }
@@ -2527,13 +2527,15 @@ export default function OnboardingScreen() {
       {/* Standard header for form steps */}
       {!isFullScreen && (
         <View style={[sm.header, { paddingTop: insets.top + 8 }]}>
-          <TouchableOpacity
-            style={sm.backBtn}
-            onPress={goBack}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <Feather name="chevron-left" size={20} color={MUTED} />
-          </TouchableOpacity>
+          {!isAccountTypeStep && (
+            <TouchableOpacity
+              style={sm.backBtn}
+              onPress={goBack}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <Feather name="chevron-left" size={20} color={MUTED} />
+            </TouchableOpacity>
+          )}
 
           {showsProgressBar() && (
             <View style={{ flex: 1 }}>

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
+import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
+import SellerHomeCommerceDashboard from '@/components/SellerHomeCommerceDashboard';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
 import { View, Text, ScrollView, StyleSheet, Animated, Modal, TextInput, FlatList, Alert, Pressable, TouchableOpacity, Linking, StyleProp, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -235,7 +237,7 @@ function RevenueTrendChart({
 
 const COMMAND_ITEMS = [
   { label: 'Create product',    icon: 'package'      as const, route: '/(tabs)/products' },
-  { label: 'Create design',     icon: 'pen-tool'     as const, route: '/(tabs)/studio'   },
+  { label: 'Create design',     icon: 'pen-tool'     as const, route: '/design'          },
   { label: 'Create post',       icon: 'video'        as const, route: '/create-post'     },
   { label: 'View orders',       icon: 'shopping-bag' as const, route: '/(tabs)/orders'   },
   { label: 'Manufacturer Hub',  icon: 'package'      as const, route: '/manufacturer-hub' },
@@ -586,8 +588,16 @@ export default function SellerHomeScreen() {
 
   const trend = salesTrend ? getTrendSummary(salesTrend) : null;
   const trendColor = trend?.direction === 'down' ? RED : trend?.direction === 'up' ? GREEN_BRIGHT : MUTED;
+  const dashboardLayout = 'commerce' as 'commerce' | 'legacy';
 
-  return (
+  return dashboardLayout === 'commerce' ? (
+    <SellerHomeCommerceDashboard
+      topInset={insets.top}
+      userId={userId}
+      setupState={setupState}
+      onSetupStateChange={setSetupState}
+    />
+  ) : (
     <View style={{ flex: 1, backgroundColor: SCREEN_BG }}>
       <View style={[s.header, { paddingTop: insets.top + 8 }]}>
         <View>
@@ -812,7 +822,7 @@ export default function SellerHomeScreen() {
                { label: 'Create Post', icon: 'video', accent: theme.accent, badge: !setupState.openedFeatures.includes('create-post'), onPress: () => { markFeatureOpened('create-post', userId); nav('/create-post'); } },
                { label: 'Add Product', icon: 'plus-circle', accent: theme.secondary, onPress: () => nav('/(tabs)/products') },
                { label: 'View Orders', icon: 'shopping-bag', accent: BLUE, onPress: () => nav('/(tabs)/orders') },
-               { label: 'Studio', icon: 'zap', accent: ORANGE, onPress: () => nav('/(tabs)/studio') },
+               { label: 'Design Studio', icon: 'zap', accent: ORANGE, onPress: () => nav('/design') },
              ]} />
           </AnimatedEntrance>
         )}
@@ -875,6 +885,7 @@ export default function SellerHomeScreen() {
 
       </Animated.ScrollView>
 
+      <SellerStudioRadialMenu />
       <AIBrainFAB context={{ screen: 'home' as const }} bottomOffset={72} />
 
       <Modal visible={commandModal} animationType="slide" transparent>

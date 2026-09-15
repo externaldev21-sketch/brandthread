@@ -564,6 +564,16 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     analytics: {
       dashboard:  () => get('/api/analytics/dashboard'),
+      home: (range: 'live' | 'today' | 'yesterday' | 'week') =>
+        get<{
+          range: string;
+          totalCents: number;
+          orderCount: number;
+          visitorCount: number;
+          toFulfill: number;
+          toCapture: number;
+          buckets: Array<{ bucket: string; totalCents: number; orderCount: number }>;
+        }>(`/api/analytics/home?range=${range}`),
       revenue:    (period: string) => get(`/api/analytics/revenue?period=${period}`),
       products:   () => get<any[]>('/api/analytics/products'),
       /** Top customers by spend + repeat-buyer stats — derived from real orders */

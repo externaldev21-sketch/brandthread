@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
+import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
 import { LinearGradient } from 'expo-linear-gradient';
 import { formatCents } from '@/lib/money';
 import { getEntitlementRejection } from '@/lib/entitlementError';
@@ -165,7 +166,7 @@ export default function ManufacturerHub() {
 
   const { hasPlan, loading: planLoading, error: planError, retry: retryPlan } = useSubscriptionPlan();
   const [upsellVisible, setUpsellVisible] = useState(false);
-  const hasGrowthAccess = hasPlan('growth');
+  const hasGrowthAccess = !GROWTH_PLAN_ENFORCEMENT_ENABLED || hasPlan('growth');
 
   useEffect(() => {
     if (tab === 'messages') setActiveTab('messages');

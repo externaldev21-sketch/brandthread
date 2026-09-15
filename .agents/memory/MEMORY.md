@@ -98,3 +98,4 @@
 - [OpenAPI integer validation](openapi-integer-validation.md) — generated validators may accept fractions for integer fields; enforce integer semantics at sensitive server boundaries.
 - [Social relationship locking](social-relationship-locking.md) — pairwise follow/block mutations share one unordered-user lock; block checks happen inside the locked transaction.
 - [Thread-pull commerce transition](thread-pull-commerce-transition.md) — signature motion uses funnel-only route aliases so unrelated product and checkout visits retain native navigation.
+- [Temporary Growth gate bypass](growth-gate-bypass.md) — seller Growth feature enforcement is centrally disabled for testing; entitlement and pricing logic remain intact.

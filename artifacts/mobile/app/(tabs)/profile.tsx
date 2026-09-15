@@ -12,6 +12,9 @@ import { getSellerPosts, subscribeSocial, type SellerThreadPost } from '@/servic
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import PlanUpsellModal from '@/components/PlanUpsellModal';
+import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
+import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
 import { formatCents } from '@/lib/money';
 import { reportNetworkError } from '@/lib/networkNotice';
 import {
@@ -44,7 +47,7 @@ interface SocialCounts {
 }
 
 const QUICK_ACTIONS: { icon: keyof typeof Feather.glyphMap; label: string; route: string }[] = [
-  { icon: 'video',      label: 'Create Post',   route: '/create-post' },
+  { icon: 'layers',     label: 'Brand Assets',  route: '/design-brand-assets' },
   { icon: 'tag',        label: 'Add Product',   route: '/add-product' },
   { icon: 'send',       label: 'New Campaign',  route: '/(tabs)/marketing' },
   { icon: 'user',       label: 'My Profile',    route: '/seller-profile?isOwner=true' },
@@ -61,6 +64,7 @@ export default function ProfileScreen() {
   const api = useApi();
   const colors = useColors();
   const { theme } = useAppTheme();
+  const { hasPlan, loading: planLoading, error: planError, retry: retryPlan } = useSubscriptionPlan();
   const [activeTab, setActiveTab] = useState(0);
   const [sellerPosts, setSellerPosts] = useState<SellerThreadPost[]>([]);
   const [myStoryIds, setMyStoryIds] = useState<string[]>([]);
@@ -72,6 +76,7 @@ export default function ProfileScreen() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [upsellFeature, setUpsellFeature] = useState<string | null>(null);
 
   const loadPosts = useCallback(async () => {
     try {
@@ -156,6 +161,19 @@ export default function ProfileScreen() {
   function nav(route: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(route as never);
+  }
+
+  function openProfileAction(route: string, label?: string) {
+    if (
+      GROWTH_PLAN_ENFORCEMENT_ENABLED &&
+      route === '/design-brand-assets' &&
+      (planLoading || !!planError || !hasPlan('growth'))
+    ) {
+      if (planError) retryPlan();
+      setUpsellFeature(label ?? 'Brand Assets');
+      return;
+    }
+    nav(route);
   }
 
   function openProfileEditor() {
@@ -391,10 +409,33 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      <View style={s.profileCreationRow}>
+        <TouchableOpacity
+          style={s.profileCreationButton}
+          activeOpacity={0.8}
+          onPress={() => nav('/seller-go-live')}
+          accessibilityRole="button"
+          accessibilityLabel="Go Live"
+        >
+          <Feather name="radio" size={18} color={FG} />
+          <Text style={s.profileCreationLabel}>Go Live</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={s.profileCreationButton}
+          activeOpacity={0.8}
+          onPress={() => nav('/create-post')}
+          accessibilityRole="button"
+          accessibilityLabel="Create Post"
+        >
+          <Feather name="video" size={18} color={FG} />
+          <Text style={s.profileCreationLabel}>Create Post</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* ── Quick Actions ── */}
       <View style={s.quickRow}>
         {QUICK_ACTIONS.map((qa) => (
-          <TouchableOpacity key={qa.label} style={s.quickItem} activeOpacity={0.75} onPress={() => nav(qa.route)} accessibilityRole="button" accessibilityLabel={qa.label}>
+          <TouchableOpacity key={qa.label} style={s.quickItem} activeOpacity={0.75} onPress={() => openProfileAction(qa.route, qa.label)} accessibilityRole="button" accessibilityLabel={qa.label}>
             <View style={s.quickIconBox}>
               <Feather name={qa.icon} size={18} color={FG} />
             </View>
@@ -514,6 +555,17 @@ export default function ProfileScreen() {
       </View>
       )}
     </ScrollView>
+
+      <PlanUpsellModal
+        visible={upsellFeature !== null}
+        featureName={upsellFeature ?? ''}
+        requiredPlan="growth"
+        onClose={() => setUpsellFeature(null)}
+        onUpgrade={() => {
+          setUpsellFeature(null);
+          router.push('/subscription' as never);
+        }}
+      />
 
       {/* ── Profile Editor Modal ── */}
       <Modal
@@ -671,6 +723,29 @@ const s = StyleSheet.create({
     paddingHorizontal: SP.md, paddingVertical: SP.xs,
     borderTopWidth: 1, borderBottomWidth: 1, borderColor: BORDER,
     marginBottom: SP.lg,
+  },
+  profileCreationRow: {
+    flexDirection: 'row',
+    gap: SP.sm,
+    paddingHorizontal: SP.md,
+    marginBottom: SP.md,
+  },
+  profileCreationButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: CARD,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SP.xs,
+  },
+  profileCreationLabel: {
+    color: FG,
+    fontFamily: FONT.semibold,
+    fontSize: FS.sm,
   },
   quickItem: { alignItems: 'center', paddingVertical: SP.md, gap: 6 },
   quickIconBox: {
