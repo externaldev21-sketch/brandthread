@@ -1129,10 +1129,10 @@ function BuyerAuthStep({
   );
 }
 
-// ─── Seller Auth Step — single-column labeled form ────────────────────────────
-type SellerAuthPhase = 'form' | 'verify' | 'existing-account';
+// ─── Shared Auth Step — single-column labeled form for buyer and seller ───────
+type SharedAuthPhase = 'form' | 'verify' | 'existing-account';
 
-interface SellerAuthStepProps {
+interface SharedAuthStepProps {
   signUp: ReturnType<typeof useSignUp>['signUp'];
   startGoogleOAuth: () => Promise<any>;
   startAppleOAuth: () => Promise<any>;
@@ -1148,17 +1148,17 @@ interface SellerAuthStepProps {
   onLastNamePrefill: (lastName: string) => void;
 }
 
-function SellerAuthStep({
+function SharedAuthStep({
   signUp, startGoogleOAuth, startAppleOAuth, onAuthComplete, onDevClear,
   username, onUsernameChange, referralCode, onReferralCodeChange,
   onFirstNamePrefill, onLastNamePrefill,
-}: SellerAuthStepProps) {
+}: SharedAuthStepProps) {
   const { theme } = useAppTheme();
   const router = useRouter();
   const { isSignedIn, signOut } = useAuth();
   const { user } = useUser();
 
-  const [phase, setPhase]             = useState<SellerAuthPhase>('form');
+  const [phase, setPhase]             = useState<SharedAuthPhase>('form');
   const [email, setEmail]             = useState('');
   const [formFirstName, setFormFirstName] = useState('');
   const [formLastName, setFormLastName]   = useState('');
@@ -2305,10 +2305,10 @@ export default function OnboardingScreen() {
 
     /* ─── BUYER STEPS ─── */
     if (flow === 'buyer') {
-      // Step 1: Buyer Auth — bold Sign up screen
+      // Step 1: Shared buyer/seller account-creation form
       if (step === BUYER_STEP_INDEX.AUTH) return (
         <>
-          <BuyerAuthStep
+          <SharedAuthStep
             signUp={signUp}
             startGoogleOAuth={startGoogleOAuth}
             startAppleOAuth={startAppleOAuth}
@@ -2318,6 +2318,8 @@ export default function OnboardingScreen() {
             onUsernameChange={setUsername}
             referralCode={referralCode}
             onReferralCodeChange={setReferralCode}
+            onFirstNamePrefill={setFirstName}
+            onLastNamePrefill={setLastName}
           />
           {deviceProbeEnabled && (
             <TouchableOpacity
@@ -2396,10 +2398,10 @@ export default function OnboardingScreen() {
 
     /* ─── SELLER STEPS ─── */
     if (flow === 'seller') {
-      // Step 1: Seller Auth — single-column labeled form
+      // Step 1: Shared buyer/seller account-creation form
       if (step === SELLER_STEP_INDEX.AUTH) return (
         <>
-          <SellerAuthStep
+          <SharedAuthStep
             signUp={signUp}
             startGoogleOAuth={startGoogleOAuth}
             startAppleOAuth={startAppleOAuth}

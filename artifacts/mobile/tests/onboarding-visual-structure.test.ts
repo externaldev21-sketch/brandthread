@@ -55,9 +55,12 @@ describe('onboarding visual structure', () => {
     expect(onboarding).toContain('backgroundColor: theme.accentDim');
   });
 
-  it('seller auth form has email, first name, last name, password, confirm password fields', () => {
+  it('uses one shared account form for buyer and seller with the seller field structure', () => {
     const onboarding = read('app/onboarding.tsx');
-    expect(onboarding).toContain('function SellerAuthStep');
+    expect(onboarding).toContain('function SharedAuthStep');
+    expect(onboarding.match(/<SharedAuthStep/g)?.length).toBe(2);
+    expect(onboarding).not.toContain('<BuyerAuthStep');
+    expect(onboarding).not.toContain('<SellerAuthStep');
     expect(onboarding).toContain('First name');
     expect(onboarding).toContain('Last name');
     expect(onboarding).toContain('Confirm password');
@@ -65,16 +68,6 @@ describe('onboarding visual structure', () => {
     expect(onboarding).toContain('formLastName');
     expect(onboarding).toContain('confirmPassword');
     expect(onboarding).toContain('passwordsMatch');
-  });
-
-  it('buyer auth has bold Sign up header with stacked OAuth rows before email option', () => {
-    const onboarding = read('app/onboarding.tsx');
-    expect(onboarding).toContain('function BuyerAuthStep');
-    expect(onboarding).toContain('chooseHeadline');
-    expect(onboarding).toContain('Sign up');
-    expect(onboarding).toContain('Use email');
-    // email-form phase shows the form
-    expect(onboarding).toContain("email-form");
   });
 
   it('thread explainer screen exists and routes buyers to the feed', () => {
