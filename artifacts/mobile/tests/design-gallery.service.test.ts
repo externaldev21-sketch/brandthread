@@ -25,6 +25,10 @@ vi.mock('@/lib/serviceConfig', () => ({
   serviceRequest: vi.fn(),
 }));
 
+vi.mock('@/lib/imageDimensions', () => ({
+  getImageDimensions: () => Promise.resolve({ width: 1, height: 1 }),
+}));
+
 // ─── imports after mocks ──────────────────────────────────────────────────────
 
 import {
@@ -38,8 +42,13 @@ import {
   purgeDeletedProjects,
   duplicateProject,
   updateProject,
+  initDesignService,
+  getRecoverableLegacyProjectCount,
+  recoverLegacyDesignProjects,
 } from '../services/designService';
 import { SELLER_CANVAS_PRESETS } from '../services/designTypes';
+import { serviceRequest } from '@/lib/serviceConfig';
+import { ApiError } from '@/lib/networkNotice';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -315,5 +324,315 @@ describe('designService — route and project integrity', () => {
 
     const projects = await getProjects();
     expect(projects.some(p => p.id === 'proj_legacy_1')).toBe(true);
+  });
+});
+
+describe('designService — delete/sync ordering', () => {
+  it('does not restore a project when delete starts during a queued cloud push', async () => {
+    clearStorage();
+    const request = vi.mocked(serviceRequest);
+    request.mockRejectedValueOnce(new Error('offline'));
+    const project = await createProject('canvas', 'Queued', { width: 1080, height: 1080 });
+
+    let markPutStarted!: () => void;
+    let releasePut!: () => void;
+    const putStarted = new Promise<void>(resolve => { markPutStarted = resolve; });
+    const pendingPut = new Promise<{ project: typeof project }>(resolve => {
+      releasePut = () => resolve({ project: { ...project, cloudRevision: 1 } });
+    });
+    request.mockImplementation((path, options) => {
+      if (options?.method === 'PUT') {
+        markPutStarted();
+        return pendingPut as never;
+      }
+      if (path === '/api/design-studio/projects') return Promise.resolve({ projects: [] }) as never;
+      if (options?.method === 'DELETE') return Promise.resolve({}) as never;
+      return Promise.reject(new Error('offline'));
+    });
+
+    await getProjects();
+    await putStarted;
+    const deleting = deleteProject(project.id);
+    releasePut();
+    await deleting;
+
+    request.mockRejectedValue(new Error('offline'));
+    await expect(getProject(project.id)).resolves.toBeNull();
+  });
+
+  it('treats cloud absence as authoritative for a project deleted on another device', async () => {
+    clearStorage();
+    const stale = {
+      id: 'proj_deleted_elsewhere',
+      name: 'Deleted elsewhere',
+      type: 'canvas' as const,
+      status: 'saved' as const,
+      canvas: { width: 1080, height: 1080, backgroundHex: '#000000' },
+      layers: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      cloudRevision: 4,
+    };
+    store['bt:design:anon:joined:projects:v2'] = JSON.stringify([stale]);
+    const request = vi.mocked(serviceRequest);
+    request.mockImplementation((path) => {
+      if (path === '/api/design-studio/projects') return Promise.resolve({ projects: [] }) as never;
+      return Promise.reject(new ApiError(404, '{"error":"Project not found"}'));
+    });
+
+    expect(await getProjects()).toEqual([]);
+    await expect(getProject(stale.id)).resolves.toBeNull();
+    await expect(updateProject(stale.id, { name: 'Must not return' })).rejects.toThrow('not found');
+  });
+});
+
+describe('designService — legacy recovery', () => {
+  it('recovers pre-sync projects only after an authenticated store confirms ownership', async () => {
+    clearStorage();
+    const legacy = {
+      id: 'proj_legacy_recovery',
+      name: 'Original artwork',
+      type: 'canvas' as const,
+      status: 'saved' as const,
+      canvas: { width: 1200, height: 1600, backgroundHex: '#000000' },
+      layers: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    store['bt:design:projects:v1'] = JSON.stringify([legacy]);
+    vi.mocked(serviceRequest).mockRejectedValue(new Error('offline'));
+    initDesignService('seller_recovery', 'own');
+    try {
+      expect(await getRecoverableLegacyProjectCount()).toBe(1);
+      expect(await recoverLegacyDesignProjects()).toBe(1);
+      expect(await getRecoverableLegacyProjectCount()).toBe(0);
+      await expect(getProject(legacy.id)).resolves.toMatchObject({
+        id: legacy.id,
+        name: legacy.name,
+      });
+    } finally {
+      initDesignService(null);
+    }
+  });
+});
+
+describe('designService — portable source formats', () => {
+  it('resumes from the created revision after a transient source upload failure', async () => {
+    clearStorage();
+    initDesignService('seller_partial_create', 'own');
+    const request = vi.mocked(serviceRequest);
+    let serverProject: Record<string, unknown> | null = null;
+    let putCount = 0;
+    let postCount = 0;
+    let retryRevision: string | undefined;
+    request.mockImplementation((path, options) => {
+      if (options?.method === 'POST') {
+        postCount += 1;
+        if (postCount === 1) return Promise.reject(new Error('connection dropped'));
+        return Promise.resolve({
+          asset: { objectPath: '/objects/resumed-source' },
+        }) as never;
+      }
+      if (options?.method === 'PUT') {
+        putCount += 1;
+        serverProject = JSON.parse(String(options.body)) as Record<string, unknown>;
+        retryRevision = putCount > 1
+          ? (options.headers as Record<string, string>)['X-Design-Revision']
+          : retryRevision;
+        return Promise.resolve({
+          project: { ...serverProject, cloudRevision: putCount },
+        }) as never;
+      }
+      if (path === '/api/design-studio/projects') {
+        const canvas = serverProject!.canvas as Record<string, unknown>;
+        return Promise.resolve({
+          projects: [{
+            ...serverProject,
+            cloudRevision: 2,
+            canvas: {
+              ...canvas,
+              backgroundImageUri: 'https://download.test/resumed-source',
+            },
+          }],
+        }) as never;
+      }
+      return Promise.reject(new Error('Unexpected request'));
+    });
+
+    const gif = Buffer.from('R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==', 'base64');
+    const created = await createProject('canvas', 'Interrupted upload', {
+      width: 1,
+      height: 1,
+      backgroundImageUri: `data:image/gif;base64,${gif.toString('base64')}`,
+    });
+    expect(created.cloudRevision).toBe(1);
+    expect(putCount).toBe(1);
+
+    await getProjects();
+    for (let attempt = 0; attempt < 20 && putCount < 2; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    const afterRetry = await getProjects();
+    expect(retryRevision).toBe('1');
+    expect(putCount).toBe(2);
+    expect(afterRetry.filter(project => project.id === created.id)).toHaveLength(1);
+    expect(afterRetry.some(project => project.name.includes('offline conflict'))).toBe(false);
+    expect((serverProject!.canvas as Record<string, unknown>).backgroundImageUri)
+      .toBe('/objects/resumed-source');
+    initDesignService(null);
+  });
+
+  it.each([
+    {
+      label: 'GIF',
+      mimeType: 'image/gif',
+      bytes: Buffer.from('R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==', 'base64'),
+      lossless: 'true',
+    },
+    {
+      label: 'WebP',
+      mimeType: 'image/webp',
+      bytes: (() => {
+        const value = Buffer.alloc(26);
+        value.write('RIFF', 0, 'ascii');
+        value.writeUInt32LE(18, 4);
+        value.write('WEBPVP8L', 8, 'ascii');
+        value.writeUInt32LE(5, 16);
+        Buffer.from([0x2f, 0x00, 0x00, 0x00, 0x00]).copy(value, 20);
+        return value;
+      })(),
+      lossless: 'true',
+    },
+  ])('uploads $label with its real MIME and hydrates it on another device', async ({
+    mimeType, bytes, lossless,
+  }) => {
+    clearStorage();
+    const userId = `seller_formats_${mimeType.split('/')[1]}`;
+    initDesignService(userId, 'own');
+    let serverProject: Record<string, unknown> | null = null;
+    let uploadedHeaders: Record<string, string> | null = null;
+    const request = vi.mocked(serviceRequest);
+    request.mockImplementation((path, options) => {
+      if (options?.method === 'POST') {
+        uploadedHeaders = options.headers as Record<string, string>;
+        return Promise.resolve({
+          asset: {
+            objectPath: `/objects/${mimeType.split('/')[1]}-source`,
+          },
+        }) as never;
+      }
+      if (options?.method === 'PUT') {
+        serverProject = JSON.parse(String(options.body)) as Record<string, unknown>;
+        return Promise.resolve({
+          project: {
+            ...serverProject,
+            cloudRevision: options.headers &&
+              (options.headers as Record<string, string>)['X-Design-Revision'] ? 2 : 1,
+          },
+        }) as never;
+      }
+      if (path === '/api/design-studio/projects') {
+        const canvas = (serverProject!.canvas as Record<string, unknown>);
+        return Promise.resolve({
+          projects: [{
+            ...serverProject,
+            cloudRevision: 2,
+            canvas: {
+              ...canvas,
+              backgroundImageUri: 'https://download.test/source',
+            },
+          }],
+        }) as never;
+      }
+      return Promise.reject(new Error('Unexpected request'));
+    });
+
+    const sourceUri = `data:${mimeType};base64,${bytes.toString('base64')}`;
+    const created = await createProject('canvas', 'Portable source', {
+      width: 1,
+      height: 1,
+      backgroundImageUri: sourceUri,
+    });
+    expect(uploadedHeaders).toMatchObject({
+      'Content-Type': mimeType,
+      'X-Design-Lossless': lossless,
+    });
+
+    delete store[`bt:design:${userId}:own:projects:v2`];
+    const onSecondDevice = await getProjects();
+    expect(onSecondDevice.find(project => project.id === created.id)?.canvas).toMatchObject({
+      backgroundImageUri: 'https://download.test/source',
+      backgroundImageObjectPath: `/objects/${mimeType.split('/')[1]}-source`,
+    });
+    initDesignService(null);
+  });
+});
+
+describe('designService — direct-load revision reconciliation', () => {
+  it('accepts a higher cloud revision despite an older client timestamp', async () => {
+    clearStorage();
+    const userId = 'seller_clock_skew';
+    initDesignService(userId, 'own');
+    const local = {
+      id: 'proj_clock_skew',
+      name: 'Stale local',
+      type: 'canvas' as const,
+      status: 'saved' as const,
+      canvas: { width: 100, height: 100, backgroundHex: '#000000' },
+      layers: [],
+      createdAt: '2030-01-01T00:00:00.000Z',
+      updatedAt: '2030-01-02T00:00:00.000Z',
+      cloudRevision: 2,
+    };
+    store[`bt:design:${userId}:own:projects:v2`] = JSON.stringify([local]);
+    vi.mocked(serviceRequest).mockResolvedValue({
+      project: {
+        ...local,
+        name: 'Current cloud',
+        updatedAt: '2029-01-01T00:00:00.000Z',
+        cloudRevision: 3,
+      },
+    } as never);
+
+    await expect(getProject(local.id)).resolves.toMatchObject({
+      name: 'Current cloud',
+      cloudRevision: 3,
+    });
+    initDesignService(null);
+  });
+
+  it('preserves an equal-revision local snapshot while it is pending in the outbox', async () => {
+    clearStorage();
+    const userId = 'seller_pending_direct';
+    initDesignService(userId, 'own');
+    const local = {
+      id: 'proj_pending_direct',
+      name: 'Unsynced local edit',
+      type: 'canvas' as const,
+      status: 'saved' as const,
+      canvas: { width: 100, height: 100, backgroundHex: '#000000' },
+      layers: [],
+      createdAt: '2029-01-01T00:00:00.000Z',
+      updatedAt: '2029-01-01T00:00:00.000Z',
+      cloudRevision: 4,
+    };
+    store[`bt:design:${userId}:own:projects:v2`] = JSON.stringify([local]);
+    store[`bt:design:${userId}:own:sync-state:v2`] = JSON.stringify({
+      upserts: { [local.id]: local },
+      deletedIds: [],
+    });
+    vi.mocked(serviceRequest).mockResolvedValue({
+      project: {
+        ...local,
+        name: 'Cloud timestamp only',
+        updatedAt: '2031-01-01T00:00:00.000Z',
+      },
+    } as never);
+
+    await expect(getProject(local.id)).resolves.toMatchObject({
+      name: 'Unsynced local edit',
+      cloudRevision: 4,
+    });
+    initDesignService(null);
   });
 });

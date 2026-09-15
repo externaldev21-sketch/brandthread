@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requirePlan } from "../middlewares/requireAuth";
+import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import healthRouter from "./health";
 import authRouter from "./auth";
 import productsRouter from "./products";
@@ -80,6 +80,7 @@ import callRouter      from "./call";
 import featureFlagsRouter from "./feature-flags";
 import ipCasesRouter from "./ip-cases";
 import shopifyImportRouter from "./shopify-import";
+import designStudioRouter from "./design-studio";
 
 const router = Router();
 
@@ -165,6 +166,7 @@ router.use("/taxes",                     tc, taxesRouter);
 router.use("/team",                      teamRouter);
 router.use("/store/ai",                  tc, storeAiRouter);
 router.use("/store",                     tc, storeRouter);
+router.use("/design-studio",             requireAuth, tc, designStudioRouter);
 router.use("/shopify-imports",           tc, shopifyImportRouter);
 
 // ─── Freelancer marketplace (Community tab) ───────────────────────────────────

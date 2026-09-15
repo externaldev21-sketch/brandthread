@@ -6,6 +6,10 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '@/lib/serviceConfig';
+import { masterUploadMetadata, type MasterExportAsset } from '@/lib/designExportPolicy';
+import { getImageDimensions } from '@/lib/imageDimensions';
+import { cacheDesignCloudImage } from '@/lib/designCloudImageCache';
+import { ApiError } from '@/lib/networkNotice';
 import {
   DesignProject, DesignProjectType, DesignProjectStatus, DesignCanvas,
   DesignLayer, DesignVersion, DesignVersionMeta, BrandAsset, BrandAssetTypeKind,
@@ -16,9 +20,57 @@ import {
 } from './designTypes';
 
 // ─── Storage Keys ─────────────────────────────────────────────────────────────
-const DS_PROJECTS_KEY = 'bt:design:projects:v1';
-const DS_ASSETS_KEY   = 'bt:design:brand-assets:v1';
-const DS_VERSIONS_KEY = 'bt:design:versions:v1';
+let _designUserId = 'anon';
+let _designStoreContext = 'joined';
+let _designScopeGeneration = 0;
+const LEGACY_PROJECTS_KEY = 'bt:design:projects:v1';
+
+export function initDesignService(userId: string | null, storeContext: string | null = null): void {
+  const nextUser = userId ?? 'anon';
+  const nextStore = storeContext ?? 'joined';
+  if (nextUser !== _designUserId || nextStore !== _designStoreContext) _designScopeGeneration += 1;
+  _designUserId = nextUser;
+  _designStoreContext = nextStore;
+}
+
+function K(userId = _designUserId, storeContext = _designStoreContext) {
+  const scope = `${userId}:${storeContext}`.replace(/[^a-zA-Z0-9:_-]/g, '_');
+  return {
+    projects: `bt:design:${scope}:projects:v2`,
+    assets: `bt:design:${scope}:brand-assets:v2`,
+    versions: `bt:design:${scope}:versions:v2`,
+    sourceMap: `bt:design:${scope}:cloud-source-map:v2`,
+    syncState: `bt:design:${scope}:sync-state:v2`,
+    legacyRecovery: `bt:design:${scope}:legacy-recovery:v1`,
+  };
+}
+
+type DesignSyncContext = {
+  generation: number;
+  storeContext: string;
+  keys: ReturnType<typeof K>;
+};
+
+function captureSyncContext(): DesignSyncContext {
+  return {
+    generation: _designScopeGeneration,
+    storeContext: _designStoreContext,
+    keys: K(),
+  };
+}
+
+function assertCurrentContext(context: DesignSyncContext): void {
+  if (context.generation !== _designScopeGeneration) {
+    throw new Error('Design Studio store context changed during sync.');
+  }
+}
+
+function syncHeaders(context: DesignSyncContext, revision?: number): Record<string, string> {
+  return {
+    'X-Store-Context': context.storeContext,
+    ...(revision == null ? {} : { 'X-Design-Revision': String(revision) }),
+  };
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 let _idCounter = 0;
@@ -31,32 +83,413 @@ function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function saveProjects(arr: DesignProject[]): Promise<void> {
-  await AsyncStorage.setItem(DS_PROJECTS_KEY, JSON.stringify(arr));
+async function saveProjects(arr: DesignProject[], key = K().projects): Promise<void> {
+  await AsyncStorage.setItem(key, JSON.stringify(arr));
 }
 
-async function loadProjects(): Promise<DesignProject[]> {
-  const raw = await AsyncStorage.getItem(DS_PROJECTS_KEY);
+async function loadProjects(key = K().projects): Promise<DesignProject[]> {
+  let raw = await AsyncStorage.getItem(key);
+  // Only anonymous preview mode may adopt the legacy device-global cache.
+  // Authenticated accounts must never guess ownership of those old records.
+  if (!raw && _designUserId === 'anon') raw = await AsyncStorage.getItem(LEGACY_PROJECTS_KEY);
   if (!raw) return [];
   try { return JSON.parse(raw) as DesignProject[]; } catch { return []; }
 }
 
-async function saveVersions(arr: DesignVersion[]): Promise<void> {
-  await AsyncStorage.setItem(DS_VERSIONS_KEY, JSON.stringify(arr));
+async function pushProjectToCloud(
+  project: DesignProject,
+  context = captureSyncContext(),
+): Promise<DesignProject> {
+  assertCurrentContext(context);
+  let revision = project.cloudRevision;
+  // New projects must exist before their separately stored source assets.
+  if (revision == null) {
+    const created = await serviceRequest<{ project: DesignProject }>(
+      `/api/design-studio/projects/${encodeURIComponent(project.id)}`,
+      { method: 'PUT', body: JSON.stringify(project), headers: syncHeaders(context) },
+    );
+    revision = created.project.cloudRevision;
+    if (revision == null) throw new Error('Design Studio cloud did not return a project revision.');
+    await persistProvisionalCloudRevision(project.id, revision, context);
+    project = { ...project, cloudRevision: revision };
+  }
+  assertCurrentContext(context);
+  const cloudProject = await prepareCloudProject(project, context);
+  const response = await serviceRequest<{ project: DesignProject }>(
+    `/api/design-studio/projects/${encodeURIComponent(project.id)}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(cloudProject),
+      headers: syncHeaders(context, revision),
+    },
+  );
+  assertCurrentContext(context);
+  return response.project;
 }
 
-async function loadVersions(): Promise<DesignVersion[]> {
-  const raw = await AsyncStorage.getItem(DS_VERSIONS_KEY);
+async function persistProvisionalCloudRevision(
+  projectId: string,
+  revision: number,
+  context: DesignSyncContext,
+): Promise<void> {
+  assertCurrentContext(context);
+  const projects = await loadProjects(context.keys.projects);
+  await saveProjects(
+    projects.map(project => project.id === projectId ? { ...project, cloudRevision: revision } : project),
+    context.keys.projects,
+  );
+  const state = await loadSyncState(context.keys.syncState);
+  if (state.upserts[projectId]) {
+    state.upserts[projectId] = { ...state.upserts[projectId], cloudRevision: revision };
+    await AsyncStorage.setItem(context.keys.syncState, JSON.stringify(state));
+  }
+}
+
+type DesignSyncState = {
+  upserts: Record<string, DesignProject>;
+  deletedIds: string[];
+};
+
+const syncStateLocks = new Map<string, Promise<void>>();
+const projectOperationEpochs = new Map<string, number>();
+
+function projectEpochKey(context: DesignSyncContext, projectId: string): string {
+  return `${context.keys.syncState}:${projectId}`;
+}
+
+function captureProjectEpoch(context: DesignSyncContext, projectId: string): number {
+  return projectOperationEpochs.get(projectEpochKey(context, projectId)) ?? 0;
+}
+
+function invalidateProjectOperations(context: DesignSyncContext, projectId: string): void {
+  const key = projectEpochKey(context, projectId);
+  projectOperationEpochs.set(key, (projectOperationEpochs.get(key) ?? 0) + 1);
+}
+
+function assertProjectEpoch(context: DesignSyncContext, projectId: string, epoch: number): void {
+  assertCurrentContext(context);
+  if (captureProjectEpoch(context, projectId) !== epoch) {
+    throw new Error('Design Studio project was deleted during sync.');
+  }
+}
+
+async function withSyncLock<T>(context: DesignSyncContext, operation: () => Promise<T>): Promise<T> {
+  const key = context.keys.syncState;
+  const previous = syncStateLocks.get(key) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const tail = previous.then(() => gate);
+  syncStateLocks.set(key, tail);
+  await previous;
+  try {
+    assertCurrentContext(context);
+    return await operation();
+  } finally {
+    release();
+    if (syncStateLocks.get(key) === tail) syncStateLocks.delete(key);
+  }
+}
+
+async function loadSyncState(key = K().syncState): Promise<DesignSyncState> {
+  try {
+    const parsed = JSON.parse(await AsyncStorage.getItem(key) ?? '{}') as Partial<DesignSyncState>;
+    return { upserts: parsed.upserts ?? {}, deletedIds: parsed.deletedIds ?? [] };
+  } catch {
+    return { upserts: {}, deletedIds: [] };
+  }
+}
+
+async function queueProjectSync(project: DesignProject, context: DesignSyncContext): Promise<void> {
+  await withSyncLock(context, async () => {
+    await queueProjectSyncLocked(project, context);
+  });
+}
+
+async function queueProjectSyncLocked(
+  project: DesignProject,
+  context: DesignSyncContext,
+): Promise<void> {
+  const state = await loadSyncState(context.keys.syncState);
+  if (state.deletedIds.includes(project.id)) return;
+  const local = (await loadProjects(context.keys.projects)).find(item => item.id === project.id);
+  state.upserts[project.id] = {
+    ...project,
+    cloudRevision: local?.cloudRevision ?? project.cloudRevision,
+  };
+  await AsyncStorage.setItem(context.keys.syncState, JSON.stringify(state));
+}
+
+async function drainProjectSync(context = captureSyncContext()): Promise<void> {
+  await withSyncLock(context, async () => {
+    const state = await loadSyncState(context.keys.syncState);
+    for (const project of Object.values(state.upserts)) {
+      const epoch = captureProjectEpoch(context, project.id);
+      try {
+        assertProjectEpoch(context, project.id, epoch);
+        const synced = await pushProjectToCloud(project, context);
+        assertProjectEpoch(context, project.id, epoch);
+        const projects = await loadProjects(context.keys.projects);
+        assertProjectEpoch(context, project.id, epoch);
+        await saveProjects(
+          projects.map(item => item.id === synced.id ? { ...item, cloudRevision: synced.cloudRevision } : item),
+          context.keys.projects,
+        );
+        delete state.upserts[project.id];
+        await AsyncStorage.setItem(context.keys.syncState, JSON.stringify(state));
+      } catch (error) {
+        if (captureProjectEpoch(context, project.id) !== epoch) {
+          delete state.upserts[project.id];
+          await AsyncStorage.setItem(context.keys.syncState, JSON.stringify(state));
+          continue;
+        }
+        if (error instanceof ApiError && error.status === 409) {
+          await reconcileProjectConflict(project, state, context);
+          continue;
+        }
+        return;
+      }
+    }
+  });
+}
+
+async function deleteProjectsSerialized(
+  projectIds: string[],
+  context: DesignSyncContext,
+): Promise<void> {
+  await withSyncLock(context, async () => {
+    const ids = new Set(projectIds);
+    const projects = await loadProjects(context.keys.projects);
+    await saveProjects(projects.filter(project => !ids.has(project.id)), context.keys.projects);
+
+    const state = await loadSyncState(context.keys.syncState);
+    const tombstones = new Set(state.deletedIds);
+    for (const id of ids) {
+      tombstones.add(id);
+      delete state.upserts[id];
+    }
+    state.deletedIds = [...tombstones];
+    await AsyncStorage.setItem(context.keys.syncState, JSON.stringify(state));
+
+    const remainingTargets = new Set<string>();
+    for (const id of ids) {
+      try {
+        await serviceRequest(`/api/design-studio/projects/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          headers: syncHeaders(context),
+        });
+        assertCurrentContext(context);
+      } catch (error) {
+        if (!(error instanceof ApiError && error.status === 404)) remainingTargets.add(id);
+      }
+    }
+    state.deletedIds = state.deletedIds.filter(id => !ids.has(id) || remainingTargets.has(id));
+    await AsyncStorage.setItem(context.keys.syncState, JSON.stringify(state));
+  });
+}
+
+async function drainProjectDeletes(context: DesignSyncContext): Promise<void> {
+  await withSyncLock(context, async () => {
+    const state = await loadSyncState(context.keys.syncState);
+    const remaining: string[] = [];
+    for (const id of state.deletedIds) {
+      try {
+        await serviceRequest(`/api/design-studio/projects/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          headers: syncHeaders(context),
+        });
+        assertCurrentContext(context);
+      } catch (error) {
+        if (!(error instanceof ApiError && error.status === 404)) remaining.push(id);
+      }
+    }
+    state.deletedIds = remaining;
+    await AsyncStorage.setItem(context.keys.syncState, JSON.stringify(state));
+  });
+}
+
+async function pushProjectSerialized(
+  project: DesignProject,
+  context: DesignSyncContext,
+  epoch = captureProjectEpoch(context, project.id),
+): Promise<DesignProject> {
+  return withSyncLock(context, () => {
+    assertProjectEpoch(context, project.id, epoch);
+    return pushProjectToCloud(project, context);
+  });
+}
+
+async function reconcileProjectConflict(
+  local: DesignProject,
+  state: DesignSyncState,
+  context: DesignSyncContext,
+  knownCloud?: DesignProject,
+): Promise<void> {
+  const cloudProject = knownCloud ?? (await serviceRequest<{ project: DesignProject }>(
+      `/api/design-studio/projects/${encodeURIComponent(local.id)}`,
+      { headers: syncHeaders(context) },
+    )).project;
+  assertCurrentContext(context);
+  const cloud = await cacheCloudImages(cloudProject);
+  const now = new Date().toISOString();
+  const conflict: DesignProject = {
+    ...local,
+    id: uid('proj'),
+    name: `${local.name} (conflict copy)`,
+    cloudRevision: undefined,
+    createdAt: now,
+    updatedAt: now,
+  };
+  delete (conflict as DesignProject & { thumbnailObjectPath?: string }).thumbnailObjectPath;
+  delete (conflict.canvas as DesignCanvas & { backgroundImageObjectPath?: string }).backgroundImageObjectPath;
+  for (const layer of conflict.layers) {
+    if (layer.data.kind === 'image') {
+      delete (layer.data as typeof layer.data & { cloudObjectPath?: string }).cloudObjectPath;
+    }
+  }
+  const projects = await loadProjects(context.keys.projects);
+  await saveProjects(
+    [...projects.filter(project => project.id !== local.id), cloud, conflict],
+    context.keys.projects,
+  );
+  delete state.upserts[local.id];
+  state.upserts[conflict.id] = conflict;
+  await AsyncStorage.setItem(context.keys.syncState, JSON.stringify(state));
+}
+
+async function sourceMap(key = K().sourceMap): Promise<Record<string, string>> {
+  try { return JSON.parse(await AsyncStorage.getItem(key) ?? '{}') as Record<string, string>; }
+  catch { return {}; }
+}
+
+async function uploadProjectImage(
+  projectId: string,
+  uri: string,
+  kind: 'source' | 'thumbnail',
+  context: DesignSyncContext,
+): Promise<string> {
+  assertCurrentContext(context);
+  const mapKey = context.keys.sourceMap;
+  const cached = await sourceMap(mapKey);
+  const cacheKey = `${projectId}:${kind}:${uri}`;
+  if (cached[cacheKey]) return cached[cacheKey];
+  const response = await fetch(uri);
+  if (!response.ok) throw new Error('Could not read a Design Studio source image.');
+  const blob = await response.blob();
+  const bytes = await blob.arrayBuffer();
+  const dimensions = await getImageDimensions(uri);
+  const normalizedType = blob.type.toLowerCase();
+  const path = uri.split('?')[0].toLowerCase();
+  const candidates = ['png', 'jpeg', 'gif', 'webp'] as const;
+  const format = candidates.find(candidate => {
+    const mime = candidate === 'jpeg' ? 'image/jpeg' : `image/${candidate}`;
+    const extensions = candidate === 'jpeg' ? ['.jpg', '.jpeg'] : [`.${candidate}`];
+    return normalizedType === mime || uri.startsWith(`data:${mime}`) ||
+      extensions.some(extension => path.endsWith(extension));
+  });
+  if (!format) throw new Error('Unsupported Design Studio source image type.');
+  const mimeType = format === 'jpeg' ? 'image/jpeg' : `image/${format}` as const;
+  const raw = new Uint8Array(bytes);
+  let webpLossless = false;
+  for (let index = 12; format === 'webp' && index + 3 < raw.length; index += 1) {
+    if (raw[index] === 0x56 && raw[index + 1] === 0x50 &&
+        raw[index + 2] === 0x38 && raw[index + 3] === 0x4c) {
+      webpLossless = true;
+      break;
+    }
+  }
+  const lossless = format === 'png' || format === 'gif' || webpLossless;
+  const uploaded = await serviceRequest<{ asset: SyncedDesignAsset }>(
+    `/api/design-studio/projects/${encodeURIComponent(projectId)}/assets/${kind}`,
+    {
+      method: 'POST',
+      body: bytes,
+      headers: {
+        ...syncHeaders(context),
+        'Content-Type': mimeType,
+        'X-Design-Width': String(dimensions.width),
+        'X-Design-Height': String(dimensions.height),
+        'X-Design-Format': format,
+        'X-Design-Lossless': String(lossless),
+      },
+    },
+  );
+  assertCurrentContext(context);
+  cached[cacheKey] = uploaded.asset.objectPath;
+  await AsyncStorage.setItem(mapKey, JSON.stringify(cached));
+  return uploaded.asset.objectPath;
+}
+
+async function cacheCloudImages(project: DesignProject): Promise<DesignProject> {
+  const cached = JSON.parse(JSON.stringify(project)) as DesignProject;
+  async function localCopy(uri: string, objectPath: string): Promise<string> {
+    return cacheDesignCloudImage(project.id, objectPath, uri);
+  }
+  const canvas = cached.canvas as DesignCanvas & { backgroundImageObjectPath?: string };
+  if (canvas.backgroundImageUri && canvas.backgroundImageObjectPath) {
+    canvas.backgroundImageUri = await localCopy(canvas.backgroundImageUri, canvas.backgroundImageObjectPath);
+  }
+  for (const layer of cached.layers) {
+    if (layer.data.kind !== 'image') continue;
+    const image = layer.data as typeof layer.data & { uri: string; cloudObjectPath?: string };
+    if (image.uri && image.cloudObjectPath) image.uri = await localCopy(image.uri, image.cloudObjectPath);
+  }
+  return cached;
+}
+
+async function prepareCloudProject(project: DesignProject, context: DesignSyncContext): Promise<DesignProject> {
+  const snapshot = JSON.parse(JSON.stringify(project)) as DesignProject;
+  const snapshotWithCloud = snapshot as DesignProject & { thumbnailObjectPath?: string };
+  const canvas = snapshot.canvas as DesignCanvas & { backgroundImageObjectPath?: string };
+  if (canvas.backgroundImageObjectPath) {
+    canvas.backgroundImageUri = canvas.backgroundImageObjectPath;
+  } else if (canvas.backgroundImageUri) {
+    canvas.backgroundImageObjectPath = await uploadProjectImage(project.id, canvas.backgroundImageUri, 'source', context);
+    canvas.backgroundImageUri = canvas.backgroundImageObjectPath;
+  }
+  for (const layer of snapshot.layers) {
+    if (layer.data.kind !== 'image') continue;
+    const image = layer.data as typeof layer.data & { uri: string; cloudObjectPath?: string };
+    if (image.cloudObjectPath) {
+      image.uri = image.cloudObjectPath;
+    } else if (image.uri) {
+      image.cloudObjectPath = await uploadProjectImage(project.id, image.uri, 'source', context);
+      image.uri = image.cloudObjectPath;
+    }
+  }
+  if (snapshotWithCloud.thumbnailObjectPath) {
+    snapshot.thumbnail = snapshotWithCloud.thumbnailObjectPath;
+  } else if (snapshot.thumbnail) {
+    snapshotWithCloud.thumbnailObjectPath = await uploadProjectImage(project.id, snapshot.thumbnail, 'thumbnail', context);
+    snapshot.thumbnail = snapshotWithCloud.thumbnailObjectPath;
+  }
+  return snapshot;
+}
+
+async function loadCloudProjects(context: DesignSyncContext): Promise<DesignProject[]> {
+  const response = await serviceRequest<{ projects: DesignProject[] }>(
+    '/api/design-studio/projects',
+    { headers: syncHeaders(context) },
+  );
+  assertCurrentContext(context);
+  return response.projects;
+}
+
+async function saveVersions(arr: DesignVersion[], key = K().versions): Promise<void> {
+  await AsyncStorage.setItem(key, JSON.stringify(arr));
+}
+
+async function loadVersions(key = K().versions): Promise<DesignVersion[]> {
+  const raw = await AsyncStorage.getItem(key);
   if (!raw) return [];
   try { return JSON.parse(raw) as DesignVersion[]; } catch { return []; }
 }
 
-async function saveAssets(arr: BrandAsset[]): Promise<void> {
-  await AsyncStorage.setItem(DS_ASSETS_KEY, JSON.stringify(arr));
+async function saveAssets(arr: BrandAsset[], key = K().assets): Promise<void> {
+  await AsyncStorage.setItem(key, JSON.stringify(arr));
 }
 
-async function loadAssets(): Promise<BrandAsset[]> {
-  const raw = await AsyncStorage.getItem(DS_ASSETS_KEY);
+async function loadAssets(key = K().assets): Promise<BrandAsset[]> {
+  const raw = await AsyncStorage.getItem(key);
   if (!raw) return [];
   try { return JSON.parse(raw) as BrandAsset[]; } catch { return []; }
 }
@@ -82,8 +515,8 @@ function makeSeedProject(
   };
 }
 
-async function seedIfEmpty(): Promise<DesignProject[]> {
-  const existing = await loadProjects();
+async function seedIfEmpty(projectsKey = K().projects): Promise<DesignProject[]> {
+  const existing = await loadProjects(projectsKey);
   if (existing.length > 0) return existing;
   const seeds: DesignProject[] = [
     makeSeedProject('Spring Drop Hoodie', 'garment', 'saved', {
@@ -93,8 +526,55 @@ async function seedIfEmpty(): Promise<DesignProject[]> {
     makeSeedProject('Product Launch Mockup', 'mockup', 'draft'),
     makeSeedProject('Campaign Assets', 'campaign', 'exported'),
   ];
-  await saveProjects(seeds);
+  await saveProjects(seeds, projectsKey);
   return seeds;
+}
+
+function parseLegacyProjects(raw: string | null): DesignProject[] {
+  if (!raw) return [];
+  try {
+    const values = JSON.parse(raw) as unknown[];
+    if (!Array.isArray(values)) return [];
+    return values.filter((value): value is DesignProject => {
+      if (!value || typeof value !== 'object') return false;
+      const project = value as Partial<DesignProject>;
+      return typeof project.id === 'string' && typeof project.name === 'string' &&
+        Array.isArray(project.layers) && !!project.canvas &&
+        Number.isSafeInteger(project.canvas.width) && Number.isSafeInteger(project.canvas.height);
+    });
+  } catch {
+    return [];
+  }
+}
+
+export async function getRecoverableLegacyProjectCount(): Promise<number> {
+  if (_designUserId === 'anon') return 0;
+  const keys = K();
+  if (await AsyncStorage.getItem(keys.legacyRecovery)) return 0;
+  return parseLegacyProjects(await AsyncStorage.getItem(LEGACY_PROJECTS_KEY)).length;
+}
+
+export async function recoverLegacyDesignProjects(): Promise<number> {
+  if (_designUserId === 'anon') throw new Error('Sign in before recovering Design Studio projects.');
+  const context = captureSyncContext();
+  const recovered = await withSyncLock(context, async () => {
+    if (await AsyncStorage.getItem(context.keys.legacyRecovery)) return [] as DesignProject[];
+    const legacy = parseLegacyProjects(await AsyncStorage.getItem(LEGACY_PROJECTS_KEY));
+    const current = await loadProjects(context.keys.projects);
+    const currentIds = new Set(current.map(project => project.id));
+    const additions = legacy.filter(project => !currentIds.has(project.id))
+      .map(project => ({ ...project, cloudRevision: undefined }));
+    const state = await loadSyncState(context.keys.syncState);
+    for (const project of additions) {
+      if (!state.deletedIds.includes(project.id)) state.upserts[project.id] = project;
+    }
+    await saveProjects([...current, ...additions], context.keys.projects);
+    await AsyncStorage.setItem(context.keys.syncState, JSON.stringify(state));
+    await AsyncStorage.setItem(context.keys.legacyRecovery, new Date().toISOString());
+    return additions;
+  });
+  void drainProjectSync(context);
+  return recovered.length;
 }
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
@@ -103,7 +583,47 @@ async function seedIfEmpty(): Promise<DesignProject[]> {
  * Returns only non-deleted projects (normal navigation).
  */
 export async function getProjects(): Promise<DesignProject[]> {
-  const all = await seedIfEmpty();
+  const context = captureSyncContext();
+  const keys = context.keys;
+  await drainProjectDeletes(context);
+  const pendingDeletes = new Set((await loadSyncState(keys.syncState)).deletedIds);
+  let all: DesignProject[];
+  try {
+    const cloud = (await loadCloudProjects(context)).filter(project => !pendingDeletes.has(project.id));
+    all = await withSyncLock(context, async () => {
+      const local = await loadProjects(keys.projects);
+      const state = await loadSyncState(keys.syncState);
+      const cloudIds = new Set(cloud.map(project => project.id));
+      const merged = new Map<string, DesignProject>();
+      for (const project of local) {
+        if (pendingDeletes.has(project.id)) continue;
+        if (cloudIds.has(project.id) || project.cloudRevision == null) {
+          merged.set(project.id, project);
+        } else {
+          delete state.upserts[project.id];
+          invalidateProjectOperations(context, project.id);
+        }
+      }
+      for (const project of cloud) {
+        const localProject = merged.get(project.id);
+        const isPending = Boolean(state.upserts[project.id]);
+        const cloudRevision = project.cloudRevision ?? 0;
+        const localRevision = localProject?.cloudRevision ?? 0;
+        if (!localProject || cloudRevision > localRevision ||
+            (!isPending && new Date(project.updatedAt).getTime() >= new Date(localProject.updatedAt).getTime())) {
+          merged.set(project.id, await cacheCloudImages(project));
+        }
+      }
+      const reconciled = [...merged.values()];
+      await saveProjects(reconciled, keys.projects);
+      await AsyncStorage.setItem(keys.syncState, JSON.stringify(state));
+      return reconciled;
+    });
+  } catch {
+    all = await seedIfEmpty(keys.projects);
+  }
+  if (context.generation !== _designScopeGeneration) return [];
+  void drainProjectSync(context);
   return all.filter(p => !p.deletedAt);
 }
 
@@ -112,8 +632,49 @@ export async function getProjects(): Promise<DesignProject[]> {
  * The canvas editor uses this so an id in the URL always resolves.
  */
 export async function getProject(id: string): Promise<DesignProject | null> {
-  const projects = await loadProjects();
-  return projects.find(p => p.id === id) ?? null;
+  const context = captureSyncContext();
+  const keys = context.keys;
+  const projects = await loadProjects(keys.projects);
+  const local = projects.find(p => p.id === id) ?? null;
+  try {
+    const response = await serviceRequest<{ project: DesignProject }>(
+      `/api/design-studio/projects/${encodeURIComponent(id)}`,
+      { headers: syncHeaders(context) },
+    );
+    assertCurrentContext(context);
+    const state = await loadSyncState(keys.syncState);
+    const pending = Boolean(state.upserts[id]);
+    const cloudRevision = response.project.cloudRevision ?? 0;
+    const localRevision = local?.cloudRevision ?? 0;
+    if (local && pending && cloudRevision > localRevision) {
+      await withSyncLock(context, () =>
+        reconcileProjectConflict(local, state, context, response.project));
+      return (await loadProjects(keys.projects)).find(project => project.id === id) ?? null;
+    }
+    const cloudWins = !local ||
+      cloudRevision > localRevision ||
+      (!pending && cloudRevision === localRevision &&
+       new Date(response.project.updatedAt).getTime() >= new Date(local.updatedAt).getTime());
+    if (cloudWins) {
+      const cachedProject = await cacheCloudImages(response.project);
+      await saveProjects([...projects.filter(project => project.id !== id), cachedProject], keys.projects);
+      return cachedProject;
+    }
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404 && local?.cloudRevision != null) {
+      invalidateProjectOperations(context, id);
+      await withSyncLock(context, async () => {
+        const current = await loadProjects(keys.projects);
+        await saveProjects(current.filter(project => project.id !== id), keys.projects);
+        const state = await loadSyncState(keys.syncState);
+        delete state.upserts[id];
+        await AsyncStorage.setItem(keys.syncState, JSON.stringify(state));
+      });
+      return null;
+    }
+    // Local editing remains available while offline or before auth is ready.
+  }
+  return local;
 }
 
 /**
@@ -133,7 +694,9 @@ export async function createProject(
   garmentType?: GarmentType,
   garmentColor?: string,
 ): Promise<DesignProject> {
-  const projects = await seedIfEmpty();
+  const context = captureSyncContext();
+  const keys = context.keys;
+  const projects = await seedIfEmpty(keys.projects);
   const now = new Date().toISOString();
   const fullCanvas: DesignCanvas = {
     width: canvas.width ?? 1080,
@@ -154,18 +717,100 @@ export async function createProject(
     createdAt: now,
     updatedAt: now,
   };
-  await saveProjects([...projects, project]);
-  return project;
+  await saveProjects([...projects, project], keys.projects);
+  try {
+    const synced = await pushProjectSerialized(project, context);
+    const localSynced = { ...project, cloudRevision: synced.cloudRevision };
+    await saveProjects([...projects, localSynced], keys.projects);
+    return localSynced;
+  } catch {
+    await queueProjectSync(project, context);
+    return (await loadProjects(keys.projects)).find(item => item.id === project.id) ?? project;
+  }
 }
 
 export async function updateProject(id: string, partial: Partial<DesignProject>): Promise<DesignProject> {
-  const projects = await loadProjects();
-  const idx = projects.findIndex(p => p.id === id);
-  if (idx === -1) throw new Error(`Project ${id} not found`);
-  const updated: DesignProject = { ...projects[idx], ...partial, id, updatedAt: new Date().toISOString() };
-  projects[idx] = updated;
-  await saveProjects(projects);
-  return updated;
+  const context = captureSyncContext();
+  const epoch = captureProjectEpoch(context, id);
+  return withSyncLock(context, async () => {
+    assertProjectEpoch(context, id, epoch);
+    const projects = await loadProjects(context.keys.projects);
+    const idx = projects.findIndex(p => p.id === id);
+    if (idx === -1) throw new Error(`Project ${id} not found`);
+    const updated: DesignProject = {
+      ...projects[idx],
+      ...partial,
+      cloudRevision: projects[idx].cloudRevision,
+      id,
+      updatedAt: new Date().toISOString(),
+    };
+    projects[idx] = updated;
+    await saveProjects(projects, context.keys.projects);
+    try {
+      assertProjectEpoch(context, id, epoch);
+      const synced = await pushProjectToCloud(updated, context);
+      assertProjectEpoch(context, id, epoch);
+      projects[idx] = { ...updated, cloudRevision: synced.cloudRevision };
+      await saveProjects(projects, context.keys.projects);
+      return projects[idx];
+    } catch {
+      if (captureProjectEpoch(context, id) === epoch) await queueProjectSyncLocked(updated, context);
+      return (await loadProjects(context.keys.projects)).find(item => item.id === id) ?? updated;
+    }
+  });
+}
+
+export interface SyncedDesignAsset {
+  id: string;
+  projectId: string;
+  kind: 'master' | 'thumbnail' | 'source';
+  objectPath: string;
+  downloadUrl: string;
+  width: number;
+  height: number;
+  mimeType: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp';
+  format: 'png' | 'jpeg' | 'gif' | 'webp';
+  lossless: boolean;
+  quality: number | null;
+  byteSize: number;
+}
+
+/** Uploads already-verified bytes without resize or re-encoding. */
+export async function syncVerifiedDesignAsset(
+  projectId: string,
+  asset: MasterExportAsset,
+  kind: 'master' | 'thumbnail' = 'master',
+): Promise<SyncedDesignAsset> {
+  const context = captureSyncContext();
+  const metadata = masterUploadMetadata(asset);
+  const source = await fetch(asset.uri);
+  if (!source.ok) throw new Error('Could not read the verified Design Studio asset.');
+  const bytes = await source.arrayBuffer();
+  const response = await serviceRequest<{ asset: SyncedDesignAsset }>(
+    `/api/design-studio/projects/${encodeURIComponent(projectId)}/assets/${kind}`,
+    {
+      method: 'POST',
+      body: bytes,
+      headers: {
+        ...syncHeaders(context),
+        'Content-Type': metadata.mimeType,
+        'X-Design-Width': String(metadata.width),
+        'X-Design-Height': String(metadata.height),
+        'X-Design-Format': metadata.format,
+        'X-Design-Lossless': String(metadata.lossless),
+        ...(metadata.quality == null ? {} : { 'X-Design-Quality': String(Math.round(metadata.quality * 100)) }),
+      },
+    },
+  );
+  assertCurrentContext(context);
+  return response.asset;
+}
+
+export async function getSyncedDesignAssets(projectId: string): Promise<SyncedDesignAsset[]> {
+  const response = await serviceRequest<{ assets: SyncedDesignAsset[] }>(
+    `/api/design-studio/projects/${encodeURIComponent(projectId)}/assets`,
+  );
+  return response.assets;
 }
 
 // autosaveProject — accepts a full DesignProject (used by design-canvas.tsx)
@@ -185,33 +830,54 @@ export async function softDeleteProject(id: string): Promise<void> {
  * Restore a soft-deleted project back to the main gallery.
  */
 export async function restoreDeletedProject(id: string): Promise<DesignProject> {
-  const projects = await loadProjects();
-  const idx = projects.findIndex(p => p.id === id);
-  if (idx === -1) throw new Error(`Project ${id} not found`);
-  const { deletedAt: _removed, ...rest } = projects[idx];
-  const updated: DesignProject = { ...rest, updatedAt: new Date().toISOString() };
-  projects[idx] = updated;
-  await saveProjects(projects);
-  return updated;
+  const context = captureSyncContext();
+  const epoch = captureProjectEpoch(context, id);
+  return withSyncLock(context, async () => {
+    assertProjectEpoch(context, id, epoch);
+    const projects = await loadProjects(context.keys.projects);
+    const idx = projects.findIndex(p => p.id === id);
+    if (idx === -1) throw new Error(`Project ${id} not found`);
+    const { deletedAt: _removed, ...rest } = projects[idx];
+    const updated: DesignProject = { ...rest, updatedAt: new Date().toISOString() };
+    projects[idx] = updated;
+    await saveProjects(projects, context.keys.projects);
+    try {
+      assertProjectEpoch(context, id, epoch);
+      const synced = await pushProjectToCloud(updated, context);
+      assertProjectEpoch(context, id, epoch);
+      projects[idx] = { ...updated, cloudRevision: synced.cloudRevision };
+      await saveProjects(projects, context.keys.projects);
+      return projects[idx];
+    } catch {
+      if (captureProjectEpoch(context, id) === epoch) await queueProjectSyncLocked(updated, context);
+      return updated;
+    }
+  });
 }
 
 /**
  * Permanently delete — removes from storage with no recovery path.
  */
 export async function deleteProject(id: string): Promise<void> {
-  const projects = await loadProjects();
-  await saveProjects(projects.filter(p => p.id !== id));
+  const context = captureSyncContext();
+  invalidateProjectOperations(context, id);
+  await deleteProjectsSerialized([id], context);
 }
 
 /**
  * Permanently delete all soft-deleted projects.
  */
 export async function purgeDeletedProjects(): Promise<void> {
-  const projects = await loadProjects();
-  await saveProjects(projects.filter(p => !p.deletedAt));
+  const context = captureSyncContext();
+  const keys = context.keys;
+  const projects = await loadProjects(keys.projects);
+  const deletedIds = projects.filter(p => !!p.deletedAt).map(p => p.id);
+  for (const id of deletedIds) invalidateProjectOperations(context, id);
+  await deleteProjectsSerialized(deletedIds, context);
 }
 
 export async function duplicateProject(id: string): Promise<DesignProject> {
+  const context = captureSyncContext();
   const project = await getProject(id);
   if (!project) throw new Error(`Project ${id} not found`);
   const now = new Date().toISOString();
@@ -224,9 +890,26 @@ export async function duplicateProject(id: string): Promise<DesignProject> {
     updatedAt: now,
     deletedAt: undefined,
   };
-  const projects = await loadProjects();
-  await saveProjects([...projects, copy]);
-  return copy;
+  const copyCloud = copy as DesignProject & { thumbnailObjectPath?: string };
+  delete copyCloud.thumbnailObjectPath;
+  const copyCanvas = copy.canvas as DesignCanvas & { backgroundImageObjectPath?: string };
+  delete copyCanvas.backgroundImageObjectPath;
+  for (const layer of copy.layers) {
+    if (layer.data.kind === 'image') delete (layer.data as typeof layer.data & { cloudObjectPath?: string }).cloudObjectPath;
+  }
+  assertCurrentContext(context);
+  const keys = context.keys;
+  const projects = await loadProjects(keys.projects);
+  await saveProjects([...projects, copy], keys.projects);
+  try {
+    const synced = await pushProjectSerialized(copy, context);
+    const localSynced = { ...copy, cloudRevision: synced.cloudRevision };
+    await saveProjects([...projects, localSynced], keys.projects);
+    return localSynced;
+  } catch {
+    await queueProjectSync(copy, context);
+    return copy;
+  }
 }
 
 export async function archiveProject(id: string): Promise<DesignProject> {

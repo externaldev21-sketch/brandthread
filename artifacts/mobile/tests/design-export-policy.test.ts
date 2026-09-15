@@ -36,7 +36,35 @@ import {
   cropDimensionLabel,
   type MasterDescriptor,
   type MasterExportAsset,
+  masterUploadMetadata,
 } from '../lib/designExportPolicy';
+
+describe('masterUploadMetadata', () => {
+  it('preserves exact verified PNG metadata', () => {
+    const asset: MasterExportAsset = {
+      uri: 'file:///master.png', mimeType: 'image/png', width: 4500, height: 5400,
+      format: 'png', lossless: true,
+    };
+    expect(masterUploadMetadata(asset)).toEqual({
+      mimeType: 'image/png', width: 4500, height: 5400, format: 'png',
+      lossless: true, quality: undefined,
+    });
+  });
+
+  it('rejects lossy PNG metadata', () => {
+    expect(() => masterUploadMetadata({
+      uri: 'file:///master.png', mimeType: 'image/png', width: 1080, height: 1080,
+      format: 'png', lossless: false,
+    })).toThrow();
+  });
+
+  it('rejects JPEG metadata below the quality floor', () => {
+    expect(() => masterUploadMetadata({
+      uri: 'file:///master.jpg', mimeType: 'image/jpeg', width: 1080, height: 1080,
+      format: 'jpeg', lossless: false, quality: 0.9,
+    })).toThrow();
+  });
+});
 
 // ─── 1. resolveMasterDescriptor ───────────────────────────────────────────────
 

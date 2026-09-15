@@ -15,8 +15,10 @@ import {
   jsonNotFound,
   normalizeErrorResponses,
 } from "./middlewares/errorHandling";
-import { appRateLimiter } from "./middlewares/rateLimit";
+import { appRateLimiter, rateLimit } from "./middlewares/rateLimit";
 import { validateMutationEnvelope } from "./middlewares/validateRequest";
+import { DESIGN_STUDIO_ASSET_MIME_TYPES } from "./lib/designStudioAssetTypes";
+import { requireAuth } from "./middlewares/requireAuth";
 
 const app: Express = express();
 app.set("trust proxy", 1);
@@ -50,6 +52,42 @@ app.use(
 app.use(
   "/api/v1/webhooks/stripe",
   express.raw({ type: "application/json" }),
+);
+
+// Authentication and strict admission controls run before Design Studio binary
+// bodies are buffered. Content-Length is only an early rejection; express.raw
+// remains the authoritative streamed size limit.
+const designStudioUploadAdmission = [
+  clerkMiddleware((req) => ({
+    publishableKey: publishableKeyFromHost(
+      getClerkProxyHost(req) ?? "",
+      process.env.CLERK_PUBLISHABLE_KEY,
+    ),
+  })),
+  requireAuth,
+  rateLimit("asset-upload"),
+  (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const length = Number(req.headers["content-length"]);
+    if (Number.isFinite(length) && length > 40 * 1024 * 1024) {
+      res.status(413).json({ error: "Design Studio asset is too large" });
+      return;
+    }
+    next();
+  },
+];
+
+// Design Studio master uploads must reach ingestion as the original bytes.
+// Register both API aliases before the global JSON parser; the route verifies
+// byte signatures and dimensions and stores the same Buffer without re-encoding.
+app.use(
+  "/api/design-studio/projects/:projectId/assets/:kind",
+  ...designStudioUploadAdmission,
+  express.raw({ type: DESIGN_STUDIO_ASSET_MIME_TYPES, limit: "40mb" }),
+);
+app.use(
+  "/api/v1/design-studio/projects/:projectId/assets/:kind",
+  ...designStudioUploadAdmission,
+  express.raw({ type: DESIGN_STUDIO_ASSET_MIME_TYPES, limit: "40mb" }),
 );
 
 // Tighter limit for every store AI route that can receive visual references

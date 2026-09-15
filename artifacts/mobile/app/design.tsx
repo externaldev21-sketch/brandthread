@@ -23,6 +23,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity,
   Alert, ActivityIndicator, FlatList, Modal, TextInput,
   Dimensions, Pressable,
+  Linking,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -44,6 +45,8 @@ import {
   getProjects, softDeleteProject, duplicateProject,
   updateProject, createProject, getDeletedProjects,
   restoreDeletedProject, deleteProject, purgeDeletedProjects,
+  getSyncedDesignAssets,
+  getRecoverableLegacyProjectCount, recoverLegacyDesignProjects,
 } from '@/services/designService';
 import {
   DesignProject,
@@ -664,6 +667,7 @@ interface PreviewModalProps {
 
 function ArtworkPreviewModal({ visible, project, onClose, onEdit }: PreviewModalProps) {
   const insets = useSafeAreaInsets();
+  const [masterLoading, setMasterLoading] = useState(false);
   if (!project) return null;
   const previewSize = Math.min(Dimensions.get('window').width - SP.xl * 2, 420);
   return (
@@ -691,6 +695,32 @@ function ArtworkPreviewModal({ visible, project, onClose, onEdit }: PreviewModal
         </View>
 
         <View style={[s.previewActions, { paddingBottom: insets.bottom + SP.lg }]}>
+          <TouchableOpacity
+            style={[s.previewEditBtn, { backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER }]}
+            disabled={masterLoading}
+            onPress={async () => {
+              setMasterLoading(true);
+              try {
+                const master = (await getSyncedDesignAssets(project.id))
+                  .find(asset => asset.kind === 'master');
+                if (!master) {
+                  Alert.alert('No cloud master yet', 'Export this project once to save a full-quality master.');
+                  return;
+                }
+                await Linking.openURL(master.downloadUrl);
+              } catch {
+                Alert.alert('Could not open master', 'Check your connection and try again.');
+              } finally {
+                setMasterLoading(false);
+              }
+            }}
+            activeOpacity={0.8}
+          >
+            {masterLoading
+              ? <ActivityIndicator color={FG} />
+              : <Feather name="download" size={ICON.md} color={FG} />}
+            <Text style={[s.previewEditLabel, { color: FG }]}>Cloud Master</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={s.previewEditBtn} onPress={onEdit} activeOpacity={0.8}>
             <Feather name="edit-2" size={ICON.md} color={BG} />
             <Text style={s.previewEditLabel}>Open Canvas</Text>
@@ -941,6 +971,7 @@ export default function DesignGalleryScreen() {
 
   const [projects, setProjects] = useState<DesignProject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [recoverableLegacyCount, setRecoverableLegacyCount] = useState(0);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deletedExpanded, setDeletedExpanded] = useState(false);
@@ -956,7 +987,12 @@ export default function DesignGalleryScreen() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      setProjects(await getProjects());
+      const [nextProjects, legacyCount] = await Promise.all([
+        getProjects(),
+        getRecoverableLegacyProjectCount(),
+      ]);
+      setProjects(nextProjects);
+      setRecoverableLegacyCount(legacyCount);
     } finally {
       setLoading(false);
     }
@@ -1174,6 +1210,37 @@ export default function DesignGalleryScreen() {
             <Text style={[s.actionBtnLabel, { color: BG }]}>New Canvas</Text>
           </TouchableOpacity>
         </View>
+      )}
+
+      {!selectionMode && recoverableLegacyCount > 0 && (
+        <TouchableOpacity
+          style={{ marginHorizontal: SP.lg, marginTop: SP.sm, padding: SP.md, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md }}
+          onPress={() => Alert.alert(
+            'Recover projects from this device?',
+            `${recoverableLegacyCount} project${recoverableLegacyCount === 1 ? '' : 's'} were saved before account sync. Recover them into the selected store only if they belong to this store.`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Recover',
+                onPress: async () => {
+                  try {
+                    await recoverLegacyDesignProjects();
+                    await loadData();
+                  } catch {
+                    Alert.alert('Recovery failed', 'Your original device projects were not changed. Try again.');
+                  }
+                },
+              },
+            ],
+          )}
+        >
+          <Text style={{ color: FG, fontSize: FS.sm, fontFamily: FONT.medium }}>
+            Recover {recoverableLegacyCount} project{recoverableLegacyCount === 1 ? '' : 's'} from this device
+          </Text>
+          <Text style={{ color: MUTED, fontSize: FS.xs, marginTop: SP.xs }}>
+            Confirm they belong to the selected store before syncing.
+          </Text>
+        </TouchableOpacity>
       )}
 
       {/* Project grid */}

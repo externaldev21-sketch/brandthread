@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp, date, json, boolean, primaryKey, index, numeric, unique, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, timestamp, date, json, boolean, primaryKey, index, numeric, unique, uniqueIndex, foreignKey } from 'drizzle-orm/pg-core';
 export * from './manufacturers';
 export * from './freelancers';
 export * from './subscriptionEntitlements';
@@ -992,6 +992,43 @@ export const storefrontVersions = pgTable('storefront_versions', {
   createdAt:    timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   storefrontIdx: index('storefront_versions_storefront_id_idx').on(table.storefrontId),
+}));
+
+// ─── Design Studio cloud projects ────────────────────────────────────────────
+export const designStudioProjects = pgTable('design_studio_projects', {
+  id:        text('id').primaryKey(),
+  ownerId:   text('owner_id').notNull(),
+  snapshot:  json('snapshot').$type<Record<string, unknown>>().notNull().default({}),
+  revision:  integer('revision').notNull().default(1),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  ownerIdx: index('design_studio_projects_owner_id_idx').on(table.ownerId),
+  idOwnerUnique: uniqueIndex('design_studio_projects_id_owner_unique').on(table.id, table.ownerId),
+}));
+
+export const designStudioAssets = pgTable('design_studio_assets', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  projectId:  text('project_id').notNull().references(() => designStudioProjects.id, { onDelete: 'cascade' }),
+  ownerId:    text('owner_id').notNull(),
+  kind:       text('kind').notNull(), // 'master' | 'thumbnail' | 'source' (never interchangeable)
+  objectPath: text('object_path').notNull(),
+  width:      integer('width').notNull(),
+  height:     integer('height').notNull(),
+  mimeType:   text('mime_type').notNull(),
+  format:     text('format').notNull(),
+  lossless:   boolean('lossless').notNull(),
+  quality:    integer('quality'),
+  byteSize:   integer('byte_size').notNull(),
+  createdAt:  timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  projectIdx: index('design_studio_assets_project_id_idx').on(table.projectId),
+  ownerIdx: index('design_studio_assets_owner_id_idx').on(table.ownerId),
+  projectOwnerFk: foreignKey({
+    columns: [table.projectId, table.ownerId],
+    foreignColumns: [designStudioProjects.id, designStudioProjects.ownerId],
+    name: 'design_studio_assets_project_owner_fk',
+  }).onDelete('cascade'),
 }));
 
 export const storefrontCustomDomains = pgTable('storefront_custom_domains', {

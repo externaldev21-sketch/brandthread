@@ -5,6 +5,7 @@ import type { Request, RequestHandler } from "express";
 
 export type RateLimitPolicyName =
   | "authentication"
+  | "asset-upload"
   | "checkout"
   | "webhook"
   | "expensive"
@@ -25,6 +26,12 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
     limit: 30,
     windowMs: 10 * 60_000,
     message: "Too many authentication requests. Please wait before trying again.",
+  },
+  "asset-upload": {
+    id: "asset-upload",
+    limit: 6,
+    windowMs: 60_000,
+    message: "Too many asset uploads. Please wait a minute and try again.",
   },
   checkout: {
     id: "checkout",
@@ -157,6 +164,10 @@ export async function consumeRateLimitBucket(
 
 function middlewareForPolicy(explicitPolicy?: RateLimitPolicyName): RequestHandler {
   return async (req, res, next) => {
+    if ((req as Request & { rateLimitApplied?: boolean }).rateLimitApplied) {
+      next();
+      return;
+    }
     if (
       req.method === "OPTIONS" ||
       req.path.endsWith("/health") ||
@@ -197,6 +208,9 @@ function middlewareForPolicy(explicitPolicy?: RateLimitPolicyName): RequestHandl
           retryAfterSeconds,
         });
         return;
+      }
+      if (explicitPolicy) {
+        (req as Request & { rateLimitApplied?: boolean }).rateLimitApplied = true;
       }
       next();
     } catch (err) {

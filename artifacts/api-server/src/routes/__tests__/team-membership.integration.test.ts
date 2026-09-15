@@ -11,8 +11,8 @@ import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
-import { db, teamMembers, users } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, designStudioAssets, designStudioProjects, teamMembers, users } from "@workspace/db";
+import { and, eq } from "drizzle-orm";
 
 const testState = vi.hoisted(() => ({
   userId: "",
@@ -29,8 +29,28 @@ vi.mock("../../middlewares/requireAuth", () => ({
   },
 }));
 
+const storedDesignBytes = vi.hoisted(() => new Map<string, Buffer>());
+vi.mock("../../lib/objectStorage", () => ({
+  ObjectStorageService: class {
+    async createObjectEntityFromBuffer(bytes: Buffer, contentType: string) {
+      const path = `/design-test/${storedDesignBytes.size}-${contentType.replace("/", "-")}`;
+      storedDesignBytes.set(path, Buffer.from(bytes));
+      return path;
+    }
+    async getObjectEntityDownloadURL(path: string) {
+      return `https://objects.test${path}`;
+    }
+    async deleteObjectEntity(path: string) {
+      storedDesignBytes.delete(path);
+    }
+  },
+}));
+
 import teamRouter from "../team";
 import { requireRole, teamContext } from "../../middlewares/requireRole";
+import { requireAuth } from "../../middlewares/requireAuth";
+import designStudioRouter from "../design-studio";
+import { DESIGN_STUDIO_ASSET_MIME_TYPES } from "../../lib/designStudioAssetTypes";
 
 const suffix = crypto.randomBytes(4).toString("hex");
 const olderOwnerId = `team-membership-older-owner-${suffix}`;
@@ -230,12 +250,17 @@ beforeAll(async () => {
   removedMembershipId = removedMembership!.id;
 
   const app = express();
+  app.use(
+    "/api/design-studio/projects/:projectId/assets/:kind",
+    express.raw({ type: DESIGN_STUDIO_ASSET_MIME_TYPES, limit: "40mb" }),
+  );
   app.use(express.json());
   app.use((req: any, _res, next) => {
     req.log = { error: vi.fn() };
     next();
   });
   app.use("/api/team", teamRouter);
+  app.use("/api/design-studio", requireAuth, teamContext(), designStudioRouter);
   app.get("/api/team-context", teamContext(), (req, res) => {
     res.json({
       actingStoreOwner: (req as any).clerkUserId,
@@ -254,6 +279,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await db.delete(designStudioProjects).where(eq(designStudioProjects.ownerId, olderOwnerId));
+  await db.delete(designStudioProjects).where(eq(designStudioProjects.ownerId, newerOwnerId));
+  await db.delete(designStudioProjects).where(eq(designStudioProjects.ownerId, memberId));
   await db.delete(teamMembers).where(eq(teamMembers.ownerId, olderOwnerId));
   await db.delete(teamMembers).where(eq(teamMembers.ownerId, newerOwnerId));
   await db.delete(teamMembers).where(eq(teamMembers.ownerId, equalOwnerAId));
@@ -328,6 +356,150 @@ describe("authenticated team membership discovery", () => {
       actorRole: "staff",
       teamMembershipId: olderMembership!.id,
     });
+  });
+
+  it("keeps Design Studio CRUD in the explicitly selected store owner's namespace", async () => {
+    const memberships = await getMemberships(memberId);
+    const selected = memberships.body.memberships.find(
+      (membership) => membership.ownerId === olderOwnerId,
+    )!;
+    const projectId = crypto.randomUUID();
+    testState.userId = memberId;
+    const saved = await fetch(`${baseUrl}/api/design-studio/projects/${projectId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Store-Context": selected.id,
+      },
+      body: JSON.stringify({
+        id: projectId,
+        name: "Joined store design",
+        type: "canvas",
+        status: "saved",
+        canvas: { width: 1080, height: 1080, backgroundHex: "#000000" },
+        layers: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }),
+    });
+    expect(saved.status).toBe(200);
+
+    const [stored] = await db.select({
+      ownerId: designStudioProjects.ownerId,
+    }).from(designStudioProjects).where(eq(designStudioProjects.id, projectId));
+    expect(stored?.ownerId).toBe(olderOwnerId);
+
+    const joined = await fetch(`${baseUrl}/api/design-studio/projects`, {
+      headers: { "X-Store-Context": selected.id },
+    });
+    expect(joined.status).toBe(200);
+    expect((await joined.json() as { projects: Array<{ id: string }> }).projects)
+      .toContainEqual(expect.objectContaining({ id: projectId }));
+
+    const own = await fetch(`${baseUrl}/api/design-studio/projects`, {
+      headers: { "X-Store-Context": "own" },
+    });
+    expect(own.status).toBe(200);
+    expect((await own.json() as { projects: Array<{ id: string }> }).projects)
+      .not.toContainEqual(expect.objectContaining({ id: projectId }));
+  });
+
+  it("parses and stores exact PNG, JPEG, GIF, and WebP source bytes through HTTP", async () => {
+    const memberships = await getMemberships(memberId);
+    const selected = memberships.body.memberships.find(
+      (membership) => membership.ownerId === olderOwnerId,
+    )!;
+    const projectId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    testState.userId = memberId;
+    const created = await fetch(`${baseUrl}/api/design-studio/projects/${projectId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Store-Context": selected.id,
+      },
+      body: JSON.stringify({
+        id: projectId,
+        name: "All source formats",
+        type: "canvas",
+        status: "saved",
+        canvas: { width: 1, height: 1, backgroundHex: "#000000" },
+        layers: [],
+        createdAt: now,
+        updatedAt: now,
+      }),
+    });
+    expect(created.status).toBe(200);
+
+    const jpeg = Buffer.from([
+      0xff, 0xd8,
+      0xff, 0xc0, 0x00, 0x11, 0x08, 0x00, 0x01, 0x00, 0x01,
+      0x03, 0x01, 0x11, 0x00, 0x02, 0x11, 0x00, 0x03, 0x11, 0x00,
+      0xff, 0xda, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3f, 0x00,
+      0x00, 0xff, 0xd9,
+    ]);
+    const webp = Buffer.alloc(26);
+    webp.write("RIFF", 0, "ascii");
+    webp.writeUInt32LE(18, 4);
+    webp.write("WEBPVP8L", 8, "ascii");
+    webp.writeUInt32LE(5, 16);
+    Buffer.from([0x2f, 0x00, 0x00, 0x00, 0x00]).copy(webp, 20);
+    const formats = [
+      {
+        mime: "image/png",
+        format: "png",
+        lossless: true,
+        bytes: Buffer.from(
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+          "base64",
+        ),
+      },
+      { mime: "image/jpeg", format: "jpeg", lossless: false, bytes: jpeg },
+      {
+        mime: "image/gif",
+        format: "gif",
+        lossless: true,
+        bytes: Buffer.from("R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", "base64"),
+      },
+      { mime: "image/webp", format: "webp", lossless: true, bytes: webp },
+    ];
+
+    for (const source of formats) {
+      const response = await fetch(
+        `${baseUrl}/api/design-studio/projects/${projectId}/assets/source`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": source.mime,
+            "X-Store-Context": selected.id,
+            "X-Design-Width": "1",
+            "X-Design-Height": "1",
+            "X-Design-Format": source.format,
+            "X-Design-Lossless": String(source.lossless),
+          },
+          body: source.bytes,
+        },
+      );
+      expect(response.status).toBe(201);
+      const body = await response.json() as { asset: { objectPath: string } };
+      expect(storedDesignBytes.get(body.asset.objectPath)).toEqual(source.bytes);
+    }
+
+    const stored = await db.select().from(designStudioAssets).where(and(
+      eq(designStudioAssets.projectId, projectId),
+      eq(designStudioAssets.ownerId, olderOwnerId),
+    ));
+    expect(stored.map(asset => [asset.mimeType, asset.format, asset.lossless]))
+      .toEqual(formats.map(source => [source.mime, source.format, source.lossless]));
+
+    const deleted = await fetch(`${baseUrl}/api/design-studio/projects/${projectId}`, {
+      method: "DELETE",
+      headers: { "X-Store-Context": selected.id },
+    });
+    expect(deleted.status).toBe(200);
+    for (const asset of stored) expect(storedDesignBytes.has(asset.objectPath)).toBe(false);
+    expect(await db.select().from(designStudioAssets).where(eq(designStudioAssets.projectId, projectId)))
+      .toHaveLength(0);
   });
 
   it("rejects a membership that belongs to a different caller", async () => {

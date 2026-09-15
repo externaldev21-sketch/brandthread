@@ -90,6 +90,19 @@ export interface MasterExportAsset {
   readonly quality?: number;
 }
 
+/**
+ * Cloud ingestion must persist this metadata beside the exact verified bytes.
+ * Thumbnail records use the same shape but a distinct asset kind and object.
+ */
+export interface MasterUploadMetadata {
+  readonly width: number;
+  readonly height: number;
+  readonly mimeType: 'image/png' | 'image/jpeg';
+  readonly format: 'png' | 'jpeg';
+  readonly lossless: boolean;
+  readonly quality?: number;
+}
+
 // ─── Descriptor resolution ────────────────────────────────────────────────────
 
 /**
@@ -309,3 +322,24 @@ export function cropDimensionLabel(desc: MasterDescriptor): string {
     : `${desc.width} × ${desc.height}`;
 }
 
+
+export function masterUploadMetadata(asset: MasterExportAsset): MasterUploadMetadata {
+  if (asset.format === 'png' && (!asset.lossless || asset.mimeType !== 'image/png' || asset.quality != null)) {
+    throw new Error('PNG master metadata must be lossless and must not include JPEG quality.');
+  }
+  if (asset.format === 'jpeg' &&
+      (asset.lossless || asset.mimeType !== 'image/jpeg' ||
+       asset.quality == null || asset.quality < MIN_JPEG_QUALITY || asset.quality > 1)) {
+    throw new Error('JPEG master metadata must declare quality between 95% and 100%.');
+  }
+  assertDimension(asset.width, 'width');
+  assertDimension(asset.height, 'height');
+  return {
+    width: asset.width,
+    height: asset.height,
+    mimeType: asset.mimeType,
+    format: asset.format,
+    lossless: asset.lossless,
+    quality: asset.quality,
+  };
+}

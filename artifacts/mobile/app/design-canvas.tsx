@@ -85,7 +85,7 @@ import {
 } from '@/lib/preferencesModel';
 import {
   getProject, createProject, autosaveProject, updateProject,
-  createVersion, duplicateProject,
+  createVersion, duplicateProject, syncVerifiedDesignAsset,
 } from '@/services/designService';
 import {
   resolveMasterDescriptor, MasterDescriptor, MasterExportAsset,
@@ -1974,6 +1974,7 @@ export default function DesignCanvasScreen() {
           width: desc.width, height: desc.height, format: 'png', lossless: true,
         };
         triggerWebDownload(asset.uri, `${slug}_product.png`);
+        void syncVerifiedDesignAsset(project.id, asset, 'master').catch(() => {});
         Alert.alert(
           'Design downloaded',
           `Your full-resolution PNG (${desc.width}×${desc.height}) has been downloaded. ` +
@@ -1991,6 +1992,7 @@ export default function DesignCanvasScreen() {
         width: desc.width, height: desc.height, format: 'png', lossless: true,
       };
       await saveImageToMediaLibrary(asset.uri);
+      void syncVerifiedDesignAsset(project.id, asset, 'master').catch(() => {});
       Alert.alert(
         'Saved to Camera Roll',
         `Full-resolution PNG (${desc.width}×${desc.height}) saved. ` +
@@ -2027,6 +2029,7 @@ export default function DesignCanvasScreen() {
           width: desc.width, height: desc.height, format: 'png', lossless: true,
         };
         triggerWebDownload(asset.uri, `${slug}_post.png`);
+        void syncVerifiedDesignAsset(project.id, asset, 'master').catch(() => {});
         Alert.alert(
           'Design downloaded',
           `Full-resolution PNG (${desc.width}×${desc.height}) downloaded. ` +
@@ -2044,6 +2047,7 @@ export default function DesignCanvasScreen() {
         width: desc.width, height: desc.height, format: 'png', lossless: true,
       };
       await saveImageToMediaLibrary(asset.uri);
+      void syncVerifiedDesignAsset(project.id, asset, 'master').catch(() => {});
       Alert.alert(
         'Saved to Camera Roll',
         `Full-resolution PNG (${desc.width}×${desc.height}) saved. ` +
@@ -2216,7 +2220,8 @@ export default function DesignCanvasScreen() {
   }
 
   async function handleExport(format: 'png' | 'jpeg') {
-    if (exporting) return;
+    if (exporting || !project) return;
+    const exportingProjectId = project.id;
     closeSheet();
     await new Promise<void>(r => setTimeout(r, 220));
     setExporting(true);
@@ -2248,6 +2253,7 @@ export default function DesignCanvasScreen() {
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        void syncVerifiedDesignAsset(exportingProjectId, asset, 'master').catch(() => {});
         return;
       }
 
@@ -2304,6 +2310,7 @@ export default function DesignCanvasScreen() {
         Alert.alert('Saved to Camera Roll', `"${projectName}" saved as ${format.toUpperCase()}${suffix}.`, [{ text: 'OK' }]);
       }
 
+      await syncVerifiedDesignAsset(exportingProjectId, asset, 'master').catch(() => {});
       try { new File(asset.uri).delete(); } catch { /* best-effort */ }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: unknown) {
@@ -2331,12 +2338,21 @@ export default function DesignCanvasScreen() {
         const dataUrl = `data:image/png;base64,${base64}`;
         // Verify PNG dimensions on web
         await verifyExportDimensionsWeb(dataUrl, desc);
+        const asset: MasterExportAsset = {
+          uri: dataUrl,
+          mimeType: 'image/png',
+          width: desc.width,
+          height: desc.height,
+          format: 'png',
+          lossless: true,
+        };
         const a = document.createElement('a');
         a.href = dataUrl;
         a.download = `${(projectName || 'design').replace(/\s+/g, '_')}_share.png`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        void syncVerifiedDesignAsset(project!.id, asset, 'master').catch(() => {});
         return;
       }
 
@@ -2356,6 +2372,7 @@ export default function DesignCanvasScreen() {
       const available = await Sharing.isAvailableAsync();
       if (!available) { Alert.alert('Sharing unavailable', 'System share sheet is not available.'); return; }
       await Sharing.shareAsync(asset.uri, { mimeType: 'image/png', dialogTitle: `Share ${projectName}`, UTI: 'public.png' });
+      await syncVerifiedDesignAsset(project!.id, asset, 'master').catch(() => {});
       try { new File(asset.uri).delete(); } catch { /* best-effort */ }
     } catch (err: unknown) {
       if (err instanceof ExportDimensionError || err instanceof ExportVerificationError) {

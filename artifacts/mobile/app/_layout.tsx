@@ -27,11 +27,13 @@ import {
   clearApiCache,
   configureApi,
   setStoreContext,
+  subscribeStoreContext,
   storeContextStorageKey,
   useApi,
 } from '@/lib/api';
 import { clearSocialCache, hydrateMyProfileFromAccount, initSocialService, socialKeysForUser } from '@/services/socialService';
 import { clearCartCache, initCartService } from '@/services/cartService';
+import { initDesignService } from '@/services/designService';
 import { initBuyerProfile } from '@/lib/buyerProfile';
 import StoreContextBanner from '@/components/StoreContextBanner';
 import NetworkNoticeBanner from '@/components/NetworkNoticeBanner';
@@ -405,6 +407,7 @@ function ServiceConfigurer() {
     prevUserIdRef.current = newUserId;
     initSocialService(newUserId);
     initCartService(newUserId);
+    initDesignService(newUserId);
     initBuyerProfile(newUserId);
 
     if (!newUserId || !isSignedIn) return;
@@ -428,6 +431,10 @@ function ServiceConfigurer() {
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, isSignedIn, api]);
+
+  useEffect(() => subscribeStoreContext((context) => {
+    initDesignService(user?.id ?? null, context);
+  }), [user?.id]);
 
   // Hydrate persisted store context once per sign-in session.
   useEffect(() => {

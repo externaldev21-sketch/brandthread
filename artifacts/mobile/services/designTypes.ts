@@ -173,6 +173,8 @@ export interface DesignProject {
   redoStack?: string[];
   createdAt: string;
   updatedAt: string;
+  /** Server concurrency token; never used as editable artwork state. */
+  cloudRevision?: number;
   /** Soft-delete: timestamp of when the project was moved to Recently Deleted. */
   deletedAt?: string;
 }

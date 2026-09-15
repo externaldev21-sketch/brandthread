@@ -46,7 +46,7 @@ Per-design timers start only after project restoration while the app is active. 
 
 **How to apply:** Treat timer pause and the following coordinated save as one ordered operation. Never start a default timer while project loading is pending.
 
-Every project JSON entry point, including clipboard paste, must use the same byte limit and strict layer sanitizer before persistence.
+Every external project JSON entry point must use the same byte limit and strict layer sanitizer before persistence. In-editor clipboard paste only clones already-sanitized in-memory layers.
 
 **Why:** Hardening only the document picker leaves alternate import surfaces able to store malformed or unbounded layer data.
 
@@ -57,3 +57,9 @@ Master exports always use the exact integer logical canvas or crop dimensions. P
 **Why:** Screen-size fallbacks, silent dimension rounding, crop fractions, and resize caps can make a high-resolution project export blurry, smaller than designed, or impossible to export.
 
 **How to apply:** Rasterize only from the off-screen logical SVG, reject invalid geometry instead of resizing it, never pass PNG through a lossy encoder, and keep gallery thumbnail sizing isolated from editable layers and master assets.
+
+Cloud project state is scoped by both authenticated account and selected store. All local mutation, outbox/tombstone changes, cloud writes, and returned revision commits for a project must share one serialized scope operation; deletes invalidate in-flight work before waiting. Revision conflicts preserve the cloud version and retain offline edits as a separate conflict copy.
+
+**Why:** Independent AsyncStorage writes, mutable store headers, or timestamp-only conflict handling can leak work across stores, permanently stall sync, or let an older save recreate a deleted project.
+
+**How to apply:** Capture immutable account/store context per operation, use server revisions for conditional writes, keep source URIs durable locally, and never let cloud availability block a verified local export.
