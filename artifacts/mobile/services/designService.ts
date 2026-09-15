@@ -5,10 +5,16 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { randomUUID } from 'expo-crypto';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { masterUploadMetadata, type MasterExportAsset } from '@/lib/designExportPolicy';
 import { getImageDimensions } from '@/lib/imageDimensions';
-import { cacheDesignCloudImage } from '@/lib/designCloudImageCache';
+import {
+  cacheDesignCloudImage,
+  readRetainedDesignUploadAsset,
+  removeRetainedDesignUploadAsset,
+  retainDesignUploadAsset,
+} from '@/lib/designCloudImageCache';
 import { ApiError } from '@/lib/networkNotice';
 import {
   DesignProject, DesignProjectType, DesignProjectStatus, DesignCanvas,
@@ -31,6 +37,7 @@ export function initDesignService(userId: string | null, storeContext: string | 
   if (nextUser !== _designUserId || nextStore !== _designStoreContext) _designScopeGeneration += 1;
   _designUserId = nextUser;
   _designStoreContext = nextStore;
+  if (nextUser !== 'anon') void drainVerifiedUploadQueue(captureSyncContext());
 }
 
 function K(userId = _designUserId, storeContext = _designStoreContext) {
@@ -41,6 +48,7 @@ function K(userId = _designUserId, storeContext = _designStoreContext) {
     versions: `bt:design:${scope}:versions:v2`,
     sourceMap: `bt:design:${scope}:cloud-source-map:v2`,
     syncState: `bt:design:${scope}:sync-state:v2`,
+    uploadQueue: `bt:design:${scope}:verified-upload-queue:v1`,
     legacyRecovery: `bt:design:${scope}:legacy-recovery:v1`,
   };
 }
@@ -256,6 +264,7 @@ async function deleteProjectsSerialized(
   projectIds: string[],
   context: DesignSyncContext,
 ): Promise<void> {
+  await discardVerifiedUploadsForProjects(projectIds, context);
   await withSyncLock(context, async () => {
     const ids = new Set(projectIds);
     const projects = await loadProjects(context.keys.projects);
@@ -775,17 +784,57 @@ export interface SyncedDesignAsset {
   byteSize: number;
 }
 
-/** Uploads already-verified bytes without resize or re-encoding. */
-export async function syncVerifiedDesignAsset(
+interface VerifiedUploadQueueEntry {
+  id: string;
+  projectId: string;
+  kind: 'master' | 'thumbnail';
+  asset: MasterExportAsset;
+  queuedAt: string;
+}
+
+const verifiedUploadLocks = new Map<string, Promise<void>>();
+const verifiedUploadRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+async function withVerifiedUploadLock<T>(
+  context: DesignSyncContext,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const key = context.keys.uploadQueue;
+  const previous = verifiedUploadLocks.get(key) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const tail = previous.then(() => gate);
+  verifiedUploadLocks.set(key, tail);
+  await previous;
+  try {
+    assertCurrentContext(context);
+    return await operation();
+  } finally {
+    release();
+    if (verifiedUploadLocks.get(key) === tail) verifiedUploadLocks.delete(key);
+  }
+}
+
+async function loadVerifiedUploadQueue(key: string): Promise<VerifiedUploadQueueEntry[]> {
+  try {
+    const value = JSON.parse(await AsyncStorage.getItem(key) ?? '[]') as unknown;
+    return Array.isArray(value) ? value as VerifiedUploadQueueEntry[] : [];
+  } catch {
+    return [];
+  }
+}
+
+async function uploadVerifiedDesignAsset(
   projectId: string,
   asset: MasterExportAsset,
-  kind: 'master' | 'thumbnail' = 'master',
+  kind: 'master' | 'thumbnail',
+  context: DesignSyncContext,
+  uploadId: string,
 ): Promise<SyncedDesignAsset> {
-  const context = captureSyncContext();
+  assertCurrentContext(context);
   const metadata = masterUploadMetadata(asset);
-  const source = await fetch(asset.uri);
-  if (!source.ok) throw new Error('Could not read the verified Design Studio asset.');
-  const bytes = await source.arrayBuffer();
+  const bytes = await readRetainedDesignUploadAsset(asset.uri);
+  assertCurrentContext(context);
   const response = await serviceRequest<{ asset: SyncedDesignAsset }>(
     `/api/design-studio/projects/${encodeURIComponent(projectId)}/assets/${kind}`,
     {
@@ -798,12 +847,112 @@ export async function syncVerifiedDesignAsset(
         'X-Design-Height': String(metadata.height),
         'X-Design-Format': metadata.format,
         'X-Design-Lossless': String(metadata.lossless),
+        'X-Design-Upload-Id': uploadId,
         ...(metadata.quality == null ? {} : { 'X-Design-Quality': String(Math.round(metadata.quality * 100)) }),
       },
     },
   );
   assertCurrentContext(context);
   return response.asset;
+}
+
+function scheduleVerifiedUploadRetry(context: DesignSyncContext): void {
+  const key = context.keys.uploadQueue;
+  if (verifiedUploadRetryTimers.has(key)) return;
+  const timer = setTimeout(() => {
+    verifiedUploadRetryTimers.delete(key);
+    void drainVerifiedUploadQueue(context);
+  }, 30_000);
+  verifiedUploadRetryTimers.set(key, timer);
+}
+
+async function queueVerifiedUpload(
+  id: string,
+  projectId: string,
+  asset: MasterExportAsset,
+  kind: 'master' | 'thumbnail',
+  context: DesignSyncContext,
+): Promise<void> {
+  const retainedUri = await retainDesignUploadAsset(asset.uri, id, asset.format);
+  try {
+    await withVerifiedUploadLock(context, async () => {
+      const queue = await loadVerifiedUploadQueue(context.keys.uploadQueue);
+      queue.push({
+        id,
+        projectId,
+        kind,
+        asset: { ...asset, uri: retainedUri },
+        queuedAt: new Date().toISOString(),
+      });
+      await AsyncStorage.setItem(context.keys.uploadQueue, JSON.stringify(queue));
+    });
+  } catch (error) {
+    await removeRetainedDesignUploadAsset(retainedUri).catch(() => {});
+    throw error;
+  }
+  scheduleVerifiedUploadRetry(context);
+}
+
+async function discardVerifiedUploadsForProjects(
+  projectIds: string[],
+  context: DesignSyncContext,
+): Promise<void> {
+  const ids = new Set(projectIds);
+  await withVerifiedUploadLock(context, async () => {
+    const queue = await loadVerifiedUploadQueue(context.keys.uploadQueue);
+    const discarded = queue.filter(entry => ids.has(entry.projectId));
+    if (discarded.length === 0) return;
+    await AsyncStorage.setItem(
+      context.keys.uploadQueue,
+      JSON.stringify(queue.filter(entry => !ids.has(entry.projectId))),
+    );
+    await Promise.all(discarded.map(entry =>
+      removeRetainedDesignUploadAsset(entry.asset.uri).catch(() => {})));
+  });
+}
+
+export async function drainVerifiedUploadQueue(
+  context = captureSyncContext(),
+): Promise<void> {
+  if (_designUserId === 'anon') return;
+  await withVerifiedUploadLock(context, async () => {
+    const queue = await loadVerifiedUploadQueue(context.keys.uploadQueue);
+    while (queue.length > 0) {
+      const entry = queue[0];
+      try {
+        await uploadVerifiedDesignAsset(entry.projectId, entry.asset, entry.kind, context, entry.id);
+      } catch (error) {
+        // Auth expiry, a project that has not synced yet, conflicts, and rate
+        // limits can all recover. Only reject bytes the server cannot accept.
+        if (error instanceof ApiError && [400, 413, 415, 422].includes(error.status)) {
+          queue.shift();
+          await AsyncStorage.setItem(context.keys.uploadQueue, JSON.stringify(queue));
+          await removeRetainedDesignUploadAsset(entry.asset.uri).catch(() => {});
+          continue;
+        }
+        scheduleVerifiedUploadRetry(context);
+        return;
+      }
+      queue.shift();
+      await AsyncStorage.setItem(context.keys.uploadQueue, JSON.stringify(queue));
+      await removeRetainedDesignUploadAsset(entry.asset.uri).catch(() => {});
+    }
+  }).catch(() => {});
+}
+
+/** Uploads already-verified bytes without resize or re-encoding; failures are durably queued. */
+export async function syncVerifiedDesignAsset(
+  projectId: string,
+  asset: MasterExportAsset,
+  kind: 'master' | 'thumbnail' = 'master',
+): Promise<SyncedDesignAsset | null> {
+  const context = captureSyncContext();
+  const uploadId = randomUUID();
+  // Persist before the first network attempt. Every upload then flows through
+  // one FIFO lock, so an older retry cannot overtake and replace a newer master.
+  await queueVerifiedUpload(uploadId, projectId, asset, kind, context);
+  void drainVerifiedUploadQueue(context);
+  return null;
 }
 
 export async function getSyncedDesignAssets(projectId: string): Promise<SyncedDesignAsset[]> {

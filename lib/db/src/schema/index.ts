@@ -1011,6 +1011,7 @@ export const designStudioAssets = pgTable('design_studio_assets', {
   id:         uuid('id').primaryKey().defaultRandom(),
   projectId:  text('project_id').notNull().references(() => designStudioProjects.id, { onDelete: 'cascade' }),
   ownerId:    text('owner_id').notNull(),
+  uploadId:   text('upload_id'),
   kind:       text('kind').notNull(), // 'master' | 'thumbnail' | 'source' (never interchangeable)
   objectPath: text('object_path').notNull(),
   width:      integer('width').notNull(),
@@ -1024,6 +1025,9 @@ export const designStudioAssets = pgTable('design_studio_assets', {
 }, (table) => ({
   projectIdx: index('design_studio_assets_project_id_idx').on(table.projectId),
   ownerIdx: index('design_studio_assets_owner_id_idx').on(table.ownerId),
+  uploadIdUnique: uniqueIndex('design_studio_assets_upload_id_unique')
+    .on(table.ownerId, table.projectId, table.uploadId)
+    .where(sql`${table.uploadId} IS NOT NULL`),
   projectOwnerFk: foreignKey({
     columns: [table.projectId, table.ownerId],
     foreignColumns: [designStudioProjects.id, designStudioProjects.ownerId],

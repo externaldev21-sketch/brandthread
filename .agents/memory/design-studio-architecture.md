@@ -63,3 +63,9 @@ Cloud project state is scoped by both authenticated account and selected store. 
 **Why:** Independent AsyncStorage writes, mutable store headers, or timestamp-only conflict handling can leak work across stores, permanently stall sync, or let an older save recreate a deleted project.
 
 **How to apply:** Capture immutable account/store context per operation, use server revisions for conditional writes, keep source URIs durable locally, and never let cloud availability block a verified local export.
+
+Verified master uploads use an enqueue-before-send FIFO contract. Queue IDs must be cryptographically unique and server-idempotent; native document storage or browser blob storage owns the exact bytes until success or explicit deletion.
+
+**Why:** Direct best-effort uploads can lose files after a connection drop, while concurrent retries can reorder masters or duplicate a request whose response was lost.
+
+**How to apply:** Persist exact encoded bytes and metadata before networking, return control to export immediately, serialize retries by account/store, and discard bytes only after confirmed success or an explicit terminal rejection.

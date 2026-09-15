@@ -352,6 +352,29 @@ router.post(
       res.status(404).json({ error: "Project not found" });
       return;
     }
+    const uploadId = typeof req.headers["x-design-upload-id"] === "string"
+      ? req.headers["x-design-upload-id"]
+      : null;
+    if (uploadId != null && !/^[a-zA-Z0-9_-]{1,128}$/.test(uploadId)) {
+      res.status(400).json({ error: "Invalid Design Studio upload identifier" });
+      return;
+    }
+    if (uploadId) {
+      const [existing] = await db.select().from(designStudioAssets).where(and(
+        eq(designStudioAssets.projectId, project.id),
+        eq(designStudioAssets.ownerId, ownerId(req)),
+        eq(designStudioAssets.uploadId, uploadId),
+      )).limit(1);
+      if (existing) {
+        res.status(200).json({
+          asset: {
+            ...existing,
+            downloadUrl: await storage.getObjectEntityDownloadURL(existing.objectPath),
+          },
+        });
+        return;
+      }
+    }
     const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
     const mimeType = String(req.headers["content-type"] ?? "").split(";")[0];
     const format = String(req.headers["x-design-format"] ?? "");
@@ -437,6 +460,7 @@ router.post(
         const [inserted] = await tx.insert(designStudioAssets).values({
           projectId: project.id,
           ownerId: ownerId(req),
+          uploadId,
           kind,
           objectPath,
           width: actual.width,
