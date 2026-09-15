@@ -12,6 +12,7 @@ import {
   Alert,
   Animated,
   Dimensions,
+  Easing,
   Image,
   KeyboardAvoidingView,
   Linking,
@@ -1875,7 +1876,10 @@ export default function OnboardingScreen() {
 
   const [finishing, setFinishing]         = useState(false);
 
-  const slideAnim = useRef(new Animated.Value(0)).current;
+  const transitionProgress = useRef(new Animated.Value(1)).current;
+  const transitionDirection = useRef<1 | -1>(1);
+  const firstNameInputRef = useRef<TextInput>(null);
+  const brandNameInputRef = useRef<TextInput>(null);
   const restoredDraft = useRef(false);
 
   // Clerk may take longer than local storage to initialize in a web preview.
@@ -1958,19 +1962,40 @@ export default function OnboardingScreen() {
   // Persist onboarding answers under the authenticated user's immutable ID.
   useEffect(() => {
     if (!user?.id || !ready || !flow) return;
-    saveDraft().catch(() => {});
+    const timer = setTimeout(() => {
+      saveDraft().catch(() => {});
+    }, 350);
+    return () => clearTimeout(timer);
   }, [user?.id, ready, flow, saveDraft]);
+
+  // Let the lightweight screen transition finish before opening the keyboard.
+  // Focusing during the transition forces iOS to relayout the moving container.
+  useEffect(() => {
+    const isNameStep = (flow === 'buyer' && step === BUYER_STEP_INDEX.NAME)
+      || (flow === 'seller' && step === SELLER_STEP_INDEX.NAME);
+    const isBrandNameStep = flow === 'seller' && step === SELLER_STEP_INDEX.BRAND_NAME;
+    if (!isNameStep && !isBrandNameStep) return;
+
+    const timer = setTimeout(() => {
+      if (isBrandNameStep) {
+        brandNameInputRef.current?.focus();
+      } else {
+        firstNameInputRef.current?.focus();
+      }
+    }, 260);
+    return () => clearTimeout(timer);
+  }, [flow, step]);
 
   // ── Auth completion handler (OAuth/native without remount) ──────────────────
   const handleAuthComplete = useCallback(() => {
     // After auth, move to the first post-auth step (Name) for the chosen flow
     if (flow === 'buyer') {
-      setStep(BUYER_STEP_INDEX.NAME);
+      transitionTo(BUYER_STEP_INDEX.NAME, 1);
     } else if (flow === 'seller') {
-      setStep(SELLER_STEP_INDEX.NAME);
+      transitionTo(SELLER_STEP_INDEX.NAME, 1);
     } else {
       // No flow set yet — go to auth but shouldn't happen in v6 order
-      setStep(BUYER_STEP_INDEX.AUTH);
+      transitionTo(BUYER_STEP_INDEX.AUTH, 1);
     }
   }, [flow]);
 
@@ -1979,7 +2004,7 @@ export default function OnboardingScreen() {
     if (ready && isSignedIn && postAuth === '1' && !flow) {
       // postAuth=1 means we just verified email; step 0 = AccountType was already passed
       // If flow is still null, go to AccountType so user can choose
-      setStep(BUYER_STEP_INDEX.ACCOUNT_TYPE);
+      transitionTo(BUYER_STEP_INDEX.ACCOUNT_TYPE, -1);
     }
   }, [flow, isSignedIn, postAuth, ready]);
 
@@ -1991,50 +2016,55 @@ export default function OnboardingScreen() {
     if (!prevSignedIn.current && isSignedIn) {
       // Just signed in via OAuth — move to Name step (flow is already set from AccountType choice)
       if (flow === 'buyer') {
-        setStep(BUYER_STEP_INDEX.NAME);
+        transitionTo(BUYER_STEP_INDEX.NAME, 1);
       } else if (flow === 'seller') {
-        setStep(SELLER_STEP_INDEX.NAME);
+        transitionTo(SELLER_STEP_INDEX.NAME, 1);
       }
     }
     prevSignedIn.current = isSignedIn ?? false;
   }, [isSignedIn, ready, flow]);
 
   // ── Navigation helpers ──────────────────────────────────────────────────────
-  function animateTo(next: number, dir: 1 | -1) {
-    Animated.timing(slideAnim, { toValue: dir * -SW, duration: 220, useNativeDriver: true }).start(() => {
-      setStep(next);
-      slideAnim.setValue(dir * SW);
-      Animated.timing(slideAnim, { toValue: 0, duration: 220, useNativeDriver: true }).start();
+  function transitionTo(next: number, dir: 1 | -1) {
+    transitionProgress.stopAnimation();
+    transitionDirection.current = dir;
+    transitionProgress.setValue(0);
+    setStep(next);
+    requestAnimationFrame(() => {
+      Animated.timing(transitionProgress, {
+        toValue: 1,
+        duration: 230,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
     });
   }
 
   function goNext(overrideStep?: number) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const next = overrideStep ?? step + 1;
-    saveDraft({ step: next });
-    animateTo(next, 1);
+    transitionTo(next, 1);
   }
 
   function goBack() {
     if (step === 0) { router.back(); return; }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    animateTo(step - 1, -1);
+    transitionTo(step - 1, -1);
   }
 
-  async function continueFromAccountType() {
+  function continueFromAccountType() {
     if (!selectedFlow) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     // After AccountType (step 0), go to path-specific Auth (step 1)
     const next = selectedFlow === 'buyer'
       ? BUYER_STEP_INDEX.AUTH
       : SELLER_STEP_INDEX.AUTH;
-    await AsyncStorage.multiSet([
+    void AsyncStorage.multiSet([
       [PENDING_FLOW_KEY, selectedFlow],
       [ONBOARDING_KEY, 'false'],
-    ]);
+    ]).catch(() => {});
     setFlow(selectedFlow);
-    await saveDraft({ flow: selectedFlow, step: next });
-    animateTo(next, 1);
+    transitionTo(next, 1);
   }
 
   // ── Finish handlers ─────────────────────────────────────────────────────────
@@ -2239,13 +2269,13 @@ export default function OnboardingScreen() {
             <View style={sm.inputWrap}>
               <Text style={sm.label}>First name</Text>
               <TextInput
+                ref={firstNameInputRef}
                 style={sm.input}
                 placeholder="Alex"
                 placeholderTextColor={MUTED2}
                 value={firstName}
                 onChangeText={setFirstName}
                 autoCapitalize="words"
-                autoFocus
                 maxLength={40}
               />
             </View>
@@ -2274,15 +2304,15 @@ export default function OnboardingScreen() {
 
       // Step 4: Loading
       if (step === BUYER_STEP_INDEX.LOADING) return (
-        <LoadingAnimation steps={BUYER_LOADING_STEPS} onDone={() => { setStep(BUYER_STEP_INDEX.NOTIFICATIONS); }} />
+        <LoadingAnimation steps={BUYER_LOADING_STEPS} onDone={() => transitionTo(BUYER_STEP_INDEX.NOTIFICATIONS, 1)} />
       );
 
       // Step 5: Notifications
       if (step === BUYER_STEP_INDEX.NOTIFICATIONS) return (
         <NotificationsStep
           flow="buyer"
-          onEnable={() => { setStep(BUYER_STEP_INDEX.SUCCESS); }}
-          onSkip={() => setStep(BUYER_STEP_INDEX.SUCCESS)}
+          onEnable={() => transitionTo(BUYER_STEP_INDEX.SUCCESS, 1)}
+          onSkip={() => transitionTo(BUYER_STEP_INDEX.SUCCESS, 1)}
         />
       );
 
@@ -2320,13 +2350,13 @@ export default function OnboardingScreen() {
             <View style={sm.inputWrap}>
               <Text style={sm.label}>First name</Text>
               <TextInput
+                ref={firstNameInputRef}
                 style={sm.input}
                 placeholder="Alex"
                 placeholderTextColor={MUTED2}
                 value={firstName}
                 onChangeText={setFirstName}
                 autoCapitalize="words"
-                autoFocus
                 maxLength={40}
               />
             </View>
@@ -2343,13 +2373,13 @@ export default function OnboardingScreen() {
             <View style={sm.inputWrap}>
               <Text style={sm.label}>Brand name</Text>
               <TextInput
+                ref={brandNameInputRef}
                 style={sm.input}
                 placeholder="e.g. Noir Collective"
                 placeholderTextColor={MUTED2}
                 value={brandName}
                 onChangeText={setBrandName}
                 autoCapitalize="words"
-                autoFocus
                 maxLength={60}
               />
               <Text style={sm.inputHint}>Brandthread AI will use this to shape your workspace.</Text>
@@ -2439,15 +2469,15 @@ export default function OnboardingScreen() {
 
       // Step 7: Loading
       if (step === SELLER_STEP_INDEX.LOADING) return (
-        <LoadingAnimation steps={SELLER_LOADING_STEPS} onDone={() => setStep(SELLER_STEP_INDEX.NOTIFICATIONS)} />
+        <LoadingAnimation steps={SELLER_LOADING_STEPS} onDone={() => transitionTo(SELLER_STEP_INDEX.NOTIFICATIONS, 1)} />
       );
 
       // Step 8: Notifications
       if (step === SELLER_STEP_INDEX.NOTIFICATIONS) return (
         <NotificationsStep
           flow="seller"
-          onEnable={() => { setStep(SELLER_STEP_INDEX.SUCCESS); }}
-          onSkip={() => setStep(SELLER_STEP_INDEX.SUCCESS)}
+          onEnable={() => transitionTo(SELLER_STEP_INDEX.SUCCESS, 1)}
+          onSkip={() => transitionTo(SELLER_STEP_INDEX.SUCCESS, 1)}
         />
       );
 
@@ -2527,7 +2557,16 @@ export default function OnboardingScreen() {
       <Animated.View style={[
         sm.stepWrap,
         isAccountTypeStep && sm.accountTypeStepWrap,
-        isAuthStep ? sm.interactiveStepWrap : { transform: [{ translateX: slideAnim }] },
+        isAuthStep && sm.interactiveStepWrap,
+        {
+          opacity: transitionProgress,
+          transform: [{
+            translateX: transitionProgress.interpolate({
+              inputRange: [0, 1],
+              outputRange: [transitionDirection.current * 18, 0],
+            }),
+          }],
+        },
       ]}>
         {renderStep()}
       </Animated.View>

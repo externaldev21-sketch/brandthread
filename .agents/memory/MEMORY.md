@@ -83,6 +83,7 @@
 - [Trust and recovery boundaries](trust-recovery-boundaries.md) — product deletion has a five-minute server recovery window; IP status uses hashed capabilities; verified status is always derived.
 - [Expo platform modules in Vitest](expo-platform-modules-vitest.md) — Vitest does not resolve suffix-only Expo modules; renderer-tested imports need a neutral fallback.
 - [Expo React types under pnpm](expo-react-types-pnpm.md) — expose React declarations with typeRoots; never alias runtime `react` to @types/react because Metro consumes paths.
+- [Expo SDK 57 pnpm resolution](expo-sdk57-pnpm-resolution.md) — TypeScript 6 may need public-hoisted React declarations; keep runtime React resolution untouched.
 - [Expo Router test placement](expo-router-test-placement.md) — never add Vitest files under the mobile app route tree; Metro imports them as routes and can break web boot.
 - [Drop broadcast claim boundary](drop-broadcast-claim-boundary.md) — manual and scheduled launch notifications share one locked, eligibility-checked claim and clear pending state atomically.
 - [Premium image acceptance](premium-image-acceptance.md) — customer-facing AI images require premium generation plus operation-specific, fail-closed visual QA with one bounded correction pass.

@@ -95,4 +95,29 @@ describe('onboarding visual structure', () => {
     expect(onboarding).toContain("PENDING_FLOW_KEY = 'onboarding_pending_flow'");
     expect(onboarding).toContain('[PENDING_FLOW_KEY, selectedFlow]');
   });
+
+  it('uses one immediate native-driver transition for every onboarding step', () => {
+    const onboarding = read('app/onboarding.tsx');
+    expect(onboarding).toContain('function transitionTo(next: number, dir: 1 | -1)');
+    expect(onboarding).toContain('transitionProgress.setValue(0);\n    setStep(next);\n    requestAnimationFrame');
+    expect(onboarding).toContain('duration: 230');
+    expect(onboarding).toContain('useNativeDriver: true');
+    expect(onboarding).not.toContain('duration: 220');
+    expect(onboarding).not.toContain('isAuthStep ? sm.interactiveStepWrap');
+    expect(onboarding).toContain('onDone={() => transitionTo(BUYER_STEP_INDEX.NOTIFICATIONS, 1)}');
+    expect(onboarding).toContain('onDone={() => transitionTo(SELLER_STEP_INDEX.NOTIFICATIONS, 1)}');
+  });
+
+  it('keeps account-type storage and draft persistence off the transition path', () => {
+    const onboarding = read('app/onboarding.tsx');
+    expect(onboarding).toContain('void AsyncStorage.multiSet([');
+    expect(onboarding).toContain('const timer = setTimeout(() => {\n      saveDraft().catch(() => {});\n    }, 350);');
+  });
+
+  it('delays name-field focus until the incoming screen transition completes', () => {
+    const onboarding = read('app/onboarding.tsx');
+    expect(onboarding).toContain('firstNameInputRef.current?.focus()');
+    expect(onboarding).toContain('brandNameInputRef.current?.focus()');
+    expect(onboarding).toContain('}, 260);');
+  });
 });
