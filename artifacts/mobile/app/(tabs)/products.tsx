@@ -1,22 +1,22 @@
 /**
  * Brandthread — Seller Products Tab
- * Main catalog management screen.
+ * Shopify-pattern layout: persistent search row, status pills, divider-separated rows.
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
-import { View, Text, ScrollView, FlatList, StyleSheet, Alert, Share, Modal, Pressable } from 'react-native';
+import { View, Text, ScrollView, FlatList, StyleSheet, Alert, Share, Modal, Pressable, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, COMP, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
+import { BG, SCREEN_BG, SURFACE, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { AnimatedEntrance, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SearchBar, FilterChip, StatusBadge, EmptyState, SectionHeader, StatCard, GuidedTip, ProductGridSkeleton, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
+import { AnimatedEntrance, BrandthreadCard, PrimaryButton, IconButton, SearchBar, FilterChip, StatusBadge, EmptyState, ProductGridSkeleton, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { getProducts, getProductStats, archiveProduct, unarchiveProduct, deleteProduct, restoreProduct, duplicateProduct, listDrafts, deleteDraft } from '@/services/productService';
-import { Product, ProductDraft, ProductFilter, ProductCategory } from '@/services/productTypes';
+import { Product, ProductDraft, ProductFilter } from '@/services/productTypes';
 import { formatCents, integerPercent } from '@/lib/money';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -51,16 +51,16 @@ interface Stats {
   totalInventoryValueCents: number;
 }
 
-// ─── Product Card ─────────────────────────────────────────────────────────────
+// ─── Product Row ─────────────────────────────────────────────────────────────
 
-interface ProductCardProps {
+interface ProductRowProps {
   product: Product;
-  onEdit: () => void;
-  onDuplicate: () => void;
+  onPress: () => void;
   onMore: () => void;
+  isLast: boolean;
 }
 
-function ProductCard({ product, onEdit, onDuplicate, onMore }: ProductCardProps) {
+function ProductRow({ product, onPress, onMore, isLast }: ProductRowProps) {
   const { theme } = useAppTheme();
   const coverUri = product.media.find(m => m.isCover)?.uri ?? product.media[0]?.uri;
   const gradColors = getCategoryColors(product.category, theme);
@@ -77,86 +77,60 @@ function ProductCard({ product, onEdit, onDuplicate, onMore }: ProductCardProps)
     : null;
 
   return (
-    <BrandthreadCard style={[s.productCard, { padding: 0, overflow: 'hidden' }]}>
-      {/* Main row */}
-      <View style={s.cardRow}>
-        {/* Thumbnail */}
-        <View style={s.thumbWrap}>
+    <>
+      <TouchableOpacity
+        activeOpacity={0.82}
+        onPress={onPress}
+        style={s.productRow}
+        accessibilityLabel={`${product.name}, ${statusLabel(product.status)}, ${formatCents(price)}`}
+      >
+        {/* Square thumbnail */}
+        <View style={s.rowThumb}>
           {coverUri ? (
-            <CachedImage source={{ uri: coverUri }} style={s.thumb} contentFit="cover" />
+            <CachedImage source={{ uri: coverUri }} style={s.rowThumbImg} contentFit="cover" />
           ) : (
-            <LinearGradient colors={gradColors} style={s.thumb} />
+            <LinearGradient colors={gradColors} style={s.rowThumbImg} />
           )}
         </View>
 
         {/* Content */}
-        <View style={s.cardContent}>
-          {/* Name + status */}
-          <View style={s.cardTopRow}>
-            <Text style={s.productName} numberOfLines={1}>{product.name}</Text>
+        <View style={s.rowContent}>
+          <View style={s.rowTopLine}>
+            <Text style={s.rowName} numberOfLines={1}>{product.name}</Text>
             <StatusBadge label={statusLabel(product.status)} variant={statusVariant(product.status)} small />
           </View>
 
-          {/* Category + sales model */}
-          <View style={s.cardMetaRow}>
-            <Text style={s.categoryText}>{product.category}</Text>
-            {product.salesModel === 'pre-order' && (
-              <StatusBadge label="Pre-order" variant="purple" small />
-            )}
-            {product.salesModel === 'pre-made' && (
-              <StatusBadge label="Pre-made" variant="neutral" small />
-            )}
-          </View>
-
-          {/* Price row */}
-          <View style={s.priceRow}>
-            <Text style={s.price}>{formatCents(price)}</Text>
-            {compare && compare > price && (
-              <Text style={s.comparePrice}>{formatCents(compare)}</Text>
-            )}
-            {discountPct && (
-              <Text style={s.discount}>-{discountPct}%</Text>
-            )}
-          </View>
-
-          {/* Inventory row */}
-          <View style={s.infoRow}>
-            <Feather name="layers" size={11} color={MUTED} />
-            <Text style={s.infoText}>
-              {product.variants.length} variant{product.variants.length !== 1 ? 's' : ''}
+          <View style={s.rowMeta}>
+            <Text style={s.rowMetaText} numberOfLines={1}>
+              {product.category}
+              {product.variants.length > 0 ? ` · ${product.variants.length} variant${product.variants.length !== 1 ? 's' : ''}` : ''}
             </Text>
-            <Text style={s.bullet}>·</Text>
-            <Text style={[s.infoText, { color: stockColor }]}>{stockLabel}</Text>
           </View>
 
-          {/* Sales row */}
-          <View style={s.infoRow}>
-            <Feather name="bar-chart-2" size={11} color={MUTED} />
-            <Text style={s.infoText}>{product.totalSales} sold</Text>
-            <Text style={s.bullet}> · </Text>
-            <Text style={[s.infoText, { color: SUBTLE }]}>{formatCents(product.totalRevenueCents)} revenue</Text>
+          <View style={s.rowPriceLine}>
+            <Text style={s.rowPrice}>{formatCents(price)}</Text>
+            {compare && compare > price && (
+              <Text style={s.rowCompare}>{formatCents(compare)}</Text>
+            )}
+            {discountPct !== null && (
+              <Text style={s.rowDiscount}>-{discountPct}%</Text>
+            )}
+            <Text style={[s.rowStock, { color: stockColor }]}>{stockLabel}</Text>
           </View>
         </View>
-      </View>
 
-      {/* Action row */}
-      <View style={s.actionRow}>
-        <PressableScale style={s.actionBtn} onPress={onEdit} accessibilityLabel={`Edit ${product.name}`}>
-          <Feather name="edit-2" size={13} color={theme.accentLight} />
-          <Text style={[s.actionLabel, { color: theme.accentLight }]}>Edit</Text>
-        </PressableScale>
-        <View style={s.actionDivider} />
-        <PressableScale style={s.actionBtn} onPress={onDuplicate} accessibilityLabel={`Duplicate ${product.name}`}>
-          <Feather name="copy" size={13} color={MUTED} />
-          <Text style={s.actionLabel}>Duplicate</Text>
-        </PressableScale>
-        <View style={s.actionDivider} />
-        <PressableScale style={s.actionBtn} onPress={onMore} accessibilityLabel={`More actions for ${product.name}`}>
-          <Feather name="more-horizontal" size={13} color={MUTED} />
-          <Text style={s.actionLabel}>More</Text>
-        </PressableScale>
-      </View>
-    </BrandthreadCard>
+        {/* More button */}
+        <TouchableOpacity
+          style={s.rowMoreBtn}
+          onPress={e => { e.stopPropagation(); onMore(); }}
+          hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+          accessibilityLabel={`More actions for ${product.name}`}
+        >
+          <Feather name="more-horizontal" size={ICON.sm} color={MUTED} />
+        </TouchableOpacity>
+      </TouchableOpacity>
+      {!isLast && <View style={s.rowDivider} />}
+    </>
   );
 }
 
@@ -172,14 +146,13 @@ interface ActionSheetProps {
 
 function ActionSheet({ product, visible, onClose, onRefresh, onDelete }: ActionSheetProps) {
   const router = useRouter();
+  const { theme } = useAppTheme();
   if (!product) return null;
 
-  const p = product as Product; // non-nullable alias for closure capture
+  const p = product as Product;
   const isArchived = p.status === 'archived';
 
-  function closeSheet() {
-    onClose();
-  }
+  function closeSheet() { onClose(); }
 
   async function handleArchive() {
     closeSheet();
@@ -235,8 +208,6 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete }: ActionS
     { label: 'Delete', icon: 'trash-2', accent: RED, onPress: handleDelete },
   ];
 
-  const { theme } = useAppTheme();
-
   return (
     <Modal
       visible={visible}
@@ -245,17 +216,17 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete }: ActionS
       presentationStyle="overFullScreen"
       onRequestClose={closeSheet}
     >
-      <Pressable style={as.overlay} onPress={closeSheet} />
-      <View style={as.sheet}>
-        <View style={as.handle} />
-        <Text style={as.sheetTitle} numberOfLines={1}>{p.name}</Text>
+      <Pressable style={sh.overlay} onPress={closeSheet} />
+      <View style={sh.sheet}>
+        <View style={sh.handle} />
+        <Text style={sh.sheetTitle} numberOfLines={1}>{p.name}</Text>
         <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
           {actions.map((item, idx) => (
-            <PressableScale key={idx} style={as.actionItem} onPress={item.onPress} accessibilityLabel={`${item.label}, ${p.name}`}>
-              <View style={[as.actionIcon, { backgroundColor: (item.accent ?? theme.accent) + '18' }]}>
+            <PressableScale key={idx} style={sh.actionItem} onPress={item.onPress} accessibilityLabel={`${item.label}, ${p.name}`}>
+              <View style={[sh.actionIcon, { backgroundColor: (item.accent ?? theme.accent) + '18' }]}>
                 <Feather name={item.icon} size={ICON.sm} color={item.accent ?? MUTED} />
               </View>
-              <Text style={[as.actionLabel, item.accent ? { color: item.accent } : {}]}>{item.label}</Text>
+              <Text style={[sh.actionLabel, item.accent ? { color: item.accent } : {}]}>{item.label}</Text>
               <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />
             </PressableScale>
           ))}
@@ -279,7 +250,6 @@ function FilterModal({ visible, current, onApply, onClose }: FilterModalProps) {
 
   useEffect(() => { setSelected(current); }, [current, visible]);
 
-  // Use static chips for filter modal (no counts needed here)
   const staticChips: { label: string; value: ProductFilter }[] = [
     { label: 'All',          value: 'all' },
     { label: 'Active',       value: 'active' },
@@ -300,10 +270,10 @@ function FilterModal({ visible, current, onApply, onClose }: FilterModalProps) {
       presentationStyle="overFullScreen"
       onRequestClose={onClose}
     >
-      <Pressable style={as.overlay} onPress={onClose} />
-      <View style={[as.sheet, { paddingBottom: SP.xl }]}>
-        <View style={as.handle} />
-        <Text style={as.sheetTitle}>Filter Products</Text>
+      <Pressable style={sh.overlay} onPress={onClose} />
+      <View style={[sh.sheet, { paddingBottom: SP.xl }]}>
+        <View style={sh.handle} />
+        <Text style={sh.sheetTitle}>Filter Products</Text>
         <View style={fm.chips}>
           {staticChips.map(chip => (
             <FilterChip
@@ -324,11 +294,55 @@ function FilterModal({ visible, current, onApply, onClose }: FilterModalProps) {
   );
 }
 
+// ─── Sort Modal ───────────────────────────────────────────────────────────────
+
+type SortKey = 'name' | 'price_asc' | 'price_desc' | 'newest' | 'oldest' | 'sales';
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'newest', label: 'Newest first' },
+  { key: 'oldest', label: 'Oldest first' },
+  { key: 'name', label: 'Name A-Z' },
+  { key: 'price_asc', label: 'Price: low to high' },
+  { key: 'price_desc', label: 'Price: high to low' },
+  { key: 'sales', label: 'Best selling' },
+];
+
+function SortModal({
+  visible, current, onSelect, onClose,
+}: {
+  visible: boolean;
+  current: SortKey;
+  onSelect: (k: SortKey) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={sh.overlay} onPress={onClose} />
+      <View style={sh.sheet}>
+        <View style={sh.handle} />
+        <Text style={sh.sheetTitle}>Sort Products</Text>
+        {SORT_OPTIONS.map(({ key, label }) => (
+          <TouchableOpacity
+            key={key}
+            style={[sh.sortOption, current === key && sh.sortOptionActive]}
+            onPress={() => { Haptics.selectionAsync(); onSelect(key); onClose(); }}
+            activeOpacity={0.8}
+          >
+            <Text style={[sh.sortOptionText, current === key && sh.sortOptionTextActive]}>
+              {label}
+            </Text>
+            {current === key && <Feather name="check" size={ICON.sm} color={PURPLE_LIGHT} />}
+          </TouchableOpacity>
+        ))}
+      </View>
+    </Modal>
+  );
+}
+
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function ProductsScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { showUndo } = useUndoToast();
@@ -337,12 +351,12 @@ export default function ProductsScreen() {
   const [inProgressDrafts, setInProgressDrafts] = useState<ProductDraft[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [filter, setFilter] = useState<ProductFilter>('all');
+  const [sort, setSort] = useState<SortKey>('newest');
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchActive, setSearchActive] = useState(false);
-  const [dismissedTips, setDismissedTips] = useState<string[]>([]);
   const [actionProduct, setActionProduct] = useState<Product | null>(null);
   const [actionSheetVisible, setActionSheetVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [sortModalVisible, setSortModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const loadStats = useCallback(async () => {
@@ -364,7 +378,6 @@ export default function ProductsScreen() {
     try {
       const result = await getProducts({ filter, text: searchQuery || undefined });
       setProducts(Array.isArray(result) ? result : []);
-      // Always refresh stats after products refresh
       await loadStats();
     } catch {
       setProducts([]);
@@ -377,15 +390,12 @@ export default function ProductsScreen() {
     loadProducts();
   }, [loadProducts]);
 
-  // Reload when the tab comes back into focus (e.g. after creating a product)
   useFocusEffect(useCallback(() => {
     loadProducts();
     listDrafts().then(rows => setInProgressDrafts(Array.isArray(rows) ? rows : [])).catch(() => {});
   }, [loadProducts]));
 
-  function refresh() {
-    loadProducts();
-  }
+  function refresh() { loadProducts(); }
 
   const handleDiscardDraft = useCallback((draftId: string, draftName: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -415,15 +425,13 @@ export default function ProductsScreen() {
   async function handleDelete(product: Product) {
     Alert.alert(
       'Delete product?',
-       'You can undo this for a short time.',
+      'You can undo this for a short time.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            // Remove immediately; if the authoritative request fails, reload
-            // rather than retaining a client-side deletion.
             setProducts(prev => prev.filter(p => p.id !== product.id));
             try {
               await deleteProduct(product.id);
@@ -450,204 +458,212 @@ export default function ProductsScreen() {
     setActionSheetVisible(true);
   }
 
-  // Computed filter chips with count badges from stats
-  const filterChips: { label: string; value: ProductFilter }[] = [
-    { label: 'All', value: 'all' as ProductFilter },
-    { label: stats ? `Active (${stats.active})` : 'Active', value: 'active' as ProductFilter },
-    { label: stats ? `Draft (${stats.draft})` : 'Draft', value: 'draft' as ProductFilter },
-    { label: 'Scheduled', value: 'scheduled' as ProductFilter },
-    { label: 'Archived', value: 'archived' as ProductFilter },
-    { label: stats ? `Pre-order (${stats.preOrder})` : 'Pre-order', value: 'pre-order' as ProductFilter },
-    { label: 'Pre-made', value: 'pre-made' as ProductFilter },
-    { label: stats ? `Low stock (${stats.lowStock})` : 'Low stock', value: 'low-stock' as ProductFilter },
-    { label: stats ? `Out of stock (${stats.outOfStock})` : 'Out of stock', value: 'out-of-stock' as ProductFilter },
+  async function handleExportProducts() {
+    const escapeCsv = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
+    const rows = products.map(product => [
+      product.name,
+      product.status,
+      product.variants.length,
+      formatCents(product.pricing.priceCents),
+      product.inventory.totalStock,
+    ].map(escapeCsv).join(','));
+    const csv = [
+      'Product,Status,Variants,Price,Inventory',
+      ...rows,
+    ].join('\n');
+    await Share.share({ title: 'Products Export', message: csv });
+  }
+
+  // Sorted products
+  const sortedProducts = useMemo(() => {
+    const arr = [...products];
+    switch (sort) {
+      case 'name': return arr.sort((a, b) => a.name.localeCompare(b.name));
+      case 'price_asc': return arr.sort((a, b) => a.pricing.priceCents - b.pricing.priceCents);
+      case 'price_desc': return arr.sort((a, b) => b.pricing.priceCents - a.pricing.priceCents);
+      case 'oldest': return arr.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      case 'sales': return arr.sort((a, b) => b.totalSales - a.totalSales);
+      case 'newest':
+      default: return arr.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    }
+  }, [products, sort]);
+
+  // Status filter pills
+  const filterPills: { label: string; value: ProductFilter }[] = [
+    { label: 'All', value: 'all' },
+    { label: 'Active', value: 'active' },
+    { label: 'Draft', value: 'draft' },
+    { label: 'Archived', value: 'archived' },
   ];
 
-  const renderProduct = useCallback(({ item }: { item: Product }) => (
-    <ProductCard
+  const currentSortLabel = SORT_OPTIONS.find(o => o.key === sort)?.label ?? 'Sort';
+  const hasActiveFilter = filter !== 'all';
+
+  const renderProduct = useCallback(({ item, index }: { item: Product; index: number }) => (
+    <ProductRow
       product={item}
-      onEdit={() => router.push(('/product-detail?id=' + item.id) as never)}
-      onDuplicate={() => handleDuplicate(item.id)}
+      onPress={() => router.push(('/product-detail?id=' + item.id) as never)}
       onMore={() => openActionSheet(item)}
+      isLast={index === sortedProducts.length - 1}
     />
-  ), [router]);
+  ), [router, sortedProducts.length]);
 
   const keyExtractor = useCallback((item: Product) => item.id, []);
 
-  const statsForDisplay = stats ?? { active: 0, draft: 0, lowStock: 0, outOfStock: 0, preOrder: 0, totalInventoryValueCents: 0 };
-
   const ListHeader = useMemo(() => (
-    <>
-      {/* In-progress creation drafts */}
+    <View>
+      {/* In-progress drafts */}
       {inProgressDrafts.length > 0 && (
-        <>
-          <SectionHeader title={`In Progress (${inProgressDrafts.length})`} style={{ marginBottom: SP.sm }} />
+        <View style={s.draftSection}>
+          <Text style={s.draftSectionLabel}>In Progress ({inProgressDrafts.length})</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: SP.sm, paddingBottom: SP.sm }}
-            style={{ marginBottom: SP.md }}
+            contentContainerStyle={{ gap: SP.sm, paddingRight: SP.md }}
           >
             {inProgressDrafts.slice(0, 3).map(draft => (
               <PressableScale
                 key={draft.id}
                 style={s.draftCard}
                 onPress={() => router.push(('/add-product?editId=' + draft.id) as never)}
-                accessibilityLabel={`Resume ${draft.name || 'untitled product'} draft, step ${draft.currentStep ?? 1} of 10`}
+                accessibilityLabel={`Resume ${draft.name || 'untitled product'} draft`}
               >
                 <View style={s.draftCardTop}>
-                  <Feather name="edit-3" size={14} color={ORANGE} />
-                  <Text style={[s.draftStep, { flex: 1 }]}>Step {draft.currentStep ?? 1}/10</Text>
+                  <Feather name="edit-3" size={12} color={ORANGE} />
+                  <Text style={s.draftStep}>Step {draft.currentStep ?? 1}/10</Text>
                   <PressableScale
                     hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
                     onPress={() => handleDiscardDraft(draft.id, draft.name ?? '')}
-                    accessibilityLabel={`Discard ${draft.name || 'untitled product'} draft`}
+                    accessibilityLabel={`Discard ${draft.name || 'untitled'} draft`}
                   >
-                    <Feather name="x" size={13} color={MUTED} />
+                    <Feather name="x" size={12} color={SUBTLE} />
                   </PressableScale>
                 </View>
-                <Text style={s.draftName} numberOfLines={1}>
-                  {draft.name || 'Untitled product'}
-                </Text>
-                <Text style={s.draftTime} numberOfLines={1}>
-                  Saved {draft.lastSavedAt ? new Date(draft.lastSavedAt).toLocaleDateString() : '—'}
-                </Text>
-                <View style={s.draftResume}>
-                  <Text style={[s.draftResumeLabel, { color: theme.accentLight }]}>Resume →</Text>
-                </View>
+                <Text style={s.draftName} numberOfLines={1}>{draft.name || 'Untitled product'}</Text>
+                <Text style={s.draftResume}>Resume</Text>
               </PressableScale>
             ))}
-            {inProgressDrafts.length > 3 && (
-              <PressableScale
-                style={[s.seeAllDraftsCard, { backgroundColor: theme.accentDim, borderColor: theme.accent + '55' }]}
-                onPress={() => router.push('/drafts' as never)}
-                accessibilityRole="button"
-                accessibilityLabel={`See all ${inProgressDrafts.length} drafts`}
-              >
-                <View style={[s.seeAllDraftsIcon, { backgroundColor: theme.accent + '22' }]}>
-                  <Feather name="list" size={16} color={theme.accentLight} />
-                </View>
-                <Text style={[s.seeAllDraftsLabel, { color: theme.accentLight }]}>See all ({inProgressDrafts.length})</Text>
-                <Feather name="chevron-right" size={14} color={theme.accentLight} />
-              </PressableScale>
-            )}
           </ScrollView>
-        </>
+        </View>
       )}
 
-      {/* Summary stats */}
-      <AnimatedEntrance>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.statsRow}
-          style={{ marginBottom: SP.md }}
-        >
-          <StatCard label="Active" value={String(statsForDisplay.active)} icon="check-circle" accent={SUCCESS} style={s.statCard} />
-          <StatCard label="Draft" value={String(statsForDisplay.draft)} icon="edit-3" accent={ORANGE} style={s.statCard} />
-          <StatCard label="Low Stock" value={String(statsForDisplay.lowStock)} icon="alert-triangle" accent={RED} style={s.statCard} />
-          <StatCard label="Out of Stock" value={String(statsForDisplay.outOfStock)} icon="x-circle" accent={RED} style={s.statCard} />
-          <StatCard label="Pre-orders" value={String(statsForDisplay.preOrder)} icon="clock" accent={theme.accent} style={s.statCard} />
-          <StatCard label="Value" value={formatCents(statsForDisplay.totalInventoryValueCents)} icon="dollar-sign" accent={GOLD} style={s.statCard} />
-        </ScrollView>
-      </AnimatedEntrance>
-
-      {/* Filter chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.filterRow}
-        style={{ marginBottom: SP.md }}
-      >
-        {filterChips.map(chip => (
-          <FilterChip
-            key={chip.value}
-            label={chip.label}
-            active={filter === chip.value}
-            onPress={() => setFilter(chip.value)}
-          />
-        ))}
-      </ScrollView>
-
-      {/* Guided tip */}
-      <GuidedTip
-        id="products-tip"
-        text="Products you create here can be tagged in Seller posts. Only active and scheduled products appear in the Thread."
-        dismissedIds={dismissedTips}
-        onDismiss={(id) => setDismissedTips(prev => [...prev, id])}
-        style={{ marginBottom: SP.md, marginHorizontal: 0 }}
-      />
-
-      {/* Section header */}
-      <SectionHeader
-        title={filter === 'all' ? 'All Products' : filterChips.find(c => c.value === filter)?.label ?? 'Products'}
-        action={{ label: 'Sort', onPress: () => {} }}
-        style={{ marginBottom: SP.sm }}
-      />
-    </>
-  ), [stats, filter, dismissedTips, inProgressDrafts, router, handleDiscardDraft]);
+      {/* Products group container */}
+      <View style={s.groupContainer}>
+        {/* Group header */}
+        <View style={s.groupHeader}>
+          <Text style={s.groupCount}>{sortedProducts.length} {sortedProducts.length === 1 ? 'product' : 'products'}</Text>
+        </View>
+      </View>
+    </View>
+  ), [inProgressDrafts, router, handleDiscardDraft, sortedProducts.length]);
 
   const ListEmpty = useMemo(() => (
-    <EmptyState
-      icon="package"
-      title="Your first product starts here."
-      description="Add product details, media, pricing, variants and inventory."
-      action={{ label: 'Create product', icon: 'plus', onPress: () => router.push('/add-product' as never) }}
-    />
+    <View style={s.groupContainer}>
+      <EmptyState
+        icon="package"
+        title="Your first product starts here."
+        description="Add product details, media, pricing, variants and inventory."
+        action={{ label: 'Create product', icon: 'plus', onPress: () => router.push('/add-product' as never) }}
+      />
+    </View>
   ), [router]);
 
   return (
     <View style={s.root}>
-      {/* Fixed header */}
-      <View style={[s.header, { paddingTop: insets.top + 8 }]}>
-        <View style={s.headerRow}>
-          <Text style={s.headerTitle}>Products</Text>
-          <View style={s.headerActions}>
-            <IconButton
-              name="search"
-              onPress={() => setSearchActive(v => !v)}
-              color={searchActive ? PURPLE_LIGHT : FG}
-              accessibilityLabel={searchActive ? 'Hide product search' : 'Search products'}
-            />
-            <IconButton
-              name="filter"
-              onPress={() => setFilterModalVisible(true)}
-              color={filter !== 'all' ? PURPLE_LIGHT : FG}
-              accessibilityLabel={filter === 'all' ? 'Filter products' : `Filter products, ${filter} selected`}
-            />
-            <IconButton
-              name="download"
-              onPress={() => router.push('/product-import' as never)}
-              accessibilityLabel="Import products"
-            />
-            <IconButton
-              name="plus"
+      {/* ── Fixed header ── */}
+      <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
+        {/* Title row */}
+        <View style={s.titleRow}>
+          <TouchableOpacity
+            style={s.titleBtn}
+            onPress={() => Alert.alert('Product view', 'Choose a view', [
+              { text: 'All products', onPress: () => setFilter('all') },
+              { text: 'Collections', onPress: () => router.push('/store-collections' as never) },
+              { text: 'Cancel', style: 'cancel' },
+            ])}
+            activeOpacity={0.7}
+          >
+            <Text style={s.titleText}>Products</Text>
+            <Feather name="chevron-down" size={18} color={MUTED} />
+          </TouchableOpacity>
+          <View style={s.titleActions}>
+            <TouchableOpacity
+              style={s.headerIconBtn}
               onPress={() => router.push('/add-product' as never)}
-              color={PURPLE_LIGHT}
               accessibilityLabel="Add product"
-            />
+            >
+              <Feather name="plus" size={ICON.md} color={FG} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.headerIconBtn}
+              onPress={() => Alert.alert('Products', 'Choose an action', [
+                { text: 'Import products', onPress: () => router.push('/product-import' as never) },
+                { text: 'Export products', onPress: () => { void handleExportProducts(); } },
+                { text: 'Cancel', style: 'cancel' },
+              ])}
+              accessibilityLabel="More product actions"
+            >
+              <Feather name="more-horizontal" size={ICON.md} color={FG} />
+            </TouchableOpacity>
           </View>
         </View>
-        {searchActive && (
-          <SearchBar
-            value={searchQuery}
-            onChange={setSearchQuery}
-            placeholder="Search products…"
-            style={{ marginBottom: SP.sm }}
-          />
-        )}
+
+        {/* Persistent search row */}
+        <View style={s.searchRow}>
+          <View style={s.searchBox}>
+            <Feather name="search" size={14} color={MUTED} style={{ marginRight: SP.xs }} />
+            <SearchBar
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Search products…"
+              style={s.searchInput}
+            />
+          </View>
+          <TouchableOpacity
+            style={[s.controlBtn, hasActiveFilter && s.controlBtnActive]}
+            onPress={() => setFilterModalVisible(true)}
+            accessibilityLabel={hasActiveFilter ? `Filter: ${filter}` : 'Filter products'}
+          >
+            <Feather name="sliders" size={14} color={hasActiveFilter ? PURPLE_LIGHT : MUTED} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={s.controlBtn}
+            onPress={() => setSortModalVisible(true)}
+            accessibilityLabel={`Sort: ${currentSortLabel}`}
+          >
+            <Feather name="chevrons-down" size={14} color={MUTED} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Status pills */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.pillsRow}
+        >
+          {filterPills.map(pill => (
+            <FilterChip
+              key={pill.value}
+              label={pill.value === 'active' && stats ? `Active (${stats.active})` :
+                     pill.value === 'draft' && stats ? `Draft (${stats.draft})` :
+                     pill.label}
+              active={filter === pill.value}
+              onPress={() => setFilter(pill.value)}
+            />
+          ))}
+        </ScrollView>
       </View>
 
-      {/* Product list */}
+      {/* ── Product list ── */}
       <FlatList
-        data={products}
+        data={sortedProducts}
         keyExtractor={keyExtractor}
         renderItem={renderProduct}
         ListHeaderComponent={ListHeader}
-        ListEmptyComponent={ListEmpty}
+        ListEmptyComponent={loading ? null : ListEmpty}
         contentContainerStyle={s.listContent}
         showsVerticalScrollIndicator={false}
-        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+        ItemSeparatorComponent={null}
       />
 
       {/* Action sheet */}
@@ -666,9 +682,19 @@ export default function ProductsScreen() {
         onApply={(f) => setFilter(f)}
         onClose={() => setFilterModalVisible(false)}
       />
+
+      {/* Sort modal */}
+      <SortModal
+        visible={sortModalVisible}
+        current={sort}
+        onSelect={k => setSort(k)}
+        onClose={() => setSortModalVisible(false)}
+      />
+
       <AIBrainFAB context={{ screen: 'products' as const }} bottomOffset={72} />
+
       {loading && (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: SCREEN_BG, zIndex: 10 }}>
+        <View style={s.loadingOverlay} pointerEvents="none">
           <ProductGridSkeleton />
         </View>
       )}
@@ -683,38 +709,116 @@ const s = StyleSheet.create({
     flex: 1,
     backgroundColor: SCREEN_BG,
   },
+
+  // Header
   header: {
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
     backgroundColor: BG,
     borderBottomWidth: 1,
     borderBottomColor: BORDER,
+    paddingBottom: 0,
   },
-  headerRow: {
+  titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: SP.sm,
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.sm,
+    minHeight: 44,
   },
-  headerTitle: {
+  titleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  titleText: {
     fontSize: FS.xl,
     fontFamily: FONT.bold,
     color: FG,
     letterSpacing: -0.3,
   },
-  headerActions: {
+  titleActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SP.sm,
+    gap: SP.xs,
+  },
+  headerIconBtn: {
+    width: COMP.iconBtn,
+    height: COMP.iconBtn,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Search row
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.sm,
+  },
+  searchBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: CARD,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: SP.sm,
+    height: 36,
+  },
+  searchInput: {
+    flex: 1,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
+    height: 36,
+  },
+  controlBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: CARD,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  controlBtnActive: {
+    borderColor: BORDER_ACTIVE,
+    backgroundColor: PURPLE_DIM,
+  },
+
+  // Status pills row
+  pillsRow: {
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.sm,
+    paddingTop: 2,
+    gap: SP.xs,
+  },
+
+  // Draft section
+  draftSection: {
+    paddingTop: SP.md,
+    paddingLeft: SP.md,
+    marginBottom: SP.sm,
+  },
+  draftSectionLabel: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: MUTED,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: SP.sm,
   },
   draftCard: {
-    width: 160,
+    width: 140,
     backgroundColor: CARD,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.sm,
     borderWidth: 1,
-    borderColor: ORANGE + '55',
+    borderColor: ORANGE + '44',
     padding: SP.sm,
-    gap: 4,
+    gap: 3,
   },
   draftCardTop: {
     flexDirection: 'row',
@@ -722,6 +826,7 @@ const s = StyleSheet.create({
     gap: 4,
   },
   draftStep: {
+    flex: 1,
     fontSize: FS.xs,
     fontFamily: FONT.medium,
     color: ORANGE,
@@ -731,173 +836,135 @@ const s = StyleSheet.create({
     fontFamily: FONT.semibold,
     color: FG,
   },
-  draftTime: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: MUTED,
-  },
   draftResume: {
-    marginTop: 4,
-  },
-  draftResumeLabel: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
     color: PURPLE_LIGHT,
+    marginTop: 2,
   },
-  seeAllDraftsCard: {
-    width: 132,
-    minHeight: 132,
-    backgroundColor: PURPLE_DIM,
+
+  // Group container (card background for list)
+  groupContainer: {
+    marginHorizontal: SP.md,
+    backgroundColor: CARD,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: BORDER_ACTIVE,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SP.xs,
-    paddingHorizontal: SP.sm,
-  },
-  seeAllDraftsIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: RADIUS.sm,
-    backgroundColor: PURPLE + '22',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 2,
-  },
-  seeAllDraftsLabel: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
-    color: PURPLE_LIGHT,
-    textAlign: 'center',
-  },
-  statsRow: {
-    paddingHorizontal: SP.md,
-    gap: SP.sm,
-    paddingTop: SP.sm,
-  },
-  statCard: {
-    minWidth: 90,
-  },
-  filterRow: {
-    paddingHorizontal: SP.md,
-    gap: SP.sm,
-  },
-  listContent: {
-    paddingHorizontal: SP.md,
-    paddingTop: SP.md,
-    paddingBottom: COMP.tabBarH + SP.xl,
-  },
-  productCard: {
-    marginBottom: 0,
-  },
-  cardRow: {
-    flexDirection: 'row',
-  },
-  thumbWrap: {
-    width: 80,
-    height: 80,
+    borderColor: BORDER,
     overflow: 'hidden',
-    borderTopLeftRadius: RADIUS.lg,
+    marginBottom: SP.sm,
   },
-  thumb: {
-    width: 80,
-    height: 80,
+  groupHeader: {
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
   },
-  cardContent: {
+  groupCount: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: SUBTLE,
+  },
+
+  // Product row
+  productRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+    minHeight: 72,
+    backgroundColor: CARD,
+  },
+  rowThumb: {
+    width: 52,
+    height: 52,
+    borderRadius: RADIUS.xs,
+    overflow: 'hidden',
+    flexShrink: 0,
+  },
+  rowThumbImg: {
+    width: 52,
+    height: 52,
+  },
+  rowContent: {
     flex: 1,
     paddingHorizontal: SP.sm,
-    paddingTop: SP.sm,
-    paddingBottom: SP.xs,
-    gap: 3,
+    gap: 2,
   },
-  cardTopRow: {
+  rowTopLine: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: SP.xs,
   },
-  productName: {
+  rowName: {
     flex: 1,
-    fontSize: FS.base,
-    fontFamily: FONT.bold,
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
     color: FG,
-    letterSpacing: -0.2,
+    letterSpacing: -0.1,
   },
-  cardMetaRow: {
+  rowMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SP.xs,
   },
-  categoryText: {
+  rowMetaText: {
     fontSize: FS.xs,
-    fontFamily: FONT.medium,
+    fontFamily: FONT.regular,
     color: MUTED,
   },
-  priceRow: {
+  rowPriceLine: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.xs,
-    marginTop: 1,
+    flexWrap: 'wrap',
   },
-  price: {
-    fontSize: FS.sm,
+  rowPrice: {
+    fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: PURPLE_LIGHT,
+    color: FG,
   },
-  comparePrice: {
+  rowCompare: {
     fontSize: FS.xs,
     fontFamily: FONT.regular,
     color: SUBTLE,
     textDecorationLine: 'line-through',
   },
-  discount: {
+  rowDiscount: {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: RED,
   },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  infoText: {
+  rowStock: {
     fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: MUTED,
+    fontFamily: FONT.medium,
   },
-  bullet: {
-    fontSize: FS.xs,
-    color: SUBTLE,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: BORDER,
-    marginTop: SP.xs,
-  },
-  actionBtn: {
-    flex: 1,
-    flexDirection: 'row',
+  rowMoreBtn: {
+    width: COMP.minTouchTarget,
+    height: COMP.minTouchTarget,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 10,
+    flexShrink: 0,
   },
-  actionDivider: {
-    width: 1,
-    height: 20,
+  rowDivider: {
+    height: 1,
     backgroundColor: BORDER,
+    marginLeft: 52 + SP.md + SP.md, // align with content start after thumb
   },
-  actionLabel: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
-    color: MUTED,
+
+  // List
+  listContent: {
+    paddingBottom: COMP.tabBarH + SP.xl,
+  },
+
+  loadingOverlay: {
+    ...StyleSheet.absoluteFill,
+    top: 120,
+    backgroundColor: SCREEN_BG,
+    zIndex: 10,
   },
 });
 
-const as = StyleSheet.create({
+const sh = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.72)',
@@ -949,6 +1016,24 @@ const as = StyleSheet.create({
     fontSize: FS.base,
     fontFamily: FONT.medium,
     color: FG,
+  },
+  sortOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: SP.md,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+  },
+  sortOptionActive: {},
+  sortOptionText: {
+    fontSize: FS.base,
+    fontFamily: FONT.medium,
+    color: MUTED,
+  },
+  sortOptionTextActive: {
+    color: PURPLE_LIGHT,
+    fontFamily: FONT.semibold,
   },
 });
 

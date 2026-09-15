@@ -19,7 +19,7 @@
 - [Orders System Architecture](orders-system-architecture.md) — orderTypes.ts + orderService.ts; 7 new screens; routes in _layout.tsx; AsyncStorage v1 keys; demo data seeds 6 orders.
 - [Inventory System Architecture](inventory-system-architecture.md) — inventoryTypes.ts + inventoryService.ts; 7 screens (hub + 6 detail); AsyncStorage inv:*:v1 keys; demo seeds 6 items + 2 locations.
 - [Store Builder Architecture](store-builder-architecture.md) — storeTypes.ts + storeService.ts; 20 screens; bt:store:v1 key; no dynamic imports in service; StoreValidationResult from storeService not storeTypes.
-- [Design Studio Architecture](design-studio-architecture.md) — designTypes.ts + designService.ts; 17 screens; bt:design:*:v1 keys; mock AI in service; textColor/fillColor field names; no local color names.
+- [Design Studio Architecture](design-studio-architecture.md) — Expo-safe shared rendering, full-resolution master exports, validated imports, and ordered timer persistence govern the editor.
 - [Analytics System Architecture](analytics-system-architecture.md) — 10 screens, 2 service files, all 9 nav entry points wired; no chart library (custom View bars); useColors() avoided; bt:analytics:*:v1 keys.
 - [Cart & Checkout Architecture](cart-checkout-architecture.md) — cartTypes.ts + cartService.ts; 6 screens; Cart is 6th buyer tab; demo payment (test 0002/0003); AsyncStorage bt:cart:v1 + bt:checkout:v1.
 - [Seller Subscription Architecture](subscription-architecture.md) — migration 004 adds 5 users columns; /api/seller/subscription/* routes; Stripe lookup_key pricing; cast retrieve() to any for TypeScript.

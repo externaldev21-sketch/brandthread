@@ -182,14 +182,6 @@ export default function ProductImportScreen() {
         contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + COMP.tabBarH + SP.md }]}
         keyboardShouldPersistTaps="handled"
       >
-        {/* ── Guided Tip ── */}
-        <View style={[s.tip, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
-          <Feather name="zap" size={ICON.xs} color={colors.primary} style={{ marginTop: 1 }} />
-          <Text style={s.tipText}>
-            Import your existing products into Brandthread from another platform or a CSV spreadsheet.
-          </Text>
-        </View>
-
         {/* ── METHOD A: CSV Import ── */}
         <GradientCard
           style={s.methodCard}
@@ -416,23 +408,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   scroll: {
     paddingHorizontal: SP.md,
     gap: SP.sm,
-  },
-  tip: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: SP.sm,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-    marginBottom: SP.xs,
-  },
-  tipText: {
-    flex: 1,
-    fontSize: FS.sm,
-    fontFamily: FONT.regular,
-    color: FG,
-    lineHeight: 18,
   },
   methodCard: {
     marginBottom: SP.xs,

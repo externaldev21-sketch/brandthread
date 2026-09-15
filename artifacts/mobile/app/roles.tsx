@@ -18,7 +18,6 @@ export default function RolesScreen() {
   const colors = useColors();
   const router = useRouter();
   const api = useApi();
-  const [bannerVisible, setBannerVisible] = useState(true);
   const [roles, setRoles] = useState(DEFAULT_ROLES);
 
   useEffect(() => {
@@ -46,21 +45,6 @@ export default function RolesScreen() {
       />
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
-        {bannerVisible && (
-          <View style={[styles.banner, { backgroundColor: colors.primary + '14', borderBottomColor: colors.primary + '33' }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.bannerTitle, { color: colors.foreground }]}>POS roles update</Text>
-              <Text style={[styles.bannerBody, { color: colors.mutedForeground }]}>
-                User management and device setup permissions in previous POS roles are now replaced with new system roles. Only specific administrators can create and edit POS roles.{' '}
-                <Text style={{ textDecorationLine: 'underline' }} onPress={haptic}>Learn more</Text>
-              </Text>
-            </View>
-            <TouchableOpacity onPress={() => { haptic(); setBannerVisible(false); }} activeOpacity={0.7}>
-              <Feather name="x" size={18} color={colors.mutedForeground} />
-            </TouchableOpacity>
-          </View>
-        )}
-
         <View style={styles.toolbarRow}>
           <View style={[styles.allPill, { backgroundColor: colors.secondary }]}>
             <Text style={[styles.allPillText, { color: colors.foreground }]}>All</Text>
@@ -110,9 +94,6 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   headerActions: { flexDirection: 'row', gap: 8 },
   headerBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  banner: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1 },
-  bannerTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginBottom: 4 },
-  bannerBody: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17 },
   toolbarRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 14 },
   allPill: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
   allPillText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },

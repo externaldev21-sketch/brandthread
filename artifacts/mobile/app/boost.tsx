@@ -417,14 +417,6 @@ export default function BoostScreen() {
               })}
             </View>
 
-            {/* What is a boost */}
-            <View style={s.infoBanner}>
-              <Feather name="zap" size={16} color={GOLD} />
-              <Text style={s.infoBannerText}>
-                Boosted content is ranked higher in buyer feeds, reaching beyond your existing followers.
-              </Text>
-            </View>
-
             {/* Budget slider */}
             <View style={s.sliderSection}>
               <View style={s.sliderHeading}>
@@ -659,9 +651,6 @@ const createStyles = (colors: ReturnType<typeof useColors>) => {
   },
   radioOuterActive: { borderColor: PURPLE },
   radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: PURPLE },
-
-  infoBanner:     { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#1A1505', borderWidth: 1, borderColor: '#4A3800', borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.lg },
-  infoBannerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: '#D97706', lineHeight: 18 },
 
   sectionLabel:  { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, letterSpacing: 1, textTransform: 'uppercase', marginBottom: SP.sm, marginTop: SP.sm },
   sectionLabelInline: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, letterSpacing: 1, textTransform: 'uppercase' },

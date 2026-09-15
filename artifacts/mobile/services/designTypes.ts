@@ -45,7 +45,19 @@ export interface DrawPath { d: string; color: string; width: number; opacity: nu
 export interface DesignTransform {
   x: number; y: number; width: number; height: number;
   rotation: number; scaleX: number; scaleY: number; opacity?: number;
+  /** Visual-only mirror flags — applied as SVG translate/scale in compositor. */
+  flipX?: boolean;
+  flipY?: boolean;
   transform?: { rotation?: number };
+  /** Distort/Warp: serialized SVG matrix string (applied INSTEAD of standard position). */
+  affineSvgMatrix?: string;
+  /** Distort: serialized DistortQuad JSON string. */
+  distortQuad?: string;
+  /** Warp: serialized WarpMeshPoint[] JSON string. */
+  warpMesh?: string;
+  /** Liquify net displacement in logical units (applied as additional translate). */
+  liquifyDx?: number;
+  liquifyDy?: number;
 }
 
 export interface DesignEffect { type: EffectKind; value: number; color?: string; }
@@ -122,6 +134,8 @@ export interface DesignLayer {
   opacity: number;
   createdAt: string;
   updatedAt: string;
+  /** Persisted adjustments (curves, liquify). Added by AdjustmentsTool. */
+  adjustments?: import('../lib/adjustmentsModel').DesignLayerAdjustments;
 }
 
 export interface DesignCanvas {
@@ -159,6 +173,8 @@ export interface DesignProject {
   redoStack?: string[];
   createdAt: string;
   updatedAt: string;
+  /** Soft-delete: timestamp of when the project was moved to Recently Deleted. */
+  deletedAt?: string;
 }
 
 // DesignVersion — canonical version with snapshot
@@ -425,3 +441,55 @@ export const DEFAULT_TRANSFORM: DesignTransform = {
   x: 50, y: 50, width: 200, height: 100,
   rotation: 0, scaleX: 1, scaleY: 1, opacity: 1,
 };
+
+// ─── Seller-specific Canvas Presets ──────────────────────────────────────────
+
+export interface SellerCanvasPreset {
+  id: string;
+  label: string;
+  description: string;
+  width: number;
+  height: number;
+  dpi?: number;
+  colorProfile?: 'sRGB' | 'P3' | 'CMYK';
+  transparentBg?: boolean;
+}
+
+export const SELLER_CANVAS_PRESETS: SellerCanvasPreset[] = [
+  {
+    id: 'product_photo',
+    label: 'Product Photo',
+    description: '2048 x 2048 px — sRGB',
+    width: 2048, height: 2048, dpi: 72, colorProfile: 'sRGB',
+  },
+  {
+    id: 'ig_post',
+    label: 'Instagram Post',
+    description: '1080 x 1080 px',
+    width: 1080, height: 1080, dpi: 72, colorProfile: 'sRGB',
+  },
+  {
+    id: 'ig_story',
+    label: 'Instagram Story',
+    description: '1080 x 1920 px',
+    width: 1080, height: 1920, dpi: 72, colorProfile: 'sRGB',
+  },
+  {
+    id: 'tshirt_print',
+    label: 'T-Shirt Print Area',
+    description: '4500 x 5400 px — 300 dpi',
+    width: 4500, height: 5400, dpi: 300, colorProfile: 'sRGB',
+  },
+  {
+    id: 'poster_18x24',
+    label: 'Poster 18 x 24 in',
+    description: '5400 x 7200 px — 300 dpi',
+    width: 5400, height: 7200, dpi: 300, colorProfile: 'sRGB',
+  },
+  {
+    id: 'logo_sticker',
+    label: 'Logo / Sticker',
+    description: '1024 x 1024 px — transparent',
+    width: 1024, height: 1024, dpi: 72, colorProfile: 'sRGB', transparentBg: true,
+  },
+];

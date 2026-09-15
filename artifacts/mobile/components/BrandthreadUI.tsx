@@ -855,40 +855,6 @@ const qaS = StyleSheet.create({
   label:   { width: '100%', minWidth: 0, fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, textAlign: 'center' },
 });
 
-// ─── GuidedTip ────────────────────────────────────────────────────────────────
-
-interface GuidedTipProps {
-  id: string;
-  text: string;
-  dismissedIds: string[];
-  onDismiss: (id: string) => void;
-  style?: StyleProp<ViewStyle>;
-}
-
-export function GuidedTip({ id, text, dismissedIds, onDismiss, style }: GuidedTipProps) {
-  const { theme } = useAppTheme();
-  if (dismissedIds.includes(id)) return null;
-  return (
-    <View style={[gtS.root, { backgroundColor: theme.accentDim, borderColor: theme.accent + '33' }, style]}>
-      <Feather name="zap" size={ICON.xs} color={theme.accentLight} style={{ marginTop: 1 }} />
-      <Text style={gtS.text}>{text}</Text>
-      <PressableScale
-        onPress={() => onDismiss(id)}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
-        <Feather name="x" size={ICON.xs} color={MUTED} />
-      </PressableScale>
-    </View>
-  );
-}
-
-const gtS = StyleSheet.create({
-  root: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm,
-          borderRadius: RADIUS.sm, borderWidth: 1,
-          paddingHorizontal: SP.md, paddingVertical: SP.sm, marginHorizontal: SP.md },
-  text: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 18 },
-});
-
 // ─── NewFeatureBadge ──────────────────────────────────────────────────────────
 
 interface NewFeatureBadgeProps {

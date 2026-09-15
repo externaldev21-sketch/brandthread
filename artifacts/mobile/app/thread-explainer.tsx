@@ -182,26 +182,6 @@ export default function ThreadExplainerScreen() {
             ))}
           </View>
 
-          {/* Quick-start tips */}
-          <View style={styles.tipsCard}>
-            <View style={styles.tipsHeader}>
-              <Feather name="zap" size={15} color={theme.accentLight} />
-              <Text style={[styles.tipsTitle, { color: theme.accentLight }]}>Quick tips</Text>
-            </View>
-            <View style={styles.tipsList}>
-              {[
-                'Swipe up to see the next post',
-                'Tap a product tag to shop',
-                'Follow brands to customise your feed',
-                'Use Discover to find new brands',
-              ].map((tip) => (
-                <View key={tip} style={styles.tipRow}>
-                  <View style={[styles.tipDot, { backgroundColor: theme.accent }]} />
-                  <Text style={styles.tipText}>{tip}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
         </Animated.View>
       </ScrollView>
 
@@ -303,45 +283,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     color: MUTED,
     lineHeight: 19,
-  },
-  tipsCard: {
-    backgroundColor: CARD,
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: BORDER,
-    padding: 16,
-    marginBottom: 8,
-  },
-  tipsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    marginBottom: 12,
-  },
-  tipsTitle: {
-    fontSize: 13,
-    fontFamily: 'Inter_700Bold',
-    letterSpacing: 0.3,
-  },
-  tipsList: {
-    gap: 10,
-  },
-  tipRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  tipDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    flexShrink: 0,
-  },
-  tipText: {
-    fontSize: 14,
-    fontFamily: 'Inter_400Regular',
-    color: FG,
-    lineHeight: 20,
   },
   ctaWrap: {
     position: 'absolute',

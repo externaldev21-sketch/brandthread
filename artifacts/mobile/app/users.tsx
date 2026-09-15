@@ -276,11 +276,6 @@ export default function UsersScreen() {
               </TouchableOpacity>
             ))
           )}
-          <View style={[styles.body, { backgroundColor: colors.secondary }]}>
-            <TouchableOpacity onPress={haptic} activeOpacity={0.7}>
-              <Text style={[styles.learnMore, { color: colors.mutedForeground }]}>Learn more about team roles</Text>
-            </TouchableOpacity>
-          </View>
         </ScrollView>
       )}
     </View>
@@ -313,7 +308,6 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   onlineDot: { width: 10, height: 10, borderRadius: 5 },
   body: { flex: 1, alignItems: 'center', paddingTop: 24, paddingBottom: 24 },
-  learnMore: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   // Detail mode
   card: { borderRadius: 14, borderWidth: 1, marginBottom: 20 },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },

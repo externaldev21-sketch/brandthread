@@ -195,7 +195,6 @@ export default function WebsiteScreen() {
         <View style={[styles.seoBar, { backgroundColor: colors.secondary }]}>
           <View style={[styles.seoFill, { width: '82%', backgroundColor: colors.success }]} />
         </View>
-        <Text style={[styles.seoTip, { color: colors.mutedForeground }]}>Tip: Add alt text to 3 product images to boost to 90+</Text>
       </View>
 
       {/* Pages */}
@@ -266,7 +265,6 @@ const styles = StyleSheet.create({
   seoScore: { fontSize: 16, fontFamily: 'Inter_700Bold' },
   seoBar: { height: 6, borderRadius: 3, overflow: 'hidden', marginBottom: 8 },
   seoFill: { height: '100%', borderRadius: 3 },
-  seoTip: { fontSize: 12, fontFamily: 'Inter_400Regular' },
   sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
   pageRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10 },

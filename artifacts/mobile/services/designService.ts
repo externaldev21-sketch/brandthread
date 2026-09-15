@@ -99,13 +99,31 @@ async function seedIfEmpty(): Promise<DesignProject[]> {
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
 
+/**
+ * Returns only non-deleted projects (normal navigation).
+ */
 export async function getProjects(): Promise<DesignProject[]> {
-  return seedIfEmpty();
+  const all = await seedIfEmpty();
+  return all.filter(p => !p.deletedAt);
 }
 
+/**
+ * Returns a project by id regardless of soft-delete state.
+ * The canvas editor uses this so an id in the URL always resolves.
+ */
 export async function getProject(id: string): Promise<DesignProject | null> {
   const projects = await loadProjects();
   return projects.find(p => p.id === id) ?? null;
+}
+
+/**
+ * Returns only soft-deleted projects for the Recently Deleted view.
+ */
+export async function getDeletedProjects(): Promise<DesignProject[]> {
+  const all = await loadProjects();
+  return all.filter(p => !!p.deletedAt).sort((a, b) =>
+    new Date(b.deletedAt!).getTime() - new Date(a.deletedAt!).getTime(),
+  );
 }
 
 export async function createProject(
@@ -155,9 +173,42 @@ export async function autosaveProject(project: DesignProject): Promise<DesignPro
   return updateProject(project.id, { ...project, status: project.status ?? 'saved' });
 }
 
+/**
+ * Soft-delete: moves project to Recently Deleted by setting deletedAt.
+ * Normal gallery and getProjects() will no longer return it.
+ */
+export async function softDeleteProject(id: string): Promise<void> {
+  await updateProject(id, { deletedAt: new Date().toISOString() });
+}
+
+/**
+ * Restore a soft-deleted project back to the main gallery.
+ */
+export async function restoreDeletedProject(id: string): Promise<DesignProject> {
+  const projects = await loadProjects();
+  const idx = projects.findIndex(p => p.id === id);
+  if (idx === -1) throw new Error(`Project ${id} not found`);
+  const { deletedAt: _removed, ...rest } = projects[idx];
+  const updated: DesignProject = { ...rest, updatedAt: new Date().toISOString() };
+  projects[idx] = updated;
+  await saveProjects(projects);
+  return updated;
+}
+
+/**
+ * Permanently delete — removes from storage with no recovery path.
+ */
 export async function deleteProject(id: string): Promise<void> {
   const projects = await loadProjects();
   await saveProjects(projects.filter(p => p.id !== id));
+}
+
+/**
+ * Permanently delete all soft-deleted projects.
+ */
+export async function purgeDeletedProjects(): Promise<void> {
+  const projects = await loadProjects();
+  await saveProjects(projects.filter(p => !p.deletedAt));
 }
 
 export async function duplicateProject(id: string): Promise<DesignProject> {
@@ -171,6 +222,7 @@ export async function duplicateProject(id: string): Promise<DesignProject> {
     status: 'draft',
     createdAt: now,
     updatedAt: now,
+    deletedAt: undefined,
   };
   const projects = await loadProjects();
   await saveProjects([...projects, copy]);

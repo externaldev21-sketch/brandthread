@@ -539,13 +539,6 @@ export default function PaymentsScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Upgrade note */}
-          <View style={[styles.upgradeNote, { borderTopColor: colors.border, backgroundColor: isDark ? '#1A1815' : colors.secondary }]}>
-            <Text style={[styles.upgradeNoteText, { color: colors.mutedForeground }]}>
-              You can get improved payout rates by{' '}
-              <Text style={{ color: primary, fontFamily: 'Inter_600SemiBold' }}>upgrading your plan</Text>.
-            </Text>
-          </View>
         </View>
 
         {/* ── Additional payment providers ── */}
@@ -660,8 +653,6 @@ const styles = StyleSheet.create({
   payoutAccount: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   viewPayoutsLink: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
 
-  upgradeNote: { padding: 14, borderTopWidth: 1 },
-  upgradeNoteText: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17 },
 
   // Additional providers
   groupTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginTop: 28, marginBottom: 4 },

@@ -189,20 +189,6 @@ export default function SellerGoLiveScreen() {
           </View>
         )}
 
-        {/* Tips */}
-        <View style={[s.tipsCard, { backgroundColor: CARD, borderColor: BORDER }]}>
-          {[
-            'Check your lighting and sound before going live',
-            'Engage with viewer comments to build connection',
-            'Tag products to let viewers shop without leaving',
-            'Your stream saves automatically as a replay',
-          ].map((tip, i) => (
-            <View key={i} style={s.tipRow}>
-              <Feather name="check-circle" size={14} color={PURPLE} style={{ marginTop: 1 }} />
-              <Text style={[s.tipText, { color: MUTED }]}>{tip}</Text>
-            </View>
-          ))}
-        </View>
       </ScrollView>
 
       {/* Go Live CTA */}
@@ -253,9 +239,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   productPrice:   { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
   checkbox:       { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   selCount:       { fontSize: FS.xs, fontFamily: FONT.semibold, textAlign: 'right' },
-  tipsCard:       { borderRadius: RADIUS.lg, borderWidth: 1, padding: 14, gap: 10 },
-  tipRow:         { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
-  tipText:        { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, lineHeight: 18 },
   footer:         { borderTopWidth: 1, padding: SP.md },
   goLiveBtn:      { borderRadius: RADIUS.pill, height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   goLiveBtnText:  { color: '#fff', fontFamily: FONT.bold, fontSize: FS.base, letterSpacing: 0.5 },

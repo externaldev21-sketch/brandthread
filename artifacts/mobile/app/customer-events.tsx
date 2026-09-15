@@ -71,11 +71,6 @@ export default function CustomerEventsScreen() {
           </View>
         </View>
 
-        <View style={[styles.divider, { backgroundColor: colors.secondary }]} />
-
-        <TouchableOpacity onPress={haptic} activeOpacity={0.7}>
-          <Text style={[styles.learnMore, { color: colors.mutedForeground }]}>Learn more about pixels</Text>
-        </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -100,5 +95,4 @@ const styles = StyleSheet.create({
   chipDot: { width: 6, height: 6, borderRadius: 3 },
   chipText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   statusLine: { fontSize: 12, fontFamily: 'Inter_400Regular' },
-  learnMore: { fontSize: 12, fontFamily: 'Inter_500Medium', textAlign: 'center', paddingVertical: 40 },
 });

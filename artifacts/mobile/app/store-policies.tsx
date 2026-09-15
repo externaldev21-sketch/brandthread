@@ -243,12 +243,6 @@ export default function StorePoliciesScreen() {
             })}
           </View>
 
-          <View style={[s.tipCard, { backgroundColor: `${PURPLE}10`, borderColor: `${PURPLE}25` }]}>
-            <Feather name="zap" size={15} color={PURPLE} style={{ marginTop: 1 }} />
-            <Text style={[s.tipText, { color: MUTED }]}>
-              Tap any policy and use <Text style={{ color: PURPLE, fontFamily: FONT.semibold }}>Generate with AI</Text> to create a first draft in seconds.
-            </Text>
-          </View>
         </ScrollView>
       )}
     </View>
@@ -277,6 +271,4 @@ const s = StyleSheet.create({
   policySub: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
   policyRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   statusDot: { width: 7, height: 7, borderRadius: 4 },
-  tipCard: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', borderRadius: RADIUS.lg, borderWidth: 1, padding: 14 },
-  tipText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
 });

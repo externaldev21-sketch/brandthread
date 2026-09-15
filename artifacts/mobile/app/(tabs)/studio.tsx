@@ -13,13 +13,12 @@ import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { dismissTip, markFeatureOpened, getSetupState } from '@/lib/setupStore';
+import { markFeatureOpened, getSetupState } from '@/lib/setupStore';
 import { getProjects } from '@/services/designService';
 import { DesignProject, PROJECT_TYPE_LABELS, PROJECT_STATUS_LABELS } from '@/services/designTypes';
 import { BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, ORANGE, ORANGE_DIM, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, SectionHeader, EmptyState, GuidedTip, NewFeatureBadge, StatusBadge, LockBadge } from '@/components/BrandthreadUI';
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, SectionHeader, EmptyState, NewFeatureBadge, StatusBadge, LockBadge } from '@/components/BrandthreadUI';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED, GROWTH_STUDIO_TOOLS, type GrowthTool, type GrowthToolId } from '@/lib/growthTools';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
@@ -103,8 +102,6 @@ const TEMPLATES = [
   { label: 'Lookbook',     colors: ['#F97316', '#F59E0B'] as [string,string] },
 ];
 
-const DISMISSED_TIPS_KEY = '@brandthread/dismissed_tips';
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function StudioScreen() {
@@ -119,7 +116,6 @@ export default function StudioScreen() {
 
   const { hasPlan, loading: planLoading, error: planError, retry: retryPlan } = useSubscriptionPlan();
 
-  const [dismissedTips,  setDismissedTips]  = useState<string[]>([]);
   const [openedFeatures, setOpenedFeatures] = useState<string[]>([]);
   const [projects,       setProjects]       = useState<DesignProject[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
@@ -155,26 +151,14 @@ export default function StudioScreen() {
 
   useEffect(() => { loadProjects(); }, [loadProjects]);
 
-  // load dismissed tips
+  // load opened feature state
   useEffect(() => {
     (async () => {
       try {
         const state = await getSetupState();
-        setDismissedTips(state.dismissedTips ?? []);
         setOpenedFeatures(state.openedFeatures ?? []);
-      } catch {
-        try {
-          const raw = await AsyncStorage.getItem(DISMISSED_TIPS_KEY);
-          if (raw) setDismissedTips(JSON.parse(raw));
-        } catch { /* non-fatal */ }
-      }
+      } catch { /* non-fatal */ }
     })();
-  }, []);
-
-  const handleDismissTip = useCallback(async (id: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await dismissTip(id);
-    setDismissedTips(prev => [...prev, id]);
   }, []);
 
   const handleToolPress = useCallback(async (tool: StudioTool) => {
@@ -233,28 +217,6 @@ export default function StudioScreen() {
             <Feather name="refresh-cw" size={ICON.sm} color={ORANGE} />
           </TouchableOpacity>
         )}
-
-        {/* ── INFO BANNER ── */}
-        <LinearGradient
-          colors={[theme.accentDim, '#0E1830']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={s.banner}
-        >
-          <Feather name="zap" size={16} color={PURPLE_LIGHT} />
-          <Text style={s.bannerText}>
-            AI-powered design tools and brand kit — all in one place.
-          </Text>
-        </LinearGradient>
-
-        {/* ── GUIDED TIP ── */}
-        <GuidedTip
-          id="studio-tip"
-          text="Create designs, content and AI photos for your brand here. Only Seller posts appear on the public Thread."
-          dismissedIds={dismissedTips}
-          onDismiss={handleDismissTip}
-          style={s.tip}
-        />
 
         {/* ── START CREATING GRID ── */}
         <View style={s.sectionHeader}>
@@ -494,33 +456,6 @@ const s = StyleSheet.create({
     fontSize: FS.sm,
     fontFamily: FONT.medium,
     color: ORANGE,
-  },
-
-  // Banner
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginHorizontal: H_PAD,
-    marginBottom: SP.sm,
-    paddingHorizontal: SP.md,
-    paddingVertical: 10,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: PURPLE + '33',
-  },
-  bannerText: {
-    flex: 1,
-    fontSize: FS.xs,
-    fontFamily: FONT.medium,
-    color: PURPLE_LIGHT,
-    lineHeight: 17,
-  },
-
-  // Tip
-  tip: {
-    marginHorizontal: H_PAD,
-    marginBottom: SP.sm,
   },
 
   // Section header

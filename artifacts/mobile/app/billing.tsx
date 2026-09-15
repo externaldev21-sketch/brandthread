@@ -19,7 +19,6 @@ export default function BillingScreen() {
   const router = useRouter();
   const api = useApi();
   const { managementURL, restore } = useRevenueCat();
-  const [bannerVisible, setBannerVisible] = useState(true);
   const [filter, setFilter] = useState<BillFilter>('all');
   const { currentRole, isLoadingRole } = useTeamRole();
   const [bills, setBills] = useState<Array<{
@@ -146,21 +145,6 @@ export default function BillingScreen() {
       />
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
-        {bannerVisible && (
-          <View style={[styles.banner, { backgroundColor: colors.primary + '14', borderBottomColor: colors.primary + '33' }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.bannerTitle, { color: colors.foreground }]}>You're earning 1% on all sales as subscription credits</Text>
-              <Text style={[styles.bannerBody, { color: colors.mutedForeground }]}>
-                Credits will be applied when you reach $1,000 or more in sales. You'll earn credits until December 9, 2026 or until $5,000.{' '}
-                <Text style={{ textDecorationLine: 'underline' }} onPress={haptic}>View terms</Text>
-              </Text>
-            </View>
-            <TouchableOpacity onPress={() => { haptic(); setBannerVisible(false); }} activeOpacity={0.7}>
-              <Feather name="x" size={18} color={colors.mutedForeground} />
-            </TouchableOpacity>
-          </View>
-        )}
-
         <View style={styles.section}>
           <View style={styles.rowBetween}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Upcoming bill</Text>
@@ -311,9 +295,6 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   accessLoading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   headerBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  banner: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1 },
-  bannerTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginBottom: 4 },
-  bannerBody: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17 },
   section: { paddingHorizontal: 20, paddingVertical: 18 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   sectionTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },

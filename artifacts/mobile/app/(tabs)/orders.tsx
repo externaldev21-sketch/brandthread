@@ -1,14 +1,19 @@
+/**
+ * Brandthread — Seller Orders Tab
+ * Shopify-pattern layout: persistent search row, status pills, date-grouped divider rows.
+ */
+
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
-import { View, Text, ScrollView, FlatList, TouchableOpacity, TextInput, StyleSheet, Alert, RefreshControl, Modal, Share } from 'react-native';
+import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, Share, SectionList } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED, CARD_GLASS, CARD_ELEVATED_GLASS, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, GRAD_DARK_FADE, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { BG, SCREEN_BG, SURFACE, CARD, CARD_GLASS, CARD_ELEVATED_GLASS, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, CYAN, CYAN_DIM, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
-import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState, StatCard, SearchBar, BrandedLoader } from '@/components/BrandthreadUI';
+import { IconButton, FilterChip, StatusBadge, EmptyState, SearchBar, BrandedLoader } from '@/components/BrandthreadUI';
 import { filterOrders, sortOrders } from '@/services/orderService';
 import { Order, OrderFilterKey, OrderSortKey, OrderAddress, OrderCustomer, FulfillmentStatus, FulfillmentType, OrderStatus, PaymentStatus, CancellationReason, CANCELLATION_REASONS } from '@/services/orderTypes';
 import { useApi } from '@/hooks/useApi';
@@ -28,10 +33,25 @@ interface OrderStats {
   total: number;
 }
 
+interface OrderSection {
+  title: string;
+  data: Order[];
+}
+
+type OrderListFilter = OrderFilterKey | 'unpaid' | 'open' | 'archived';
+type OrderListOrder = Order & {
+  listItemCount?: number;
+  listItemLabel?: string;
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function fmtTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
 function fmtMoney(cents: number): string {
@@ -98,9 +118,36 @@ function computeStats(orders: Order[]): OrderStats {
   };
 }
 
+/** Group a sorted order list into date-labelled sections. */
+function groupByDate(orders: Order[]): OrderSection[] {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  const fmt = (d: Date) =>
+    d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+
+  const todayStr = fmt(today);
+  const yesterdayStr = fmt(yesterday);
+
+  const buckets = new Map<string, Order[]>();
+
+  for (const order of orders) {
+    const d = new Date(order.createdAt);
+    const label = fmt(d) === todayStr
+      ? 'Today'
+      : fmt(d) === yesterdayStr
+        ? 'Yesterday'
+        : d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+
+    if (!buckets.has(label)) buckets.set(label, []);
+    buckets.get(label)!.push(order);
+  }
+
+  return Array.from(buckets.entries()).map(([title, data]) => ({ title, data }));
+}
+
 // ─── API → Order adapter ──────────────────────────────────────────────────────
-// Maps the seller orders API response to the full Order type used by this screen.
-// Only fills the fields that filterOrders / sortOrders / the UI actually read.
 
 const DB_STATUS_MAP: Record<string, OrderStatus> = {
   pending:        'new',
@@ -122,7 +169,7 @@ const FULFILLMENT_MAP: Partial<Record<OrderStatus, FulfillmentStatus>> = {
   disputed:      'unfulfilled',
 };
 
-export function apiRowToOrder(row: any): Order {
+export function apiRowToOrder(row: any): OrderListOrder {
   const ordStatus: OrderStatus = DB_STATUS_MAP[row.status as string] ?? 'new';
   const fStatus: FulfillmentStatus = FULFILLMENT_MAP[ordStatus] ?? 'unfulfilled';
   const initials = ((row.customerName as string | undefined) ?? 'C')
@@ -173,6 +220,8 @@ export function apiRowToOrder(row: any): Order {
     } : undefined,
     hasUnreadMessage: false, isPreOrder: false, isManufacturerFulfilled: false,
     currency: 'USD', tags: [],
+    listItemCount: Number.isSafeInteger(row.itemCount) && row.itemCount >= 0 ? row.itemCount : undefined,
+    listItemLabel: typeof row.dropName === 'string' && row.dropName.trim() ? row.dropName.trim() : undefined,
     createdAt: typeof row.createdAt === 'string' ? row.createdAt : new Date(row.createdAt).toISOString(),
     updatedAt: typeof row.updatedAt === 'string' ? row.updatedAt : new Date(row.updatedAt).toISOString(),
   };
@@ -180,7 +229,40 @@ export function apiRowToOrder(row: any): Order {
 
 // ─── Filter Config ────────────────────────────────────────────────────────────
 
-const FILTERS: { key: OrderFilterKey; label: string }[] = [
+const FILTERS: { key: OrderListFilter; label: string }[] = [
+  { key: 'all',        label: 'All' },
+  { key: 'unfulfilled', label: 'Unfulfilled' },
+  { key: 'unpaid',     label: 'Unpaid' },
+  { key: 'open',       label: 'Open' },
+  { key: 'archived',   label: 'Archived' },
+];
+
+function filterOrderList(orders: Order[], filter: OrderListFilter): Order[] {
+  if (filter === 'unpaid') {
+    return orders.filter(order =>
+      order.paymentStatus === 'pending' ||
+      order.paymentStatus === 'failed' ||
+      order.paymentStatus === 'voided'
+    );
+  }
+  if (filter === 'open') {
+    return orders.filter(order =>
+      order.status !== 'cancelled' &&
+      order.status !== 'refunded' &&
+      order.status !== 'delivered'
+    );
+  }
+  if (filter === 'archived') {
+    return orders.filter(order =>
+      order.status === 'cancelled' ||
+      order.status === 'refunded' ||
+      order.status === 'delivered'
+    );
+  }
+  return filterOrders(orders, filter);
+}
+
+const ALL_FILTERS: { key: OrderFilterKey; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'new', label: 'New' },
   { key: 'unfulfilled', label: 'Unfulfilled' },
@@ -206,10 +288,10 @@ const SORTS: { key: OrderSortKey; label: string }[] = [
   { key: 'payment_status', label: 'Payment status' },
 ];
 
-// ─── Order Card ───────────────────────────────────────────────────────────────
+// ─── Order Row ────────────────────────────────────────────────────────────────
 
-interface OrderCardProps {
-  order: Order;
+interface OrderRowProps {
+  order: OrderListOrder;
   selected: boolean;
   selectionMode: boolean;
   onPress: () => void;
@@ -217,199 +299,181 @@ interface OrderCardProps {
   onMarkProcessing: () => void;
   onMarkReady: () => void;
   onShip: () => void;
+  isLast?: boolean;
 }
 
-export function OrderCard({
+export function OrderRow({
   order, selected, selectionMode, onPress, onLongPress,
-  onMarkProcessing, onMarkReady, onShip,
-}: OrderCardProps) {
+  onMarkProcessing, onMarkReady, onShip, isLast = false,
+}: OrderRowProps) {
   const { theme } = useAppTheme();
   const isHighRisk = order.riskLevel === 'high';
   const hasReturn = order.returns.length > 0;
   const hasDispute = order.disputes.length > 0;
+  const isArchived = order.status === 'cancelled';
 
   const firstItem = order.lineItems[0];
-  const moreCount = order.lineItems.length - 1;
-  const itemSummary = firstItem
+  const itemCount = order.listItemCount ?? order.lineItems.length;
+  const moreCount = Math.max(0, itemCount - 1);
+  const itemLabel = firstItem
     ? moreCount > 0
-      ? `${firstItem.productName} + ${moreCount} more`
+      ? `${firstItem.productName} +${moreCount}`
       : firstItem.productName
-    : 'No items';
+    : order.listItemLabel ?? (itemCount > 0 ? `${itemCount} ${itemCount === 1 ? 'item' : 'items'}` : 'No items');
 
   const payColor = getPaymentColor(order.paymentStatus);
   const fulColor = getFulfillmentColor(order.fulfillmentStatus);
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.82}
-      onPress={onPress}
-      onLongPress={onLongPress}
-      style={[s.card, selected && s.cardSelected, isHighRisk && s.cardRisk]}
-    >
-      {/* Selection indicator */}
-      {selectionMode && (
-        <View style={[s.selBox, selected && s.selBoxActive]}>
-          {selected && <Feather name="check" size={10} color={FG} />}
-        </View>
-      )}
+    <>
+      <TouchableOpacity
+        activeOpacity={0.82}
+        onPress={onPress}
+        onLongPress={onLongPress}
+        style={[s.orderRow, selected && s.orderRowSelected, isHighRisk && s.orderRowRisk, isArchived && s.orderRowArchived]}
+        accessibilityLabel={`Order ${order.orderNumber}, ${order.customer.name}, ${fmtMoney(order.payment.totalCents)}`}
+      >
+        {/* Selection checkbox */}
+        {selectionMode && (
+          <View style={[s.selBox, selected && s.selBoxActive]}>
+            {selected && <Feather name="check" size={10} color={FG} />}
+          </View>
+        )}
 
-      {/* Row 1: Order number + badges */}
-      <View style={s.cardRow}>
-        <View style={s.cardRowLeft}>
-          <Text style={s.orderNum}>{order.orderNumber}</Text>
-          {order.status === 'new' && (
-            <View style={s.newBadge}>
-              <Text style={s.newBadgeText}>NEW</Text>
+        {/* Row: order number + price + time */}
+        <View style={s.orderMainRow}>
+          <View style={s.orderLeft}>
+            <View style={s.orderNumRow}>
+              <Text style={s.orderNum}>{order.orderNumber}</Text>
+              {order.status === 'new' && (
+                <View style={s.newDot}>
+                  <Text style={s.newDotText}>NEW</Text>
+                </View>
+              )}
+              {order.hasUnreadMessage && <View style={s.unreadDot} />}
+              {isHighRisk && (
+                <View style={s.riskBadge}>
+                  <Feather name="alert-triangle" size={9} color={RED} />
+                  <Text style={s.riskText}>RISK</Text>
+                </View>
+              )}
+              {hasReturn && (
+                <View style={s.returnBadge}>
+                  <Text style={s.returnBadgeText}>RETURN</Text>
+                </View>
+              )}
+              {hasDispute && (
+                <View style={s.disputeBadge}>
+                  <Text style={s.disputeBadgeText}>DISPUTE</Text>
+                </View>
+              )}
             </View>
-          )}
-          {order.hasUnreadMessage && <View style={s.unreadDot} />}
+
+            {/* Customer + item label */}
+            <Text style={s.orderCustomer} numberOfLines={1}>{order.customer.name}</Text>
+            <Text style={s.orderItems} numberOfLines={1}>
+              {itemLabel}
+              {itemCount > 0 && !itemLabel.startsWith(`${itemCount} `)
+                ? ` · ${itemCount} ${itemCount === 1 ? 'item' : 'items'}`
+                : ''}
+            </Text>
+            {isArchived && order.cancellation?.reason && (
+              <Text style={s.orderCancelled} numberOfLines={1}>
+                {`Cancelled · ${getCancellationReasonLabel(order.cancellation.reason)}`}
+              </Text>
+            )}
+          </View>
+
+          {/* Right: price + time */}
+          <View style={s.orderRight}>
+            <Text style={s.orderAmount}>{fmtMoney(order.payment.totalCents)}</Text>
+            <Text style={s.orderTime}>{fmtTime(order.createdAt)}</Text>
+          </View>
         </View>
-        <View style={s.cardRowRight}>
-          {isHighRisk && (
-            <View style={s.riskBadge}>
-              <Feather name="alert-triangle" size={9} color={RED} />
-              <Text style={s.riskText}>HIGH RISK</Text>
-            </View>
-          )}
-          {hasReturn && (
-            <View style={s.returnBadge}>
-              <Text style={s.returnBadgeText}>RETURN</Text>
-            </View>
-          )}
-          {hasDispute && (
-            <View style={s.disputeBadge}>
-              <Text style={s.disputeBadgeText}>DISPUTE</Text>
-            </View>
-          )}
-        </View>
-      </View>
 
-      {/* Row 2: Customer + date */}
-      <View style={s.cardRow}>
-        <Text style={s.customerName}>{order.customer.name}</Text>
-        <Text style={s.orderDate}>{fmtDate(order.createdAt)}</Text>
-      </View>
-
-      {/* Row 3: Items summary */}
-      <Text style={s.itemSummary} numberOfLines={1}>
-        {itemSummary}  ·  {order.lineItems.length} {order.lineItems.length === 1 ? 'item' : 'items'}
-      </Text>
-      {order.status === 'cancelled' && order.cancellation?.reason && (
-        <View style={s.cancellationReasonRow}>
-          <Feather name="x-circle" size={12} color={RED} />
-          <Text style={s.cancellationReasonText} numberOfLines={1}>
-            Cancelled · {getCancellationReasonLabel(order.cancellation.reason)}
-          </Text>
-        </View>
-      )}
-
-      {/* Divider */}
-      <View style={s.divider} />
-
-      {/* Row 4: Payment + fulfillment + total */}
-      <View style={s.cardRow}>
-        <View style={s.statusRow}>
+        {/* Status pills row */}
+        <View style={s.orderStatusRow}>
           <View style={s.statusPill}>
             <View style={[s.statusDot, { backgroundColor: payColor }]} />
-            <Text style={[s.statusLabel, { color: payColor }]}>
-              {getPaymentLabel(order.paymentStatus)}
-            </Text>
+            <Text style={[s.statusText, { color: payColor }]}>{getPaymentLabel(order.paymentStatus)}</Text>
           </View>
           <View style={s.statusPill}>
             <View style={[s.statusDot, { backgroundColor: fulColor }]} />
-            <Text style={[s.statusLabel, { color: fulColor }]}>
-              {getFulfillmentLabel(order.fulfillmentStatus)}
-            </Text>
+            <Text style={[s.statusText, { color: fulColor }]}>{getFulfillmentLabel(order.fulfillmentStatus)}</Text>
           </View>
-        </View>
-        <Text style={s.totalAmount}>{fmtMoney(order.payment.totalCents)}</Text>
-      </View>
-
-      {/* Row 5: Tags */}
-      {(order.isPreOrder || order.isManufacturerFulfilled) && (
-        <View style={s.tagRow}>
           {order.isPreOrder && (
-            <View style={s.tagPreOrder}>
-              <Text style={s.tagPreOrderText}>PRE-ORDER</Text>
+            <View style={s.tagPill}>
+              <Text style={s.tagText}>PRE-ORDER</Text>
             </View>
           )}
           {order.isManufacturerFulfilled && (
-            <View style={s.tagMfg}>
-              <Text style={s.tagMfgText}>MFG</Text>
+            <View style={[s.tagPill, { borderColor: BLUE + '44', backgroundColor: BLUE_DIM }]}>
+              <Text style={[s.tagText, { color: BLUE }]}>MFG</Text>
+            </View>
+          )}
+          {isArchived && order.cancellation?.reason && (
+            <View style={[s.tagPill, { borderColor: RED + '44', backgroundColor: RED_DIM }]}>
+              <Text style={[s.tagText, { color: RED }]}>
+                {getCancellationReasonLabel(order.cancellation.reason).toUpperCase()}
+              </Text>
+            </View>
+          )}
+
+          {/* Quick action — pushed right */}
+          <View style={{ flex: 1 }} />
+          {order.status === 'new' && (
+            <TouchableOpacity
+              style={s.quickAction}
+              onPress={e => { e.stopPropagation(); onMarkProcessing(); }}
+              activeOpacity={0.8}
+            >
+              <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.quickActionGrad}>
+                <Feather name="check-circle" size={11} color={theme.onAccent} />
+                <Text style={[s.quickActionText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Accept</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+          {order.status === 'processing' && (
+            <TouchableOpacity
+              style={s.quickAction}
+              onPress={e => { e.stopPropagation(); onMarkReady(); }}
+              activeOpacity={0.8}
+            >
+              <LinearGradient colors={[BLUE, CYAN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.quickActionGrad}>
+                <Feather name="package" size={11} color="#fff" />
+                <Text style={s.quickActionText}>Ready</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+          {order.status === 'ready_to_ship' && (
+            <TouchableOpacity
+              style={s.quickAction}
+              onPress={e => { e.stopPropagation(); onShip(); }}
+              activeOpacity={0.8}
+            >
+              <LinearGradient colors={[SUCCESS, CYAN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.quickActionGrad}>
+                <Feather name="send" size={11} color="#fff" />
+                <Text style={s.quickActionText}>Ship</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+          {order.status === 'shipped' && order.shipments[0] && (
+            <View style={s.trackingPill}>
+              <Feather name="truck" size={10} color={SUCCESS} />
+              <Text style={s.trackingText}>
+                {order.shipments[0].carrier} · {order.shipments[0].trackingNumber?.slice(-6)}
+              </Text>
             </View>
           )}
         </View>
-      )}
-
-      {/* Divider */}
-      <View style={s.divider} />
-
-      {/* Row 6: Context actions */}
-      <View style={s.actionRow}>
-        {order.status === 'new' && (
-          <TouchableOpacity
-            style={s.actionBtn}
-            onPress={e => { e.stopPropagation(); onMarkProcessing(); }}
-            activeOpacity={0.8}
-          >
-            <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.actionBtnGrad}>
-              <Feather name="check-circle" size={12} color={theme.onAccent} />
-              <Text style={[s.actionBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Accept</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        )}
-        {order.status === 'processing' && (
-          <TouchableOpacity
-            style={s.actionBtn}
-            onPress={e => { e.stopPropagation(); onMarkReady(); }}
-            activeOpacity={0.8}
-          >
-            <LinearGradient colors={[BLUE, CYAN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.actionBtnGrad}>
-              <Feather name="package" size={12} color="#fff" />
-              <Text style={s.actionBtnText}>Mark Ready</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        )}
-        {order.status === 'ready_to_ship' && (
-          <TouchableOpacity
-            style={s.actionBtn}
-            onPress={e => { e.stopPropagation(); onShip(); }}
-            activeOpacity={0.8}
-          >
-            <LinearGradient colors={[SUCCESS, CYAN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.actionBtnGrad}>
-              <Feather name="send" size={12} color="#fff" />
-              <Text style={s.actionBtnText}>Ship</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        )}
-        {order.status === 'shipped' && order.shipments[0] && (
-          <View style={s.trackingPill}>
-            <Feather name="truck" size={11} color={SUCCESS} />
-            <Text style={s.trackingText}>
-              {order.shipments[0].carrier} · {order.shipments[0].trackingNumber?.slice(-6)}
-            </Text>
-          </View>
-        )}
-        {order.status === 'disputed' && (
-          <View style={s.disputePill}>
-            <Feather name="alert-circle" size={11} color={RED} />
-            <Text style={s.disputePillText}>Dispute open</Text>
-          </View>
-        )}
-        <TouchableOpacity
-          style={s.viewBtn}
-          onPress={e => { e.stopPropagation(); onPress(); }}
-          activeOpacity={0.8}
-        >
-          <Text style={s.viewBtnText}>
-            {order.status === 'disputed' ? 'View Dispute' : 'View Details'}
-          </Text>
-          <Feather name="arrow-right" size={12} color={PURPLE_LIGHT} />
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+      {!isLast && <View style={s.rowDivider} />}
+    </>
   );
 }
+
+// ─── Legacy OrderCard export (kept for test compatibility) ────────────────────
+export const OrderCard = OrderRow;
 
 // ─── Sort Modal ───────────────────────────────────────────────────────────────
 
@@ -421,7 +485,6 @@ function SortModal({
   onSelect: (k: OrderSortKey) => void;
   onClose: () => void;
 }) {
-  const { theme } = useAppTheme();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={onClose} />
@@ -432,7 +495,7 @@ function SortModal({
           <TouchableOpacity
             key={key}
             style={[s.sortOption, current === key && s.sortOptionActive]}
-            onPress={() => { Haptics.selectionAsync(); onSelect(key); }}
+            onPress={() => { Haptics.selectionAsync(); onSelect(key); onClose(); }}
             activeOpacity={0.8}
           >
             <Text style={[s.sortOptionText, current === key && s.sortOptionTextActive]}>
@@ -441,6 +504,45 @@ function SortModal({
             {current === key && <Feather name="check" size={ICON.sm} color={PURPLE_LIGHT} />}
           </TouchableOpacity>
         ))}
+        <TouchableOpacity style={s.modalCloseBtn} onPress={onClose}>
+          <Text style={s.modalCloseBtnText}>Cancel</Text>
+        </TouchableOpacity>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Filter Sheet ─────────────────────────────────────────────────────────────
+
+function FilterSheet({
+  visible, current, onSelect, onClose,
+}: {
+  visible: boolean;
+  current: OrderFilterKey;
+  onSelect: (k: OrderFilterKey) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={onClose} />
+      <View style={s.modalSheet}>
+        <View style={s.modalHandle} />
+        <Text style={s.modalTitle}>Filter Orders</Text>
+        <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }}>
+          {ALL_FILTERS.map(({ key, label }) => (
+            <TouchableOpacity
+              key={key}
+              style={[s.sortOption, current === key && s.sortOptionActive]}
+              onPress={() => { Haptics.selectionAsync(); onSelect(key); onClose(); }}
+              activeOpacity={0.8}
+            >
+              <Text style={[s.sortOptionText, current === key && s.sortOptionTextActive]}>
+                {label}
+              </Text>
+              {current === key && <Feather name="check" size={ICON.sm} color={PURPLE_LIGHT} />}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
         <TouchableOpacity style={s.modalCloseBtn} onPress={onClose}>
           <Text style={s.modalCloseBtnText}>Cancel</Text>
         </TouchableOpacity>
@@ -460,22 +562,19 @@ export default function OrdersScreen() {
   const api = useApi();
   const { userId } = useAuth();
 
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<OrderListOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [updatesPaused, setUpdatesPaused] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchActive, setSearchActive] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<OrderFilterKey>('all');
+  const [activeFilter, setActiveFilter] = useState<OrderListFilter>('all');
   const [sort, setSort] = useState<OrderSortKey>('newest');
   const [sortModalVisible, setSortModalVisible] = useState(false);
+  const [filterSheetVisible, setFilterSheetVisible] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [stats, setStats] = useState<OrderStats | null>(null);
 
-  // Backoff: stop polling after 3 consecutive failures; resume on next focus.
-  // A generation counter ensures requests from a previous focus cycle cannot
-  // increment the failure count or clear the timer of the current focus cycle.
   const consecutiveFailuresRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const generationRef = useRef(0);
@@ -483,17 +582,11 @@ export default function OrdersScreen() {
   const hasLoadedRef = useRef(false);
 
   const loadData = useCallback(async (generation: number) => {
-    // Keep one request in flight per focus cycle. Without this guard, a slow
-    // poll can overlap the next tick and an older success can clear the
-    // paused state after a later failure has already stopped the timer.
     if (requestGenerationRef.current === generation) return;
     requestGenerationRef.current = generation;
     try {
       const rows = await api.orders.list();
-      if (generationRef.current !== generation) return; // stale focus cycle
-      // Guard: API can return null/undefined/error-object when the request fails
-      // or when the seller has no orders yet. Array.isArray prevents the
-      // "rows.map is not a function" TypeError that crashes the screen.
+      if (generationRef.current !== generation) return;
       const all = Array.isArray(rows) ? (rows as any[]).map(apiRowToOrder) : [];
       setOrders(all);
       setStats(computeStats(all));
@@ -501,7 +594,7 @@ export default function OrdersScreen() {
       setUpdatesPaused(false);
       consecutiveFailuresRef.current = 0;
     } catch (e) {
-      if (generationRef.current !== generation) return; // stale focus cycle
+      if (generationRef.current !== generation) return;
       console.error('Failed to load seller orders', e);
       setOrders([]);
       setStats(computeStats([]));
@@ -526,17 +619,9 @@ export default function OrdersScreen() {
     }
   }, [api]);
 
-  // Load on focus and poll every 30 s so status updates appear live.
-  // After 3 consecutive failures the interval is cleared to avoid hammering a
-  // down/offline server; it resets on the next focus event.
   useFocusEffect(
     useCallback(() => {
-      // Immediately zero the Orders tab badge and record the viewed timestamp.
-      // clearBadge() updates the shared in-memory store (instant re-render in
-      // the tab bar) and persists the per-seller watermark to AsyncStorage for
-      // the next app launch. No-op when not authenticated.
       if (userId) clearBadge(userId);
-
       const generation = ++generationRef.current;
       consecutiveFailuresRef.current = 0;
       setUpdatesPaused(false);
@@ -549,7 +634,7 @@ export default function OrdersScreen() {
           timerRef.current = null;
         }
       };
-    }, [loadData])
+    }, [loadData, userId])
   );
 
   const retryUpdates = useCallback(() => {
@@ -580,16 +665,19 @@ export default function OrdersScreen() {
         o.lineItems.some(li => li.productName.toLowerCase().includes(q))
       );
     }
-    base = filterOrders(base, activeFilter);
+    base = filterOrderList(base, activeFilter);
     base = sortOrders(base, sort);
     return base;
   }, [orders, searchQuery, activeFilter, sort]);
 
+  // Date-grouped sections
+  const sections = useMemo(() => groupByDate(filtered), [filtered]);
+
   // Filter counts
   const filterCounts = useMemo(() => {
-    const map: Partial<Record<OrderFilterKey, number>> = {};
+    const map: Partial<Record<OrderListFilter, number>> = {};
     FILTERS.forEach(({ key }) => {
-      const count = filterOrders(orders, key).length;
+      const count = filterOrderList(orders, key).length;
       if (key !== 'all') map[key] = count;
     });
     return map;
@@ -623,7 +711,6 @@ export default function OrdersScreen() {
 
   const handleCardPress = useCallback((order: Order) => {
     if (selectedIds.length > 0) {
-      // Toggle selection
       setSelectedIds(prev =>
         prev.includes(order.id) ? prev.filter(id => id !== order.id) : [...prev, order.id]
       );
@@ -667,16 +754,13 @@ export default function OrdersScreen() {
         const customer = o.customer?.name ?? o.customer?.email ?? 'Unknown';
         const date = new Date(o.createdAt).toLocaleDateString('en-US');
         const total = formatCents(o.payment.totalCents);
-        const itemCount = o.lineItems.length;
+        const itemCount = o.listItemCount ?? o.lineItems.length;
         return [
           o.orderNumber ?? o.id.slice(0, 8),
           `"${customer.replace(/"/g, '""')}"`,
-          date,
-          o.status,
-          o.paymentStatus,
+          date, o.status, o.paymentStatus,
           o.fulfillmentStatus ?? 'unfulfilled',
-          itemCount,
-          total,
+          itemCount, total,
         ].join(',');
       });
       const csv = ['Order #,Customer,Date,Status,Payment,Fulfillment,Items,Total', ...rows].join('\n');
@@ -693,11 +777,22 @@ export default function OrdersScreen() {
       { text: 'Refresh', onPress: onRefresh },
       { text: 'Cancel', style: 'cancel' },
     ]);
-  }, [onRefresh]);
+  }, [onRefresh, handleExportCsv]);
 
-  // ─── Render item ───────────────────────────────────────────────────────────
+  // ─── Render helpers ────────────────────────────────────────────────────────
 
-  const renderItem = useCallback(({ item }: { item: Order }) => {
+  const hasActiveFilter = activeFilter !== 'all';
+  const currentSortLabel = SORTS.find(s => s.key === sort)?.label ?? 'Sort';
+
+  const renderSectionHeader = useCallback(({ section }: { section: OrderSection }) => (
+    <View style={s.sectionHeader}>
+      <Text style={s.sectionTitle}>{section.title}</Text>
+      <Text style={s.sectionCount}>{section.data.length} {section.data.length === 1 ? 'order' : 'orders'}</Text>
+    </View>
+  ), []);
+
+  const renderItem = useCallback(({ item, index, section }: { item: Order; index: number; section: OrderSection }) => {
+    const isLast = index === section.data.length - 1;
     const swipeAction =
       item.status === 'new'
         ? { label: 'Accept', icon: 'check-circle' as const, color: theme.accent, run: () => handleMarkProcessing(item.id) }
@@ -716,7 +811,7 @@ export default function OrdersScreen() {
         disabled={selectedIds.length > 0}
         accessibilityLabel={`${swipeAction.label} order ${item.orderNumber}`}
       >
-        <OrderCard
+        <OrderRow
           order={item}
           selected={selectedIds.includes(item.id)}
           selectionMode={selectedIds.length > 0}
@@ -725,6 +820,7 @@ export default function OrdersScreen() {
           onMarkProcessing={() => handleMarkProcessing(item.id)}
           onMarkReady={() => handleMarkReady(item.id)}
           onShip={() => handleShip(item.id)}
+          isLast={isLast}
         />
       </SwipeActionRow>
     );
@@ -732,164 +828,9 @@ export default function OrdersScreen() {
 
   const keyExtractor = useCallback((o: Order) => o.id, []);
 
-  // ─── Header right ──────────────────────────────────────────────────────────
-
-  const headerRight = (
-    <View style={s.headerRight}>
-      <IconButton
-        name="bar-chart-2"
-        onPress={() => router.push('/(tabs)/analytics' as never)}
-        color={FG}
-      />
-      <IconButton
-        name="search"
-        onPress={() => {
-          setSearchActive(v => !v);
-          if (searchActive) setSearchQuery('');
-        }}
-        color={searchActive ? PURPLE_LIGHT : FG}
-      />
-      <IconButton
-        name="sliders"
-        onPress={() => {
-          Haptics.selectionAsync();
-          // cycle filter via modal — use sort modal for now as filter bar is visible
-        }}
-        color={activeFilter !== 'all' ? PURPLE_LIGHT : FG}
-      />
-      <IconButton
-        name="sliders"
-        onPress={() => setSortModalVisible(true)}
-        color={FG}
-      />
-      <IconButton name="more-horizontal" onPress={handleMoreMenu} color={FG} />
-    </View>
-  );
-
-  // ─── Empty + Loading ───────────────────────────────────────────────────────
-
-  const ListEmpty = useCallback(() => {
-    if (loading) return null;
-    if (loadError) return null; // error banner shown above the list
-    return (
-      <EmptyState
-        icon="shopping-bag"
-        title="No orders yet"
-        description="Your first orders will appear here. Share your store link to start selling."
-        style={{ marginTop: SP.xl }}
-      />
-    );
-  }, [loading, loadError]);
-
-  const ListHeader = useCallback(() => (
-    <View>
-      {/* Summary Strip */}
-      {stats && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.statStrip}
-        >
-          <TouchableOpacity style={[s.statChip, { borderColor: PURPLE + '55' }]} onPress={() => setActiveFilter('all')}>
-            <Text style={[s.statChipVal, { color: PURPLE_LIGHT }]}>{stats.total}</Text>
-            <Text style={s.statChipLabel}>Total</Text>
-          </TouchableOpacity>
-          {stats.newOrders > 0 && (
-            <TouchableOpacity style={[s.statChip, { borderColor: ORANGE + '55' }]} onPress={() => setActiveFilter('new')}>
-              <Text style={[s.statChipVal, { color: ORANGE }]}>{stats.newOrders}</Text>
-              <Text style={s.statChipLabel}>New</Text>
-            </TouchableOpacity>
-          )}
-          {stats.toProcess > 0 && (
-            <TouchableOpacity style={[s.statChip, { borderColor: BLUE + '55' }]} onPress={() => setActiveFilter('processing')}>
-              <Text style={[s.statChipVal, { color: BLUE }]}>{stats.toProcess}</Text>
-              <Text style={s.statChipLabel}>Processing</Text>
-            </TouchableOpacity>
-          )}
-          {stats.readyToShip > 0 && (
-            <TouchableOpacity style={[s.statChip, { borderColor: SUCCESS + '55' }]} onPress={() => setActiveFilter('ready_to_ship')}>
-              <Text style={[s.statChipVal, { color: SUCCESS }]}>{stats.readyToShip}</Text>
-              <Text style={s.statChipLabel}>Ready</Text>
-            </TouchableOpacity>
-          )}
-          {stats.returnRequests > 0 && (
-            <TouchableOpacity style={[s.statChip, { borderColor: CYAN + '55' }]} onPress={() => setActiveFilter('returned')}>
-              <Text style={[s.statChipVal, { color: CYAN }]}>{stats.returnRequests}</Text>
-              <Text style={s.statChipLabel}>Returns</Text>
-            </TouchableOpacity>
-          )}
-          {stats.disputes > 0 && (
-            <TouchableOpacity style={[s.statChip, { borderColor: RED + '55' }]} onPress={() => setActiveFilter('disputed')}>
-              <Text style={[s.statChipVal, { color: RED }]}>{stats.disputes}</Text>
-              <Text style={s.statChipLabel}>Disputes</Text>
-            </TouchableOpacity>
-          )}
-        </ScrollView>
-      )}
-
-      {/* Filter bar */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.filterBar}
-      >
-        {FILTERS.map(({ key, label }) => (
-          <FilterChip
-            key={key}
-            label={label}
-            active={activeFilter === key}
-            onPress={() => setActiveFilter(key)}
-            count={key !== 'all' && filterCounts[key] != null ? filterCounts[key] : undefined}
-          />
-        ))}
-      </ScrollView>
-
-      {/* Results count */}
-      <View style={s.resultsRow}>
-        <Text style={s.resultsText}>
-          {filtered.length} {filtered.length === 1 ? 'order' : 'orders'}
-          {activeFilter !== 'all' ? ` · ${FILTERS.find(f => f.key === activeFilter)?.label}` : ''}
-        </Text>
-        {sort !== 'newest' && (
-          <TouchableOpacity onPress={() => setSortModalVisible(true)}>
-            <Text style={s.sortLabel}>
-              {SORTS.find(s => s.key === sort)?.label} ↕
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
-  ), [stats, activeFilter, filterCounts, filtered.length, sort]);
-
-  // ─── Render ────────────────────────────────────────────────────────────────
-
-  return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <Text style={s.headerTitle}>Orders</Text>
-        {headerRight}
-      </View>
-
-      {/* Search bar */}
-      {searchActive && (
-        <View style={s.searchWrap}>
-          <SearchBar
-            value={searchQuery}
-            onChange={setSearchQuery}
-            placeholder="Search orders, customers, SKUs…"
-            style={{ flex: 1 }}
-          />
-          <TouchableOpacity
-            onPress={() => { setSearchActive(false); setSearchQuery(''); }}
-            style={s.searchClose}
-          >
-            <Feather name="x" size={ICON.sm} color={MUTED} />
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Live update backoff banner */}
+  const ListHeaderComponent = useCallback(() => (
+    <View style={s.listHeader}>
+      {/* Paused / error banners */}
       {updatesPaused && !loading && (
         <TouchableOpacity
           style={s.pausedBanner}
@@ -905,8 +846,6 @@ export default function OrdersScreen() {
           <Feather name="refresh-cw" size={12} color={ORANGE} />
         </TouchableOpacity>
       )}
-
-      {/* Error banner with retry */}
       {loadError && !loading && !updatesPaused && (
         <View style={s.errorBanner}>
           <Feather name="alert-circle" size={ICON.sm} color={RED} />
@@ -922,13 +861,131 @@ export default function OrdersScreen() {
         </View>
       )}
 
-      {/* Main list */}
-      <FlatList
-        data={filtered}
+      {/* Results count */}
+      <View style={s.resultsRow}>
+        <Text style={s.resultsText}>
+          {filtered.length} {filtered.length === 1 ? 'order' : 'orders'}
+          {activeFilter !== 'all'
+            ? ` · ${FILTERS.find(f => f.key === activeFilter)?.label ?? ALL_FILTERS.find(f => f.key === activeFilter)?.label}`
+            : ''}
+        </Text>
+        {sort !== 'newest' && (
+          <TouchableOpacity onPress={() => setSortModalVisible(true)}>
+            <Text style={s.sortIndicator}>{currentSortLabel} ↕</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  ), [updatesPaused, loading, loadError, filtered.length, activeFilter, sort, currentSortLabel, retryUpdates, onRefresh]);
+
+  const ListEmptyComponent = useCallback(() => {
+    if (loading) return null;
+    return (
+      <EmptyState
+        icon="shopping-bag"
+        title="No orders yet"
+        description="Your first orders will appear here. Share your store link to start selling."
+        style={{ marginTop: SP.xl, marginHorizontal: SP.md }}
+      />
+    );
+  }, [loading]);
+
+  // ─── Render ────────────────────────────────────────────────────────────────
+
+  return (
+    <View style={[s.root, { paddingTop: insets.top }]}>
+      {/* ── Fixed header ── */}
+      <View style={s.header}>
+        {/* Title row */}
+        <View style={s.titleRow}>
+          <TouchableOpacity
+            style={s.titleBtn}
+            onPress={() => Alert.alert('Order view', 'Choose a view', [
+              { text: 'All orders', onPress: () => setActiveFilter('all') },
+              { text: 'Open orders', onPress: () => setActiveFilter('open') },
+              { text: 'Archived orders', onPress: () => setActiveFilter('archived') },
+              { text: 'Cancel', style: 'cancel' },
+            ])}
+            activeOpacity={0.7}
+          >
+            <Text style={s.titleText}>Orders</Text>
+            <Feather name="chevron-down" size={18} color={MUTED} />
+          </TouchableOpacity>
+          <View style={s.titleActions}>
+            <TouchableOpacity
+              style={s.headerIconBtn}
+              onPress={() => Alert.alert(
+                'Create order',
+                'Orders are created from customer checkout. Manual order creation is not available yet.',
+              )}
+              accessibilityLabel="Create order"
+            >
+              <Feather name="plus" size={ICON.md} color={FG} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.headerIconBtn}
+              onPress={handleMoreMenu}
+              accessibilityLabel="More order actions"
+            >
+              <Feather name="more-horizontal" size={ICON.md} color={FG} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Persistent search row */}
+        <View style={s.searchRow}>
+          <View style={s.searchBox}>
+            <Feather name="map-pin" size={14} color={MUTED} style={{ marginRight: SP.xs }} />
+            <SearchBar
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="All locations · Search orders"
+              style={s.searchInput}
+            />
+          </View>
+          <TouchableOpacity
+            style={[s.controlBtn, hasActiveFilter && s.controlBtnActive]}
+            onPress={() => setFilterSheetVisible(true)}
+            accessibilityLabel={hasActiveFilter ? `Filter: ${activeFilter}` : 'Filter orders'}
+          >
+            <Feather name="sliders" size={14} color={hasActiveFilter ? PURPLE_LIGHT : MUTED} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={s.controlBtn}
+            onPress={() => setSortModalVisible(true)}
+            accessibilityLabel={`Sort: ${currentSortLabel}`}
+          >
+            <Feather name="chevrons-down" size={14} color={MUTED} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Status pills */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.pillsRow}
+        >
+          {FILTERS.map(({ key, label }) => (
+            <FilterChip
+              key={key}
+              label={label}
+              active={activeFilter === key}
+              onPress={() => setActiveFilter(key)}
+              count={key !== 'all' && filterCounts[key] != null ? filterCounts[key] : undefined}
+            />
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* ── Order list (section list for date groups) ── */}
+      <SectionList
+        sections={sections}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
-        ListHeaderComponent={ListHeader}
-        ListEmptyComponent={ListEmpty}
+        renderSectionHeader={renderSectionHeader}
+        renderSectionFooter={() => <View style={{ height: SP.sm }} />}
+        ListHeaderComponent={ListHeaderComponent}
+        ListEmptyComponent={ListEmptyComponent}
         contentContainerStyle={[
           s.listContent,
           filtered.length === 0 && { flexGrow: 1 },
@@ -936,6 +993,7 @@ export default function OrdersScreen() {
         ]}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
+        stickySectionHeadersEnabled={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -945,6 +1003,8 @@ export default function OrdersScreen() {
           />
         }
       />
+
+      {/* Loading overlay */}
       {loading && !refreshing && (
         <View style={s.loadingOverlay} pointerEvents="none">
           <BrandedLoader label="Lining up your orders…" />
@@ -982,9 +1042,18 @@ export default function OrdersScreen() {
       <SortModal
         visible={sortModalVisible}
         current={sort}
-        onSelect={k => { setSort(k); setSortModalVisible(false); }}
+        onSelect={k => setSort(k)}
         onClose={() => setSortModalVisible(false)}
       />
+
+      {/* Filter Sheet */}
+      <FilterSheet
+        visible={filterSheetVisible}
+        current={FILTERS.some(filter => filter.key === activeFilter) ? 'all' : activeFilter as OrderFilterKey}
+        onSelect={k => setActiveFilter(k)}
+        onClose={() => setFilterSheetVisible(false)}
+      />
+
       <AIBrainFAB context={{ screen: 'orders' as const }} bottomOffset={72} />
     </View>
   );
@@ -999,91 +1068,101 @@ const s = StyleSheet.create({
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFill,
-    top: 72,
+    top: 160,
     backgroundColor: SCREEN_BG,
     zIndex: 10,
   },
 
   // Header
   header: {
+    backgroundColor: BG,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+  },
+  titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-    minHeight: COMP.headerH,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
+    paddingTop: SP.sm,
+    paddingBottom: SP.sm,
+    minHeight: 44,
   },
-  headerTitle: {
+  titleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  titleText: {
     fontSize: FS.xl,
     fontFamily: FONT.bold,
     color: FG,
     letterSpacing: -0.3,
   },
-  headerRight: {
+  titleActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SP.xs,
   },
-
-  // Search
-  searchWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-  },
-  searchClose: {
-    width: 36,
-    height: 36,
-    borderRadius: RADIUS.sm,
-    backgroundColor: CARD_GLASS,
-    borderWidth: 1,
-    borderColor: BORDER,
+  headerIconBtn: {
+    width: COMP.iconBtn,
+    height: COMP.iconBtn,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  // Stat strip
-  statStrip: {
-    paddingHorizontal: SP.md,
-    paddingTop: SP.md,
-    paddingBottom: SP.sm,
-    gap: SP.sm,
-  },
-  statChip: {
+  // Search row
+  searchRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: CARD_GLASS,
-    borderRadius: RADIUS.md,
+    gap: SP.xs,
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.sm,
+  },
+  searchBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: CARD,
+    borderRadius: RADIUS.sm,
     borderWidth: 1,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-    minWidth: 72,
-    gap: 2,
+    borderColor: BORDER,
+    paddingHorizontal: SP.sm,
+    height: 36,
   },
-  statChipVal: {
-    fontSize: FS.xl,
-    fontFamily: FONT.bold,
-    letterSpacing: -0.5,
+  searchInput: {
+    flex: 1,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
+    height: 36,
   },
-  statChipLabel: {
-    fontSize: FS.xs,
-    fontFamily: FONT.medium,
-    color: MUTED,
+  controlBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: CARD,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  controlBtnActive: {
+    borderColor: BORDER_ACTIVE,
+    backgroundColor: PURPLE_DIM,
   },
 
-  // Filter bar
-  filterBar: {
+  // Status pills
+  pillsRow: {
     paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-    gap: SP.sm,
+    paddingBottom: SP.sm,
+    paddingTop: 2,
+    gap: SP.xs,
   },
 
-  // Results row
+  // List header
+  listHeader: {
+    paddingTop: SP.sm,
+  },
   resultsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1096,34 +1175,50 @@ const s = StyleSheet.create({
     fontFamily: FONT.medium,
     color: SUBTLE,
   },
-  sortLabel: {
+  sortIndicator: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
     color: PURPLE_LIGHT,
   },
 
-  // List
-  listContent: {
+  // Section header
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: SP.md,
-    gap: SP.sm,
+    paddingTop: SP.sm,
+    paddingBottom: SP.xs,
+  },
+  sectionTitle: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: MUTED,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sectionCount: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: SUBTLE,
   },
 
-  // Order card
-  card: {
-    backgroundColor: CARD_GLASS,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: BORDER,
-    padding: SP.md,
-    gap: SP.sm,
-    marginBottom: SP.sm,
+  // Order row
+  orderRow: {
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+    backgroundColor: CARD,
+    minHeight: 44,
   },
-  cardSelected: {
-    borderColor: BORDER_ACTIVE,
+  orderRowSelected: {
     backgroundColor: CARD_ELEVATED_GLASS,
   },
-  cardRisk: {
-    borderColor: RED + '44',
+  orderRowRisk: {
+    borderLeftWidth: 2,
+    borderLeftColor: RED + '66',
+  },
+  orderRowArchived: {
+    opacity: 0.68,
   },
 
   // Selection
@@ -1136,7 +1231,7 @@ const s = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1.5,
     borderColor: BORDER,
-    backgroundColor: CARD_GLASS,
+    backgroundColor: CARD,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
@@ -1146,58 +1241,56 @@ const s = StyleSheet.create({
     borderColor: PURPLE,
   },
 
-  // Card rows
-  cardRow: {
+  orderMainRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+    marginBottom: SP.xs,
   },
-  cardRowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
+  orderLeft: {
     flex: 1,
+    gap: 2,
   },
-  cardRowRight: {
+  orderNumRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.xs,
+    flexWrap: 'nowrap',
   },
-
   orderNum: {
-    fontSize: FS.base,
+    fontSize: FS.sm,
     fontFamily: FONT.bold,
     color: FG,
-    letterSpacing: -0.2,
+    letterSpacing: -0.1,
   },
-  newBadge: {
+  newDot: {
     backgroundColor: ORANGE_DIM,
     borderRadius: RADIUS.pill,
-    paddingHorizontal: SP.sm,
-    paddingVertical: 2,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
     borderWidth: 1,
     borderColor: ORANGE + '44',
   },
-  newBadgeText: {
+  newDotText: {
     fontSize: 9,
     fontFamily: FONT.bold,
     color: ORANGE,
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   unreadDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: PURPLE,
   },
   riskBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 2,
     backgroundColor: RED_DIM,
     borderRadius: RADIUS.pill,
-    paddingHorizontal: SP.sm,
-    paddingVertical: 2,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
     borderWidth: 1,
     borderColor: RED + '44',
   },
@@ -1205,13 +1298,13 @@ const s = StyleSheet.create({
     fontSize: 9,
     fontFamily: FONT.bold,
     color: RED,
-    letterSpacing: 0.4,
+    letterSpacing: 0.3,
   },
   returnBadge: {
     backgroundColor: CYAN_DIM,
     borderRadius: RADIUS.pill,
-    paddingHorizontal: SP.sm,
-    paddingVertical: 2,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
   },
   returnBadgeText: {
     fontSize: 9,
@@ -1222,8 +1315,8 @@ const s = StyleSheet.create({
   disputeBadge: {
     backgroundColor: RED_DIM,
     borderRadius: RADIUS.pill,
-    paddingHorizontal: SP.sm,
-    paddingVertical: 2,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
   },
   disputeBadgeText: {
     fontSize: 9,
@@ -1231,146 +1324,100 @@ const s = StyleSheet.create({
     color: RED,
     letterSpacing: 0.3,
   },
-  customerName: {
-    fontSize: FS.base,
+  orderCustomer: {
+    fontSize: FS.sm,
     fontFamily: FONT.semibold,
     color: FG,
   },
-  orderDate: {
+  orderItems: {
     fontSize: FS.xs,
-    fontFamily: FONT.medium,
-    color: SUBTLE,
-  },
-  itemSummary: {
-    fontSize: FS.sm,
     fontFamily: FONT.regular,
     color: MUTED,
   },
-  cancellationReasonRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.xs,
-    marginTop: SP.xs,
-  },
-  cancellationReasonText: {
-    flex: 1,
+  orderCancelled: {
     fontSize: FS.xs,
     fontFamily: FONT.medium,
     color: RED,
   },
-  divider: {
-    height: 1,
-    backgroundColor: BORDER,
-    marginVertical: 2,
+  orderRight: {
+    alignItems: 'flex-end',
+    gap: 2,
+    paddingLeft: SP.sm,
+    flexShrink: 0,
+  },
+  orderAmount: {
+    fontSize: FS.sm,
+    fontFamily: FONT.bold,
+    color: FG,
+    letterSpacing: -0.1,
+  },
+  orderTime: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: SUBTLE,
   },
 
-  // Status pills
-  statusRow: {
+  // Status row
+  orderStatusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SP.sm,
-    flex: 1,
+    gap: SP.xs,
+    flexWrap: 'nowrap',
   },
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
   },
-  statusLabel: {
+  statusText: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
   },
-  totalAmount: {
-    fontSize: FS.base,
-    fontFamily: FONT.bold,
-    color: FG,
-    letterSpacing: -0.2,
-  },
-
-  // Tags
-  tagRow: {
-    flexDirection: 'row',
-    gap: SP.xs,
-    marginTop: -SP.xs,
-  },
-  tagPreOrder: {
+  tagPill: {
     backgroundColor: PURPLE_DIM,
     borderRadius: RADIUS.pill,
-    paddingHorizontal: SP.sm,
-    paddingVertical: 2,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
     borderWidth: 1,
-    borderColor: BORDER_ACTIVE,
+    borderColor: BORDER_ACTIVE + '55',
   },
-  tagPreOrderText: {
+  tagText: {
     fontSize: 9,
     fontFamily: FONT.bold,
     color: PURPLE_LIGHT,
-    letterSpacing: 0.4,
-  },
-  tagMfg: {
-    backgroundColor: BLUE_DIM,
-    borderRadius: RADIUS.pill,
-    paddingHorizontal: SP.sm,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: BLUE + '44',
-  },
-  tagMfgText: {
-    fontSize: 9,
-    fontFamily: FONT.bold,
-    color: BLUE,
-    letterSpacing: 0.4,
+    letterSpacing: 0.3,
   },
 
-  // Action row
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
-    flexWrap: 'wrap',
-  },
-  actionBtn: {
-    borderRadius: RADIUS.sm,
+  // Quick action
+  quickAction: {
+    borderRadius: RADIUS.xs,
     overflow: 'hidden',
   },
-  actionBtnGrad: {
+  quickActionGrad: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
+    gap: 3,
+    paddingHorizontal: SP.sm,
+    paddingVertical: 4,
   },
-  actionBtnText: {
+  quickActionText: {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: '#fff',
   },
-  viewBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginLeft: 'auto',
-    paddingHorizontal: SP.sm,
-    paddingVertical: SP.xs,
-  },
-  viewBtnText: {
-    fontSize: FS.sm,
-    fontFamily: FONT.semibold,
-    color: PURPLE_LIGHT,
-  },
   trackingPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: SUCCESS_DIM,
     borderRadius: RADIUS.pill,
     paddingHorizontal: SP.sm,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderWidth: 1,
     borderColor: SUCCESS + '44',
   },
@@ -1379,21 +1426,79 @@ const s = StyleSheet.create({
     fontFamily: FONT.medium,
     color: SUCCESS,
   },
-  disputePill: {
+
+  // Row divider
+  rowDivider: {
+    height: 1,
+    backgroundColor: BORDER,
+    marginLeft: SP.md,
+  },
+
+  // List
+  listContent: {
+    paddingHorizontal: 0,
+  },
+
+  // Banners
+  pausedBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: SP.sm,
+    marginHorizontal: SP.md,
+    marginBottom: SP.xs,
+    backgroundColor: ORANGE_DIM,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: ORANGE + '44',
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+  },
+  pausedBannerText: {
+    flex: 1,
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: FG,
+  },
+  pausedBannerAction: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: ORANGE,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    marginHorizontal: SP.md,
+    marginBottom: SP.xs,
     backgroundColor: RED_DIM,
-    borderRadius: RADIUS.pill,
-    paddingHorizontal: SP.sm,
-    paddingVertical: 4,
+    borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: RED + '44',
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
   },
-  disputePillText: {
+  errorBannerText: {
+    flex: 1,
     fontSize: FS.xs,
     fontFamily: FONT.medium,
     color: RED,
+    lineHeight: 16,
+  },
+  errorRetryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: PURPLE_DIM,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: BORDER_ACTIVE + '44',
+    paddingHorizontal: SP.sm,
+    paddingVertical: SP.xs,
+  },
+  errorRetryText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: PURPLE_LIGHT,
   },
 
   // Bulk bar
@@ -1436,7 +1541,7 @@ const s = StyleSheet.create({
     fontFamily: FONT.semibold,
   },
 
-  // Sort modal
+  // Sort / filter modal
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.72)',
@@ -1474,9 +1579,7 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: BORDER,
   },
-  sortOptionActive: {
-    // subtle purple tint handled by text color
-  },
+  sortOptionActive: {},
   sortOptionText: {
     fontSize: FS.base,
     fontFamily: FONT.medium,
@@ -1499,69 +1602,5 @@ const s = StyleSheet.create({
     fontSize: FS.base,
     fontFamily: FONT.semibold,
     color: MUTED,
-  },
-
-  // Error banner
-  pausedBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
-    marginHorizontal: SP.md,
-    marginTop: SP.sm,
-    marginBottom: SP.xs,
-    backgroundColor: ORANGE_DIM,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: ORANGE + '44',
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-  },
-  pausedBannerText: {
-    flex: 1,
-    fontSize: FS.xs,
-    fontFamily: FONT.medium,
-    color: FG,
-  },
-  pausedBannerAction: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
-    color: ORANGE,
-  },
-  errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
-    marginHorizontal: SP.md,
-    marginTop: SP.sm,
-    marginBottom: SP.xs,
-    backgroundColor: RED_DIM,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: RED + '44',
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-  },
-  errorBannerText: {
-    flex: 1,
-    fontSize: FS.xs,
-    fontFamily: FONT.medium,
-    color: RED,
-    lineHeight: 16,
-  },
-  errorRetryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: PURPLE_DIM,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: PURPLE_LIGHT + '44',
-    paddingHorizontal: SP.sm,
-    paddingVertical: SP.xs,
-  },
-  errorRetryText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
-    color: PURPLE_LIGHT,
   },
 });
