@@ -16,6 +16,8 @@
     "test:navigation:native:ci": "NATIVE_GESTURE_REQUIRED=1 pnpm run test:navigation:native",
     "test:onboarding:native": "node tests/onboarding-transitions.device.mjs",
     "test:onboarding:native:ci": "NATIVE_ONBOARDING_REQUIRED=1 pnpm run test:onboarding:native",
+    "test:seller-dashboard:native": "node tests/seller-dashboard.device.mjs",
+    "test:seller-dashboard:native:ci": "NATIVE_SELLER_DASHBOARD_REQUIRED=1 pnpm run test:seller-dashboard:native",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "verify:app-identity": "node scripts/verify-app-identity.js",
     "verify:apple-auth": "node scripts/verify-apple-auth.js",

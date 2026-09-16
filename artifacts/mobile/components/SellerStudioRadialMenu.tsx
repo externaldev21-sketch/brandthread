@@ -195,6 +195,7 @@ export default function SellerStudioRadialMenu() {
         ]}
       >
         <Pressable
+          testID={`seller-studio-action-${action.id}`}
           accessibilityRole="button"
           accessibilityLabel={action.label}
           onPress={() => choose(action)}
@@ -222,6 +223,7 @@ export default function SellerStudioRadialMenu() {
       {/* Lightning-bolt trigger — hidden while modal is open */}
       {!open && (
         <Pressable
+          testID="seller-studio-menu-open"
           accessibilityRole="button"
           accessibilityLabel="Open Studio tools"
           onPress={expand}
@@ -248,6 +250,8 @@ export default function SellerStudioRadialMenu() {
       >
         {/* Solid dark backdrop */}
         <Animated.View
+          testID="seller-studio-menu-backdrop"
+          accessibilityLabel="Studio tools dark backdrop"
           style={[StyleSheet.absoluteFill, styles.backdrop, { opacity: progress }]}
           pointerEvents="none"
         />
@@ -319,6 +323,7 @@ export default function SellerStudioRadialMenu() {
           ]}
         >
           <Pressable
+            testID="seller-studio-menu-close"
             accessibilityRole="button"
             accessibilityLabel="Close Studio tools"
             onPress={() => collapse()}

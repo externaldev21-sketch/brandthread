@@ -64,6 +64,7 @@ export default function SellerCreateFAB() {
   return (
     <>
       <Pressable
+        testID="seller-create-fab"
         style={({ pressed }) => [
           styles.fab,
           {
@@ -99,6 +100,7 @@ export default function SellerCreateFAB() {
           </View>
           {ACTIONS.map(action => (
             <Pressable
+              testID={`seller-create-action-${action.label.toLowerCase().replace(/\s+/g, '-')}`}
               key={action.label}
               style={({ pressed }) => [styles.action, pressed && { backgroundColor: theme.accentDim }]}
               onPress={() => choose(action.route)}

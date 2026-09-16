@@ -427,6 +427,8 @@ export default function SellerHomeCommerceDashboard({
   return (
     <View style={styles.root}>
       <ScrollView
+        testID="seller-dashboard-scroll"
+        accessibilityLabel="Seller dashboard scroll"
         style={styles.scrollView}
         contentContainerStyle={[styles.scroll, { paddingTop: topInset + SP.sm }]}
         showsVerticalScrollIndicator={false}
@@ -714,6 +716,11 @@ export default function SellerHomeCommerceDashboard({
             </View>
           </View>
         )}
+        <View
+          testID="seller-dashboard-scroll-end"
+          accessibilityLabel="Seller dashboard scroll end"
+          style={styles.scrollEndMarker}
+        />
       </ScrollView>
 
       <SellerStudioRadialMenu />
@@ -728,6 +735,7 @@ const styles = StyleSheet.create({
   // gives it a bounded height and allows inner content to scroll correctly.
   scrollView: { flex: 1 },
   scroll: { flexGrow: 1, paddingBottom: 160 },
+  scrollEndMarker: { height: 1 },
 
   // ── Top bar
   topBar: {
