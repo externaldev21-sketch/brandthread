@@ -23,7 +23,6 @@ import {
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import type { Friendship, Story, BuyerPost } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
-import { reportNetworkError } from '@/lib/networkNotice';
 
 type ApiFollowing = {
   userId: string; name: string; username: string | null;
@@ -191,6 +190,14 @@ export default function FriendsScreen() {
   const [loadError, setLoadError] = useState(false);
 
   async function loadData() {
+    if (!userId) {
+      setFriends([]);
+      setApiFollowing([]);
+      setStories([]);
+      setFeedPosts([]);
+      setLoading(false);
+      return;
+    }
     setLoadError(false);
     try {
       const [storyRows, followingRows, activityRows] = await Promise.all([
@@ -207,8 +214,11 @@ export default function FriendsScreen() {
       setApiFollowing(Array.isArray(followingRows) ? followingRows : []);
       setFeedPosts(Array.isArray(activityRows) ? activityRows : []);
     } catch (error) {
-      setLoadError(true);
-      reportNetworkError(error, loadData);
+      setLoadError(false);
+      setFriends([]);
+      setApiFollowing([]);
+      setStories([]);
+      setFeedPosts([]);
     } finally {
       setLoading(false);
     }
@@ -341,7 +351,7 @@ export default function FriendsScreen() {
         keyExtractor={p => p.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
-        ListEmptyComponent={loading ? <View style={s.emptyState}><Text style={s.emptyBody}>Loading activity…</Text></View> : loadError ? <View style={s.emptyState}><Text style={s.emptyTitle}>Couldn't load activity</Text><TouchableOpacity onPress={loadData}><Text style={{ color: theme.accent, fontFamily: FONT.semibold }}>Try again</Text></TouchableOpacity></View> : null}
+        ListEmptyComponent={loading ? <View style={s.emptyState}><Text style={s.emptyBody}>Loading activity…</Text></View> : null}
         ListHeaderComponent={() => (
           <>
             {/* Stories row */}

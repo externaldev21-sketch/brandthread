@@ -1302,3 +1302,26 @@ export const orderFundReservations = pgTable('order_fund_reservations', {
   ownerIdx: index('order_fund_reservations_owner_idx').on(table.ownerId),
   labelUnique: uniqueIndex('order_fund_reservations_label_unique').on(table.shippingLabelId),
 }));
+
+export const sellerCashoutAttempts = pgTable('seller_cashout_attempts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerId: text('owner_id').notNull(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  amountCents: integer('amount_cents').notNull(),
+  currency: text('currency').notNull(),
+  stripeAccountId: text('stripe_account_id'),
+  bankDestinationId: text('bank_destination_id'),
+  status: text('status').notNull().default('processing'), // processing|succeeded|failed
+  stripePayoutId: text('stripe_payout_id'),
+  responseStatus: text('response_status'),
+  responseArrivalDate: timestamp('response_arrival_date', { withTimezone: true }),
+  errorHttpStatus: integer('error_http_status'),
+  errorCode: text('error_code'),
+  errorMessage: text('error_message'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  ownerIdx: index('seller_cashout_attempts_owner_idx').on(table.ownerId),
+  ownerIdempotencyUnique: uniqueIndex('seller_cashout_attempts_owner_idempotency_unique')
+    .on(table.ownerId, table.idempotencyKey),
+}));

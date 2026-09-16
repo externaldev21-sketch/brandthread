@@ -39,7 +39,7 @@ const TABS: {
   label: string;
   icon: keyof typeof Feather.glyphMap;
 }[] = [
-  { name: 'index',    label: 'Home',     icon: 'home' },
+  { name: 'index',    label: 'Dashboard', icon: 'home' },
   { name: 'products', label: 'Products', icon: 'package' },
   { name: 'orders',   label: 'Orders',   icon: 'shopping-bag' },
   { name: 'profile',  label: 'Profile',  icon: 'user' },
@@ -241,7 +241,7 @@ export default function TabLayout() {
         }}
       >
         {/* Visible tabs */}
-        <Tabs.Screen name="index"    options={{ title: 'Home' }} />
+        <Tabs.Screen name="index"    options={{ title: 'Dashboard' }} />
         <Tabs.Screen name="products" options={{ title: 'Products' }} />
         <Tabs.Screen name="orders"   options={{ title: 'Orders' }} />
         <Tabs.Screen name="profile"  options={{ title: 'Profile' }} />

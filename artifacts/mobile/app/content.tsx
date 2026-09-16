@@ -63,14 +63,12 @@ export default function ContentScreen() {
   const [tab, setTab] = useState<FilterTab>('all');
   const [content, setContent] = useState<ContentPost[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
 
   function back() { router.back(); }
 
   const loadContent = useCallback(async () => {
     setLoading(true);
-    setLoadError(null);
     try {
       const posts = await getSellerPosts();
       setContent(posts.map((post): ContentPost => ({
@@ -96,7 +94,6 @@ export default function ContentScreen() {
       })));
     } catch {
       setContent([]);
-      setLoadError('We couldn’t load your content. Check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -276,16 +273,6 @@ export default function ContentScreen() {
               <ActivityIndicator color={colors.primary} />
               <Text style={s.loadingText}>Loading your content…</Text>
             </View>
-          ) : loadError ? (
-            <View style={s.empty}>
-              <Feather name="wifi-off" size={32} color={ORANGE} />
-              <Text style={s.emptyTitle}>Couldn’t load content</Text>
-              <Text style={s.emptyDesc}>{loadError}</Text>
-              <TouchableOpacity style={[s.retryBtn, { backgroundColor: colors.primary }]} onPress={loadContent}>
-                <Feather name="refresh-cw" size={14} color="#FFFFFF" />
-                <Text style={s.retryText}>Try again</Text>
-              </TouchableOpacity>
-            </View>
           ) : posts.length === 0 ? (
             <View style={s.empty}>
               <Feather name="video" size={32} color={MUTED} />
@@ -390,7 +377,5 @@ const s = StyleSheet.create({
   empty:     { alignItems: 'center', paddingVertical: 36, gap: 8 },
   emptyTitle:{ fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
   emptyDesc: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
-  retryBtn: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 8, borderRadius: 9, paddingHorizontal: 13, paddingVertical: 9 },
-  retryText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
 });
 

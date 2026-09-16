@@ -29,7 +29,6 @@ export default function RequestSampleScreen() {
   const { manufacturerId } = useLocalSearchParams<{ manufacturerId?: string }>();
   const [manufacturer, setManufacturer] = useState<Manufacturer | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
   const [productType, setProductType] = useState('T-Shirt');
   const [quantity, setQuantity] = useState(1);
   const [colorway, setColorway] = useState('');
@@ -41,7 +40,6 @@ export default function RequestSampleScreen() {
   useEffect(() => {
     let active = true;
     if (!manufacturerId) {
-      setLoadError('Choose a manufacturer from the Manufacturer Hub before requesting a sample.');
       setLoading(false);
       return;
     }
@@ -49,11 +47,8 @@ export default function RequestSampleScreen() {
       .then((value) => {
         if (!active) return;
         setManufacturer(value ?? null);
-        if (!value) setLoadError('This manufacturer is unavailable.');
       })
-      .catch((error) => active && setLoadError(
-        error instanceof Error ? error.message : 'Could not load this manufacturer.',
-      ))
+      .catch(() => {})
       .finally(() => active && setLoading(false));
     return () => { active = false; };
   }, [manufacturerId]);
@@ -95,23 +90,7 @@ export default function RequestSampleScreen() {
     return <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>;
   }
 
-  if (loadError || !manufacturer) {
-    return (
-      <View style={[styles.center, { paddingHorizontal: 28 }]}>
-        <Feather name="alert-circle" size={28} color={MUTED} />
-        <Text style={styles.errorText}>{loadError}</Text>
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: colors.primary }]}
-          onPress={() => router.replace('/manufacturer-hub' as never)}
-          accessibilityRole="button"
-          accessibilityLabel="Open Manufacturer Hub"
-          accessibilityHint="Returns to the manufacturer directory"
-        >
-          <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Open Manufacturer Hub</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  if (!manufacturer) return <View style={styles.root} />;
 
   return (
     <View style={[styles.root, { paddingTop: Platform.OS === 'web' ? 20 : insets.top }]}>
@@ -186,7 +165,6 @@ function Chip({ label, active, onPress, color }: { label: string; active: boolea
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   center: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: 14 },
-  errorText: { color: MUTED, textAlign: 'center', lineHeight: 20 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
   backButton: { width: COMP.minTouchTarget, minHeight: COMP.minTouchTarget, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: FG, fontSize: 16, fontFamily: 'Inter_700Bold', textAlign: 'center' },

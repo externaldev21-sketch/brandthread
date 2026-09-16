@@ -1,7 +1,8 @@
 /**
  * Production Analytics — Brandthread Seller App
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Platform, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -93,32 +94,41 @@ export default function AnalyticsProductionScreen() {
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { isLoaded: authLoaded, userId } = useAuth();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   const [data,       setData]       = useState<ProductionAnalytics | null>(null);
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const requestUser = useRef<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
+    if (!authLoaded || !userId) return;
+    const requestedUser = userId;
+    requestUser.current = requestedUser;
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
       const f = filter ?? await getFilterState();
       if (!filter) setFilter(f);
-      setData(await getProductionAnalytics(f)); setError(null);
+      const next = await getProductionAnalytics(f);
+      if (requestUser.current !== requestedUser) return;
+      setData(next);
     } catch (err) {
-      setData(null); setError(err instanceof Error ? err.message : 'Production analytics are unavailable.');
+      if (requestUser.current !== requestedUser) return;
     } finally { setLoading(false); setRefreshing(false); }
-  }, [filter]);
+  }, [filter, authLoaded, userId]);
 
-  useEffect(() => { load(); }, []); // eslint-disable-line
+  useEffect(() => {
+    requestUser.current = null;
+    setData(null); setFilter(null);
+    setLoading(!authLoaded);
+    if (authLoaded && userId) { setLoading(true); load(); }
+  }, [authLoaded, userId]); // load reads the current filter
 
   if (loading) {
     return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><ActivityIndicator size="large" color={PURPLE} /></View>;
   }
-  if (error) return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><Text style={{ color: MUTED }}>{error}</Text><TouchableOpacity onPress={() => load()}><Text style={{ color: PURPLE }}>Retry</Text></TouchableOpacity></View>;
-
   return (
     <ScrollView
       style={s.scroll}

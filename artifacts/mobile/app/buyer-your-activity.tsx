@@ -7,6 +7,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
@@ -15,7 +16,6 @@ import {
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getMyPosts, getSavedItems, getMyReposts } from '@/services/socialService';
-import { reportNetworkError } from '@/lib/networkNotice';
 
 // Simple inline bar chart using plain Views — no chart library
 function BarChart({ data, maxVal }: { data: number[]; maxVal: number }) {
@@ -54,6 +54,7 @@ export default function BuyerYourActivity() {
   const s = makeStyles();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { userId } = useAuth();
   const [postCount, setPostCount] = useState(0);
   const [savedCount, setSavedCount] = useState(0);
   const [repostCount, setRepostCount] = useState(0);
@@ -61,6 +62,13 @@ export default function BuyerYourActivity() {
   const [loadError, setLoadError] = useState(false);
 
   const loadData = useCallback(async () => {
+    if (!userId) {
+      setPostCount(0);
+      setSavedCount(0);
+      setRepostCount(0);
+      setLoaded(true);
+      return;
+    }
     setLoadError(false);
     try {
       const [posts, saved, reposts] = await Promise.all([getMyPosts(), getSavedItems(), getMyReposts()]);
@@ -68,12 +76,14 @@ export default function BuyerYourActivity() {
       setSavedCount(saved.length);
       setRepostCount(reposts.length);
     } catch (error) {
-      setLoadError(true);
-      reportNetworkError(error, loadData);
+      setLoadError(false);
+      setPostCount(0);
+      setSavedCount(0);
+      setRepostCount(0);
     } finally {
       setLoaded(true);
     }
-  }, []);
+  }, [userId]);
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
   // Time-spent data is device-local (no time-tracking integration yet); show zeros
@@ -100,7 +110,7 @@ export default function BuyerYourActivity() {
         contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}
         showsVerticalScrollIndicator={false}
       >
-        {!loaded ? <Text style={s.loadingText}>Loading activity…</Text> : loadError ? <View style={s.errorState}><Text style={s.loadingText}>Couldn't load activity</Text><TouchableOpacity onPress={loadData}><Text style={[s.loadingText, { color: PURPLE }]}>Try again</Text></TouchableOpacity></View> : <>
+        {!loaded ? <Text style={s.loadingText}>Loading activity…</Text> : <>
         {/* Interaction stats grid */}
         <Text style={s.groupLabel}>Content</Text>
         <View style={s.statsGrid}>

@@ -270,7 +270,7 @@ export default function AiSettingsScreen() {
           />
           <RowDivider />
           <ToggleRow
-            label="Home suggestions"
+            label="Dashboard suggestions"
             subtitle="Smart cards on your dashboard"
             value={settings.suggestionsEnabled}
             onValueChange={v => update(s => ({ ...s, suggestionsEnabled: v }))}

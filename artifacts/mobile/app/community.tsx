@@ -2,12 +2,13 @@
  * Community — freelancer marketplace.
  * Browse real freelancer profiles, filter by service, hire from their profile.
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   ScrollView, View, Text, TouchableOpacity, StyleSheet,
   ActivityIndicator, Image, RefreshControl,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,34 +24,39 @@ import {
 export default function CommunityScreen() {
   const colors = useColors();
   const api = useApi();
+  const { isLoaded: authLoaded, userId } = useAuth();
   const router = useRouter();
   const [freelancers, setFreelancers] = useState<Freelancer[]>([]);
   const [me, setMe] = useState<Freelancer | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const loadGeneration = useRef(0);
 
   const load = useCallback(
     async (isRefresh = false) => {
+      const generation = ++loadGeneration.current;
       if (isRefresh) setRefreshing(true);
       try {
-        setError(null);
         const [listRes, meRes] = await Promise.all([
           api.freelancers.list(filter ? { serviceType: filter } : undefined),
           // Not signed in / preview mode → just treat as "not a freelancer"
-          api.freelancers.me().catch(() => ({ freelancer: null as Freelancer | null })),
+          authLoaded && userId
+            ? api.freelancers.me().catch(() => ({ freelancer: null as Freelancer | null }))
+            : Promise.resolve({ freelancer: null as Freelancer | null }),
         ]);
+        if (loadGeneration.current !== generation) return;
         setFreelancers(listRes.freelancers);
         setMe(meRes.freelancer);
       } catch {
-        setError('Could not load freelancers. Pull to retry.');
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (loadGeneration.current === generation) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
-    [api, filter],
+    [api, filter, authLoaded, userId],
   );
 
   useFocusEffect(
@@ -182,11 +188,6 @@ export default function CommunityScreen() {
           {loading ? (
             <View style={styles.centerBox}>
               <ActivityIndicator color={colors.primary} />
-            </View>
-          ) : error ? (
-            <View style={styles.centerBox}>
-              <Feather name="wifi-off" size={22} color={SUBTLE} />
-              <Text style={styles.emptyText}>{error}</Text>
             </View>
           ) : freelancers.length === 0 ? (
             <View style={styles.centerBox}>

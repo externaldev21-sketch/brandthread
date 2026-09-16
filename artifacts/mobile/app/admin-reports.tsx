@@ -225,8 +225,8 @@ export default function AdminReportsScreen() {
     try {
       const rows = await (api as any).reports.list() as Report[];
       setReports(rows ?? []);
-    } catch (err: any) {
-      if (!isRefresh) Alert.alert('Error', err?.message ?? 'Could not load reports');
+    } catch {
+      // Read failures leave the normal empty state visible.
     } finally {
       setLoading(false); setRefreshing(false);
     }

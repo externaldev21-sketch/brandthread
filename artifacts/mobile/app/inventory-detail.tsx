@@ -122,7 +122,9 @@ export default function InventoryDetailScreen() {
       setAdjustments(adjs.slice(0, 10));
       setEvents(evts.slice(0, 10));
     } catch {
-      Alert.alert('Error', 'Failed to load item details.');
+      setItem(null);
+      setAdjustments([]);
+      setEvents([]);
     } finally {
       setLoading(false);
     }

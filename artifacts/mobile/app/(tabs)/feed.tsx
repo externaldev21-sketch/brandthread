@@ -83,7 +83,6 @@ function BuyerHighDemandPage() {
 
   const [items, setItems]       = useState<HighDemandProduct[]>([]);
   const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState<string | null>(null);
 
   // api.publicProducts.highDemand(limit) → PublicProduct[]
   // Direct array response — no {items} wrapper.
@@ -91,7 +90,6 @@ function BuyerHighDemandPage() {
   // No fallback fetch — empty array shows the empty state.
   const fetchDemand = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       const rows = await api.publicProducts.highDemand(6);
       const safe = Array.isArray(rows) ? rows : [];
@@ -111,7 +109,6 @@ function BuyerHighDemandPage() {
         },
       })));
     } catch {
-      setError('Could not load high-demand products. Check your connection.');
     } finally {
       setLoading(false);
     }
@@ -146,18 +143,6 @@ function BuyerHighDemandPage() {
                 <View style={[hdStyles.skelLine, { width: 48 }]} />
               </View>
             ))}
-          </View>
-        ) : error ? (
-          <View style={{ alignItems: 'center', gap: 12, paddingTop: 40 }}>
-            <Feather name="alert-circle" size={28} color={MUTED} />
-            <Text style={{ fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center' }}>{error}</Text>
-            <TouchableOpacity
-              onPress={() => { Haptics.selectionAsync(); fetchDemand(); }}
-              style={{ borderWidth: 1, borderColor: theme.accent, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}
-            >
-              <Feather name="refresh-cw" size={12} color={theme.accent} />
-              <Text style={{ fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.accent }}>Try again</Text>
-            </TouchableOpacity>
           </View>
         ) : items.length === 0 ? (
           <View style={{ alignItems: 'center', gap: 10, paddingTop: 40 }}>
@@ -856,7 +841,6 @@ export default function FeedScreen({ buyerMode = false }: { buyerMode?: boolean 
   const [feedRefreshing, setFeedRefreshing] = useState(false);
   const [feedLoadingMore, setFeedLoadingMore] = useState(false);
   const [feedHasMore, setFeedHasMore] = useState(true);
-  const [feedError, setFeedError] = useState<string | null>(null);
   const [activeLiveStreams, setActiveLiveStreams] = useState<LiveStreamFeedItem[]>([]);
   const api = useApi();
   const feedCursorRef = useRef(createThreadFeedCursor());
@@ -879,7 +863,6 @@ export default function FeedScreen({ buyerMode = false }: { buyerMode?: boolean 
     setFeedLoadingMore(false);
     if (initial) setFeedLoading(true);
     else setFeedRefreshing(true);
-    setFeedError(null);
     try {
       const page = await getThreadPostsPage(initialCursor, THREAD_PAGE_SIZE, feedTab);
       if (feedGenerationRef.current !== generation) return;
@@ -896,7 +879,6 @@ export default function FeedScreen({ buyerMode = false }: { buyerMode?: boolean 
       // Keep the current feed visible when a pull-to-refresh or social
       // notification fails; only the first load needs an empty state.
       if (initial) setSellerFeedPosts([]);
-      setFeedError('Could not load Thread. Check your connection and try again.');
     } finally {
       if (feedLoadKeyRef.current === loadKey) feedLoadKeyRef.current = null;
       if (feedGenerationRef.current === generation) {
@@ -1193,15 +1175,6 @@ export default function FeedScreen({ buyerMode = false }: { buyerMode?: boolean 
               <Text style={{ fontSize: FS.base, fontFamily: FONT.medium, color: '#8C8577' }}>
                 No results for "{searchQuery}"
               </Text>
-            </View>
-          ) : feedError && displayItems.length === 0 ? (
-            <View style={{ width: SCREEN_W, height: SCREEN_H, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 40 }}>
-              <Feather name="alert-circle" size={40} color={MUTED} />
-              <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center' }}>Could not load Thread</Text>
-              <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' }}>{feedError}</Text>
-              <TouchableOpacity onPress={() => void loadFeed(true)}>
-                <Text style={{ color: PURPLE, fontFamily: FONT.semibold }}>Try again</Text>
-              </TouchableOpacity>
             </View>
           ) : !feedLoading ? (
             <View style={{ width: SCREEN_W, height: SCREEN_H, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 40 }}>

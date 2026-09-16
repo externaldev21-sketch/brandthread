@@ -12,6 +12,7 @@ import {
   TextInput, Alert, ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -45,6 +46,7 @@ export default function ProductSizeChartScreen() {
   const colors = useColors();
   const { productId, productName } = useLocalSearchParams<{ productId: string; productName?: string }>();
   const router = useRouter();
+  const { userId } = useAuth();
   const insets = useSafeAreaInsets();
   const api    = useApi();
 
@@ -63,7 +65,7 @@ export default function ProductSizeChartScreen() {
 
   // Load existing chart from product
   function loadProduct() {
-    if (!productId) { setLoading(false); return; }
+    if (!productId || !userId) { setLoading(false); return; }
     setLoading(true);
     setLoadError(null);
     const req = (api as any).products?.get?.(productId);
@@ -84,14 +86,15 @@ export default function ProductSizeChartScreen() {
         setLoadError(null);
       })
       .catch(() => {
-        // Do NOT silently open with defaults when the product request failed.
-        // Show a visible error so the user knows the product data wasn't loaded.
-        setLoadError('Could not load product data. Please go back and try again.');
+        // A failed read leaves the editor in its blank, editable state.
+        setColumns(DEFAULT_COLUMNS);
+        setRows(DEFAULT_SIZES.map(size => ({ size, values: new Array(DEFAULT_COLUMNS.length).fill('') })));
+        setLoadError(null);
       })
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => { loadProduct(); }, [productId]);
+  useEffect(() => { loadProduct(); }, [productId, userId]);
 
   // ── Cell edit ───────────────────────────────────────────────────────────────
   function updateCell(rowIdx: number, colIdx: number, value: string) {
@@ -183,35 +186,6 @@ export default function ProductSizeChartScreen() {
     return (
       <View style={[s.root, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
         <ActivityIndicator color={colors.accentForeground} />
-      </View>
-    );
-  }
-
-  // Show a visible, retryable error — do NOT silently open with default chart data
-  if (loadError) {
-    return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
-        <BrandthreadHeader
-          title="Size Chart"
-          subtitle={productName ?? undefined}
-          onBack={() => router.back()}
-        />
-        <View style={s.errorWrap}>
-          <Feather name="alert-circle" size={36} color={RED} style={{ marginBottom: 14 }} />
-          <Text style={s.errorTitle}>Couldn't load product</Text>
-          <Text style={s.errorBody}>{loadError}</Text>
-          <TouchableOpacity
-            style={s.retryBtn}
-            activeOpacity={0.8}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); loadProduct(); }}
-          >
-            <Feather name="refresh-cw" size={14} color="#fff" style={{ marginRight: 6 }} />
-            <Text style={s.retryBtnText}>Try again</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.backLink} onPress={() => router.back()} activeOpacity={0.7}>
-            <Text style={s.backLinkText}>← Go back</Text>
-          </TouchableOpacity>
-        </View>
       </View>
     );
   }

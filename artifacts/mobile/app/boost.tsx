@@ -171,7 +171,6 @@ export default function BoostScreen() {
   const [showPicker, setShowPicker] = useState(!initialTargetId);
   const [targets, setTargets] = useState<BoostTarget[]>([]);
   const [loadingTargets, setLoadingTargets] = useState(!initialTargetId);
-  const [targetError, setTargetError] = useState('');
   const [objective, setObjective] = useState<BoostObjective>('views');
   const [budgetCents, setBudgetCents] = useState(2500);
   const [durationDays, setDurationDays] = useState(7);
@@ -188,12 +187,11 @@ export default function BoostScreen() {
 
   const loadTargets = useCallback(async () => {
     setLoadingTargets(true);
-    setTargetError('');
     try {
       const rows = await api.boosts.targets();
       setTargets(rows ?? []);
     } catch {
-      setTargetError('We couldn’t load your posts. Check your connection and try again.');
+      setTargets([]);
     } finally {
       setLoadingTargets(false);
     }
@@ -326,14 +324,6 @@ export default function BoostScreen() {
 
             {loadingTargets ? (
               <ActivityIndicator color={PURPLE} style={{ marginVertical: 48 }} />
-            ) : targetError ? (
-              <View style={s.pickerState}>
-                <Feather name="wifi-off" size={24} color={MUTED} />
-                <Text style={s.pickerStateText}>{targetError}</Text>
-                <TouchableOpacity style={s.retryBtn} onPress={loadTargets}>
-                  <Text style={s.retryText}>Try again</Text>
-                </TouchableOpacity>
-              </View>
             ) : targets.length === 0 ? (
               <View style={s.pickerState}>
                 <Feather name="video" size={26} color={MUTED} />
@@ -613,7 +603,6 @@ const createStyles = (colors: ReturnType<typeof useColors>) => {
   },
   pickerStateTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.base, marginTop: 12, marginBottom: 5 },
   pickerStateText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 19, marginTop: 10 },
-  retryBtn: { marginTop: 16, borderRadius: RADIUS.sm, backgroundColor: PURPLE, paddingHorizontal: 18, paddingVertical: 10 },
   retryText: { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.sm },
 
   selectedTargetCard: {

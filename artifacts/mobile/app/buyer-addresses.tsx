@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, RED, FONT, FS, SP, RADIUS, COMP, SUCCESS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
+import { useAuth } from '@clerk/expo';
 
 export default function BuyerAddressesScreen() {
   const { theme } = useAppTheme();
@@ -14,6 +15,7 @@ export default function BuyerAddressesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
+  const { userId } = useAuth();
 
   const [addresses, setAddresses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,17 +38,22 @@ export default function BuyerAddressesScreen() {
   const [isDefault, setIsDefault] = useState(false);
 
   const load = async () => {
+    if (!userId) {
+      setAddresses([]);
+      setLoading(false);
+      return;
+    }
     try {
       const data = await api.buyer.addresses.list();
       setAddresses(data);
     } catch {
-      Alert.alert('Error', 'Could not load addresses.');
+      setAddresses([]);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [userId]);
 
   const handleAddNew = () => {
     Haptics.selectionAsync();

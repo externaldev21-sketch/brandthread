@@ -30,6 +30,7 @@ import {
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { getEntitlementRejection } from '@/lib/entitlementError';
 import { PendingManufacturerOperations } from '@/services/manufacturerIdempotency';
+import { useAuth } from '@clerk/expo';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -321,6 +322,7 @@ export default function ManufacturerMessagesScreen() {
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
   const api     = useApi();
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
 
   const [resolvedThreadId, setResolvedThreadId] = useState<string | null>(params.threadId ?? null);
   const [mfrDisplayName, setMfrDisplayName] = useState(params.mfrName ?? 'Manufacturer');
@@ -331,7 +333,6 @@ export default function ManufacturerMessagesScreen() {
   const [inputText,  setInputText]  = useState('');
   const [sending,    setSending]    = useState(false);
   const [loading,    setLoading]    = useState(true);
-  const [loadError,  setLoadError]  = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [cardDialog, setCardDialog] = useState<'sample_card' | 'bulk_card' | null>(null);
 
@@ -357,12 +358,10 @@ export default function ManufacturerMessagesScreen() {
 
   const loadApiMessages = useCallback(async (threadId: string) => {
     try {
-      setLoadError('');
       const msgs = await api.manufacturers.threads.messages.list(threadId);
       setApiMessages(msgs.reverse()); // newest first for inverted list
     } catch (e) {
       if (showUpgrade(e)) return;
-      setLoadError('Could not load messages.');
       console.error('Failed to load messages:', e);
     } finally {
       setRefreshing(false);
@@ -370,6 +369,7 @@ export default function ManufacturerMessagesScreen() {
   }, [api, showUpgrade]);
 
   useEffect(() => {
+    if (!authLoaded || !isSignedIn) return;
     (async () => {
       setLoading(true);
       if (resolvedThreadId) {
@@ -381,7 +381,7 @@ export default function ManufacturerMessagesScreen() {
             setManufacturerId(thread.manufacturerId);
           }
         } catch (error) {
-          if (!showUpgrade(error)) Alert.alert('Error', 'Could not load this conversation.');
+          if (showUpgrade(error)) return;
         }
         await loadApiMessages(resolvedThreadId);
       } else if (params.mfrId) {
@@ -394,18 +394,12 @@ export default function ManufacturerMessagesScreen() {
           setResolvedThreadId(thread.id);
           // Messages will load via the effect below
         } catch (error) {
-          if (!showUpgrade(error)) {
-            Alert.alert('Error', 'Could not open this manufacturer conversation.');
-          }
+          showUpgrade(error);
         }
-      } else {
-        Alert.alert('Conversation unavailable', 'A valid manufacturer thread is required.', [
-          { text: 'Back', onPress: () => router.back() },
-        ]);
       }
       setLoading(false);
     })();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authLoaded, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // When threadId resolves, load messages
   useEffect(() => {
@@ -627,14 +621,7 @@ export default function ManufacturerMessagesScreen() {
       </View>
 
       {/* Messages */}
-      {loadError && apiMessages.length === 0 ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.lg }}>
-          <Text style={{ color: MUTED, fontFamily: FONT.medium, marginBottom: SP.md }}>{loadError}</Text>
-          <TouchableOpacity style={dlgS.sendBtn} onPress={() => resolvedThreadId && loadApiMessages(resolvedThreadId)}>
-            <Text style={dlgS.sendBtnText}>Try again</Text>
-          </TouchableOpacity>
-        </View>
-      ) : <FlatList
+      <FlatList
           ref={listRef}
           data={apiMessages}
           keyExtractor={m => m.id}
@@ -656,7 +643,7 @@ export default function ManufacturerMessagesScreen() {
               </Text>
             </View>
           }
-        />}
+         />
 
       {/* Input Bar */}
       <View style={[s.inputArea, { paddingBottom: Math.max(insets.bottom, SP.md) }]}>

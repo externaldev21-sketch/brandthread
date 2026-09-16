@@ -19,7 +19,6 @@ import { SellerQuickActionsGrid } from '@/components/SellerQuickActionsGrid';
 import { BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED, SELLER_DASHBOARD_GLASS, SELLER_DASHBOARD_GLASS_ELEVATED, BORDER, BORDER_SUBTLE, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, GREEN_BRIGHT, BLUE, ORANGE, RED, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
-import { reportNetworkError } from '@/lib/networkNotice';
 import { useRevenueCat } from '@/lib/revenueCat';
 import { getBillingRecoveryTarget, isSubscriptionPaymentRecoveryRequired } from '@/lib/subscriptionRecovery';
 import { initFromStorage, subscribe } from '@/lib/orderBadgeStore';
@@ -322,6 +321,13 @@ export default function SellerHomeScreen() {
   }, [api, userId]);
 
   useEffect(() => {
+    if (!userId) {
+      setLoading(false);
+      setDashStats(null);
+      setSalesTrend(null);
+      setRecentOrders([]);
+      return;
+    }
     const timer = setTimeout(() => { void loadSetup(); }, 0);
     const minLoad = setTimeout(() => {}, 500);
     setDashStatsError(false);
@@ -343,7 +349,6 @@ export default function SellerHomeScreen() {
     }).catch((error) => {
       setDashStats(null);
       setDashStatsError(true);
-      reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
 
     Promise.all([
@@ -362,14 +367,12 @@ export default function SellerHomeScreen() {
       setInvStats(deriveInventoryStats(Array.isArray(rows) ? rows : []));
     }).catch((error) => {
       setInvStats(null);
-      reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
 
     api.finance.balance().then((data: any) => {
       setPayoutInfo(data && typeof data === 'object' ? data : null);
     }).catch((error) => {
       setPayoutInfo(null);
-      reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
 
     api.orders.list().then((rows: any) => {
@@ -382,14 +385,12 @@ export default function SellerHomeScreen() {
       setOrderStats(null);
       setRecentOrders(null);
       setOrdersError(true);
-      reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
 
     api.products.list().then((rows: any) => {
       setSearchProducts(Array.isArray(rows) ? rows : []);
     }).catch((error) => {
       setSearchProducts([]);
-      reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
 
     api.analytics.revenue('last7').then((data: any) => {
@@ -399,7 +400,6 @@ export default function SellerHomeScreen() {
     }).catch((error) => {
       setSalesTrend(null);
       setSalesTrendError(true);
-      reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
 
     return () => { clearTimeout(timer); clearTimeout(minLoad); };
@@ -653,13 +653,6 @@ export default function SellerHomeScreen() {
         <AnimatedEntrance delay={0} style={s.pageSection}>
           <SellerDashboardSectionHeader title="Overview" action="Analytics" onAction={() => nav('/(tabs)/analytics')} />
 
-          {dashStatsError ? (
-            <DashboardUnavailableState
-              title="Your overview will be ready shortly"
-              message="We couldn't refresh your latest numbers. Your workspace is still available."
-              onRetry={() => setRetryKey(key => key + 1)}
-            />
-          ) : (
           <SellerDashboardKPIGrid cards={[
             {
               label: 'Net Revenue',
@@ -682,7 +675,6 @@ export default function SellerHomeScreen() {
               value: dashStats === null || dashStats.storefrontVisits === 0 ? '—' : `${(dashStats.completedOrders / dashStats.storefrontVisits * 100).toFixed(1)}%`,
             },
           ]} />
-          )}
 
           <UnifiedCard onPress={() => nav('/(tabs)/analytics')} style={{ padding: SP.sm, paddingBottom: 12 }}>
              <SellerDashboardTrendHeader />
@@ -830,13 +822,7 @@ export default function SellerHomeScreen() {
         <AnimatedEntrance delay={200} style={s.pageSection}>
            <SellerDashboardSectionHeader title="Recent Orders" action="View all" onAction={() => nav('/(tabs)/orders')} />
 
-           {ordersError ? (
-              <DashboardUnavailableState
-                title="Orders are taking a moment"
-                message="We couldn't refresh your latest orders just yet."
-                onRetry={() => setRetryKey(key => key + 1)}
-              />
-           ) : recentOrders === null ? (
+           {recentOrders === null ? (
               <LoadingSkeleton height={140} style={{ borderRadius: RADIUS.lg }} />
            ) : recentOrders.length === 0 ? (
               <UnifiedCard glow style={{ padding: SP.lg }}>

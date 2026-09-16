@@ -11,12 +11,12 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { BG, SCREEN_BG, SURFACE, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
+import { BG, SCREEN_BG, SURFACE, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, ORANGE, RED, RED_DIM, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { AnimatedEntrance, BrandthreadCard, PrimaryButton, IconButton, SearchBar, FilterChip, StatusBadge, EmptyState, ProductGridSkeleton, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
-import { getProducts, getProductStats, archiveProduct, unarchiveProduct, deleteProduct, restoreProduct, duplicateProduct, listDrafts, deleteDraft } from '@/services/productService';
-import { Product, ProductDraft, ProductFilter } from '@/services/productTypes';
+import { getProducts, getProductStats, archiveProduct, unarchiveProduct, deleteProduct, restoreProduct, duplicateProduct } from '@/services/productService';
+import { Product, ProductFilter } from '@/services/productTypes';
 import { formatCents, integerPercent } from '@/lib/money';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -348,7 +348,6 @@ export default function ProductsScreen() {
   const { showUndo } = useUndoToast();
 
   const [products, setProducts] = useState<Product[]>([]);
-  const [inProgressDrafts, setInProgressDrafts] = useState<ProductDraft[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [filter, setFilter] = useState<ProductFilter>('all');
   const [sort, setSort] = useState<SortKey>('newest');
@@ -392,29 +391,9 @@ export default function ProductsScreen() {
 
   useFocusEffect(useCallback(() => {
     loadProducts();
-    listDrafts().then(rows => setInProgressDrafts(Array.isArray(rows) ? rows : [])).catch(() => {});
   }, [loadProducts]));
 
   function refresh() { loadProducts(); }
-
-  const handleDiscardDraft = useCallback((draftId: string, draftName: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(
-      'Discard draft?',
-      `"${draftName || 'Untitled product'}" will be permanently deleted.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Discard',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteDraft(draftId);
-            setInProgressDrafts(prev => prev.filter(d => d.id !== draftId));
-          },
-        },
-      ]
-    );
-  }, []);
 
   async function handleDuplicate(id: string) {
     await duplicateProduct(id);
@@ -512,41 +491,6 @@ export default function ProductsScreen() {
 
   const ListHeader = useMemo(() => (
     <View>
-      {/* In-progress drafts */}
-      {inProgressDrafts.length > 0 && (
-        <View style={s.draftSection}>
-          <Text style={s.draftSectionLabel}>In Progress ({inProgressDrafts.length})</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: SP.sm, paddingRight: SP.md }}
-          >
-            {inProgressDrafts.slice(0, 3).map(draft => (
-              <PressableScale
-                key={draft.id}
-                style={s.draftCard}
-                onPress={() => router.push(('/add-product?editId=' + draft.id) as never)}
-                accessibilityLabel={`Resume ${draft.name || 'untitled product'} draft`}
-              >
-                <View style={s.draftCardTop}>
-                  <Feather name="edit-3" size={12} color={ORANGE} />
-                  <Text style={s.draftStep}>Step {draft.currentStep ?? 1}/10</Text>
-                  <PressableScale
-                    hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-                    onPress={() => handleDiscardDraft(draft.id, draft.name ?? '')}
-                    accessibilityLabel={`Discard ${draft.name || 'untitled'} draft`}
-                  >
-                    <Feather name="x" size={12} color={SUBTLE} />
-                  </PressableScale>
-                </View>
-                <Text style={s.draftName} numberOfLines={1}>{draft.name || 'Untitled product'}</Text>
-                <Text style={s.draftResume}>Resume</Text>
-              </PressableScale>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
       {/* Products group container */}
       <View style={s.groupContainer}>
         {/* Group header */}
@@ -555,7 +499,7 @@ export default function ProductsScreen() {
         </View>
       </View>
     </View>
-  ), [inProgressDrafts, router, handleDiscardDraft, sortedProducts.length]);
+  ), [sortedProducts.length]);
 
   const ListEmpty = useMemo(() => (
     <View style={s.groupContainer}>
@@ -611,7 +555,6 @@ export default function ProductsScreen() {
         {/* Persistent search row */}
         <View style={s.searchRow}>
           <View style={s.searchBox}>
-            <Feather name="search" size={14} color={MUTED} style={{ marginRight: SP.xs }} />
             <SearchBar
               value={searchQuery}
               onChange={setSearchQuery}
@@ -795,52 +738,6 @@ const s = StyleSheet.create({
     paddingBottom: SP.sm,
     paddingTop: 2,
     gap: SP.xs,
-  },
-
-  // Draft section
-  draftSection: {
-    paddingTop: SP.md,
-    paddingLeft: SP.md,
-    marginBottom: SP.sm,
-  },
-  draftSectionLabel: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
-    color: MUTED,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: SP.sm,
-  },
-  draftCard: {
-    width: 140,
-    backgroundColor: CARD,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: ORANGE + '44',
-    padding: SP.sm,
-    gap: 3,
-  },
-  draftCardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  draftStep: {
-    flex: 1,
-    fontSize: FS.xs,
-    fontFamily: FONT.medium,
-    color: ORANGE,
-  },
-  draftName: {
-    fontSize: FS.sm,
-    fontFamily: FONT.semibold,
-    color: FG,
-  },
-  draftResume: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
-    color: PURPLE_LIGHT,
-    marginTop: 2,
   },
 
   // Group container (card background for list)

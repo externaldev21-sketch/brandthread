@@ -10,15 +10,18 @@
  */
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { users, orderFundReservations } from "@workspace/db";
+import { users, orderFundReservations, sellerCashoutAttempts } from "@workspace/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 import { stripe } from "../lib/stripe";
+import { cashOutableAmount, isValidPayoutIdempotencyKey } from "../lib/payoutSafety";
 
 const router = Router();
 router.use(requireAuth);
 router.use(teamContext());
+const PAYOUT_CURRENCY = "usd";
+const SAFE_PROVIDER_RETRY_WINDOW_MS = 20 * 60 * 60 * 1000;
 
 function getSellerId(req: any): string {
   return (req as any).clerkUserId as string;
@@ -40,6 +43,37 @@ function formatCents(cents: number, currency = "usd"): string {
   }).format(cents / 100);
 }
 
+function findEligibleBankAccount(accounts: any[]): any | undefined {
+  return accounts.find((externalAccount) =>
+    externalAccount?.object === "bank_account"
+    && externalAccount.currency?.toLowerCase() === PAYOUT_CURRENCY
+    && externalAccount.default_for_currency === true
+    && externalAccount.status !== "errored"
+    && externalAccount.status !== "verification_failed",
+  );
+}
+
+type CashoutResult =
+  | { kind: "continue" }
+  | {
+      kind: "error";
+      httpStatus: number;
+      code: string;
+      message: string;
+      availableAfterReservations?: number;
+    }
+  | {
+      kind: "success";
+      duplicate: boolean;
+      payout: {
+        id: string;
+        amount: number;
+        currency: string;
+        status: string;
+        arrivalDate: Date;
+      };
+    };
+
 // ─── GET /api/finance/balance ─────────────────────────────────────────────────
 
 // Finance data is owner-only: a joined-store member must not infer balances,
@@ -59,20 +93,52 @@ router.get("/balance", requireRole("owner"), async (req, res) => {
       return;
     }
 
-    const [balance, payouts] = await Promise.all([
+    const [balance, payouts, reservationRows, processingRows, account, externalAccounts] = await Promise.all([
       stripe.balance.retrieve({}, { stripeAccount: accountId }),
       stripe.payouts.list({ limit: 1, status: "pending" }, { stripeAccount: accountId }),
+      db.select({ reserved: sql<number>`COALESCE(SUM(${orderFundReservations.amountCents}), 0)::int` })
+        .from(orderFundReservations)
+        .where(and(
+          eq(orderFundReservations.ownerId, sellerId),
+          inArray(orderFundReservations.status, ["reserved", "spent"]),
+        )),
+      db.select({
+        idempotencyKey: sellerCashoutAttempts.idempotencyKey,
+        amountCents: sellerCashoutAttempts.amountCents,
+        currency: sellerCashoutAttempts.currency,
+        createdAt: sellerCashoutAttempts.createdAt,
+      })
+        .from(sellerCashoutAttempts)
+        .where(and(
+          eq(sellerCashoutAttempts.ownerId, sellerId),
+          eq(sellerCashoutAttempts.status, "processing"),
+        )),
+      stripe.accounts.retrieve(accountId),
+      stripe.accounts.listExternalAccounts(accountId, {
+        object: "bank_account",
+        limit: 100,
+      }),
     ]);
 
-    const avail   = balance.available[0] ?? { amount: 0, currency: "usd" };
-    const pending = balance.pending[0]   ?? { amount: 0, currency: "usd" };
+    const avail = balance.available.find((entry) => entry.currency === PAYOUT_CURRENCY)
+      ?? { amount: 0, currency: PAYOUT_CURRENCY };
+    const pending = balance.pending.find((entry) => entry.currency === PAYOUT_CURRENCY)
+      ?? { amount: 0, currency: PAYOUT_CURRENCY };
     const nextP   = payouts.data[0] ?? null;
+    const reserved = Number(reservationRows[0]?.reserved ?? 0);
+    const processingReserved = processingRows
+      .filter((row) => row.currency === PAYOUT_CURRENCY)
+      .reduce((sum, row) => sum + row.amountCents, 0);
+    const availableAfterReservations = cashOutableAmount(avail.amount, reserved + processingReserved);
+    const processingCashout = processingRows
+      .filter((row) => row.currency === PAYOUT_CURRENCY)
+      .sort((a, b) => b.createdAt.valueOf() - a.createdAt.valueOf())[0];
 
     res.json({
       available: {
-        amount:    avail.amount,
+        amount:    availableAfterReservations,
         currency:  avail.currency,
-        formatted: formatCents(avail.amount, avail.currency),
+        formatted: formatCents(availableAfterReservations, avail.currency),
       },
       pending: {
         amount:    pending.amount,
@@ -88,6 +154,14 @@ router.get("/balance", requireRole("owner"), async (req, res) => {
         status:      nextP.status,
       } : null,
       connected: true,
+      payoutsEnabled: account.payouts_enabled === true,
+      bankConnected: Boolean(findEligibleBankAccount(externalAccounts.data)),
+      processingCashout: processingCashout ? {
+        idempotencyKey: processingCashout.idempotencyKey,
+        amount: processingCashout.amountCents,
+        currency: processingCashout.currency,
+        formatted: formatCents(processingCashout.amountCents, processingCashout.currency),
+      } : null,
     });
   } catch (err: any) {
     req.log.error({ err }, "Failed to load balance");
@@ -226,56 +300,337 @@ router.get("/statement.csv", requireRole("owner"), async (req, res) => {
   }
 });
 
-// ─── POST /api/finance/payout — manual instant payout ─────────────────────────
+// ─── POST /api/finance/payout — manual bank payout ────────────────────────────
 
 router.post("/payout", requireRole("owner"), async (req, res) => {
   const sellerId = getSellerId(req);
-  const { amount, currency = "usd" } = req.body;
+  const { amount, currency, idempotencyKey } = req.body;
 
   try {
-    const accountId = await getStripeAccount(sellerId);
-    if (!stripe || !accountId) {
-      res.status(400).json({ error: "Stripe not connected" }); return;
+    if (!isValidPayoutIdempotencyKey(idempotencyKey)) {
+      res.status(400).json({
+        error: "A valid idempotency key is required",
+        code: "INVALID_IDEMPOTENCY_KEY",
+      });
+      return;
+    }
+    if (!Number.isSafeInteger(amount) || amount <= 0 || currency !== PAYOUT_CURRENCY) {
+      res.status(400).json({
+        error: "A positive integer USD amount is required",
+        code: "INVALID_PAYOUT_AMOUNT",
+      });
+      return;
+    }
+    const currentAccountId = await getStripeAccount(sellerId);
+    if (!stripe) {
+      res.status(503).json({ error: "Stripe is unavailable" }); return;
     }
     const stripeClient = stripe;
-
-    const payout = await db.transaction(async (tx) => {
-      // Label reservations and payouts share this seller-scoped lock, so neither
-      // can observe and spend the same funds while the other is in flight.
+    const claimResult: CashoutResult = await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${sellerId}))`);
-      const [balance, reservationRows] = await Promise.all([
-        stripeClient.balance.retrieve({}, { stripeAccount: accountId }),
-        tx.select({ reserved: sql<number>`COALESCE(SUM(${orderFundReservations.amountCents}), 0)::int` })
-          .from(orderFundReservations)
-          .where(and(
-            eq(orderFundReservations.ownerId, sellerId),
-            inArray(orderFundReservations.status, ["reserved", "spent"]),
-          )),
-      ]);
-      const currencyBalance = balance.available.find((entry) => entry.currency === currency);
-      const providerAvailable = currencyBalance?.amount ?? 0;
-      const reserved = Number(reservationRows[0]?.reserved ?? 0);
-      const payoutAmount = amount ?? Math.max(0, providerAvailable - reserved);
-      if (!Number.isInteger(payoutAmount) || payoutAmount <= 0 || payoutAmount > providerAvailable - reserved) {
-        throw Object.assign(new Error("Requested payout would spend funds reserved for shipping labels"), {
-          status: 409,
-          code: "FUNDS_RESERVED_FOR_LABELS",
-          availableAfterReservations: Math.max(0, providerAvailable - reserved),
+
+      const [existing] = await tx.select()
+        .from(sellerCashoutAttempts)
+        .where(and(
+          eq(sellerCashoutAttempts.ownerId, sellerId),
+          eq(sellerCashoutAttempts.idempotencyKey, idempotencyKey),
+        ))
+        .limit(1);
+
+      if (existing) {
+        if (existing.amountCents !== amount || existing.currency !== currency) {
+          return {
+            kind: "error" as const,
+            httpStatus: 409,
+            code: "IDEMPOTENCY_CONFLICT",
+            message: "This cash-out retry does not match the originally confirmed amount",
+          };
+        }
+        if (existing.status === "succeeded" && existing.stripePayoutId && existing.responseStatus && existing.responseArrivalDate) {
+          return {
+            kind: "success" as const,
+            duplicate: true,
+            payout: {
+              id: existing.stripePayoutId,
+              amount: existing.amountCents,
+              currency: existing.currency,
+              status: existing.responseStatus,
+              arrivalDate: existing.responseArrivalDate,
+            },
+          };
+        }
+        if (existing.status === "failed") {
+          return {
+            kind: "error" as const,
+            httpStatus: existing.errorHttpStatus ?? 409,
+            code: existing.errorCode ?? "PAYOUT_FAILED",
+            message: existing.errorMessage ?? "Payout failed",
+          };
+        }
+        return { kind: "continue" as const };
+      } else {
+        if (!currentAccountId) {
+          return {
+            kind: "error" as const,
+            httpStatus: 409,
+            code: "PAYOUTS_NOT_ENABLED",
+            message: "Connect and verify a bank account before cashing out",
+          };
+        }
+        const [account, externalAccounts, balance, reservationRows, processingRows] = await Promise.all([
+          stripeClient.accounts.retrieve(currentAccountId),
+          stripeClient.accounts.listExternalAccounts(currentAccountId, {
+            object: "bank_account",
+            limit: 100,
+          }),
+          stripeClient.balance.retrieve({}, { stripeAccount: currentAccountId }),
+          tx.select({ reserved: sql<number>`COALESCE(SUM(${orderFundReservations.amountCents}), 0)::int` })
+            .from(orderFundReservations)
+            .where(and(
+              eq(orderFundReservations.ownerId, sellerId),
+              inArray(orderFundReservations.status, ["reserved", "spent"]),
+            )),
+          tx.select({ amountCents: sellerCashoutAttempts.amountCents })
+            .from(sellerCashoutAttempts)
+            .where(and(
+              eq(sellerCashoutAttempts.ownerId, sellerId),
+              eq(sellerCashoutAttempts.status, "processing"),
+              eq(sellerCashoutAttempts.currency, PAYOUT_CURRENCY),
+            )),
+        ]);
+        const bankAccount = findEligibleBankAccount(externalAccounts.data);
+        if (account.payouts_enabled !== true || !bankAccount) {
+          return {
+            kind: "error" as const,
+            httpStatus: 409,
+            code: "PAYOUTS_NOT_ENABLED",
+            message: "Bank payouts are not enabled for this Stripe account",
+          };
+        }
+        const providerAvailable = balance.available.find((entry) => entry.currency === PAYOUT_CURRENCY)?.amount ?? 0;
+        const reserved = Number(reservationRows[0]?.reserved ?? 0);
+        const processingReserved = processingRows.reduce((sum, row) => sum + row.amountCents, 0);
+        const availableAfterReservations = cashOutableAmount(providerAvailable, reserved + processingReserved);
+        if (amount !== availableAfterReservations) {
+          return {
+            kind: "error" as const,
+            httpStatus: 409,
+            code: "BALANCE_CHANGED",
+            message: "The available balance changed. Review the new balance and confirm again.",
+            availableAfterReservations,
+          };
+        }
+        await tx.insert(sellerCashoutAttempts).values({
+          ownerId: sellerId,
+          idempotencyKey,
+          amountCents: amount,
+          currency,
+          stripeAccountId: currentAccountId,
+          bankDestinationId: bankAccount.id,
+          status: "processing",
         });
+        return { kind: "continue" as const };
       }
-      return stripeClient.payouts.create(
-        { amount: payoutAmount, currency, method: "instant" },
-        { stripeAccount: accountId },
-      );
     });
 
-    res.status(201).json({
-      id:          payout.id,
-      amount:      payout.amount,
-      currency:    payout.currency,
-      formatted:   formatCents(payout.amount, payout.currency),
-      status:      payout.status,
-      arrivalDate: new Date(payout.arrival_date * 1000).toISOString(),
+    let result: CashoutResult = claimResult;
+    if (claimResult.kind === "continue") {
+      result = await db.transaction(async (tx): Promise<CashoutResult> => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${sellerId}))`);
+        const [current] = await tx.select()
+          .from(sellerCashoutAttempts)
+          .where(and(
+            eq(sellerCashoutAttempts.ownerId, sellerId),
+            eq(sellerCashoutAttempts.idempotencyKey, idempotencyKey),
+          ))
+          .limit(1);
+        if (!current) {
+          return {
+            kind: "error",
+            httpStatus: 500,
+            code: "PAYOUT_ATTEMPT_MISSING",
+            message: "The cash-out attempt could not be loaded",
+          };
+        }
+        if (current.amountCents !== amount || current.currency !== currency) {
+          return {
+            kind: "error",
+            httpStatus: 409,
+            code: "IDEMPOTENCY_CONFLICT",
+            message: "This cash-out retry does not match the originally confirmed amount",
+          };
+        }
+        if (current.status === "succeeded" && current.stripePayoutId && current.responseStatus && current.responseArrivalDate) {
+          return {
+            kind: "success",
+            duplicate: true,
+            payout: {
+              id: current.stripePayoutId,
+              amount: current.amountCents,
+              currency: current.currency,
+              status: current.responseStatus,
+              arrivalDate: current.responseArrivalDate,
+            },
+          };
+        }
+        if (current.status === "failed") {
+          return {
+            kind: "error",
+            httpStatus: current.errorHttpStatus ?? 409,
+            code: current.errorCode ?? "PAYOUT_FAILED",
+            message: current.errorMessage ?? "Payout failed",
+          };
+        }
+        if (!current.stripeAccountId || !current.bankDestinationId) {
+          return {
+            kind: "error",
+            httpStatus: 409,
+            code: "PAYOUT_REVIEW_REQUIRED",
+            message: "This cash-out attempt needs review before it can continue",
+          };
+        }
+
+        let reconciledPayout: any | undefined;
+        try {
+          const recentPayouts = await stripeClient.payouts.list(
+            { limit: 100 },
+            { stripeAccount: current.stripeAccountId },
+          );
+          reconciledPayout = recentPayouts.data.find(
+            (payout) => payout.metadata?.brandthread_cashout_attempt === current.id,
+          );
+        } catch {
+          return {
+            kind: "error",
+            httpStatus: 502,
+            code: "PAYOUT_PROVIDER_UNCONFIRMED",
+            message: "The payout provider result could not be confirmed",
+          };
+        }
+        if (reconciledPayout) {
+          const arrivalDate = new Date(reconciledPayout.arrival_date * 1000);
+          await tx.update(sellerCashoutAttempts)
+            .set({
+              status: "succeeded",
+              stripePayoutId: reconciledPayout.id,
+              responseStatus: reconciledPayout.status,
+              responseArrivalDate: arrivalDate,
+              errorHttpStatus: null,
+              errorCode: null,
+              errorMessage: null,
+              updatedAt: new Date(),
+            })
+            .where(eq(sellerCashoutAttempts.id, current.id));
+          return {
+            kind: "success",
+            duplicate: true,
+            payout: {
+              id: reconciledPayout.id,
+              amount: reconciledPayout.amount,
+              currency: reconciledPayout.currency,
+              status: reconciledPayout.status,
+              arrivalDate,
+            },
+          };
+        }
+        if (Date.now() - current.createdAt.valueOf() > SAFE_PROVIDER_RETRY_WINDOW_MS) {
+          return {
+            kind: "error",
+            httpStatus: 409,
+            code: "PAYOUT_REVIEW_REQUIRED",
+            message: "This cash-out attempt is too old to retry automatically and needs review",
+          };
+        }
+
+      try {
+        const payout = await stripeClient.payouts.create(
+          {
+            amount: current.amountCents,
+            currency: current.currency,
+            method: "standard",
+            destination: current.bankDestinationId,
+            metadata: { brandthread_cashout_attempt: current.id },
+          },
+          {
+            stripeAccount: current.stripeAccountId,
+            idempotencyKey: `brandthread-cashout/${current.id}`,
+          },
+        );
+        const arrivalDate = new Date(payout.arrival_date * 1000);
+        await tx.update(sellerCashoutAttempts)
+          .set({
+            status: "succeeded",
+            stripePayoutId: payout.id,
+            responseStatus: payout.status,
+            responseArrivalDate: arrivalDate,
+            errorHttpStatus: null,
+            errorCode: null,
+            errorMessage: null,
+            updatedAt: new Date(),
+          })
+          .where(and(
+            eq(sellerCashoutAttempts.ownerId, sellerId),
+            eq(sellerCashoutAttempts.idempotencyKey, idempotencyKey),
+          ));
+        return {
+          kind: "success" as const,
+          duplicate: false,
+          payout: {
+            id: payout.id,
+            amount: payout.amount,
+            currency: payout.currency,
+            status: payout.status,
+            arrivalDate,
+          },
+        };
+      } catch (providerError: any) {
+        const providerStatus = Number(providerError?.statusCode ?? providerError?.status);
+        const definitive = Number.isInteger(providerStatus) && providerStatus >= 400 && providerStatus < 500;
+        const httpStatus = definitive ? providerStatus : 502;
+        const code = typeof providerError?.code === "string" ? providerError.code : "PAYOUT_PROVIDER_UNCONFIRMED";
+        const message = definitive
+          ? (providerError?.message ?? "Stripe rejected the payout")
+          : "The payout provider result could not be confirmed";
+        await tx.update(sellerCashoutAttempts)
+          .set({
+            status: definitive ? "failed" : "processing",
+            errorHttpStatus: httpStatus,
+            errorCode: code,
+            errorMessage: message,
+            updatedAt: new Date(),
+          })
+          .where(and(
+            eq(sellerCashoutAttempts.ownerId, sellerId),
+            eq(sellerCashoutAttempts.idempotencyKey, idempotencyKey),
+          ));
+        return { kind: "error" as const, httpStatus, code, message };
+      }
+      });
+    }
+
+    if (result.kind === "continue") {
+      res.status(500).json({ error: "The payout attempt did not finish", code: "PAYOUT_ATTEMPT_INCOMPLETE" });
+      return;
+    }
+    if (result.kind === "error") {
+      res.status(result.httpStatus).json({
+        error: result.message,
+        code: result.code,
+        ...("availableAfterReservations" in result
+          ? { availableAfterReservations: result.availableAfterReservations }
+          : {}),
+      });
+      return;
+    }
+
+    res.status(result.duplicate ? 200 : 201).json({
+      id: result.payout.id,
+      amount: result.payout.amount,
+      currency: result.payout.currency,
+      formatted: formatCents(result.payout.amount, result.payout.currency),
+      status: result.payout.status,
+      arrivalDate: result.payout.arrivalDate.toISOString(),
+      duplicate: result.duplicate,
     });
   } catch (err: any) {
     req.log.error({ err }, "Failed to request payout");

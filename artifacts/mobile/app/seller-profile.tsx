@@ -18,6 +18,7 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import type { SellerPost } from '@/services/types';
 import type { Product } from '@/services/productTypes';
 import { useApi } from '@/hooks/useApi';
@@ -363,6 +364,7 @@ export default function SellerProfileScreen() {
   const routeSellerId = params.id ?? params.sellerId;
   const isOwner = params.isOwner === 'true';
   const api = useApi();
+  const { isLoaded: authLoaded, userId } = useAuth();
 
   const [profile, setProfile] = useState(() => mapApiProfile({}));
   const [activeTab, setActiveTab] = useState(0);
@@ -377,7 +379,6 @@ export default function SellerProfileScreen() {
   const [posts, setPosts] = useState<SellerPost[]>([]);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
-  const [profileError, setProfileError] = useState<string | null>(null);
   const [followPending, setFollowPending] = useState(false);
 
   const tabs = ['Posts', 'Products'];
@@ -386,10 +387,22 @@ export default function SellerProfileScreen() {
   // Load seller data
   useEffect(() => {
     const sellerId = routeSellerId as string | undefined;
+    let active = true;
+    setProfile(mapApiProfile({}));
+    setPosts([]);
+    setLiveProducts([]);
+    setProfileImageUrl(null);
+    setFollowers(0);
+    setIsFollowing(false);
+    setApiRating(null);
+    if (isOwner && (!authLoaded || !userId)) {
+      setProfileLoading(!authLoaded);
+      setProductsLoading(!authLoaded);
+      return () => { active = false; };
+    }
     (async () => {
       setProfileLoading(true);
       setProductsLoading(true);
-      setProfileError(null);
       try {
         if (!sellerId && isOwner) {
           const [p, postRows] = await Promise.all([
@@ -397,7 +410,8 @@ export default function SellerProfileScreen() {
             api.posts.publicList(),
           ]);
           const ownPosts = postRows.filter((post: any) => post.userId === p.clerkId).map(mapApiPost);
-          setProfile(mapApiProfile(p, ownPosts.length));
+           if (!active) return;
+           setProfile(mapApiProfile(p, ownPosts.length));
           setPosts(ownPosts);
           setProfileImageUrl(p.profileImageUrl ?? null);
           setLiveProducts([]);
@@ -411,7 +425,8 @@ export default function SellerProfileScreen() {
           ]);
           const sellerPosts = postRows.map(mapApiPost);
           const products = Array.isArray(data.products) ? data.products as Product[] : [];
-          setProfile(mapApiProfile(data.profile ?? {}, sellerPosts.length, products.length));
+           if (!active) return;
+           setProfile(mapApiProfile(data.profile ?? {}, sellerPosts.length, products.length));
           setFollowers(Number(followState.followersCount ?? data.profile?.followersCount ?? 0));
           setIsFollowing(followState.isFollowing);
           setProfileImageUrl(typeof data.profile?.profileImageUrl === 'string' ? data.profile.profileImageUrl : null);
@@ -419,23 +434,36 @@ export default function SellerProfileScreen() {
           setPosts(sellerPosts);
         }
       } catch {
+        if (!active) return;
+        setProfile(mapApiProfile({}));
         setPosts([]);
         setLiveProducts([]);
-        setProfileError("We couldn\u2019t load this seller profile. Check your connection and try again.");
+        setProfileImageUrl(null);
+        setFollowers(0);
+        setIsFollowing(false);
+        setApiRating(null);
       } finally {
-        setProfileLoading(false);
-        setProductsLoading(false);
+        if (active) {
+          setProfileLoading(false);
+          setProductsLoading(false);
+        }
       }
     })();
-  }, [api, isOwner, routeSellerId]);
+    return () => { active = false; };
+  }, [api, authLoaded, isOwner, routeSellerId, userId]);
 
   // Load reviews
   useEffect(() => {
     const sellerId = (routeSellerId ?? profile.sellerId) as string | undefined;
-    if (!sellerId) return;
+    let active = true;
+    setApiRating(null);
+    if (!sellerId) return () => { active = false; };
     api.reviews.forSeller(sellerId)
-      .then((data: any) => setApiRating({ avgRating: data.avgRating ?? 0, totalCount: data.totalCount ?? 0 }))
+      .then((data: any) => {
+        if (active) setApiRating({ avgRating: data.avgRating ?? 0, totalCount: data.totalCount ?? 0 });
+      })
       .catch(() => {});
+    return () => { active = false; };
   }, [api, profile.sellerId, routeSellerId]);
 
   const handleFollow = useCallback(async () => {
@@ -530,22 +558,6 @@ export default function SellerProfileScreen() {
       <View style={[styles.root, { alignItems: 'center', justifyContent: 'center', gap: 12 }]}>
         <ActivityIndicator color={colors.primary} />
         <Text style={{ color: MUTED, fontFamily: FONT.medium, fontSize: FS.sm }}>Loading seller profile…</Text>
-      </View>
-    );
-  }
-
-  if (profileError) {
-    return (
-      <View style={[styles.root, { alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 28 }]}>
-        <Feather name="alert-circle" size={32} color={RED} />
-        <Text style={{ color: FG, fontSize: FS.base, fontFamily: FONT.semibold }}>Couldn't load profile</Text>
-        <Text style={{ color: MUTED, textAlign: 'center', fontFamily: FONT.regular }}>{profileError}</Text>
-        <TouchableOpacity
-          style={styles.outlineBtn}
-          onPress={() => router.replace((routeSellerId ? '/seller-profile?id=' + routeSellerId : '/seller-profile?isOwner=true') as never)}
-        >
-          <Text style={styles.outlineBtnText}>Try again</Text>
-        </TouchableOpacity>
       </View>
     );
   }

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { and, eq, sql } from "drizzle-orm";
 import {
-  db, orders, shippingLabelQuotes, shippingLabels, orderFundReservations, dropWallets,
+  db, orders, shippingLabelQuotes, shippingLabels, orderFundReservations, dropWallets, sellerCashoutAttempts,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole, teamContext } from "../middlewares/requireRole";
@@ -133,6 +133,20 @@ router.post("/:orderId/purchase", requireRole("staff"), async (req, res) => {
         throw Object.assign(new Error("This shipping rate is expired or does not belong to this order"), { status: 409, code: "INVALID_SHIPPING_QUOTE" });
       }
       const priceCents = quote.priceCents;
+
+      const [processingCashout] = await tx.select({ id: sellerCashoutAttempts.id })
+        .from(sellerCashoutAttempts)
+        .where(and(
+          eq(sellerCashoutAttempts.ownerId, ownerId),
+          eq(sellerCashoutAttempts.status, "processing"),
+        ))
+        .limit(1);
+      if (processingCashout) {
+        throw Object.assign(new Error("A cash out is currently processing. Retry this label after it finishes."), {
+          status: 409,
+          code: "CASHOUT_IN_PROGRESS",
+        });
+      }
 
       const reservedResult = await tx.execute(sql`
         SELECT COALESCE(SUM(amount_cents), 0)::int AS reserved

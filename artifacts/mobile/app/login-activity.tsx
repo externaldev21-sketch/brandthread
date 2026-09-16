@@ -51,7 +51,6 @@ export default function LoginActivityScreen() {
   const api = useApi();
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -60,7 +59,7 @@ export default function LoginActivityScreen() {
         // Sort newest first
         setSessions((data.sessions ?? []).sort((a, b) => b.lastActiveAt - a.lastActiveAt));
       } catch {
-        setError('Could not load login activity. Please try again.');
+        setSessions([]);
       } finally {
         setLoading(false);
       }
@@ -80,11 +79,6 @@ export default function LoginActivityScreen() {
       {loading ? (
         <View style={s.center}>
           <ActivityIndicator color={colors.primary} />
-        </View>
-      ) : error ? (
-        <View style={s.center}>
-          <Feather name="alert-circle" size={28} color={MUTED} style={{ marginBottom: 12 }} />
-          <Text style={s.errorText}>{error}</Text>
         </View>
       ) : (
         <ScrollView
@@ -167,8 +161,6 @@ const s = StyleSheet.create({
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   title:   { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   center:  { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
-  errorText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' },
-
   body: { paddingHorizontal: SP.md, paddingTop: SP.lg },
   desc: {
     fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED,

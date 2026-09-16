@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,37 +12,67 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import AIBrainFAB from '@/components/AIBrainFAB';
 import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
+import { ApiError } from '@/lib/networkNotice';
+import { useTeamRole } from '@/hooks/useTeamRole';
+import { subscribeStoreContext } from '@/lib/api';
+import {
+  selectSellerHomeAnalytics,
+  sellerHomeAnalyticsKey,
+  zeroSellerHomeAnalytics,
+  type SellerHomeAnalyticsSnapshot,
+} from '@/lib/sellerHomeAnalytics';
 import { skipTask, type SetupState, type SetupTask } from '@/lib/setupStore';
 import { withSellerSetupOrigin } from '@/lib/setupNavigation';
 import {
   BORDER,
-  CARD,
+  BORDER_SUBTLE,
+  CARD_ELEVATED_GLASS,
   FG,
   FONT,
   FS,
   MUTED,
   RADIUS,
   SCREEN_BG,
+  SELLER_DASHBOARD_GLASS,
+  SKELETON_GLASS,
   SP,
+  SUBTLE,
+  SUCCESS,
+  SUCCESS_DIM,
 } from '@/lib/theme';
 
 type TimeRange = 'live' | 'today' | 'yesterday' | 'week';
 
-type HomeAnalytics = {
-  range: string;
-  totalCents: number;
-  orderCount: number;
-  visitorCount: number;
-  toFulfill: number;
-  toCapture: number;
-  buckets: Array<{ bucket: string; totalCents: number; orderCount: number }>;
-};
+interface FinanceBalance {
+  available: { amount: number; currency: string; formatted: string };
+  pending: { amount: number; currency: string; formatted: string };
+  connected: boolean;
+  payoutsEnabled?: boolean;
+  bankConnected?: boolean;
+  processingCashout?: {
+    idempotencyKey: string;
+    amount: number;
+    currency: string;
+    formatted: string;
+  } | null;
+}
+
+interface PersistedCashoutAttempt {
+  idempotencyKey: string;
+  amount: number;
+  currency: string;
+}
+
+function cashoutAttemptStorageKey(userId: string): string {
+  return `bt:seller-cashout-attempt:${userId}`;
+}
 
 const RANGES: Array<{ id: TimeRange; label: string }> = [
   { id: 'live', label: 'Live' },
@@ -62,6 +92,97 @@ function bucketLabel(value: string, range: TimeRange): string {
   });
 }
 
+// ─── Skeleton shimmer row ────────────────────────────────────────────────────
+function SkeletonBlock({ width, height, style }: { width?: number | string; height: number; style?: object }) {
+  return (
+    <View
+      style={[
+        {
+          width: width ?? '100%',
+          height,
+          borderRadius: RADIUS.sm,
+          backgroundColor: SKELETON_GLASS,
+        },
+        style,
+      ]}
+    />
+  );
+}
+
+// ─── Loading skeleton for the summary area ───────────────────────────────────
+function SummarySkeleton() {
+  return (
+    <View style={styles.statGrid}>
+      {[0, 1, 2].map((index) => (
+        <View key={index} style={styles.statTile}>
+          <SkeletonBlock width={index === 0 ? 72 : 48} height={10} />
+          <SkeletonBlock width={index === 0 ? 92 : 38} height={28} style={{ marginTop: SP.sm }} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ─── Chart skeleton bars ─────────────────────────────────────────────────────
+function ChartSkeleton({ count = 10 }: { count?: number }) {
+  const heights = [45, 62, 30, 75, 52, 88, 38, 66, 44, 55];
+  return (
+    <View style={styles.chart}>
+      {Array.from({ length: count }).map((_, i) => (
+        <View key={i} style={styles.barColumn}>
+          <View style={styles.barTrack}>
+            <View
+              style={[
+                styles.bar,
+                {
+                  height: `${heights[i % heights.length]}%`,
+                  backgroundColor: SKELETON_GLASS,
+                },
+              ]}
+            />
+          </View>
+          <SkeletonBlock width={14} height={8} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ─── Empty chart state ────────────────────────────────────────────────────────
+function ChartEmptyState({ range }: { range: TimeRange }) {
+  const rangeLabel = RANGES.find((r) => r.id === range)?.label ?? range;
+  const ghost = [18, 28, 14, 35, 22, 42, 16, 30, 20, 26];
+  return (
+    <View style={styles.chartEmptyWrap}>
+      {/* Ghost bars — visually suggest the chart shape without implying real data */}
+      <View style={[styles.chart, styles.chartGhost]}>
+        {ghost.map((h, i) => (
+          <View key={i} style={styles.barColumn}>
+            <View style={styles.barTrack}>
+              <View
+                style={[
+                  styles.bar,
+                  {
+                    height: `${h}%`,
+                    backgroundColor: BORDER_SUBTLE,
+                  },
+                ]}
+              />
+            </View>
+            <View style={{ width: 14, height: 8, borderRadius: 3, backgroundColor: BORDER_SUBTLE }} />
+          </View>
+        ))}
+      </View>
+      {/* Overlay label */}
+      <View style={styles.chartEmptyOverlay} pointerEvents="none">
+        <Feather name="bar-chart-2" size={20} color={SUBTLE} />
+        <Text style={styles.chartEmptyTitle}>No sales {rangeLabel === 'Live' ? 'right now' : `for ${rangeLabel.toLowerCase()}`}</Text>
+        <Text style={styles.chartEmptySubtitle}>Sales will appear here as orders come in</Text>
+      </View>
+    </View>
+  );
+}
+
 export default function SellerHomeCommerceDashboard({
   topInset,
   userId,
@@ -76,36 +197,204 @@ export default function SellerHomeCommerceDashboard({
   const router = useRouter();
   const api = useApi();
   const { theme } = useAppTheme();
+  const { currentRole, isLoadingRole } = useTeamRole();
   const [range, setRange] = useState<TimeRange>('today');
-  const [data, setData] = useState<HomeAnalytics | null>(null);
+  const [snapshot, setSnapshot] = useState<SellerHomeAnalyticsSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const [reloadKey, setReloadKey] = useState(0);
+  const [financeBalance, setFinanceBalance] = useState<FinanceBalance | null>(null);
+  const [financeLoading, setFinanceLoading] = useState(true);
+  const [cashingOut, setCashingOut] = useState(false);
+  const balanceGenerationRef = useRef(0);
+  const payoutAttemptKeyRef = useRef<string | null>(null);
+  const data = selectSellerHomeAnalytics(snapshot, userId, range);
 
   useEffect(() => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
     let active = true;
+    const requestKey = sellerHomeAnalyticsKey(userId, range);
     setLoading(true);
-    setError(false);
     api.analytics.home(range)
       .then((next) => {
         if (!active) return;
-        setData(next);
+        setSnapshot({ key: requestKey, data: next });
       })
-      .catch(() => {
+      .catch((requestError) => {
         if (!active) return;
-        setData(null);
-        setError(true);
+        if (__DEV__) {
+          console.warn('[seller-dashboard] analytics unavailable; showing zero state', requestError);
+        }
+        setSnapshot({ key: requestKey, data: zeroSellerHomeAnalytics(range) });
       })
       .finally(() => {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [api, range, reloadKey]);
+  }, [api, range, userId]);
+
+  const loadFinanceBalance = useCallback(async () => {
+    const generation = ++balanceGenerationRef.current;
+    if (!userId || isLoadingRole || currentRole !== 'owner') {
+      setFinanceBalance(null);
+      setFinanceLoading(isLoadingRole);
+      return;
+    }
+    setFinanceBalance(null);
+    setFinanceLoading(true);
+    try {
+      const next = await api.finance.balance() as FinanceBalance;
+      if (balanceGenerationRef.current === generation) {
+        setFinanceBalance(next);
+      }
+    } catch {
+      if (balanceGenerationRef.current === generation) {
+        setFinanceBalance(null);
+      }
+    } finally {
+      if (balanceGenerationRef.current === generation) {
+        setFinanceLoading(false);
+      }
+    }
+  }, [api, currentRole, isLoadingRole, userId]);
+
+  useEffect(() => {
+    void loadFinanceBalance();
+  }, [loadFinanceBalance]);
+
+  useEffect(() => subscribeStoreContext(() => {
+    balanceGenerationRef.current += 1;
+    payoutAttemptKeyRef.current = null;
+    setFinanceBalance(null);
+    void loadFinanceBalance();
+  }), [loadFinanceBalance]);
+
+  useEffect(() => {
+    payoutAttemptKeyRef.current = null;
+  }, [userId]);
 
   const nav = useCallback((route: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     router.push(route as never);
   }, [router]);
+
+  const requestCashOut = useCallback(() => {
+    if (currentRole !== 'owner') {
+      Alert.alert('Owner access required', 'Only the store owner can cash out earnings.');
+      return;
+    }
+    if (
+      !financeBalance?.connected
+      || financeBalance.payoutsEnabled !== true
+      || financeBalance.bankConnected !== true
+    ) {
+      Alert.alert(
+        'Finish bank setup',
+        'Connect and verify your bank account before cashing out.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open payouts', onPress: () => nav('/payouts') },
+        ],
+      );
+      return;
+    }
+    const processingCashout = financeBalance.processingCashout;
+    const amount = processingCashout?.amount ?? financeBalance.available.amount;
+    const currency = processingCashout?.currency ?? financeBalance.available.currency;
+    const formattedAmount = processingCashout?.formatted ?? financeBalance.available.formatted;
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
+      Alert.alert('No available balance', 'Money still processing will move from Pending Balance to Available Balance when it can be paid out.');
+      return;
+    }
+
+    Alert.alert(
+      `${processingCashout ? 'Finish cash out' : 'Cash out'} ${formattedAmount}?`,
+      processingCashout
+        ? 'This safely retries the same bank payout. It will not create a second cash out.'
+        : 'This will send your full available balance to your connected bank account. Bank processing times may apply.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Cash out',
+          onPress: () => {
+            void (async () => {
+              if (!userId) return;
+              const storageKey = cashoutAttemptStorageKey(userId);
+              let idempotencyKey = processingCashout?.idempotencyKey ?? payoutAttemptKeyRef.current;
+              try {
+                if (!idempotencyKey) {
+                  const storedValue = await AsyncStorage.getItem(storageKey);
+                  if (storedValue) {
+                    const stored = JSON.parse(storedValue) as PersistedCashoutAttempt;
+                    if (
+                      stored.amount === amount
+                      && stored.currency === currency
+                      && /^[A-Za-z0-9_-]{16,128}$/.test(stored.idempotencyKey)
+                    ) {
+                      idempotencyKey = stored.idempotencyKey;
+                    }
+                  }
+                }
+                idempotencyKey ??= `cashout_${Date.now()}_${Math.random().toString(36).slice(2, 14)}`;
+                await AsyncStorage.setItem(storageKey, JSON.stringify({
+                  idempotencyKey,
+                  amount,
+                  currency,
+                } satisfies PersistedCashoutAttempt));
+              } catch {
+                Alert.alert(
+                  'Could not cash out',
+                  'This device could not save a safe retry record. Free up storage and try again.',
+                );
+                return;
+              }
+              payoutAttemptKeyRef.current = idempotencyKey;
+              setCashingOut(true);
+              try {
+                const payout = await api.finance.payout({
+                  idempotencyKey,
+                  amount,
+                  currency,
+                });
+                payoutAttemptKeyRef.current = null;
+                await AsyncStorage.removeItem(storageKey).catch(() => {});
+                await loadFinanceBalance();
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                Alert.alert(
+                  'Cash out requested',
+                  `${payout.formatted ?? financeBalance.available.formatted} is being sent to your bank account.`,
+                );
+              } catch (error) {
+                if (
+                  error instanceof ApiError
+                  && error.status < 500
+                  && error.code !== 'PAYOUT_REVIEW_REQUIRED'
+                ) {
+                  payoutAttemptKeyRef.current = null;
+                  await AsyncStorage.removeItem(storageKey).catch(() => {});
+                }
+                const message = error instanceof ApiError && error.code === 'FUNDS_RESERVED_FOR_LABELS'
+                  ? 'Part of this balance is reserved for shipping labels. Your available balance has been refreshed.'
+                  : error instanceof ApiError && error.code === 'BALANCE_CHANGED'
+                    ? 'Your available balance changed. Review the refreshed amount before confirming again.'
+                  : error instanceof ApiError && error.code === 'PAYOUTS_NOT_ENABLED'
+                    ? 'Finish verifying your connected bank account before cashing out.'
+                    : error instanceof ApiError && error.code === 'PAYOUT_REVIEW_REQUIRED'
+                      ? 'This payout needs review before it can continue. Do not start another cash out for the same funds.'
+                    : 'The cash-out request could not be confirmed. Try again to safely retry the same request.';
+                await loadFinanceBalance();
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+                Alert.alert('Could not cash out', message);
+              } finally {
+                setCashingOut(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }, [api, currentRole, financeBalance, loadFinanceBalance, nav, userId]);
 
   const openTask = useCallback((task: SetupTask) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -127,6 +416,12 @@ export default function SellerHomeCommerceDashboard({
 
   const unfinishedTasks = setupState.tasks.filter((task) => !task.completed && !task.skipped);
   const maxBucket = Math.max(0, ...(data?.buckets.map((bucket) => bucket.totalCents) ?? []));
+  const hasActivity = data?.buckets.some((bucket) => bucket.totalCents > 0) ?? false;
+  const toFulfill = data?.toFulfill ?? 0;
+  const toCapture = data?.toCapture ?? 0;
+  const totalSales = data?.totalCents ?? 0;
+  const orderCount = data?.orderCount ?? 0;
+  const visitorCount = data?.visitorCount ?? 0;
 
   return (
     <View style={styles.root}>
@@ -134,9 +429,12 @@ export default function SellerHomeCommerceDashboard({
         contentContainerStyle={[styles.scroll, { paddingTop: topInset + SP.sm }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* ── Top bar ──────────────────────────────────────────────────── */}
         <View style={styles.topBar}>
-          <Text style={styles.screenTitle}>Home</Text>
+          <Text style={styles.screenTitle}>Dashboard</Text>
         </View>
+
+        {/* ── Time range pills ─────────────────────────────────────────── */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -166,136 +464,243 @@ export default function SellerHomeCommerceDashboard({
           })}
         </ScrollView>
 
-        <View style={styles.summary}>
-          {loading ? (
-            <ActivityIndicator size="small" color={theme.accent} />
-          ) : error ? (
-            <Pressable style={styles.errorState} onPress={() => setReloadKey((key) => key + 1)}>
-              <Feather name="alert-circle" size={18} color={MUTED} />
-              <Text style={styles.errorText}>Could not load dashboard. Tap to retry.</Text>
-            </Pressable>
+        {/* ── Summary stats ─────────────────────────────────────────────── */}
+        <View style={styles.statsCard}>
+          {!data ? (
+            <SummarySkeleton />
           ) : (
-            <>
-              <View style={styles.primaryStat}>
+            <View style={styles.statGrid}>
+              <View style={styles.statTile}>
                 <Text style={styles.statLabel}>Total sales</Text>
-                <Text style={styles.salesValue}>{formatCents(data?.totalCents ?? 0)}</Text>
-                <Text style={styles.orderCount}>
-                  {data?.orderCount ?? 0} {(data?.orderCount ?? 0) === 1 ? 'order' : 'orders'}
+                <Text
+                  style={styles.statValue}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.65}
+                >
+                  {formatCents(totalSales)}
                 </Text>
               </View>
-              <View style={styles.secondaryStat}>
-                <Feather name="users" size={18} color={theme.accentLight} />
-                <Text style={styles.visitorValue}>{data?.visitorCount ?? 0}</Text>
-                <Text style={styles.visitorLabel}>{range === 'live' ? 'online visitors' : 'visitors'}</Text>
+              <View style={styles.statTile}>
+                <Text style={styles.statLabel}>Orders</Text>
+                <Text
+                  style={styles.statValue}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.65}
+                >
+                  {orderCount}
+                </Text>
               </View>
-            </>
+              <View style={styles.statTile}>
+                <Text style={styles.statLabel}>{range === 'live' ? 'Online now' : 'Visitors'}</Text>
+                <Text
+                  style={styles.statValue}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.65}
+                >
+                  {visitorCount}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          <View style={styles.balanceSummary}>
+            <View style={styles.balanceLine}>
+              <Text style={styles.balanceLabel}>Pending Balance</Text>
+              <Text style={styles.balanceValue}>
+                {financeLoading ? '—' : financeBalance?.pending.formatted ?? '$0.00'}
+              </Text>
+            </View>
+            <View style={styles.balanceLine}>
+              <Text style={styles.balanceLabel}>Available Balance</Text>
+              <Text style={styles.balanceValue}>
+                {financeLoading ? '—' : financeBalance?.available.formatted ?? '$0.00'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Cash-out CTA — flush to bottom of stats card */}
+          {data && !loading && (
+            <TouchableOpacity
+              testID="seller-dashboard-cash-out"
+              style={[
+                styles.dashboardButton,
+                { backgroundColor: FG },
+                (financeLoading || cashingOut) && styles.dashboardButtonDisabled,
+              ]}
+              activeOpacity={0.82}
+              disabled={financeLoading || cashingOut}
+              onPress={requestCashOut}
+              accessibilityRole="button"
+              accessibilityLabel="Cash out available balance"
+              accessibilityState={{ disabled: financeLoading || cashingOut }}
+            >
+              {cashingOut ? (
+                <ActivityIndicator size="small" color={SCREEN_BG} />
+              ) : (
+                <Feather name="dollar-sign" size={15} color={SCREEN_BG} />
+              )}
+              <Text style={[styles.dashboardButtonText, { color: SCREEN_BG }]}>
+                {cashingOut ? 'Cashing out…' : 'Cash out'}
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
 
-        <TouchableOpacity
-          style={[styles.dashboardButton, { backgroundColor: theme.accent }]}
-          activeOpacity={0.85}
-          onPress={() => nav('/(tabs)/analytics')}
-        >
-          <Text style={[styles.dashboardButtonText, { color: theme.onAccent }]}>View dashboard</Text>
-          <Feather name="arrow-right" size={17} color={theme.onAccent} />
-        </TouchableOpacity>
-
+        {/* ── Sales activity chart ──────────────────────────────────────── */}
         <View style={styles.chartCard}>
           <View style={styles.chartHeader}>
             <Text style={styles.sectionTitle}>Sales activity</Text>
-            <Text style={styles.chartRange}>{RANGES.find((item) => item.id === range)?.label}</Text>
+            <View style={styles.chartBadge}>
+              <Text style={styles.chartRange}>
+                {RANGES.find((item) => item.id === range)?.label}
+              </Text>
+            </View>
           </View>
-          <View style={styles.chart}>
-            {(data?.buckets ?? []).map((bucket) => {
-              const ratio = maxBucket > 0 ? bucket.totalCents / maxBucket : 0;
-              return (
-                <View key={bucket.bucket} style={styles.barColumn}>
-                  <View style={styles.barTrack}>
-                    <View
-                      style={[
-                        styles.bar,
-                        {
-                          height: maxBucket > 0 ? `${Math.max(5, ratio * 100)}%` : 0,
-                          backgroundColor: theme.accent,
-                        },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.barLabel}>{bucketLabel(bucket.bucket, range)}</Text>
-                </View>
-              );
-            })}
-          </View>
-          {!loading && !error && maxBucket === 0 && (
-            <Text style={styles.flatChartText}>No sales in this time range</Text>
-          )}
-        </View>
 
-        <View style={styles.actionCard}>
-          {(data?.toFulfill ?? 0) > 0 && (
-            <TouchableOpacity style={styles.actionRow} onPress={() => nav('/(tabs)/orders')}>
-              <View style={styles.actionCopy}>
-                <Text style={styles.actionTitle}>
-                  {data!.toFulfill} {data!.toFulfill === 1 ? 'order' : 'orders'} to fulfill
-                </Text>
-                <Text style={styles.actionSubtitle}>Review paid orders awaiting fulfillment</Text>
-              </View>
-              <Feather name="chevron-right" size={20} color={MUTED} />
-            </TouchableOpacity>
-          )}
-          {(data?.toCapture ?? 0) > 0 && (
-            <TouchableOpacity style={styles.actionRow} onPress={() => nav('/payments')}>
-              <View style={styles.actionCopy}>
-                <Text style={styles.actionTitle}>
-                  {data!.toCapture} {data!.toCapture === 1 ? 'payment' : 'payments'} to capture
-                </Text>
-                <Text style={styles.actionSubtitle}>Review authorized payments</Text>
-              </View>
-              <Feather name="chevron-right" size={20} color={MUTED} />
-            </TouchableOpacity>
-          )}
-          {!loading && !error && (data?.toFulfill ?? 0) === 0 && (data?.toCapture ?? 0) === 0 && (
-            <View style={styles.emptyActions}>
-              <Feather name="check-circle" size={18} color={MUTED} />
-              <Text style={styles.emptyActionsText}>No orders or payments need attention</Text>
+          {!data ? (
+            <ChartSkeleton />
+          ) : !hasActivity || maxBucket === 0 ? (
+            <ChartEmptyState range={range} />
+          ) : (
+            <View style={styles.chart}>
+              {(data?.buckets ?? []).map((bucket) => {
+                const ratio = maxBucket > 0 ? bucket.totalCents / maxBucket : 0;
+                return (
+                  <View key={bucket.bucket} style={styles.barColumn}>
+                    <View style={styles.barTrack}>
+                      <View
+                        style={[
+                          styles.bar,
+                          {
+                            height: maxBucket > 0 ? `${Math.max(4, ratio * 100)}%` : 0,
+                            backgroundColor: theme.accent,
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.barLabel}>{bucketLabel(bucket.bucket, range)}</Text>
+                  </View>
+                );
+              })}
             </View>
           )}
         </View>
 
+        {/* ── Action items (fulfill / capture) ─────────────────────────── */}
+        {data && !loading && (
+          <View style={styles.actionSection}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionHeaderLabel}>Needs attention</Text>
+            </View>
+
+            <View style={styles.actionCard}>
+              {toFulfill > 0 && (
+                <TouchableOpacity
+                  style={[styles.actionRow, toCapture > 0 && styles.actionRowBordered]}
+                  onPress={() => nav('/(tabs)/orders')}
+                  activeOpacity={0.75}
+                >
+                  <View style={styles.actionIconWrap}>
+                    <Feather name="package" size={16} color={FG} />
+                  </View>
+                  <View style={styles.actionCopy}>
+                    <Text style={styles.actionTitle}>
+                      {toFulfill} {toFulfill === 1 ? 'order' : 'orders'} to fulfill
+                    </Text>
+                    <Text style={styles.actionSubtitle}>Paid orders awaiting shipment</Text>
+                  </View>
+                  <View style={styles.actionBadge}>
+                    <Text style={styles.actionBadgeText}>{toFulfill > 9 ? '9+' : toFulfill}</Text>
+                  </View>
+                  <Feather name="chevron-right" size={18} color={SUBTLE} />
+                </TouchableOpacity>
+              )}
+
+              {toCapture > 0 && (
+                <TouchableOpacity
+                  style={styles.actionRow}
+                  onPress={() => nav('/payments')}
+                  activeOpacity={0.75}
+                >
+                  <View style={styles.actionIconWrap}>
+                    <Feather name="credit-card" size={16} color={FG} />
+                  </View>
+                  <View style={styles.actionCopy}>
+                    <Text style={styles.actionTitle}>
+                      {toCapture} {toCapture === 1 ? 'payment' : 'payments'} to capture
+                    </Text>
+                    <Text style={styles.actionSubtitle}>Authorized payments pending capture</Text>
+                  </View>
+                  <View style={styles.actionBadge}>
+                    <Text style={styles.actionBadgeText}>{toCapture > 9 ? '9+' : toCapture}</Text>
+                  </View>
+                  <Feather name="chevron-right" size={18} color={SUBTLE} />
+                </TouchableOpacity>
+              )}
+
+              {toFulfill === 0 && toCapture === 0 && (
+                <View style={styles.emptyActions}>
+                  <View style={[styles.emptyActionsIcon, { backgroundColor: SUCCESS_DIM }]}>
+                    <Feather name="check" size={16} color={SUCCESS} />
+                  </View>
+                  <Text style={styles.emptyActionsText}>All caught up</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* ── Setup checklist ───────────────────────────────────────────── */}
         {unfinishedTasks.length > 0 && (
           <View style={styles.setupSection}>
-            <View style={styles.setupHeader}>
-              <Text style={styles.sectionTitle}>Set up your business</Text>
-              <Text style={styles.setupCount}>{unfinishedTasks.length} remaining</Text>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionHeaderLabel}>Set up your business</Text>
+              <View style={styles.setupCountBadge}>
+                <Text style={styles.setupCountText}>{unfinishedTasks.length}</Text>
+              </View>
             </View>
-            {unfinishedTasks.map((task) => (
-              <TouchableOpacity
-                key={task.id}
-                style={styles.setupCard}
-                activeOpacity={0.85}
-                onPress={() => openTask(task)}
-              >
-                <View style={[styles.setupIcon, { backgroundColor: theme.accentDim }]}>
-                  <Feather name={task.icon as keyof typeof Feather.glyphMap} size={20} color={theme.accentLight} />
-                </View>
-                <View style={styles.setupCopy}>
-                  <Text style={styles.setupTitle}>{task.label}</Text>
-                  <Text style={styles.setupDescription}>{task.description}</Text>
-                </View>
-                <Pressable
-                  style={styles.optionsButton}
-                  hitSlop={10}
-                  onPress={(event) => {
-                    event.stopPropagation();
-                    showTaskOptions(task);
-                  }}
-                  accessibilityLabel={`Options for ${task.label}`}
+
+            <View style={styles.setupList}>
+              {unfinishedTasks.map((task, index) => (
+                <TouchableOpacity
+                  key={task.id}
+                  style={[
+                    styles.setupCard,
+                    index < unfinishedTasks.length - 1 && styles.setupCardBordered,
+                  ]}
+                  activeOpacity={0.75}
+                  onPress={() => openTask(task)}
                 >
-                  <Feather name="more-horizontal" size={20} color={MUTED} />
-                </Pressable>
-              </TouchableOpacity>
-            ))}
+                  <View style={[styles.setupIcon, { backgroundColor: theme.accentDim }]}>
+                    <Feather
+                      name={task.icon as keyof typeof Feather.glyphMap}
+                      size={18}
+                      color={theme.accentLight}
+                    />
+                  </View>
+                  <View style={styles.setupCopy}>
+                    <Text style={styles.setupTitle}>{task.label}</Text>
+                    <Text style={styles.setupDescription} numberOfLines={2}>
+                      {task.description}
+                    </Text>
+                  </View>
+                  <Pressable
+                    style={styles.optionsButton}
+                    hitSlop={10}
+                    onPress={(event) => {
+                      event.stopPropagation();
+                      showTaskOptions(task);
+                    }}
+                    accessibilityLabel={`Options for ${task.label}`}
+                  >
+                    <Feather name="more-horizontal" size={18} color={MUTED} />
+                  </Pressable>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         )}
       </ScrollView>
@@ -309,114 +714,364 @@ export default function SellerHomeCommerceDashboard({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: SCREEN_BG },
   scroll: { paddingBottom: 160 },
+
+  // ── Top bar
   topBar: {
-    minHeight: 58,
+    minHeight: 52,
     paddingHorizontal: SP.md,
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
+    paddingBottom: SP.xs,
   },
-  screenTitle: { color: FG, fontFamily: FONT.bold, fontSize: FS.xl },
-  rangeRow: { paddingHorizontal: SP.md, gap: SP.xs, paddingBottom: SP.lg },
-  rangePill: {
-    minHeight: 38,
+  screenTitle: {
+    color: FG,
+    fontFamily: FONT.bold,
+    fontSize: FS.xl,
+    letterSpacing: -0.4,
+  },
+
+  // ── Range pills
+  rangeRow: {
     paddingHorizontal: SP.md,
+    gap: SP.xs,
+    paddingVertical: SP.sm,
+  },
+  rangePill: {
+    minHeight: 36,
+    paddingHorizontal: 14,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: RADIUS.pill,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: CARD,
+    backgroundColor: SELLER_DASHBOARD_GLASS,
   },
   rangeText: { color: MUTED, fontFamily: FONT.semibold, fontSize: FS.sm },
-  summary: {
-    minHeight: 126,
+
+  // ── Stats card
+  statsCard: {
     marginHorizontal: SP.md,
+    marginTop: SP.xs,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: SELLER_DASHBOARD_GLASS,
+    overflow: 'hidden',
+  },
+  statGrid: {
+    flexDirection: 'column',
+    gap: SP.sm,
+    padding: SP.sm,
+  },
+  statTile: {
+    width: '100%',
+    minHeight: 82,
+    justifyContent: 'space-between',
+    padding: SP.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: BORDER_SUBTLE,
+    backgroundColor: CARD_ELEVATED_GLASS,
+  },
+  statLabel: {
+    color: MUTED,
+    fontFamily: FONT.medium,
+    fontSize: FS.xs,
+    letterSpacing: 0.2,
+  },
+  statValue: {
+    color: FG,
+    fontFamily: FONT.bold,
+    fontSize: FS.xxl,
+    letterSpacing: -0.5,
+    marginTop: SP.sm,
+    width: '100%',
+  },
+
+  balanceSummary: {
+    paddingHorizontal: SP.md,
+    paddingTop: SP.xs,
+    paddingBottom: SP.md,
+    gap: SP.sm,
+  },
+  balanceLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-    paddingBottom: SP.lg,
+    justifyContent: 'space-between',
+    gap: SP.md,
   },
-  primaryStat: { flex: 1 },
-  statLabel: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.sm },
-  salesValue: { color: FG, fontFamily: FONT.bold, fontSize: 38, marginTop: SP.xs },
-  orderCount: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: SP.xs },
-  secondaryStat: {
-    minWidth: 112,
-    borderLeftWidth: 1,
-    borderLeftColor: BORDER,
-    paddingLeft: SP.lg,
-    alignItems: 'flex-start',
-    gap: 3,
+  balanceLabel: {
+    color: MUTED,
+    fontFamily: FONT.medium,
+    fontSize: FS.sm,
   },
-  visitorValue: { color: FG, fontFamily: FONT.bold, fontSize: FS.xl },
-  visitorLabel: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs },
-  errorState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.sm },
-  errorText: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.sm },
+  balanceValue: {
+    color: FG,
+    fontFamily: FONT.semibold,
+    fontSize: FS.sm,
+  },
+
+  // ── Cash-out button
   dashboardButton: {
-    margin: SP.md,
-    minHeight: 48,
+    marginHorizontal: SP.md,
+    marginBottom: SP.md,
+    minHeight: 44,
     borderRadius: RADIUS.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SP.xs,
+  },
+  dashboardButtonDisabled: { opacity: 0.55 },
+  dashboardButtonText: { fontFamily: FONT.bold, fontSize: FS.sm },
+
+  // ── Chart card
+  chartCard: {
+    marginHorizontal: SP.md,
+    marginTop: SP.sm,
+    padding: SP.md,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: SELLER_DASHBOARD_GLASS,
+  },
+  chartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SP.md,
+  },
+  sectionTitle: {
+    color: FG,
+    fontFamily: FONT.bold,
+    fontSize: FS.md,
+    letterSpacing: -0.2,
+  },
+  chartBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: RADIUS.pill,
+    backgroundColor: SKELETON_GLASS,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  chartRange: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.xs },
+  chart: {
+    height: 144,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: SP.xs,
+  },
+  barColumn: {
+    flex: 1,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: SP.xs,
+  },
+  barTrack: {
+    flex: 1,
+    width: '56%',
+    justifyContent: 'flex-end',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: BORDER,
+  },
+  bar: {
+    width: '100%',
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+  },
+  barLabel: { color: SUBTLE, fontFamily: FONT.regular, fontSize: 9 },
+
+  // ── Chart empty state
+  chartEmptyWrap: {
+    height: 144,
+    position: 'relative',
+  },
+  chartGhost: {
+    opacity: 1,
+  },
+  chartEmptyOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: CARD_ELEVATED_GLASS,
+    borderRadius: RADIUS.sm,
+  },
+  chartEmptyTitle: {
+    color: MUTED,
+    fontFamily: FONT.semibold,
+    fontSize: FS.sm,
+    textAlign: 'center',
+  },
+  chartEmptySubtitle: {
+    color: SUBTLE,
+    fontFamily: FONT.regular,
+    fontSize: FS.xs,
+    textAlign: 'center',
+  },
+
+  // ── Action items section
+  actionSection: {
+    marginTop: SP.sm,
+    paddingHorizontal: SP.md,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    marginBottom: SP.sm,
+    paddingHorizontal: 2,
+  },
+  sectionHeaderLabel: {
+    color: MUTED,
+    fontFamily: FONT.bold,
+    fontSize: FS.xs,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    flex: 1,
+  },
+  actionCard: {
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: SELLER_DASHBOARD_GLASS,
+    overflow: 'hidden',
+  },
+  actionRow: {
+    minHeight: 66,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SP.md,
+    gap: SP.sm,
+  },
+  actionRowBordered: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: BORDER,
+  },
+  actionIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: RADIUS.sm,
+    backgroundColor: SKELETON_GLASS,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  actionCopy: { flex: 1, minWidth: 0 },
+  actionTitle: {
+    color: FG,
+    fontFamily: FONT.semibold,
+    fontSize: FS.sm,
+    letterSpacing: -0.1,
+  },
+  actionSubtitle: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
+  actionBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: SELLER_DASHBOARD_GLASS,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+    flexShrink: 0,
+  },
+  actionBadgeText: {
+    color: FG,
+    fontFamily: FONT.bold,
+    fontSize: 11,
+  },
+  emptyActions: {
+    minHeight: 60,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: SP.sm,
   },
-  dashboardButtonText: { fontFamily: FONT.bold, fontSize: FS.sm },
-  chartCard: {
-    marginHorizontal: SP.md,
-    padding: SP.md,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: CARD,
+  emptyActionsIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  chartHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sectionTitle: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
-  chartRange: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.xs },
-  chart: { height: 150, flexDirection: 'row', alignItems: 'flex-end', gap: SP.xs, marginTop: SP.lg },
-  barColumn: { flex: 1, height: '100%', alignItems: 'center', justifyContent: 'flex-end', gap: SP.xs },
-  barTrack: { flex: 1, width: '52%', justifyContent: 'flex-end', borderBottomWidth: 1, borderBottomColor: BORDER },
-  bar: { width: '100%', borderTopLeftRadius: RADIUS.xs, borderTopRightRadius: RADIUS.xs },
-  barLabel: { color: MUTED, fontFamily: FONT.regular, fontSize: 9 },
-  flatChartText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'center', marginTop: SP.sm },
-  actionCard: {
-    margin: SP.md,
+  emptyActionsText: {
+    color: MUTED,
+    fontFamily: FONT.medium,
+    fontSize: FS.sm,
+  },
+
+  // ── Setup section
+  setupSection: {
+    marginTop: SP.sm,
+    paddingHorizontal: SP.md,
+  },
+  setupCountBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: SELLER_DASHBOARD_GLASS,
+    borderWidth: 1,
+    borderColor: BORDER,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  setupCountText: {
+    color: MUTED,
+    fontFamily: FONT.bold,
+    fontSize: 11,
+  },
+  setupList: {
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: CARD,
+    backgroundColor: SELLER_DASHBOARD_GLASS,
     overflow: 'hidden',
   },
-  actionRow: {
-    minHeight: 70,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: BORDER,
-  },
-  actionCopy: { flex: 1 },
-  actionTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
-  actionSubtitle: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 3 },
-  emptyActions: { minHeight: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm },
-  emptyActionsText: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.sm },
-  setupSection: { paddingHorizontal: SP.md, gap: SP.sm },
-  setupHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.xs },
-  setupCount: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.xs },
   setupCard: {
-    minHeight: 98,
-    padding: SP.md,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: CARD,
+    minHeight: 80,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SP.md,
+    gap: SP.sm,
   },
-  setupIcon: { width: 44, height: 44, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
-  setupCopy: { flex: 1 },
-  setupTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
-  setupDescription: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 17, marginTop: 4 },
-  optionsButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  setupCardBordered: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: BORDER_SUBTLE,
+  },
+  setupIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  setupCopy: { flex: 1, minWidth: 0 },
+  setupTitle: {
+    color: FG,
+    fontFamily: FONT.semibold,
+    fontSize: FS.sm,
+    letterSpacing: -0.1,
+  },
+  setupDescription: {
+    color: MUTED,
+    fontFamily: FONT.regular,
+    fontSize: FS.xs,
+    lineHeight: 17,
+    marginTop: 3,
+  },
+  optionsButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
 });

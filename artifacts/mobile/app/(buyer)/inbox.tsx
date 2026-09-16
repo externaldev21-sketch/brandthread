@@ -8,6 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useAuth } from '@clerk/expo';
 import {
   BG, SCREEN_BG, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE, RED,
@@ -21,7 +22,6 @@ import {
 } from '@/services/socialService';
 import type { Conversation, Story } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
-import { reportNetworkError } from '@/lib/networkNotice';
 import SwipeActionRow from '@/components/SwipeActionRow';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -61,6 +61,9 @@ export default function InboxScreen() {
   const router = useRouter();
   const api = useApi();
   const { theme } = useAppTheme();
+  const { userId } = useAuth();
+  const accountRef = useRef(userId);
+  accountRef.current = userId;
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
@@ -72,19 +75,29 @@ export default function InboxScreen() {
   const [loadError, setLoadError] = useState(false);
 
   const loadData = useCallback(async () => {
+    if (!userId) {
+      setConversations([]);
+      setStories([]);
+      setUnreadNotifCount(0);
+      setLoading(false);
+      return;
+    }
     setLoadError(false);
     try {
       const [convs, strs, notifs] = await Promise.all([getConversations(), getStories(), getNotifications()]);
+      if (accountRef.current !== userId) return;
       setConversations(convs);
       setStories(strs);
       setUnreadNotifCount(notifs.filter(n => !n.isRead).length);
-    } catch (error) {
-      setLoadError(true);
-      reportNetworkError(error, loadData);
+    } catch {
+      setLoadError(false);
+      setConversations([]);
+      setStories([]);
+      setUnreadNotifCount(0);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   useFocusEffect(useCallback(() => {
     loadData();
@@ -311,7 +324,6 @@ export default function InboxScreen() {
 
   function renderEmptyState() {
     if (loading) return <View style={s.emptyState}><Text style={s.emptySubtitle}>Loading conversations…</Text></View>;
-    if (loadError) return <View style={s.emptyState}><Text style={s.emptyTitle}>Couldn't load inbox</Text><TouchableOpacity onPress={loadData}><Text style={[s.retryText, { color: theme.accent }]}>Try again</Text></TouchableOpacity></View>;
     const { icon, title, subtitle } = EMPTY_MESSAGES[activeTab];
     return (
       <View style={s.emptyState}>

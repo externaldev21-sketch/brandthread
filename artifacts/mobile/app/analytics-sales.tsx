@@ -1,7 +1,8 @@
 /**
  * Sales Analytics — Brandthread Seller App
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Platform, Alert, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -57,6 +58,7 @@ export default function AnalyticsSalesScreen() {
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { isLoaded: authLoaded, userId } = useAuth();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   const [data,       setData]       = useState<SalesAnalytics | null>(null);
@@ -64,20 +66,30 @@ export default function AnalyticsSalesScreen() {
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeChart, setActiveChart] = useState<'sales' | 'orders' | 'units' | 'aov' | 'refunds'>('sales');
-  const [error, setError] = useState<string | null>(null);
+  const requestUser = useRef<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
+    if (!authLoaded || !userId) return;
+    const requestedUser = userId;
+    requestUser.current = requestedUser;
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
       const f = filter ?? await getFilterState();
       if (!filter) setFilter(f);
-      setData(await getSalesAnalytics(f)); setError(null);
+      const next = await getSalesAnalytics(f);
+      if (requestUser.current !== requestedUser) return;
+      setData(next);
     } catch (err) {
-      setData(null); setError(err instanceof Error ? err.message : 'Sales analytics are unavailable.');
+      if (requestUser.current !== requestedUser) return;
     } finally { setLoading(false); setRefreshing(false); }
-  }, [filter]);
+  }, [filter, authLoaded, userId]);
 
-  useEffect(() => { load(); }, []); // eslint-disable-line
+  useEffect(() => {
+    requestUser.current = null;
+    setData(null); setFilter(null);
+    setLoading(!authLoaded);
+    if (authLoaded && userId) { setLoading(true); load(); }
+  }, [authLoaded, userId]); // load reads the current filter
 
   const chartData = (): AnalyticsPoint[] => {
     if (!data) return [];
@@ -93,8 +105,6 @@ export default function AnalyticsSalesScreen() {
   if (loading) {
     return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><ActivityIndicator size="large" color={PURPLE} /><Text style={s.loadText}>Loading…</Text></View>;
   }
-  if (error) return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><Text style={s.loadText}>{error}</Text><TouchableOpacity onPress={() => load()}><Text style={{ color: PURPLE }}>Retry</Text></TouchableOpacity></View>;
-
   return (
     <ScrollView
       style={s.scroll}

@@ -202,10 +202,11 @@ async function request<T = any>(
   getToken: GetToken,
   asText = false,
   getCacheScope: GetCacheScope = () => 'anonymous',
+  reportErrors = true,
 ): Promise<T> {
   const resolvedPath = versionApiPath(path);
   const isRead = (options.method ?? 'GET').toUpperCase() === 'GET';
-  const cacheKey = isRead && !asText
+  const cacheKey = isRead && options.cache !== 'no-store' && !asText
     ? await apiCacheKey(resolvedPath, getCacheScope)
     : null;
   const token = await getToken();
@@ -228,10 +229,10 @@ async function request<T = any>(
     res = await fetch(`${BASE}${resolvedPath}`, { ...options, headers });
   } catch (error) {
     const retry = isRead
-      ? () => request<T>(path, options, getToken, asText, getCacheScope)
+      ? () => request<T>(path, options, getToken, asText, getCacheScope, reportErrors)
       : undefined;
     const cached = cacheKey ? await readApiCache<T>(cacheKey) : null;
-    reportNetworkError(error, retry, cached !== null);
+    if (reportErrors) reportNetworkError(error, retry, cached !== null);
     if (cached !== null) return cached;
     throw error;
   }
@@ -239,14 +240,14 @@ async function request<T = any>(
     const body = await res.text();
     const error = new ApiError(res.status, body);
     const retry = isRead
-      ? () => request<T>(path, options, getToken, asText, getCacheScope)
+      ? () => request<T>(path, options, getToken, asText, getCacheScope, reportErrors)
       : undefined;
     const cached = cacheKey && res.status >= 500 ? await readApiCache<T>(cacheKey) : null;
-    reportNetworkError(error, retry, cached !== null);
+    if (reportErrors) reportNetworkError(error, retry, cached !== null);
     if (cached !== null) return cached;
     throw error;
   }
-  dismissNetworkNotice();
+  if (reportErrors) dismissNetworkNotice();
   if (asText) return res.text() as Promise<T>;
   const data = await res.json() as T;
   if (cacheKey) {
@@ -446,6 +447,8 @@ export interface PostAnalyticsResponse {
 }
 export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () => 'anonymous') {
   const get     = <T>(path: string) => request<T>(path, { method: 'GET' }, getToken, false, getCacheScope);
+  const freshGet = <T>(path: string) => request<T>(path, { method: 'GET', cache: 'no-store' }, getToken, false, getCacheScope);
+  const quietGet = <T>(path: string) => request<T>(path, { method: 'GET' }, getToken, false, getCacheScope, false);
   const getText  = (path: string)   => request<string>(path, { method: 'GET' }, getToken, true, getCacheScope);
   const post  = <T>(path: string, body: unknown) => request<T>(path, { method: 'POST',  body: JSON.stringify(body) }, getToken, false, getCacheScope);
   const put   = <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT',   body: JSON.stringify(body) }, getToken, false, getCacheScope);
@@ -533,7 +536,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<{ caseReference: string; status: string }>(`/api/ip-cases/${encodeURIComponent(caseReference)}/status?token=${encodeURIComponent(token)}`),
     },
     orders: {
-      list:           ()                       => get('/api/orders'),
+      list:           ()                       => quietGet('/api/orders'),
       get:            (id: string)             => get(`/api/orders/${id}`),
       create:         (body: unknown)          => post('/api/orders', body),
       updateStatus:   (id: string, status: string, opts?: { reason?: string; notes?: string }) =>
@@ -546,13 +549,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     customers: {
       list:    (search?: string) => get(`/api/customers${search ? `?search=${encodeURIComponent(search)}` : ''}`),
-      get:     (id: string)      => get(`/api/customers/${id}`),
+      get:     (id: string)      => quietGet(`/api/customers/${id}`),
       create:  (body: unknown)   => post('/api/customers', body),
       update:  (id: string, body: unknown) => put(`/api/customers/${id}`, body),
       /** Overwrite customer tags array */
       addTag:  (id: string, tags: string[]) => put<any>(`/api/customers/${id}`, { tags }),
       /** Full order history for one customer */
-      orders:  (id: string) => get<any[]>(`/api/customers/${id}/orders`),
+      orders:  (id: string) => quietGet<any[]>(`/api/customers/${id}/orders`),
     },
     drops: {
       list:    ()                       => get('/api/drops'),
@@ -953,7 +956,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     /** DM conversations between buyers and sellers. */
     conversations: {
-      list:    () => get<any[]>('/api/conversations'),
+      list:    () => quietGet<any[]>('/api/conversations'),
       get:     (id: string) => get<any>(`/api/conversations/${encodeURIComponent(id)}`),
       /** Create a new conversation or return the existing one between the same two participants. */
       createOrGet: (body: {
@@ -1059,7 +1062,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         body?:      string;
       }) => post<any>('/api/reviews', body),
       /** Seller — all received reviews with buyer + product info (authenticated as seller). */
-      mine:  () => get<any[]>('/api/reviews/mine'),
+      mine:  () => quietGet<any[]>('/api/reviews/mine'),
       /** Seller — post a public reply to a received review. */
       reply: (reviewId: string, replyText: string) =>
         post<any>(`/api/reviews/${encodeURIComponent(reviewId)}/reply`, { replyText }),
@@ -1345,17 +1348,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       friendActivity: (limit = 30, offset = 0) =>
         get<any[]>(`/api/social/friends/activity?limit=${limit}&offset=${offset}`),
       /** List buyers I follow */
-      following: () =>
-        get<Array<{
+      following: (userId?: string) =>
+        quietGet<Array<{
           userId: string; name: string; username: string | null; handle: string;
           initials: string; color: string; followedAt: string;
-        }>>('/api/social/following'),
+        }>>(`/api/social/following${userId ? `?userId=${encodeURIComponent(userId)}` : ''}`),
       /** List buyers who follow me (with isFollowingBack flag) */
-      followers: () =>
-        get<Array<{
+      followers: (userId?: string) =>
+        quietGet<Array<{
           userId: string; name: string; username: string | null; handle: string;
           initials: string; color: string; followedAt: string; isFollowingBack: boolean;
-        }>>('/api/social/followers'),
+        }>>(`/api/social/followers${userId ? `?userId=${encodeURIComponent(userId)}` : ''}`),
       /** Search buyers by name / username */
       search: (q: string, limit = 20) =>
         get<Array<{
@@ -1617,7 +1620,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     /** Finance / Payouts dashboard — real Stripe Connect data */
     finance: {
-      balance:      () => get<any>('/api/finance/balance'),
+      balance:      () => freshGet<any>('/api/finance/balance'),
       payouts:      (limit?: number) => get<any>(`/api/finance/payouts${limit ? `?limit=${limit}` : ''}`),
       transactions: (limit?: number, type?: string) => {
         const q = new URLSearchParams();
@@ -1626,8 +1629,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         return get<any>(`/api/finance/transactions${q.toString() ? `?${q}` : ''}`);
       },
       statementCsvUrl: () => '/api/finance/statement.csv',
-      payout: (data?: { amount?: number; currency?: string }) =>
-        post<any>('/api/finance/payout', data ?? {}),
+      payout: (data: { idempotencyKey: string; amount: number; currency: string }) =>
+        post<any>('/api/finance/payout', data),
     },
     /** Taxes & Duties — Stripe Tax integration */
     taxes: {

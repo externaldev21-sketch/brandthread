@@ -2,7 +2,7 @@
  * Account Type Settings — lets a user see their current account type
  * and request a switch between Buyer and Seller modes.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, ScrollView,
 } from 'react-native';
@@ -15,6 +15,7 @@ import {
   BG, CARD, BORDER, FG, MUTED, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
+import { useAuth } from '@clerk/expo';
 
 type AccountType = 'seller' | 'buyer';
 
@@ -23,11 +24,12 @@ export default function AccountTypeSettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
+  const requestRef = useRef(0);
 
   const [currentType, setCurrentType] = useState<AccountType | null>(null);
   const [selectedType, setSelectedType] = useState<AccountType | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const accountInfo: Record<AccountType, { icon: keyof typeof Feather.glyphMap; color: string; title: string; bullets: string[] }> = {
     seller: {
@@ -45,23 +47,23 @@ export default function AccountTypeSettingsScreen() {
   };
 
   function fetchProfile() {
+    const requestId = ++requestRef.current;
     setLoading(true);
-    setLoadError(null);
     api.auth.me()
       .then((profile: any) => {
+        if (requestId !== requestRef.current) return;
         const t: AccountType = profile?.accountType === 'buyer' ? 'buyer' : 'seller';
         setCurrentType(t);
         setSelectedType(t);
-        setLoadError(null);
       })
       .catch(() => {
-        // Do NOT silently default — surface the error so the user can retry.
-        setLoadError('Could not load your account type. Check your connection and try again.');
       })
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => { fetchProfile(); }, []);
+  useEffect(() => {
+    if (authLoaded && isSignedIn) fetchProfile();
+  }, [authLoaded, isSignedIn]);
 
   const isDirty = selectedType !== null && selectedType !== currentType;
 
@@ -110,21 +112,6 @@ export default function AccountTypeSettingsScreen() {
       {loading ? (
         <View style={s.loadingWrap}>
           <ActivityIndicator color={colors.primary} />
-        </View>
-      ) : loadError ? (
-        /* Do NOT silently open with a seller default — show retryable error */
-        <View style={s.errorWrap}>
-          <Feather name="alert-circle" size={36} color={colors.primary} style={{ marginBottom: 12 }} />
-          <Text style={s.errorTitle}>Couldn't load account type</Text>
-          <Text style={s.errorBody}>{loadError}</Text>
-          <TouchableOpacity
-            style={[s.retryBtn, { backgroundColor: colors.primary }]}
-            activeOpacity={0.8}
-            onPress={() => fetchProfile()}
-          >
-            <Feather name="refresh-cw" size={14} color={colors.primaryForeground} style={{ marginRight: 6 }} />
-            <Text style={[s.retryBtnText, { color: colors.primaryForeground }]}>Try again</Text>
-          </TouchableOpacity>
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 60 }}>
@@ -210,13 +197,6 @@ const s = StyleSheet.create({
   headerTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
   backBtn:     { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-
-  // Error state
-  errorWrap:  { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl },
-  errorTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG, marginBottom: SP.sm, textAlign: 'center' },
-  errorBody:  { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20, marginBottom: SP.lg },
-  retryBtn:   { flexDirection: 'row', alignItems: 'center', borderRadius: RADIUS.md, paddingVertical: 12, paddingHorizontal: SP.lg },
-  retryBtnText: { fontSize: FS.sm, fontFamily: FONT.bold },
 
   currentBadge:    { flexDirection: 'row', alignItems: 'center', gap: SP.xs, backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, paddingHorizontal: SP.sm, paddingVertical: SP.xs, alignSelf: 'flex-start', marginBottom: SP.md },
   currentBadgeText:{ fontSize: FS.sm, fontFamily: FONT.semibold },

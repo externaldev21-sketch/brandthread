@@ -366,7 +366,6 @@ export default function SampleDetailScreen() {
   const [sample, setSample] = useState<Sample | null>(null);
   const [manufacturerName, setManufacturerName] = useState('');
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   // Review form state
@@ -391,24 +390,24 @@ export default function SampleDetailScreen() {
   const [imageUploading, setImageUploading] = useState(false);
   const [paying, setPaying] = useState(false);
   const [paymentError, setPaymentError] = useState('');
+  const loadGeneration = useRef(0);
 
   const load = useCallback(async () => {
     if (!id) return;
+    const generation = ++loadGeneration.current;
     setLoading(true);
-    setLoadError(null);
     try {
       const s = await getSample(id);
-      if (s) {
+      if (s && generation === loadGeneration.current) {
         setSample(s);
         setManufacturerName(s.manufacturerName ?? 'Manufacturer');
-      } else {
+      } else if (generation === loadGeneration.current) {
         setSample(null);
       }
     } catch {
-      setSample(null);
-      setLoadError('Could not load this sample. Check your connection and try again.');
+      if (generation === loadGeneration.current) setSample(null);
     } finally {
-      setLoading(false);
+      if (generation === loadGeneration.current) setLoading(false);
     }
   }, [id]);
 
@@ -639,15 +638,7 @@ export default function SampleDetailScreen() {
     return (
       <BrandthreadScreen>
         <BrandthreadHeader title="Sample Details" onBack={() => router.back()} />
-        <View style={s.centered}>
-          <Text style={s.errorText}>{loadError ?? 'Sample not found.'}</Text>
-          {loadError && (
-            <TouchableOpacity style={s.retryBtn} onPress={load} activeOpacity={0.8}>
-              <Feather name="refresh-cw" size={14} color={ON_DARK} />
-              <Text style={s.retryBtnText}>Try again</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        <View style={s.centered} />
       </BrandthreadScreen>
     );
   }
@@ -1028,27 +1019,6 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  errorText: {
-    fontSize: FS.base,
-    fontFamily: FONT.medium,
-    color: MUTED,
-  },
-  retryBtn: {
-    marginTop: SP.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.xs,
-    backgroundColor: ACCENT,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-    borderRadius: RADIUS.sm,
-  },
-  retryBtnText: {
-    fontSize: FS.sm,
-    fontFamily: FONT.semibold,
-    color: ON_DARK,
-  },
-
   // Badge row
   badgeRow: {
     flexDirection: 'row',

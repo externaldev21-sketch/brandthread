@@ -21,7 +21,6 @@ import {
 } from '@/services/socialService';
 import type { Story, StoryMedia } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
-import { reportNetworkError } from '@/lib/networkNotice';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -57,7 +56,7 @@ export default function BuyerStoryViewer() {
   const [likedSet, setLikedSet] = useState<Set<string>>(new Set());
   const [likesCounts, setLikesCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+  const loadGeneration = useRef(0);
 
   const progress = useRef(new Animated.Value(0)).current;
   const ids = allStoryIds ? allStoryIds.split(',').filter(Boolean) : storyId ? [storyId] : [];
@@ -66,9 +65,10 @@ export default function BuyerStoryViewer() {
   const currentSlide: StoryMedia | undefined = currentStory?.media[slideIdx];
 
   const loadStories = useCallback(async () => {
-    setLoadError(false);
+    const generation = ++loadGeneration.current;
     try {
       const all = await getStories();
+      if (loadGeneration.current !== generation) return;
       const now = Date.now();
       const filtered = ids
         .map(id => all.find(s => s.id === id))
@@ -78,11 +78,9 @@ export default function BuyerStoryViewer() {
         const idx = filtered.findIndex(s => s.id === storyId);
         if (idx >= 0) setStoryIdx(idx);
       }
-    } catch (error) {
-      setLoadError(true);
-      reportNetworkError(error, () => loadStories());
+    } catch {
     } finally {
-      setLoading(false);
+      if (loadGeneration.current === generation) setLoading(false);
     }
   }, []);
 
@@ -181,8 +179,7 @@ export default function BuyerStoryViewer() {
 
   if (!currentStory || !currentSlide) {
     return <View style={[styles.container, styles.loadState]}>
-      <Text style={styles.loadText}>{loading ? 'Loading story…' : loadError ? 'Couldn’t load story' : 'This story is no longer available.'}</Text>
-      {loadError ? <TouchableOpacity onPress={loadStories}><Text style={styles.retryText}>Try again</Text></TouchableOpacity> : null}
+      {loading ? <Text style={styles.loadText}>Loading story…</Text> : null}
     </View>;
   }
 
@@ -705,6 +702,5 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   loadState: { alignItems: 'center', justifyContent: 'center', gap: SP.sm },
   loadText: { color: ON_DARK, fontFamily: FONT.regular, fontSize: FS.sm },
-  retryText: { color: PURPLE, fontFamily: FONT.semibold, fontSize: FS.sm },
   });
 };

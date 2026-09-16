@@ -12,7 +12,6 @@ import { useUser } from '@clerk/expo';
 import { BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
-import { reportNetworkError } from '@/lib/networkNotice';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { subscribeConversationReadFailure } from '@/lib/conversationReadEvents';
 
@@ -51,7 +50,7 @@ export default function SellerInboxScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
-  const { user } = useUser();
+  const { user, isLoaded: clerkLoaded = true } = useUser();
   const myId = user?.id ?? '';
 
   const [convs, setConvs] = useState<ConvView[]>([]);
@@ -67,7 +66,18 @@ export default function SellerInboxScreen() {
   // until a response contains a message newer than the one we opened.
   const optimisticReadsRef = useRef(new Map<string, number>());
 
+  useEffect(() => {
+    // Do not let a previous Clerk identity remain visible while auth changes.
+    generationRef.current += 1;
+    requestGenerationRef.current = null;
+    optimisticReadsRef.current.clear();
+    setConvs([]);
+    setLoadError(false);
+    setIsLoading(!clerkLoaded);
+  }, [clerkLoaded, myId]);
+
   const load = useCallback(async (generation: number, silent = false) => {
+    if (!clerkLoaded || !myId) return;
     // Keep one request in flight per focus cycle so a slow request cannot
     // overlap a later poll and corrupt the consecutive-failure count.
     if (requestGenerationRef.current === generation) return;
@@ -109,7 +119,6 @@ export default function SellerInboxScreen() {
     } catch (e) {
       if (generationRef.current !== generation) return;
       setLoadError(true);
-      reportNetworkError(e, () => load(generation, true));
       consecutiveFailuresRef.current += 1;
       if (consecutiveFailuresRef.current >= 3 && pollRef.current !== null) {
         clearInterval(pollRef.current);
@@ -121,7 +130,7 @@ export default function SellerInboxScreen() {
         requestGenerationRef.current = null;
       }
     }
-  }, [api]);
+  }, [api, clerkLoaded, myId]);
 
   useEffect(() => subscribeConversationReadFailure((conversationId) => {
     // A failed mark-as-read must not leave the inbox suppressing the server's
@@ -129,7 +138,7 @@ export default function SellerInboxScreen() {
     // the authoritative participant count.
     if (!optimisticReadsRef.current.delete(conversationId)) return;
     void load(generationRef.current, true);
-  }), [load]);
+  }), [load, clerkLoaded, myId]);
 
   useFocusEffect(useCallback(() => {
     const generation = ++generationRef.current;
@@ -142,7 +151,7 @@ export default function SellerInboxScreen() {
         pollRef.current = null;
       }
     };
-  }, [load]));
+  }, [load, clerkLoaded, myId]));
 
   async function onRefresh() {
     setIsRefreshing(true);
@@ -245,23 +254,6 @@ export default function SellerInboxScreen() {
       {isLoading ? (
         <View style={s.centerFill}>
           <ActivityIndicator color={PURPLE} />
-        </View>
-      ) : loadError && convs.length === 0 ? (
-        <View style={s.centerFill}>
-          <Feather name="wifi-off" size={40} color={MUTED} />
-          <Text style={s.emptyTitle}>Messages couldn't load</Text>
-          <Text style={s.emptyBody}>Check your connection and try again.</Text>
-          <TouchableOpacity
-            style={s.retryButton}
-            onPress={() => {
-              consecutiveFailuresRef.current = 0;
-              load(generationRef.current, true);
-            }}
-            activeOpacity={0.8}
-          >
-            <Feather name="refresh-cw" size={15} color={PURPLE} />
-            <Text style={s.retryText}>Try again</Text>
-          </TouchableOpacity>
         </View>
       ) : convs.length === 0 ? (
         <View style={s.centerFill}>

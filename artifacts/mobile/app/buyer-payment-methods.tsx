@@ -19,6 +19,7 @@ import {
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useAuth } from '@clerk/expo';
 
 interface PaymentMethod {
   id: string;
@@ -63,22 +64,26 @@ export default function BuyerPaymentMethodsScreen() {
   const [loading, setLoading] = useState(true);
   const [removing, setRemoving] = useState<string | null>(null);
   const [settingDefault, setSettingDefault] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { userId } = useAuth();
 
   const load = async () => {
     setLoading(true);
-    setError(null);
+    if (!userId) {
+      setPaymentMethods([]);
+      setLoading(false);
+      return;
+    }
     try {
       const data = await api.reviews.paymentMethods() as any;
       setPaymentMethods(data.paymentMethods ?? []);
     } catch {
-      setError('Could not load your payment methods. Please try again.');
+      setPaymentMethods([]);
     } finally {
       setLoading(false);
     }
   };
 
-  useFocusEffect(useCallback(() => { load(); }, []));
+  useFocusEffect(useCallback(() => { load(); }, [userId]));
 
   async function setDefault(pm: PaymentMethod) {
     if (pm.isDefault || settingDefault) return;
@@ -131,14 +136,6 @@ export default function BuyerPaymentMethodsScreen() {
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color={theme.accent} /></View>
-      ) : error ? (
-        <View style={s.center}>
-          <Feather name="alert-circle" size={30} color={MUTED} style={{ marginBottom: 12 }} />
-          <Text style={s.errorText}>{error}</Text>
-          <TouchableOpacity onPress={load} style={s.retryBtn} activeOpacity={0.7}>
-            <Text style={s.retryBtnText}>Try again</Text>
-          </TouchableOpacity>
-        </View>
       ) : (
         <ScrollView
           contentContainerStyle={[s.body, { paddingBottom: insets.bottom + 40 }]}

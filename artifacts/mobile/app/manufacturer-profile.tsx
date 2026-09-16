@@ -86,19 +86,21 @@ export default function ManufacturerProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (!id) return;
-    setLoadError('');
+    let active = true;
     Promise.all([getManufacturer(id), getFavoriteManufacturerIds()]).then(([mfg, favoriteIds]) => {
+      if (!active) return;
       setManufacturer(mfg ?? null);
       setSaved(favoriteIds.includes(id));
       setLoading(false);
-    }).catch((error) => {
-      setLoadError(error instanceof Error ? error.message : 'This manufacturer profile could not be loaded.');
+    }).catch(() => {
+      if (!active) return;
+      setManufacturer(null);
       setLoading(false);
     });
+    return () => { active = false; };
   }, [id]);
 
   async function handleSave() {
@@ -113,8 +115,8 @@ export default function ManufacturerProfileScreen() {
         await saveManufacturer(id);
         setSaved(true);
       }
-    } catch (error) {
-      Alert.alert('Could not update favorite', error instanceof Error ? error.message : 'Please try again.');
+    } catch {
+      Alert.alert('Could not update favorite', 'Please try again.');
     } finally {
       setActionLoading(false);
     }
@@ -126,8 +128,8 @@ export default function ManufacturerProfileScreen() {
     try {
       const conv = await getOrCreateConversation(id, { contextLabel: 'General' });
       router.push(('/manufacturer-messages?threadId=' + conv.id) as never);
-    } catch (error) {
-      Alert.alert('Could not open conversation', error instanceof Error ? error.message : 'Please try again.');
+    } catch {
+      Alert.alert('Could not open conversation', 'Please try again.');
     }
   }
 
@@ -149,8 +151,7 @@ export default function ManufacturerProfileScreen() {
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Feather name="arrow-left" size={ICON.md} color={FG} />
         </TouchableOpacity>
-        <EmptyState icon="alert-circle" title="Manufacturer unavailable" description={loadError || 'This manufacturer profile could not be loaded.'}
-          action={{ label: 'Try again', onPress: () => router.replace(`/manufacturer-profile?id=${id}` as never), icon: 'refresh-cw' }} />
+        <EmptyState icon="alert-circle" title="Manufacturer unavailable" description="" />
       </View>
     );
   }

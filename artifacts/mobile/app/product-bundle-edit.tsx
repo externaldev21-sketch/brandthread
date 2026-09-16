@@ -79,7 +79,7 @@ export default function ProductBundleEditScreen() {
         setIsActive(b.status === 'active');
         setItems(b.items ?? []);
       })
-      ?.catch(() => Alert.alert('Error', 'Could not load bundle.'))
+      ?.catch(() => {})
       ?.finally(() => setLoading(false));
   }, [bundleId]);
 

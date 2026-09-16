@@ -33,6 +33,7 @@ import {
   useAudioRecorder,
 } from 'expo-audio';
 import { useColors } from '@/hooks/useColors';
+import { useAuth } from '@clerk/expo';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 
@@ -142,6 +143,7 @@ export default function BuyerConversationScreen() {
 
   const flatListRef = useRef<FlatList<ListRow>>(null);
   const api = useApi();
+  const { userId } = useAuth();
 
   const [conv, setConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -169,6 +171,12 @@ export default function BuyerConversationScreen() {
   // ── Load conversation + messages ────────────────────────────────────────────
 
   const loadData = useCallback(async () => {
+    if (!userId) {
+      setConv(null);
+      setMessages([]);
+      setIsLoading(false);
+      return;
+    }
     try {
       let loadedConv: Conversation | null = null;
 
@@ -204,7 +212,7 @@ export default function BuyerConversationScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [params.id, params.participantId]);
+  }, [params.id, params.participantId, userId]);
 
   useFocusEffect(useCallback(() => {
     loadData();
@@ -263,7 +271,6 @@ export default function BuyerConversationScreen() {
       setSellerProducts(data ?? []);
     } catch {
       setSellerProducts([]);
-      Alert.alert('Could not load products', 'Please try again in a moment.');
     } finally {
       setProductsLoading(false);
     }
@@ -277,7 +284,6 @@ export default function BuyerConversationScreen() {
       setSellerPosts(data ?? []);
     } catch {
       setSellerPosts([]);
-      Alert.alert('Could not load posts', 'Please try again in a moment.');
     } finally {
       setPostsLoading(false);
     }

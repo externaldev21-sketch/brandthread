@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -183,6 +184,7 @@ export default function InventoryScreen() {
   const colors = useColors();
   const { theme } = useAppTheme();
   const router = useRouter();
+  const { userId } = useAuth();
   const insets = useSafeAreaInsets();
 
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
@@ -200,6 +202,18 @@ export default function InventoryScreen() {
   const [activeFilter, setActiveFilter] = useState<InventoryFilterKey>('all');
 
   const loadData = useCallback(async () => {
+    if (!userId) {
+      setOverview(null);
+      setItems([]);
+      setFiltered([]);
+      setAlerts([]);
+      setTransfers([]);
+      setIncoming([]);
+      setCounts([]);
+      setEvents([]);
+      setLoading(false);
+      return;
+    }
     try {
       const [ov, its, alrts, trfs, inc, cnts, evts] = await Promise.all([
         getInventoryOverview(),
@@ -227,12 +241,11 @@ export default function InventoryScreen() {
       setIncoming([]);
       setCounts([]);
       setEvents([]);
-      Alert.alert('Error', 'Failed to load inventory data.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [activeFilter]);
+  }, [activeFilter, userId]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 

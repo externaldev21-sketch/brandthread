@@ -183,7 +183,6 @@ export default function CreatePostScreen() {
   const [scheduledDateInput, setScheduledDateInput] = useState('');
   const [productTags, setProductTags]             = useState<PostProductTag[]>([]);
   const [taggableProducts, setTaggableProducts]   = useState<Product[]>([]);
-  const [taggableProductsError, setTaggableProductsError] = useState<string | null>(null);
   const [loadingTaggable, setLoadingTaggable]     = useState(false);
 
   // ── Sound / text overlays ──
@@ -218,10 +217,9 @@ export default function CreatePostScreen() {
 
   function fetchTaggableProducts() {
     setLoadingTaggable(true);
-    setTaggableProductsError(null);
     getTaggableProducts()
-      .then(p => { setTaggableProducts(p); setTaggableProductsError(null); })
-      .catch(() => { setTaggableProductsError('Could not load products. Tap to retry.'); })
+      .then(p => { setTaggableProducts(p); })
+      .catch(() => { setTaggableProducts([]); })
       .finally(() => setLoadingTaggable(false));
   }
 
@@ -236,9 +234,7 @@ export default function CreatePostScreen() {
         if (!active) return;
         const post = posts.find(item => item.id === editId);
         if (!post) {
-          Alert.alert('Post not found', 'This post may have been deleted.', [
-            { text: 'OK', onPress: leaveSetupDestination },
-          ]);
+          leaveSetupDestination();
           return;
         }
         setEditingPost(post);
@@ -276,9 +272,7 @@ export default function CreatePostScreen() {
       })
       .catch(() => {
         if (!active) return;
-        Alert.alert('Could not load post', 'Check your connection and try again.', [
-          { text: 'OK', onPress: leaveSetupDestination },
-        ]);
+        leaveSetupDestination();
       })
       .finally(() => { if (active) setLoadingEdit(false); });
     return () => { active = false; };
@@ -993,18 +987,6 @@ export default function CreatePostScreen() {
                     ))}
                   </View>
                 )}
-                {taggableProductsError ? (
-                  /* Error is scoped to this section only — rest of composer remains fully usable */
-                  <TouchableOpacity
-                    style={s.productErrorRow}
-                    activeOpacity={0.8}
-                    onPress={() => fetchTaggableProducts()}
-                  >
-                    <Feather name="alert-circle" size={14} color={ORANGE} />
-                    <Text style={s.productErrorText}>{taggableProductsError}</Text>
-                    <Feather name="refresh-cw" size={13} color={ORANGE} />
-                  </TouchableOpacity>
-                ) : (
                   <TouchableOpacity
                     style={[s.outlineBtn, { marginTop: 8 }]}
                     onPress={() => setShowProductModal(true)}
@@ -1018,7 +1000,6 @@ export default function CreatePostScreen() {
                     )}
                     <Text style={s.outlineBtnText}>{loadingTaggable ? 'Loading products…' : 'Tag products'}</Text>
                   </TouchableOpacity>
-                )}
               </>
             )}
 
@@ -1165,8 +1146,6 @@ export default function CreatePostScreen() {
             productSearch={productSearch} setProductSearch={setProductSearch}
             productTags={productTags} onTag={tagProduct}
             taggableProducts={taggableProducts}
-            productsError={taggableProductsError}
-            onRetryProducts={fetchTaggableProducts}
             insets={insets}
           />
           <SoundModal
@@ -1370,11 +1349,9 @@ interface ProductModalProps {
   productSearch: string; setProductSearch: (v: string) => void;
   productTags: PostProductTag[]; onTag: (p: Product) => void;
   taggableProducts: Product[];
-  productsError?: string | null;
-  onRetryProducts?: () => void;
   insets: { top: number; bottom: number };
 }
-function ProductModal({ visible, onClose, productSearch, setProductSearch, productTags, onTag, taggableProducts, productsError, onRetryProducts, insets }: ProductModalProps) {
+function ProductModal({ visible, onClose, productSearch, setProductSearch, productTags, onTag, taggableProducts, insets }: ProductModalProps) {
   const colors = useColors();
   const PURPLE = colors.primary;
   const sm = React.useMemo(() => createModalStyles(colors), [colors]);
@@ -1404,22 +1381,7 @@ function ProductModal({ visible, onClose, productSearch, setProductSearch, produ
             </View>
           </ScrollView>
         )}
-        {productsError ? (
-          <View style={sm.productModalError}>
-            <Feather name="alert-circle" size={28} color={ORANGE} style={{ marginBottom: 10 }} />
-            <Text style={sm.productModalErrorTitle}>Couldn't load products</Text>
-            <Text style={sm.productModalErrorBody}>{productsError}</Text>
-            <TouchableOpacity
-              style={sm.productModalRetryBtn}
-              activeOpacity={0.8}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onRetryProducts?.(); }}
-            >
-              <Feather name="refresh-cw" size={14} color="#fff" style={{ marginRight: 6 }} />
-              <Text style={sm.productModalRetryText}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
+        <>
             <View style={[sm.searchWrap, { marginTop: 8 }]}>
               <Feather name="search" size={14} color={MUTED} style={{ marginRight: 8 }} />
               <TextInput style={sm.searchInput} value={productSearch} onChangeText={setProductSearch} placeholder="Search products..." placeholderTextColor={MUTED} />
@@ -1455,7 +1417,6 @@ function ProductModal({ visible, onClose, productSearch, setProductSearch, produ
               })}
             </ScrollView>
           </>
-        )}
         <View style={{ paddingHorizontal: 16 }}>
           <TouchableOpacity onPress={onClose} activeOpacity={0.85}>
             <LinearGradient colors={colors.gradient} style={sm.addTextBtn}>
@@ -1572,9 +1533,6 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   outlineBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: BORDER, paddingVertical: 12, paddingHorizontal: 16 },
   outlineBtnText:{ fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
 
-  // Inline product error (doesn't block composer)
-  productErrorRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: ORANGE + '44', paddingHorizontal: 12, paddingVertical: 10 },
-  productErrorText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.medium, color: ORANGE, lineHeight: 16 },
 
   publishBtn:    { borderRadius: 14, paddingVertical: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   publishBtnText:{ fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
@@ -1629,10 +1587,4 @@ const createModalStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.c
   tagBtnActive:{ backgroundColor: colors.primary, borderColor: colors.primary },
   tagBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED },
 
-  // Product modal error state
-  productModalError:      { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  productModalErrorTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG, marginBottom: 6, textAlign: 'center' },
-  productModalErrorBody:  { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 18, marginBottom: 20 },
-  productModalRetryBtn:   { flexDirection: 'row', alignItems: 'center', backgroundColor: ORANGE, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 20 },
-  productModalRetryText:  { fontSize: FS.sm, fontFamily: FONT.bold, color: '#fff' },
 });

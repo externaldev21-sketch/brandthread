@@ -13,7 +13,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BG, SCREEN_BG, SURFACE, CARD, CARD_GLASS, CARD_ELEVATED_GLASS, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, CYAN, CYAN_DIM, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
-import { IconButton, FilterChip, StatusBadge, EmptyState, SearchBar, BrandedLoader } from '@/components/BrandthreadUI';
+import { IconButton, FilterChip, StatusBadge, SearchBar, BrandedLoader } from '@/components/BrandthreadUI';
 import { filterOrders, sortOrders } from '@/services/orderService';
 import { Order, OrderFilterKey, OrderSortKey, OrderAddress, OrderCustomer, FulfillmentStatus, FulfillmentType, OrderStatus, PaymentStatus, CancellationReason, CANCELLATION_REASONS } from '@/services/orderTypes';
 import { useApi } from '@/hooks/useApi';
@@ -560,12 +560,12 @@ export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
 
   const api = useApi();
-  const { userId } = useAuth();
+  const { userId, isLoaded: authLoaded, isSignedIn } = useAuth();
 
   const [orders, setOrders] = useState<OrderListOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [readUnavailable, setReadUnavailable] = useState(false);
   const [updatesPaused, setUpdatesPaused] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<OrderListFilter>('all');
@@ -574,6 +574,7 @@ export default function OrdersScreen() {
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [stats, setStats] = useState<OrderStats | null>(null);
+  const [ordersOwnerId, setOrdersOwnerId] = useState<string | null>(null);
 
   const consecutiveFailuresRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -582,23 +583,27 @@ export default function OrdersScreen() {
   const hasLoadedRef = useRef(false);
 
   const loadData = useCallback(async (generation: number) => {
+    if (!authLoaded || !isSignedIn || !userId) return;
     if (requestGenerationRef.current === generation) return;
+    const requestOwnerId = userId;
     requestGenerationRef.current = generation;
     try {
       const rows = await api.orders.list();
       if (generationRef.current !== generation) return;
       const all = Array.isArray(rows) ? (rows as any[]).map(apiRowToOrder) : [];
       setOrders(all);
+      setOrdersOwnerId(requestOwnerId);
       setStats(computeStats(all));
-      setLoadError(null);
+      setReadUnavailable(false);
       setUpdatesPaused(false);
       consecutiveFailuresRef.current = 0;
     } catch (e) {
       if (generationRef.current !== generation) return;
-      console.error('Failed to load seller orders', e);
+      if (__DEV__) console.warn('[seller-orders] refresh unavailable; showing empty state', e);
       setOrders([]);
+      setOrdersOwnerId(requestOwnerId);
       setStats(computeStats([]));
-      setLoadError('Could not load orders. Check your connection and try again.');
+      setReadUnavailable(true);
       consecutiveFailuresRef.current += 1;
       if (consecutiveFailuresRef.current >= 3) {
         setUpdatesPaused(true);
@@ -617,14 +622,19 @@ export default function OrdersScreen() {
         requestGenerationRef.current = null;
       }
     }
-  }, [api]);
+  }, [api, authLoaded, isSignedIn, userId]);
 
   useFocusEffect(
     useCallback(() => {
-      if (userId) clearBadge(userId);
+      if (!authLoaded || !isSignedIn || !userId) {
+        setLoading(true);
+        return undefined;
+      }
+      clearBadge(userId);
       const generation = ++generationRef.current;
       consecutiveFailuresRef.current = 0;
       setUpdatesPaused(false);
+      setReadUnavailable(false);
       if (!hasLoadedRef.current) setLoading(true);
       loadData(generation);
       timerRef.current = setInterval(() => loadData(generation), 30_000);
@@ -634,7 +644,7 @@ export default function OrdersScreen() {
           timerRef.current = null;
         }
       };
-    }, [loadData, userId])
+    }, [authLoaded, isSignedIn, loadData, userId])
   );
 
   const retryUpdates = useCallback(() => {
@@ -655,10 +665,11 @@ export default function OrdersScreen() {
 
   // Filtered + sorted list
   const filtered = useMemo(() => {
-    let base = orders;
+    const visibleOrders = ordersOwnerId === userId ? orders : [];
+    let base = visibleOrders;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
-      base = orders.filter(o =>
+      base = visibleOrders.filter(o =>
         o.orderNumber.toLowerCase().includes(q) ||
         o.customer.name.toLowerCase().includes(q) ||
         o.customer.email.toLowerCase().includes(q) ||
@@ -668,7 +679,7 @@ export default function OrdersScreen() {
     base = filterOrderList(base, activeFilter);
     base = sortOrders(base, sort);
     return base;
-  }, [orders, searchQuery, activeFilter, sort]);
+  }, [orders, ordersOwnerId, userId, searchQuery, activeFilter, sort]);
 
   // Date-grouped sections
   const sections = useMemo(() => groupByDate(filtered), [filtered]);
@@ -677,11 +688,12 @@ export default function OrdersScreen() {
   const filterCounts = useMemo(() => {
     const map: Partial<Record<OrderListFilter, number>> = {};
     FILTERS.forEach(({ key }) => {
-      const count = filterOrderList(orders, key).length;
+      const visibleOrders = ordersOwnerId === userId ? orders : [];
+      const count = filterOrderList(visibleOrders, key).length;
       if (key !== 'all') map[key] = count;
     });
     return map;
-  }, [orders]);
+  }, [orders, ordersOwnerId, userId]);
 
   // ─── Actions ───────────────────────────────────────────────────────────────
 
@@ -750,7 +762,8 @@ export default function OrdersScreen() {
 
   const handleExportCsv = useCallback(async () => {
     try {
-      const rows = orders.map(o => {
+      const visibleOrders = ordersOwnerId === userId ? orders : [];
+      const rows = visibleOrders.map(o => {
         const customer = o.customer?.name ?? o.customer?.email ?? 'Unknown';
         const date = new Date(o.createdAt).toLocaleDateString('en-US');
         const total = formatCents(o.payment.totalCents);
@@ -768,7 +781,7 @@ export default function OrdersScreen() {
     } catch {
       Alert.alert('Export failed', 'Could not export orders. Please try again.');
     }
-  }, [orders]);
+  }, [orders, ordersOwnerId, userId]);
 
   const handleMoreMenu = useCallback(() => {
     Alert.alert('Orders', 'Choose an action', [
@@ -830,37 +843,6 @@ export default function OrdersScreen() {
 
   const ListHeaderComponent = useCallback(() => (
     <View style={s.listHeader}>
-      {/* Paused / error banners */}
-      {updatesPaused && !loading && (
-        <TouchableOpacity
-          style={s.pausedBanner}
-          onPress={retryUpdates}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel="Live updates paused. Tap to retry."
-          testID="orders-live-updates-retry"
-        >
-          <Feather name="wifi-off" size={ICON.sm} color={ORANGE} />
-          <Text style={s.pausedBannerText}>Live updates paused</Text>
-          <Text style={s.pausedBannerAction}>Tap to retry</Text>
-          <Feather name="refresh-cw" size={12} color={ORANGE} />
-        </TouchableOpacity>
-      )}
-      {loadError && !loading && !updatesPaused && (
-        <View style={s.errorBanner}>
-          <Feather name="alert-circle" size={ICON.sm} color={RED} />
-          <Text style={s.errorBannerText} numberOfLines={2}>{loadError}</Text>
-          <TouchableOpacity
-            style={s.errorRetryBtn}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onRefresh(); }}
-            activeOpacity={0.8}
-          >
-            <Feather name="refresh-cw" size={12} color={PURPLE_LIGHT} />
-            <Text style={s.errorRetryText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
       {/* Results count */}
       <View style={s.resultsRow}>
         <Text style={s.resultsText}>
@@ -876,19 +858,14 @@ export default function OrdersScreen() {
         )}
       </View>
     </View>
-  ), [updatesPaused, loading, loadError, filtered.length, activeFilter, sort, currentSortLabel, retryUpdates, onRefresh]);
+  ), [filtered.length, activeFilter, sort, currentSortLabel]);
 
   const ListEmptyComponent = useCallback(() => {
-    if (loading) return null;
+    if (loading || readUnavailable) return null;
     return (
-      <EmptyState
-        icon="shopping-bag"
-        title="No orders yet"
-        description="Your first orders will appear here. Share your store link to start selling."
-        style={{ marginTop: SP.xl, marginHorizontal: SP.md }}
-      />
+      <Text style={s.plainEmptyText}>No orders yet</Text>
     );
-  }, [loading]);
+  }, [loading, readUnavailable]);
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -912,16 +889,6 @@ export default function OrdersScreen() {
             <Feather name="chevron-down" size={18} color={MUTED} />
           </TouchableOpacity>
           <View style={s.titleActions}>
-            <TouchableOpacity
-              style={s.headerIconBtn}
-              onPress={() => Alert.alert(
-                'Create order',
-                'Orders are created from customer checkout. Manual order creation is not available yet.',
-              )}
-              accessibilityLabel="Create order"
-            >
-              <Feather name="plus" size={ICON.md} color={FG} />
-            </TouchableOpacity>
             <TouchableOpacity
               style={s.headerIconBtn}
               onPress={handleMoreMenu}
@@ -1174,6 +1141,13 @@ const s = StyleSheet.create({
     fontSize: FS.xs,
     fontFamily: FONT.medium,
     color: SUBTLE,
+  },
+  plainEmptyText: {
+    marginTop: SP.lg,
+    textAlign: 'center',
+    color: MUTED,
+    fontFamily: FONT.regular,
+    fontSize: FS.sm,
   },
   sortIndicator: {
     fontSize: FS.xs,

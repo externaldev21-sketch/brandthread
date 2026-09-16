@@ -4,7 +4,7 @@
  *   type   — 'followers' | 'following'
  *   userId — optional, defaults to the current seller
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   ActivityIndicator, Image,
@@ -13,11 +13,12 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { useApi } from '@/lib/api';
 import {
   BG, CARD, BORDER, FG, MUTED, PURPLE, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
+import { useUser } from '@clerk/expo';
+import { useApi } from '@/hooks/useApi';
 
 interface ConnectionUser {
   id: string;
@@ -31,7 +32,8 @@ export default function ConnectionsScreen() {
   const colors = useColors();
   const router   = useRouter();
   const insets   = useSafeAreaInsets();
-  const api      = useApi();
+  const { user, isLoaded: clerkLoaded } = useUser();
+  const api = useApi();
   const { type = 'followers', userId } = useLocalSearchParams<{ type?: string; userId?: string }>();
 
   const isFollowers = type === 'followers';
@@ -39,24 +41,35 @@ export default function ConnectionsScreen() {
 
   const [users, setUsers]     = useState<ConnectionUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState<string | null>(null);
 
-  useEffect(() => {
-    const endpoint = isFollowers
-      ? `/api/social/followers${userId ? `?userId=${userId}` : ''}`
-      : `/api/social/following${userId ? `?userId=${userId}` : ''}`;
-
-    fetch(endpoint)
-      .then(r => r.json())
+  const load = useCallback(() => {
+    if (!clerkLoaded || !user?.id) return;
+    let active = true;
+    setLoading(true);
+    const request = isFollowers ? api.social.followers(userId) : api.social.following(userId);
+    request
       .then(data => {
-        const list: ConnectionUser[] = Array.isArray(data)
-          ? data
-          : (data?.followers ?? data?.following ?? data?.users ?? []);
+        if (!active) return;
+        const list: ConnectionUser[] = (Array.isArray(data) ? data : []).map((item) => ({
+          id: item.userId,
+          name: item.name,
+          username: item.username ?? undefined,
+          isFollowing: 'isFollowingBack' in item && typeof item.isFollowingBack === 'boolean'
+            ? item.isFollowingBack
+            : undefined,
+        }));
         setUsers(list);
       })
-      .catch(() => setError('Could not load connections.'))
-      .finally(() => setLoading(false));
-  }, [type, userId]);
+      .catch(() => { if (active) setUsers([]); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [api, clerkLoaded, user?.id, isFollowers, userId]);
+
+  useEffect(() => {
+    setUsers([]);
+    const cleanup = load();
+    return cleanup;
+  }, [load]);
 
   function renderItem({ item }: { item: ConnectionUser }) {
     const initials = (item.name ?? item.username ?? '?')
@@ -108,21 +121,7 @@ export default function ConnectionsScreen() {
         </View>
       )}
 
-      {!loading && error && (
-        <View style={s.center}>
-          <Feather name="wifi-off" size={36} color={MUTED} />
-          <Text style={s.errorText}>{error}</Text>
-          <TouchableOpacity
-            style={s.retryBtn}
-            onPress={() => { setLoading(true); setError(null); }}
-            activeOpacity={0.8}
-          >
-            <Text style={s.retryBtnText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {!loading && !error && users.length === 0 && (
+      {!loading && users.length === 0 && (
         <View style={s.center}>
           <Feather name="users" size={40} color={MUTED} />
           <Text style={s.emptyTitle}>No {title.toLowerCase()} yet</Text>
@@ -134,7 +133,7 @@ export default function ConnectionsScreen() {
         </View>
       )}
 
-      {!loading && !error && users.length > 0 && (
+      {!loading && users.length > 0 && (
         <FlatList
           data={users}
           keyExtractor={item => item.id}

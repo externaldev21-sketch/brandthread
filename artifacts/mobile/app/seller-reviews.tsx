@@ -1,7 +1,7 @@
 /**
  * Seller Reviews — view received reviews and post public replies.
  */
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Alert, ActivityIndicator, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BG, CARD, SURFACE, BORDER, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
+import { useUser } from '@clerk/expo';
 
 type Review = {
   id: string;
@@ -159,23 +160,44 @@ export default function SellerReviewsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
+  const { user, isLoaded: clerkLoaded } = useUser();
+  const requestGeneration = useRef(0);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    requestGeneration.current += 1;
+    setReviews([]);
+    setError(null);
+    setLoading(!clerkLoaded);
+  }, [clerkLoaded, user?.id]);
+
   const load = useCallback(async () => {
+    if (!clerkLoaded || !user?.id) return;
+    const generation = ++requestGeneration.current;
     try {
       setError(null);
       const data = await api.reviews.mine();
+      if (requestGeneration.current !== generation) return;
       if (Array.isArray(data)) setReviews(data);
     } catch {
-      setError('Could not load reviews. Pull to refresh.');
+      if (requestGeneration.current !== generation) return;
+      setError('unavailable');
     } finally {
-      setLoading(false);
+      if (requestGeneration.current === generation) setLoading(false);
     }
-  }, [api]);
+  }, [api, clerkLoaded, user?.id]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    if (!clerkLoaded || !user?.id) {
+      setReviews([]);
+      setLoading(!clerkLoaded);
+      return;
+    }
+    setLoading(true);
+    load();
+  }, [load, clerkLoaded, user?.id]));
 
   const avgRating = reviews.length
     ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
@@ -227,16 +249,7 @@ export default function SellerReviewsScreen() {
             <ActivityIndicator size="large" color={PURPLE} />
           </View>
         )}
-        {!loading && error && (
-          <View style={s.center}>
-            <Feather name="alert-circle" size={32} color={MUTED} />
-            <Text style={s.errorText}>{error}</Text>
-            <TouchableOpacity onPress={load} style={s.retryBtn}>
-              <Text style={s.retryText}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        {!loading && !error && reviews.length === 0 && (
+        {!loading && reviews.length === 0 && (
           <View style={s.center}>
             <Feather name="star" size={40} color={MUTED} />
             <Text style={s.emptyTitle}>No reviews yet</Text>

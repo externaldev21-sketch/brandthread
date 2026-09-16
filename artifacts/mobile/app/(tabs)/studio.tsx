@@ -11,6 +11,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensio
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { markFeatureOpened, getSetupState } from '@/lib/setupStore';
@@ -108,6 +109,7 @@ export default function StudioScreen() {
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const router   = useRouter();
+  const { userId } = useAuth();
   const insets   = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
 
@@ -136,6 +138,11 @@ export default function StudioScreen() {
 
   // load design projects
   const loadProjects = useCallback(() => {
+    if (!userId) {
+      setProjects([]);
+      setLoadingProjects(false);
+      return;
+    }
     setLoadingProjects(true);
     setProjectsError(null);
     getProjects()
@@ -143,11 +150,9 @@ export default function StudioScreen() {
         setProjects(p.filter(x => x.status !== 'archived'));
         setProjectsError(null);
       })
-      .catch(() => {
-        setProjectsError('Could not load projects. Tap to retry.');
-      })
+      .catch(() => setProjects([]))
       .finally(() => setLoadingProjects(false));
-  }, []);
+  }, [userId]);
 
   useEffect(() => { loadProjects(); }, [loadProjects]);
 
@@ -203,20 +208,6 @@ export default function StudioScreen() {
             <Text style={s.myProjectsBtnText}>My Projects</Text>
           </TouchableOpacity>
         </View>
-
-        {planError && (
-          <TouchableOpacity
-            style={s.planErrorBanner}
-            onPress={retryPlan}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="Could not load plan. Tap to retry."
-          >
-            <Feather name="alert-circle" size={ICON.sm} color={ORANGE} />
-            <Text style={s.planErrorText}>Could not load plan — tap to retry</Text>
-            <Feather name="refresh-cw" size={ICON.sm} color={ORANGE} />
-          </TouchableOpacity>
-        )}
 
         {/* ── START CREATING GRID ── */}
         <View style={s.sectionHeader}>
@@ -281,16 +272,6 @@ export default function StudioScreen() {
           <View style={s.loadingRow}>
             <ActivityIndicator size="small" color={PURPLE} />
           </View>
-        ) : projectsError ? (
-          <TouchableOpacity
-            style={s.projErrorRow}
-            activeOpacity={0.8}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); loadProjects(); }}
-          >
-            <Feather name="alert-circle" size={16} color={ORANGE} />
-            <Text style={s.projErrorText}>{projectsError}</Text>
-            <Feather name="refresh-cw" size={14} color={ORANGE} />
-          </TouchableOpacity>
         ) : projects.length > 0 ? (
           projects.slice(0, 4).map((proj) => {
             const variant: 'purple'|'success'|'info'|'warning'|'neutral' =

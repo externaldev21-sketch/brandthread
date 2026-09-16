@@ -2,7 +2,7 @@
  * Brandthread — Following / Drops
  * Shows brands the buyer follows, with their latest drops and real countdown timers.
  * Loads real active drops from /api/public/drops.
- * Never shows mock/invented brands — shows real empty state or retryable error instead.
+ * Never shows mock/invented brands — shows real empty state when there are no drops.
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -170,11 +170,9 @@ export default function FollowingScreen() {
 
   const [drops, setDrops] = useState<DropItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const loadDrops = useCallback(() => {
     setLoading(true);
-    setError(null);
     api.publicDrops.list()
       .then((raw: any) => {
         const list: any[] = Array.isArray(raw) ? raw : raw?.drops ?? [];
@@ -200,11 +198,8 @@ export default function FollowingScreen() {
           };
         });
         setDrops(mapped);
-        setError(null);
       })
-      .catch(() => {
-        setError('Could not load drops. Check your connection and try again.');
-      })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [api]);
 
@@ -213,7 +208,6 @@ export default function FollowingScreen() {
   const liveCount = drops.filter(d => !d.releaseAt || new Date(d.releaseAt).getTime() <= Date.now()).length;
   const upcomingCount = drops.filter(d => d.releaseAt && new Date(d.releaseAt).getTime() > Date.now()).length;
   const subtitle = loading ? 'Loading drops…'
-    : error ? 'Failed to load'
     : drops.length === 0 ? 'No drops yet'
     : upcomingCount > 0 ? `${upcomingCount} upcoming, ${liveCount} live`
     : `${liveCount} active drop${liveCount === 1 ? '' : 's'}`;
@@ -262,28 +256,9 @@ export default function FollowingScreen() {
         </View>
       )}
 
-      {/* Drop cards / loading / empty / error */}
+      {/* Drop cards / loading / empty */}
       {loading ? (
         <View style={s.loadingWrap}><ActivityIndicator color={PURPLE} /></View>
-      ) : error ? (
-        <View style={s.centeredWrap}>
-          <View style={s.errorBox}>
-            <Feather name="wifi-off" size={32} color={RED} style={{ marginBottom: 12 }} />
-            <Text style={s.errorTitle}>Couldn't load drops</Text>
-            <Text style={s.errorBody}>{error}</Text>
-            <TouchableOpacity
-              style={[s.retryBtn, { backgroundColor: PURPLE_DIM, borderColor: PURPLE }]}
-              activeOpacity={0.8}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                loadDrops();
-              }}
-            >
-              <Feather name="refresh-cw" size={14} color={PURPLE} style={{ marginRight: 6 }} />
-              <Text style={[s.retryBtnText, { color: PURPLE }]}>Try again</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
       ) : drops.length === 0 ? (
         <View style={s.centeredWrap}>
           <Feather name="heart" size={36} color={MUTED} style={{ marginBottom: 12 }} />
@@ -336,20 +311,6 @@ const s = StyleSheet.create({
 
   loadingWrap:  { flex: 1, alignItems: 'center', justifyContent: 'center' },
   centeredWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-
-  // Error state
-  errorBox: {
-    alignItems: 'center', backgroundColor: RED_DIM, borderRadius: RADIUS.lg,
-    borderWidth: 1, borderColor: RED + '44', padding: SP.lg, width: '100%',
-  },
-  errorTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG, marginBottom: 6 },
-  errorBody:  { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 18 },
-  retryBtn: {
-    flexDirection: 'row', alignItems: 'center', marginTop: SP.md,
-    borderRadius: RADIUS.sm, borderWidth: 1,
-    paddingHorizontal: SP.md, paddingVertical: SP.sm,
-  },
-  retryBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold },
 
   // Empty state
   emptyTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG, marginBottom: 8, textAlign: 'center' },

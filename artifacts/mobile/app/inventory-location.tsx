@@ -45,7 +45,7 @@ export default function InventoryLocationScreen() {
       const locs = await getLocations();
       setLocations(locs);
     } catch {
-      Alert.alert('Error', 'Failed to load locations.');
+      setLocations([]);
     } finally {
       setLoadingList(false);
     }

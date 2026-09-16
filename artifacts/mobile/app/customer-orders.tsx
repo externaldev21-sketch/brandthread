@@ -2,7 +2,7 @@
  * Customer Orders — full order history for a specific customer.
  * Route: /customer-orders?customerId=<uuid>
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator, Platform,
@@ -20,6 +20,7 @@ import { useApi } from '@/lib/api';
 import { StatusBadge } from '@/components/BrandthreadUI';
 import { useColors } from '@/hooks/useColors';
 import { formatCents } from '@/lib/money';
+import { useUser } from '@clerk/expo';
 
 type Customer = {
   id: string;
@@ -61,32 +62,53 @@ export default function CustomerOrdersScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
+  const { user, isLoaded: clerkLoaded } = useUser();
   const { customerId } = useLocalSearchParams<{ customerId: string }>();
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const requestGeneration = useRef(0);
+
+  useEffect(() => {
+    requestGeneration.current += 1;
+    setCustomer(null);
+    setOrders([]);
+    setError(null);
+    setLoading(!clerkLoaded);
+  }, [clerkLoaded, user?.id, customerId]);
 
   const load = useCallback(async () => {
-    if (!customerId) return;
+    if (!customerId || !clerkLoaded || !user?.id) return;
+    const generation = ++requestGeneration.current;
     try {
       setError(null);
       const [cust, ords] = await Promise.all([
         api.customers.get(customerId),
         api.customers.orders(customerId),
       ]);
+      if (requestGeneration.current !== generation) return;
       setCustomer(cust as Customer);
       setOrders(Array.isArray(ords) ? ords : []);
     } catch {
-      setOrders([]);
-      setError('Could not load customer data.');
+      if (requestGeneration.current !== generation) return;
+      setError('unavailable');
     } finally {
-      setLoading(false);
+      if (requestGeneration.current === generation) setLoading(false);
     }
-  }, [api, customerId]);
+  }, [api, customerId, clerkLoaded, user?.id]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    if (!clerkLoaded || !user?.id || !customerId) {
+      setCustomer(null);
+      setOrders([]);
+      setLoading(!clerkLoaded);
+      return;
+    }
+    setLoading(true);
+    load();
+  }, [load, clerkLoaded, user?.id, customerId]));
 
   return (
     <View style={[s.root, { paddingTop: Platform.OS === 'web' ? 20 : insets.top }]}>
@@ -104,14 +126,6 @@ export default function CustomerOrdersScreen() {
       {loading ? (
         <View style={s.center}>
           <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      ) : error ? (
-        <View style={s.center}>
-          <Feather name="alert-circle" size={32} color={MUTED} />
-          <Text style={s.errorText}>{error}</Text>
-          <TouchableOpacity onPress={load} style={s.retryBtn}>
-            <Text style={s.retryText}>Retry</Text>
-          </TouchableOpacity>
         </View>
       ) : (
         <ScrollView

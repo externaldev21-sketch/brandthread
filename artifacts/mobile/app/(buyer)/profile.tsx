@@ -24,7 +24,6 @@ import {
 import { useApi } from '@/lib/api';
 import { loadBuyerProfile } from '@/lib/buyerProfile';
 import { loadHighlights, type Highlight } from '@/lib/highlightsService';
-import { reportNetworkError } from '@/lib/networkNotice';
 import type {
   BuyerSocialProfile, BuyerPost, RepostRecord, SavedItem, PrivacySettings,
 } from '@/services/socialTypes';
@@ -110,6 +109,8 @@ export default function ProfileScreen() {
   const { user } = useUser();
   const api     = useApi();
   const { theme } = useAppTheme();
+  const accountRef = useRef(user?.id);
+  accountRef.current = user?.id;
 
   const [profile, setProfile] = useState<BuyerSocialProfile | null>(null);
   const [hasActiveStory, setHasActiveStory] = useState(false);
@@ -129,6 +130,14 @@ export default function ProfileScreen() {
   const [postSheet, setPostSheet] = useState<BuyerPost | null>(null);
 
   const loadData = useCallback(async () => {
+    if (!user?.id) {
+      setProfile(null);
+      setPosts([]);
+      setReposts([]);
+      setSavedItems([]);
+      setLoading(false);
+      return;
+    }
     setLoadError(false);
     try {
     const [p, po, rp, sv, pr, bp, hl, myStories] = await Promise.all([
@@ -141,6 +150,7 @@ export default function ProfileScreen() {
       loadHighlights(),
       api.social.myStories().catch(() => []),
     ]);
+    if (accountRef.current !== user?.id) return;
     setProfile(p);
     setPosts(po.filter(x => !x.isArchived && !x.isDraft));
     setReposts(rp);
@@ -150,12 +160,15 @@ export default function ProfileScreen() {
     setHighlights(hl);
     setHasActiveStory(Array.isArray(myStories) && myStories.length > 0);
     } catch (error) {
-      setLoadError(true);
-      reportNetworkError(error, () => loadData());
+      setLoadError(false);
+      setProfile(null);
+      setPosts([]);
+      setReposts([]);
+      setSavedItems([]);
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, user?.id]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -293,13 +306,6 @@ export default function ProfileScreen() {
         {loading ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyDesc}>Loading profile…</Text>
-          </View>
-        ) : loadError ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>Couldn't load profile</Text>
-            <TouchableOpacity style={[styles.emptyAction, { borderColor: theme.accent }]} onPress={loadData}>
-              <Text style={[styles.emptyActionText, { color: theme.accent }]}>Try again</Text>
-            </TouchableOpacity>
           </View>
         ) : (
           <>

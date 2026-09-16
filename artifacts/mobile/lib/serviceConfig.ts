@@ -12,7 +12,7 @@ import {
   dismissNetworkNotice,
   reportNetworkError,
 } from '@/lib/networkNotice';
-import { storeContextHeaders } from '@/lib/api';
+import { storeContextHeaders, versionApiPath } from '@/lib/api';
 
 type GetToken = () => Promise<string | null>;
 
@@ -33,13 +33,14 @@ export function configureServices(getToken: GetToken): void {
 export async function serviceRequest<T = unknown>(
   path: string,
   options: RequestInit = {},
+  reportErrors = true,
 ): Promise<T> {
   if (!_getToken) throw new Error("Services not configured");
   const token = await _getToken();
   const base = process.env.EXPO_PUBLIC_API_BASE_URL ?? "";
   let res: Response;
   try {
-    res = await fetch(`${base}${path}`, {
+    res = await fetch(`${base}${versionApiPath(path)}`, {
       ...options,
       headers: {
         "Content-Type": "application/json",
@@ -50,20 +51,20 @@ export async function serviceRequest<T = unknown>(
     });
   } catch (error) {
     const retry = !options.method || options.method === 'GET'
-      ? () => serviceRequest<T>(path, options)
+      ? () => serviceRequest<T>(path, options, reportErrors)
       : undefined;
-    reportNetworkError(error, retry);
+    if (reportErrors) reportNetworkError(error, retry);
     throw error;
   }
   if (!res.ok) {
     const body = await res.text();
     const error = new ApiError(res.status, body);
     const retry = !options.method || options.method === 'GET'
-      ? () => serviceRequest<T>(path, options)
+      ? () => serviceRequest<T>(path, options, reportErrors)
       : undefined;
-    reportNetworkError(error, retry);
+    if (reportErrors) reportNetworkError(error, retry);
     throw error;
   }
-  dismissNetworkNotice();
+  if (reportErrors) dismissNetworkNotice();
   return res.json() as Promise<T>;
 }

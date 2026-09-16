@@ -164,7 +164,7 @@ export default function ManufacturerHub() {
     router.back();
   }
 
-  const { hasPlan, loading: planLoading, error: planError, retry: retryPlan } = useSubscriptionPlan();
+  const { hasPlan, loading: planLoading, error: planError } = useSubscriptionPlan();
   const [upsellVisible, setUpsellVisible] = useState(false);
   const hasGrowthAccess = !GROWTH_PLAN_ENFORCEMENT_ENABLED || hasPlan('growth');
 
@@ -221,20 +221,6 @@ export default function ManufacturerHub() {
           ))}
         </ScrollView>
       </View>
-
-      {planError && (
-        <TouchableOpacity
-          style={s.planErrorBanner}
-          onPress={retryPlan}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel="Could not load plan. Tap to retry."
-        >
-          <Feather name="alert-circle" size={ICON.sm} color={ORANGE} />
-          <Text style={s.planErrorText}>Could not load plan — tap to retry</Text>
-          <Feather name="refresh-cw" size={ICON.sm} color={ORANGE} />
-        </TouchableOpacity>
-      )}
 
       {/* Tab content */}
       <View style={s.content}>
@@ -341,14 +327,13 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [favoritesOnly, setFavoritesOnly] = useState(false);
-  const [loadError, setLoadError] = useState('');
+  const [loadError, setLoadError] = useState(false);
   const [mutationError, setMutationError] = useState('');
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async (query = searchQuery, f = filters) => {
     try {
-      setLoadError('');
       const [results, favoriteIds] = await Promise.all([
         searchManufacturers({
           query: query || undefined,
@@ -362,13 +347,14 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
         }),
         getFavoriteManufacturerIds(),
       ]);
+      setLoadError(false);
       setManufacturers(Array.isArray(results) ? results : []);
       setSavedIds(new Set(favoriteIds));
     } catch (e) {
       setManufacturers([]);
       setSavedIds(new Set());
       if (!showManufacturerUpgrade(e, router)) {
-        setLoadError('Could not load manufacturers or favorites.');
+        setLoadError(true);
       }
       console.error(e);
     } finally {
@@ -466,16 +452,14 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
         <FilterChip label={`Favorites (${savedIds.size})`} active={favoritesOnly} onPress={() => setFavoritesOnly(true)} />
       </View>
 
-      {!!(loadError || mutationError) && (
+      {!!mutationError && (
         <TouchableOpacity
           style={s.inlineError}
-          onPress={() => load()}
-          accessibilityRole="button"
-          accessibilityLabel="Retry loading favorite manufacturers"
+          onPress={() => setMutationError('')}
+          accessibilityRole="alert"
         >
           <Feather name="alert-circle" size={ICON.sm} color={ORANGE} />
-          <Text style={s.inlineErrorText}>{loadError || mutationError}</Text>
-          <Text style={s.inlineErrorAction}>Retry</Text>
+          <Text style={s.inlineErrorText}>{mutationError}</Text>
         </TouchableOpacity>
       )}
 
@@ -499,16 +483,14 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={PURPLE} />}
         ListEmptyComponent={
-          loading ? null : (
+            loading || loadError ? null : (
             <EmptyState
               icon={favoritesOnly ? 'heart' : 'search'}
-              title={loadError ? 'Could not load manufacturers' : favoritesOnly ? 'No favorite manufacturers yet' : 'No manufacturers found'}
-              description={loadError ? 'Check your connection and try again.' : favoritesOnly ? 'Save manufacturers from Discover and they will appear here.' : 'Try adjusting your search or filters.'}
-              action={loadError
-                ? { label: 'Try again', onPress: () => load() }
-                : favoritesOnly
-                  ? { label: 'Browse manufacturers', onPress: () => setFavoritesOnly(false) }
-                  : { label: 'Clear filters', onPress: () => applyFilters(DEFAULT_FILTERS) }}
+              title={favoritesOnly ? 'No favorite manufacturers yet' : 'No manufacturers found'}
+              description={favoritesOnly ? 'Save manufacturers from Discover and they will appear here.' : 'Try adjusting your search or filters.'}
+              action={favoritesOnly
+                ? { label: 'Browse manufacturers', onPress: () => setFavoritesOnly(false) }
+                : { label: 'Clear filters', onPress: () => applyFilters(DEFAULT_FILTERS) }}
             />
           )
         }
@@ -756,11 +738,11 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
   const [mfgMap, setMfgMap] = useState<Record<string, Manufacturer>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      setError('');
+      setError(false);
       const rels = await getRelationships();
       const safeRels = Array.isArray(rels) ? rels : [];
       setRelationships(safeRels);
@@ -773,7 +755,7 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
       setMfgMap(map);
     } catch (e) {
       setRelationships([]);
-      setError('Could not load your saved manufacturers.');
+      setError(true);
       console.error(e);
     } finally {
       setLoading(false);
@@ -791,7 +773,7 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
         idx => {
           if (idx === 0) getOrCreateConversation(mfg.id)
             .then(conv => router.push((`/manufacturer-messages?threadId=${conv.id}`) as never))
-            .catch(() => setError('Could not open a conversation. Please try again.'));
+            .catch(() => Alert.alert('Message unavailable', 'Could not open a conversation. Please try again.'));
           if (idx === 1) router.push((`/quote-request?manufacturerId=${mfg.id}`) as never);
         }
       );
@@ -799,17 +781,14 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
       Alert.alert(mfg.name, 'Choose action', [
         { text: 'Message', onPress: () => getOrCreateConversation(mfg.id)
           .then(conv => router.push((`/manufacturer-messages?threadId=${conv.id}`) as never))
-          .catch(() => setError('Could not open a conversation. Please try again.')) },
+          .catch(() => Alert.alert('Message unavailable', 'Could not open a conversation. Please try again.')) },
         { text: 'Request Quote', onPress: () => router.push((`/quote-request?manufacturerId=${mfg.id}`) as never) },
         { text: 'Cancel', style: 'cancel' },
       ]);
     }
   };
 
-  if (!loading && error) {
-    return <EmptyState icon="alert-circle" title="Could not load manufacturers" description={error}
-      action={{ label: 'Try again', onPress: load, icon: 'refresh-cw' }} style={s.emptyState} />;
-  }
+  if (error) return <View style={s.flex} />;
 
   if (!loading && relationships.length === 0) {
     return (
@@ -908,11 +887,11 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [manufacturerNames, setManufacturerNames] = useState<Record<string, string>>({});
-  const [error, setError] = useState('');
+  const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      setError('');
+      setError(false);
       const [reqs, qs] = await Promise.all([getQuoteRequests(), getQuotes()]);
       setQuoteRequests((Array.isArray(reqs) ? reqs : []).filter(r => r.status !== 'accepted'));
       setQuotes(Array.isArray(qs) ? qs : []);
@@ -923,7 +902,7 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
       setQuoteRequests([]);
       setQuotes([]);
       setManufacturerNames({});
-      setError('Could not load quotes. Check your connection and try again.');
+      setError(true);
       console.error(e);
     } finally {
       setLoading(false);
@@ -937,7 +916,7 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
     Alert.alert('Accept Quote', `Accept this quote for ${formatCents(quote.unitPriceCents)}/unit?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Accept', onPress: () => acceptQuote(quote.id).then(load)
-        .catch(() => setError('Could not accept this quote. Refresh and try again.')) },
+        .catch(() => Alert.alert('Quote update failed', 'Could not accept this quote. Refresh and try again.')) },
     ]);
   };
 
@@ -945,17 +924,13 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
     Alert.alert('Decline Quote', 'Are you sure you want to decline this quote?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Decline', style: 'destructive', onPress: () => declineQuote(quote.id).then(load)
-        .catch(() => setError('Could not decline this quote. Refresh and try again.')) },
+        .catch(() => Alert.alert('Quote update failed', 'Could not decline this quote. Refresh and try again.')) },
     ]);
   };
 
   // Group quotes by requestId for compare detection
   const quotesByRequest: Record<string, Quote[]> = {};
-  if (!loading && error) {
-    return <EmptyState icon="alert-circle" title="Could not load quotes" description={error}
-      action={{ label: 'Try again', onPress: load, icon: 'refresh-cw' }} style={s.emptyState} />;
-  }
-
+  if (error) return <View style={s.flex} />;
   quotes.forEach(q => {
     if (!quotesByRequest[q.quoteRequestId]) quotesByRequest[q.quoteRequestId] = [];
     quotesByRequest[q.quoteRequestId].push(q);
@@ -992,7 +967,7 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
                 req={req}
                 manufacturerName={manufacturerNames[req.manufacturerId]}
                 onView={() => router.push((`/quote-detail?quoteId=${req.id}`) as never)}
-                onWithdraw={() => withdrawQuoteRequest(req.id).then(load).catch(() => setError('Could not withdraw this request. Refresh and try again.'))}
+                onWithdraw={() => withdrawQuoteRequest(req.id).then(load).catch(() => Alert.alert('Quote update failed', 'Could not withdraw this request. Refresh and try again.'))}
               />
             ))}
           </>
@@ -1125,15 +1100,15 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const [samples, setSamples] = useState<Sample[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      setError('');
+      setError(false);
       const s = await getSamples();
       setSamples(s.filter(order => order.orderType !== 'bulk'));
     } catch (e) {
-      setError('Could not load sample orders.');
+      setError(true);
       console.error(e);
     } finally {
       setLoading(false);
@@ -1148,10 +1123,7 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   }, [load]);
 
   if (loading) return <View style={s.centered}><ActivityIndicator color={PURPLE} /></View>;
-  if (error) {
-    return <EmptyState icon="alert-circle" title="Could not load samples" description={error}
-      action={{ label: 'Try again', onPress: load, icon: 'refresh-cw' }} style={s.emptyState} />;
-  }
+  if (error) return <View style={s.flex} />;
   if (samples.length === 0) {
     return (
       <EmptyState
@@ -1228,15 +1200,15 @@ function ProductionTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const [productionOrders, setProductionOrders] = useState<ProductionOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      setError('');
+      setError(false);
       const orders = await getProductionOrders();
       setProductionOrders(orders);
     } catch (e) {
-      setError('Could not load production orders.');
+      setError(true);
       console.error(e);
     } finally {
       setLoading(false);
@@ -1251,10 +1223,7 @@ function ProductionTab({ router }: { router: ReturnType<typeof useRouter> }) {
   }, [load]);
 
   if (loading) return <View style={s.centered}><ActivityIndicator color={PURPLE} /></View>;
-  if (error) {
-    return <EmptyState icon="alert-circle" title="Could not load production" description={error}
-      action={{ label: 'Try again', onPress: load, icon: 'refresh-cw' }} style={s.emptyState} />;
-  }
+  if (error) return <View style={s.flex} />;
   if (productionOrders.length === 0) {
     return (
       <EmptyState
@@ -1347,15 +1316,15 @@ function MessagesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const [conversations, setConversations] = useState<ManufacturerConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      setError('');
+      setError(false);
       const convs = await getConversations();
       setConversations(convs);
     } catch (e) {
-      setError('Could not load manufacturer messages.');
+      setError(true);
       console.error(e);
     } finally {
       setLoading(false);
@@ -1370,10 +1339,7 @@ function MessagesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   }, [load]);
 
   if (loading) return <View style={s.centered}><ActivityIndicator color={PURPLE} /></View>;
-  if (error) {
-    return <EmptyState icon="alert-circle" title="Could not load messages" description={error}
-      action={{ label: 'Try again', onPress: load, icon: 'refresh-cw' }} style={s.emptyState} />;
-  }
+  if (error) return <View style={s.flex} />;
   if (conversations.length === 0) {
     return (
       <EmptyState
@@ -1455,8 +1421,6 @@ const s = StyleSheet.create({
   tabLabel:     { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   tabLabelActive:{ color: PURPLE_LIGHT, fontFamily: FONT.semibold },
   tabUnderline: { height: 2, width: '100%', backgroundColor: PURPLE, borderRadius: RADIUS.pill },
-  planErrorBanner: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginHorizontal: SP.md, marginTop: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.md, backgroundColor: '#2B1E0F', borderWidth: 1, borderColor: ORANGE },
-  planErrorText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: ORANGE },
   content:      { flex: 1 },
   listContent:  { paddingTop: SP.md, paddingBottom: SP.xxl + COMP.tabBarH },
   gridContent:  { paddingHorizontal: SP.md },
@@ -1470,6 +1434,5 @@ const s = StyleSheet.create({
   discoverModeRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
   inlineError: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginHorizontal: SP.md, marginBottom: SP.sm, padding: SP.sm, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: ORANGE, backgroundColor: '#2B1E0F' },
   inlineErrorText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: ORANGE },
-  inlineErrorAction: { fontSize: FS.sm, fontFamily: FONT.semibold, color: ORANGE },
   emptyState:   { flex: 1, justifyContent: 'center' },
 });

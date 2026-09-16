@@ -197,7 +197,7 @@ export default function BuyerSaved() {
       </View>
 
       {/* CONTENT */}
-       {loading ? <View style={styles.emptyContainer}><Text style={styles.emptyDesc}>Loading saved items…</Text></View> : loadError ? <View style={styles.emptyContainer}><Text style={styles.emptyTitle}>Couldn't load saved items</Text><TouchableOpacity onPress={loadData}><Text style={[styles.emptyDesc, { color: PURPLE }]}>Try again</Text></TouchableOpacity></View> : filtered.length === 0 ? (
+       {loading ? <View style={styles.emptyContainer}><Text style={styles.emptyDesc}>Loading saved items…</Text></View> : filtered.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Feather name={activeTabDef.icon as any} size={48} color={MUTED} />
           <Text style={styles.emptyTitle}>{emptyTitle()}</Text>

@@ -57,7 +57,7 @@ export default function TeamInviteScreen() {
           setInvite(data);
         }
       })
-      .catch((err: any) => setError(err?.message ?? 'This invite link is invalid or has expired.'))
+      .catch(() => setError('This invite link is invalid or has expired.'))
       .finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
@@ -76,8 +76,8 @@ export default function TeamInviteScreen() {
       await api.team.accept(String(token));
       await AsyncStorage.removeItem(PENDING_INVITE_KEY).catch(() => {});
       setAccepted(true);
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to accept the invite.');
+    } catch {
+      setError('This invite link is invalid or has expired.');
     }
     setAccepting(false);
   };

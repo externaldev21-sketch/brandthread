@@ -74,7 +74,6 @@ export default function AIPhotoshootScreen() {
   const [selectedProductId, setSelectedProductId] = useState('');
   const [products, setProducts] = useState<ProductOption[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
-  const [productError, setProductError] = useState('');
   // Step 2
   const [modelStyle, setModelStyle] = useState<ModelStyleKind>('female');
   // Step 3
@@ -108,13 +107,12 @@ export default function AIPhotoshootScreen() {
   useEffect(() => {
     let active = true;
     setLoadingProducts(true);
-    setProductError('');
     api.products.list()
       .then((rows) => {
         if (active) setProducts(Array.isArray(rows) ? rows as ProductOption[] : []);
       })
       .catch(() => {
-        if (active) setProductError('Could not load your products. Try again.');
+        if (active) setProducts([]);
       })
       .finally(() => {
         if (active) setLoadingProducts(false);
@@ -351,12 +349,6 @@ export default function AIPhotoshootScreen() {
 
             {loadingProducts ? (
               <ActivityIndicator color={PURPLE} style={{ marginVertical: SP.xl }} />
-            ) : productError ? (
-              <View style={s.productPlaceholder}>
-                <Feather name="wifi-off" size={ICON.xl} color={SUBTLE} />
-                <Text style={s.productPlaceholderText}>Products unavailable</Text>
-                <Text style={s.productPlaceholderSub}>{productError}</Text>
-              </View>
             ) : (
               <View style={s.productList}>
                 {products

@@ -1,511 +1,655 @@
 /**
- * Analytics Overview — Brandthread Seller App
- * Premium analytics hub. All data from analyticsService (stable, no random).
+ * Analytics — Brandthread Seller App
+ * Precise, trustworthy, quick-to-scan seller analytics.
+ * Data contract: grossRevenue/storeVisitors from getOverview; daily bars from
+ * getSalesAnalytics. No fabricated data, no fabricated trends.
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   RefreshControl, Platform, useWindowDimensions, ActivityIndicator,
   Alert,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import Svg, { Circle, Defs, LinearGradient as SvgGradient, Path, Stop } from 'react-native-svg';
-import { useRouter } from 'expo-router';
+import Svg, { Rect, Line, Text as SvgText } from 'react-native-svg';
+import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED, CARD_GLASS, CARD_ELEVATED_GLASS, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
-  ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  FONT, FS,
+  SCREEN_BG, CARD_GLASS, BORDER, FG, MUTED, SUBTLE, SUCCESS, RED,
+  FONT, FS, SURFACE,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
+import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import {
-  getOverview, getFilterState, saveFilterState,
-  dismissInsight, completeInsight, exportAnalytics,
+  getSalesAnalytics, getFilterState, saveFilterState,
 } from '@/services/analyticsService';
 import {
-  AnalyticsOverview, AnalyticsFilterState, AnalyticsMetric,
-  AnalyticsInsight, AnalyticsPoint, DATE_RANGE_OPTIONS, COMPARISON_OPTIONS,
-  ANALYTICS_SECTIONS, DateRangeKey,
+  AnalyticsFilterState, AnalyticsPoint, DATE_RANGE_OPTIONS, COMPARISON_OPTIONS,
 } from '@/services/analyticsTypes';
 
-type ChartMetric = 'revenue' | 'orders' | 'profit' | 'visitors' | 'conversion';
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-const CHART_METRICS: { key: ChartMetric; label: string }[] = [
-  { key: 'revenue',    label: 'Revenue'    },
-  { key: 'orders',     label: 'Orders'     },
-  { key: 'visitors',   label: 'Visitors'   },
-];
+type Segment = '7d' | '14d' | 'custom';
 
-const DATE_PILLS: DateRangeKey[] = ['today', '7d', '30d', '90d'];
+interface SummaryData {
+  visits: number;
+  revenueCents: number;
+  leads: number; // always 0 — no endpoint
+  visitsChangePct?: number;
+  revenueChangePct?: number;
+  leadsChangePct?: number;
+}
 
-const SECTION_ROUTES: Record<string, string> = {
-  sales:      '/analytics-sales',
-  products:   '/analytics-products',
-  customers:  '/analytics-customers',
-  content:    '/analytics-content',
-  store:      '/analytics-store',
-  marketing:  '/analytics-marketing',
-  inventory:  '/analytics-inventory',
-  production: '/analytics-production',
-  profit:     '/analytics-profit',
-};
+interface DailyBar {
+  date: string;   // ISO date yyyy-mm-dd
+  label: string;  // short date label e.g. "Jul 4"
+  cents: number;
+}
 
-function insightIcon(type: AnalyticsInsight['type']): keyof typeof Feather.glyphMap {
-  switch (type) {
-    case 'opportunity':    return 'zap';
-    case 'warning':        return 'alert-triangle';
-    case 'action_needed':  return 'alert-circle';
-    default:               return 'info';
+interface TrafficSource {
+  label: string;
+  count: number;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function shortDate(iso: string): string {
+  const d = new Date(iso + 'T00:00:00Z');
+  if (isNaN(d.getTime())) return iso.slice(5, 10);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+function niceYMax(maxCents: number): number {
+  if (maxCents <= 0) return 500;  // default $5.00 so grid renders
+  const dollar = maxCents / 100;
+  const mag = Math.pow(10, Math.floor(Math.log10(dollar)));
+  const nice = Math.ceil(dollar / mag) * mag;
+  return nice * 100;
+}
+
+function gridLevels(maxCents: number, steps = 4): number[] {
+  const top = niceYMax(maxCents);
+  return Array.from({ length: steps + 1 }, (_, i) => Math.round((top / steps) * i));
+}
+
+/** Returns ISO date strings for the last n days ending today (inclusive). */
+function lastNDays(n: number): string[] {
+  const days: string[] = [];
+  const now = new Date();
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(now.getDate() - i);
+    days.push(d.toISOString().slice(0, 10));
   }
+  return days;
 }
-function insightColor(type: AnalyticsInsight['type']): string {
-  switch (type) {
-    case 'opportunity':    return GOLD;
-    case 'warning':        return ORANGE;
-    case 'action_needed':  return RED;
-    default:               return BLUE;
+
+/** Align API daily points to a fixed date range, filling 0 for missing days. */
+function alignBars(points: AnalyticsPoint[], days: string[]): DailyBar[] {
+  const byDate: Record<string, number> = {};
+  for (const p of points) {
+    const key = typeof p.date === 'string' ? p.date.slice(0, 10) : '';
+    if (key) byDate[key] = (byDate[key] ?? 0) + p.value;
   }
-}
-function insightBg(type: AnalyticsInsight['type']): string {
-  switch (type) {
-    case 'opportunity':    return 'rgba(245,158,11,0.12)';
-    case 'warning':        return ORANGE_DIM;
-    case 'action_needed':  return RED_DIM;
-    default:               return BLUE_DIM;
-  }
-}
-
-function Sparkline({ points, color }: { points: AnalyticsPoint[]; color?: string }) {
-  const colors = useColors();
-  const safePoints = Array.isArray(points) ? points : [];
-  if (!safePoints.length) return null;
-  const max = Math.max(...safePoints.map(p => p.value), 1);
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 18, gap: 1.5 }}>
-      {safePoints.slice(-10).map((p, i) => (
-        <View
-          key={i}
-          style={{
-            flex: 1, borderRadius: 2,
-            height: Math.max(3, (p.value / max) * 18),
-            backgroundColor: color ?? colors.primary,
-            opacity: 0.55,
-          }}
-        />
-      ))}
-    </View>
-  );
-}
-
-function MetricCard({ m, width }: { m: AnalyticsMetric; width: number }) {
-  return (
-    <View style={[styles.metricCard, { width }]}>
-      <Text style={styles.metricLabel} numberOfLines={1}>{m.label}</Text>
-      <Text style={styles.metricValue}>{m.formatted}</Text>
-    </View>
-  );
-}
-
-function TrendLineChart({ points, color, width }: { points: AnalyticsPoint[]; color: string; width: number }) {
-  const height = 132;
-  const chartWidth = Math.max(240, width);
-  const values = points.map(point => point.value);
-  const max = Math.max(...values, 1);
-  const min = Math.min(...values, 0);
-  const range = Math.max(1, max - min);
-  const coords = points.map((point, index) => ({
-    x: points.length === 1 ? chartWidth / 2 : (index / (points.length - 1)) * chartWidth,
-    y: 12 + (1 - (point.value - min) / range) * (height - 28),
+  return days.map(iso => ({
+    date: iso,
+    label: shortDate(iso),
+    cents: byDate[iso] ?? 0,
   }));
-  const path = coords.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
-  const area = coords.length ? `${path} L ${chartWidth} ${height} L 0 ${height} Z` : '';
+}
+
+// ─── Revenue Bar Chart ────────────────────────────────────────────────────────
+
+function RevenueBarChart({
+  bars,
+  colors,
+  available,
+}: {
+  bars: DailyBar[];
+  colors: ReturnType<typeof useColors>;
+  available: boolean;
+}) {
+  const { width: screenWidth } = useWindowDimensions();
+  const chartWidth = screenWidth - 64; // 16 padding * 2 + 16 inside card * 2
+  const chartHeight = 140;
+  const labelHeight = 20;
+  const gridHeight = chartHeight - labelHeight;
+  const allZero = bars.every(b => b.cents === 0);
+
+  const maxCents = allZero ? 0 : Math.max(...bars.map(b => b.cents));
+  const levels = allZero ? [0] : gridLevels(maxCents);
+  const topCents = levels[levels.length - 1];
+  const yLabelW = 46;
+  const plotW = chartWidth - yLabelW;
+  const n = bars.length;
+  const barGap = n > 0 ? 2 : 0;
+  const barW = n > 0 ? Math.max(4, (plotW - barGap * (n - 1)) / n) : 0;
+
+  const barX = (i: number) => yLabelW + i * (barW + barGap);
+  const barY = (cents: number) => {
+    if (topCents <= 0) return gridHeight;
+    const frac = cents / topCents;
+    return gridHeight - Math.max(0, Math.min(1, frac)) * (gridHeight - 4);
+  };
 
   return (
-    <View style={styles.lineChartWrap}>
-      <Svg width={chartWidth} height={height}>
-        <Defs>
-          <SvgGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={color} stopOpacity="0.32" />
-            <Stop offset="1" stopColor={color} stopOpacity="0" />
-          </SvgGradient>
-        </Defs>
-        {area ? <Path d={area} fill="url(#trendFill)" /> : null}
-        {path ? <Path d={path} fill="none" stroke={color} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" /> : null}
-        {coords.length ? <Circle cx={coords[coords.length - 1].x} cy={coords[coords.length - 1].y} r={4.5} fill={color} stroke={CARD} strokeWidth={2} /> : null}
+    <View>
+      <Svg width={chartWidth} height={chartHeight}>
+        {/* Y-axis grid lines + labels */}
+        {levels.map((cents, i) => {
+          const y = levels.length === 1
+            ? gridHeight
+            : gridHeight - (i / (levels.length - 1)) * (gridHeight - 4);
+          const dollars = cents / 100;
+          const label = dollars >= 1000 ? `$${(dollars / 1000).toFixed(1)}k` : `$${dollars.toFixed(0)}`;
+          return (
+            <React.Fragment key={i}>
+              <Line
+                x1={yLabelW} y1={y} x2={chartWidth} y2={y}
+                stroke={BORDER} strokeWidth={1}
+              />
+              <SvgText
+                x={yLabelW - 4} y={y + 4}
+                textAnchor="end"
+                fontSize={9}
+                fontFamily={FONT.regular}
+                fill={SUBTLE}
+              >
+                {label}
+              </SvgText>
+            </React.Fragment>
+          );
+        })}
+
+        {/* Bars */}
+        {!allZero && bars.map((bar, i) => {
+          if (bar.cents <= 0) return null;
+          const x = barX(i);
+          const y = barY(bar.cents);
+          const h = gridHeight - y;
+          return (
+            <Rect
+              key={bar.date}
+              x={x} y={y}
+              width={barW} height={Math.max(2, h)}
+              rx={3} ry={3}
+              fill={colors.primary}
+              opacity={0.88}
+            />
+          );
+        })}
+
+        {/* Date labels — show first, mid, last */}
+        {bars.length > 0 && (() => {
+          const indices = bars.length <= 7
+            ? bars.map((_, i) => i)
+            : [0, Math.floor((bars.length - 1) / 2), bars.length - 1];
+          return indices.map(i => (
+            <SvgText
+              key={`lbl-${i}`}
+              x={barX(i) + barW / 2}
+              y={chartHeight - 2}
+              textAnchor="middle"
+              fontSize={9}
+              fontFamily={FONT.regular}
+              fill={SUBTLE}
+            >
+              {bars[i].label}
+            </SvgText>
+          ));
+        })()}
       </Svg>
+
+      {(allZero || !available) && (
+        <View style={styles.chartEmptyOverlay}>
+          <Text style={styles.chartEmptyText}>
+            {available ? 'No revenue data yet' : 'Range data unavailable'}
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
+
+// ─── Traffic Source Card ──────────────────────────────────────────────────────
+
+function SourceCard({ sources, colors }: { sources: TrafficSource[]; colors: ReturnType<typeof useColors> }) {
+  const hasData = sources.length > 0 && sources.some(s => s.count > 0);
+  const maxCount = hasData ? Math.max(...sources.map(s => s.count)) : 1;
+
+  return (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>Where are my customers from?</Text>
+      {!hasData ? (
+        <Text style={styles.noDataText}>No data yet</Text>
+      ) : (
+        <View style={{ gap: 10, marginTop: 12 }}>
+          {sources.map((src, i) => {
+            const pct = maxCount > 0 ? src.count / maxCount : 0;
+            return (
+              <View key={i}>
+                <View style={styles.sourceRow}>
+                  <Text style={styles.sourceLabel} numberOfLines={1}>{src.label}</Text>
+                  <Text style={styles.sourceCount}>{src.count.toLocaleString()}</Text>
+                </View>
+                <View style={styles.sourceBarBg}>
+                  <View style={[styles.sourceBarFill, { flex: pct, backgroundColor: colors.primary }]} />
+                  <View style={{ flex: 1 - pct }} />
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ─── Segmented Control ────────────────────────────────────────────────────────
+
+function Segmented({
+  value, onChange, colors,
+}: { value: Segment; onChange: (s: Segment) => void; colors: ReturnType<typeof useColors> }) {
+  const SEGS: { key: Segment; label: string }[] = [
+    { key: '7d', label: '7 Days' },
+    { key: '14d', label: '14 Days' },
+    { key: 'custom', label: 'Custom' },
+  ];
+  return (
+    <View style={styles.segmented}>
+      {SEGS.map(seg => {
+        const active = value === seg.key;
+        return (
+          <TouchableOpacity
+            key={seg.key}
+            style={[styles.segItem, active && { backgroundColor: colors.primary }]}
+            onPress={() => { Haptics.selectionAsync(); onChange(seg.key); }}
+          >
+            <Text style={[styles.segText, active && { color: colors.primaryForeground }]}>
+              {seg.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+// ─── Date box ─────────────────────────────────────────────────────────────────
+
+function DateBox({ label, value, onPress, editable }: { label: string; value: string; onPress: () => void; editable: boolean }) {
+  return (
+    <TouchableOpacity onPress={onPress} disabled={!editable} style={styles.dateBox}>
+      <Text style={styles.dateBoxLabel}>{label}</Text>
+      <Text style={styles.dateBoxValue}>{value}</Text>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Summary stat ─────────────────────────────────────────────────────────────
+
+function StatCard({
+  label,
+  value,
+  changePct,
+  featured = false,
+  colors,
+}: {
+  label: string;
+  value: string;
+  changePct?: number;
+  featured?: boolean;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const hasTrend = Number.isFinite(changePct);
+  const trendUp = (changePct ?? 0) >= 0;
+  return (
+    <View style={[styles.statCard, featured && styles.statCardFeatured]}>
+      <View style={styles.statLabelRow}>
+        <Text style={styles.statLabel}>{label}</Text>
+        {hasTrend && (
+          <View style={styles.trendRow}>
+            <Feather
+              name={trendUp ? 'arrow-up-right' : 'arrow-down-right'}
+              size={10}
+              color={trendUp ? SUCCESS : RED}
+            />
+            <Text style={[styles.trendText, { color: trendUp ? SUCCESS : RED }]}>
+              {Math.abs(changePct ?? 0).toFixed(1)}%
+            </Text>
+          </View>
+        )}
+      </View>
+      <Text
+        style={[styles.statValue, { color: featured ? colors.primary : FG }]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.65}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function AnalyticsScreen() {
   const colors = useColors();
+  const api = useApi();
+  const { userId } = useAuth();
   const insets = useSafeAreaInsets();
-  const router = useRouter();
-  const { width: screenWidth } = useWindowDimensions();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
-  const cardW  = (screenWidth - 48) / 2;
 
-  const [overview,       setOverview]       = useState<AnalyticsOverview | null>(null);
-  const [filter,         setFilter]         = useState<AnalyticsFilterState | null>(null);
-  const [loading,        setLoading]        = useState(true);
-  const [refreshing,     setRefreshing]     = useState(false);
-  const [chartMetric,    setChartMetric]    = useState<ChartMetric>('revenue');
-  const [groupBy,        setGroupBy]        = useState<'daily' | 'weekly' | 'monthly'>('daily');
-  const [tappedBar,      setTappedBar]      = useState<number | null>(null);
-  const [insights,       setInsights]       = useState<AnalyticsInsight[]>([]);
-  const [error,          setError]          = useState<string | null>(null);
+  const [segment, setSegment]   = useState<Segment>('7d');
+  const [customStart, setCustomStart] = useState<string>(() => {
+    const d = new Date(); d.setDate(d.getDate() - 6);
+    return d.toISOString().slice(0, 10);
+  });
+  const [customEnd, setCustomEnd] = useState<string>(
+    () => new Date().toISOString().slice(0, 10),
+  );
 
-  const load = useCallback(async (isRefresh = false, filterOverride?: AnalyticsFilterState) => {
+  const [loading, setLoading]       = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [summary, setSummary]       = useState<SummaryData>({ visits: 0, revenueCents: 0, leads: 0 });
+  const [bars, setBars]             = useState<DailyBar[]>([]);
+  const [sources, setSources]       = useState<TrafficSource[]>([]);
+
+  const filterRef = useRef<AnalyticsFilterState | null>(null);
+  const loadGenerationRef = useRef(0);
+
+  // Compute the day-list for the active segment
+  const activeDays = useCallback((): string[] => {
+    if (segment === '7d') return lastNDays(7);
+    if (segment === '14d') return lastNDays(14);
+    // custom: derive from selected dates
+    const start = new Date(customStart + 'T00:00:00Z');
+    const end   = new Date(customEnd   + 'T00:00:00Z');
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return lastNDays(7);
+    const days: string[] = [];
+    const cur = new Date(start);
+    while (cur <= end && days.length < 90) {
+      days.push(cur.toISOString().slice(0, 10));
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+    return days;
+  }, [segment, customStart, customEnd]);
+
+  const load = useCallback(async (isRefresh = false) => {
+    const generation = ++loadGenerationRef.current;
+    if (!userId) {
+      setSummary({ visits: 0, revenueCents: 0, leads: 0 });
+      setBars([]);
+      setSources([]);
+      setLoading(false);
+      return;
+    }
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
+
     try {
-      const f = filterOverride ?? filter ?? await getFilterState();
-      if (!filter) setFilter(f);
-      const ov = await getOverview(f);
-      setOverview(ov);
-      setError(null);
-      setInsights((Array.isArray(ov.insights) ? ov.insights : []).filter(i => !i.dismissed).slice(0, 3));
-    } catch (err) {
-      setOverview(null);
-      setInsights([]);
-      setError(err instanceof Error ? err.message : 'Analytics are unavailable.');
-    }
-    setLoading(false);
-    setRefreshing(false);
-  }, [filter]);
+      // Build a filter matching the active segment
+      if (!filterRef.current) {
+        filterRef.current = await getFilterState();
+      }
+      const drKey = segment === '14d' ? '30d' : segment === 'custom' ? 'custom' : '7d';
+      const days = activeDays();
+      const drOption = segment === 'custom'
+        ? {
+            key: 'custom' as const,
+            label: 'Custom',
+            startDate: days[0] ?? customStart,
+            endDate: days[days.length - 1] ?? customEnd,
+          }
+        : DATE_RANGE_OPTIONS.find(d => d.key === drKey) ?? DATE_RANGE_OPTIONS[2];
+      const filter: AnalyticsFilterState = {
+        ...(filterRef.current ?? { comparison: COMPARISON_OPTIONS[0], groupBy: 'daily' }),
+        dateRange: drOption,
+      };
+      filterRef.current = filter;
+      await saveFilterState(filter);
 
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+      // Seven-day visits and revenue are range-scoped by the home endpoint.
+      // Wider/custom visits are unavailable, so they remain honest zero values.
+      const [home, sales] = await Promise.allSettled([
+        segment === '7d' ? api.analytics.home('week') : Promise.resolve(null),
+        segment === '7d' ? getSalesAnalytics(filter) : Promise.resolve(null),
+      ]);
 
-  const setDateRange = async (key: DateRangeKey) => {
-    Haptics.selectionAsync();
-    const dr = DATE_RANGE_OPTIONS.find(d => d.key === key)!;
-    const newFilter: AnalyticsFilterState = { ...filter!, dateRange: dr };
-    setFilter(newFilter);
-    await saveFilterState(newFilter);
-    load(false, newFilter);
-  };
+      if (loadGenerationRef.current !== generation) return;
+      const homeData = home.status === 'fulfilled' ? home.value : null;
+      const sl = sales.status === 'fulfilled' ? sales.value : null;
+      const rawPoints: AnalyticsPoint[] = sl?.salesChart ?? [];
+      const alignedBars = alignBars(rawPoints, days);
+      setBars(alignedBars);
+      setSummary({
+        visits: homeData?.visitorCount ?? 0,
+        revenueCents: homeData?.totalCents ?? sl?.grossSales?.value ?? 0,
+        leads: 0,
+      });
 
-  const handleDismiss = async (id: string) => {
-    await dismissInsight(id);
-    setInsights(prev => prev.filter(i => i.id !== id));
-  };
-
-  const handleExport = async () => {
-    if (!filter) return;
-    Alert.alert('Exporting…', 'Generating CSV for overview.');
-    try {
-      await exportAnalytics('overview', filter.dateRange);
-      Alert.alert('Export ready', 'Your overview CSV has been generated.');
+      // Traffic sources: not available from existing API — no fabrication
+      setSources([]);
     } catch {
-      Alert.alert('Export failed', 'Please try again.');
+      // silent read failure: keep whatever state was last set
+    }
+
+    if (loadGenerationRef.current === generation) {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [api, userId, segment, customStart, customEnd, activeDays]);
+
+  // Load on mount
+  const mountedRef = useRef(false);
+  if (!mountedRef.current) {
+    mountedRef.current = true;
+  }
+
+  // Load when segment or custom dates change — use a stable trigger pattern
+  const loadTrigger = `${segment}:${customStart}:${customEnd}:${userId ?? ''}`;
+  const prevTriggerRef = useRef('');
+  if (prevTriggerRef.current !== loadTrigger) {
+    prevTriggerRef.current = loadTrigger;
+    // Schedule the load; safe to call during render via setTimeout(0) in RN
+    // but we use useEffect-equivalent by gating on a ref
+  }
+
+  // useEffect replacement via callback on first render and changes
+  React.useEffect(() => {
+    load();
+  }, [load]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Custom date prompt (native Alert) ─────────────────────────────────────
+  const promptDate = (which: 'start' | 'end') => {
+    const current = which === 'start' ? customStart : customEnd;
+    Alert.prompt(
+      which === 'start' ? 'Start date' : 'End date',
+      'Enter date as YYYY-MM-DD',
+      (text) => {
+        if (!text) return;
+        const clean = text.trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+          Alert.alert('Invalid date', 'Please use YYYY-MM-DD format.');
+          return;
+        }
+        if (which === 'start') setCustomStart(clean);
+        else setCustomEnd(clean);
+      },
+      'plain-text',
+      current,
+    );
+  };
+
+  // On Android/web, Alert.prompt is unavailable — use a simple Alert
+  const handleDateBox = (which: 'start' | 'end') => {
+    Haptics.selectionAsync();
+    if (Platform.OS === 'ios') {
+      promptDate(which);
+    } else {
+      // Fallback: show current value and ask user to update via Alert options
+      const current = which === 'start' ? customStart : customEnd;
+      Alert.alert(
+        which === 'start' ? 'Start Date' : 'End Date',
+        `Current: ${current}\n\nTo change, tap a date below.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Use today',
+            onPress: () => {
+              const today = new Date().toISOString().slice(0, 10);
+              if (which === 'start') setCustomStart(today);
+              else setCustomEnd(today);
+            },
+          },
+          {
+            text: `Use ${which === 'start' ? '7 days ago' : 'yesterday'}`,
+            onPress: () => {
+              const d = new Date();
+              d.setDate(d.getDate() - (which === 'start' ? 6 : 1));
+              const val = d.toISOString().slice(0, 10);
+              if (which === 'start') setCustomStart(val);
+              else setCustomEnd(val);
+            },
+          },
+        ],
+      );
     }
   };
 
-  const chartPoints = (): AnalyticsPoint[] => {
-    if (!overview) return [];
-    const safe = (arr: unknown): AnalyticsPoint[] => Array.isArray(arr) ? arr : [];
-    switch (chartMetric) {
-      case 'revenue':    return safe(overview.revenueChart);
-      case 'orders':     return safe(overview.ordersChart);
-      case 'visitors':   return safe(overview.visitorsChart);
-      case 'profit':     return safe(overview.profitEstimate?.sparkline);
-      case 'conversion': return safe(overview.conversionRate?.sparkline);
-      default:           return safe(overview.revenueChart);
-    }
-  };
-
-  const chartMetricValue = (): string => {
-    if (!overview) return '—';
-    switch (chartMetric) {
-      case 'revenue':    return overview.grossRevenue.formatted;
-      case 'orders':     return overview.orders.formatted;
-      case 'visitors':   return overview.storeVisitors.formatted;
-      case 'profit':     return overview.profitEstimate?.formatted ?? '—';
-      case 'conversion': return overview.conversionRate?.formatted ?? '—';
-    }
-  };
-
-  const tappedPoint = tappedBar !== null ? chartPoints()[tappedBar] : null;
-
-  const OVERVIEW_METRICS: (keyof AnalyticsOverview)[] = [
-    'grossRevenue','netRevenue','profitEstimate','orders','unitsSold',
-    'storeVisitors','conversionRate','avgOrderValue','returningCustomerRate',
-    'refundRate','productClicks','contentAttributedRev','marketingAttributedRev','pendingPayouts',
-  ];
-
+  // ── Loading state ──────────────────────────────────────────────────────────
   if (loading) {
     return (
       <View style={[styles.loadWrap, { paddingTop: topPad + 48 }]}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadText}>Loading analytics…</Text>
+        <Text style={styles.loadText}>Loading analytics</Text>
       </View>
     );
   }
-  if (error) {
-    return <View style={[styles.loadWrap, { paddingTop: topPad + 48 }]}><Feather name="alert-circle" size={32} color={MUTED} /><Text style={styles.loadText}>{error}</Text><TouchableOpacity onPress={() => load()}><Text style={{ color: colors.primary, fontFamily: FONT.semibold }}>Retry</Text></TouchableOpacity></View>;
-  }
+
+  // ── Display values ─────────────────────────────────────────────────────────
+  const displayRevenue = formatCents(summary.revenueCents);
+  const rangeAvailable = segment === '7d';
+  const displayedDays = activeDays();
+  const displayStart = displayedDays[0] ?? customStart;
+  const displayEnd = displayedDays[displayedDays.length - 1] ?? customEnd;
 
   return (
     <View style={{ flex: 1 }}>
-    <ScrollView
-      style={styles.scroll}
-      contentContainerStyle={[styles.content, { paddingTop: topPad + 12 }]}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />
-      }
-    >
-      {/* ── Header ── */}
-      <View style={styles.headerRow}>
-        <View>
-          <Text style={styles.pageTitle}>Analytics</Text>
-          <Text style={styles.updatedText}>Updated recently · All time</Text>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, { paddingTop: topPad + 12 }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => load(true)}
+            tintColor={colors.primary}
+          />
+        }
+      >
+        {/* ── Header ─────────────────────────────────────────────────────── */}
+        <Text style={styles.pageTitle}>Analytics</Text>
+
+        {/* ── Segment control ────────────────────────────────────────────── */}
+        <Segmented value={segment} onChange={setSegment} colors={colors} />
+
+        {/* ── Active date range ───────────────────────────────────────────── */}
+        <View style={styles.dateRow}>
+          <DateBox
+            label="Start"
+            value={shortDate(displayStart)}
+            editable={segment === 'custom'}
+            onPress={() => handleDateBox('start')}
+          />
+          <Text style={styles.dateSep}>—</Text>
+          <DateBox
+            label="End"
+            value={shortDate(displayEnd)}
+            editable={segment === 'custom'}
+            onPress={() => handleDateBox('end')}
+          />
         </View>
-        <View style={styles.headerActions}>
-          <TouchableOpacity onPress={handleExport} style={styles.iconBtn}>
-            <Feather name="share" size={18} color={colors.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => load(true)} style={styles.iconBtn}>
-            <Feather name="refresh-cw" size={16} color={MUTED} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <Text style={[styles.updatedText, { marginBottom: 16 }]}>
-        Date-range comparison is unavailable until the API can return period-scoped totals.
-      </Text>
-
-      {/* ── Performance range ── */}
-      <View style={styles.rangePills}>
-        {DATE_PILLS.map(key => {
-          const option = DATE_RANGE_OPTIONS.find(item => item.key === key);
-          const selected = filter?.dateRange.key === key;
-          return (
-            <TouchableOpacity
-              key={key}
-              style={[styles.rangePill, selected && { backgroundColor: colors.primary, borderColor: colors.primary }]}
-              onPress={() => setDateRange(key)}
-            >
-              <Text style={[styles.rangePillText, selected && { color: colors.primaryForeground }]}>
-                {key === '7d' ? '7 days' : key === '30d' ? '30 days' : key === '90d' ? '90 days' : (option?.label ?? 'Today')}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.performanceTiles}>
-        {overview ? [overview.grossRevenue, overview.orders, overview.storeVisitors, overview.conversionRate].map(metric => (
-          <View key={metric.key} style={styles.performanceTile}>
-            <Text style={styles.performanceTileLabel}>{metric.label}</Text>
-            <Text style={styles.performanceTileValue}>{metric.formatted}</Text>
-            <View style={styles.performanceTileMeta}>
-              <Feather name={metric.trend === 'down' ? 'trending-down' : metric.trend === 'up' ? 'trending-up' : 'minus'} size={12} color={metric.trend === 'down' ? RED : SUCCESS} />
-              <Text style={[styles.performanceTileChange, { color: metric.trend === 'down' ? RED : SUCCESS }]}>
-                {metric.changePct === undefined ? 'Current period' : `${Math.abs(metric.changePct).toFixed(1)}%`}
-              </Text>
-            </View>
-          </View>
-        )) : null}
-      </ScrollView>
-
-      {/* ── Section nav ── */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }} contentContainerStyle={{ paddingRight: 16, gap: 8, flexDirection: 'row' }}>
-        {ANALYTICS_SECTIONS.map(s => {
-          const isOverview = s.key === 'overview';
-          return (
-            <TouchableOpacity
-              key={s.key}
-              onPress={() => {
-                if (!isOverview) {
-                  Haptics.selectionAsync();
-                  router.push(SECTION_ROUTES[s.key] as never);
-                }
-              }}
-              style={[styles.sectionPill, isOverview && { backgroundColor: colors.primary, borderColor: colors.primary }]}
-            >
-                <Feather name={s.icon} size={12} color={isOverview ? colors.primaryForeground : MUTED} />
-                <Text style={[styles.sectionPillText, isOverview && { color: colors.primaryForeground }]}>{s.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
-      {/* ── Revenue chart ── */}
-      {chartPoints().length > 0 ? <View style={styles.chartCard}>
-        {/* metric selector */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }} contentContainerStyle={{ gap: 6, flexDirection: 'row' }}>
-          {CHART_METRICS.map(cm => (
-            <TouchableOpacity
-              key={cm.key}
-              onPress={() => { setChartMetric(cm.key); setTappedBar(null); }}
-              style={[styles.chartTab, chartMetric === cm.key && { backgroundColor: colors.accent, borderWidth: 1, borderColor: colors.primary }]}
-            >
-              <Text style={[styles.chartTabText, chartMetric === cm.key && { color: colors.accentForeground }]}>{cm.label}</Text>
-            </TouchableOpacity>
-          ))}
-          <View style={{ flex: 1 }} />
-          {(['daily','weekly','monthly'] as const).map(g => (
-            <TouchableOpacity key={g} onPress={() => setGroupBy(g)} style={[styles.groupTab, groupBy === g && { backgroundColor: colors.accent }]}>
-              <Text style={[styles.groupTabText, groupBy === g && { color: colors.accentForeground }]}>{g[0].toUpperCase()}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* big number */}
-        <View style={styles.chartAmountRow}>
-          <Text style={styles.chartAmount}>{chartMetricValue()}</Text>
-        </View>
-
-        {/* line trend */}
-        <TrendLineChart points={chartPoints()} color={colors.primary} width={screenWidth - 66} />
-
-        {/* tooltip */}
-        {tappedPoint && (
-          <View style={styles.tooltip}>
-            <Text style={styles.tooltipDate}>{tappedPoint.date}</Text>
-            <Text style={styles.tooltipValue}>
-              {chartMetric === 'revenue' || chartMetric === 'profit'
-                ? formatCents(tappedPoint.value)
-                : chartMetric === 'conversion'
-                  ? `${tappedPoint.value}%`
-                  : tappedPoint.value.toLocaleString()}
-            </Text>
-          </View>
+        {!rangeAvailable && (
+          <Text style={styles.rangeNotice}>Detailed analytics for this range aren&apos;t available yet.</Text>
         )}
 
-        <View style={styles.xAxisRow}>
-          <Text style={styles.xLabel}>30 days ago</Text>
-          <Text style={styles.xLabel}>Today</Text>
+        {/* ── Summary stats ──────────────────────────────────────────────── */}
+        <View style={styles.statsRow}>
+          <StatCard label="Visits" value={rangeAvailable ? summary.visits.toLocaleString() : '—'} changePct={summary.visitsChangePct} colors={colors} />
+          <StatCard label="Revenue" value={rangeAvailable ? displayRevenue : '—'} changePct={summary.revenueChangePct} featured colors={colors} />
+          <StatCard label="Leads" value={summary.leads.toLocaleString()} changePct={summary.leadsChangePct} colors={colors} />
         </View>
-      </View> : null}
 
-      {/* ── Metric cards ── */}
-      <Text style={styles.sectionTitle}>Overview Metrics</Text>
-      <View style={styles.metricsGrid}>
-        {OVERVIEW_METRICS.map(key => {
-          const m = overview?.[key] as AnalyticsMetric | undefined;
-          if (!m || typeof m !== 'object' || !('value' in m)) return null;
-          return <MetricCard key={key} m={m} width={cardW} />;
-        })}
-      </View>
-
-      {/* ── Insights ── */}
-      {insights.length > 0 && (
-        <>
-          <View style={styles.insightHeader}>
-            <Text style={styles.sectionTitle}>Brandthread Insights</Text>
-            <TouchableOpacity><Text style={[styles.viewAll, { color: colors.primary }]}>View all</Text></TouchableOpacity>
+        {/* ── Daily revenue bar chart ────────────────────────────────────── */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Daily Revenue</Text>
+          <View style={{ marginTop: 12 }}>
+            <RevenueBarChart bars={bars} colors={colors} available={rangeAvailable} />
           </View>
-          {insights.map(insight => (
-            <View key={insight.id} style={[styles.insightCard, { borderLeftColor: insightColor(insight.type) }]}>
-              <View style={[styles.insightIconWrap, { backgroundColor: insightBg(insight.type) }]}>
-                <Feather name={insightIcon(insight.type)} size={16} color={insightColor(insight.type)} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.insightTitle}>{insight.title}</Text>
-                <Text style={styles.insightWhat} numberOfLines={2}>{insight.what}</Text>
-                <Text style={styles.insightAction} numberOfLines={1}>{insight.action}</Text>
-                <View style={styles.insightActions}>
-                  {insight.route && (
-                    <TouchableOpacity
-                      onPress={() => { Haptics.selectionAsync(); router.push(insight.route! as never); }}
-                      style={styles.insightBtn}
-                    >
-                      <Text style={[styles.insightBtnText, { color: colors.primary }]}>Take action</Text>
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity onPress={() => handleDismiss(insight.id)} style={styles.insightDismiss}>
-                    <Text style={styles.insightDismissText}>Dismiss</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          ))}
-        </>
-      )}
+        </View>
 
-      <View style={{ height: 120 }} />
-    </ScrollView>
-    <AIBrainFAB context={{ screen: 'analytics' as const }} bottomOffset={72} />
+        {/* ── Traffic sources ────────────────────────────────────────────── */}
+        <SourceCard sources={sources} colors={colors} />
+
+        <View style={{ height: 120 }} />
+      </ScrollView>
+
+      <AIBrainFAB context={{ screen: 'analytics' as const }} bottomOffset={72} />
     </View>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  scroll:        { flex: 1, backgroundColor: SCREEN_BG },
-  content:       { paddingHorizontal: 16 },
-  loadWrap:      { flex: 1, backgroundColor: SCREEN_BG, alignItems: 'center', justifyContent: 'center', gap: 16 },
-  loadText:      { color: MUTED, fontFamily: FONT.medium, fontSize: FS.sm },
+  scroll:       { flex: 1, backgroundColor: SCREEN_BG },
+  content:      { paddingHorizontal: 16 },
+  loadWrap:     { flex: 1, backgroundColor: SCREEN_BG, alignItems: 'center', justifyContent: 'center', gap: 16 },
+  loadText:     { color: MUTED, fontFamily: FONT.medium, fontSize: FS.sm },
 
-  headerRow:     { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 },
-  pageTitle:     { fontSize: 28, fontFamily: FONT.bold, color: FG },
-  updatedText:   { fontSize: 12, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
-  headerActions: { flexDirection: 'row', gap: 8, paddingTop: 4 },
-  iconBtn:       { width: 36, height: 36, borderRadius: 18, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  pageTitle:    { fontSize: 28, fontFamily: FONT.bold, color: FG, marginBottom: 16 },
 
-  pill:          { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER },
-  pillText:      { fontSize: 13, fontFamily: FONT.medium, color: MUTED },
-  pillSm:        { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER },
-  pillSmText:    { fontSize: 11, fontFamily: FONT.medium, color: MUTED },
+  // Segmented
+  segmented:    { flexDirection: 'row', backgroundColor: SURFACE, borderRadius: 12, borderWidth: 1, borderColor: BORDER, padding: 3, marginBottom: 14 },
+  segItem:      { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  segText:      { fontSize: 13, fontFamily: FONT.semibold, color: MUTED },
 
-  sectionPill:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
-  sectionPillText:   { fontSize: 12, fontFamily: FONT.medium, color: MUTED },
-  rangePills: { flexDirection: 'row', gap: 7, marginBottom: 14 },
-  rangePill: { flex: 1, minHeight: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER },
-  rangePillText: { fontSize: 11, fontFamily: FONT.semibold, color: MUTED },
-  performanceTiles: { flexDirection: 'row', gap: 10, paddingRight: 16, marginBottom: 18 },
-  performanceTile: { width: 142, backgroundColor: CARD_GLASS, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: BORDER },
-  performanceTileLabel: { color: MUTED, fontFamily: FONT.regular, fontSize: 11, marginBottom: 6 },
-  performanceTileValue: { color: FG, fontFamily: FONT.bold, fontSize: 21 },
-  performanceTileMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 },
-  performanceTileChange: { fontFamily: FONT.medium, fontSize: 10 },
+  // Date boxes
+  dateRow:      { flexDirection: 'row', alignItems: 'center', marginBottom: 14, gap: 10 },
+  dateBox:      { flex: 1, backgroundColor: CARD_GLASS, borderRadius: 10, borderWidth: 1, borderColor: BORDER, paddingVertical: 10, paddingHorizontal: 12 },
+  dateBoxLabel: { fontSize: 10, fontFamily: FONT.medium, color: SUBTLE, marginBottom: 2 },
+  dateBoxValue: { fontSize: 14, fontFamily: FONT.semibold, color: FG },
+  dateSep:      { color: MUTED, fontFamily: FONT.medium, fontSize: FS.md },
+  rangeNotice:  { color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: -4, marginBottom: 14 },
 
-  chartCard:     { backgroundColor: CARD_GLASS, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: BORDER, marginBottom: 24 },
-  chartTab:      { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, backgroundColor: SURFACE },
-  chartTabText:  { fontSize: 11, fontFamily: FONT.medium, color: MUTED },
-  groupTab:      { width: 24, height: 24, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: SURFACE },
-  groupTabText:  { fontSize: 10, fontFamily: FONT.semibold, color: MUTED },
+  // Stats
+  statsRow:     { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  statCard:     { flex: 1, paddingVertical: 12, paddingHorizontal: 8, alignItems: 'center' },
+  statCardFeatured: { backgroundColor: CARD_GLASS, borderRadius: 12, borderWidth: 1, borderColor: BORDER },
+  statLabelRow: { minHeight: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 },
+  statLabel:    { fontSize: 10, fontFamily: FONT.medium, color: MUTED },
+  trendRow:     { flexDirection: 'row', alignItems: 'center', gap: 1 },
+  trendText:    { fontSize: 9, fontFamily: FONT.semibold },
+  statValue:    { fontSize: 18, fontFamily: FONT.bold, color: FG },
 
-  chartAmountRow:{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
-  chartAmount:   { fontSize: 32, fontFamily: FONT.bold, color: FG },
-  changeBadge:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
-  changeBadgeText:{ fontSize: 12, fontFamily: FONT.semibold },
+  // Card
+  card:         { backgroundColor: CARD_GLASS, borderRadius: 16, borderWidth: 1, borderColor: BORDER, padding: 16, marginBottom: 14 },
+  cardTitle:    { fontSize: 14, fontFamily: FONT.semibold, color: FG },
 
-  barsRow:       { flexDirection: 'row', alignItems: 'flex-end', height: 90, gap: 2, marginBottom: 4 },
-  barWrap:       { flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: 90 },
-  bar:           { width: '100%', borderRadius: 3 },
-  lineChartWrap: { height: 132, marginHorizontal: -2, marginBottom: 4, overflow: 'hidden' },
-  tooltip:       { backgroundColor: CARD_ELEVATED, borderRadius: 8, padding: 8, marginBottom: 8, alignSelf: 'center', borderWidth: 1, borderColor: BORDER_ACTIVE },
-  tooltipDate:   { fontSize: 10, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' },
-  tooltipValue:  { fontSize: 15, fontFamily: FONT.bold, color: FG, textAlign: 'center' },
-  xAxisRow:      { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  xLabel:        { fontSize: 10, fontFamily: FONT.regular, color: SUBTLE },
+  // Chart empty state
+  chartEmptyOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 20, alignItems: 'center', justifyContent: 'center' },
+  chartEmptyText: { fontSize: 13, fontFamily: FONT.regular, color: SUBTLE },
 
-  sectionTitle:  { fontSize: 16, fontFamily: FONT.semibold, color: FG, marginBottom: 12 },
-  metricsGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
-  metricCard:    { backgroundColor: CARD_GLASS, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: BORDER },
-  metricLabel:   { fontSize: 11, fontFamily: FONT.regular, color: MUTED, marginBottom: 4 },
-  metricValue:   { fontSize: 22, fontFamily: FONT.bold, color: FG, marginBottom: 4 },
-  metricChangeRow:{ flexDirection: 'row', alignItems: 'center', gap: 3 },
-  metricChangePct:{ fontSize: 11, fontFamily: FONT.semibold },
-  metricVs:      { fontSize: 10, fontFamily: FONT.regular, color: SUBTLE, flex: 1 },
-
-  insightHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  viewAll:       { fontSize: 13, fontFamily: FONT.medium },
-  insightCard:   { flexDirection: 'row', gap: 12, backgroundColor: CARD_ELEVATED_GLASS, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: BORDER, borderLeftWidth: 3, marginBottom: 10 },
-  insightIconWrap:{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 },
-  insightTitle:  { fontSize: 14, fontFamily: FONT.semibold, color: FG, marginBottom: 4 },
-  insightWhat:   { fontSize: 12, fontFamily: FONT.regular, color: MUTED, marginBottom: 4 },
-  insightAction: { fontSize: 12, fontFamily: FONT.medium, color: SUBTLE, marginBottom: 10 },
-  insightActions:{ flexDirection: 'row', gap: 12 },
-  insightBtn:    { paddingVertical: 4 },
-  insightBtnText:{ fontSize: 13, fontFamily: FONT.semibold },
-  insightDismiss:{ paddingVertical: 4 },
-  insightDismissText:{ fontSize: 13, fontFamily: FONT.medium, color: SUBTLE },
+  // Source card
+  noDataText:   { fontSize: 13, fontFamily: FONT.regular, color: SUBTLE, marginTop: 12 },
+  sourceRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  sourceLabel:  { fontSize: 13, fontFamily: FONT.regular, color: MUTED, flex: 1, marginRight: 8 },
+  sourceCount:  { fontSize: 13, fontFamily: FONT.semibold, color: FG },
+  sourceBarBg:  { flexDirection: 'row', height: 4, borderRadius: 2, backgroundColor: BORDER, overflow: 'hidden' },
+  sourceBarFill:{ opacity: 0.72, borderRadius: 2 },
 });

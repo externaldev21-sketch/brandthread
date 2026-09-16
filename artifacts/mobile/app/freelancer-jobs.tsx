@@ -9,6 +9,7 @@ import {
   ActivityIndicator, Alert, RefreshControl,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -32,6 +33,7 @@ type JobsData = { isFreelancer: boolean; asHirer: FreelancerJob[]; asFreelancer:
 export default function FreelancerJobsScreen() {
   const colors = useColors();
   const api = useApi();
+  const { isLoaded: authLoaded, userId } = useAuth();
   const router = useRouter();
   const [data, setData] = useState<JobsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -39,6 +41,7 @@ export default function FreelancerJobsScreen() {
   const [tab, setTab] = useState<'hiring' | 'gigs'>('hiring');
   const [busyId, setBusyId] = useState<string | null>(null);
   const defaultedTab = useRef(false);
+  const loadGeneration = useRef(0);
   const statusMeta: Record<string, { label: string; color: string; bg: string }> = {
     ...STATUS_META,
     accepted: { label: 'Accepted', color: colors.primary, bg: colors.accent },
@@ -47,9 +50,18 @@ export default function FreelancerJobsScreen() {
 
   const load = useCallback(
     async (isRefresh = false) => {
+      const generation = ++loadGeneration.current;
+      if (!authLoaded) return;
+      if (!userId) {
+        setData(null);
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
       if (isRefresh) setRefreshing(true);
       try {
         const res = await api.freelancerJobs.list();
+        if (loadGeneration.current !== generation) return;
         setData(res);
         // Sensible default tab on first load: freelancers with gigs but no hires
         if (!defaultedTab.current) {
@@ -59,13 +71,15 @@ export default function FreelancerJobsScreen() {
           }
         }
       } catch {
-        // keep whatever we had; error UI below when data is null
+        // Keep existing data visible when a refresh cannot complete.
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (loadGeneration.current === generation) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
-    [api],
+    [api, authLoaded, userId],
   );
 
   useFocusEffect(
@@ -260,11 +274,6 @@ export default function FreelancerJobsScreen() {
         {loading ? (
           <View style={styles.centerBox}>
             <ActivityIndicator color={colors.primary} />
-          </View>
-        ) : !data ? (
-          <View style={styles.centerBox}>
-            <Feather name="wifi-off" size={22} color={SUBTLE} />
-            <Text style={styles.emptyText}>Could not load jobs. Pull down to retry.</Text>
           </View>
         ) : jobs.length === 0 ? (
           <View style={styles.centerBox}>

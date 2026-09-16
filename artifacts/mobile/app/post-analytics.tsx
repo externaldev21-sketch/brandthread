@@ -142,19 +142,14 @@ export default function PostAnalyticsScreen() {
   const postId = typeof params.id === 'string' ? params.id : '';
   const [analytics, setAnalytics] = useState<PostAnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(Boolean(postId));
-  const [loadError, setLoadError] = useState<string | null>(
-    postId ? null : 'Choose a post from your content library first.',
-  );
 
   const loadPost = useCallback(async () => {
     if (!postId) return;
     setLoading(true);
-    setLoadError(null);
     try {
       setAnalytics(await api.posts.analytics(postId));
     } catch {
       setAnalytics(null);
-      setLoadError('We couldn’t load verified analytics for this post. Make sure it belongs to your store, then try again.');
     } finally {
       setLoading(false);
     }
@@ -180,14 +175,9 @@ export default function PostAnalyticsScreen() {
     );
   }
 
-  if (!analytics || loadError) {
+  if (!analytics) {
     return (
       <View style={styles.notFound}>
-        <Feather name="alert-circle" size={30} color={ERR} />
-        <Text style={styles.notFoundText}>{loadError ?? 'Post not found'}</Text>
-        <TouchableOpacity style={styles.quickActionShare} onPress={postId ? loadPost : () => router.back()}>
-          <Text style={styles.quickActionText}>{postId ? 'Try again' : 'Back to content'}</Text>
-        </TouchableOpacity>
       </View>
     );
   }

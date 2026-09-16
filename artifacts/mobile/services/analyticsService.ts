@@ -58,7 +58,7 @@ export async function saveFilterState(state: AnalyticsFilterState): Promise<void
 }
 
 export async function getOverview(filter?: AnalyticsFilterState): Promise<AnalyticsOverview> {
-  const data = await serviceRequest<any>('/api/analytics/dashboard');
+  const data = await serviceRequest<any>('/api/analytics/dashboard', {}, false);
   const revenueCents = cents(data?.revenue?.totalCents ?? 0, 'revenue total');
   const orders = number(data?.orders?.total);
   const visitors = number(data?.storefrontVisits);
@@ -82,7 +82,7 @@ export async function getOverview(filter?: AnalyticsFilterState): Promise<Analyt
 }
 
 export async function getSalesAnalytics(filter?: AnalyticsFilterState): Promise<SalesAnalytics> {
-  const data = await serviceRequest<any>(`/api/analytics/revenue?period=${periodFor(filter)}`);
+  const data = await serviceRequest<any>(`/api/analytics/revenue?period=${periodFor(filter)}`, {}, false);
   const daily = Array.isArray(data?.daily) ? data.daily : [];
   const salesChart = daily.map((row: any) => ({
     date: typeof row.day === 'string' ? row.day.slice(0, 10) : '',
@@ -99,7 +99,7 @@ export async function getSalesAnalytics(filter?: AnalyticsFilterState): Promise<
 }
 
 export async function getProductAnalytics(_filter?: AnalyticsFilterState): Promise<ProductAnalytics> {
-  const response = await serviceRequest<any>('/api/analytics/products');
+  const response = await serviceRequest<any>('/api/analytics/products', {}, false);
   const rows = Array.isArray(response) ? response : [];
   const mapped = rows.map((row: any) => ({
     productId: String(row.productId ?? ''),
@@ -112,7 +112,7 @@ export async function getProductAnalytics(_filter?: AnalyticsFilterState): Promi
 }
 
 export async function getCustomerAnalytics(_filter?: AnalyticsFilterState): Promise<CustomerAnalytics> {
-  const data = await serviceRequest<any>('/api/analytics/customers?limit=10');
+  const data = await serviceRequest<any>('/api/analytics/customers?limit=10', {}, false);
   const stats = data?.stats ?? {};
   return {
     totalCustomers: metric('total_customers', 'Total Customers', number(stats.totalCustomers), 'number'),

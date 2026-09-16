@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useAuth } from '@clerk/expo';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image,
   KeyboardAvoidingView, Modal, Platform, TextInput,
@@ -12,10 +13,6 @@ import { getSellerPosts, subscribeSocial, type SellerThreadPost } from '@/servic
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import PlanUpsellModal from '@/components/PlanUpsellModal';
-import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
-import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
-import { formatCents } from '@/lib/money';
 import { reportNetworkError } from '@/lib/networkNotice';
 import {
   BG, SCREEN_BG, CARD, BORDER, FG, MUTED, SUBTLE,
@@ -47,14 +44,11 @@ interface SocialCounts {
 }
 
 const QUICK_ACTIONS: { icon: keyof typeof Feather.glyphMap; label: string; route: string }[] = [
-  { icon: 'layers',     label: 'Brand Assets',  route: '/design-brand-assets' },
-  { icon: 'tag',        label: 'Add Product',   route: '/add-product' },
-  { icon: 'send',       label: 'New Campaign',  route: '/(tabs)/marketing' },
   { icon: 'user',       label: 'My Profile',    route: '/seller-profile?isOwner=true' },
   { icon: 'message-circle', label: 'Messages',  route: '/seller-inbox' },
 ];
 
-const CONTENT_TABS = ['Posts', 'Drafts', 'Scheduled', 'Analytics'];
+const CONTENT_TABS = ['Post', 'Draft', 'Schedule'];
 
 // ─── Screen ─────────────────────────────────────────────────────────────────
 
@@ -64,7 +58,7 @@ export default function ProfileScreen() {
   const api = useApi();
   const colors = useColors();
   const { theme } = useAppTheme();
-  const { hasPlan, loading: planLoading, error: planError, retry: retryPlan } = useSubscriptionPlan();
+  const { isLoaded: authLoaded, userId } = useAuth();
   const [activeTab, setActiveTab] = useState(0);
   const [sellerPosts, setSellerPosts] = useState<SellerThreadPost[]>([]);
   const [myStoryIds, setMyStoryIds] = useState<string[]>([]);
@@ -75,36 +69,36 @@ export default function ProfileScreen() {
   const [bioInput, setBioInput] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [loadError, setLoadError] = useState(false);
-  const [upsellFeature, setUpsellFeature] = useState<string | null>(null);
+  const requestUserRef = useRef<string | null>(null);
 
   const loadPosts = useCallback(async () => {
+    if (!authLoaded || !userId) return;
+    const requestUser = userId;
     try {
       const posts = await getSellerPosts();
-      setSellerPosts(posts);
-    } catch (error) {
-      setLoadError(true);
-      reportNetworkError(error, loadPosts);
-    }
-  }, []);
+      if (requestUserRef.current === requestUser) setSellerPosts(posts);
+    } catch { /* keep the profile usable when posts are unavailable */ }
+  }, [authLoaded, userId]);
 
   const loadMyStories = useCallback(async () => {
+    if (!authLoaded || !userId) return;
+    const requestUser = userId;
     try {
       const rows = await api.social.myStories();
       const now  = Date.now();
       const active = (Array.isArray(rows) ? rows : [])
         .filter((s: any) => s.expiresAt > now)
         .map((s: any) => s.id as string);
-      setMyStoryIds(active);
-    } catch (error) {
-      setLoadError(true);
-      reportNetworkError(error, loadMyStories);
-    }
-  }, [api]);
+      if (requestUserRef.current === requestUser) setMyStoryIds(active);
+    } catch { /* stories are optional profile content */ }
+  }, [api, authLoaded, userId]);
 
   const loadProfile = useCallback(async () => {
+    if (!authLoaded || !userId) return;
+    const requestUser = userId;
     try {
       const data = await api.seller.getProfile();
+      if (requestUserRef.current !== requestUser) return;
       setProfile({
         brandName:          data.brandName   ?? null,
         displayName:        data.displayName ?? null,
@@ -121,59 +115,48 @@ export default function ProfileScreen() {
         },
       });
       setSocialCounts((current) => ({ ...current, likes: data.totalLikes ?? 0 }));
-    } catch (error) {
-      setLoadError(true);
-      reportNetworkError(error, loadProfile);
-    }
-  }, [api]);
+    } catch { /* nullable profile fields already render safely */ }
+  }, [api, authLoaded, userId]);
 
   const loadSocialCounts = useCallback(async () => {
+    if (!authLoaded || !userId) return;
+    const requestUser = userId;
     try {
       const [followersArr, followingArr] = await Promise.all([
         api.social.followers(),
         api.social.following(),
       ]);
+      if (requestUserRef.current !== requestUser) return;
       setSocialCounts((current) => ({
         ...current,
         followers: Array.isArray(followersArr) ? followersArr.length : 0,
         following: Array.isArray(followingArr) ? followingArr.length : 0,
       }));
-    } catch (error) {
-      setLoadError(true);
-      reportNetworkError(error, loadSocialCounts);
-    }
-  }, [api]);
+    } catch { /* zero counts remain visible */ }
+  }, [api, authLoaded, userId]);
 
   const loadPage = useCallback(() => {
-    setLoadError(false);
+    if (!authLoaded || !userId) return;
     void loadPosts();
     void loadMyStories();
     void loadSocialCounts();
     void loadProfile();
-  }, [loadPosts, loadMyStories, loadProfile, loadSocialCounts]);
+  }, [authLoaded, userId, loadPosts, loadMyStories, loadProfile, loadSocialCounts]);
 
   useEffect(() => {
-    void loadPage();
+    requestUserRef.current = userId ?? null;
+    setSellerPosts([]);
+    setMyStoryIds([]);
+    setProfile(null);
+    setSocialCounts({ followers: 0, following: 0, likes: 0 });
+    if (authLoaded && userId) void loadPage();
     const unsub = subscribeSocial(() => { loadPosts(); loadMyStories(); });
     return unsub;
-  }, [loadPage, loadPosts, loadMyStories]);
+  }, [authLoaded, userId, loadPage, loadPosts, loadMyStories]);
 
   function nav(route: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(route as never);
-  }
-
-  function openProfileAction(route: string, label?: string) {
-    if (
-      GROWTH_PLAN_ENFORCEMENT_ENABLED &&
-      route === '/design-brand-assets' &&
-      (planLoading || !!planError || !hasPlan('growth'))
-    ) {
-      if (planError) retryPlan();
-      setUpsellFeature(label ?? 'Brand Assets');
-      return;
-    }
-    nav(route);
   }
 
   function openProfileEditor() {
@@ -232,15 +215,6 @@ export default function ProfileScreen() {
     .slice(0, 2)
     .join('')
     .toUpperCase();
-  const metrics = profile?.metrics ?? null;
-  const hasNoActivity = !!metrics && metrics.orders === 0 && metrics.visitors === 0;
-  const performanceStats = [
-    { label: 'Total Revenue', value: metrics ? formatCents(metrics.revenueCents) : '—' },
-    { label: 'Visitors', value: metrics ? metrics.visitors.toLocaleString() : '—' },
-    { label: 'Orders', value: metrics ? metrics.orders.toLocaleString() : '—' },
-    { label: 'Conversion Rate', value: metrics ? `${metrics.conversionRate.toFixed(2)}%` : '—' },
-  ];
-
   return (
     <>
     <ScrollView
@@ -271,19 +245,6 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       </View>
-
-      {loadError && (
-        <View style={s.loadError}>
-          <Feather name="wifi-off" size={16} color={MUTED} />
-          <View style={{ flex: 1 }}>
-            <Text style={s.loadErrorTitle}>Some profile details couldn't load</Text>
-            <Text style={s.loadErrorText}>Your available information is still shown.</Text>
-          </View>
-          <TouchableOpacity onPress={() => void loadPage()} accessibilityRole="button">
-            <Text style={[s.loadRetry, { color: theme.accentLight }]}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
       {/* ── Centered avatar + name + stats ── */}
       <View style={s.profileCenter}>
@@ -435,7 +396,7 @@ export default function ProfileScreen() {
       {/* ── Quick Actions ── */}
       <View style={s.quickRow}>
         {QUICK_ACTIONS.map((qa) => (
-          <TouchableOpacity key={qa.label} style={s.quickItem} activeOpacity={0.75} onPress={() => openProfileAction(qa.route, qa.label)} accessibilityRole="button" accessibilityLabel={qa.label}>
+          <TouchableOpacity key={qa.label} style={s.quickItem} activeOpacity={0.75} onPress={() => nav(qa.route)} accessibilityRole="button" accessibilityLabel={qa.label}>
             <View style={s.quickIconBox}>
               <Feather name={qa.icon} size={18} color={FG} />
             </View>
@@ -448,7 +409,7 @@ export default function ProfileScreen() {
       <View style={s.tabsBar}>
         {CONTENT_TABS.map((tab, i) => {
           const active = activeTab === i;
-          const icons: (keyof typeof Feather.glyphMap)[] = ['grid', 'file-text', 'clock', 'bar-chart-2'];
+          const icons: (keyof typeof Feather.glyphMap)[] = ['grid', 'file-text', 'clock'];
           return (
             <TouchableOpacity
               key={tab}
@@ -467,27 +428,6 @@ export default function ProfileScreen() {
         })}
       </View>
 
-      {activeTab === 3 ? (
-        <View style={s.analyticsSection}>
-          <Text style={s.analyticsTitle}>Store performance</Text>
-          <Text style={s.analyticsSubtitle}>Paid orders and storefront visits, all time.</Text>
-          <View style={s.perfGrid}>
-            {performanceStats.map((stat) => (
-              <View key={stat.label} style={s.perfCard}>
-                <Text style={s.perfLabel}>{stat.label}</Text>
-                <Text style={s.perfValue}>{stat.value}</Text>
-              </View>
-            ))}
-          </View>
-          {hasNoActivity && (
-            <View style={s.neutralAnalyticsState}>
-              <Feather name="bar-chart-2" size={22} color={MUTED} />
-              <Text style={s.neutralAnalyticsTitle}>No storefront activity yet</Text>
-              <Text style={s.neutralAnalyticsText}>Your real revenue, orders, and conversion rate will appear here as shoppers visit and place paid orders.</Text>
-            </View>
-          )}
-        </View>
-      ) : (
       <View style={s.grid}>
         {/* Create Post tile */}
         <TouchableOpacity
@@ -537,7 +477,7 @@ export default function ProfileScreen() {
         }
 
         {/* Empty state */}
-        {activeTab !== 3 && sellerPosts.filter(p => {
+        {sellerPosts.filter(p => {
           if (activeTab === 0) return !p.isDraft && !p.isArchived;
           if (activeTab === 1) return p.isDraft && !p.isArchived;
           if (activeTab === 2) return !p.isDraft && !p.isArchived && !!p.scheduledAt;
@@ -553,19 +493,7 @@ export default function ProfileScreen() {
           </View>
         )}
       </View>
-      )}
     </ScrollView>
-
-      <PlanUpsellModal
-        visible={upsellFeature !== null}
-        featureName={upsellFeature ?? ''}
-        requiredPlan="growth"
-        onClose={() => setUpsellFeature(null)}
-        onUpgrade={() => {
-          setUpsellFeature(null);
-          router.push('/subscription' as never);
-        }}
-      />
 
       {/* ── Profile Editor Modal ── */}
       <Modal
@@ -754,24 +682,6 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   quickLabel: { fontSize: 11, fontFamily: FONT.medium, color: MUTED, textAlign: 'center' },
-
-  // Analytics
-  analyticsSection: { padding: SP.md, gap: SP.sm },
-  analyticsTitle: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
-  analyticsSubtitle: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginBottom: SP.sm },
-  perfGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
-  perfCard: {
-    width: '48.5%', backgroundColor: CARD, borderRadius: RADIUS.md,
-    borderWidth: 1, borderColor: BORDER, padding: SP.md,
-  },
-  perfLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: 6 },
-  perfValue: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG, letterSpacing: -0.3 },
-  neutralAnalyticsState: {
-    alignItems: 'center', borderWidth: 1, borderColor: BORDER,
-    borderRadius: RADIUS.md, padding: SP.md, marginTop: SP.sm, gap: 7,
-  },
-  neutralAnalyticsTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
-  neutralAnalyticsText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'center', lineHeight: 17 },
 
   // Content tabs
   tabsBar: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, marginBottom: 1 },

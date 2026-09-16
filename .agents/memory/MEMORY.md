@@ -101,3 +101,4 @@
 - [Temporary Growth gate bypass](growth-gate-bypass.md) — seller Growth feature enforcement is centrally disabled for testing; entitlement and pricing logic remain intact.
 - [Native transition measurement](native-transition-measurement.md) — measure scheduling inside the app; use device automation for visible frames, focus events, and keyboard state.
 - [External object deletion](external-object-deletion.md) — commit ownership deletion and durable cleanup intent together; delete storage later only after rechecking live references.
+- [Seller cash-out safety](seller-cashout-safety.md) — cash-outs bind exact confirmed funds, account, bank, and durable provider reference; ambiguous old attempts fail closed.

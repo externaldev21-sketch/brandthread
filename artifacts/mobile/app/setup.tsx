@@ -262,7 +262,7 @@ export default function SetupScreen() {
               </View>
             </View>
             <PrimaryButton
-              label="Go to Home"
+              label="Go to Dashboard"
               onPress={() => router.replace('/(tabs)/' as never)}
               icon="home"
               style={{ marginTop: SP.md }}

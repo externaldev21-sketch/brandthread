@@ -14,7 +14,6 @@ import { BG, CARD, BORDER, FG, MUTED } from '@/lib/theme';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
-import { reportNetworkError } from '@/lib/networkNotice';
 import { EmptyState, SearchResultsSkeleton } from '@/components/BrandthreadUI';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { CachedImage } from '@/components/CachedImage';
@@ -95,10 +94,8 @@ export default function SearchScreen() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [people,  setPeople]  = useState<PersonResult[]>([]);
   const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [searchFocused, setSearchFocused] = useState(true);
-  const [retryNonce, setRetryNonce] = useState(0);
   const topPad = Platform.OS === 'web' ? 24 : insets.top;
   const recentKey = `bt:buyer-search-recent:${userId ?? 'anon'}`;
 
@@ -168,13 +165,11 @@ export default function SearchScreen() {
     if (q.length < 1 && !hasActiveFilters) {
       setResults([]);
       setPeople([]);
-      setSearchError(null);
       setSearching(false);
       return;
     }
     let cancelled = false;
     setSearching(true);
-    setSearchError(null);
     const timer = setTimeout(async () => {
       const minPriceCents = minPrice ? parseDecimalToCents(minPrice) : undefined;
       const maxPriceCents = maxPrice ? parseDecimalToCents(maxPrice) : undefined;
@@ -192,18 +187,13 @@ export default function SearchScreen() {
       if (!cancelled) {
         setResults(brandRes.status === 'fulfilled' ? brandRes.value.results ?? [] : []);
         setPeople(peopleData.status === 'fulfilled' ? peopleData.value as PersonResult[] : []);
-        if (brandRes.status === 'rejected' && peopleData.status === 'rejected') {
-          const error = brandRes.reason ?? peopleData.reason;
-          setSearchError('Search could not load. Check your connection and try again.');
-          reportNetworkError(error, () => setRetryNonce((value) => value + 1));
-        }
         setSearching(false);
       }
     }, 350);
     return () => { cancelled = true; clearTimeout(timer); };
   // Query/filter changes and explicit retries are the only search triggers.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, sort, minPrice, maxPrice, category, retryNonce, hasActiveFilters]);
+  }, [query, sort, minPrice, maxPrice, category, hasActiveFilters]);
 
   const suggestions = useMemo(() => {
     const seen = new Set<string>();
@@ -380,13 +370,6 @@ export default function SearchScreen() {
               <Feather name="chevron-right" size={17} color={muted} />
             </TouchableOpacity>
           </>
-        ) : searchError ? (
-          <EmptyState
-            icon="wifi-off"
-            title="The thread slipped."
-            description={searchError}
-            action={{ label: 'Try search again', icon: 'refresh-cw', onPress: () => setRetryNonce((value) => value + 1) }}
-          />
         ) : (
           <>
             {suggestions.length > 0 ? (

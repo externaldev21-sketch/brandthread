@@ -107,11 +107,11 @@ export default function BuyerSettingsDetail() {
     <View style={styles.header}><TouchableOpacity style={styles.back} onPress={() => router.back()}><Feather name="arrow-left" size={21} color={FG}/></TouchableOpacity><Text style={styles.title}>{cfg.title}</Text><View style={styles.back}/></View>
     <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}>
       {cfg.intro ? <Text style={styles.intro}>{cfg.intro}</Text> : null}
-      {loadError ? <View style={styles.card}><Text style={[styles.label, { padding: SP.md }]}>Couldn't load settings</Text><TouchableOpacity onPress={load}><Text style={[styles.value, { padding: SP.md, color: PURPLE }]}>Try again</Text></TouchableOpacity></View> : loading || !settings ? <Text style={styles.intro}>Loading settings…</Text> : <View style={styles.card}>{items.map((item, i) => <TouchableOpacity key={`${item.label}-${i}`} activeOpacity={item.toggle ? 1 : 0.7} style={[styles.row, i < items.length - 1 && styles.divider]} onPress={() => { if (!item.toggle) { Haptics.selectionAsync(); item.action?.(); if (!item.action && !item.value?.toLowerCase().includes('off')) Alert.alert(item.label, 'This control is ready for backend wiring.'); } }}>
+      {loading ? <Text style={styles.intro}>Loading settings…</Text> : settings ? <View style={styles.card}>{items.map((item, i) => <TouchableOpacity key={`${item.label}-${i}`} activeOpacity={item.toggle ? 1 : 0.7} style={[styles.row, i < items.length - 1 && styles.divider]} onPress={() => { if (!item.toggle) { Haptics.selectionAsync(); item.action?.(); if (!item.action && !item.value?.toLowerCase().includes('off')) Alert.alert(item.label, 'This control is ready for backend wiring.'); } }}>
         {item.icon ? <View style={styles.itemIcon}><Feather name={item.icon} size={19} color={FG}/></View> : null}
         <View style={{ flex: 1 }}><Text style={styles.label}>{item.label}</Text>{item.sub ? <Text style={styles.sub}>{item.sub}</Text> : null}</View>
         {item.toggle && settings ? <Switch value={Boolean(settings[item.toggle])} onValueChange={(v) => toggle(item.toggle!, v)} trackColor={{ false: CARD_ELEVATED, true: PURPLE }} thumbColor={ON_DARK} /> : <><Text style={styles.value}>{item.value}</Text><Feather name="chevron-right" size={18} color={SUBTLE}/></>}
-      </TouchableOpacity>)}</View>}
+      </TouchableOpacity>)}</View> : null}
     </ScrollView>
   </View>;
 }

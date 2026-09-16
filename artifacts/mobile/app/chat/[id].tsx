@@ -142,7 +142,14 @@ export default function ChatScreen() {
     if (!id) {
       setConversation(null);
       setMessages([]);
-      setLoadError('This conversation is unavailable.');
+      setLoadError(null);
+      setIsLoading(false);
+      return;
+    }
+    if (!userId) {
+      setConversation(null);
+      setMessages([]);
+      setLoadError(null);
       setIsLoading(false);
       return;
     }
@@ -167,7 +174,7 @@ export default function ChatScreen() {
         if (active) {
           setConversation(null);
           setMessages([]);
-          setLoadError(error instanceof Error ? `Conversation unavailable: ${error.message}` : 'Conversation unavailable.');
+          setLoadError(null);
         }
       } finally {
         if (active) setIsLoading(false);
@@ -214,9 +221,6 @@ export default function ChatScreen() {
   if (!conversation || !participant) {
     return (
       <View style={[s.state, { backgroundColor: bg }]}>
-        <Feather name="message-circle" size={30} color={muted} />
-        <Text style={[s.stateTitle, { color: fg }]}>Conversation unavailable</Text>
-        <Text style={[s.stateText, { color: muted }]}>{loadError ?? 'This conversation could not be found.'}</Text>
         <TouchableOpacity onPress={() => router.back()} style={[s.stateButton, { borderColor: border }]}>
           <Text style={[s.stateButtonText, { color: colors.primary }]}>Go back</Text>
         </TouchableOpacity>

@@ -162,25 +162,26 @@ export default function BuyerDropDetail() {
 
   const [drop, setDrop] = useState<DropDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [subscribed, setSubscribed] = useState(false);
   const [notifyLoading, setNotifyLoading] = useState(false);
 
   useEffect(() => {
+    let active = true;
     if (!dropId) {
-      setError('No drop ID provided.');
       setLoading(false);
-      return;
+      return () => { active = false; };
     }
     Promise.all([
       api.publicDrops.get(dropId),
       api.publicDrops.notificationStatus(dropId).catch(() => ({ subscribed: false })),
     ]).then(([data, notification]) => {
+      if (!active) return;
       setDrop(data as DropDetail);
       setSubscribed(notification.subscribed);
       Animated.timing(entrance, { toValue: 1, duration: 650, useNativeDriver: true }).start();
-    }).catch(() => setError('Could not load this drop. It may no longer be active.'))
-      .finally(() => setLoading(false));
+    }).catch(() => { if (active) setDrop(null); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, [dropId]);
 
   const countdown = useCountdown(drop?.releaseAt);
@@ -208,17 +209,7 @@ export default function BuyerDropDetail() {
   if (loading) {
     return <View style={styles.center}><ActivityIndicator color={colors.primary} size="large" /></View>;
   }
-  if (error || !drop) {
-    return (
-      <View style={[styles.center, { paddingTop: insets.top }]}>
-        <Feather name="alert-circle" size={34} color={MUTED} />
-        <Text style={styles.errorText}>{error ?? 'Drop unavailable.'}</Text>
-        <TouchableOpacity style={styles.errorBack} onPress={() => router.back()}>
-          <Text style={styles.errorBackText}>Go back</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  if (!drop) return <View style={styles.center} />;
 
   return (
     <View style={styles.root}>
@@ -374,9 +365,6 @@ export default function BuyerDropDetail() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   center: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl, gap: SP.md },
-  errorText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center' },
-  errorBack: { borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.pill, paddingHorizontal: SP.lg, paddingVertical: SP.sm },
-  errorBackText: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
   hero: { height: HERO_H, backgroundColor: CARD, position: 'relative', justifyContent: 'flex-end' },
   heroHeader: { position: 'absolute', top: 0, left: SP.md, right: SP.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 2 },
   roundButton: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(0,0,0,0.48)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },

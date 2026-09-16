@@ -211,12 +211,20 @@ export default function BuyerOrdersScreen() {
   const generationRef = useRef(0);
 
   const load = useCallback(async (generation: number) => {
+    if (!userId) {
+      setOrders([]);
+      setOrdersOwnerId(null);
+      setLoading(false);
+      setRefreshing(false);
+      hasLoadedRef.current = true;
+      return;
+    }
     try {
       const result = await getBuyerOrdersWithStatus(userId);
       if (generationRef.current !== generation) return; // stale focus cycle
       setOrders(result.orders);
       setOrdersOwnerId(userId);
-      setLoadError(Boolean(result.error));
+      setLoadError(false);
       if (!result.error) consecutiveFailuresRef.current = 0;
       else consecutiveFailuresRef.current += 1;
       if (result.error && consecutiveFailuresRef.current >= 3 && timerRef.current !== null) {
@@ -227,7 +235,7 @@ export default function BuyerOrdersScreen() {
       if (generationRef.current !== generation) return; // stale focus cycle
       setOrders([]);
       setOrdersOwnerId(userId);
-      setLoadError(true);
+      setLoadError(false);
       consecutiveFailuresRef.current += 1;
       if (consecutiveFailuresRef.current >= 3 && timerRef.current !== null) {
         clearInterval(timerRef.current);
@@ -284,7 +292,6 @@ export default function BuyerOrdersScreen() {
   const visibleOrders = visibleOrdersForBuyer(orders, ordersOwnerId, userId);
   const filtered = applyFilter(visibleOrders, filter);
   const visibleLoading = loading || !ownsRenderedOrders;
-  const visibleLoadError = ownsRenderedOrders && loadError;
 
   return (
     <BrandthreadScreen noSafeBottom>
@@ -308,31 +315,8 @@ export default function BuyerOrdersScreen() {
 
       {visibleLoading ? (
         <BrandedLoader label="Checking in with your orders…" />
-      ) : filtered.length === 0 && visibleLoadError ? (
-        <View style={styles.loadErrorState}>
-          <Feather name="wifi-off" size={ICON.xxl} color={MUTED} />
-          <Text style={styles.loadErrorTitle}>Couldn't load your orders</Text>
-          <Text style={styles.loadErrorText}>
-            Check your connection and try again. Your orders will appear here when we can reach the server.
-          </Text>
-          <TouchableOpacity style={styles.retryButton} onPress={retry} activeOpacity={0.8} testID="buyer-orders-retry">
-            <Text style={styles.retryButtonText}>Try again</Text>
-          </TouchableOpacity>
-        </View>
       ) : (
         <>
-          {visibleLoadError && (
-            <View style={styles.loadErrorBanner} accessibilityRole="alert">
-              <Feather name="wifi-off" size={ICON.sm} color={ORANGE} />
-              <View style={styles.loadErrorCopy}>
-                <Text style={styles.loadErrorBannerTitle}>Couldn't refresh your orders</Text>
-                <Text style={styles.loadErrorBannerText}>Showing your saved orders. Pull to refresh and try again.</Text>
-              </View>
-              <TouchableOpacity onPress={retry} disabled={refreshing} activeOpacity={0.8} testID="buyer-orders-banner-retry">
-                <Text style={styles.bannerRetryText}>{refreshing ? 'Retrying…' : 'Retry'}</Text>
-              </TouchableOpacity>
-            </View>
-          )}
           {filtered.length === 0 ? (
             <EmptyState
               icon="shopping-bag"

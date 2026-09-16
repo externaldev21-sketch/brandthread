@@ -1,7 +1,8 @@
 /**
  * Customer Analytics — Brandthread Seller App
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Platform, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -60,17 +61,20 @@ export default function AnalyticsCustomersScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
+  const { isLoaded: authLoaded, userId } = useAuth();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   const [data,       setData]       = useState<CustomerAnalytics | null>(null);
   const [topCustomers, setTopCustomers] = useState<TopCustomer[]>([]);
-  const [topCustomersError, setTopCustomersError] = useState<string | null>(null);
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const requestUser = useRef<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
+    if (!authLoaded || !userId) return;
+    const requestedUser = userId;
+    requestUser.current = requestedUser;
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
       const f = filter ?? await getFilterState();
@@ -78,27 +82,30 @@ export default function AnalyticsCustomersScreen() {
       const [analytics, customerResponse] = await Promise.all([
         getCustomerAnalytics(f), api.analytics.customers(10).catch(() => null),
       ]);
-      setData(analytics); setError(null);
+      if (requestUser.current !== requestedUser) return;
+      setData(analytics);
       if (customerResponse) {
         setTopCustomers(customerResponse.topCustomers ?? []);
-        setTopCustomersError(null);
       } else {
         setTopCustomers([]);
-        setTopCustomersError('Could not load top customers. Pull to refresh to try again.');
+        setTopCustomers([]);
       }
     } catch (err) {
+      if (requestUser.current !== requestedUser) return;
       setData(null); setTopCustomers([]);
-      setError(err instanceof Error ? err.message : 'Customer analytics are unavailable.');
     } finally { setLoading(false); setRefreshing(false); }
-  }, [api, filter]);
+  }, [api, filter, authLoaded, userId]);
 
-  useEffect(() => { load(); }, []); // eslint-disable-line
+  useEffect(() => {
+    requestUser.current = null;
+    setData(null); setFilter(null); setTopCustomers([]);
+    setLoading(!authLoaded);
+    if (authLoaded && userId) { setLoading(true); load(); }
+  }, [authLoaded, userId]); // load reads the current filter
 
   if (loading) {
     return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><ActivityIndicator size="large" color={PURPLE} /></View>;
   }
-  if (error) return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><Text style={{ color: MUTED }}>{error}</Text><TouchableOpacity onPress={() => load()}><Text style={{ color: PURPLE }}>Retry</Text></TouchableOpacity></View>;
-
   return (
     <ScrollView
       style={s.scroll}
@@ -133,12 +140,7 @@ export default function AnalyticsCustomersScreen() {
       {/* Top customers */}
       <Text style={s.sectionTitle}>Top Customers</Text>
       <View style={s.card}>
-        {topCustomersError ? (
-          <View style={s.customerEmpty}>
-            <Feather name="alert-circle" size={22} color={MUTED} />
-            <Text style={s.customerEmptyText}>{topCustomersError}</Text>
-          </View>
-        ) : topCustomers.length === 0 ? (
+        {topCustomers.length === 0 ? (
           <View style={s.customerEmpty}>
             <Feather name="users" size={22} color={MUTED} />
             <Text style={s.customerEmptyText}>No customer orders yet</Text>

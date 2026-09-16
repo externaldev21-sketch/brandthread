@@ -181,30 +181,29 @@ export default function QuoteDetailScreen() {
   const [counteroffers, setCounteroffers] = useState<Counteroffer[]>([]);
   const [manufacturerName, setManufacturerName] = useState('');
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [showCounterForm, setShowCounterForm] = useState(mode === 'counter');
+  const loadGeneration = useRef(0);
 
   const load = useCallback(async () => {
     if (!quoteId) return;
+    const generation = ++loadGeneration.current;
     setLoading(true);
-    setLoadError('');
     try {
       const [q, cos] = await Promise.all([
         getQuote(quoteId),
         getCounteroffersForQuote(quoteId),
       ]);
-      if (q) {
+      if (q && generation === loadGeneration.current) {
         setQuote(q);
         setCounteroffers(cos);
         const mfg = await getManufacturer(q.manufacturerId);
-        setManufacturerName(mfg?.name ?? 'Manufacturer');
-      } else setLoadError('This quote is no longer available.');
-    } catch (error) {
-      setQuote(null);
-      setLoadError(error instanceof Error ? error.message : 'Could not load this quote.');
+        if (generation === loadGeneration.current) setManufacturerName(mfg?.name ?? 'Manufacturer');
+      } else if (generation === loadGeneration.current) setQuote(null);
+    } catch {
+      if (generation === loadGeneration.current) setQuote(null);
     } finally {
-      setLoading(false);
+      if (generation === loadGeneration.current) setLoading(false);
     }
   }, [quoteId]);
 
@@ -317,12 +316,7 @@ export default function QuoteDetailScreen() {
     return (
       <BrandthreadScreen>
         <BrandthreadHeader title="Quote Details" onBack={() => router.back()} />
-        <View style={s.centered}>
-          <Text style={s.errorText}>{loadError || 'Quote not found.'}</Text>
-          <TouchableOpacity style={s.retryButton} onPress={load}>
-            <Text style={s.retryButtonText}>Try again</Text>
-          </TouchableOpacity>
-        </View>
+        <View style={s.centered} />
       </BrandthreadScreen>
     );
   }
@@ -547,24 +541,6 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  errorText: {
-    fontSize: FS.base,
-    fontFamily: FONT.medium,
-    color: MUTED,
-  },
-  retryButton: {
-    marginTop: SP.md,
-    borderRadius: RADIUS.md,
-    backgroundColor: PURPLE,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-  },
-  retryButtonText: {
-    color: ON_DARK,
-    fontFamily: FONT.semibold,
-    fontSize: FS.sm,
-  },
-
   // Status card
   statusRow: {
     flexDirection: 'row',

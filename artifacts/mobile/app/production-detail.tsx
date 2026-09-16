@@ -25,7 +25,6 @@ export default function ProductionDetailScreen() {
   const [order, setOrder] = useState<ProductionOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
   const [wallets, setWallets] = useState<BulkWalletOption[]>([]);
   const [requiredCents, setRequiredCents] = useState(0);
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
@@ -35,12 +34,10 @@ export default function ProductionDetailScreen() {
   const load = useCallback(async (refresh = false) => {
     if (!id) return;
     refresh ? setRefreshing(true) : setLoading(true);
-    setError('');
     try {
       setOrder((await getProductionOrder(id)) ?? null);
     } catch {
       setOrder(null);
-      setError('Could not load this production order.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -58,7 +55,7 @@ export default function ProductionDetailScreen() {
         ? current : options.wallets.find(wallet => wallet.eligible)?.id ?? null);
     } catch (err: any) {
       setWallets([]);
-      setPaymentError(err?.message ?? 'Could not load wallet payment options.');
+      setPaymentError('Wallet payment options are unavailable right now.');
     }
   }, [id]);
 
@@ -83,7 +80,7 @@ export default function ProductionDetailScreen() {
       setPaymentError(
         message.includes('payouts are not ready')
           ? 'The manufacturer must finish Stripe verification before this wallet payment can be released. Message them, then retry.'
-          : message || 'Wallet payment could not be completed. Please retry.',
+          : 'Wallet payment could not be completed. Please retry.',
       );
     } finally {
       setPaying(false);
@@ -108,11 +105,6 @@ export default function ProductionDetailScreen() {
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <BrandthreadHeader title="Production" onBack={() => router.back()} />
         <View style={styles.center}>
-          <Text style={styles.error}>{error || 'Production order not found.'}</Text>
-          <TouchableOpacity style={styles.retry} onPress={() => load()}>
-            <Feather name="refresh-cw" size={14} color={ON_DARK} />
-            <Text style={styles.retryText}>Try again</Text>
-          </TouchableOpacity>
         </View>
       </View>
     );
@@ -209,9 +201,6 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   center: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: SP.lg },
   scroll: { padding: SP.md, gap: SP.md },
-  error: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.base, textAlign: 'center' },
-  retry: { marginTop: SP.md, flexDirection: 'row', alignItems: 'center', gap: SP.xs, backgroundColor: PURPLE, borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  retryText: { color: ON_DARK, fontFamily: FONT.semibold },
   title: { color: FG, fontFamily: FONT.bold, fontSize: FS.lg },
   meta: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: SP.xs },
   track: { height: 6, backgroundColor: BORDER, borderRadius: RADIUS.pill, overflow: 'hidden', marginTop: SP.md },

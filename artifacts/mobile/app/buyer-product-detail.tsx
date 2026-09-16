@@ -490,11 +490,13 @@ export default function BuyerProductDetailScreen() {
           try {
             const row = await api.publicProducts.get(productId);
             if (row && !row.error) {
-              setSellerVacationMessage(
-                row.sellerVacationMode
-                  ? row.sellerVacationMessage ?? 'This seller is currently away and is not accepting purchases.'
-                  : null,
-              );
+              if (!cancelled) {
+                setSellerVacationMessage(
+                  row.sellerVacationMode
+                    ? row.sellerVacationMessage ?? 'This seller is currently away and is not accepting purchases.'
+                    : null,
+                );
+              }
               // Populate demand signals from server-supplied fields only.
               // Never fabricate these values.
               if (!cancelled) {
@@ -541,13 +543,16 @@ export default function BuyerProductDetailScreen() {
 
   useEffect(() => {
     if (!product?.id) return;
+    let cancelled = false;
     api.reviews.forProduct(product.id)
       .then((data: any) => {
+        if (cancelled) return;
         setProductReviews(data.reviews ?? []);
         setAvgRating(data.avgRating ?? 0);
         setReviewCount(data.totalCount ?? 0);
       })
       .catch(() => {});
+    return () => { cancelled = true; };
   }, [product?.id]);
 
   async function handleRefresh() {
@@ -596,17 +601,7 @@ export default function BuyerProductDetailScreen() {
   }
 
   if (!product) {
-    return (
-      <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
-        <Feather name="alert-circle" size={ICON.xxl} color={MUTED} />
-        <Text style={{ color: MUTED, marginTop: SP.md, fontFamily: FONT.regular, textAlign: 'center' }}>
-          Product not found or no longer available.
-        </Text>
-         <TouchableOpacity style={{ marginTop: SP.md, minHeight: COMP.minTouchTarget, justifyContent: 'center' }} onPress={leaveProduct} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Go back">
-          <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.semibold }}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
-    );
+    return <View style={{ flex: 1, backgroundColor: 'transparent' }} />;
   }
 
   const variant = findVariant(product, selections);
@@ -1170,11 +1165,15 @@ function RelatedProducts({ productId }: { productId: string }) {
     );
   }
 
-  if (error || products.length === 0) {
+  if (error) {
+    return null;
+  }
+
+  if (products.length === 0) {
     return (
       <View style={{ paddingVertical: SP.md }}>
         <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: SUBTLE }}>
-          {error ? 'Unable to load related products.' : 'No related products found.'}
+          No related products found.
         </Text>
       </View>
     );

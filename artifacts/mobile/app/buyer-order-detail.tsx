@@ -565,50 +565,6 @@ export default function BuyerOrderDetailScreen() {
     };
   }, [api, id, userId]));
 
-  function handleRetry() {
-    if (!id) return;
-    const accountGeneration = accountGenerationRef.current;
-    setLoading(true);
-    setFetchError(false);
-    setIsFetching(true);
-    setOrder(null);
-    consecutiveFailuresRef.current = 0;
-    // Clear the stale polling interval so useFocusEffect re-runs cleanly
-    if (timerRef.current !== null) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    api.buyer.orders.get(id).then(row => {
-      if (accountGenerationRef.current !== accountGeneration) return;
-      setOrder(adaptOrderDetail(row));
-      setOrderOwnerId(userId);
-      setFetchError(false);
-      setLoading(false);
-      setIsFetching(false);
-      setLastUpdatedAt(Date.now());
-      timerRef.current = setInterval(() => {
-        api.buyer.orders.get(id).then(r => {
-          if (accountGenerationRef.current === accountGeneration) {
-            setOrder(adaptOrderDetail(r));
-            setOrderOwnerId(userId);
-          }
-        }).catch(() => {});
-        api.returns.listBuyer().then(rows => {
-          if (accountGenerationRef.current === accountGeneration) {
-            setReturnRequest(rows.find((request: any) => request.orderId === id) ?? null);
-          }
-        }).catch(() => {});
-      }, 15_000);
-    }).catch(() => {
-      if (accountGenerationRef.current !== accountGeneration) return;
-      setOrder(null);
-      setOrderOwnerId(userId);
-      setLoading(false);
-      setIsFetching(false);
-      setFetchError(true);
-    });
-  }
-
   function handlePullRefresh() {
     if (!id || refreshing) return;
     const accountGeneration = accountGenerationRef.current;
@@ -757,37 +713,13 @@ export default function BuyerOrderDetailScreen() {
   }
 
   if (!order) {
-    const isNetworkError = fetchError;
     return (
       <BrandthreadScreen>
         <BrandthreadHeader
-          title={isNetworkError ? 'Couldn\'t Load Order' : 'Order Not Found'}
+          title="Order Details"
           onBack={() => router.back()}
         />
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
-          <Feather
-            name={isNetworkError ? 'wifi-off' : 'alert-circle'}
-            size={ICON.xxl}
-            color={MUTED}
-          />
-          <Text style={{ marginTop: SP.md, fontSize: FS.base, fontFamily: FONT.semibold, color: FG, textAlign: 'center' }}>
-            {isNetworkError ? 'Connection Problem' : 'Order Not Found'}
-          </Text>
-          <Text style={{ marginTop: SP.xs, fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20 }}>
-            {isNetworkError
-              ? 'We couldn\'t reach our servers right now. Check your connection and try again.'
-              : 'We couldn\'t find this order. It may have been removed or the link may be invalid.'}
-          </Text>
-          {isNetworkError && (
-            <PrimaryButton
-              label="Try Again"
-              icon="refresh-cw"
-              onPress={handleRetry}
-              style={{ marginTop: SP.lg }}
-            />
-          )}
-          <SecondaryButton label="Go Back" onPress={() => router.back()} style={{ marginTop: SP.sm }} />
-        </View>
+        <View style={{ flex: 1 }} />
       </BrandthreadScreen>
     );
   }

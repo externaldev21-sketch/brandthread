@@ -102,11 +102,9 @@ export default function QuoteCompareScreen() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [manufacturers, setManufacturers] = useState<Map<string, Manufacturer>>(new Map());
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     if (!requestId) { setLoading(false); return; }
-    setError('');
     try {
       const qs = await getQuotesForRequest(requestId);
       setQuotes(qs);
@@ -116,10 +114,9 @@ export default function QuoteCompareScreen() {
         if (mfg) mfgMap.set(mfg.id, mfg);
       });
       setManufacturers(mfgMap);
-    } catch (loadError) {
+    } catch {
       setQuotes([]);
       setManufacturers(new Map());
-      setError(loadError instanceof Error ? loadError.message : 'Could not load quotes.');
     } finally {
       setLoading(false);
     }
@@ -152,16 +149,7 @@ export default function QuoteCompareScreen() {
     <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: insets.top }}>
       <BrandthreadHeader title="Compare Quotes" onBack={() => router.back()} />
 
-      {!!error && (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl }}>
-          <Feather name="alert-circle" size={48} color={ORANGE} style={{ marginBottom: SP.md }} />
-          <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, marginBottom: 8 }}>Could not load quotes</Text>
-          <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', marginBottom: SP.md }}>{error}</Text>
-          <PrimaryButton label="Try again" onPress={load} />
-        </View>
-      )}
-
-      {!error && quotes.length === 0 && (
+      {quotes.length === 0 && (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl }}>
           <Feather name="inbox" size={48} color={SUBTLE} style={{ marginBottom: SP.md }} />
           <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, marginBottom: 8 }}>No Quotes Yet</Text>

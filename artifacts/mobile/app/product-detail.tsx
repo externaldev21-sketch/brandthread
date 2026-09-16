@@ -10,6 +10,7 @@ import { View, Text, ScrollView, StyleSheet, Alert, Animated, Image, FlatList } 
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
@@ -46,6 +47,7 @@ export default function ProductDetailScreen() {
   const { theme } = useAppTheme();
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
+  const { userId } = useAuth();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ id: string; tab?: string }>();
   const id = params.id;
@@ -64,7 +66,7 @@ export default function ProductDetailScreen() {
   const tabScrollRef = useRef<ScrollView>(null);
 
   const loadProduct = useCallback(async () => {
-    if (!id) {
+    if (!id || !userId) {
       setLoading(false);
       return;
     }
@@ -79,31 +81,28 @@ export default function ProductDetailScreen() {
       }
     } catch (error) {
       setLoadError(true);
-      reportNetworkError(error, loadProduct);
+      setProduct(null);
     } finally {
       setLoading(false);
     }
-  }, [id, params.tab]);
+  }, [id, params.tab, userId]);
 
   // Load product
   useEffect(() => { void loadProduct(); }, [loadProduct]);
 
   // Load analytics when tab opens
   useEffect(() => {
-    if (activeTab === 'analytics' && id && !analytics) {
+    if (activeTab === 'analytics' && id && userId && !analytics) {
       setAnalyticsLoading(true);
       getProductAnalytics(id).then(a => {
         setAnalytics(a);
         setAnalyticsError(false);
       }).catch(error => {
         setAnalyticsError(true);
-        reportNetworkError(error, () => {
-          setAnalytics(null);
-          setActiveTab('analytics');
-        });
+        setAnalytics(null);
       }).finally(() => setAnalyticsLoading(false));
     }
-  }, [activeTab, id, analyticsRetry]);
+  }, [activeTab, id, analyticsRetry, userId]);
 
   const handleTabPress = useCallback((tab: Tab, index: number) => {
     Haptics.selectionAsync();
@@ -125,22 +124,9 @@ export default function ProductDetailScreen() {
     );
   }
 
-  if (loadError && !product) {
-    return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
-        <EmptyState
-          icon="wifi-off"
-          title="Product couldn't load"
-          description="Check your connection and try again."
-          action={{ label: 'Try again', onPress: loadProduct, icon: 'refresh-cw' }}
-        />
-      </View>
-    );
-  }
   if (!product) {
     return (
       <View style={[s.root, { paddingTop: insets.top }]}>
-        <EmptyState icon="package" title="Product not found" description="This product may have been deleted or the link is invalid." action={{ label: 'Go back', onPress: () => router.back() }} />
       </View>
     );
   }
@@ -624,7 +610,6 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
       setInvError(false);
     } catch (error) {
       setInvError(true);
-      reportNetworkError(error, loadInventoryItems);
     } finally {
       setInvLoading(false);
     }
@@ -711,15 +696,6 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
       </View>
 
       {invLoading && <View style={{ paddingHorizontal: SP.md }}><LoadingSkeleton height={72} /></View>}
-      {invError && !invLoading && (
-        <EmptyState
-          icon="wifi-off"
-          title="Inventory details couldn't load"
-          description="Your product totals are still shown above."
-          action={{ label: 'Try again', onPress: loadInventoryItems, icon: 'refresh-cw' }}
-        />
-      )}
-
       {/* Inventory items from inventoryService */}
       {invItems.length > 0 && (
         <View style={{ paddingHorizontal: SP.md }}>
@@ -823,14 +799,7 @@ const invS = StyleSheet.create({
 // ─── Orders Tab ───────────────────────────────────────────────────────────────
 
 function OrdersTab({ product, router }: { product: Product; router: ReturnType<typeof useRouter> }) {
-  return (
-    <EmptyState
-      icon="shopping-bag"
-      title="Order details unavailable"
-      description="Product-specific orders will appear here once the live order filter is connected."
-      style={{ marginTop: SP.xl }}
-    />
-  );
+  return null;
 }
 
 const ord = StyleSheet.create({
@@ -997,16 +966,7 @@ function AnalyticsTab({
   product: Product;
 }) {
   const { theme } = useAppTheme();
-  if (error) {
-    return (
-      <EmptyState
-        icon="wifi-off"
-        title="Analytics couldn't load"
-        description="Check your connection and try again."
-        action={{ label: 'Try again', onPress: onRetry, icon: 'refresh-cw' }}
-      />
-    );
-  }
+  if (error) return null;
   if (loading || !analytics) {
     return (
       <View style={{ padding: SP.md, gap: SP.md }}>
