@@ -8,7 +8,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import * as ImagePicker from 'expo-image-picker';
 import { getSellerPosts, subscribeSocial, type SellerThreadPost } from '@/services/socialService';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
@@ -68,7 +67,6 @@ export default function ProfileScreen() {
   const [brandNameInput, setBrandNameInput] = useState('');
   const [bioInput, setBioInput] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const requestUserRef = useRef<string | null>(null);
 
   const loadPosts = useCallback(async () => {
@@ -224,17 +222,24 @@ export default function ProfileScreen() {
     >
       {/* ── Top bar: brand name + icons ── */}
       <View style={s.topBar}>
+        {/* Brand/account switcher button — navigates to account-switcher screen */}
         <TouchableOpacity
           style={s.topBarTitle}
-          onPress={openProfileEditor}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push('/account-switcher' as never);
+          }}
           activeOpacity={0.75}
           accessibilityRole="button"
-          accessibilityLabel="Edit brand name and bio"
-          testID="profile-edit-header"
+          accessibilityLabel="Switch account"
+          testID="profile-account-switcher"
         >
-          <Text style={s.brandNameTitle} numberOfLines={1}>
-            {profile?.brandName || profile?.displayName || 'My Brand'}
-          </Text>
+          <View style={s.accountSwitcherRow}>
+            <Text style={s.brandNameTitle} numberOfLines={1}>
+              {profile?.brandName || profile?.displayName || 'My Brand'}
+            </Text>
+            <Feather name="chevron-down" size={16} color={FG} style={s.chevron} />
+          </View>
         </TouchableOpacity>
         <View style={s.topBarIcons}>
           <TouchableOpacity style={s.iconBtn} onPress={() => nav('/notifications-settings')} accessibilityRole="button" accessibilityLabel="Notification settings">
@@ -248,7 +253,7 @@ export default function ProfileScreen() {
 
       {/* ── Centered avatar + name + stats ── */}
       <View style={s.profileCenter}>
-        {/* Avatar */}
+        {/* Avatar — tapping opens stories if active, otherwise create-post */}
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={() => {
@@ -275,41 +280,7 @@ export default function ProfileScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Camera button */}
-        <TouchableOpacity
-          style={s.cameraBtn}
-          activeOpacity={0.8}
-          disabled={uploadingAvatar}
-          accessibilityRole="button"
-          accessibilityLabel={uploadingAvatar ? 'Uploading brand photo' : 'Change brand photo'}
-          accessibilityState={{ disabled: uploadingAvatar, busy: uploadingAvatar }}
-          onPress={async () => {
-            const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo access to update your brand avatar.'); return; }
-            const result = await ImagePicker.launchImageLibraryAsync({
-              allowsEditing: true,
-              aspect: [1, 1],
-              quality: 0.85,
-              mediaTypes: ['images'],
-            });
-            if (result.canceled || !result.assets[0]) return;
-            setUploadingAvatar(true);
-            try {
-              const updated = await api.seller.uploadAvatar(result.assets[0]);
-              setProfile((current) => current ? { ...current, profileImageUrl: updated.profileImageUrl } : current);
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            } catch (error) {
-              reportNetworkError(error);
-              Alert.alert('Could not update photo', 'Check your connection and try again.');
-            } finally {
-              setUploadingAvatar(false);
-            }
-          }}
-        >
-          <Feather name={uploadingAvatar ? "loader" : "camera"} size={12} color={FG} />
-        </TouchableOpacity>
-
-        {/* Brand name */}
+        {/* Brand name — tapping opens the profile editor */}
         <TouchableOpacity
           onPress={openProfileEditor}
           activeOpacity={0.75}
@@ -591,15 +562,6 @@ export default function ProfileScreen() {
 
 const s = StyleSheet.create({
   root: { flex: 1 },
-  loadError: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    marginHorizontal: SP.md, marginBottom: SP.md, padding: 12,
-    borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
-    backgroundColor: CARD,
-  },
-  loadErrorTitle: { color: FG, fontSize: FS.xs, fontFamily: FONT.semibold },
-  loadErrorText:  { color: MUTED, fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
-  loadRetry:      { fontSize: FS.xs, fontFamily: FONT.bold },
 
   // Top bar
   topBar: {
@@ -607,13 +569,15 @@ const s = StyleSheet.create({
     paddingHorizontal: SP.md, marginBottom: SP.md,
   },
   topBarTitle: { flex: 1 },
+  accountSwitcherRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   brandNameTitle: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
+  chevron: { marginTop: 2 },
   topBarIcons: { flexDirection: 'row', gap: SP.xs },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
 
   // Centered profile
   profileCenter: { alignItems: 'center', paddingHorizontal: SP.md, paddingBottom: SP.lg },
-  avatarWrap: { marginBottom: SP.sm, position: 'relative' },
+  avatarWrap: { marginBottom: SP.sm },
   avatar: {
     width: 96, height: 96, borderRadius: 48,
     backgroundColor: CARD,
@@ -622,12 +586,6 @@ const s = StyleSheet.create({
   avatarActive: { borderWidth: 2, borderColor: ACCENT },
   avatarImage: { width: '100%', height: '100%', borderRadius: 48 },
   avatarText: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
-  cameraBtn: {
-    position: 'absolute', bottom: SP.sm, right: -SP.md,
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: CARD, borderWidth: 1.5, borderColor: BG,
-    alignItems: 'center', justifyContent: 'center',
-  },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   brandName: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
   brandHandle: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginBottom: SP.xs },

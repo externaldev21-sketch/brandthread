@@ -30,7 +30,6 @@ import {
 } from '@/lib/orderBadgeStore';
 import { getSellerOrderBadgeCount } from '@/lib/sellerOrderBadge';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
-import SellerCreateFAB from '@/components/SellerCreateFAB';
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
@@ -254,7 +253,6 @@ export default function TabLayout() {
         <Tabs.Screen name="analytics" options={{ href: null }} />
         <Tabs.Screen name="marketing" options={{ href: null }} />
       </Tabs>
-      <SellerCreateFAB />
     </>
   );
 }

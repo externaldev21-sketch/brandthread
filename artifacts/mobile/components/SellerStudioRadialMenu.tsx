@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  Dimensions,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -15,27 +17,32 @@ import * as Haptics from 'expo-haptics';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED, GROWTH_STUDIO_TOOLS } from '@/lib/growthTools';
-import { BG, BORDER, CARD, CARD_ELEVATED, FG, FONT, FS, MUTED, RADIUS, SP } from '@/lib/theme';
+import { BG, BORDER, CARD, CARD_ELEVATED, FG, FONT, FS, MUTED, RADIUS, SP, SUBTLE } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
-type StudioAction = {
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type MenuAction = {
   id: string;
   label: string;
   icon: keyof typeof Feather.glyphMap;
   route: string;
+  /** Growth plan required to access this action */
   growthOnly: boolean;
 };
 
+// ─── Studio actions (existing six, Growth-gated) ─────────────────────────────
+
 const GROWTH_ROUTES: Record<string, string> = {
-  'design-studio': '/design',
-  'ai-photoshoot': '/design-ai-photoshoot',
-  'mockup-to-model': '/design-mockup-to-model',
-  'remove-bg': '/design-bg-removal',
-  'ai-design': '/design-text-to-design',
-  'campaign-gen': '/design-campaign',
+  'design-studio':  '/design',
+  'ai-photoshoot':  '/design-ai-photoshoot',
+  'mockup-to-model':'/design-mockup-to-model',
+  'remove-bg':      '/design-bg-removal',
+  'ai-design':      '/design-text-to-design',
+  'campaign-gen':   '/design-campaign',
 };
 
-const RADIAL_TOOL_IDS = [
+const STUDIO_TOOL_IDS = [
   'design-studio',
   'mockup-to-model',
   'remove-bg',
@@ -44,8 +51,8 @@ const RADIAL_TOOL_IDS = [
   'ai-photoshoot',
 ] as const;
 
-const ACTIONS: StudioAction[] = RADIAL_TOOL_IDS.map((id) => {
-  const tool = GROWTH_STUDIO_TOOLS.find((candidate) => candidate.id === id);
+const STUDIO_ACTIONS: MenuAction[] = STUDIO_TOOL_IDS.map((id) => {
+  const tool = GROWTH_STUDIO_TOOLS.find((c) => c.id === id);
   if (!tool) throw new Error(`Missing Studio tool definition: ${id}`);
   return {
     id: tool.id,
@@ -56,29 +63,47 @@ const ACTIONS: StudioAction[] = RADIAL_TOOL_IDS.map((id) => {
   };
 });
 
-// Height per row: icon 44 + vertical padding
-const ROW_HEIGHT = 60;
-// Stagger delay (ms) between each row animating in
-const STAGGER_MS = 38;
+// ─── Shortcut actions (not Growth-gated here; destinations handle access) ────
+
+const SHORTCUT_ACTIONS: MenuAction[] = [
+  { id: 'create-post',  label: 'Create post',       icon: 'video',       route: '/create-post', growthOnly: false },
+  { id: 'add-product',  label: 'Add new product',   icon: 'package',     route: '/add-product', growthOnly: false },
+  { id: 'boost',        label: 'Boost',              icon: 'trending-up', route: '/boost',        growthOnly: false },
+];
+
+// ─── Layout constants ─────────────────────────────────────────────────────────
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const SHEET_WIDTH  = Math.min(SCREEN_WIDTH - 48, 360);
+const ROW_HEIGHT   = 60;
+const STAGGER_MS   = 32; // ms between each row animating in
+
+// Total animated items = studio (6) + shortcuts (3) = 9
+const ALL_ACTIONS  = [...STUDIO_ACTIONS, ...SHORTCUT_ACTIONS];
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function SellerStudioRadialMenu() {
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const router   = useRouter();
+  const insets   = useSafeAreaInsets();
   const { theme } = useAppTheme();
-  const { hasPlan, loading: planLoading, error: planError, retry: retryPlan } = useSubscriptionPlan();
+  const { hasPlan, loading: planLoading, error: planError, retry: retryPlan } =
+    useSubscriptionPlan();
 
-  // Master progress for backdrop + close button
-  const progress = useRef(new Animated.Value(0)).current;
-  // Per-item animated values for staggered entry
-  const itemAnims = useRef(ACTIONS.map(() => new Animated.Value(0))).current;
+  // One progress value drives backdrop + close-button.
+  const progress  = useRef(new Animated.Value(0)).current;
+  // One animated value per row (studio + shortcuts in order).
+  const itemAnims = useRef(ALL_ACTIONS.map(() => new Animated.Value(0))).current;
 
-  const [open, setOpen] = useState(false);
+  const [open, setOpen]               = useState(false);
   const [upsellFeature, setUpsellFeature] = useState<string | null>(null);
 
   useEffect(() => () => {
     progress.stopAnimation();
     itemAnims.forEach((a) => a.stopAnimation());
   }, [progress, itemAnims]);
+
+  // ── Open ──────────────────────────────────────────────────────────────────
 
   const expand = () => {
     setOpen(true);
@@ -87,7 +112,6 @@ export default function SellerStudioRadialMenu() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
 
     requestAnimationFrame(() => {
-      // Backdrop + toggle button fade in quickly
       Animated.spring(progress, {
         toValue: 1,
         damping: 22,
@@ -96,8 +120,7 @@ export default function SellerStudioRadialMenu() {
         useNativeDriver: true,
       }).start();
 
-      // Items stagger from center outward — animate sequentially with delay
-      ACTIONS.forEach((_, i) => {
+      ALL_ACTIONS.forEach((_, i) => {
         Animated.spring(itemAnims[i], {
           toValue: 1,
           damping: 20,
@@ -110,14 +133,14 @@ export default function SellerStudioRadialMenu() {
     });
   };
 
+  // ── Close ─────────────────────────────────────────────────────────────────
+
   const collapse = (after?: () => void) => {
-    // Reverse stagger: last item out first
-    const reverseAnims = [...itemAnims].reverse();
-    reverseAnims.forEach((anim, i) => {
+    [...itemAnims].reverse().forEach((anim, i) => {
       Animated.timing(anim, {
         toValue: 0,
-        duration: 100,
-        delay: i * 20,
+        duration: 90,
+        delay: i * 18,
         useNativeDriver: true,
       }).start();
     });
@@ -131,7 +154,9 @@ export default function SellerStudioRadialMenu() {
     });
   };
 
-  const choose = (action: StudioAction) => {
+  // ── Choose ────────────────────────────────────────────────────────────────
+
+  const choose = (action: MenuAction) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     if (
       GROWTH_PLAN_ENFORCEMENT_ENABLED &&
@@ -145,8 +170,54 @@ export default function SellerStudioRadialMenu() {
     collapse(() => router.push(action.route as never));
   };
 
+  // ── Row renderer ──────────────────────────────────────────────────────────
+
+  const renderRow = (action: MenuAction, globalIndex: number) => {
+    const anim = itemAnims[globalIndex];
+    const opacity    = anim;
+    const translateY = anim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [20 + globalIndex * 4, 0],
+    });
+    const scale = anim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.9, 1],
+    });
+
+    return (
+      <Animated.View
+        key={action.id}
+        style={[
+          styles.rowWrap,
+          { width: SHEET_WIDTH, opacity, transform: [{ translateY }, { scale }] },
+        ]}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={action.label}
+          onPress={() => choose(action)}
+          style={({ pressed }) => [
+            styles.actionRow,
+            pressed && styles.actionRowPressed,
+          ]}
+        >
+          <View style={[styles.actionIcon, { borderColor: BORDER, backgroundColor: CARD }]}>
+            <Feather name={action.icon} size={20} color={theme.accentLight} />
+          </View>
+          <Text style={styles.actionLabel} numberOfLines={1}>
+            {action.label}
+          </Text>
+          <Feather name="chevron-right" size={16} color={MUTED} />
+        </Pressable>
+      </Animated.View>
+    );
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+
   return (
     <>
+      {/* Lightning-bolt trigger — hidden while modal is open */}
       {!open && (
         <Pressable
           accessibilityRole="button"
@@ -173,80 +244,47 @@ export default function SellerStudioRadialMenu() {
         statusBarTranslucent
         onRequestClose={() => collapse()}
       >
-        {/* ── Backdrop — very dark so home content reads as inactive ── */}
+        {/* Solid dark backdrop */}
         <Animated.View
-          style={[
-            StyleSheet.absoluteFill,
-            styles.backdrop,
-            { opacity: progress },
-          ]}
+          style={[StyleSheet.absoluteFill, styles.backdrop, { opacity: progress }]}
           pointerEvents="none"
         />
 
-        {/* Tap-to-dismiss layer */}
+        {/* Full-screen tap-to-dismiss */}
         <Pressable
           accessibilityLabel="Close Studio tools"
           onPress={() => collapse()}
           style={StyleSheet.absoluteFill}
         />
 
-        {/* ── Centered vertical list ── */}
-        <View style={styles.listWrap} pointerEvents="box-none">
-          {ACTIONS.map((action, index) => {
-            const anim = itemAnims[index];
+        {/* ── Scrollable centered content ── */}
+        <View style={styles.outerWrap} pointerEvents="box-none">
+          <ScrollView
+            style={{ width: SHEET_WIDTH }}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            scrollEnabled
+            alwaysBounceVertical={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* ── Section: Main menu ── */}
+            <Text style={styles.sectionHeading}>Main menu</Text>
 
-            // Each row travels from the lightning trigger's top-right area
-            // into its final position in the centered list.
-            const translateX = anim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [150, 0],
-            });
-            const translateY = anim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [-(140 + index * (ROW_HEIGHT + 6)), 0],
-            });
-            const opacity = anim;
-            const scale = anim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0.88, 1],
-            });
+            {STUDIO_ACTIONS.map((action, i) => renderRow(action, i))}
 
-            return (
-              <Animated.View
-                key={action.id}
-                style={[
-                  styles.rowWrap,
-                  { opacity, transform: [{ translateX }, { translateY }, { scale }] },
-                ]}
-              >
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={action.label}
-                  onPress={() => choose(action)}
-                  style={({ pressed }) => [
-                    styles.actionRow,
-                    pressed && styles.actionRowPressed,
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.actionIcon,
-                      { borderColor: BORDER, backgroundColor: CARD },
-                    ]}
-                  >
-                    <Feather name={action.icon} size={20} color={theme.accentLight} />
-                  </View>
-                  <Text style={styles.actionLabel} numberOfLines={1}>
-                    {action.label}
-                  </Text>
-                  <Feather name="chevron-right" size={16} color={MUTED} />
-                </Pressable>
-              </Animated.View>
-            );
-          })}
+            {/* ── Spacer between sections ── */}
+            <View style={styles.sectionSpacer} />
+
+            {/* ── Section: Shortcuts ── */}
+            <Text style={styles.sectionHeading}>Shortcuts</Text>
+
+            {SHORTCUT_ACTIONS.map((action, i) =>
+              renderRow(action, STUDIO_ACTIONS.length + i),
+            )}
+          </ScrollView>
         </View>
 
-        {/* Close button — stays at its trigger position */}
+        {/* Close button at the trigger position */}
         <Animated.View
           style={[
             styles.toggle,
@@ -291,7 +329,10 @@ export default function SellerStudioRadialMenu() {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
+  // Lightning-bolt / close toggle
   toggle: {
     position: 'absolute',
     right: SP.md,
@@ -315,24 +356,43 @@ const styles = StyleSheet.create({
   },
   pressed: { transform: [{ scale: 0.94 }], opacity: 0.9 },
 
-  // Backdrop: substantially darker than before (was BG at 0.9 opacity which
-  // made home content look nearly identical to the active state).
+  // Backdrop: 0.88 black — substantially darker than the previous BG alias
   backdrop: {
     backgroundColor: BG,
   },
 
-  // Centered container — list sits in vertical center of screen
-  listWrap: {
+  // Outer wrapper centers the scroll list on screen
+  outerWrap: {
     ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: SP.lg,
+  },
+
+  listContent: {
+    alignItems: 'center',
     gap: 6,
+    paddingVertical: SP.lg,
+  },
+
+  // Section heading — uppercase label above each group
+  sectionHeading: {
+    width: SHEET_WIDTH,
+    color: SUBTLE,
+    fontFamily: FONT.bold,
+    fontSize: FS.xs,
+    letterSpacing: 0.9,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+    paddingHorizontal: 4,
+  },
+
+  // Gap between the two sections
+  sectionSpacer: {
+    height: SP.lg,
   },
 
   rowWrap: {
-    width: '100%',
-    maxWidth: 360,
+    // width set inline per SHEET_WIDTH
   },
 
   actionRow: {

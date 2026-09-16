@@ -11,7 +11,7 @@ import {
   useFonts,
 } from '@expo-google-fonts/inter';
 import { Keyboard, Platform, Pressable, Text, View } from 'react-native';
-import { Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
+import { Stack, useGlobalSearchParams, useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import { DarkTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import * as SplashScreen from 'expo-splash-screen';
 import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useUser } from '@clerk/expo';
@@ -155,6 +155,7 @@ function AuthGate() {
   const api      = useApi();
   const router   = useRouter();
   const segments = useSegments();
+  const { addAccount } = useGlobalSearchParams<{ addAccount?: string }>();
   const rootNavigationState = useRootNavigationState();
   const devForcedRef = useRef(false);
   const topSegment = segments[0];
@@ -308,6 +309,7 @@ function AuthGate() {
     // users stay on it; the screen itself handles its own seen-state redirect.
     const inThreadExplainer = (segments[0] as string) === 'thread-explainer';
     const inProtectedArea = !inAuthScreen && !inOnboarding && !inInvite && !inPublicScreen && !inThreadExplainer;
+    const inAddAccountFlow = addAccount === '1' && (inAuthScreen || inOnboarding);
 
     // Allow public access to specific buyer routes for guests
     const isGuestAllowedRoute =
@@ -369,7 +371,7 @@ function AuthGate() {
     // bare "/" boot route to the correct dashboard.
     // Thread explainer is an intentional post-onboarding buyer screen — don't
     // redirect buyers away from it; it handles its own navigation.
-    if (onboardingDone && (inAuthScreen || inOnboarding || atRoot) && !inThreadExplainer) {
+    if (onboardingDone && (inAuthScreen || inOnboarding || atRoot) && !inThreadExplainer && !inAddAccountFlow) {
       const dest = storedRole === 'buyer' ? '/(buyer)/' : '/(tabs)/';
       router.replace(dest as never);
       return;
@@ -381,7 +383,7 @@ function AuthGate() {
     } else if (onboardingDone && storedRole === 'seller' && inBuyerGroup) {
       router.replace('/(tabs)/' as never);
     }
-  }, [isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole, threadExplainerSeen, splashSeen, pendingInvite, rootNavigationState?.key]);
+  }, [addAccount, isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole, threadExplainerSeen, splashSeen, pendingInvite, rootNavigationState?.key]);
 
   return null;
 }
@@ -846,6 +848,8 @@ function RootLayoutNav() {
         <Stack.Screen name="shopping-preferences"    options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="account-type-settings"   options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="login-methods"           options={{ headerShown: false, animation: 'slide_from_right' }} />
+        {/* Account management */}
+        <Stack.Screen name="account-switcher"       options={{ headerShown: false, animation: 'slide_from_right' }} />
       </Stack>
         </View>
       </Pressable>

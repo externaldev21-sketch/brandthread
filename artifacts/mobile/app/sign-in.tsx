@@ -13,7 +13,7 @@ import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { useSignIn, useSSO, useAuth, useUser } from '@clerk/expo';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
-import { useRouter, type Href } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -45,8 +45,10 @@ export default function SignInScreen() {
   const { startSSOFlow } = useSSO();
 
   const router = useRouter();
+  const { addAccount } = useLocalSearchParams<{ addAccount?: string }>();
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
+  const isAddAccount = addAccount === '1';
 
   // Warm up the browser on Android for faster OAuth sheet presentation
   useEffect(() => {
@@ -82,11 +84,12 @@ export default function SignInScreen() {
       if (signIn.status === 'complete') {
         await signIn.finalize({
           navigate: ({ decorateUrl }) => {
-            const url = decorateUrl('/');
+            const destination = isAddAccount ? '/account-switcher' : '/';
+            const url = decorateUrl(destination);
             if (url.startsWith('http') && typeof window !== 'undefined') {
               window.location.href = url;
             } else {
-              router.replace(url as Href);
+              router.replace(destination as Href);
             }
           },
         });
@@ -119,8 +122,10 @@ export default function SignInScreen() {
       if (createdSessionId && setActive) {
         // Existing user — activate the session; AuthGate will route by user_role
         await setActive({ session: createdSessionId });
+        if (isAddAccount) router.replace('/account-switcher' as never);
       } else if (ssoSignIn?.status === 'complete' || ssoSignUp?.status === 'complete') {
         // Session was created by Clerk automatically — AuthGate picks it up
+        if (isAddAccount) router.replace('/account-switcher' as never);
       } else if (ssoSignUp) {
         // Brand-new user with no account yet — send them through onboarding
         router.replace('/onboarding' as never);
@@ -137,7 +142,7 @@ export default function SignInScreen() {
   }
 
   // ─── Active session screen ────────────────────────────────────────────────────
-  if (isSignedIn) {
+  if (isSignedIn && !isAddAccount) {
     return (
       <View style={[s.root, { paddingTop: insets.top }]}>
         <StatusBar barStyle="light-content" />
@@ -242,8 +247,12 @@ export default function SignInScreen() {
           </View>
 
           {/* Heading */}
-          <Text style={s.headline}>Welcome back.</Text>
-          <Text style={s.subtitle}>Sign in to continue where you left off.</Text>
+          <Text style={s.headline}>{isAddAccount ? 'Add another account.' : 'Welcome back.'}</Text>
+          <Text style={s.subtitle}>
+            {isAddAccount
+              ? 'Sign in to add an existing Brandthread account to this device.'
+              : 'Sign in to continue where you left off.'}
+          </Text>
 
           {/* ── OAuth ─────────────────────────────────────────────────────────── */}
           {/* Google — dark surface with Google logo, per Google brand guidelines */}

@@ -1152,12 +1152,14 @@ interface SharedAuthStepProps {
   onFirstNamePrefill: (firstName: string) => void;
   /** Prefill last name (stored for profile write) */
   onLastNamePrefill: (lastName: string) => void;
+  allowSignedInAccountCreation?: boolean;
 }
 
 function SharedAuthStep({
   signUp, startGoogleOAuth, startAppleOAuth, onAuthComplete, onDevClear,
   username, onUsernameChange, referralCode, onReferralCodeChange,
   onFirstNamePrefill, onLastNamePrefill,
+  allowSignedInAccountCreation = false,
 }: SharedAuthStepProps) {
   const { theme } = useAppTheme();
   const router = useRouter();
@@ -1202,7 +1204,7 @@ function SharedAuthStep({
   async function handleSignUp() {
     if (!canSubmit || loading) return;
     if (!passwordsMatch) { setError('Passwords do not match.'); return; }
-    if (isSignedIn) {
+    if (isSignedIn && !allowSignedInAccountCreation) {
       const who = currentEmail ? `as ${currentEmail}` : 'with another account';
       setError(`You are currently signed in ${who}. Tap "Sign out and create another account" below.`);
       return;
@@ -1257,11 +1259,13 @@ function SharedAuthStep({
             const referralQuery = referralCode
               ? `&referralCode=${encodeURIComponent(referralCode)}`
               : '';
-            const url = decorateUrl(`/onboarding?postAuth=1${referralQuery}`);
+            const addAccountQuery = allowSignedInAccountCreation ? '&addAccount=1' : '';
+            const destination = `/onboarding?postAuth=1${addAccountQuery}${referralQuery}`;
+            const url = decorateUrl(destination);
             if (url.startsWith('http') && typeof window !== 'undefined') {
               window.location.href = url;
             } else {
-              router.replace('/onboarding' as never);
+              router.replace(destination as never);
             }
           },
         });
@@ -1296,7 +1300,7 @@ function SharedAuthStep({
   }
 
   // Already signed in
-  if (isSignedIn && phase === 'form') {
+  if (isSignedIn && phase === 'form' && !allowSignedInAccountCreation) {
     return (
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={ssa.scroll} keyboardShouldPersistTaps="handled">
@@ -1860,18 +1864,21 @@ export default function OnboardingScreen() {
   const router  = useRouter();
   const {
     postAuth,
+    addAccount,
     referralCode: referralCodeParam,
     deviceFlow,
     deviceStep,
     deviceProbe,
   } = useLocalSearchParams<{
     postAuth?: string;
+    addAccount?: string;
     referralCode?: string;
     deviceFlow?: string;
     deviceStep?: string;
     deviceProbe?: string;
   }>();
   const insets  = useSafeAreaInsets();
+  const isAddAccount = addAccount === '1';
   const deviceProbeEnabled = __DEV__ && deviceProbe === '1';
   const deviceProbeFlow: Flow | null = __DEV__ && (deviceFlow === 'buyer' || deviceFlow === 'seller')
     ? deviceFlow
@@ -1886,6 +1893,9 @@ export default function OnboardingScreen() {
   // Step 0 = AccountType for both paths (v6 ordering)
   const [step, setStep]           = useState(deviceProbeStep);
   const [ready, setReady]         = useState(deviceProbeEnabled);
+  const [addAccountSourceUserId, setAddAccountSourceUserId] = useState<string | null | undefined>(
+    isAddAccount ? undefined : null,
+  );
 
   // Buyer data
   const [firstName, setFirstName]         = useState('');
@@ -1943,11 +1953,24 @@ export default function OnboardingScreen() {
     return () => clearTimeout(fallback);
   }, []);
 
+  // In add-account mode, the already-active account is only the source of the
+  // flow. Never restore or overwrite its onboarding draft while creating the
+  // second Clerk identity.
+  useEffect(() => {
+    if (!isAddAccount || !userLoaded || addAccountSourceUserId !== undefined) return;
+    setAddAccountSourceUserId(user?.id ?? null);
+  }, [addAccountSourceUserId, isAddAccount, user?.id, userLoaded]);
+
   // ── Restore draft for the active account ─────────────────────────────────────
   useEffect(() => {
     if (deviceProbeEnabled) return;
     if (!authLoaded || (isSignedIn && !userLoaded)) return;
     if (isSignedIn && !user?.id) return;
+    if (isAddAccount && addAccountSourceUserId === undefined) return;
+    if (isAddAccount && user?.id === addAccountSourceUserId) {
+      setReady(true);
+      return;
+    }
     if (restoredDraft.current) return;
     restoredDraft.current = true;
 
@@ -1997,7 +2020,7 @@ export default function OnboardingScreen() {
       }
     }
     init();
-  }, [authLoaded, userLoaded, isSignedIn, postAuth, user?.id, deviceProbeEnabled]);
+  }, [addAccountSourceUserId, authLoaded, userLoaded, isSignedIn, isAddAccount, postAuth, user?.id, deviceProbeEnabled]);
 
   // ── Persist draft ───────────────────────────────────────────────────────────
   const saveDraft = useCallback(async (overrides?: Record<string, unknown>) => {
@@ -2016,11 +2039,12 @@ export default function OnboardingScreen() {
   // Persist onboarding answers under the authenticated user's immutable ID.
   useEffect(() => {
     if (!user?.id || !ready || !flow) return;
+    if (isAddAccount && user.id === addAccountSourceUserId) return;
     const timer = setTimeout(() => {
       saveDraft().catch(() => {});
     }, 350);
     return () => clearTimeout(timer);
-  }, [user?.id, ready, flow, saveDraft]);
+  }, [addAccountSourceUserId, isAddAccount, user?.id, ready, flow, saveDraft]);
 
   // Let the lightweight screen transition finish before opening the keyboard.
   // Focusing during the transition forces iOS to relayout the moving container.
@@ -2385,6 +2409,7 @@ export default function OnboardingScreen() {
             onReferralCodeChange={setReferralCode}
             onFirstNamePrefill={setFirstName}
             onLastNamePrefill={setLastName}
+            allowSignedInAccountCreation={isAddAccount}
           />
           {deviceProbeEnabled && (
             <TouchableOpacity
@@ -2478,6 +2503,7 @@ export default function OnboardingScreen() {
             onReferralCodeChange={setReferralCode}
             onFirstNamePrefill={setFirstName}
             onLastNamePrefill={setLastName}
+            allowSignedInAccountCreation={isAddAccount}
           />
           {deviceProbeEnabled && (
             <TouchableOpacity
