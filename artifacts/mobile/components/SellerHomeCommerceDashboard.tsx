@@ -31,6 +31,7 @@ import {
 import { skipTask, type SetupState, type SetupTask } from '@/lib/setupStore';
 import { withSellerSetupOrigin } from '@/lib/setupNavigation';
 import {
+  BG,
   BORDER,
   BORDER_SUBTLE,
   CARD_ELEVATED_GLASS,
@@ -538,11 +539,11 @@ export default function SellerHomeCommerceDashboard({
               accessibilityState={{ disabled: financeLoading || cashingOut }}
             >
               {cashingOut ? (
-                <ActivityIndicator size="small" color={SCREEN_BG} />
+                <ActivityIndicator size="small" color={BG} />
               ) : (
-                <Feather name="dollar-sign" size={15} color={SCREEN_BG} />
+                <Feather name="dollar-sign" size={15} color={BG} />
               )}
-              <Text style={[styles.dashboardButtonText, { color: SCREEN_BG }]}>
+              <Text style={[styles.dashboardButtonText, { color: BG }]}>
                 {cashingOut ? 'Cashing out…' : 'Cash out'}
               </Text>
             </TouchableOpacity>
