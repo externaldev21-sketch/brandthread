@@ -15,7 +15,7 @@ import * as Haptics from 'expo-haptics';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED, GROWTH_STUDIO_TOOLS } from '@/lib/growthTools';
-import { BG, CARD, FG, FONT, FS, SP } from '@/lib/theme';
+import { BG, BORDER, CARD, CARD_ELEVATED, FG, FONT, FS, MUTED, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
 type StudioAction = {
@@ -56,45 +56,74 @@ const ACTIONS: StudioAction[] = RADIAL_TOOL_IDS.map((id) => {
   };
 });
 
-const POSITION_OFFSETS = [
-  { top: 84, right: 18 },
-  { top: 146, right: 42 },
-  { top: 208, right: 54 },
-  { top: 106, right: 188 },
-  { top: 168, right: 212 },
-  { top: 230, right: 224 },
-] as const;
+// Height per row: icon 44 + vertical padding
+const ROW_HEIGHT = 60;
+// Stagger delay (ms) between each row animating in
+const STAGGER_MS = 38;
 
 export default function SellerStudioRadialMenu() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
   const { hasPlan, loading: planLoading, error: planError, retry: retryPlan } = useSubscriptionPlan();
+
+  // Master progress for backdrop + close button
   const progress = useRef(new Animated.Value(0)).current;
+  // Per-item animated values for staggered entry
+  const itemAnims = useRef(ACTIONS.map(() => new Animated.Value(0))).current;
+
   const [open, setOpen] = useState(false);
   const [upsellFeature, setUpsellFeature] = useState<string | null>(null);
 
-  useEffect(() => () => progress.stopAnimation(), [progress]);
+  useEffect(() => () => {
+    progress.stopAnimation();
+    itemAnims.forEach((a) => a.stopAnimation());
+  }, [progress, itemAnims]);
 
   const expand = () => {
     setOpen(true);
     progress.setValue(0);
+    itemAnims.forEach((a) => a.setValue(0));
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+
     requestAnimationFrame(() => {
+      // Backdrop + toggle button fade in quickly
       Animated.spring(progress, {
         toValue: 1,
-        damping: 18,
-        stiffness: 180,
-        mass: 0.7,
+        damping: 22,
+        stiffness: 220,
+        mass: 0.6,
         useNativeDriver: true,
       }).start();
+
+      // Items stagger from center outward — animate sequentially with delay
+      ACTIONS.forEach((_, i) => {
+        Animated.spring(itemAnims[i], {
+          toValue: 1,
+          damping: 20,
+          stiffness: 200,
+          mass: 0.55,
+          delay: i * STAGGER_MS,
+          useNativeDriver: true,
+        }).start();
+      });
     });
   };
 
   const collapse = (after?: () => void) => {
+    // Reverse stagger: last item out first
+    const reverseAnims = [...itemAnims].reverse();
+    reverseAnims.forEach((anim, i) => {
+      Animated.timing(anim, {
+        toValue: 0,
+        duration: 100,
+        delay: i * 20,
+        useNativeDriver: true,
+      }).start();
+    });
     Animated.timing(progress, {
       toValue: 0,
-      duration: 150,
+      duration: 180,
       useNativeDriver: true,
     }).start(() => {
       setOpen(false);
@@ -137,69 +166,115 @@ export default function SellerStudioRadialMenu() {
         </Pressable>
       )}
 
-      <Modal visible={open} transparent animationType="none" onRequestClose={() => collapse()}>
-        <View style={StyleSheet.absoluteFill}>
-          <Pressable
-            accessibilityLabel="Close Studio tools"
-            onPress={() => collapse()}
-            style={styles.backdrop}
-          />
+      <Modal
+        visible={open}
+        transparent
+        animationType="none"
+        statusBarTranslucent
+        onRequestClose={() => collapse()}
+      >
+        {/* ── Backdrop — very dark so home content reads as inactive ── */}
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            styles.backdrop,
+            { opacity: progress },
+          ]}
+          pointerEvents="none"
+        />
 
+        {/* Tap-to-dismiss layer */}
+        <Pressable
+          accessibilityLabel="Close Studio tools"
+          onPress={() => collapse()}
+          style={StyleSheet.absoluteFill}
+        />
+
+        {/* ── Centered vertical list ── */}
+        <View style={styles.listWrap} pointerEvents="box-none">
           {ACTIONS.map((action, index) => {
-            const offset = POSITION_OFFSETS[index];
-            const start = Math.min(index * 0.035, 0.3);
-            const itemProgress = progress.interpolate({
-              inputRange: [start, 1],
-              outputRange: [0, 1],
-              extrapolate: 'clamp',
+            const anim = itemAnims[index];
+
+            // Each row travels from the lightning trigger's top-right area
+            // into its final position in the centered list.
+            const translateX = anim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [150, 0],
             });
+            const translateY = anim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [-(140 + index * (ROW_HEIGHT + 6)), 0],
+            });
+            const opacity = anim;
+            const scale = anim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.88, 1],
+            });
+
             return (
               <Animated.View
                 key={action.id}
                 style={[
-                  styles.actionPosition,
-                  {
-                    top: insets.top + offset.top,
-                    right: offset.right,
-                    opacity: itemProgress,
-                    transform: [
-                      { translateY: itemProgress.interpolate({ inputRange: [0, 1], outputRange: [-18, 0] }) },
-                      { scale: itemProgress.interpolate({ inputRange: [0, 1], outputRange: [0.72, 1] }) },
-                    ],
-                  },
+                  styles.rowWrap,
+                  { opacity, transform: [{ translateX }, { translateY }, { scale }] },
                 ]}
               >
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={action.label}
                   onPress={() => choose(action)}
-                  style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+                  style={({ pressed }) => [
+                    styles.actionRow,
+                    pressed && styles.actionRowPressed,
+                  ]}
                 >
-                  <Text style={styles.actionLabel} numberOfLines={2}>{action.label}</Text>
-                  <View style={[styles.actionIcon, { borderColor: theme.accent, backgroundColor: CARD }]}>
-                    <Feather name={action.icon} size={18} color={theme.accentLight} />
+                  <View
+                    style={[
+                      styles.actionIcon,
+                      { borderColor: BORDER, backgroundColor: CARD },
+                    ]}
+                  >
+                    <Feather name={action.icon} size={20} color={theme.accentLight} />
                   </View>
+                  <Text style={styles.actionLabel} numberOfLines={1}>
+                    {action.label}
+                  </Text>
+                  <Feather name="chevron-right" size={16} color={MUTED} />
                 </Pressable>
               </Animated.View>
             );
           })}
+        </View>
 
+        {/* Close button — stays at its trigger position */}
+        <Animated.View
+          style={[
+            styles.toggle,
+            {
+              top: insets.top + SP.xl,
+              backgroundColor: theme.accent,
+              shadowColor: theme.shadowColor,
+              opacity: progress,
+              transform: [
+                {
+                  scale: progress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.8, 1],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Close Studio tools"
             onPress={() => collapse()}
-            style={[
-              styles.toggle,
-              {
-                top: insets.top + SP.xl,
-                backgroundColor: theme.accent,
-                shadowColor: theme.shadowColor,
-              },
-            ]}
+            style={styles.toggleInner}
           >
             <Feather name="x" size={22} color={theme.onAccent} />
           </Pressable>
-        </View>
+        </Animated.View>
       </Modal>
 
       <PlanUpsellModal
@@ -231,40 +306,65 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 7 },
   },
+  toggleInner: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   pressed: { transform: [{ scale: 0.94 }], opacity: 0.9 },
+
+  // Backdrop: substantially darker than before (was BG at 0.9 opacity which
+  // made home content look nearly identical to the active state).
   backdrop: {
-    ...StyleSheet.absoluteFill,
     backgroundColor: BG,
-    opacity: 0.9,
   },
-  actionPosition: {
-    position: 'absolute',
-    width: 166,
+
+  // Centered container — list sits in vertical center of screen
+  listWrap: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SP.lg,
+    gap: 6,
   },
-  action: {
-    minHeight: 52,
+
+  rowWrap: {
+    width: '100%',
+    maxWidth: 360,
+  },
+
+  actionRow: {
+    height: ROW_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: SP.xs,
+    paddingHorizontal: SP.sm,
+    gap: SP.sm,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: CARD,
+  },
+  actionRowPressed: {
+    backgroundColor: CARD_ELEVATED,
+    transform: [{ scale: 0.98 }],
+  },
+
+  actionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
   actionLabel: {
     flex: 1,
     color: FG,
     fontFamily: FONT.semibold,
-    fontSize: FS.xs,
-    textAlign: 'right',
-  },
-  actionIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: BG,
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
+    fontSize: FS.md,
+    letterSpacing: -0.1,
   },
 });

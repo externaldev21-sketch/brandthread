@@ -427,8 +427,12 @@ export default function SellerHomeCommerceDashboard({
   return (
     <View style={styles.root}>
       <ScrollView
+        style={styles.scrollView}
         contentContainerStyle={[styles.scroll, { paddingTop: topInset + SP.sm }]}
         showsVerticalScrollIndicator={false}
+        alwaysBounceVertical
+        scrollEnabled
+        keyboardShouldPersistTaps="handled"
       >
         {/* ── Top bar ──────────────────────────────────────────────────── */}
         <View style={styles.topBar}>
@@ -714,6 +718,9 @@ export default function SellerHomeCommerceDashboard({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: SCREEN_BG },
+  // flex: 1 on the ScrollView itself is required on iOS so the layout engine
+  // gives it a bounded height and allows inner content to scroll correctly.
+  scrollView: { flex: 1 },
   scroll: { paddingBottom: 160 },
 
   // ── Top bar
