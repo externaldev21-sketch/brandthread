@@ -9,6 +9,7 @@ import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { useLocalSearchParams, useRootNavigationState, useRouter } from 'expo-router';
 import BootScreen from '@/components/BootScreen';
+import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
 
 export default function Index() {
   const router = useRouter();
@@ -16,9 +17,12 @@ export default function Index() {
   const rootNavigationState = useRootNavigationState();
 
   useEffect(() => {
-    if (!__DEV__ || Platform.OS !== 'web') return;
+    if (!__DEV__) return;
     if (!rootNavigationState?.key) return;
-    const effectivePreviewRole = previewRole === 'buyer' ? 'buyer' : 'seller';
+    const effectivePreviewRole = Platform.OS === 'web'
+      ? (previewRole === 'buyer' ? 'buyer' : 'seller')
+      : DEV_BYPASS_ROLE;
+    if (!effectivePreviewRole) return;
     const redirect = setTimeout(() => {
       router.replace((effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/') as never);
     }, 50);

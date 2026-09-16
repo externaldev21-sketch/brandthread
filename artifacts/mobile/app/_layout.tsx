@@ -48,6 +48,7 @@ import { createNotificationResponseHandler } from '@/lib/notificationNavigation'
 import { useCanUseMarketing } from '@/contexts/CookieConsentContext';
 import { setMarketingPixelConsent, trackMarketingPixelEvent } from '@/lib/marketingPixels';
 import { captureNotificationEvent, flushNotificationEvents } from '@/lib/notificationEventOutbox';
+import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
 
 const TRANSPARENT_NAVIGATION_THEME = {
   ...DarkTheme,
@@ -110,7 +111,6 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 // ─── DEV: bypass all auth + onboarding on every platform ─────────────────────
 // Set to 'buyer' or 'seller' to jump straight to that dashboard on device.
 // Set back to null when you're ready to test real sign-in.
-const DEV_BYPASS_ROLE: 'buyer' | 'seller' | null = 'seller';
 const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST === '1';
 
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
