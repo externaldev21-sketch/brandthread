@@ -432,6 +432,10 @@ export default function SellerHomeCommerceDashboard({
         showsVerticalScrollIndicator={false}
         alwaysBounceVertical
         scrollEnabled
+        nestedScrollEnabled
+        directionalLockEnabled={false}
+        contentInsetAdjustmentBehavior="never"
+        removeClippedSubviews={false}
         keyboardShouldPersistTaps="handled"
       >
         {/* ── Top bar ──────────────────────────────────────────────────── */}
@@ -442,6 +446,8 @@ export default function SellerHomeCommerceDashboard({
         {/* ── Time range pills ─────────────────────────────────────────── */}
         <ScrollView
           horizontal
+          nestedScrollEnabled
+          directionalLockEnabled
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.rangeRow}
         >
@@ -721,7 +727,7 @@ const styles = StyleSheet.create({
   // flex: 1 on the ScrollView itself is required on iOS so the layout engine
   // gives it a bounded height and allows inner content to scroll correctly.
   scrollView: { flex: 1 },
-  scroll: { paddingBottom: 160 },
+  scroll: { flexGrow: 1, paddingBottom: 160 },
 
   // ── Top bar
   topBar: {

@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -86,6 +87,7 @@ const ALL_ACTIONS  = [...STUDIO_ACTIONS, ...SHORTCUT_ACTIONS];
 export default function SellerStudioRadialMenu() {
   const router   = useRouter();
   const insets   = useSafeAreaInsets();
+  const { height: screenHeight } = useWindowDimensions();
   const { theme } = useAppTheme();
   const { hasPlan, loading: planLoading, error: planError, retry: retryPlan } =
     useSubscriptionPlan();
@@ -258,9 +260,21 @@ export default function SellerStudioRadialMenu() {
         />
 
         {/* ── Scrollable centered content ── */}
-        <View style={styles.outerWrap} pointerEvents="box-none">
+        <View
+          style={[
+            styles.outerWrap,
+            {
+              paddingTop: insets.top + 88,
+              paddingBottom: Math.max(insets.bottom + 32, 48),
+            },
+          ]}
+          pointerEvents="box-none"
+        >
           <ScrollView
-            style={{ width: SHEET_WIDTH }}
+            style={{
+              width: SHEET_WIDTH,
+              maxHeight: Math.max(320, screenHeight - insets.top - insets.bottom - 136),
+            }}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             scrollEnabled
@@ -377,12 +391,12 @@ const styles = StyleSheet.create({
   // Section heading — uppercase label above each group
   sectionHeading: {
     width: SHEET_WIDTH,
-    color: SUBTLE,
+    color: FG,
     fontFamily: FONT.bold,
-    fontSize: FS.xs,
-    letterSpacing: 0.9,
+    fontSize: FS.sm,
+    letterSpacing: 0.5,
     textTransform: 'uppercase',
-    marginBottom: 2,
+    marginBottom: 4,
     paddingHorizontal: 4,
   },
 
