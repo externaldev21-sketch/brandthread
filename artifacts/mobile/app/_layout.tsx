@@ -17,6 +17,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useUser } from '@clerk/expo';
 import { tokenCache } from '@/lib/tokenCache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { flushPendingBuyerOnboardingSync } from '@/lib/buyerOnboardingSync';
 import { RoleProvider } from '@/contexts/RoleContext';
 import { ThreadPullProvider } from '@/contexts/ThreadPullTransitionContext';
 import { AppThemeProvider } from '@/contexts/AppThemeContext';
@@ -230,6 +231,20 @@ function AuthGate() {
       const belongsToSignedInUser = pairs[2][1] === userId;
       let done = belongsToSignedInUser && pairs[0][1] === 'true';
       let role = belongsToSignedInUser ? pairs[1][1] : null;
+
+      // A buyer may have entered the app after a second recoverable preference
+      // save failure. Retry that user-scoped payload before resolving routing,
+      // even if the local completion marker could not be written.
+      if (userId) {
+        try {
+          await flushPendingBuyerOnboardingSync(userId, api);
+        } catch (error) {
+          console.error('[buyer-onboarding] pending sync failed', {
+            name: error instanceof Error ? error.name : typeof error,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
 
       // Upgrade legitimately completed pre-server-marker installs. This runs
       // only when completion is already bound to the same Clerk user locally.

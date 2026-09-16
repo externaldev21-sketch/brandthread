@@ -36,7 +36,7 @@ describe("Apple auth end-to-end code contract", () => {
     expect(onboardingSource.match(/const profile = await api\.auth\.sync\(\{ name \}\);/g))
       .toHaveLength(2);
     const buyerCompletion = onboardingSource.indexOf(
-      "await api.auth.completeOnboarding('buyer');",
+      "await syncBuyerOnboarding(profile.clerkId, styleInterests, api);",
     );
     const buyerProfile = onboardingSource.indexOf("const updated = await api.auth.updateProfile({");
     expect(buyerCompletion).toBeGreaterThan(buyerProfile);

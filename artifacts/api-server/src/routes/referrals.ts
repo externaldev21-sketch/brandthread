@@ -122,7 +122,16 @@ router.get("/stats", async (req, res) => {
 // idempotent — returns 409 if this user was already attributed.
 router.post("/apply", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
-  const { code } = req.body as { code?: string };
+  const { code, expectedClerkId } = req.body as { code?: string; expectedClerkId?: string };
+
+  if (expectedClerkId && expectedClerkId !== myId) {
+    (req as any).log?.warn("referral application rejected after account context changed");
+    res.status(409).json({
+      error: "The signed-in account changed before the referral could be saved.",
+      code: "ACCOUNT_CONTEXT_CHANGED",
+    });
+    return;
+  }
 
   if (!code || typeof code !== "string") {
     res.status(400).json({ error: "code required" });

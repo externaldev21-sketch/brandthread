@@ -140,14 +140,50 @@ describe("signup identity synchronization", () => {
       accountType: "buyer",
     });
     expect(profile.status).toBe(200);
+    const switchedProfile = await request(buyerId, "PATCH", "/api/auth/profile", {
+      displayName: "Wrong Account",
+      accountType: "seller",
+      expectedClerkId: sellerId,
+    });
+    expect(switchedProfile.status).toBe(409);
+    expect(switchedProfile.body.code).toBe("ACCOUNT_CONTEXT_CHANGED");
+    const preferences = await request(
+      buyerId,
+      "PATCH",
+      "/api/auth/onboarding/buyer-preferences",
+      { styleInterests: ["Minimal", "Vintage"], expectedClerkId: buyerId },
+    );
+    expect(preferences.status).toBe(200);
+    expect(preferences.body).toEqual({ ok: true });
     const completed = await request(
       buyerId,
       "POST",
       "/api/auth/onboarding/complete",
-      { accountType: "buyer" },
+      { accountType: "buyer", expectedClerkId: buyerId },
     );
     expect(completed.status).toBe(200);
     expect(completed.body.onboardingComplete).toBe(true);
+
+    const retried = await request(
+      buyerId,
+      "POST",
+      "/api/auth/onboarding/complete",
+      { accountType: "buyer", expectedClerkId: buyerId },
+    );
+    expect(retried.status).toBe(200);
+    expect(retried.body).toMatchObject({
+      accountType: "buyer",
+      onboardingComplete: true,
+    });
+
+    const switchedAccount = await request(
+      buyerId,
+      "PATCH",
+      "/api/auth/onboarding/buyer-preferences",
+      { styleInterests: ["Luxury"], expectedClerkId: sellerId },
+    );
+    expect(switchedAccount.status).toBe(409);
+    expect(switchedAccount.body.code).toBe("ACCOUNT_CONTEXT_CHANGED");
   });
 
   it("requires the local seller user before saving the onboarding brand name", async () => {
@@ -242,6 +278,6 @@ describe("signup identity synchronization", () => {
       { accountType: "buyer" },
     );
     expect(roleChange.status).toBe(409);
-    expect(roleChange.body.code).toBe("ONBOARDING_ALREADY_COMPLETE");
+    expect(roleChange.body.code).toBe("ONBOARDING_ROLE_MISMATCH");
   });
 });

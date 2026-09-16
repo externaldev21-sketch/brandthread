@@ -31,6 +31,11 @@ const onboardingBodySchema = z.object({
 }).passthrough();
 const completeOnboardingBodySchema = z.object({
   accountType: z.enum(["buyer", "seller"]),
+  expectedClerkId: z.string().min(1).optional(),
+}).passthrough();
+const buyerPreferencesBodySchema = z.object({
+  styleInterests: z.array(z.string().trim().min(1).max(80)).max(24),
+  expectedClerkId: z.string().min(1),
 }).passthrough();
 const profileBodySchema = z.object({
   displayName: optionalProfileText,
@@ -40,6 +45,7 @@ const profileBodySchema = z.object({
   name: optionalProfileText,
   username: usernameSchema.optional(),
   accountType: z.enum(["buyer", "seller"]).optional(),
+  expectedClerkId: z.string().min(1).optional(),
 }).passthrough();
 const privacyBodySchema = z.object({
   dmPrivacy: z.enum(["requests", "followers_only"]),
@@ -430,6 +436,18 @@ router.post(
   async (req, res) => {
     const clerkUserId = (req as any).clerkUserId as string;
     const accountType = req.body.accountType as "buyer" | "seller";
+    const expectedClerkId = req.body.expectedClerkId as string | undefined;
+    if (expectedClerkId && expectedClerkId !== clerkUserId) {
+      (req as any).log?.warn(
+        { requestedAccountType: accountType },
+        "onboarding completion rejected after account context changed",
+      );
+      res.status(409).json({
+        error: "The signed-in account changed before onboarding could be saved.",
+        code: "ACCOUNT_CONTEXT_CHANGED",
+      });
+      return;
+    }
     const result = await db.transaction(async (tx) => {
       const [existing] = await tx
         .select()
@@ -443,10 +461,19 @@ router.post(
           body: { error: "User not found — call POST /auth/sync first" },
         } as const;
       }
+      if (existing.onboardingComplete && existing.accountType === accountType) {
+        return {
+          status: 200,
+          body: existing,
+        } as const;
+      }
       if (existing.onboardingComplete) {
         return {
           status: 409,
-          body: { error: "Onboarding is already complete.", code: "ONBOARDING_ALREADY_COMPLETE" },
+          body: {
+            error: "The requested role does not match the completed onboarding role.",
+            code: "ONBOARDING_ROLE_MISMATCH",
+          },
         } as const;
       }
       if (existing.accountType !== accountType) {
@@ -485,7 +512,66 @@ router.post(
         .returning();
       return { status: 200, body: updated } as const;
     });
+    if (result.status >= 400) {
+      (req as any).log?.warn(
+        {
+          code: "code" in result.body ? result.body.code : undefined,
+          requestedAccountType: accountType,
+        },
+        "onboarding completion rejected",
+      );
+    }
     res.status(result.status).json(result.body);
+  },
+);
+
+// ─── PATCH /api/auth/onboarding/buyer-preferences ─────────────────────────────
+// Buyer preferences belong to the authenticated account, not the seller router.
+router.patch(
+  "/onboarding/buyer-preferences",
+  requireAuth,
+  validateRequest({ body: buyerPreferencesBodySchema }),
+  async (req, res) => {
+    const clerkUserId = (req as any).clerkUserId as string;
+    const styleInterests = req.body.styleInterests as string[];
+    const expectedClerkId = req.body.expectedClerkId as string;
+    if (expectedClerkId !== clerkUserId) {
+      (req as any).log?.warn(
+        "buyer onboarding preferences rejected after account context changed",
+      );
+      res.status(409).json({
+        error: "The signed-in account changed before preferences could be saved.",
+        code: "ACCOUNT_CONTEXT_CHANGED",
+      });
+      return;
+    }
+    const [existing] = await db
+      .select({ accountType: users.accountType })
+      .from(users)
+      .where(eq(users.clerkId, clerkUserId))
+      .limit(1);
+    if (!existing) {
+      res.status(404).json({ error: "User not found — call POST /auth/sync first" });
+      return;
+    }
+    if (existing.accountType !== "buyer") {
+      (req as any).log?.warn(
+        { savedAccountType: existing.accountType },
+        "buyer onboarding preferences rejected",
+      );
+      res.status(409).json({
+        error: "Save the buyer onboarding role before saving buyer preferences.",
+        code: "ONBOARDING_ROLE_MISMATCH",
+      });
+      return;
+    }
+    await db.execute(sql`
+      UPDATE users
+      SET buyer_style_interests = ${JSON.stringify(styleInterests)}::jsonb,
+          updated_at = now()
+      WHERE clerk_id = ${clerkUserId}
+    `);
+    res.json({ ok: true });
   },
 );
 
@@ -493,7 +579,7 @@ router.post(
 // Update editable profile fields. Validates and enforces uniqueness on username.
 router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema }), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
-  const { displayName, brandName, bio, website, name, username, accountType } = req.body as {
+  const { displayName, brandName, bio, website, name, username, accountType, expectedClerkId } = req.body as {
     displayName?: string;
     brandName?:   string;
     bio?:         string;
@@ -501,7 +587,16 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
     name?:        string;
     username?:    string;
     accountType?: "buyer" | "seller";
+    expectedClerkId?: string;
   };
+  if (expectedClerkId && expectedClerkId !== clerkId) {
+    (req as any).log?.warn("profile update rejected after account context changed");
+    res.status(409).json({
+      error: "The signed-in account changed before the profile could be saved.",
+      code: "ACCOUNT_CONTEXT_CHANGED",
+    });
+    return;
+  }
 
   const updates: Record<string, any> = { updatedAt: new Date() };
   if (displayName !== undefined) updates.displayName = displayName;

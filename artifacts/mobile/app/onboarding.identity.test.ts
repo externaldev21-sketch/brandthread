@@ -44,11 +44,32 @@ describe("signup identity inputs", () => {
     expect(referralSection).toContain("onReferralCodeChange(");
     expect(referralSection).toContain("editable");
 
-    expect(source).toContain(
-      "isAuthStep ? sm.interactiveStepWrap : { transform: [{ translateX: slideAnim }] }",
-    );
+    expect(source).toContain("isAuthStep && sm.interactiveStepWrap");
+    expect(source).toContain("translateX: transitionProgress.interpolate");
     expect(source).toContain(
       "interactiveStepWrap: { position: 'relative', zIndex: 2 }",
     );
+  });
+});
+
+describe("buyer onboarding completion recovery", () => {
+  it("uses the buyer preferences route and retries the request before falling through", () => {
+    const finishBuyer = source.indexOf("async function finishBuyer(retryAttempt = false)");
+    expect(finishBuyer).toBeGreaterThan(-1);
+
+    const buyerSlice = source.slice(finishBuyer, source.indexOf("async function finishSeller()", finishBuyer));
+    expect(buyerSlice).toContain("await queueBuyerOnboardingSync(profile.clerkId, styleInterests)");
+    expect(buyerSlice).toContain("await syncBuyerOnboarding(profile.clerkId, styleInterests, api)");
+    expect(buyerSlice).toContain("expectedClerkId: profile.clerkId");
+    expect(buyerSlice).toContain("api.referrals.apply(referralCode.trim(), profile.clerkId)");
+    expect(buyerSlice).toContain("onPress: () => { void finishBuyer(true); }");
+    expect(buyerSlice).toContain("retryAttempt");
+    expect(buyerSlice).toContain("failureStage === 'preferences-or-completion'");
+    expect(buyerSlice).toContain("&& profileId");
+    expect(buyerSlice).toContain("pendingSyncQueued");
+    expect(buyerSlice).toContain("isRecoverableBuyerOnboardingSyncError(error)");
+    expect(buyerSlice).toContain("router.replace('/thread-explainer'");
+    expect(source).toContain("console.error('[buyer-onboarding] save failed'");
+    expect(buyerSlice).not.toContain("api.seller.saveOnboardingData({ styleInterests })");
   });
 });

@@ -53,6 +53,12 @@ import { SellerPlanRecommendationStep } from '@/components/onboarding/SellerPlan
 import { recommendSellerPlan } from '@/lib/sellerPlans';
 import type { SellerPlanId } from '@/lib/sellerBilling';
 import { registerGrantedPushToken } from '@/lib/contextualPushPermission';
+import {
+  queueBuyerOnboardingSync,
+  isRecoverableBuyerOnboardingSyncError,
+  syncBuyerOnboarding,
+} from '@/lib/buyerOnboardingSync';
+import { ApiError } from '@/lib/networkNotice';
 import { SCREEN_BG } from '@/lib/theme';
 import {
   APPLE_OAUTH_STRATEGY,
@@ -2128,18 +2134,36 @@ export default function OnboardingScreen() {
   }
 
   // ── Finish handlers ─────────────────────────────────────────────────────────
-  async function finishBuyer() {
+  function logBuyerOnboardingFailure(stage: string, error: unknown, retryAttempt: boolean) {
+    const apiError = error instanceof ApiError ? error : null;
+    console.error('[buyer-onboarding] save failed', {
+      stage,
+      retryAttempt,
+      name: error instanceof Error ? error.name : typeof error,
+      message: error instanceof Error ? error.message : String(error),
+      status: apiError?.status,
+      code: apiError?.code,
+      requestId: apiError?.requestId,
+    });
+  }
+
+  async function finishBuyer(retryAttempt = false) {
     if (finishing) return;
     setFinishing(true);
+    let profileId: string | null = null;
+    let failureStage = 'required-profile';
+    let pendingSyncQueued = false;
     try {
       // Compose full name from firstName (and optionally lastName if we captured it)
       const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ') || firstName.trim();
       const uname = username.trim().toLowerCase();
       const profile = await api.auth.sync({ name });
+      profileId = profile.clerkId;
       const updated = await api.auth.updateProfile({
         name,
         displayName: name,
         accountType: 'buyer',
+        expectedClerkId: profile.clerkId,
         ...(uname ? { username: uname } : {}),
       });
       await hydrateMyProfileFromAccount({
@@ -2154,12 +2178,15 @@ export default function OnboardingScreen() {
         username: updated.username ?? uname,
       });
       if (referralCode.trim()) {
-        await api.referrals.apply(referralCode.trim()).catch(() => {});
+        await api.referrals.apply(referralCode.trim(), profile.clerkId).catch((error) => {
+          logBuyerOnboardingFailure('referral', error, retryAttempt);
+        });
       }
-      if (styleInterests.length > 0) {
-        await api.seller.saveOnboardingData({ styleInterests }).catch(() => {});
-      }
-      await api.auth.completeOnboarding('buyer');
+      failureStage = 'pending-sync-queue';
+      await queueBuyerOnboardingSync(profile.clerkId, styleInterests);
+      pendingSyncQueued = true;
+      failureStage = 'preferences-or-completion';
+      await syncBuyerOnboarding(profile.clerkId, styleInterests, api);
       await AsyncStorage.multiSet([
         [ONBOARDING_KEY, 'true'],
         [ONBOARDING_OWNER_KEY, profile.clerkId],
@@ -2172,12 +2199,44 @@ export default function OnboardingScreen() {
       void registerGrantedPushToken(profile.clerkId, api);
       // Route to the feed explainer for first-time buyers
       router.replace('/thread-explainer' as never);
-    } catch {
+    } catch (error) {
       setFinishing(false);
+      logBuyerOnboardingFailure(
+        failureStage,
+        error,
+        retryAttempt,
+      );
+      if (
+        retryAttempt
+        && failureStage === 'preferences-or-completion'
+        && pendingSyncQueued
+        && profileId
+        && isRecoverableBuyerOnboardingSyncError(error)
+      ) {
+        try {
+          await AsyncStorage.multiSet([
+            [ONBOARDING_KEY, 'true'],
+            [ONBOARDING_OWNER_KEY, profileId],
+            ['user_role', 'buyer'],
+            ['onboarding_first_name', firstName],
+            ['onboarding_style_interests', JSON.stringify(styleInterests)],
+          ]);
+        } catch (storageError) {
+          logBuyerOnboardingFailure('local-fallback', storageError, true);
+        }
+        void syncBuyerOnboarding(profileId, styleInterests, api).catch((backgroundError) => {
+          logBuyerOnboardingFailure('background-retry', backgroundError, true);
+        });
+        router.replace('/thread-explainer' as never);
+        return;
+      }
       Alert.alert(
         'Setup incomplete',
-        "We couldn\u2019t save your preferences. Check your connection and try again.",
-        [{ text: 'Retry', onPress: finishBuyer }],
+        profileId
+          && failureStage === 'preferences-or-completion'
+          ? "We couldn\u2019t save your preferences. Try once more, or we’ll finish syncing after you enter the app."
+          : "We couldn\u2019t finish setting up your profile. Please try again.",
+        [{ text: 'Retry', onPress: () => { void finishBuyer(true); } }],
       );
     }
   }
@@ -2198,9 +2257,15 @@ export default function OnboardingScreen() {
         name,
         displayName: name,
         accountType: 'seller',
+        expectedClerkId: profile.clerkId,
       });
       if (referralCode.trim()) {
-        await api.referrals.apply(referralCode.trim()).catch(() => {});
+        await api.referrals.apply(referralCode.trim(), profile.clerkId).catch((error) => {
+          console.error('[seller-onboarding] referral save failed', {
+            name: error instanceof Error ? error.name : typeof error,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        });
       }
       if (goals.length > 0 || brandStage) {
         await api.seller.saveOnboardingData({ goals, brandStage });

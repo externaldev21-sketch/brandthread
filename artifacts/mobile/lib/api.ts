@@ -465,8 +465,16 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<LocalUserProfile>('/api/auth/sync', body),
       me:          ()             => get<LocalUserProfile>('/api/auth/me'),
       onboarding:  (body: unknown) => patch('/api/auth/onboarding', body),
-      completeOnboarding: (accountType: 'buyer' | 'seller') =>
-        post<LocalUserProfile>('/api/auth/onboarding/complete', { accountType }),
+      completeOnboarding: (accountType: 'buyer' | 'seller', expectedClerkId?: string) =>
+        post<LocalUserProfile>('/api/auth/onboarding/complete', {
+          accountType,
+          ...(expectedClerkId ? { expectedClerkId } : {}),
+        }),
+      saveBuyerPreferences: (styleInterests: string[], expectedClerkId: string) =>
+        patch<{ ok: boolean }>('/api/auth/onboarding/buyer-preferences', {
+          styleInterests,
+          expectedClerkId,
+        }),
       /** Check whether a username handle is available for the current user.
        *  Returns { available: true } if free (or already owned by this user),
        *  { available: false, error: string } if taken or invalid format. */
@@ -483,6 +491,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         name?:        string;
         username?:    string;
         accountType?: 'buyer' | 'seller';
+        expectedClerkId?: string;
       }) => patch<any>('/api/auth/profile', body),
       /** Permanently erase this account after the explicit DELETE confirmation. */
       deleteAccount: () => request<{ ok: true }>(
@@ -1397,8 +1406,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           '/api/referrals/stats'
         ),
       /** Attribute a referral to the current user — call once after signup with the code they entered */
-      apply: (code: string) =>
-        post<{ ok: boolean; inviterId: string }>('/api/referrals/apply', { code }),
+      apply: (code: string, expectedClerkId?: string) =>
+        post<{ ok: boolean; inviterId: string }>('/api/referrals/apply', {
+          code,
+          ...(expectedClerkId ? { expectedClerkId } : {}),
+        }),
     },
     /** Server-side privacy settings */
     privacy: {
