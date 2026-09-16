@@ -110,7 +110,7 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 // ─── DEV: bypass all auth + onboarding on every platform ─────────────────────
 // Set to 'buyer' or 'seller' to jump straight to that dashboard on device.
 // Set back to null when you're ready to test real sign-in.
-const DEV_BYPASS_ROLE: 'buyer' | 'seller' | null = null;
+const DEV_BYPASS_ROLE: 'buyer' | 'seller' | null = 'seller';
 const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST === '1';
 
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
