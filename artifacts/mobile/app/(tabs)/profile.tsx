@@ -400,23 +400,6 @@ export default function ProfileScreen() {
       </View>
 
       <View style={s.grid}>
-        {/* Create Post tile */}
-        <TouchableOpacity
-          style={s.gridTile}
-          activeOpacity={0.85}
-          onPress={() => nav('/create-post')}
-          accessibilityRole="button"
-          accessibilityLabel="Create post"
-        >
-          <View style={s.createTile}>
-            <View style={s.createPlus}>
-              <Feather name="plus" size={20} color={MUTED} />
-            </View>
-            <Text style={s.createTitle}>Create Post</Text>
-            <Text style={s.createSub}>Share something with{'\n'}your audience</Text>
-          </View>
-        </TouchableOpacity>
-
         {/* Real seller posts */}
         {sellerPosts
           .filter(p => {
@@ -655,17 +638,6 @@ const s = StyleSheet.create({
   // Grid
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   gridTile: { width: '33.333%', aspectRatio: 0.78, padding: 1 },
-  createTile: {
-    flex: 1, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
-    alignItems: 'center', justifyContent: 'center', gap: SP.sm, padding: 12,
-  },
-  createPlus: {
-    width: 40, height: 40, borderRadius: 20,
-    borderWidth: 1, borderColor: BORDER,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  createTitle: { fontSize: 12, fontFamily: FONT.bold, color: FG, textAlign: 'center' },
-  createSub: { fontSize: 10, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 14 },
   gridInner: { flex: 1, backgroundColor: CARD, padding: SP.sm, justifyContent: 'space-between' },
   gridTypeIcon: {
     position: 'absolute', top: 6, right: 6,

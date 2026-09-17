@@ -24,6 +24,13 @@ describe('seller profile action layout', () => {
     expect(profileSource).toContain("const CONTENT_TABS = ['Post', 'Draft', 'Schedule']");
     expect(profileSource).not.toContain('Store performance');
   });
+
+  it('keeps post creation in the top action and out of the content grid', () => {
+    expect(profileSource).toContain('accessibilityLabel="Create Post"');
+    expect(profileSource).not.toContain('accessibilityLabel="Create post"');
+    expect(profileSource).not.toContain('Share something with');
+    expect(profileSource).toContain("'No posts yet. Create your first post!'");
+  });
 });
 
 describe('seller analytics overview layout', () => {

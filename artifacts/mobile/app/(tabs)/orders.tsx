@@ -856,18 +856,15 @@ export default function OrdersScreen() {
     </View>
   ), [filtered.length, activeFilter, sort, currentSortLabel]);
 
-  const ListEmptyComponent = useCallback(() => {
-    if (loading) return null;
-    return (
-      <View style={s.emptyStateContainer}>
-        <EmptyState
-          icon="shopping-bag"
-          title="Your first order will show up here."
-          description="When a customer places an order, you can manage payment and fulfillment here."
-        />
-      </View>
-    );
-  }, [loading]);
+  const ListEmptyComponent = useCallback(() => (
+    <View style={s.emptyStateContainer}>
+      <EmptyState
+        icon="shopping-bag"
+        title="Your orders will show up here."
+        description="When a customer places an order, you can manage payment and fulfillment here."
+      />
+    </View>
+  ), []);
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
