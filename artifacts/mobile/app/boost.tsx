@@ -52,6 +52,7 @@ import {
   estimateBoostReach,
   buildBoostReturnUrl,
 } from '@/services/boostService';
+import { isSellerDevPreview } from '@/lib/devPreview';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -342,6 +343,46 @@ const tc = StyleSheet.create({
   },
 });
 
+// ─── Dev preview fallback targets ────────────────────────────────────────────
+// Shown only when isSellerDevPreview() is true AND the real API returns 401/error.
+// No fake business metrics — just clearly-labeled placeholders for UI review.
+
+const PREVIEW_BOOST_TARGETS: BoostTarget[] = [
+  {
+    id:         'preview-video-1',
+    mediaUrl:   null,
+    mediaType:  'video',
+    mediaUrls:  null,
+    mediaPaths: null,
+    caption:    'Preview — Video post (eligible)',
+    createdAt:  new Date(Date.now() - 86_400_000).toISOString(),
+    mediaKind:  'video',
+    imageCount: null,
+  },
+  {
+    id:         'preview-slideshow-2',
+    mediaUrl:   null,
+    mediaType:  'image',
+    mediaUrls:  null,
+    mediaPaths: null,
+    caption:    'Preview — Slideshow (2 images, eligible)',
+    createdAt:  new Date(Date.now() - 2 * 86_400_000).toISOString(),
+    mediaKind:  'slideshow',
+    imageCount: 2,
+  },
+  {
+    id:         'preview-slideshow-3',
+    mediaUrl:   null,
+    mediaType:  'image',
+    mediaUrls:  null,
+    mediaPaths: null,
+    caption:    'Preview — Slideshow (4 images, eligible)',
+    createdAt:  new Date(Date.now() - 3 * 86_400_000).toISOString(),
+    mediaKind:  'slideshow',
+    imageCount: 4,
+  },
+];
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const TOTAL_STEPS = 3; // Step 1: picker, Step 2: budget, Step 3: payment/success
@@ -353,17 +394,22 @@ export default function BoostScreen() {
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
   const api     = useApi();
-  const params  = useLocalSearchParams<{ id?: string; paymentReturn?: string }>();
+  const params  = useLocalSearchParams<{ id?: string; paymentReturn?: string; bt_preview?: string }>();
 
   const topPad    = insets.top + (Platform.OS === 'web' ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === 'web' ? 34 : 0) + 90;
+  const inSellerPreview = isSellerDevPreview(
+    params.bt_preview === 'buyer' ? '?bt_preview=buyer' : '?bt_preview=seller',
+  );
 
   // ── State ─────────────────────────────────────────────────────────────────
 
   const [step,             setStep]             = useState<0 | 1 | 2>(0);
   const [selectedTarget,   setSelectedTarget]   = useState<BoostTarget | null>(null);
-  const [targets,          setTargets]          = useState<BoostTarget[]>([]);
-  const [loadingTargets,   setLoadingTargets]   = useState(true);
+  const [targets,          setTargets]          = useState<BoostTarget[]>(
+    inSellerPreview ? PREVIEW_BOOST_TARGETS : [],
+  );
+  const [loadingTargets,   setLoadingTargets]   = useState(!inSellerPreview);
   const [targetsError,     setTargetsError]     = useState(false);
   const [budgetCents,      setBudgetCents]      = useState(2500);
   const [durationDays,     setDurationDays]     = useState(7);
@@ -380,8 +426,12 @@ export default function BoostScreen() {
 
   // History
   const [existing,         setExisting]         = useState<Boost[]>([]);
-  const [loadingExisting,  setLoadingExisting]  = useState(true);
-  const [summary,          setSummary]          = useState<Summary | null>(null);
+  const [loadingExisting,  setLoadingExisting]  = useState(!inSellerPreview);
+  const [summary,          setSummary]          = useState<Summary | null>(
+    inSellerPreview
+      ? { totalImpressions: 0, spentCentsThisMonth: 0, activeCount: 0 }
+      : null,
+  );
   const [pausingId,        setPausingId]        = useState<string | null>(null);
 
   // Prevent double-handling the paymentReturn redirect
@@ -390,40 +440,115 @@ export default function BoostScreen() {
   const reach = useMemo(() => estimateBoostReach(budgetCents), [budgetCents]);
 
   // ── Data loading ─────────────────────────────────────────────────────────
+  //
+  // Root cause of the spinner loop: useCallback([api, ...]) + useFocusEffect
+  // creates a new callback every time the api object identity changes (Clerk
+  // may allocate a fresh object on userId fluctuations in the dev web preview
+  // where there is no real session). useFocusEffect re-registers whenever its
+  // callback reference changes, firing another load cycle that keeps loading
+  // state permanently true while the screen is focused.
+  //
+  // Fix: store the API methods in a ref so the functions passed to useCallback
+  // and useFocusEffect have NO reactive dependencies on the api object. The ref
+  // is updated every render so calls always use the freshest token without
+  // causing the callbacks themselves to be recreated.
+
+  // Keep the latest api.boosts methods in a ref — updated every render,
+  // read inside stable callbacks so they never go stale.
+  const boostsRef = useRef(api.boosts);
+  boostsRef.current = api.boosts;
+
+  const inSellerPreviewRef = useRef(inSellerPreview);
+  inSellerPreviewRef.current = inSellerPreview;
+
+  // Direct Expo web navigation can render before a focus event is delivered.
+  // Seed preview state explicitly so the screen never remains on its initial
+  // loading flags while waiting for authenticated API calls it cannot make.
+  useEffect(() => {
+    if (!inSellerPreview) return;
+    setTargets(PREVIEW_BOOST_TARGETS);
+    setTargetsError(false);
+    setLoadingTargets(false);
+    setExisting([]);
+    setLoadingExisting(false);
+    setSummary({
+      totalImpressions: 0,
+      spentCentsThisMonth: 0,
+      activeCount: 0,
+    });
+  }, [inSellerPreview]);
 
   const loadTargets = useCallback(async () => {
     setLoadingTargets(true);
     setTargetsError(false);
     try {
-      const rows = await api.boosts.targets();
+      const rows = await boostsRef.current.targets();
       setTargets((rows ?? []) as BoostTarget[]);
-    } catch {
-      setTargetsError(true);
-      setTargets([]);
+    } catch (e: any) {
+      const status = e?.status ?? e?.response?.status;
+      const is401  = status === 401 || String(e?.message ?? '').includes('401');
+      if (inSellerPreviewRef.current) {
+        // Dev web preview: 401 is expected (no token). Show labeled placeholders
+        // so the post picker and budget/duration steps can be reviewed.
+        // Any other error in preview also falls back to placeholders.
+        setTargets(PREVIEW_BOOST_TARGETS);
+        setTargetsError(false);
+      } else {
+        // Production / native / buyer preview: preserve real error state.
+        // Show a clear auth message for 401 rather than a generic connection error.
+        setTargetsError(true);
+        setTargets([]);
+        // Suppress the unused-variable warning — is401 is referenced here for
+        // future per-code branching if needed.
+        void is401;
+      }
     } finally {
       setLoadingTargets(false);
     }
-  }, [api]);
+  // Stable: no deps — boostsRef and inSellerPreviewRef are refs, not reactive values.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadHistory = useCallback(async () => {
     setLoadingExisting(true);
     try {
-      const rows = await api.boosts.list();
+      const rows = await boostsRef.current.list();
       setExisting((rows ?? []) as Boost[]);
     } catch {
+      // In preview, 401 is expected — honest empty history (no fake data).
       setExisting([]);
     } finally {
       setLoadingExisting(false);
     }
-  }, [api]);
+  // Stable: no deps — boostsRef is a ref, not a reactive value.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // useFocusEffect callback has no reactive deps — loadTargets and loadHistory
+  // are stable (empty dep arrays), and boostsRef.current is read at call time.
+  // This guarantees focus fires exactly once per navigation focus event,
+  // regardless of how many times useApi() returns a newly-allocated facade.
   useFocusEffect(useCallback(() => {
+    if (inSellerPreviewRef.current) {
+      setTargets(PREVIEW_BOOST_TARGETS);
+      setTargetsError(false);
+      setLoadingTargets(false);
+      setExisting([]);
+      setLoadingExisting(false);
+      setSummary({
+        totalImpressions: 0,
+        spentCentsThisMonth: 0,
+        activeCount: 0,
+      });
+      return;
+    }
     loadTargets();
     loadHistory();
-    api.boosts.summary()
+    boostsRef.current.summary()
       .then((s) => setSummary(s))
       .catch(() => setSummary(null));
-  }, [api, loadTargets, loadHistory]));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []));
 
   // ── Handle Checkout redirect return ──────────────────────────────────────
 
@@ -440,14 +565,14 @@ export default function BoostScreen() {
   const verifyPayment = useCallback(async (boostId: string) => {
     setVerifying(true);
     try {
-      const result = await api.boosts.verify(boostId);
+      const result = await boostsRef.current.verify(boostId);
       const boost = result as Boost;
       if (boost.status === 'active') {
         setActiveBoost(boost);
         setSucceeded(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         loadHistory();
-        api.boosts.summary().then((s) => setSummary(s)).catch(() => {});
+        boostsRef.current.summary().then((s) => setSummary(s)).catch(() => {});
       } else if (boost.status === 'pending_payment') {
         setPendingBoost(boost);
         Alert.alert(
@@ -473,7 +598,9 @@ export default function BoostScreen() {
     } finally {
       setVerifying(false);
     }
-  }, [api, loadHistory]);
+  // boostsRef is a ref — not reactive. loadHistory is stable (empty dep array).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadHistory]);
 
   // ── Navigation ────────────────────────────────────────────────────────────
 
@@ -497,6 +624,17 @@ export default function BoostScreen() {
       return;
     }
 
+    // Dev seller preview: never create a real boost or initiate payment.
+    // Show an honest message so reviewers understand real checkout requires auth.
+    if (inSellerPreview) {
+      Alert.alert(
+        'Preview mode',
+        'Checkout requires a real seller account.\n\nSign in to a Brandthread seller account to test live payment.',
+        [{ text: 'OK' }],
+      );
+      return;
+    }
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     // Step 1: Create pending boost (no charge yet)
@@ -504,7 +642,7 @@ export default function BoostScreen() {
     if (!boostRecord || boostRecord.status === 'failed') {
       setCreating(true);
       try {
-        const created = await api.boosts.create({
+        const created = await boostsRef.current.create({
           targetType:  'post',
           targetId:    selectedTarget.id,
           objective:   'views',
@@ -529,7 +667,7 @@ export default function BoostScreen() {
     setPaying(true);
     try {
       const returnUrl = buildBoostReturnUrl(boostRecord.id);
-      const { url, paymentStatus } = await api.boosts.pay(boostRecord.id, returnUrl);
+      const { url, paymentStatus } = await boostsRef.current.pay(boostRecord.id, returnUrl);
 
       // Already paid (reused session that was completed)
       if (paymentStatus === 'paid' || paymentStatus === 'no_payment_required') {
@@ -591,7 +729,7 @@ export default function BoostScreen() {
         onPress: async () => {
           setPausingId(boost.id);
           try {
-            await api.boosts.update(boost.id, { status: newStatus as 'paused' | 'cancelled' });
+            await boostsRef.current.update(boost.id, { status: newStatus as 'paused' | 'cancelled' });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             setExisting((prev) =>
               prev.map((b) => b.id === boost.id ? { ...b, status: newStatus } : b),
@@ -787,9 +925,11 @@ export default function BoostScreen() {
             </View>
           ) : targetsError ? (
             <View style={s.emptyState}>
-              <Feather name="wifi-off" size={28} color={MUTED} />
-              <Text style={s.emptyTitle}>Couldn't load posts</Text>
-              <Text style={s.emptyBody}>Check your connection and try again.</Text>
+              <Feather name="lock" size={28} color={MUTED} />
+              <Text style={s.emptyTitle}>Sign in to continue</Text>
+              <Text style={s.emptyBody}>
+                Your session may have expired. Sign in again to load your eligible posts.
+              </Text>
               <TouchableOpacity style={s.retryBtn} onPress={loadTargets} accessibilityRole="button">
                 <Text style={s.retryBtnText}>Retry</Text>
               </TouchableOpacity>

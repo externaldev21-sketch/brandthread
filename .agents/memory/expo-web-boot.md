@@ -20,5 +20,11 @@ Development web previews default to the seller role, seed local onboarding/role 
 **Why:** the screenshot browser and canvas iframes are stateless — no Clerk session, no localStorage — so without this, no auth-gated screen can ever be shown or captured outside a tester run.
 **How to apply:** use the bare preview URL for seller review and add `?bt_preview=buyer` for buyer review. Screens tied to the Clerk user render fallbacks. The bypass is web + development only and never changes production or native end-user onboarding.
 
+Authenticated seller tools cannot treat this navigation bypass as a real Clerk session. In dev web seller preview, initialize review-only UI state synchronously from the route role and skip protected API calls; keep uploads, writes, checkout, and activation behind real authentication.
+
+**Why:** paid promotion screens entered generic error states because the preview bypass opened them without a token, so every protected request returned 401. Async-only fallbacks also flashed or remained on loading states during direct web captures.
+
+**How to apply:** derive preview role from route parameters so SSR and the first client frame agree. Use clearly labeled, non-financial preview fixtures only for reviewing UI; never fake successful writes, payments, entitlement, delivery, or activation.
+
 ## Debugging gotcha
 The Screenshot tool captures web pages before async boot completes (sub-second), so it shows the loading state even when the app works — it cannot observe anything time-based. Use the Playwright testing subagent to watch a page over tens of seconds (console timeline, network failures, final render). Verifying signed-in flows: Clerk programmatic login + seeding localStorage (`onboarding_complete`, `user_role`, `splash_seen`) reproduces any auth/role state.

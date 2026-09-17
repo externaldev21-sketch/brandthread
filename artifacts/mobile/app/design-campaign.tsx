@@ -71,6 +71,7 @@ import type {
   AdFormatKind,
   AdMediaKind,
 } from '@/lib/api';
+import { isSellerDevPreview } from '@/lib/devPreview';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -324,17 +325,33 @@ export default function CreateAdScreen() {
 
   const reach = useMemo(() => estimateReach(budgetCents), [budgetCents]);
 
+  // Detect preview once at mount (stable across the component lifetime)
+  const inSellerPreview = isSellerDevPreview();
+
   // ── Create draft on mount ─────────────────────────────────────────────────
   useEffect(() => {
     if (params.paymentReturn === '1' && params.id) return;
+
+    // Dev seller preview: initialize a local draft without touching the server.
+    // POST /ad-campaigns returns 401 in dev web preview (no token).
+    if (inSellerPreview) {
+      setCampaign({ id: 'preview-draft', status: 'draft' } as AdCampaign);
+      return;
+    }
 
     (async () => {
       setLoading(true);
       try {
         const res = await api.adCampaigns.create();
         setCampaign(res.campaign);
-      } catch {
-        setInitError('Could not start a new campaign. Please try again.');
+      } catch (e: any) {
+        const status = e?.status ?? e?.response?.status;
+        const is401  = status === 401 || String(e?.message ?? '').includes('401');
+        setInitError(
+          is401
+            ? 'Your session has expired. Please sign in again to create an ad campaign.'
+            : 'Could not start a new campaign. Please try again.',
+        );
       } finally {
         setLoading(false);
       }
@@ -443,6 +460,17 @@ export default function CreateAdScreen() {
         continue;
       }
 
+      // Dev seller preview: keep media local; skip object-storage upload.
+      if (inSellerPreview) {
+        // Use the local URI as the "path" — no server round-trip.
+        setLocalPaths((prev) => [...prev, asset.uri]);
+        setLocalMimes((prev) => [...prev, mimeType]);
+        setLocalUris((prev)  => [...prev, asset.uri]);
+        setMediaKind(kind);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        continue;
+      }
+
       setLoading(true);
       try {
         const fetchRes = await fetch(asset.uri);
@@ -467,6 +495,16 @@ export default function CreateAdScreen() {
 
   async function handleRemoveMedia(index: number) {
     if (!campaign) return;
+
+    // Dev seller preview: remove locally only — no API call.
+    if (inSellerPreview) {
+      setLocalPaths((prev) => { const a = [...prev]; a.splice(index, 1); return a; });
+      setLocalMimes((prev) => { const a = [...prev]; a.splice(index, 1); return a; });
+      setLocalUris((prev)  => { const a = [...prev]; a.splice(index, 1); return a; });
+      if (localPaths.length - 1 === 0) setMediaKind('photos');
+      return;
+    }
+
     setLoading(true);
     try {
       await api.adCampaigns.removeMedia(campaign.id, index);
@@ -486,11 +524,16 @@ export default function CreateAdScreen() {
     const to = direction === 'left' ? from - 1 : from + 1;
     if (to < 0 || to >= localPaths.length) return;
 
-    const order = Array.from({ length: localPaths.length }, (_, i) => i);
-    [order[from], order[to]] = [order[to], order[from]];
+    // Apply local reorder first (UI responsiveness in both preview and production)
     setLocalPaths((prev) => { const a = [...prev]; [a[from], a[to]] = [a[to], a[from]]; return a; });
     setLocalMimes((prev) => { const a = [...prev]; [a[from], a[to]] = [a[to], a[from]]; return a; });
     setLocalUris((prev)  => { const a = [...prev]; [a[from], a[to]] = [a[to], a[from]]; return a; });
+
+    // Dev seller preview: skip server reorder call.
+    if (inSellerPreview) return;
+
+    const order = Array.from({ length: localPaths.length }, (_, i) => i);
+    [order[from], order[to]] = [order[to], order[from]];
     try { await api.adCampaigns.reorderMedia(campaign.id, order); } catch { /* revert not needed */ }
   }
 
@@ -522,23 +565,26 @@ export default function CreateAdScreen() {
       const v = validateCtaStage({ ctaKind: ctaKind ?? undefined, ctaDestinationId: ctaDestId ?? undefined });
       if (!v.valid) { Alert.alert('Incomplete', v.errors.join('\n')); return; }
 
-      setLoading(true);
-      try {
-        const selected = CTA_OPTIONS.find((c) => c.kind === ctaKind);
-        const updated = await api.adCampaigns.update(campaign.id, {
-          headline,
-          description: description || undefined,
-          ctaKind: ctaKind!,
-          ctaDestinationKind: selected?.destinationKind,
-          ...(ctaDestId ? { ctaDestinationId: ctaDestId } : {}),
-        });
-        setCampaign(updated.campaign);
-      } catch {
-        Alert.alert('Error', 'Could not save details. Please try again.');
+      // Dev seller preview: skip update API call — persist only in local state.
+      if (!inSellerPreview) {
+        setLoading(true);
+        try {
+          const selected = CTA_OPTIONS.find((c) => c.kind === ctaKind);
+          const updated = await api.adCampaigns.update(campaign.id, {
+            headline,
+            description: description || undefined,
+            ctaKind: ctaKind!,
+            ctaDestinationKind: selected?.destinationKind,
+            ...(ctaDestId ? { ctaDestinationId: ctaDestId } : {}),
+          });
+          setCampaign(updated.campaign);
+        } catch {
+          Alert.alert('Error', 'Could not save details. Please try again.');
+          setLoading(false);
+          return;
+        }
         setLoading(false);
-        return;
       }
-      setLoading(false);
     }
 
     // ── Step 4: Format ──
@@ -561,6 +607,16 @@ export default function CreateAdScreen() {
 
     const v = validateBudgetStage({ formats, budgetCents, durationDays });
     if (!v.valid) { Alert.alert('Incomplete', v.errors.join('\n')); return; }
+
+    // Dev seller preview: never activate or charge. Show an honest sign-in alert.
+    if (inSellerPreview) {
+      Alert.alert(
+        'Preview mode',
+        'Checkout requires a real seller account.\n\nSign in to a Brandthread seller account to test live ad campaign payment.',
+        [{ text: 'OK' }],
+      );
+      return;
+    }
 
     setLoading(true);
     try {
@@ -988,12 +1044,13 @@ export default function CreateAdScreen() {
   // ── Error state ───────────────────────────────────────────────────────────
 
   if (initError) {
+    const isAuthError = initError.toLowerCase().includes('sign in') || initError.toLowerCase().includes('session');
     return (
       <View style={{ flex: 1, backgroundColor: BG }}>
         {renderHeader()}
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl, gap: SP.md }}>
-          <Feather name="alert-circle" size={36} color={RED} />
-          <Text style={styles.stageHeading}>Something went wrong</Text>
+          <Feather name={isAuthError ? 'lock' : 'alert-circle'} size={36} color={RED} />
+          <Text style={styles.stageHeading}>{isAuthError ? 'Sign in required' : 'Something went wrong'}</Text>
           <Text style={[styles.stageSub, { textAlign: 'center' }]}>{initError}</Text>
           <TouchableOpacity style={styles.primaryBtn} onPress={() => { setInitError(null); router.back(); }}>
             <Text style={styles.primaryBtnText}>Go back</Text>
