@@ -441,7 +441,12 @@ export default function SellerHomeCommerceDashboard({
         keyboardShouldPersistTaps="handled"
       >
         {/* ── Top bar ──────────────────────────────────────────────────── */}
-        <View style={styles.topBar}>
+        <View
+          testID="seller-dashboard-scroll-position"
+          accessibilityLabel="Seller dashboard scroll position"
+          accessible
+          style={styles.topBar}
+        >
           <Text style={styles.screenTitle}>Dashboard</Text>
         </View>
 

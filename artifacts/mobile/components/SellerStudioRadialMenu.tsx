@@ -258,7 +258,8 @@ export default function SellerStudioRadialMenu() {
 
         {/* Full-screen tap-to-dismiss */}
         <Pressable
-          accessibilityLabel="Close Studio tools"
+          testID="seller-studio-menu-dismiss"
+          accessibilityLabel="Dismiss Studio tools backdrop"
           onPress={() => collapse()}
           style={StyleSheet.absoluteFill}
         />

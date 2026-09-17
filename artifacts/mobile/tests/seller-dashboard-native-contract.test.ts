@@ -8,13 +8,15 @@ const deviceFlow = readFileSync(new URL('./seller-dashboard.device.mjs', import.
 const packageJson = readFileSync(new URL('../package.json', import.meta.url), 'utf8');
 
 describe('seller dashboard native interaction contract', () => {
-  it('keeps the iOS ScrollView bounded and exposes native scroll endpoints', () => {
+  it('keeps the native ScrollView bounded and verifies that its content moves', () => {
     expect(dashboard).toContain('testID="seller-dashboard-scroll"');
+    expect(dashboard).toContain('testID="seller-dashboard-scroll-position"');
     expect(dashboard).toContain('testID="seller-dashboard-scroll-end"');
     expect(dashboard).toContain('scrollView: { flex: 1 }');
     expect(deviceFlow).toContain("platformName: 'iOS'");
     expect(deviceFlow).toContain("await swipeDashboard()");
     expect(deviceFlow).toContain("await waitFor('Seller dashboard scroll end')");
+    expect(deviceFlow).toContain('markerAfter.y >= markerBefore.y - 20');
   });
 
   it('keeps all six centered Studio actions, backdrop, close behavior, navigation, and gating in the device contract', () => {
@@ -36,7 +38,9 @@ describe('seller dashboard native interaction contract', () => {
       expect(deviceFlow).toContain(`'${label}'`);
     }
     expect(deviceFlow).toContain("await tap('Close Studio tools')");
+    expect(deviceFlow).toContain("await tap('Dismiss Studio tools backdrop')");
     expect(deviceFlow).toContain("await tap('Design Studio')");
+    expect(deviceFlow).toContain('await pressAndroidBack()');
   });
 
   it('keeps the floating create menu and every create destination covered', () => {
@@ -46,7 +50,10 @@ describe('seller dashboard native interaction contract', () => {
     }
     expect(deviceFlow).toContain("for (const label of ['New post', 'New product', 'New drop', 'Start a boost'])");
     expect(deviceFlow).toContain("await tap('New post')");
+    expect(deviceFlow).toContain('await verifyCreateRoutes()');
     expect(packageJson).toContain('"test:seller-dashboard:native"');
     expect(packageJson).toContain('"test:seller-dashboard:native:ci"');
+    expect(packageJson).toContain('"test:seller-dashboard:android"');
+    expect(packageJson).toContain('"test:seller-dashboard:android:ci"');
   });
 });

@@ -18,6 +18,8 @@
     "test:onboarding:native:ci": "NATIVE_ONBOARDING_REQUIRED=1 pnpm run test:onboarding:native",
     "test:seller-dashboard:native": "node tests/seller-dashboard.device.mjs",
     "test:seller-dashboard:native:ci": "NATIVE_SELLER_DASHBOARD_REQUIRED=1 pnpm run test:seller-dashboard:native",
+    "test:seller-dashboard:android": "NATIVE_SELLER_DASHBOARD_PLATFORM=android node tests/seller-dashboard.device.mjs",
+    "test:seller-dashboard:android:ci": "NATIVE_SELLER_DASHBOARD_PLATFORM=android NATIVE_SELLER_DASHBOARD_ANDROID_REQUIRED=1 node tests/seller-dashboard.device.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "verify:app-identity": "node scripts/verify-app-identity.js",
     "verify:apple-auth": "node scripts/verify-apple-auth.js",
