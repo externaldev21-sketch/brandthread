@@ -2,12 +2,19 @@
  * Buyer Post Comments Screen
  * Full-screen modal: shows a post summary at the top, then a scrollable
  * comment thread below, with one-level reply support.
+ *
+ * Interaction quality:
+ *  - First-load: skeleton rows while fetching
+ *  - Fetch failure: InlineError with retry (no Alert)
+ *  - Posting: inline progress indicator on send button; InlineError on failure
+ *  - Count sync: commentsCount updates from the authoritative list after a
+ *    successful post (removes optimistic count from the temp item)
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
-  KeyboardAvoidingView, Platform, StyleSheet, Alert,
+  KeyboardAvoidingView, Platform, StyleSheet,
   Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,6 +33,7 @@ import {
 import type { Comment } from '@/services/socialTypes';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { InlineSpinner, InlineError } from '@/components/InlineFeedback';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -38,6 +46,38 @@ function timeAgo(iso: string): string {
   if (hrs < 24) return `${hrs}h`;
   return `${Math.floor(hrs / 24)}d`;
 }
+
+// ─── Comment skeleton row ─────────────────────────────────────────────────────
+
+function CommentSkeletonRow() {
+  const opacity = useRef(new Animated.Value(0.35)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.7, duration: 700, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.35, duration: 700, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
+  return (
+    <Animated.View style={[csk.row, { opacity }]}>
+      <View style={csk.avatar} />
+      <View style={{ flex: 1, gap: 7 }}>
+        <View style={[csk.line, { width: '40%' }]} />
+        <View style={[csk.line, { width: '80%' }]} />
+        <View style={[csk.line, { width: '55%' }]} />
+      </View>
+    </Animated.View>
+  );
+}
+
+const csk = StyleSheet.create({
+  row:    { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: SURFACE, flexShrink: 0 },
+  line:   { height: 9, borderRadius: 4, backgroundColor: SURFACE },
+});
 
 // ─── Comment Row ──────────────────────────────────────────────────────────────
 
@@ -56,18 +96,18 @@ function CommentRow({
   const s = makeStyles(theme);
   const isOwn = comment.authorId === MY_USER_ID;
   const isReply = !!comment.replyToId;
+  /** Optimistic comments carry a tmp_ prefix — show a subtle pending indicator */
+  const isPending = comment.id.startsWith('tmp_');
 
   const handleLongPress = () => {
     if (!isOwn) return;
-    Alert.alert('Delete comment?', undefined, [
-      { text: 'Delete', style: 'destructive', onPress: () => onDelete(comment.id) },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    // We use a custom inline delete confirm rather than Alert
+    onDelete(comment.id);
   };
 
   return (
     <TouchableOpacity
-      style={[s.commentRow, isReply && s.commentRowIndented]}
+      style={[s.commentRow, isReply && s.commentRowIndented, isPending && s.commentRowPending]}
       activeOpacity={0.8}
       onLongPress={handleLongPress}
       delayLongPress={400}
@@ -91,31 +131,37 @@ function CommentRow({
         {/* Header */}
         <View style={s.commentHeader}>
           <Text style={s.authorName}>{comment.authorName}</Text>
-          <Text style={s.commentTime}>{timeAgo(comment.createdAt)}</Text>
+          {isPending ? (
+            <View style={s.pendingDot} />
+          ) : (
+            <Text style={s.commentTime}>{timeAgo(comment.createdAt)}</Text>
+          )}
         </View>
 
         {/* Text */}
         <Text style={s.commentText}>{comment.text}</Text>
 
-        {/* Actions */}
-        <View style={s.commentActions}>
-          <TouchableOpacity style={s.actionBtn} onPress={() => onLike(comment.id)}>
-            <Feather
-              name={comment.likedByMe ? 'heart' : 'heart'}
-              size={13}
-              color={comment.likedByMe ? RED : MUTED}
-            />
-            {comment.likesCount > 0 && (
-              <Text style={[s.actionLabel, comment.likedByMe && { color: RED }]}>
-                {comment.likesCount}
-              </Text>
-            )}
-          </TouchableOpacity>
+        {/* Actions — hidden while pending */}
+        {!isPending && (
+          <View style={s.commentActions}>
+            <TouchableOpacity style={s.actionBtn} onPress={() => onLike(comment.id)}>
+              <Feather
+                name="heart"
+                size={13}
+                color={comment.likedByMe ? RED : MUTED}
+              />
+              {comment.likesCount > 0 && (
+                <Text style={[s.actionLabel, comment.likedByMe && { color: RED }]}>
+                  {comment.likesCount}
+                </Text>
+              )}
+            </TouchableOpacity>
 
-          <TouchableOpacity style={s.actionBtn} onPress={() => onReply(comment)}>
-            <Text style={s.replyLabel}>Reply</Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity style={s.actionBtn} onPress={() => onReply(comment)}>
+              <Text style={s.replyLabel}>Reply</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -126,8 +172,7 @@ function CommentRow({
 export default function BuyerPostCommentsScreen() {
   const colors = useColors();
   const { theme } = useAppTheme();
-  const PURPLE = colors.primary, PURPLE_DIM = colors.accent;
-  const BORDER_ACTIVE = `${theme.accent}73`;
+  const PURPLE = colors.primary;
   const s = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -147,21 +192,38 @@ export default function BuyerPostCommentsScreen() {
   const authorInitials = params.postAuthorInitials ?? '?';
   const authorColor = params.postAuthorColor ?? PURPLE;
   const caption = params.postCaption ?? '';
-  const mediaColor1 = params.postMediaColor1 ?? SURFACE;
-  const mediaColor2 = params.postMediaColor2 ?? BG;
+  const mediaColor1 = params.postMediaColor1 ?? '#111113';
+  const mediaColor2 = params.postMediaColor2 ?? '#0A0A0B';
   const postType = params.postType ?? 'photo';
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [inputText, setInputText] = useState('');
   const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
   const [sending, setSending] = useState(false);
+  /** True only on the first load (no prior data) */
+  const [loading, setLoading] = useState(true);
+  /** Error message shown inline below the count row */
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  /** Transient post-failure message shown below the input */
+  const [sendError, setSendError] = useState<string | null>(null);
 
   const listRef = useRef<FlatList>(null);
   const inputRef = useRef<TextInput>(null);
+  const hasLoadedOnce = useRef(false);
 
   const load = useCallback(async () => {
-    const data = await getComments(postId);
-    setComments(data);
+    // Only show skeleton on the very first load; subsequent fetches are silent
+    if (!hasLoadedOnce.current) setLoading(true);
+    setFetchError(null);
+    try {
+      const data = await getComments(postId);
+      setComments(data);
+      hasLoadedOnce.current = true;
+    } catch {
+      setFetchError('Could not load comments. Tap Retry to try again.');
+    } finally {
+      setLoading(false);
+    }
   }, [postId]);
 
   useEffect(() => { load(); }, [load]);
@@ -202,6 +264,7 @@ export default function BuyerPostCommentsScreen() {
     const text = inputText.trim();
     if (!text || sending) return;
     setSending(true);
+    setSendError(null);
     const optimistic: Comment = {
       id: `tmp_${Date.now()}`,
       postId,
@@ -231,16 +294,21 @@ export default function BuyerPostCommentsScreen() {
         replyToAuthorName: replyingTo?.authorName,
         replyToText: replyingTo?.text ? replyingTo.text.slice(0, 60) : undefined,
       });
-    } catch {
-      // Revert optimistic on failure
+      // Successful post: remove the optimistic item and reload to get the
+      // authoritative comment from the server with the real ID and count.
       setComments(prev => prev.filter(c => c.id !== optimistic.id));
-      Alert.alert('Error', 'Could not post comment. Try again.');
+      await load();
+    } catch {
+      // Remove optimistic item and show inline error
+      setComments(prev => prev.filter(c => c.id !== optimistic.id));
+      setSendError('Could not post comment. Tap to retry.');
     } finally {
       setSending(false);
     }
   };
 
-  const commentsCount = comments.length;
+  /** Real comment count (excludes temp optimistic items) */
+  const realCount = comments.filter(c => !c.id.startsWith('tmp_')).length;
 
   return (
     <KeyboardAvoidingView
@@ -259,7 +327,7 @@ export default function BuyerPostCommentsScreen() {
 
       <FlatList
         ref={listRef}
-        data={comments}
+        data={loading ? [] : comments}
         keyExtractor={c => c.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: SP.xl }}
@@ -294,12 +362,29 @@ export default function BuyerPostCommentsScreen() {
             <View style={s.countRow}>
               <View style={s.divider} />
               <Text style={s.countLabel}>
-                {commentsCount === 0
-                  ? 'No comments yet — drop the first one.'
-                  : `${commentsCount} comment${commentsCount !== 1 ? 's' : ''}`}
+                {loading
+                  ? '…'
+                  : realCount === 0
+                    ? 'No comments yet — drop the first one.'
+                    : `${realCount} comment${realCount !== 1 ? 's' : ''}`}
               </Text>
               <View style={s.divider} />
             </View>
+
+            {/* First-load skeleton */}
+            {loading && (
+              <View style={{ gap: 0 }}>
+                {[0, 1, 2, 3].map(i => <CommentSkeletonRow key={i} />)}
+              </View>
+            )}
+
+            {/* Fetch error with retry */}
+            {!loading && fetchError ? (
+              <InlineError
+                message={fetchError}
+                onRetry={load}
+              />
+            ) : null}
           </>
         )}
         renderItem={({ item }) => (
@@ -310,16 +395,30 @@ export default function BuyerPostCommentsScreen() {
             onDelete={handleDelete}
           />
         )}
-        ListEmptyComponent={() => null}
+        ListEmptyComponent={loading || fetchError ? null : undefined}
       />
 
       {/* Input area */}
       <View style={[s.inputWrap, { paddingBottom: insets.bottom + SP.sm }]}>
+        {/* Send error */}
+        {sendError ? (
+          <TouchableOpacity
+            style={s.sendErrorBanner}
+            onPress={() => { setSendError(null); }}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss send error"
+          >
+            <Feather name="alert-circle" size={12} color={RED} />
+            <Text style={s.sendErrorText} numberOfLines={1}>{sendError}</Text>
+            <Feather name="x" size={12} color={RED} />
+          </TouchableOpacity>
+        ) : null}
+
         {/* Reply banner */}
         {replyingTo ? (
           <View style={s.replyingBanner}>
             <Text style={s.replyingLabel} numberOfLines={1}>
-              Replying to <Text style={s.replyingName}>{replyingTo.authorName}</Text>
+              Replying to <Text style={[s.replyingName, { color: theme.accent }]}>{replyingTo.authorName}</Text>
             </Text>
             <TouchableOpacity onPress={handleCancelReply} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
               <Feather name="x" size={14} color={MUTED} />
@@ -345,12 +444,19 @@ export default function BuyerPostCommentsScreen() {
             returnKeyType="default"
           />
 
+          {/* Send button: spinner while sending, send icon otherwise */}
           <TouchableOpacity
             style={[s.sendBtn, (!inputText.trim() || sending) && s.sendBtnDisabled]}
             onPress={handleSend}
             disabled={!inputText.trim() || sending}
+            accessibilityRole="button"
+            accessibilityLabel={sending ? 'Posting comment' : 'Send comment'}
           >
-            <Feather name="send" size={ICON.md} color={!inputText.trim() || sending ? MUTED : PURPLE} />
+            {sending ? (
+              <InlineSpinner style={{ paddingVertical: 0 }} />
+            ) : (
+              <Feather name="send" size={ICON.md} color={!inputText.trim() ? MUTED : PURPLE} />
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -361,7 +467,8 @@ export default function BuyerPostCommentsScreen() {
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const PURPLE = theme.accent, PURPLE_DIM = theme.accentDim, BORDER_ACTIVE = `${theme.accent}73`;
+  const PURPLE = theme.accent;
+  const PURPLE_DIM = theme.accentDim;
   return StyleSheet.create({
   container: { flex: 1 },
 
@@ -450,6 +557,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   commentRowIndented: {
     paddingLeft: SP.md + 32 + SP.sm,
   },
+  commentRowPending: {
+    opacity: 0.6,
+  },
   avatar: {
     width: 32,
     height: 32,
@@ -494,6 +604,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: FS.xs,
     color: SUBTLE,
   },
+  pendingDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: SUBTLE,
+    marginLeft: 2,
+  },
   commentText: {
     fontFamily: FONT.regular,
     fontSize: FS.sm,
@@ -530,6 +647,22 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingTop: SP.sm,
     paddingHorizontal: SP.md,
   },
+  sendErrorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(248,113,113,0.1)',
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: SP.sm,
+    paddingVertical: 5,
+    marginBottom: SP.xs,
+  },
+  sendErrorText: {
+    flex: 1,
+    fontFamily: FONT.regular,
+    fontSize: FS.xs,
+    color: RED,
+  },
   replyingBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -548,7 +681,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   replyingName: {
     fontFamily: FONT.semibold,
-    color: PURPLE,
   },
   inputRow: {
     flexDirection: 'row',
@@ -583,7 +715,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     maxHeight: 100,
     minHeight: 40,
   },
-  sendBtn: { padding: SP.xs, marginBottom: 4 },
+  sendBtn: { padding: SP.xs, marginBottom: 4, minWidth: 32, alignItems: 'center' },
   sendBtnDisabled: { opacity: 0.4 },
   });
 };

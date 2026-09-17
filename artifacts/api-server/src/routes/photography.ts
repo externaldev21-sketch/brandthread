@@ -17,8 +17,12 @@ const router = Router();
 router.use(requireAuth);
 
 const MAX_IMAGES = 4;
+const MAX_REFS = 5; // mockup_to_model specific: up to 5 reference images
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB per photo
 const MAX_TOTAL_BYTES = 20 * 1024 * 1024; // 20MB across all photos
+// For mockup_to_model: 1 mockup + up to 5 refs; budget generously
+const MAX_TOTAL_BYTES_MOCKUP_TO_MODEL = 48 * 1024 * 1024; // 48MB (6 files × 8MB)
+const MOCKUP_TO_MODEL_CONCURRENCY = 2; // process 2 refs at a time
 
 const BASE64_RE = /^[A-Za-z0-9+/]+=*$/;
 const ALLOWED_IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -126,6 +130,241 @@ router.post("/generate", async (req, res) => {
       res.status(502).json({ error: "Photo quality verification is temporarily unavailable. Please try again.", retryable: true });
     } else {
       res.status(502).json({ error: "Photo generation failed. Please try again." });
+    }
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+// POST /api/photography/mockup-to-model
+// Dedicated contract: exactly one mockup + 1–5 reference images.
+// Returns one output per reference, preserving stable input/result indices.
+// Partial failures are exposed per-index; never returns fabricated fallback.
+router.post("/mockup-to-model", async (req, res) => {
+  const { mockup, references, prompt } = req.body ?? {};
+
+  // --- Validate mockup ---
+  if (typeof mockup !== "string" || !mockup) {
+    res.status(400).json({ error: "A garment mockup image is required." });
+    return;
+  }
+  const mockupBuffer = decodeDataUrl(mockup);
+  if (!mockupBuffer) {
+    res.status(400).json({ error: "The mockup image is not a valid JPEG, PNG, or WEBP. Please re-upload." });
+    return;
+  }
+  if (mockupBuffer.length > MAX_IMAGE_BYTES) {
+    res.status(400).json({ error: "The mockup image must be under 8MB." });
+    return;
+  }
+
+  // --- Validate references ---
+  if (!Array.isArray(references) || references.length === 0) {
+    res.status(400).json({ error: "At least one reference model image is required." });
+    return;
+  }
+  if (references.length > MAX_REFS) {
+    res.status(400).json({ error: `Please upload at most ${MAX_REFS} reference images.` });
+    return;
+  }
+
+  const safeDescription =
+    typeof prompt === "string" && prompt.trim().length > 0
+      ? prompt.trim().slice(0, 500)
+      : "";
+
+  // Decode and validate all reference images up front before touching disk.
+  const refBuffers: Buffer[] = [];
+  let totalBytes = mockupBuffer.length;
+  for (let i = 0; i < references.length; i++) {
+    const ref = references[i];
+    if (typeof ref !== "string") {
+      res.status(400).json({ error: `Reference image at index ${i} must be a base64-encoded image.` });
+      return;
+    }
+    const buffer = decodeDataUrl(ref);
+    if (!buffer) {
+      res.status(400).json({ error: `Reference image at index ${i} is not a valid JPEG, PNG, or WEBP. Please re-upload.` });
+      return;
+    }
+    if (buffer.length > MAX_IMAGE_BYTES) {
+      res.status(400).json({ error: `Reference image at index ${i} must be under 8MB.` });
+      return;
+    }
+    totalBytes += buffer.length;
+    if (totalBytes > MAX_TOTAL_BYTES_MOCKUP_TO_MODEL) {
+      res.status(400).json({ error: "Total image size is too large. Please upload smaller or fewer images." });
+      return;
+    }
+    refBuffers.push(buffer);
+  }
+
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "mockup-to-model-"));
+
+  try {
+    // Write mockup to disk once; reuse for every reference call.
+    const mockupFile = path.join(tmpDir, `${randomUUID()}-mockup.png`);
+    await fs.writeFile(mockupFile, mockupBuffer);
+
+    // Write all ref files up front.
+    const refFiles: string[] = [];
+    for (let i = 0; i < refBuffers.length; i++) {
+      const refFile = path.join(tmpDir, `${randomUUID()}-ref-${i}.png`);
+      await fs.writeFile(refFile, refBuffers[i]);
+      refFiles.push(refFile);
+    }
+
+    // Process references with bounded concurrency.
+    // Results array preserves input order (stable indices).
+    const results: { refIndex: number; b64_json: string }[] = [];
+    const errors: { refIndex: number; error: string; retryable: boolean }[] = [];
+    let providerFailureCount = 0;
+
+    // Run in batches of MOCKUP_TO_MODEL_CONCURRENCY.
+    for (let start = 0; start < refBuffers.length; start += MOCKUP_TO_MODEL_CONCURRENCY) {
+      const batch = refBuffers.slice(start, start + MOCKUP_TO_MODEL_CONCURRENCY);
+      await Promise.all(
+        batch.map(async (refBuffer, batchIndex) => {
+          const refIndex = start + batchIndex;
+          const refFile = refFiles[refIndex];
+          const editPrompt = buildFashionPrompt(
+            "photoshoot" as ImageOperation,
+            safeDescription,
+            "Image 1 is the garment/product mockup — preserve its exact design, artwork, colors, and construction. Image 2 is the reference photo — use this person's pose, body type, and composition as the model. Generate one finished editorial photo of the model wearing the garment.",
+          );
+          try {
+            const buffer = await generateWithVisualQa({
+              operation: "photoshoot" as ImageOperation,
+              prompt: editPrompt,
+              brief: safeDescription,
+              references: [mockupBuffer, refBuffer],
+              generate: (retryPrompt) => editImages([mockupFile, refFile], retryPrompt),
+            });
+            results.push({ refIndex, b64_json: buffer.toString("base64") });
+          } catch (err) {
+            if (err instanceof ImageQualityError) {
+              errors.push({
+                refIndex,
+                error: "This reference did not meet the quality check. Please retry.",
+                retryable: true,
+              });
+            } else if (err instanceof ImageQualityUnavailableError) {
+              errors.push({
+                refIndex,
+                error: "Quality verification is temporarily unavailable. Please retry.",
+                retryable: true,
+              });
+              providerFailureCount++;
+            } else {
+              errors.push({
+                refIndex,
+                error: "Generation failed for this reference. Please retry.",
+                retryable: true,
+              });
+              providerFailureCount++;
+            }
+          }
+        }),
+      );
+    }
+
+    // Sort results by refIndex to guarantee stable ordering.
+    results.sort((a, b) => a.refIndex - b.refIndex);
+    errors.sort((a, b) => a.refIndex - b.refIndex);
+
+    if (results.length === 0 && errors.length > 0) {
+      // All failed — never return fabricated fallback.
+      const status = providerFailureCount > 0 ? 502 : 422;
+      res.status(status).json({
+        error: "No reference images could be generated. Please retry.",
+        retryable: true,
+        results: [],
+        errors,
+      });
+      return;
+    }
+
+    // At least one succeeded — return partial results with per-index errors.
+    res.json({
+      results,
+      ...(errors.length > 0 ? { errors } : {}),
+    });
+  } catch (_err) {
+    res.status(502).json({ error: "Mockup to Model generation failed. Please try again." });
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+// POST /api/photography/mockup-to-model/retry
+// Retry a single failed reference without discarding successful outputs.
+router.post("/mockup-to-model/retry", async (req, res) => {
+  const { mockup, reference, refIndex, prompt } = req.body ?? {};
+
+  if (typeof mockup !== "string" || !mockup) {
+    res.status(400).json({ error: "A garment mockup image is required for retry." });
+    return;
+  }
+  if (typeof reference !== "string" || !reference) {
+    res.status(400).json({ error: "A reference image is required for retry." });
+    return;
+  }
+  if (!Number.isInteger(refIndex) || refIndex < 0 || refIndex >= MAX_REFS) {
+    res.status(400).json({ error: "The reference index being retried is not valid." });
+    return;
+  }
+
+  const mockupBuffer = decodeDataUrl(mockup);
+  const refBuffer = decodeDataUrl(reference);
+  if (!mockupBuffer) {
+    res.status(400).json({ error: "The mockup image is not a valid JPEG, PNG, or WEBP. Please re-upload." });
+    return;
+  }
+  if (!refBuffer) {
+    res.status(400).json({ error: "The reference image is not a valid JPEG, PNG, or WEBP. Please re-upload." });
+    return;
+  }
+  if (mockupBuffer.length > MAX_IMAGE_BYTES || refBuffer.length > MAX_IMAGE_BYTES) {
+    res.status(400).json({ error: "Each image must be under 8MB." });
+    return;
+  }
+  if (mockupBuffer.length + refBuffer.length > MAX_TOTAL_BYTES) {
+    res.status(400).json({ error: "Total image size is too large. Please upload smaller images." });
+    return;
+  }
+
+  const safeDescription =
+    typeof prompt === "string" && prompt.trim().length > 0
+      ? prompt.trim().slice(0, 500)
+      : "";
+
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "mockup-to-model-retry-"));
+  try {
+    const mockupFile = path.join(tmpDir, `${randomUUID()}-mockup.png`);
+    const refFile = path.join(tmpDir, `${randomUUID()}-ref-${refIndex}.png`);
+    await fs.writeFile(mockupFile, mockupBuffer);
+    await fs.writeFile(refFile, refBuffer);
+
+    const editPrompt = buildFashionPrompt(
+      "photoshoot" as ImageOperation,
+      safeDescription,
+      "Image 1 is the garment/product mockup — preserve its exact design, artwork, colors, and construction. Image 2 is the reference photo — use this person's pose, body type, and composition as the model. Generate one finished editorial photo of the model wearing the garment.",
+    );
+    const buffer = await generateWithVisualQa({
+      operation: "photoshoot" as ImageOperation,
+      prompt: editPrompt,
+      brief: safeDescription,
+      references: [mockupBuffer, refBuffer],
+      generate: (retryPrompt) => editImages([mockupFile, refFile], retryPrompt),
+    });
+    res.json({ refIndex, b64_json: buffer.toString("base64") });
+  } catch (err) {
+    if (err instanceof ImageQualityError) {
+      res.status(422).json({ error: "This reference did not meet the quality check. Please try again.", retryable: true });
+    } else if (err instanceof ImageQualityUnavailableError) {
+      res.status(502).json({ error: "Quality verification is temporarily unavailable. Please try again.", retryable: true });
+    } else {
+      res.status(502).json({ error: "This reference could not be generated. Please try again.", retryable: true });
     }
   } finally {
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});

@@ -165,7 +165,7 @@ try {
     'Mockup to Model',
     'Remove Background',
     'AI Design',
-    'Campaign Generator',
+    'Create Ad',
     'AI Photoshoot',
   ]) {
     await waitFor(label);

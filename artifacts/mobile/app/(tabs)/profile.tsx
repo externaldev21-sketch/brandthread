@@ -245,6 +245,16 @@ export default function ProfileScreen() {
           <TouchableOpacity style={s.iconBtn} onPress={() => nav('/notifications-settings')} accessibilityRole="button" accessibilityLabel="Notification settings">
             <Feather name="bell" size={ICON.md} color={FG} />
           </TouchableOpacity>
+          <TouchableOpacity
+            style={s.iconBtn}
+            onPress={() => nav('/share-profile')}
+            accessibilityRole="button"
+            accessibilityLabel="Share profile"
+            accessibilityHint="Opens your shareable profile link and QR code"
+            testID="seller-share-profile-btn"
+          >
+            <Feather name="share-2" size={ICON.md} color={FG} />
+          </TouchableOpacity>
           <TouchableOpacity style={s.iconBtn} onPress={() => nav('/settings')} accessibilityRole="button" accessibilityLabel="Seller settings">
             <Feather name="settings" size={ICON.md} color={FG} />
           </TouchableOpacity>

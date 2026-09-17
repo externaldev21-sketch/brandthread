@@ -2,7 +2,7 @@
  * Brandthread Buyer Product Detail
  * Variant selection, add to cart, buy now.
  */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image, RefreshControl,
   Animated, Dimensions, PanResponder,
@@ -455,6 +455,10 @@ export default function BuyerProductDetailScreen() {
   const [productReviews, setProductReviews] = useState<any[]>([]);
   const [avgRating, setAvgRating] = useState(0);
   const [reviewCount, setReviewCount] = useState(0);
+  // Track whether options were touched at least once (for required-option feedback)
+  const [optionsTouched, setOptionsTouched] = useState(false);
+  // Track added-to-bag confirmation to show a banner (auto-clears after 2s)
+  const addedBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Waitlist & pre-order reservation state
   const [waitlistJoined,  setWaitlistJoined]  = useState(false);
@@ -593,15 +597,70 @@ export default function BuyerProductDetailScreen() {
   }, [product?.id, product?.isPreOrder, isSignedIn]);
 
   if (loading) {
+    // Compact loading — small spinner in the content area, not a full-screen spinner.
+    // The gallery placeholder stays visible so the layout doesn't jump.
     return (
-      <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={PURPLE} size="large" />
+      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+        {/* Gallery skeleton */}
+        <View style={{ height: GALLERY_HEIGHT, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={PURPLE} size="large" />
+          <Text style={{ color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: SP.sm }}>Loading product…</Text>
+        </View>
+        {/* Back button remains accessible */}
+        <TouchableOpacity
+          style={[{
+            position: 'absolute', left: SP.md, width: COMP.minTouchTarget, height: COMP.minTouchTarget,
+            borderRadius: RADIUS.pill, backgroundColor: 'rgba(0,0,0,0.6)',
+            alignItems: 'center', justifyContent: 'center',
+          }, { top: insets.top + SP.sm }]}
+          onPress={leaveProduct}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+        >
+          <Feather name="chevron-left" size={ICON.md} color={FG} />
+        </TouchableOpacity>
       </View>
     );
   }
 
   if (!product) {
-    return <View style={{ flex: 1, backgroundColor: 'transparent' }} />;
+    // Compact error/not-found state with retry
+    return (
+      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+        <View style={{ height: GALLERY_HEIGHT, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center', gap: SP.md, paddingHorizontal: SP.lg }}>
+          <Feather name="alert-circle" size={ICON.xl} color={RED} />
+          <Text style={{ color: FG, fontFamily: FONT.semibold, fontSize: FS.base, textAlign: 'center' }}>Product not found</Text>
+          <Text style={{ color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 20 }}>
+            This product may be unavailable or the link may have expired.
+          </Text>
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: SP.sm }}
+            onPress={leaveProduct}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <Feather name="chevron-left" size={14} color={FG} />
+            <Text style={{ color: FG, fontFamily: FONT.semibold, fontSize: FS.sm }}>Go back</Text>
+          </TouchableOpacity>
+        </View>
+        {/* Back button */}
+        <TouchableOpacity
+          style={[{
+            position: 'absolute', left: SP.md, width: COMP.minTouchTarget, height: COMP.minTouchTarget,
+            borderRadius: RADIUS.pill, backgroundColor: 'rgba(0,0,0,0.6)',
+            alignItems: 'center', justifyContent: 'center',
+          }, { top: insets.top + SP.sm }]}
+          onPress={leaveProduct}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+        >
+          <Feather name="chevron-left" size={ICON.md} color={FG} />
+        </TouchableOpacity>
+      </View>
+    );
   }
 
   const variant = findVariant(product, selections);
@@ -615,6 +674,7 @@ export default function BuyerProductDetailScreen() {
   const paymentUnavailable = sellerPaymentReady === false;
 
   function handleSelect(optionId: string, valueId: string) {
+    setOptionsTouched(true);
     setSelections(prev => {
       const updated = { ...prev, [optionId]: valueId };
       // Reset qty if max changed
@@ -665,7 +725,9 @@ export default function BuyerProductDetailScreen() {
 
   async function handleAddToCart() {
     if (!allSelected) {
-      Alert.alert('Select Options', 'Please select all options before adding to cart.');
+      // Mark options as touched so unselected options show a required indicator
+      setOptionsTouched(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return;
     }
     if (!variant) return;
@@ -678,6 +740,9 @@ export default function BuyerProductDetailScreen() {
     if (result.success) {
       setAddedToCart(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // Auto-clear the "added" confirmation after 2.5s (matching ShopProductSheet behavior)
+      if (addedBannerTimerRef.current) clearTimeout(addedBannerTimerRef.current);
+      addedBannerTimerRef.current = setTimeout(() => setAddedToCart(false), 2500);
     } else {
       Alert.alert('Cannot Add to Cart', result.message ?? 'Please try again.');
     }
@@ -873,16 +938,28 @@ export default function BuyerProductDetailScreen() {
           {/* Divider */}
           <View style={s.divider} />
 
-          {/* Options */}
-          {product.options.map(option => (
-            <OptionPicker
-              key={option.id}
-              product={product}
-              option={option}
-              selections={selections}
-              onSelect={handleSelect}
-            />
-          ))}
+          {/* Options — unselected options highlight after the buyer attempts to add */}
+          {product.options.map(option => {
+            const isUnselected = optionsTouched && !selections[option.id];
+            return (
+              <View key={option.id}>
+                <OptionPicker
+                  product={product}
+                  option={option}
+                  selections={selections}
+                  onSelect={handleSelect}
+                />
+                {isUnselected && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: -SP.sm, marginBottom: SP.sm }}>
+                    <Feather name="alert-circle" size={12} color={RED} />
+                    <Text style={{ fontSize: FS.xs, fontFamily: FONT.medium, color: RED }}>
+                      Please select a {option.name.toLowerCase()}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
 
           {/* Stock status */}
           {allSelected && variant && (
@@ -1000,6 +1077,27 @@ export default function BuyerProductDetailScreen() {
         </View>
       </ScrollView>
 
+      {/* Add-to-bag confirmation banner — slides in above the action bar */}
+      {addedToCart && (
+        <View
+          style={[s.addedBanner]}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+        >
+          <Feather name="check-circle" size={15} color={SUCCESS} />
+          <Text style={s.addedBannerText}>Added to your bag!</Text>
+          <TouchableOpacity
+            onPress={() => router.push('/(buyer)/cart' as never)}
+            accessibilityRole="button"
+            accessibilityLabel="View cart"
+            style={s.addedBannerLink}
+          >
+            <Text style={s.addedBannerLinkText}>View Cart</Text>
+            <Feather name="chevron-right" size={12} color={SUCCESS} />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Persistent purchase bar remains visible while product content scrolls. */}
       <View
         style={[s.actionBar, { paddingBottom: insets.bottom + SP.sm }]}
@@ -1078,9 +1176,15 @@ export default function BuyerProductDetailScreen() {
             >
               {buyingNow ? (
                 <ActivityIndicator color={ON_DARK} size="small" />
+              ) : !inStock && allSelected ? (
+                // Sold-out cue: visible in the action bar when a variant is selected but OOS
+                <>
+                  <Feather name="clock" size={15} color={ORANGE} />
+                  <Text style={[s.actionBtnText, { color: ORANGE }]}>Sold Out</Text>
+                </>
               ) : (
                 <Text style={[s.actionBtnText, (!allSelected || !inStock || paymentUnavailable) && { color: SUBTLE }]}>
-                  {paymentUnavailable ? 'Payments unavailable' : !allSelected ? 'Select Options' : !inStock ? 'Out of Stock' : 'Buy Now'}
+                  {paymentUnavailable ? 'Payments unavailable' : !allSelected ? 'Select Options' : 'Buy Now'}
                 </Text>
               )}
             </LinearGradient>
@@ -1345,6 +1449,16 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   actionBtnText: { fontSize: FS.sm, fontFamily: FONT.bold, color: ON_DARK },
   srOnly: { position: 'absolute', width: 1, height: 1, opacity: 0 },
   btnDisabled: { opacity: 0.5 },
+  // Add-to-bag confirmation banner (sits just above action bar)
+  addedBanner: {
+    position: 'absolute', bottom: COMP.buttonH + SP.md + SP.md + SP.lg, left: SP.md, right: SP.md,
+    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
+    backgroundColor: SUCCESS_DIM, borderRadius: RADIUS.md, borderWidth: 1, borderColor: SUCCESS + '44',
+    paddingVertical: SP.sm, paddingHorizontal: SP.md,
+  },
+  addedBannerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.semibold, color: SUCCESS },
+  addedBannerLink: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  addedBannerLinkText: { fontSize: FS.xs, fontFamily: FONT.bold, color: SUCCESS },
   reviewsHeader: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
   reviewRow: { marginBottom: SP.md, paddingBottom: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   reviewStars: { fontSize: FS.sm, fontFamily: FONT.regular, color: GOLD, marginBottom: 2 },

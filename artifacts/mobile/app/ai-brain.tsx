@@ -1,6 +1,13 @@
 /**
- * Brandthread AI Brain Screen
- * Premium dark AI chat interface for sellers.
+ * Brandthread AI Brain Screen — Canonical Chat UI
+ *
+ * Opens with a single greeting message and an empty composer.
+ * No auto-send, no priority list, no fake business fallbacks.
+ *
+ * Message ownership:
+ *  - The SERVICE creates user + assistant messages.
+ *  - The UI only shows a temporary streaming indicator (not persisted).
+ *  - This eliminates the duplicate-message defect.
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -22,7 +29,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAuth } from '@clerk/expo';
+import { useAuth, useUser } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { useColors } from '@/hooks/useColors';
@@ -42,6 +49,7 @@ import {
   applyAction,
   undoAction,
 } from '@/services/aiService';
+import { getStoreContext } from '@/lib/api';
 import {
   BG,
   SURFACE,
@@ -92,10 +100,7 @@ function StreamingDots() {
   return (
     <View style={styles.dotsRow}>
       {[dot1, dot2, dot3].map((anim, i) => (
-        <Animated.View
-          key={i}
-          style={[styles.dot, { opacity: anim }]}
-        />
+        <Animated.View key={i} style={[styles.dot, { opacity: anim }]} />
       ))}
     </View>
   );
@@ -114,22 +119,16 @@ function ActionCardView({ msg, onApply, onDismiss, onUndo }: ActionCardProps) {
   const colors = useColors();
   const card = msg.actionCard;
   if (!card) return null;
-
   const { status } = card;
 
   return (
     <View style={styles.actionCard}>
-      {/* Type badge */}
       <View style={styles.actionBadge}>
         <Text style={styles.actionBadgeText}>{card.type.toUpperCase()}</Text>
       </View>
-
       <Text style={styles.actionTitle}>{card.title}</Text>
       <Text style={styles.actionDesc}>{card.description}</Text>
-
-      {card.impact ? (
-        <Text style={styles.actionImpact}>Expected: {card.impact}</Text>
-      ) : null}
+      {card.impact ? <Text style={styles.actionImpact}>Expected: {card.impact}</Text> : null}
 
       {status === 'pending' && (
         <View style={styles.actionBtns}>
@@ -139,7 +138,7 @@ function ActionCardView({ msg, onApply, onDismiss, onUndo }: ActionCardProps) {
             activeOpacity={0.8}
           >
             <LinearGradient
-               colors={[colors.primary, colors.accentForeground]}
+              colors={[colors.primary, colors.accentForeground]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.actionApplyGrad}
@@ -147,7 +146,6 @@ function ActionCardView({ msg, onApply, onDismiss, onUndo }: ActionCardProps) {
               <Text style={styles.actionApplyText}>Apply</Text>
             </LinearGradient>
           </TouchableOpacity>
-
           <TouchableOpacity
             style={styles.actionDismissBtn}
             onPress={() => onDismiss(msg.id)}
@@ -184,19 +182,30 @@ function ActionCardView({ msg, onApply, onDismiss, onUndo }: ActionCardProps) {
 interface MessageBubbleProps {
   msg: AIMessage;
   onLongPress: (msg: AIMessage) => void;
-  onRetry: (text: string) => void;
+  onRetry: (originalText: string) => void;
   onApply: (msgId: string) => void;
   onDismiss: (msgId: string) => void;
   onUndo: (msgId: string) => void;
+  /** The user message that preceded this assistant message (for retry). */
+  precedingUserText?: string;
 }
 
-function MessageBubble({ msg, onLongPress, onRetry, onApply, onDismiss, onUndo }: MessageBubbleProps) {
+function MessageBubble({
+  msg,
+  onLongPress,
+  onRetry,
+  onApply,
+  onDismiss,
+  onUndo,
+  precedingUserText,
+}: MessageBubbleProps) {
   const colors = useColors();
+
   if (msg.role === 'user') {
     return (
       <View style={styles.userRow}>
         <LinearGradient
-           colors={[colors.primary, colors.accentForeground]}
+          colors={[colors.primary, colors.accentForeground]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.userBubble}
@@ -207,7 +216,7 @@ function MessageBubble({ msg, onLongPress, onRetry, onApply, onDismiss, onUndo }
     );
   }
 
-  // Assistant
+  // Assistant bubble
   const hasError = !!msg.error;
   const isStreaming = !!msg.isStreaming;
 
@@ -227,10 +236,7 @@ function MessageBubble({ msg, onLongPress, onRetry, onApply, onDismiss, onUndo }
               <Text style={styles.errorText}>{msg.error}</Text>
               <TouchableOpacity
                 style={styles.retryBtn}
-                onPress={() => {
-                  // Find the previous user message to retry
-                  onRetry(msg.content || '');
-                }}
+                onPress={() => onRetry(precedingUserText ?? '')}
                 activeOpacity={0.7}
               >
                 <Feather name="refresh-cw" size={13} color={RED} />
@@ -277,7 +283,6 @@ function EmptyState({ context, onPillPress }: EmptyStateProps) {
       <Text style={styles.emptySubtitle}>
         Ask about your brand, products, content, store, or performance.
       </Text>
-
       <View style={styles.pillGrid}>
         {pills.map((prompt, i) => (
           <TouchableOpacity
@@ -294,13 +299,41 @@ function EmptyState({ context, onPillPress }: EmptyStateProps) {
   );
 }
 
+// ─── Typing Indicator ─────────────────────────────────────────────────────────
+
+/**
+ * A transient assistant typing indicator shown while the request is in flight.
+ * This is NEVER persisted as a message. It disappears when the response arrives
+ * or the request fails.
+ */
+function TypingIndicator() {
+  return (
+    <View style={styles.assistantRow}>
+      <BrandthreadLogo size={18} style={styles.assistantAvatar} />
+      <View style={styles.assistantBubbleCol}>
+        <View style={styles.assistantBubble}>
+          <StreamingDots />
+        </View>
+      </View>
+    </View>
+  );
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
+
+/** One greeting shown on every fresh session open. Never auto-sends. */
+const GREETING: AIMessage = {
+  id: '__greeting__',
+  role: 'assistant',
+  content: 'Hi — how can I help?',
+  ts: 0,
+};
 
 export default function AiBrainScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth();
   const params = useLocalSearchParams<{ context?: string }>();
 
   const parsedContext: AIScreenContext = useMemo(() => {
@@ -311,102 +344,101 @@ export default function AiBrainScreen() {
     }
   }, [params.context]);
 
+  const storeContext = getStoreContext();
+
   const [session, setSession] = useState<AISession | null>(null);
   const [inputText, setInputText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [lastUserText, setLastUserText] = useState('');
+  /**
+   * When a request fails we keep the error alongside the preserved input
+   * so the user can retry without retyping.
+   */
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [pendingRetryText, setPendingRetryText] = useState<string>('');
 
   const flatListRef = useRef<FlatList<AIMessage>>(null);
 
-  // Load session on mount
-  useEffect(() => {
-    loadSession(parsedContext).then(s => setSession(s));
-  }, []);
+  // Track the last user/store context so we can reload on switch.
+  const lastUserIdRef = useRef<string | null | undefined>(undefined);
+  const lastStoreContextRef = useRef<string | null>(null);
 
-  // ─── Send ──────────────────────────────────────────────────────────────────
+  // ─── Load session ───────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const userChanged = lastUserIdRef.current !== userId;
+    const storeChanged = lastStoreContextRef.current !== storeContext;
+
+    if (userChanged || storeChanged || session === null) {
+      lastUserIdRef.current = userId;
+      lastStoreContextRef.current = storeContext;
+      loadSession(parsedContext, userId, storeContext).then(s => setSession(s));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, storeContext]);
+
+  // ─── Dismiss error on new input ─────────────────────────────────────────────
+
+  useEffect(() => {
+    if (inputText.trim() && errorMsg) {
+      setErrorMsg(null);
+    }
+  }, [inputText, errorMsg]);
+
+  // ─── Send ───────────────────────────────────────────────────────────────────
 
   const handleSend = useCallback(
     async (override?: string) => {
       const text = (override ?? inputText).trim();
       if (!text || isGenerating || !session) return;
 
-      setLastUserText(text);
       setInputText('');
+      setErrorMsg(null);
+      setPendingRetryText(text);
       setIsGenerating(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
       const token = await getToken().catch(() => null);
-
-      // Optimistic update
-      const userMsg: AIMessage = {
-        id: Math.random().toString(36).slice(2),
-        role: 'user',
-        content: text,
-        ts: Date.now(),
-      };
-      const placeholderId = Math.random().toString(36).slice(2);
-      const placeholder: AIMessage = {
-        id: placeholderId,
-        role: 'assistant',
-        content: '',
-        ts: Date.now(),
-        isStreaming: true,
-      };
-
-      const optimisticSession: AISession = {
-        ...session,
-        messages: [...session.messages, userMsg, placeholder],
-        updatedAt: Date.now(),
-      };
-      setSession(optimisticSession);
 
       try {
         const result = await sendMessage({
           userText: text,
           session,
           authToken: token,
+          userId,
+          storeContext,
         });
         setSession(result.session);
-      } catch {
-        // Remove placeholder on abort/error
-        setSession(prev =>
-          prev
-            ? { ...prev, messages: prev.messages.filter(m => m.id !== placeholderId) }
-            : prev,
-        );
+      } catch (err: unknown) {
+        const isAbort = (err as Error)?.name === 'AbortError';
+        if (!isAbort) {
+          const msg = (err as Error)?.message ?? 'Something went wrong. Please try again.';
+          setErrorMsg(msg);
+          // Restore user text so they can retry without retyping.
+          setInputText(text);
+        }
+      } finally {
         setIsGenerating(false);
-        return;
       }
-
-      setIsGenerating(false);
     },
-    [inputText, isGenerating, session, getToken],
+    [inputText, isGenerating, session, getToken, userId, storeContext],
   );
 
-  // ─── Pill tap ─────────────────────────────────────────────────────────────
+  // ─── Pill tap (populates composer only — user taps send) ────────────────────
 
-  const handlePillPress = useCallback(
-    (text: string) => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      setInputText(text);
-      handleSend(text);
-    },
-    [handleSend],
-  );
+  const handlePillPress = useCallback((text: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setInputText(text);
+    // Intentionally NOT auto-sending. User reviews and sends.
+  }, []);
 
-  // ─── Stop generation ──────────────────────────────────────────────────────
+  // ─── Stop generation ────────────────────────────────────────────────────────
 
   const handleStop = useCallback(() => {
     cancelGeneration();
     setIsGenerating(false);
-    // Strip any remaining streaming placeholder
-    setSession(prev =>
-      prev
-        ? { ...prev, messages: prev.messages.filter(m => !m.isStreaming) }
-        : prev,
-    );
   }, []);
 
-  // ─── Clear session ────────────────────────────────────────────────────────
+  // ─── Clear session ──────────────────────────────────────────────────────────
 
   const handleClear = useCallback(() => {
     Alert.alert(
@@ -418,37 +450,38 @@ export default function AiBrainScreen() {
           text: 'Clear',
           style: 'destructive',
           onPress: async () => {
-            await clearSession();
+            await clearSession(userId, storeContext);
             setSession(startNewSession(parsedContext));
+            setErrorMsg(null);
+            setInputText('');
           },
         },
       ],
     );
-  }, [parsedContext]);
+  }, [parsedContext, userId, storeContext]);
 
-  // ─── Long press (copy) ────────────────────────────────────────────────────
+  // ─── Long press (copy) ──────────────────────────────────────────────────────
 
   const handleLongPress = useCallback((msg: AIMessage) => {
+    if (!msg.content) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert('Message', undefined, [
-      {
-        text: 'Copy',
-        onPress: () => Clipboard.setStringAsync(msg.content),
-      },
+      { text: 'Copy', onPress: () => Clipboard.setStringAsync(msg.content) },
       { text: 'Cancel', style: 'cancel' },
     ]);
   }, []);
 
-  // ─── Retry ────────────────────────────────────────────────────────────────
+  // ─── Retry ──────────────────────────────────────────────────────────────────
 
   const handleRetry = useCallback(
-    (_content: string) => {
-      handleSend(lastUserText);
+    (originalText: string) => {
+      const text = originalText || pendingRetryText;
+      if (text) handleSend(text);
     },
-    [handleSend, lastUserText],
+    [handleSend, pendingRetryText],
   );
 
-  // ─── Apply / Dismiss / Undo ───────────────────────────────────────────────
+  // ─── Apply / Dismiss / Undo ─────────────────────────────────────────────────
 
   const handleApply = useCallback(
     (msgId: string) => {
@@ -457,7 +490,7 @@ export default function AiBrainScreen() {
       if (!msg?.actionCard) return;
 
       const doApply = async () => {
-        const updated = await applyAction(session, msgId, true);
+        const updated = await applyAction(session, msgId, true, userId, storeContext);
         setSession({ ...updated });
       };
 
@@ -474,28 +507,59 @@ export default function AiBrainScreen() {
         doApply();
       }
     },
-    [session],
+    [session, userId, storeContext],
   );
 
   const handleDismiss = useCallback(
     async (msgId: string) => {
       if (!session) return;
-      const updated = await applyAction(session, msgId, false);
+      const updated = await applyAction(session, msgId, false, userId, storeContext);
       setSession({ ...updated });
     },
-    [session],
+    [session, userId, storeContext],
   );
 
   const handleUndo = useCallback(
     async (msgId: string) => {
       if (!session) return;
-      const updated = await undoAction(session, msgId);
+      const updated = await undoAction(session, msgId, userId, storeContext);
       setSession({ ...updated });
     },
-    [session],
+    [session, userId, storeContext],
   );
 
-  // ─── Render message ───────────────────────────────────────────────────────
+  // ─── Build display list ─────────────────────────────────────────────────────
+
+  /**
+   * The display list is:
+   *   [greeting, ...session.messages]
+   *
+   * The greeting is a synthetic message that never appears in the persisted
+   * session. It is always shown so the screen never opens blank.
+   * FlatList is inverted, so items are reversed for rendering.
+   */
+  const sessionMessages = session?.messages ?? [];
+  const allMessages: AIMessage[] = [GREETING, ...sessionMessages];
+
+  // Build a map from assistant-message id → preceding user text for retry.
+  const precedingUserTextMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (let i = 0; i < sessionMessages.length; i++) {
+      const m = sessionMessages[i];
+      if (m.role === 'assistant') {
+        // Look backward for the most recent user message.
+        for (let j = i - 1; j >= 0; j--) {
+          if (sessionMessages[j].role === 'user') {
+            map.set(m.id, sessionMessages[j].content);
+            break;
+          }
+        }
+      }
+    }
+    return map;
+  }, [sessionMessages]);
+
+  // ─── Render message ─────────────────────────────────────────────────────────
 
   const renderMessage = useCallback(
     ({ item }: { item: AIMessage }) => (
@@ -506,14 +570,14 @@ export default function AiBrainScreen() {
         onApply={handleApply}
         onDismiss={handleDismiss}
         onUndo={handleUndo}
+        precedingUserText={precedingUserTextMap.get(item.id)}
       />
     ),
-    [handleLongPress, handleRetry, handleApply, handleDismiss, handleUndo],
+    [handleLongPress, handleRetry, handleApply, handleDismiss, handleUndo, precedingUserTextMap],
   );
 
-  const messages = session?.messages ?? [];
-  const hasMessages = messages.length > 0;
   const label = contextLabel(parsedContext);
+  const canSend = inputText.trim().length > 0 && !isGenerating;
 
   return (
     <KeyboardAvoidingView
@@ -554,25 +618,42 @@ export default function AiBrainScreen() {
         </View>
       </View>
 
-      {/* ── Message list or empty state ──────────────────────────────────── */}
-      {hasMessages ? (
-        <FlatList
-          ref={flatListRef}
-          data={[...messages].reverse()}
-          keyExtractor={m => m.id}
-          renderItem={renderMessage}
-          inverted
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        />
-      ) : (
-        <View style={styles.emptyWrapper}>
-          <EmptyState context={parsedContext} onPillPress={handlePillPress} />
+      {/* ── Error banner ────────────────────────────────────────────────── */}
+      {errorMsg ? (
+        <View style={styles.errorBanner}>
+          <Feather name="alert-circle" size={14} color={RED} style={{ marginRight: 6 }} />
+          <Text style={styles.errorBannerText} numberOfLines={2}>{errorMsg}</Text>
+          <TouchableOpacity
+            onPress={() => handleRetry(pendingRetryText)}
+            style={styles.retryBannerBtn}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.retryBannerText}>Retry</Text>
+          </TouchableOpacity>
         </View>
-      )}
+      ) : null}
 
-      {/* ── Input row ────────────────────────────────────────────────────── */}
+      {/* ── Message list ────────────────────────────────────────────────── */}
+      <FlatList
+        ref={flatListRef}
+        data={[...allMessages].reverse()}
+        keyExtractor={m => m.id}
+        renderItem={renderMessage}
+        inverted
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={isGenerating ? <TypingIndicator /> : null}
+        ListFooterComponent={
+          sessionMessages.length === 0 ? (
+            <View style={styles.emptyWrapper}>
+              <EmptyState context={parsedContext} onPillPress={handlePillPress} />
+            </View>
+          ) : null
+        }
+      />
+
+      {/* ── Input row ───────────────────────────────────────────────────── */}
       <View style={[styles.inputRow, { paddingBottom: insets.bottom + 8 }]}>
         <TextInput
           style={styles.textInput}
@@ -582,8 +663,10 @@ export default function AiBrainScreen() {
           placeholderTextColor={SUBTLE}
           multiline
           returnKeyType="send"
-          onSubmitEditing={() => handleSend()}
           blurOnSubmit={false}
+          onSubmitEditing={() => {
+            if (canSend) handleSend();
+          }}
         />
 
         {isGenerating ? (
@@ -598,13 +681,13 @@ export default function AiBrainScreen() {
           <TouchableOpacity
             style={styles.sendBtn}
             onPress={() => handleSend()}
-            disabled={!inputText.trim()}
+            disabled={!canSend}
             activeOpacity={0.8}
           >
             <Feather
               name="send"
               size={20}
-              color={inputText.trim().length > 0 ? colors.primary : MUTED}
+              color={canSend ? colors.primary : MUTED}
             />
           </TouchableOpacity>
         )}
@@ -656,6 +739,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
+  // ── Error banner
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: RED_DIM,
+    borderBottomWidth: 1,
+    borderBottomColor: RED,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+  },
+  errorBannerText: {
+    flex: 1,
+    color: RED,
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    lineHeight: 18,
+  },
+  retryBannerBtn: {
+    marginLeft: SP.sm,
+    paddingHorizontal: SP.sm,
+    paddingVertical: 4,
+  },
+  retryBannerText: {
+    color: RED,
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+  },
+
   // ── Message list
   listContent: {
     paddingHorizontal: SP.md,
@@ -665,10 +776,10 @@ const styles = StyleSheet.create({
 
   // ── Empty state
   emptyWrapper: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: SP.lg,
+    paddingVertical: SP.xl,
   },
   emptyState: {
     alignItems: 'center',

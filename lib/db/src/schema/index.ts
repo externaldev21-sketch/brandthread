@@ -1143,19 +1143,29 @@ export const disputes = pgTable('disputes', {
 export const boosts = pgTable('boosts', {
   id:                      uuid('id').primaryKey().defaultRandom(),
   sellerId:                text('seller_id').notNull(),
-  targetType:              text('target_type').notNull(),             // 'post' | 'product'
+  targetType:              text('target_type').notNull(),             // 'post'
   targetId:                text('target_id').notNull(),
   objective:               text('objective').notNull().default('views'), // 'views' | 'likes' | 'followers' | 'profile_visits'
   budgetCents:             integer('budget_cents').notNull(),
   spentCents:              integer('spent_cents').notNull().default(0),
   durationDays:            integer('duration_days').notNull().default(7),
+  /** Legacy PaymentIntent id — kept for rows created before migration 080. Read-only after migration. */
   stripePaymentIntentId:   text('stripe_payment_intent_id'),
-  status:                  text('status').notNull().default('active'), // 'active' | 'paused' | 'completed' | 'cancelled'
+  /** Stripe Checkout Session ID — set after /pay; reused while still-open, rotated when expired. */
+  stripeCheckoutSessionId: text('stripe_checkout_session_id').unique(),
+  /** Incremented each time an expired session is rotated out; used for versioned idempotency keys. */
+  checkoutSessionVersion:  integer('checkout_session_version').notNull().default(0),
+  /** 'pending_payment' | 'active' | 'paused' | 'completed' | 'cancelled' | 'failed' */
+  status:                  text('status').notNull().default('pending_payment'),
   impressionsCount:        integer('impressions_count').notNull().default(0),
-  startsAt:                timestamp('starts_at').defaultNow().notNull(),
+  /** Set only after Stripe confirms payment — null for pending/failed/cancelled boosts. */
+  paidAt:                  timestamp('paid_at', { withTimezone: true }),
+  startsAt:                timestamp('starts_at', { withTimezone: true }),
   endsAt:                  timestamp('ends_at').notNull(),
   createdAt:               timestamp('created_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  csStatusIdx: index('boosts_cs_status_idx').on(table.stripeCheckoutSessionId, table.status),
+}));
 
 // ─── Loyalty / Rewards Points Ledger ─────────────────────────────────────────
 export const loyaltyPoints = pgTable('loyalty_points', {
@@ -1336,4 +1346,66 @@ export const sellerCashoutAttempts = pgTable('seller_cashout_attempts', {
   ownerIdx: index('seller_cashout_attempts_owner_idx').on(table.ownerId),
   ownerIdempotencyUnique: uniqueIndex('seller_cashout_attempts_owner_idempotency_unique')
     .on(table.ownerId, table.idempotencyKey),
+}));
+
+// ─── Ad Campaigns ─────────────────────────────────────────────────────────────
+// Owner-scoped ad campaign drafts. Media is stored as object-storage paths,
+// never as base64 or local URIs. Payment lifecycle: draft → pending_payment →
+// active (webhook only) / failed / cancelled.
+export const adCampaigns = pgTable('ad_campaigns', {
+  id:                     uuid('id').primaryKey().defaultRandom(),
+  sellerId:               text('seller_id').notNull(),
+
+  // ── Media ────────────────────────────────────────────────────────────────
+  /** 'video' | 'photos' — never mixed */
+  mediaKind:              text('media_kind').notNull().default('photos'),
+  /** Ordered object-storage paths (1 video or 1–5 photos) */
+  mediaObjectPaths:       json('media_object_paths').$type<string[]>().notNull().default([]),
+  /** Parallel MIME type array aligned with mediaObjectPaths */
+  mediaMimeTypes:         json('media_mime_types').$type<string[]>().notNull().default([]),
+
+  // ── Details ───────────────────────────────────────────────────────────────
+  headline:               text('headline'),
+  description:            text('description'),
+  /** 'shop_now' | 'learn_more' | 'view_product' | 'sign_up' | 'contact_us' */
+  ctaKind:                text('cta_kind'),
+  /** 'product' | 'store' | 'profile' | 'contact' */
+  ctaDestinationKind:     text('cta_destination_kind'),
+  /** product UUID, or null for store/profile/contact targets */
+  ctaDestinationId:       text('cta_destination_id'),
+
+  // ── Formats ────────────────────────────────────────────────────────────────
+  /** JSON array of format keys: 'story_9x16' | 'square_1x1' | 'portrait_4x5' | 'landscape_16x9' */
+  formats:                json('formats').$type<string[]>().notNull().default([]),
+
+  // ── Budget / Duration / Reach ─────────────────────────────────────────────
+  /** Integer cents: $5 (500) – $1000 (100000) */
+  budgetCents:            integer('budget_cents').notNull().default(500),
+  /** Whole days: 1–30 */
+  durationDays:           integer('duration_days').notNull().default(1),
+  /** Pre-computed estimate range — never reported as delivered impressions */
+  estimatedReachLow:      integer('estimated_reach_low').notNull().default(0),
+  estimatedReachHigh:     integer('estimated_reach_high').notNull().default(0),
+
+  // ── Payment / Lifecycle ───────────────────────────────────────────────────
+  /** 'draft' | 'pending_payment' | 'active' | 'failed' | 'cancelled' */
+  status:                   text('status').notNull().default('draft'),
+  /** Stripe Checkout Session ID — persisted after /pay so retries reuse the open session */
+  stripeCheckoutSessionId:  text('stripe_checkout_session_id').unique(),
+  /** Checkout session version — incremented when an expired session is rotated out */
+  checkoutSessionVersion:   integer('checkout_session_version').notNull().default(0),
+  /** Set only after webhook confirms checkout.session.completed with payment_status=paid */
+  paidAt:                   timestamp('paid_at', { withTimezone: true }),
+  startsAt:                 timestamp('starts_at', { withTimezone: true }),
+  endsAt:                   timestamp('ends_at', { withTimezone: true }),
+
+  // ── Creative Config ────────────────────────────────────────────────────────
+  /** { slideshow: { paths: string[] }, formatConfigs: { [format]: { w, h, ar } } } */
+  creativeConfig:         json('creative_config').$type<Record<string, unknown>>(),
+
+  createdAt:              timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt:              timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  sellerCreatedIdx:  index('ad_campaigns_seller_id_idx').on(table.sellerId, table.createdAt),
+  csStatusIdx:       index('ad_campaigns_cs_status_idx').on(table.stripeCheckoutSessionId, table.status),
 }));

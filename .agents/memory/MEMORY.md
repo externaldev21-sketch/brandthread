@@ -51,7 +51,7 @@
 - [Pre-order/Waitlist/Bundles/SizeChart/AbandonedCart/ShareStore](preorder-waitlist-bundles-features.md) — migration 016; 3 new API route files; 3 new mobile screens; buyer-product-detail.tsx extended; api.ts buyer+waitlist+bundles+products groups added.
 - [Financial Systems Architecture](financial-systems-architecture.md) — migrations 018–020; /api/store, /api/team, /api/disputes, /api/finance, /api/taxes, /api/store/ai; dispute webhooks; storeService hybrid (AsyncStorage+API); 8 mobile screens wired.
 - [StoreService hybrid pattern](storeservice-hybrid-pattern.md) — storeService.ts uses AsyncStorage as primary (complex UI state) + fire-and-forget API sync on save; AI endpoints try real API first, fall back to mock; publish/unpublish call real API.
-- [AI Brain system wiring](ai-brain-wiring.md) — ai-brain.tsx already live; ai-assistant.tsx now real (uses aiService.sendMessage); brand memory rebuild calls /api/ai/brand-memory/rebuild (GPT-4o-mini derives voice from products/posts/store); suggestions calls /api/ai/suggestions (real DB: low-stock variants, unfulfilled orders, caption-less posts).
+- [AI Brain conversation contract](ai-brain-wiring.md) — one canonical chat uses verified account context; never auto-send, persist blank rows, or substitute fabricated business answers.
 - [Account Security wiring](account-security-wiring.md) — biometric-unlock.tsx uses expo-local-authentication + SecureStore; login-methods.tsx adds Clerk TOTP 2FA (createTOTP/verifyTOTP/disableTOTP); security.tsx "View" → login-activity.tsx; /api/ai/sessions returns Clerk session list.
 - [Drops & Repost wiring](drops-repost-wiring.md) — releaseAt+dropId already in DB; following.tsx wired to /api/public/drops with live countdown; buyer-drop-detail.tsx new screen; feed.tsx like/repost/save fire-and-forget to real API; repost uses 'repost' interaction type (free-text column).
 - [Live Shopping Architecture](live-shopping-architecture.md) — Agora streams support seller-featured products and an in-stream Stripe Checkout overlay that keeps the broadcast mounted.
@@ -68,7 +68,7 @@
 - [Guest commerce boundaries](guest-commerce-boundaries.md) — guest shopping stays public-route-only; order lookup uses a hashed capability, with no loyalty or saved payment identity.
 - [Integer-cents money contracts](integer-cents-money-contracts.md) — mobile money stays in explicit *Cents fields; parse decimal strings strictly and format only at the UI boundary.
 - [Mobile API resilience](mobile-api-resilience.md) — classify transport/server failures centrally; only read requests get global retry actions, while mutations require explicit screen-level retries.
-- [Promote objective boundary](promote-objectives.md) — Boost objectives are persisted and reported now; true objective-aware delivery requires separate event attribution and ranking work.
+- [Promote objective boundary](promote-objectives.md) — Boost defaults to views; objective-aware delivery remains deferred until exposure attribution and ranking support exist.
 - [Returns and push preferences](returns-push-preferences.md) — return/refund submissions are server-authoritative; granular category switches gate push delivery, not the in-app feed.
 - [API failure contract](api-failure-contract.md) — every API failure uses one request-correlated envelope; 5xx responses stay generic while diagnostics remain in structured logs.
 - [Stripe Connect payout truth](stripe-connect-payout-truth.md) — seller bank and verification UI must come from live Connect account state, never finance balances or cached labels.
@@ -105,3 +105,5 @@
 - [Seller cash-out safety](seller-cashout-safety.md) — cash-outs bind exact confirmed funds, account, bank, and durable provider reference; ambiguous old attempts fail closed.
 - [Create Post interaction](create-post-interaction.md) — use a TikTok-like media-first flow with a full-screen editor and compact final details, adapted to Brandthread.
 - [Persistent seller navigation](persistent-seller-navigation.md) — the seller tab bar is app-shell navigation and remains visible on every signed-in seller route.
+- [Reference-app adaptation](reference-app-adaptation.md) — audit reference archives for useful micro-interactions as well as major flows; adapt them without replacing Brandthread’s layout.
+- [Canonical buyer checkout](canonical-buyer-checkout.md) — every buyer purchase source uses one Brandthread checkout, confirmation, purchase-detail, and rating journey.

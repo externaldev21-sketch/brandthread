@@ -11,23 +11,32 @@ import crypto from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { boosts, db, loyaltyPoints, posts, products, users } from "@workspace/db";
 
-const stripeState = vi.hoisted(() => ({ paymentMethod: true, decline: false, charges: [] as any[] }));
+const stripeState = vi.hoisted(() => ({
+  sessionStatus: "open" as "open" | "complete" | "expired",
+  paymentStatus: "unpaid" as "unpaid" | "paid" | "no_payment_required",
+}));
 const stripeFake = vi.hoisted(() => ({
-  customers: {
-    retrieve: vi.fn(async () => stripeState.paymentMethod
-      ? { invoice_settings: { default_payment_method: "pm_boost_test" } }
-      : { invoice_settings: { default_payment_method: null } }),
-  },
-  paymentIntents: {
-    create: vi.fn(async (params: any) => {
-      stripeState.charges.push(params);
-      if (stripeState.decline) {
-        const error: any = new Error("declined");
-        error.code = "card_declined";
-        throw error;
-      }
-      return { id: `pi_boost_${stripeState.charges.length}`, status: "succeeded" };
-    }),
+  checkout: {
+    sessions: {
+      create: vi.fn(async (params: any) => ({
+        id:             `cs_loyalty_test_${Date.now()}`,
+        url:            `https://checkout.stripe.com/test/cs_loyalty_test_${Date.now()}`,
+        payment_status: stripeState.paymentStatus,
+        status:         stripeState.sessionStatus,
+        amount_total:   params.line_items[0].price_data.unit_amount,
+        currency:       "usd",
+        metadata:       params.metadata,
+      })),
+      retrieve: vi.fn(async (id: string) => ({
+        id,
+        url:            `https://checkout.stripe.com/test/${id}`,
+        payment_status: stripeState.paymentStatus,
+        status:         stripeState.sessionStatus,
+        amount_total:   500,
+        currency:       "usd",
+        metadata:       { kind: "boost" },
+      })),
+    },
   },
 }));
 
@@ -78,8 +87,8 @@ beforeAll(async () => {
     { clerkId: buyer, email: `${buyer}@test.local`, name: "Loyal Buyer", role: "buyer", accountType: "buyer" },
     { clerkId: otherBuyer, email: `${otherBuyer}@test.local`, name: "Other Buyer", role: "buyer", accountType: "buyer" },
   ]);
-  [postId] = (await db.insert(posts).values({ userId: seller, mediaUrl: "https://example.test/owned.jpg", caption: "owned" }).returning({ id: posts.id })).map(x => x.id);
-  [strangerPostId] = (await db.insert(posts).values({ userId: stranger, mediaUrl: "https://example.test/other.jpg" }).returning({ id: posts.id })).map(x => x.id);
+  [postId] = (await db.insert(posts).values({ userId: seller, mediaUrl: "https://example.test/owned.mp4", mediaType: "video", caption: "owned", postStatus: "published" }).returning({ id: posts.id })).map(x => x.id);
+  [strangerPostId] = (await db.insert(posts).values({ userId: stranger, mediaUrl: "https://example.test/other.mp4", mediaType: "video", postStatus: "published" }).returning({ id: posts.id })).map(x => x.id);
   [productId] = (await db.insert(products).values({ ownerId: seller, name: "Boostable product", category: "apparel", status: "active" }).returning({ id: products.id })).map(x => x.id);
   await new Promise<void>(resolve => {
     server = app.listen(0, "127.0.0.1", () => resolve());
@@ -100,33 +109,40 @@ describe("boosts HTTP integration", () => {
   it("lists only owned promotion targets and validates each create input", async () => {
     const targets = await request(seller, "GET", "/api/boosts/targets");
     expect(targets.status).toBe(200);
+    // Targets only returns video/slideshow(2+) posts — the seller's video post is eligible
     expect(targets.body.map((row: any) => row.id)).toContain(postId);
+    // Stranger's posts are never shown
     expect(targets.body.map((row: any) => row.id)).not.toContain(strangerPostId);
     for (const payload of [
       boostPayload({ targetType: "profile" }), boostPayload({ targetId: "" }),
       boostPayload({ objective: "sales" }), boostPayload({ budgetCents: 499 }),
       boostPayload({ budgetCents: 100_001 }), boostPayload({ budgetCents: 500.5 }),
-      boostPayload({ durationDays: 0 }), boostPayload({ durationDays: 91 }),
+      boostPayload({ durationDays: 0 }), boostPayload({ durationDays: 31 }),
     ]) expect((await request(seller, "POST", "/api/boosts", payload)).status).toBe(400);
     expect((await request(seller, "POST", "/api/boosts", boostPayload({ targetId: strangerPostId }))).status).toBe(404);
-    expect((await request(seller, "POST", "/api/boosts", boostPayload({ targetType: "product", targetId: productId, objective: "likes" }))).status).toBe(201);
+    // targetType: 'product' is rejected with 400
+    expect((await request(seller, "POST", "/api/boosts", boostPayload({ targetType: "product", targetId: productId, objective: "likes" }))).status).toBe(400);
   });
 
-  it("charges a stored card, handles card declines, and records paid boost fields", async () => {
-    stripeState.paymentMethod = true;
-    stripeState.decline = false;
+  it("creates a pending_payment boost (no immediate charge) and includes reach estimate fields", async () => {
     const created = await request(seller, "POST", "/api/boosts", boostPayload({ budgetCents: 750, objective: "followers", durationDays: 3 }));
     expect(created.status).toBe(201);
-    expect(created.body).toMatchObject({ sellerId: seller, status: "active", paid: true, spentCents: 750, estimatedImpressions: 300, durationDays: 3 });
-    expect(stripeState.charges.at(-1)).toMatchObject({ amount: 750, customer: `cus_${tag}`, metadata: { sellerId: seller, targetId: postId, objective: "followers" } });
-    stripeState.decline = true;
-    const declined = await request(seller, "POST", "/api/boosts", boostPayload());
-    expect(declined).toMatchObject({ status: 402, body: { code: "card_declined" } });
-    stripeState.decline = false;
-    stripeState.paymentMethod = false;
-    const unpaid = await request(seller, "POST", "/api/boosts", boostPayload({ objective: "likes" }));
-    expect(unpaid.body).toMatchObject({ paid: false, spentCents: 0 });
-    stripeState.paymentMethod = true;
+    // New lifecycle: boost stays pending_payment until /pay/verify activates it
+    expect(created.body).toMatchObject({
+      sellerId:     seller,
+      status:       "pending_payment",
+      budgetCents:  750,
+      durationDays: 3,
+    });
+    // No charge happens at create time
+    expect(created.body.paid).toBe(false);
+    expect(created.body.paidAt).toBeFalsy();
+    expect(created.body.startsAt).toBeFalsy();
+    // Reach estimate is included
+    expect(created.body.estimatedReachLow).toBeGreaterThan(0);
+    expect(created.body.estimatedReachHigh).toBeGreaterThan(0);
+    // Legacy estimatedImpressions preserved for compat
+    expect(typeof created.body.estimatedImpressions).toBe("number");
   });
 
   it("returns scoped listings, summary totals, active post filtering, expiry and lifecycle errors", async () => {
@@ -138,6 +154,11 @@ describe("boosts HTTP integration", () => {
       sellerId: seller, targetType: "post", targetId: postId, objective: "views", budgetCents: 500,
       spentCents: 500, impressionsCount: 17, status: "completed", durationDays: 1, endsAt: new Date(Date.now() + 86_400_000),
     }).returning();
+    // Insert a currently-active boost so /active-post-ids returns this postId
+    await db.insert(boosts).values({
+      sellerId: seller, targetType: "post", targetId: postId, objective: "views", budgetCents: 1000,
+      spentCents: 1000, impressionsCount: 0, status: "active", durationDays: 7, endsAt: new Date(Date.now() + 7 * 86_400_000),
+    });
     const list = await request(seller, "GET", `/api/boosts?targetId=${postId}`);
     expect(list.status).toBe(200);
     expect(list.body.every((row: any) => row.targetId === postId && row.sellerId === seller)).toBe(true);

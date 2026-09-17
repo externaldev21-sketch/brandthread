@@ -1,53 +1,87 @@
 /**
- * Paid Promotion Boost Tool
- * Route: /boost?targetType=post|product&targetId=<uuid>
+ * Paid Promotion / Boost Flow
+ * Route: /boost?id=<uuid>&paymentReturn=1  (Stripe Checkout return)
+ *        /boost                             (fresh flow)
+ *
+ * 3-step flow (mirrors Create Ad UX):
+ *   Step 1 — Post picker: choose one published video or slideshow (2+ images)
+ *   Step 2 — Budget & duration: slider-only, same UX as Create Ad
+ *   Step 3 — Payment: Stripe Checkout hosted page; verify via /pay/verify
+ *
+ * Payment lifecycle (identical to design-campaign.tsx):
+ *   1. User taps "Boost post · $X" → POST /api/boosts (creates pending_payment record)
+ *   2. POST /api/boosts/:id/pay   → get Checkout Session url
+ *   3. WebBrowser.openAuthSessionAsync(url, returnUrl)
+ *   4. Browser returns → POST /api/boosts/:id/pay/verify → activates idempotently
+ *   5. Show success only after verified boost.status === 'active'
+ *   6. Cancel/failed → retryable; boost stays pending_payment
+ *
+ * The objective field is always persisted as 'views' for schema compatibility.
+ * The objective step is removed from the UI per the redesign contract.
+ *
+ * Selected post, budget, and duration are preserved across browser return.
  */
-import React, { useState, useCallback, useRef } from 'react';
-import { useColors } from '@/hooks/useColors';
+import React, {
+  useState, useCallback, useRef, useMemo, useEffect,
+} from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Alert, ActivityIndicator, PanResponder, LayoutChangeEvent,
+  Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { VideoView, useVideoPlayer } from 'expo-video';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import * as WebBrowser from 'expo-web-browser';
 import { useApi } from '@/hooks/useApi';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, SUCCESS, SUCCESS_DIM,
-  ORANGE, RED, GOLD, FONT, FS, SP, RADIUS, ICON,
+  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
+  SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
+  FONT, FS, SP, RADIUS, SHADOW_SM,
 } from '@/lib/theme';
 import { divideCents, formatCents } from '@/lib/money';
+import {
+  BOOST_BUDGET_STEPS,
+  BOOST_BUDGET_MIN_CENTS,
+  BOOST_BUDGET_MAX_CENTS,
+  BOOST_DURATION_MIN_DAYS,
+  BOOST_DURATION_MAX_DAYS,
+  estimateBoostReach,
+  buildBoostReturnUrl,
+} from '@/services/boostService';
 
-type BoostObjective = 'views' | 'likes' | 'followers' | 'profile_visits';
-
-const OBJECTIVES: Array<{
-  value: BoostObjective;
-  label: string;
-  description: string;
-  icon: React.ComponentProps<typeof Feather>['name'];
-}> = [
-  { value: 'views', label: 'More video views', description: 'Reach people likely to watch', icon: 'play-circle' },
-  { value: 'likes', label: 'More likes', description: 'Find people likely to engage', icon: 'heart' },
-  { value: 'followers', label: 'More followers', description: 'Grow your audience', icon: 'user-plus' },
-  { value: 'profile_visits', label: 'More profile visits', description: 'Drive people to your shop', icon: 'user' },
-];
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type BoostTarget = {
   id: string;
   mediaUrl: string | null;
   mediaType: string | null;
+  mediaUrls: string[] | null;
+  mediaPaths: string[] | null;
   caption: string | null;
   createdAt: string;
+  /** 'video' | 'slideshow' */
+  mediaKind: 'video' | 'slideshow';
+  imageCount: number | null;
 };
 
 type Boost = {
-  id: string; status: string; budgetCents: number; spentCents: number;
-  impressionsCount: number; durationDays: number; startsAt: string; endsAt: string;
-  estimatedImpressions: number; objective: BoostObjective;
+  id: string;
+  status: string;
+  budgetCents: number;
+  spentCents: number;
+  impressionsCount: number;
+  durationDays: number;
+  startsAt?: string | null;
+  endsAt: string;
+  estimatedReachLow: number;
+  estimatedReachHigh: number;
+  estimatedImpressions: number;
+  paid?: boolean;
+  paidAt?: string | null;
 };
 
 type Summary = {
@@ -56,43 +90,44 @@ type Summary = {
   activeCount: number;
 };
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function daysRemaining(endsAt: string): number {
   const ms = new Date(endsAt).getTime() - Date.now();
   return Math.max(0, Math.ceil(ms / 86_400_000));
 }
 
-function objectiveLabel(value: BoostObjective): string {
-  return OBJECTIVES.find((item) => item.value === value)?.label ?? 'More video views';
+function statusColor(s: string): string {
+  if (s === 'active')           return SUCCESS;
+  if (s === 'paused')           return ORANGE;
+  if (s === 'completed')        return MUTED;
+  if (s === 'cancelled')        return RED;
+  if (s === 'failed')           return RED;
+  if (s === 'pending_payment')  return ORANGE;
+  return MUTED;
 }
 
-function PostThumbnail({ target }: { target: BoostTarget }) {
-  const colors = useColors();
-  const s = React.useMemo(() => createStyles(colors), [colors]);
-  const isVideo = target.mediaType === 'video';
-  const player = useVideoPlayer(isVideo && target.mediaUrl ? target.mediaUrl : null, (instance) => {
-    instance.muted = true;
-    instance.loop = false;
-  });
-
-  if (!target.mediaUrl) {
-    return (
-      <View style={s.thumbnailFallback}>
-        <Feather name="file-text" size={26} color={MUTED} />
-      </View>
-    );
-  }
-
-  if (isVideo) {
-    return (
-      <View style={StyleSheet.absoluteFill}>
-        <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
-        <View style={s.videoBadge}><Feather name="play" size={10} color="#fff" /></View>
-      </View>
-    );
-  }
-
-  return <Image source={{ uri: target.mediaUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />;
+function statusBg(s: string): string {
+  if (s === 'active')           return SUCCESS_DIM;
+  if (s === 'paused')           return ORANGE_DIM;
+  if (s === 'cancelled')        return RED_DIM;
+  if (s === 'failed')           return RED_DIM;
+  if (s === 'pending_payment')  return ORANGE_DIM;
+  return 'rgba(255,255,255,0.05)';
 }
+
+function statusLabel(s: string): string {
+  if (s === 'pending_payment') return 'Pending payment';
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function reachProgress(b: Boost): number {
+  const est = b.estimatedReachLow > 0 ? b.estimatedReachLow : b.estimatedImpressions;
+  if (!est || est <= 0) return 0;
+  return Math.min(1, b.impressionsCount / est);
+}
+
+// ─── Slider primitives ────────────────────────────────────────────────────────
 
 function SnapSlider({
   value, min, max, step, onChange, accessibilityLabel,
@@ -101,14 +136,10 @@ function SnapSlider({
   min: number;
   max: number;
   step: number;
-  onChange: (value: number) => void;
+  onChange: (v: number) => void;
   accessibilityLabel: string;
 }) {
-  const colors = useColors();
-  const s = React.useMemo(() => createStyles(colors), [colors]);
   const widthRef = useRef(1);
-  const startValueRef = useRef(value);
-  startValueRef.current = value;
 
   const snap = useCallback((raw: number) => {
     const clamped = Math.max(min, Math.min(max, raw));
@@ -119,571 +150,1074 @@ function SnapSlider({
     onChange(snap(min + (Math.max(0, Math.min(widthRef.current, x)) / widthRef.current) * (max - min)));
   }, [max, min, onChange, snap]);
 
-  const panResponder = PanResponder.create({
+  const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: () => {
-      startValueRef.current = value;
-      Haptics.selectionAsync();
+    onMoveShouldSetPanResponder:  () => true,
+    onPanResponderGrant:          () => { Haptics.selectionAsync(); },
+    onPanResponderMove:           (_e, g) => {
+      onChange(snap(value + (g.dx / widthRef.current) * (max - min)));
     },
-    onPanResponderMove: (_event, gesture) => {
-      onChange(snap(startValueRef.current + (gesture.dx / widthRef.current) * (max - min)));
-    },
-  });
+  }), [max, min, onChange, snap, value]);
 
   const fraction = (value - min) / (max - min);
+
   return (
     <View
-      style={s.sliderTouchArea}
-      onLayout={(event: LayoutChangeEvent) => { widthRef.current = Math.max(1, event.nativeEvent.layout.width); }}
-      onTouchEnd={(event) => updateFromX(event.nativeEvent.locationX)}
+      style={ss.sliderTouch}
+      onLayout={(e: LayoutChangeEvent) => { widthRef.current = Math.max(1, e.nativeEvent.layout.width); }}
+      onTouchEnd={(e) => updateFromX(e.nativeEvent.locationX)}
       accessible
       accessibilityRole="adjustable"
       accessibilityLabel={accessibilityLabel}
       accessibilityValue={{ min, max, now: value }}
       accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
-      onAccessibilityAction={(event) => {
-        onChange(snap(value + (event.nativeEvent.actionName === 'increment' ? step : -step)));
+      onAccessibilityAction={(e) => {
+        onChange(snap(value + (e.nativeEvent.actionName === 'increment' ? step : -step)));
       }}
       {...panResponder.panHandlers}
     >
-      <View style={s.sliderTrack}>
-        <View style={[s.sliderFill, { width: `${fraction * 100}%` }]} />
+      <View style={ss.sliderTrack}>
+        <View style={[ss.sliderFill, { width: `${fraction * 100}%` as any }]} />
       </View>
-      <View style={[s.sliderThumb, { left: `${fraction * 100}%` }]} />
+      <View style={[ss.sliderThumb, { left: `${fraction * 100}%` as any }]} />
     </View>
   );
 }
 
+function BudgetStepSlider({
+  value, onChange,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  const widthRef = useRef(1);
+  const steps = BOOST_BUDGET_STEPS;
+
+  const indexFromX = useCallback((x: number) => {
+    const fraction = Math.max(0, Math.min(1, x / widthRef.current));
+    return Math.min(steps.length - 1, Math.round(fraction * (steps.length - 1)));
+  }, [steps.length]);
+
+  const panResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder:  () => true,
+    onPanResponderGrant:          () => { Haptics.selectionAsync(); },
+    onPanResponderMove:           (_e, g) => {
+      const currentIdx = steps.indexOf(value as typeof steps[number]);
+      const startX = currentIdx === -1
+        ? widthRef.current / 2
+        : (currentIdx / (steps.length - 1)) * widthRef.current;
+      const newIdx = indexFromX(startX + g.dx);
+      onChange(steps[newIdx]);
+    },
+  }), [steps, value, indexFromX, onChange]);
+
+  const currentIdx = steps.indexOf(value as typeof steps[number]);
+  const safeIdx = currentIdx === -1 ? 0 : currentIdx;
+  const fraction = safeIdx / (steps.length - 1);
+
+  return (
+    <View
+      style={ss.sliderTouch}
+      onLayout={(e: LayoutChangeEvent) => { widthRef.current = Math.max(1, e.nativeEvent.layout.width); }}
+      onTouchEnd={(e) => {
+        const idx = indexFromX(e.nativeEvent.locationX);
+        onChange(steps[idx]);
+        Haptics.selectionAsync();
+      }}
+      accessible
+      accessibilityRole="adjustable"
+      accessibilityLabel="Promotion budget"
+      accessibilityValue={{ min: BOOST_BUDGET_MIN_CENTS, max: BOOST_BUDGET_MAX_CENTS, now: value }}
+      accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+      onAccessibilityAction={(e) => {
+        const idx = steps.indexOf(value as typeof steps[number]);
+        const safeI = idx === -1 ? 0 : idx;
+        if (e.nativeEvent.actionName === 'increment') onChange(steps[Math.min(steps.length - 1, safeI + 1)]);
+        else onChange(steps[Math.max(0, safeI - 1)]);
+      }}
+      {...panResponder.panHandlers}
+    >
+      <View style={ss.sliderTrack}>
+        <View style={[ss.sliderFill, { width: `${fraction * 100}%` as any }]} />
+      </View>
+      <View style={[ss.sliderThumb, { left: `${fraction * 100}%` as any }]} />
+    </View>
+  );
+}
+
+const ss = StyleSheet.create({
+  sliderTouch: { height: 44, justifyContent: 'center', position: 'relative' },
+  sliderTrack: { height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.10)', overflow: 'hidden' },
+  sliderFill:  { height: 5, borderRadius: 3, backgroundColor: PURPLE_LIGHT },
+  sliderThumb: {
+    position: 'absolute', top: 10, width: 24, height: 24, borderRadius: 12,
+    marginLeft: -12, backgroundColor: '#fff',
+    borderWidth: 3, borderColor: PURPLE_LIGHT,
+    shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+});
+
+// ─── Step indicator ───────────────────────────────────────────────────────────
+
+function StepDots({ total, current }: { total: number; current: number }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, justifyContent: 'center', marginBottom: SP.md }}>
+      {Array.from({ length: total }).map((_, i) => (
+        <View
+          key={i}
+          style={{
+            width: i === current ? 18 : 6,
+            height: 6,
+            borderRadius: 3,
+            backgroundColor: i <= current ? PURPLE_LIGHT : SUBTLE,
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
+// ─── Post thumbnail ───────────────────────────────────────────────────────────
+
+function PostThumbnail({ target }: { target: BoostTarget }) {
+  const thumbnailUrl = target.mediaUrls?.[0] ?? target.mediaUrl;
+
+  if (!thumbnailUrl) {
+    return (
+      <View style={tc.fallback}>
+        <Feather name="film" size={22} color={MUTED} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <Image source={{ uri: thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+      <View style={tc.badgeRow}>
+        {target.mediaKind === 'video' ? (
+          <View style={tc.badge}>
+            <Feather name="play" size={8} color="#fff" />
+            <Text style={tc.badgeText}>Video</Text>
+          </View>
+        ) : (
+          <View style={tc.badge}>
+            <Feather name="grid" size={8} color="#fff" />
+            <Text style={tc.badgeText}>Slideshow</Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
+const tc = StyleSheet.create({
+  fallback: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: CARD_ELEVATED,
+  },
+  badgeRow: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    flexDirection: 'row',
+    gap: 4,
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontFamily: FONT.semibold,
+  },
+});
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const TOTAL_STEPS = 3; // Step 1: picker, Step 2: budget, Step 3: payment/success
+// Steps are 0-indexed for StepDots: 0=picker, 1=budget, 2=paying (not shown as step dot)
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
+
 export default function BoostScreen() {
-  const colors = useColors();
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = colors;
-  const s = React.useMemo(() => createStyles(colors), [colors]);
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
   const api     = useApi();
-  const params = useLocalSearchParams<{ targetType?: string; targetId?: string }>();
-  const initialTargetId = typeof params.targetId === 'string' ? params.targetId : '';
-  const initialTargetType = params.targetType === 'product' ? 'product' : 'post';
+  const params  = useLocalSearchParams<{ id?: string; paymentReturn?: string }>();
 
-  const [selectedTargetId, setSelectedTargetId] = useState(initialTargetId);
-  const [selectedTargetType, setSelectedTargetType] = useState<'post' | 'product'>(initialTargetType);
-  const [showPicker, setShowPicker] = useState(!initialTargetId);
-  const [targets, setTargets] = useState<BoostTarget[]>([]);
-  const [loadingTargets, setLoadingTargets] = useState(!initialTargetId);
-  const [objective, setObjective] = useState<BoostObjective>('views');
-  const [budgetCents, setBudgetCents] = useState(2500);
-  const [durationDays, setDurationDays] = useState(7);
-  const [launching,        setLaunching]         = useState(false);
-  const [existing,         setExisting]          = useState<Boost[]>([]);
-  const [loadingExisting,  setLoadingExisting]   = useState(true);
-  const [summary,          setSummary]           = useState<Summary | null>(null);
-  const [loadingSummary,   setLoadingSummary]    = useState(true);
+  const topPad    = insets.top + (Platform.OS === 'web' ? 67 : 0);
+  const bottomPad = insets.bottom + (Platform.OS === 'web' ? 34 : 0) + 90;
 
-  const estimatedImpressions = Math.round(budgetCents * 0.4);
-  const selectedTarget = targets.find((item) => item.id === selectedTargetId);
-  const budgetLabel = formatCents(budgetCents);
-  const durationLabel = `${durationDays} ${durationDays === 1 ? 'day' : 'days'}`;
+  // ── State ─────────────────────────────────────────────────────────────────
+
+  const [step,             setStep]             = useState<0 | 1 | 2>(0);
+  const [selectedTarget,   setSelectedTarget]   = useState<BoostTarget | null>(null);
+  const [targets,          setTargets]          = useState<BoostTarget[]>([]);
+  const [loadingTargets,   setLoadingTargets]   = useState(true);
+  const [targetsError,     setTargetsError]     = useState(false);
+  const [budgetCents,      setBudgetCents]      = useState(2500);
+  const [durationDays,     setDurationDays]     = useState(7);
+
+  // Pending boost record (created before Checkout)
+  const [pendingBoost,     setPendingBoost]     = useState<Boost | null>(null);
+
+  // Payment flow state
+  const [creating,         setCreating]         = useState(false);
+  const [paying,           setPaying]           = useState(false);
+  const [verifying,        setVerifying]        = useState(false);
+  const [succeeded,        setSucceeded]        = useState(false);
+  const [activeBoost,      setActiveBoost]      = useState<Boost | null>(null);
+
+  // History
+  const [existing,         setExisting]         = useState<Boost[]>([]);
+  const [loadingExisting,  setLoadingExisting]  = useState(true);
+  const [summary,          setSummary]          = useState<Summary | null>(null);
+  const [pausingId,        setPausingId]        = useState<string | null>(null);
+
+  // Prevent double-handling the paymentReturn redirect
+  const paymentReturnConsumed = useRef(false);
+
+  const reach = useMemo(() => estimateBoostReach(budgetCents), [budgetCents]);
+
+  // ── Data loading ─────────────────────────────────────────────────────────
 
   const loadTargets = useCallback(async () => {
     setLoadingTargets(true);
+    setTargetsError(false);
     try {
       const rows = await api.boosts.targets();
-      setTargets(rows ?? []);
+      setTargets((rows ?? []) as BoostTarget[]);
     } catch {
+      setTargetsError(true);
       setTargets([]);
     } finally {
       setLoadingTargets(false);
     }
   }, [api]);
 
-  useFocusEffect(useCallback(() => {
-    loadTargets();
-
-    // Load existing boosts for this target
-    if (selectedTargetId) {
-      setLoadingExisting(true);
-      api.boosts.list(selectedTargetId)
-        .then((rows: Boost[]) => setExisting(rows ?? []))
-        .catch(() => setExisting([]))
-        .finally(() => setLoadingExisting(false));
-    } else {
+  const loadHistory = useCallback(async () => {
+    setLoadingExisting(true);
+    try {
+      const rows = await api.boosts.list();
+      setExisting((rows ?? []) as Boost[]);
+    } catch {
+      setExisting([]);
+    } finally {
       setLoadingExisting(false);
     }
+  }, [api]);
 
-    // Load summary stats
-    setLoadingSummary(true);
+  useFocusEffect(useCallback(() => {
+    loadTargets();
+    loadHistory();
     api.boosts.summary()
-      .then((s: Summary) => setSummary(s))
-      .catch(() => setSummary(null))
-      .finally(() => setLoadingSummary(false));
-  }, [api, loadTargets, selectedTargetId]));
+      .then((s) => setSummary(s))
+      .catch(() => setSummary(null));
+  }, [api, loadTargets, loadHistory]));
 
-  async function handleLaunch() {
-    if (!selectedTargetId) {
-      Alert.alert('Choose a post', 'Select the post you want to promote first.'); return;
-    }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setLaunching(true);
+  // ── Handle Checkout redirect return ──────────────────────────────────────
+
+  useEffect(() => {
+    if (params.paymentReturn !== '1' || !params.id || paymentReturnConsumed.current) return;
+    paymentReturnConsumed.current = true;
+    router.setParams({ paymentReturn: undefined } as never);
+    void verifyPayment(params.id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.paymentReturn, params.id]);
+
+  // ── Verify payment (called after browser redirect) ────────────────────────
+
+  const verifyPayment = useCallback(async (boostId: string) => {
+    setVerifying(true);
     try {
-      await api.boosts.create({
-        targetType: selectedTargetType,
-        targetId: selectedTargetId,
-        objective,
-        budgetCents,
-        durationDays,
-      });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert(
-        '🚀 Boost Launched!',
-        `Your ${selectedTargetType} will be promoted for ${durationLabel} with the goal “${objectiveLabel(objective)}.” You’ll see progress in your Boost history.`,
-        [{ text: 'Done', onPress: () => router.back() }],
-      );
+      const result = await api.boosts.verify(boostId);
+      const boost = result as Boost;
+      if (boost.status === 'active') {
+        setActiveBoost(boost);
+        setSucceeded(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        loadHistory();
+        api.boosts.summary().then((s) => setSummary(s)).catch(() => {});
+      } else if (boost.status === 'pending_payment') {
+        setPendingBoost(boost);
+        Alert.alert(
+          'Payment pending',
+          "Your payment is being processed. We'll activate your boost automatically once confirmed.",
+          [{ text: 'OK' }],
+        );
+      } else if (boost.status === 'failed') {
+        setPendingBoost(boost);
+        Alert.alert(
+          'Payment failed',
+          'Your payment could not be processed. Tap "Boost post" to try again.',
+          [{ text: 'OK' }],
+        );
+      }
     } catch (e: any) {
-      const msg = e?.message ?? 'Could not launch boost.';
-      if (msg.includes('card_declined')) {
-        Alert.alert('Card Declined', 'Please update your payment method in Billing settings.');
-      } else if (msg.includes('402')) {
-        Alert.alert('Payment Required', 'Add a payment method in Billing before boosting.');
+      const msg = String(e?.message ?? '');
+      if (msg.includes('unpaid') || msg.includes('402')) {
+        Alert.alert('Checkout cancelled', 'Your payment was not completed. You can try again.', [{ text: 'OK' }]);
       } else {
-        Alert.alert('Error', msg);
+        Alert.alert('Verification failed', 'Could not confirm payment. Please check your boost status.', [{ text: 'OK' }]);
       }
     } finally {
-      setLaunching(false);
+      setVerifying(false);
+    }
+  }, [api, loadHistory]);
+
+  // ── Navigation ────────────────────────────────────────────────────────────
+
+  function goBack() {
+    if (step === 0) { router.back(); return; }
+    setStep((s) => (s - 1) as 0 | 1 | 2);
+    Haptics.selectionAsync();
+  }
+
+  function selectTarget(target: BoostTarget) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedTarget(target);
+    setStep(1);
+  }
+
+  // ── Payment flow ──────────────────────────────────────────────────────────
+
+  async function handleBoostPost() {
+    if (!selectedTarget) {
+      Alert.alert('Choose a post', 'Select the post you want to boost first.');
+      return;
+    }
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    // Step 1: Create pending boost (no charge yet)
+    let boostRecord = pendingBoost;
+    if (!boostRecord || boostRecord.status === 'failed') {
+      setCreating(true);
+      try {
+        const created = await api.boosts.create({
+          targetType:  'post',
+          targetId:    selectedTarget.id,
+          objective:   'views',
+          budgetCents,
+          durationDays,
+        });
+        boostRecord = created as Boost;
+        setPendingBoost(boostRecord);
+      } catch (e: any) {
+        const msg = e?.message ?? '';
+        const body = (() => { try { return JSON.parse(msg); } catch { return null; } })();
+        Alert.alert('Error', body?.error ?? 'Could not create boost. Please try again.');
+        return;
+      } finally {
+        setCreating(false);
+      }
+    }
+
+    if (!boostRecord) return;
+
+    // Step 2: Create Checkout Session and open browser
+    setPaying(true);
+    try {
+      const returnUrl = buildBoostReturnUrl(boostRecord.id);
+      const { url, paymentStatus } = await api.boosts.pay(boostRecord.id, returnUrl);
+
+      // Already paid (reused session that was completed)
+      if (paymentStatus === 'paid' || paymentStatus === 'no_payment_required') {
+        await verifyPayment(boostRecord.id);
+        return;
+      }
+
+      if (!url) {
+        Alert.alert('Error', 'Could not start checkout. Please try again.');
+        return;
+      }
+
+      const result = await WebBrowser.openAuthSessionAsync(url, returnUrl);
+
+      if (result.type === 'success') {
+        await verifyPayment(boostRecord.id);
+        return;
+      }
+      if (result.type === 'cancel' || result.type === 'dismiss') {
+        Alert.alert(
+          'Checkout cancelled',
+          'Your payment was not completed. Your boost is saved and you can try again.',
+          [{ text: 'OK' }],
+        );
+        return;
+      }
+      Alert.alert(
+        'Checkout incomplete',
+        'Secure checkout did not return a payment confirmation. Please try again.',
+        [{ text: 'OK' }],
+      );
+    } catch (e: any) {
+      const msg = String(e?.message ?? '');
+      Alert.alert(
+        'Payment failed',
+        msg.includes('422') || msg.includes('ineligible')
+          ? 'This post is no longer eligible for boosting. Please choose another post.'
+          : 'Could not start checkout. Please try again.',
+        [{ text: 'OK' }],
+      );
+    } finally {
+      setPaying(false);
     }
   }
 
-  function statusColor(s: string) {
-    return s === 'active' ? SUCCESS : s === 'paused' ? ORANGE : MUTED;
-  }
-  function statusLabel(s: string) {
-    return s.charAt(0).toUpperCase() + s.slice(1);
+  async function handlePause(boost: Boost) {
+    const isActive = boost.status === 'active';
+    const newStatus = isActive ? 'paused' : 'cancelled';
+    const title     = isActive ? 'Pause Boost' : 'Cancel Boost';
+    const message   = isActive
+      ? 'Pause this boost? You can reactivate it later by contacting support.'
+      : 'Are you sure you want to cancel this boost? This cannot be undone.';
+
+    Alert.alert(title, message, [
+      { text: 'Keep Running', style: 'cancel' },
+      {
+        text: title,
+        style: 'destructive',
+        onPress: async () => {
+          setPausingId(boost.id);
+          try {
+            await api.boosts.update(boost.id, { status: newStatus as 'paused' | 'cancelled' });
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            setExisting((prev) =>
+              prev.map((b) => b.id === boost.id ? { ...b, status: newStatus } : b),
+            );
+          } catch {
+            Alert.alert('Error', 'Could not update the boost. Please try again.');
+          } finally {
+            setPausingId(null);
+          }
+        },
+      },
+    ]);
   }
 
-  /** Clamp 0–1, guard against division by zero */
-  function reachProgress(b: Boost): number {
-    if (!b.estimatedImpressions || b.estimatedImpressions <= 0) return 0;
-    return Math.min(1, b.impressionsCount / b.estimatedImpressions);
-  }
+  // ── Render helpers ────────────────────────────────────────────────────────
 
-  return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.headerBack} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+  function renderHeader(title: string) {
+    return (
+      <View style={[s.header, { paddingTop: topPad + 8 }]}>
+        <TouchableOpacity
+          onPress={goBack}
+          style={s.headerBtn}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+        >
           <Feather name="arrow-left" size={20} color={FG} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Promote</Text>
-        <View style={{ width: 40 }} />
+        <Text style={s.headerTitle}>{title}</Text>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={s.headerBtn}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityLabel="Close"
+          accessibilityRole="button"
+        >
+          <Feather name="x" size={20} color={MUTED} />
+        </TouchableOpacity>
       </View>
+    );
+  }
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 100 }}>
-
-        {/* ── Summary card ─────────────────────────────────────────────────── */}
-        {loadingSummary
-          ? <ActivityIndicator color={PURPLE} style={{ marginBottom: SP.md }} />
-          : summary && (
-            <View style={s.summaryCard}>
-              <Text style={s.summaryTitle}>THIS MONTH</Text>
-              <View style={s.summaryRow}>
-                <View style={s.summaryItem}>
-                  <Feather name="eye" size={16} color={PURPLE_LIGHT} />
-                  <Text style={s.summaryValue}>{summary.totalImpressions.toLocaleString()}</Text>
-                  <Text style={s.summaryLabel}>Impressions</Text>
-                </View>
-                <View style={s.summarySep} />
-                <View style={s.summaryItem}>
-                  <Feather name="dollar-sign" size={16} color={GOLD} />
-                  <Text style={s.summaryValue}>{formatCents(summary.spentCentsThisMonth)}</Text>
-                  <Text style={s.summaryLabel}>Spent</Text>
-                </View>
-                <View style={s.summarySep} />
-                <View style={s.summaryItem}>
-                  <Feather name="zap" size={16} color={SUCCESS} />
-                  <Text style={s.summaryValue}>{summary.activeCount}</Text>
-                  <Text style={s.summaryLabel}>Active</Text>
-                </View>
-              </View>
+  function renderSelectedTargetBanner() {
+    if (!selectedTarget) return null;
+    const thumbnailUrl = selectedTarget.mediaUrls?.[0] ?? selectedTarget.mediaUrl;
+    return (
+      <View style={s.targetBanner}>
+        <View style={s.targetThumb}>
+          {thumbnailUrl ? (
+            <Image source={{ uri: thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          ) : (
+            <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: CARD_ELEVATED }]}>
+              <Feather name="film" size={14} color={MUTED} />
             </View>
-          )
-        }
+          )}
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.targetBannerCaption} numberOfLines={1}>
+            {selectedTarget.caption || 'Untitled post'}
+          </Text>
+          <Text style={s.targetBannerMeta}>
+            {selectedTarget.mediaKind === 'video' ? 'Video' : `Slideshow · ${selectedTarget.imageCount ?? ''} images`}
+            {' · '}
+            {new Date(selectedTarget.createdAt).toLocaleDateString()}
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => { setSelectedTarget(null); setStep(0); }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityLabel="Change post"
+        >
+          <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.semibold, fontSize: FS.sm }}>Change</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
-        {showPicker ? (
-          <View>
-            <View style={s.pickerHeadingRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.setupTitle}>Choose a post to promote</Text>
-                <Text style={s.setupSub}>Select one of your published posts or videos.</Text>
-              </View>
-              {selectedTargetId ? (
-                <TouchableOpacity onPress={() => setShowPicker(false)} style={s.cancelPickerBtn}>
-                  <Text style={s.cancelPickerText}>Cancel</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
+  // ── Summary card ─────────────────────────────────────────────────────────
 
-            {loadingTargets ? (
-              <ActivityIndicator color={PURPLE} style={{ marginVertical: 48 }} />
-            ) : targets.length === 0 ? (
-              <View style={s.pickerState}>
-                <Feather name="video" size={26} color={MUTED} />
-                <Text style={s.pickerStateTitle}>No posts to promote yet</Text>
-                <Text style={s.pickerStateText}>Publish a post or video first, then come back to Promote.</Text>
-              </View>
-            ) : (
-              <View style={s.postGrid}>
-                {targets.map((target) => (
-                  <TouchableOpacity
-                    key={target.id}
-                    style={s.postTile}
-                    activeOpacity={0.85}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Promote ${target.caption || 'post'}`}
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      setSelectedTargetId(target.id);
-                      setSelectedTargetType('post');
-                      setShowPicker(false);
-                    }}
-                  >
-                    <PostThumbnail target={target} />
-                    <View style={s.tileScrim} />
-                    <Text style={s.tileCaption} numberOfLines={2}>{target.caption || 'Untitled post'}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-        ) : (
-          <>
-            {/* Selected promotion target */}
-            <View style={s.selectedTargetCard}>
-              <View style={s.selectedTargetThumb}>
-                {selectedTarget ? (
-                  <PostThumbnail target={selectedTarget} />
-                ) : (
-                  <View style={s.thumbnailFallback}>
-                    <Feather name={selectedTargetType === 'product' ? 'shopping-bag' : 'video'} size={22} color={PURPLE_LIGHT} />
-                  </View>
-                )}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.selectedTargetEyebrow}>PROMOTING</Text>
-                <Text style={s.selectedTargetTitle} numberOfLines={2}>
-                  {selectedTarget?.caption || (selectedTargetType === 'product' ? 'Selected product' : 'Selected post')}
+  function renderSummaryCard() {
+    if (!summary) return null;
+    return (
+      <View style={s.summaryCard}>
+        <View style={s.summaryItem}>
+          <Text style={s.summaryValue}>{summary.activeCount}</Text>
+          <Text style={s.summaryLabel}>Active boosts</Text>
+        </View>
+        <View style={s.summaryDivider} />
+        <View style={s.summaryItem}>
+          <Text style={s.summaryValue}>{formatCents(summary.spentCentsThisMonth)}</Text>
+          <Text style={s.summaryLabel}>Spent this month</Text>
+        </View>
+        <View style={s.summaryDivider} />
+        <View style={s.summaryItem}>
+          <Text style={s.summaryValue}>{summary.totalImpressions.toLocaleString()}</Text>
+          <Text style={s.summaryLabel}>Total impressions</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // ── History section ───────────────────────────────────────────────────────
+
+  function renderHistory() {
+    if (loadingExisting) {
+      return (
+        <View style={s.centeredState}>
+          <ActivityIndicator color={PURPLE_LIGHT} />
+        </View>
+      );
+    }
+
+    const boosts = existing.filter((b) => b.status !== 'pending_payment' || b.paidAt == null);
+    if (boosts.length === 0) return null;
+
+    return (
+      <View style={{ marginTop: SP.xl }}>
+        <Text style={s.sectionHeading}>Past Boosts</Text>
+        {boosts.map((b) => (
+          <View key={b.id} style={s.historyCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm }}>
+              <View style={[s.statusBadge, { backgroundColor: statusBg(b.status) }]}>
+                <Text style={[s.statusBadgeText, { color: statusColor(b.status) }]}>
+                  {statusLabel(b.status)}
                 </Text>
               </View>
-              {selectedTargetType === 'post' ? (
-                <TouchableOpacity style={s.changeBtn} onPress={() => setShowPicker(true)}>
-                  <Text style={s.changeBtnText}>Change</Text>
+              <Text style={s.historyMeta}>
+                {formatCents(b.budgetCents)} · {b.durationDays}d
+              </Text>
+            </View>
+
+            {/* Reach progress */}
+            <View style={{ marginBottom: SP.sm }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                <Text style={s.historyMetaSmall}>Estimated reach</Text>
+                <Text style={s.historyMetaSmall}>
+                  {b.impressionsCount.toLocaleString()} / {(b.estimatedReachLow || b.estimatedImpressions).toLocaleString()}
+                </Text>
+              </View>
+              <View style={s.progressTrack}>
+                <View style={[s.progressFill, { width: `${reachProgress(b) * 100}%` as any }]} />
+              </View>
+            </View>
+
+            {b.status === 'active' && b.endsAt && (
+              <Text style={s.historyMetaSmall}>
+                {daysRemaining(b.endsAt)} day{daysRemaining(b.endsAt) !== 1 ? 's' : ''} remaining
+              </Text>
+            )}
+
+            {(b.status === 'active' || b.status === 'paused') && (
+              <TouchableOpacity
+                style={s.pauseBtn}
+                onPress={() => handlePause(b)}
+                disabled={pausingId === b.id}
+                accessibilityRole="button"
+              >
+                {pausingId === b.id ? (
+                  <ActivityIndicator size="small" color={MUTED} />
+                ) : (
+                  <Text style={s.pauseBtnText}>
+                    {b.status === 'active' ? 'Pause' : 'Cancel'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        ))}
+      </View>
+    );
+  }
+
+  // ── Step 1: Post picker ───────────────────────────────────────────────────
+
+  function renderPicker() {
+    return (
+      <View style={{ flex: 1 }}>
+        {renderHeader('Promote')}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ padding: SP.md, paddingBottom: bottomPad }}
+        >
+          {renderSummaryCard()}
+
+          <Text style={s.stepHeading}>Choose a post to promote</Text>
+          <Text style={s.stepSub}>
+            Only your published videos and slideshows (2+ images) are eligible.
+          </Text>
+
+          {loadingTargets ? (
+            <View style={s.centeredState}>
+              <ActivityIndicator color={PURPLE_LIGHT} size="large" />
+            </View>
+          ) : targetsError ? (
+            <View style={s.emptyState}>
+              <Feather name="wifi-off" size={28} color={MUTED} />
+              <Text style={s.emptyTitle}>Couldn't load posts</Text>
+              <Text style={s.emptyBody}>Check your connection and try again.</Text>
+              <TouchableOpacity style={s.retryBtn} onPress={loadTargets} accessibilityRole="button">
+                <Text style={s.retryBtnText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : targets.length === 0 ? (
+            <View style={s.emptyState}>
+              <Feather name="film" size={28} color={MUTED} />
+              <Text style={s.emptyTitle}>No eligible posts yet</Text>
+              <Text style={s.emptyBody}>
+                Publish a video or a slideshow with 2+ images, then come back to Promote.
+              </Text>
+              <TouchableOpacity
+                style={s.retryBtn}
+                onPress={() => router.push('/create-post')}
+                accessibilityRole="button"
+              >
+                <Text style={s.retryBtnText}>Create a Post</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={s.grid}>
+              {targets.map((t) => (
+                <TouchableOpacity
+                  key={t.id}
+                  style={[
+                    s.gridTile,
+                    selectedTarget?.id === t.id && s.gridTileSelected,
+                  ]}
+                  onPress={() => selectTarget(t)}
+                  activeOpacity={0.82}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Promote ${t.caption || 'post'}`}
+                  testID={`boost-target-${t.id}`}
+                >
+                  <PostThumbnail target={t} />
+                  <View style={s.gridScrim} />
+                  <Text style={s.gridCaption} numberOfLines={2}>
+                    {t.caption || 'Untitled'}
+                  </Text>
+                  {selectedTarget?.id === t.id && (
+                    <View style={s.gridCheck}>
+                      <Feather name="check" size={12} color="#fff" />
+                    </View>
+                  )}
                 </TouchableOpacity>
-              ) : null}
+              ))}
             </View>
+          )}
 
-            {/* Goal selector */}
-            <Text style={s.sectionLabel}>WHAT IS YOUR GOAL?</Text>
-            <View style={s.objectiveList}>
-              {OBJECTIVES.map((item) => {
-                const active = objective === item.value;
-                return (
-                  <TouchableOpacity
-                    key={item.value}
-                    style={[s.objectiveRow, active && s.objectiveRowActive]}
-                    onPress={() => { Haptics.selectionAsync(); setObjective(item.value); }}
-                    activeOpacity={0.8}
-                  >
-                    <View style={[s.objectiveIcon, active && s.objectiveIconActive]}>
-                      <Feather name={item.icon} size={18} color={active ? PURPLE_LIGHT : MUTED} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[s.objectiveTitle, active && s.objectiveTitleActive]}>{item.label}</Text>
-                      <Text style={s.objectiveDescription}>{item.description}</Text>
-                    </View>
-                    <View style={[s.radioOuter, active && s.radioOuterActive]}>
-                      {active ? <View style={s.radioInner} /> : null}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+          {renderHistory()}
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ── Step 2: Budget & duration ─────────────────────────────────────────────
+
+  function renderBudget() {
+    const dailyCents = divideCents(budgetCents, durationDays);
+    const isLoading  = creating || paying || verifying;
+
+    return (
+      <View style={{ flex: 1 }}>
+        {renderHeader('Boost')}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ padding: SP.md, paddingBottom: bottomPad }}
+        >
+          <StepDots total={2} current={1} />
+          {renderSelectedTargetBanner()}
+
+          {/* Budget */}
+          <View style={s.sliderCard}>
+            <View style={s.sliderCardHeader}>
+              <Text style={s.sliderCardLabel}>Budget</Text>
+              <Text style={s.sliderCardValue}>{formatCents(budgetCents)}</Text>
             </View>
-
-            {/* Budget slider */}
-            <View style={s.sliderSection}>
-              <View style={s.sliderHeading}>
-                <Text style={s.sectionLabelInline}>BUDGET</Text>
-                <Text style={s.sliderValue}>{budgetLabel}</Text>
-              </View>
-              <SnapSlider
-                value={budgetCents}
-                min={500}
-                max={25000}
-                step={500}
-                onChange={setBudgetCents}
-                accessibilityLabel="Promotion budget"
-              />
-              <View style={s.sliderRange}><Text style={s.sliderRangeText}>$5</Text><Text style={s.sliderRangeText}>$250</Text></View>
+            <BudgetStepSlider value={budgetCents} onChange={setBudgetCents} />
+            <View style={s.sliderCardFooter}>
+              <Text style={s.sliderCardHint}>{formatCents(BOOST_BUDGET_MIN_CENTS)}</Text>
+              <Text style={s.sliderCardHint}>{formatCents(BOOST_BUDGET_MAX_CENTS)}</Text>
             </View>
+          </View>
 
-            {/* Duration slider */}
-            <View style={s.sliderSection}>
-              <View style={s.sliderHeading}>
-                <Text style={s.sectionLabelInline}>HOW MANY DAYS?</Text>
-                <Text style={s.sliderValue}>{durationLabel}</Text>
-              </View>
-              <SnapSlider
-                value={durationDays}
-                min={1}
-                max={30}
-                step={1}
-                onChange={setDurationDays}
-                accessibilityLabel="Promotion duration in days"
-              />
-              <View style={s.sliderRange}><Text style={s.sliderRangeText}>1 day</Text><Text style={s.sliderRangeText}>30 days</Text></View>
+          {/* Duration */}
+          <View style={[s.sliderCard, { marginTop: SP.md }]}>
+            <View style={s.sliderCardHeader}>
+              <Text style={s.sliderCardLabel}>Duration</Text>
+              <Text style={s.sliderCardValue}>{durationDays} day{durationDays !== 1 ? 's' : ''}</Text>
             </View>
-
-            {/* Estimated reach */}
-            <View style={s.reachCard}>
-              <View style={s.reachRow}>
-                <Feather name="eye" size={18} color={PURPLE_LIGHT} />
-                <View style={{ flex: 1 }}>
-                  <Text style={s.reachTitle}>Estimated Reach</Text>
-                  <Text style={s.reachValue}>~{estimatedImpressions.toLocaleString()} impressions</Text>
-                </View>
-              </View>
-              <View style={s.divider} />
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <View style={s.reachStat}>
-                  <Text style={s.reachStatLabel}>Total Charge</Text>
-                  <Text style={s.reachStatValue}>{budgetLabel}</Text>
-                </View>
-                <View style={s.reachStat}>
-                  <Text style={s.reachStatLabel}>Duration</Text>
-                  <Text style={s.reachStatValue}>{durationLabel}</Text>
-                </View>
-                <View style={s.reachStat}>
-                  <Text style={s.reachStatLabel}>Per Day</Text>
-                  <Text style={s.reachStatValue}>{formatCents(divideCents(budgetCents, durationDays))}</Text>
-                </View>
-              </View>
+            <SnapSlider
+              value={durationDays}
+              min={BOOST_DURATION_MIN_DAYS}
+              max={BOOST_DURATION_MAX_DAYS}
+              step={1}
+              onChange={setDurationDays}
+              accessibilityLabel="Promotion duration"
+            />
+            <View style={s.sliderCardFooter}>
+              <Text style={s.sliderCardHint}>{BOOST_DURATION_MIN_DAYS} day</Text>
+              <Text style={s.sliderCardHint}>{BOOST_DURATION_MAX_DAYS} days</Text>
             </View>
+          </View>
 
-            {/* Launch button */}
-            <TouchableOpacity
-              style={[s.launchBtn, launching && { opacity: 0.6 }]}
-              onPress={handleLaunch}
-              disabled={launching}
-              activeOpacity={0.85}
-            >
-              {launching
-                ? <ActivityIndicator color="#fff" />
-                : <>
-                    <Feather name="zap" size={18} color="#fff" />
-                    <Text style={s.launchBtnText}>Launch Boost — Pay {budgetLabel}</Text>
-                  </>
-              }
-            </TouchableOpacity>
-
-            <Text style={s.disclaimer}>
-              Your stored payment method will be charged {budgetLabel}. Boosts can be paused from your Boost history.
+          {/* Estimated reach */}
+          <View style={s.reachCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs }}>
+              <Feather name="users" size={14} color={PURPLE_LIGHT} />
+              <Text style={s.reachLabel}>Estimated reach</Text>
+            </View>
+            <Text style={s.reachValue}>
+              {reach.low.toLocaleString()}–{reach.high.toLocaleString()} people
             </Text>
-          </>
-        )}
+            <Text style={s.reachDailyBudget}>
+              {formatCents(dailyCents)}/day · {formatCents(budgetCents)} total
+            </Text>
+            <Text style={s.reachDisclaimer}>
+              Estimated reach is a planning aid based on your budget and is not a guarantee
+              of impressions delivered.
+            </Text>
+          </View>
+        </ScrollView>
 
-        {/* ── Boost history ─────────────────────────────────────────────────── */}
-        {(loadingExisting ? true : existing.length > 0) && (
-          <>
-            <Text style={[s.sectionLabel, { marginTop: SP.xl }]}>BOOST HISTORY</Text>
-            {loadingExisting
-              ? <ActivityIndicator color={PURPLE} style={{ marginTop: SP.sm }} />
-              : existing.map(b => {
-                  const progress   = reachProgress(b);
-                  const daysLeft   = daysRemaining(b.endsAt);
-                  const estimated  = b.estimatedImpressions;
+        {/* Sticky bottom CTA — matches Create Ad "Create ad · $X" pattern */}
+        <View style={[s.stickyBottom, { paddingBottom: insets.bottom + (Platform.OS === 'web' ? 34 : 16) }]}>
+          <TouchableOpacity
+            style={[s.primaryBtn, isLoading && { opacity: 0.65 }]}
+            onPress={handleBoostPost}
+            disabled={isLoading}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={`Boost post · ${formatCents(budgetCents)}`}
+            testID="boost-pay-btn"
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#000" size="small" />
+            ) : (
+              <>
+                <Text style={s.primaryBtnText}>Boost post · {formatCents(budgetCents)}</Text>
+                <Feather name="zap" size={16} color="#000" />
+              </>
+            )}
+          </TouchableOpacity>
+          <Text style={s.paymentNote}>
+            Secure payment via Stripe. You'll be redirected to complete payment.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
-                  return (
-                    <View key={b.id} style={s.boostRow}>
-                      {/* Status + meta */}
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                        <View style={[s.statusDot, { backgroundColor: statusColor(b.status) }]} />
-                        <Text style={s.boostStatus}>{statusLabel(b.status)}</Text>
-                        <Text style={s.boostMeta}>{objectiveLabel(b.objective || 'views')}</Text>
-                        {b.status === 'active' && (
-                          <Text style={[s.boostMeta, { marginLeft: 'auto' }]}>
-                            {daysLeft === 0 ? 'Ends today' : `${daysLeft}d left`}
-                          </Text>
-                        )}
-                      </View>
+  // ── Success screen ────────────────────────────────────────────────────────
 
-                      {/* Impressions + spend */}
-                      <View style={{ flexDirection: 'row', gap: SP.md, marginBottom: 8 }}>
-                        <View style={s.statPill}>
-                          <Feather name="eye" size={11} color={PURPLE_LIGHT} />
-                          <Text style={s.statPillText}>
-                            {b.impressionsCount.toLocaleString()}
-                            <Text style={{ color: MUTED }}> / ~{estimated.toLocaleString()}</Text>
-                          </Text>
-                        </View>
-                        <View style={s.statPill}>
-                          <Feather name="dollar-sign" size={11} color={GOLD} />
-                          <Text style={s.statPillText}>
-                            {formatCents(b.spentCents)}
-                            <Text style={{ color: MUTED }}> / {formatCents(b.budgetCents)}</Text>
-                          </Text>
-                        </View>
-                      </View>
+  function renderSuccess() {
+    const b = activeBoost;
+    return (
+      <View style={{ flex: 1 }}>
+        {renderHeader('Promote')}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ padding: SP.md, paddingBottom: bottomPad, alignItems: 'center' }}
+        >
+          <View style={s.successIcon}>
+            <Feather name="zap" size={32} color={GOLD} />
+          </View>
+          <Text style={s.successTitle}>Boost active!</Text>
+          <Text style={s.successSub}>
+            Your post is now being promoted. Check back to see how it's performing.
+          </Text>
 
-                      {/* Reach progress bar */}
-                      <View style={s.progressTrack}>
-                        <View style={[s.progressFill, { width: `${Math.round(progress * 100)}%` as any }]} />
-                      </View>
-                      <Text style={s.progressLabel}>
-                        {Math.round(progress * 100)}% of estimated reach fulfilled
-                      </Text>
-                    </View>
-                  );
-                })
-            }
-          </>
-        )}
-      </ScrollView>
-    </View>
-  );
+          {b && (
+            <View style={[s.sliderCard, { marginTop: SP.lg, width: '100%' }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: SP.sm }}>
+                <Text style={s.sliderCardLabel}>Budget</Text>
+                <Text style={s.sliderCardValue}>{formatCents(b.budgetCents)}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: SP.sm }}>
+                <Text style={s.sliderCardLabel}>Duration</Text>
+                <Text style={s.sliderCardValue}>{b.durationDays} days</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={s.sliderCardLabel}>Estimated reach</Text>
+                <Text style={s.sliderCardValue}>
+                  {(b.estimatedReachLow || 0).toLocaleString()}–{(b.estimatedReachHigh || 0).toLocaleString()}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[s.primaryBtn, { marginTop: SP.xl, width: '100%' }]}
+            onPress={() => router.back()}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+          >
+            <Text style={s.primaryBtnText}>Done</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  if (verifying) {
+    return (
+      <View style={[s.screen, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator color={PURPLE_LIGHT} size="large" />
+        <Text style={[s.stepSub, { marginTop: SP.md, textAlign: 'center' }]}>
+          Confirming payment…
+        </Text>
+      </View>
+    );
+  }
+
+  if (succeeded) {
+    return <View style={s.screen}>{renderSuccess()}</View>;
+  }
+
+  if (step === 1) {
+    return <View style={s.screen}>{renderBudget()}</View>;
+  }
+
+  return <View style={s.screen}>{renderPicker()}</View>;
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) => {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT } = colors;
-  return StyleSheet.create({
-  root:          { flex: 1, backgroundColor: 'transparent' },
-  header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
-  headerBack:    { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:   { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
-  // ── Summary card ──────────────────────────────────────────────────────────
-  summaryCard:  { backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md },
-  summaryTitle: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, letterSpacing: 1, textTransform: 'uppercase', marginBottom: SP.sm },
-  summaryRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
-  summaryItem:  { alignItems: 'center', gap: 4 },
-  summaryValue: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG, marginTop: 2 },
-  summaryLabel: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  summarySep:   { width: 1, height: 40, backgroundColor: BORDER },
+const s = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: BG },
 
-  setupTitle: { color: FG, fontFamily: FONT.bold, fontSize: FS.xl, marginBottom: 5 },
-  setupSub: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19 },
-  pickerHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: SP.md },
-  cancelPickerBtn: { paddingHorizontal: 12, paddingVertical: 8 },
-  cancelPickerText: { color: PURPLE_LIGHT, fontFamily: FONT.semibold, fontSize: FS.sm },
-  postGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, marginBottom: SP.xl },
-  postTile: {
-    width: '32.6%',
-    aspectRatio: 0.76,
-    backgroundColor: CARD_ELEVATED,
-    overflow: 'hidden',
-    position: 'relative',
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.sm,
+    backgroundColor: BG,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
   },
-  tileScrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.16)' },
-  tileCaption: {
-    position: 'absolute', left: 7, right: 7, bottom: 7,
-    color: '#fff', fontFamily: FONT.semibold, fontSize: 11, lineHeight: 14,
-    textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontFamily: FONT.semibold,
+    fontSize: FS.md,
+    color: FG,
   },
-  videoBadge: {
-    position: 'absolute', top: 7, right: 7, width: 22, height: 22, borderRadius: 11,
-    alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.62)',
-  },
-  thumbnailFallback: {
-    ...StyleSheet.absoluteFill,
+  headerBtn: {
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  // Summary card
+  summaryCard: {
+    flexDirection: 'row',
+    backgroundColor: CARD,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: SP.md,
+    marginBottom: SP.lg,
+  },
+  summaryItem: { flex: 1, alignItems: 'center' },
+  summaryValue: { fontFamily: FONT.bold, fontSize: FS.lg, color: FG, marginBottom: 2 },
+  summaryLabel: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
+  summaryDivider: { width: 1, backgroundColor: BORDER },
+
+  // Step headings
+  stepHeading: { fontFamily: FONT.bold, fontSize: FS.xl, color: FG, marginBottom: SP.xs },
+  stepSub:     { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, marginBottom: SP.lg, lineHeight: 20 },
+
+  // Post grid
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
+  gridTile: {
+    width: '31%',
+    aspectRatio: 0.75,
+    borderRadius: RADIUS.md,
+    overflow: 'hidden',
+    backgroundColor: CARD,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    position: 'relative',
+  },
+  gridTileSelected: { borderColor: PURPLE_LIGHT },
+  gridScrim: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.28)',
+  },
+  gridCaption: {
+    position: 'absolute',
+    bottom: 6,
+    left: 4,
+    right: 4,
+    fontFamily: FONT.semibold,
+    fontSize: FS.xs,
+    color: '#fff',
+    lineHeight: 14,
+  },
+  gridCheck: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: PURPLE_LIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Empty / error states
+  centeredState: { alignItems: 'center', justifyContent: 'center', paddingVertical: SP.xl },
+  emptyState:    { alignItems: 'center', paddingVertical: SP.xl * 1.5, gap: SP.sm },
+  emptyTitle:    { fontFamily: FONT.semibold, fontSize: FS.md, color: FG },
+  emptyBody:     { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', lineHeight: 20 },
+  retryBtn:      { marginTop: SP.sm, paddingHorizontal: SP.lg, paddingVertical: SP.sm, borderRadius: RADIUS.pill, backgroundColor: PURPLE_DIM, borderWidth: 1, borderColor: PURPLE_LIGHT },
+  retryBtnText:  { fontFamily: FONT.semibold, fontSize: FS.sm, color: PURPLE_LIGHT },
+
+  // Selected target banner
+  targetBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    backgroundColor: CARD,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: SP.sm,
+    marginBottom: SP.lg,
+  },
+  targetThumb: {
+    width: 44,
+    height: 56,
+    borderRadius: RADIUS.sm,
+    overflow: 'hidden',
     backgroundColor: CARD_ELEVATED,
+    position: 'relative',
   },
-  pickerState: {
-    minHeight: 220, alignItems: 'center', justifyContent: 'center',
-    padding: SP.xl, backgroundColor: CARD, borderRadius: RADIUS.md,
-    borderWidth: 1, borderColor: BORDER, marginBottom: SP.xl,
-  },
-  pickerStateTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.base, marginTop: 12, marginBottom: 5 },
-  pickerStateText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 19, marginTop: 10 },
-  retryText: { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.sm },
+  targetBannerCaption: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, marginBottom: 2 },
+  targetBannerMeta:    { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
 
-  selectedTargetCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
-    borderRadius: RADIUS.md, padding: 10, marginBottom: SP.lg,
+  // Slider card
+  sliderCard: {
+    backgroundColor: CARD,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: SP.md,
   },
-  selectedTargetThumb: {
-    width: 58, height: 72, borderRadius: RADIUS.sm, overflow: 'hidden',
-    backgroundColor: CARD_ELEVATED, position: 'relative',
+  sliderCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SP.sm },
+  sliderCardLabel:  { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
+  sliderCardValue:  { fontFamily: FONT.bold, fontSize: FS.lg, color: FG },
+  sliderCardFooter: { flexDirection: 'row', justifyContent: 'space-between', marginTop: SP.xs },
+  sliderCardHint:   { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE },
+
+  // Reach estimate card
+  reachCard: {
+    backgroundColor: PURPLE_DIM,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: PURPLE_LIGHT + '30',
+    padding: SP.md,
+    marginTop: SP.md,
   },
-  selectedTargetEyebrow: { color: MUTED, fontFamily: FONT.semibold, fontSize: 10, letterSpacing: 1, marginBottom: 4 },
-  selectedTargetTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, lineHeight: 18 },
-  changeBtn: { paddingHorizontal: 10, paddingVertical: 8 },
-  changeBtnText: { color: PURPLE_LIGHT, fontFamily: FONT.semibold, fontSize: FS.sm },
+  reachLabel:       { fontFamily: FONT.medium, fontSize: FS.sm, color: PURPLE_LIGHT },
+  reachValue:       { fontFamily: FONT.bold, fontSize: FS.xl, color: FG, marginBottom: 2 },
+  reachDailyBudget: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, marginBottom: SP.sm },
+  reachDisclaimer:  { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, lineHeight: 16 },
 
-  objectiveList: { gap: 8, marginBottom: SP.lg },
-  objectiveRow: {
-    minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
-    borderRadius: RADIUS.md, paddingHorizontal: 12, paddingVertical: 10,
+  // Sticky bottom
+  stickyBottom: {
+    paddingHorizontal: SP.md,
+    paddingTop: SP.sm,
+    backgroundColor: BG,
+    borderTopWidth: 1,
+    borderTopColor: BORDER,
   },
-  objectiveRowActive: { borderColor: PURPLE, backgroundColor: PURPLE_DIM },
-  objectiveIcon: {
-    width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: CARD_ELEVATED,
+  primaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SP.sm,
+    backgroundColor: PURPLE_LIGHT,
+    borderRadius: RADIUS.pill,
+    paddingVertical: SP.md,
+    paddingHorizontal: SP.xl,
+    minHeight: 52,
   },
-  objectiveIconActive: { backgroundColor: PURPLE_DIM },
-  objectiveTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, marginBottom: 3 },
-  objectiveTitleActive: { color: PURPLE_LIGHT },
-  objectiveDescription: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs },
-  radioOuter: {
-    width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: MUTED,
-    alignItems: 'center', justifyContent: 'center',
+  primaryBtnText: { fontFamily: FONT.bold, fontSize: FS.md, color: '#000' },
+  paymentNote:    { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, textAlign: 'center', marginTop: SP.sm },
+
+  // History
+  sectionHeading: { fontFamily: FONT.bold, fontSize: FS.md, color: FG, marginBottom: SP.sm },
+  historyCard: {
+    backgroundColor: CARD,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: SP.md,
+    marginBottom: SP.sm,
   },
-  radioOuterActive: { borderColor: PURPLE },
-  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: PURPLE },
+  historyMeta:      { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED },
+  historyMetaSmall: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE },
+  statusBadge:      { borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 2 },
+  statusBadgeText:  { fontFamily: FONT.semibold, fontSize: FS.xs },
+  progressTrack:    { height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
+  progressFill:     { height: 4, borderRadius: 2, backgroundColor: PURPLE_LIGHT },
+  pauseBtn:         { marginTop: SP.sm, paddingVertical: SP.xs, alignItems: 'center' },
+  pauseBtnText:     { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
 
-  sectionLabel:  { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, letterSpacing: 1, textTransform: 'uppercase', marginBottom: SP.sm, marginTop: SP.sm },
-  sectionLabelInline: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, letterSpacing: 1, textTransform: 'uppercase' },
-  sliderSection: {
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
-    borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md,
+  // Success
+  successIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: ORANGE_DIM,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: SP.xl,
+    marginBottom: SP.lg,
   },
-  sliderHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 },
-  sliderValue: { color: FG, fontFamily: FONT.bold, fontSize: FS.lg },
-  sliderTouchArea: { height: 38, justifyContent: 'center', position: 'relative' },
-  sliderTrack: { height: 5, borderRadius: 3, backgroundColor: SUBTLE, overflow: 'hidden' },
-  sliderFill: { height: 5, borderRadius: 3, backgroundColor: PURPLE },
-  sliderThumb: {
-    position: 'absolute', top: 7, width: 24, height: 24, borderRadius: 12,
-    marginLeft: -12, backgroundColor: '#fff', borderWidth: 5, borderColor: PURPLE,
-    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 4, shadowOffset: { width: 0, height: 2 },
-  },
-  sliderRange: { flexDirection: 'row', justifyContent: 'space-between' },
-  sliderRangeText: { color: MUTED, fontFamily: FONT.regular, fontSize: 11 },
-
-  reachCard:   { backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md },
-  reachRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: SP.sm },
-  reachTitle:  { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.5 },
-  reachValue:  { fontSize: FS.xl, fontFamily: FONT.bold, color: PURPLE_LIGHT },
-  divider:     { height: 1, backgroundColor: BORDER, marginVertical: SP.sm },
-  reachStat:   { alignItems: 'center' },
-  reachStatLabel: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginBottom: 2 },
-  reachStatValue: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-
-  launchBtn:      { backgroundColor: PURPLE, borderRadius: RADIUS.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16, marginBottom: SP.sm },
-  launchBtnText:  { fontSize: FS.base, fontFamily: FONT.bold, color: '#fff' },
-  disclaimer:     { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 16, marginBottom: SP.xl },
-
-  // ── Boost history rows ────────────────────────────────────────────────────
-  boostRow:     { backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, padding: SP.md, marginBottom: SP.sm },
-  statusDot:    { width: 8, height: 8, borderRadius: 4 },
-  boostStatus:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  boostMeta:    { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-
-  statPill:     { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.xs, paddingHorizontal: 8, paddingVertical: 4 },
-  statPillText: { fontSize: FS.xs, fontFamily: FONT.medium, color: FG },
-
-  progressTrack: { height: 4, backgroundColor: SUBTLE, borderRadius: 2, overflow: 'hidden', marginBottom: 4 },
-  progressFill:  { height: 4, backgroundColor: PURPLE, borderRadius: 2 },
-  progressLabel: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  });
-};
+  successTitle: { fontFamily: FONT.bold, fontSize: FS.xl * 1.2, color: FG, marginBottom: SP.sm, textAlign: 'center' },
+  successSub:   { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', lineHeight: 20 },
+});

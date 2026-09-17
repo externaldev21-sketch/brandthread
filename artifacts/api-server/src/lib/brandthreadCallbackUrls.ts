@@ -1,6 +1,6 @@
 import { getWebOrigin } from "./webOrigin";
 
-type CallbackKind = "manufacturer_onboarding" | "sample_checkout";
+type CallbackKind = "manufacturer_onboarding" | "sample_checkout" | "ad_campaign_checkout" | "boost_checkout";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -24,6 +24,20 @@ export function isAllowedBrandthreadCallbackUrl(value: unknown, kind: CallbackKi
           && (url.pathname === "/complete" || url.pathname === "/refresh")
           && !url.search;
       }
+      if (kind === "ad_campaign_checkout") {
+        return url.hostname === "design-campaign"
+          && (url.pathname === "" || url.pathname === "/")
+          && hasExactQueryParams(url, ["id", "paymentReturn"])
+          && UUID_RE.test(url.searchParams.get("id") ?? "")
+          && url.searchParams.get("paymentReturn") === "1";
+      }
+      if (kind === "boost_checkout") {
+        return url.hostname === "boost"
+          && (url.pathname === "" || url.pathname === "/")
+          && hasExactQueryParams(url, ["id", "paymentReturn"])
+          && UUID_RE.test(url.searchParams.get("id") ?? "")
+          && url.searchParams.get("paymentReturn") === "1";
+      }
       return url.hostname === "sample-detail"
         && (url.pathname === "" || url.pathname === "/")
         && hasExactQueryParams(url, ["id", "paymentReturn"])
@@ -40,6 +54,18 @@ export function isAllowedBrandthreadCallbackUrl(value: unknown, kind: CallbackKi
 
     if (kind === "manufacturer_onboarding") {
       return url.pathname === "/manufacturers/payment" && !url.search;
+    }
+    if (kind === "ad_campaign_checkout") {
+      return url.pathname === "/design-campaign"
+        && hasExactQueryParams(url, ["id", "paymentReturn"])
+        && UUID_RE.test(url.searchParams.get("id") ?? "")
+        && url.searchParams.get("paymentReturn") === "1";
+    }
+    if (kind === "boost_checkout") {
+      return url.pathname === "/boost"
+        && hasExactQueryParams(url, ["id", "paymentReturn"])
+        && UUID_RE.test(url.searchParams.get("id") ?? "")
+        && url.searchParams.get("paymentReturn") === "1";
     }
     return url.pathname === "/sample-detail"
       && hasExactQueryParams(url, ["id", "paymentReturn"])

@@ -27,8 +27,12 @@ export default function BuyerQRCode() {
     getMyProfile().then(setProfile);
   }, []);
 
-  const handle = profile?.username ? `@${profile.username}` : '@yourusername';
-  const qrValue = `https://brandthread.app/u/${profile?.username ?? 'me'}`;
+  const handle = profile?.username ? `@${profile.username}` : null;
+  const canonicalUrl = profile?.username
+    ? `https://brandthread.app/u/${profile.username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '')}`
+    : null;
+  // Legacy alias — used by existing Share call below; keep for compatibility.
+  const qrValue = canonicalUrl ?? 'https://brandthread.app';
 
   async function handleShare() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -61,26 +65,35 @@ export default function BuyerQRCode() {
             <Text style={[s.cardBrand, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Brandthread</Text>
           </LinearGradient>
 
-          {/* QR area */}
-          <View style={s.qrWrap}>
-            <View style={s.qrBg}>
-              <QRCode
-                value={qrValue}
-                size={200}
-                backgroundColor="transparent"
-                color={ON_DARK}
-                enableLinearGradient
-                linearGradient={[...GRAD_PRIMARY]}
-              />
+          {/* QR area — only rendered when we have a real canonical URL */}
+          {canonicalUrl ? (
+            <View style={s.qrWrap}>
+              <View style={s.qrBg}>
+                <QRCode
+                  value={canonicalUrl}
+                  size={200}
+                  backgroundColor="transparent"
+                  color={ON_DARK}
+                  enableLinearGradient
+                  linearGradient={[...GRAD_PRIMARY]}
+                />
+              </View>
             </View>
-          </View>
+          ) : (
+            <View style={[s.qrWrap, { alignItems: 'center', justifyContent: 'center' }]}>
+              <Feather name="user-x" size={40} color={MUTED} />
+              <Text style={[s.hint, { marginTop: 8, marginBottom: 0 }]}>Set a username to generate your QR code</Text>
+            </View>
+          )}
 
           {/* Handle */}
-          <View style={s.handleRow}>
-            <LinearGradient colors={GRAD_PRIMARY} style={s.handleBadge}>
-              <Text style={[s.handleText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>{handle}</Text>
-            </LinearGradient>
-          </View>
+          {handle ? (
+            <View style={s.handleRow}>
+              <LinearGradient colors={GRAD_PRIMARY} style={s.handleBadge}>
+                <Text style={[s.handleText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>{handle}</Text>
+              </LinearGradient>
+            </View>
+          ) : null}
 
           {/* Hint */}
           <Text style={s.hint}>Point a camera at this code to visit my profile</Text>

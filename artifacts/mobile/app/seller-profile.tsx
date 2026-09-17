@@ -29,6 +29,7 @@ import {
   BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE,
   BLUE, ORANGE, RED, FONT, FS, SP, RADIUS, ICON, ACCENT,
 } from '@/lib/theme';
+import { buildCanonicalProfileUrl } from '@/lib/shareProfile';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TILE_SIZE = Math.floor((SCREEN_WIDTH - 2) / 3);
@@ -380,6 +381,10 @@ export default function SellerProfileScreen() {
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [followPending, setFollowPending] = useState(false);
+  // Canonical seller clerkId — resolved from the API response after initial load.
+  // This is what follow/message/review/posts actions must use, not the raw route param
+  // (which may be a DB UUID alias when navigating from /u/[username]).
+  const [canonicalSellerId, setCanonicalSellerId] = useState<string | null>(null);
 
   const tabs = ['Posts', 'Products'];
   const tabBarIndex = isOwner ? 3 : 4;
@@ -395,6 +400,7 @@ export default function SellerProfileScreen() {
     setFollowers(0);
     setIsFollowing(false);
     setApiRating(null);
+    setCanonicalSellerId(null);
     if (isOwner && (!authLoaded || !userId)) {
       setProfileLoading(!authLoaded);
       setProductsLoading(!authLoaded);
@@ -415,13 +421,22 @@ export default function SellerProfileScreen() {
           setPosts(ownPosts);
           setProfileImageUrl(p.profileImageUrl ?? null);
           setLiveProducts([]);
+          // Owner: canonical ID is their own Clerk ID.
+          if (p.clerkId) setCanonicalSellerId(p.clerkId);
         } else {
           if (!sellerId) throw new Error('Seller not found.');
+          // Fire the visit record with the route alias — the server resolves it.
           api.publicSellers.recordVisit(sellerId).catch(() => {});
-          const [data, postRows, followState] = await Promise.all([
-            api.publicSellers.get(sellerId),
-            api.posts.publicList(sellerId),
-            getSellerFollowState(sellerId),
+          // Use the route alias for the API call — server resolves UUID or clerkId.
+          const data = await api.publicSellers.get(sellerId);
+          // Extract the canonical clerkId returned by the server in profile.clerkId.
+          // This is the authoritative ID for all follow/message/review/posts calls.
+          const resolvedClerkId: string | undefined = data.profile?.clerkId;
+          // Load follow state and posts in parallel, using canonical ID if available.
+          const effectiveSellerId = resolvedClerkId ?? sellerId;
+          const [postRows, followState] = await Promise.all([
+            api.posts.publicList(effectiveSellerId),
+            getSellerFollowState(effectiveSellerId),
           ]);
           const sellerPosts = postRows.map(mapApiPost);
           const products = Array.isArray(data.products) ? data.products as Product[] : [];
@@ -432,6 +447,8 @@ export default function SellerProfileScreen() {
           setProfileImageUrl(typeof data.profile?.profileImageUrl === 'string' ? data.profile.profileImageUrl : null);
           setLiveProducts(products);
           setPosts(sellerPosts);
+          // Store canonical clerkId for downstream follow/message/review calls.
+          if (resolvedClerkId) setCanonicalSellerId(resolvedClerkId);
         }
       } catch {
         if (!active) return;
@@ -442,6 +459,7 @@ export default function SellerProfileScreen() {
         setFollowers(0);
         setIsFollowing(false);
         setApiRating(null);
+        setCanonicalSellerId(null);
       } finally {
         if (active) {
           setProfileLoading(false);
@@ -452,9 +470,12 @@ export default function SellerProfileScreen() {
     return () => { active = false; };
   }, [api, authLoaded, isOwner, routeSellerId, userId]);
 
-  // Load reviews
+  // Load reviews — use canonical clerkId, not the raw route alias.
   useEffect(() => {
-    const sellerId = (routeSellerId ?? profile.sellerId) as string | undefined;
+    // Prefer the canonical clerkId resolved from the profile API response.
+    // Fall back to routeSellerId only if canonicalSellerId hasn't been set yet
+    // (e.g. during initial render before the profile load completes).
+    const sellerId = canonicalSellerId ?? (routeSellerId as string | undefined);
     let active = true;
     setApiRating(null);
     if (!sellerId) return () => { active = false; };
@@ -464,11 +485,12 @@ export default function SellerProfileScreen() {
       })
       .catch(() => {});
     return () => { active = false; };
-  }, [api, profile.sellerId, routeSellerId]);
+  }, [api, canonicalSellerId, routeSellerId]);
 
   const handleFollow = useCallback(async () => {
     if (followPending) return;
-    const sellerId = routeSellerId ?? profile.sellerId;
+    // Always use canonical clerkId for follow actions — never the route alias.
+    const sellerId = canonicalSellerId;
     if (!sellerId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const previousFollowing = isFollowing;
@@ -488,11 +510,23 @@ export default function SellerProfileScreen() {
     } finally {
       setFollowPending(false);
     }
-  }, [followPending, followers, isFollowing, profile.sellerId, routeSellerId]);
+  }, [canonicalSellerId, followPending, followers, isFollowing]);
 
   const handleShare = useCallback(() => {
-    Share.share({ message: 'Check out @' + profile.username + ' on Brandthread' });
-  }, [profile.username]);
+    if (isOwner) {
+      // Owner always gets the dedicated share-profile page with QR + canonical URL.
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      router.push('/share-profile' as never);
+    } else {
+      // Non-owner (visitor) viewing a seller: share via native sheet using the canonical URL.
+      const url = buildCanonicalProfileUrl(profile.username);
+      if (url) {
+        Share.share({ message: `Check out ${profile.brandName} on Brandthread: ${url}`, url });
+      } else {
+        Share.share({ message: `Check out @${profile.username} on Brandthread` });
+      }
+    }
+  }, [isOwner, profile.username, profile.brandName, router]);
 
   const handleMessageSeller = useCallback(() => {
     if ((profile as any).vacationMode) {
@@ -503,7 +537,8 @@ export default function SellerProfileScreen() {
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const sellerId = routeSellerId ?? profile.sellerId;
+    // Use canonical clerkId for messaging — never a DB UUID alias.
+    const sellerId = canonicalSellerId ?? profile.sellerId;
     router.push((
       '/buyer-conversation?participantId=' + encodeURIComponent(sellerId) +
       '&participantName=' + encodeURIComponent(profile.brandName) +
@@ -512,7 +547,7 @@ export default function SellerProfileScreen() {
       '&participantColor=' + encodeURIComponent(profile.avatarColor) +
       '&participantAccountType=seller&type=buyer_to_seller'
     ) as never);
-  }, [router, profile, routeSellerId]);
+  }, [router, profile, canonicalSellerId]);
 
   const handleOpenInbox = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -520,7 +555,8 @@ export default function SellerProfileScreen() {
   }, [isOwner, router]);
 
   const handleMoreOptions = useCallback(() => {
-    const sellerId = routeSellerId ?? profile.sellerId;
+    // Use canonical clerkId for report — never the route alias.
+    const sellerId = canonicalSellerId ?? profile.sellerId;
     Alert.alert(
       profile.brandName,
       'What would you like to do?',
@@ -537,7 +573,7 @@ export default function SellerProfileScreen() {
         { text: 'Cancel', style: 'cancel' },
       ]
     );
-  }, [profile, handleShare, router, routeSellerId]);
+  }, [profile, handleShare, router, canonicalSellerId]);
 
   const handlePostPress = useCallback((post: SellerPost) => {
     setSelectedPost(post);
@@ -572,11 +608,18 @@ export default function SellerProfileScreen() {
           <Feather name="arrow-left" size={20} color={FG} />
         </TouchableOpacity>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerBtn} onPress={handleOpenInbox}>
+          <TouchableOpacity style={styles.headerBtn} onPress={handleOpenInbox} accessibilityRole="button" accessibilityLabel={isOwner ? 'Inbox' : 'Message seller'}>
             <Feather name="message-circle" size={20} color={FG} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.headerBtn} onPress={handleShare}>
-            <Feather name="share" size={20} color={FG} />
+          <TouchableOpacity
+            style={styles.headerBtn}
+            onPress={handleShare}
+            accessibilityRole="button"
+            accessibilityLabel={isOwner ? 'Share profile' : 'Share seller profile'}
+            accessibilityHint={isOwner ? 'Opens your shareable profile link and QR code' : 'Share this seller profile'}
+            testID={isOwner ? 'seller-profile-share-btn' : undefined}
+          >
+            <Feather name="share-2" size={20} color={FG} />
           </TouchableOpacity>
         </View>
       </View>

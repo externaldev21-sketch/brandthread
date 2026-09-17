@@ -5,10 +5,12 @@
  * GET  /api/reviews/seller/:sellerId    (public)
  */
 import { Router } from "express";
-import { db, reviews, orders, products, users } from "@workspace/db";
+import { db, reviews, products, users } from "@workspace/db";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { logger } from "../lib/logger";
+import { assertReviewOrderAuth } from "../lib/reviewOrderAuth";
+import { resolveToClerkId } from "./public";
 
 // ─── Startup migration — add seller reply columns ─────────────────────────────
 (async () => {
@@ -51,13 +53,19 @@ router.get("/product/:productId", async (req, res) => {
 });
 
 // ─── Public: reviews for a seller ────────────────────────────────────────────
+// Accepts users.clerkId or users.id (UUID) — resolves to canonical clerkId.
 router.get("/seller/:sellerId", async (req, res) => {
   const { sellerId } = req.params;
   if (!sellerId) return res.json({ reviews: [], avgRating: 0, totalCount: 0 });
+
+  // Resolve UUID alias or direct clerkId to canonical clerkId.
+  const canonicalClerkId = await resolveToClerkId(sellerId, "seller");
+  if (!canonicalClerkId) return res.json({ reviews: [], avgRating: 0, totalCount: 0 });
+
   const rows = await db
     .select()
     .from(reviews)
-    .where(eq(reviews.sellerId, sellerId))
+    .where(eq(reviews.sellerId, canonicalClerkId))
     .orderBy(desc(reviews.createdAt))
     .limit(50);
 
@@ -67,7 +75,7 @@ router.get("/seller/:sellerId", async (req, res) => {
       totalCount: sql<number>`count(*)::int`,
     })
     .from(reviews)
-    .where(eq(reviews.sellerId, sellerId));
+    .where(eq(reviews.sellerId, canonicalClerkId));
 
   return res.json({
     reviews:    rows,
@@ -91,17 +99,15 @@ router.post("/", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "sellerId and rating (1-5) are required" });
   }
 
-  // If orderId provided, verify the order exists and has a delivered/fulfilled status.
-  if (orderId) {
-    const [order] = await db
-      .select({ id: orders.id, status: orders.status, ownerId: orders.ownerId })
-      .from(orders)
-      .where(eq(orders.id, orderId));
+  // orderId is now mandatory — every buyer review must reference a real purchase.
+  if (!orderId) {
+    return res.status(400).json({ error: "orderId is required" });
+  }
 
-    if (!order) return res.status(404).json({ error: "Order not found" });
-    if (!["delivered", "fulfilled"].includes(order.status ?? "")) {
-      return res.status(400).json({ error: "Can only review a delivered order" });
-    }
+  // Authoritative order-ownership + delivery + seller + product checks.
+  const authResult = await assertReviewOrderAuth({ orderId, buyerId, sellerId, productId });
+  if (!authResult.ok) {
+    return res.status(authResult.status).json({ error: authResult.error });
   }
 
   try {
@@ -110,7 +116,7 @@ router.post("/", requireAuth, async (req, res) => {
       .values({
         buyerId,
         sellerId,
-        orderId:   orderId   ?? null,
+        orderId,
         productId: productId ?? null,
         rating,
         body: body?.trim() || null,
@@ -118,14 +124,15 @@ router.post("/", requireAuth, async (req, res) => {
       .returning();
     return res.status(201).json(row);
   } catch (err: any) {
-    if (err?.code === "23505") {
-      // Update the existing review instead of creating a duplicate
+    // Unique violation: (buyer_id, order_id) already exists — update idempotently.
+    // Drizzle ≥0.44 wraps pg errors in DrizzleQueryError; the pg error code sits
+    // on err.cause rather than err itself.  Check both so the guard is robust.
+    const pgCode = err?.code ?? (err?.cause as any)?.code;
+    if (pgCode === "23505") {
       const [row] = await db
         .update(reviews)
         .set({ rating, body: body?.trim() || null, updatedAt: new Date() })
-        .where(orderId
-          ? and(eq(reviews.buyerId, buyerId), eq(reviews.orderId, orderId))
-          : eq(reviews.buyerId, buyerId))
+        .where(and(eq(reviews.buyerId, buyerId), eq(reviews.orderId, orderId)))
         .returning();
       return res.json(row);
     }

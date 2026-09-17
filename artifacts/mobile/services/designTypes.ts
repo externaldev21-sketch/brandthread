@@ -231,8 +231,25 @@ export interface AIGenerationResult {
 // GenerateDesignResult — type alias used by design-text-to-design & design-upload-sketch
 export type GenerateDesignResult = AIGenerationResult;
 
-// GenerateMockupResult — type alias used by design-mockup-to-model
+// GenerateMockupResult — type alias used by design-mockup-to-model (legacy)
 export type GenerateMockupResult = AIGenerationResult;
+
+// MockupToModelBatchResult — new per-reference result type
+export interface MockupToModelRefResult {
+  refIndex: number;
+  imageUri: string;
+}
+
+export interface MockupToModelRefError {
+  refIndex: number;
+  error: string;
+  retryable: boolean;
+}
+
+export interface MockupToModelBatchResult {
+  results: MockupToModelRefResult[];
+  errors: MockupToModelRefError[];
+}
 
 // GeneratePhotoshootResult — type alias used by design-ai-photoshoot
 export type GeneratePhotoshootResult = AIGenerationResult;

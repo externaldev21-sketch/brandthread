@@ -14,6 +14,7 @@ import { db, users, follows, stories, storyLikes, storyViews, blocks, posts, int
 import { eq, and, or, ilike, ne, inArray, sql, gt, desc, count } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { publishNotification } from "./notifications-feed";
+import { resolveToClerkId } from "./public";
 
 const router = Router();
 router.use(requireAuth);
@@ -248,9 +249,18 @@ router.delete("/follow/:userId", async (req, res) => {
 });
 
 // ─── GET /api/social/status/:userId ──────────────────────────────────────────
+// Accepts users.clerkId or users.id (UUID) — resolves to canonical clerkId.
 router.get("/status/:userId", async (req, res) => {
   const myId  = (req as any).clerkUserId as string;
-  const other = req.params.userId;
+  const rawId = req.params.userId;
+
+  // Resolve UUID alias → canonical clerkId.
+  const canonicalClerkId = await resolveToClerkId(rawId);
+  if (!canonicalClerkId) {
+    res.json({ isFollowing: false, isFollowedBy: false, isMutual: false, followersCount: 0 });
+    return;
+  }
+  const other = canonicalClerkId;
 
   const [iFollowRow] = await db
     .select({ n: sql<number>`cast(count(*) as int)` })
@@ -272,9 +282,16 @@ router.get("/status/:userId", async (req, res) => {
 });
 
 // ─── GET /api/social/profile/:userId ─────────────────────────────────────────
+// Accepts users.clerkId or users.id (UUID) — resolves to canonical clerkId
+// before applying block/privacy/follow checks.
 router.get("/profile/:userId", async (req, res) => {
   const myId  = (req as any).clerkUserId as string;
-  const other = req.params.userId;
+  const rawId = req.params.userId;
+
+  // Resolve UUID alias → canonical clerkId.
+  const canonicalClerkId = await resolveToClerkId(rawId);
+  if (!canonicalClerkId) { res.status(404).json({ error: "User not found" }); return; }
+  const other = canonicalClerkId;
 
   const [user] = await db.select().from(users).where(eq(users.clerkId, other)).limit(1);
   if (!user) { res.status(404).json({ error: "User not found" }); return; }
@@ -325,11 +342,18 @@ router.get("/profile/:userId", async (req, res) => {
   });
 });
 
+// Accepts users.clerkId or users.id (UUID) — resolves before block/friend checks.
 router.get("/profile/:userId/posts", async (req, res) => {
-  const myId = (req as any).clerkUserId as string;
-  const other = req.params.userId;
-  const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? "30"), 10) || 30, 1), 50);
-  const offset = Math.max(parseInt(String(req.query.offset ?? "0"), 10) || 0, 0);
+  const myId  = (req as any).clerkUserId as string;
+  const rawId = req.params.userId;
+  const limit  = Math.min(Math.max(parseInt(String(req.query.limit  ?? "30"), 10) || 30, 1), 50);
+  const offset = Math.max(parseInt(String(req.query.offset ?? "0"),  10) || 0, 0);
+
+  // Resolve UUID alias → canonical clerkId.
+  const canonicalClerkId = await resolveToClerkId(rawId);
+  if (!canonicalClerkId) { res.status(404).json({ error: "User not found" }); return; }
+  const other = canonicalClerkId;
+
   const [blockedRow] = await db.select({ blockerId: blocks.blockerId }).from(blocks)
     .where(and(eq(blocks.blockerId, other), eq(blocks.blockedId, myId))).limit(1);
   if (blockedRow) { res.status(404).json({ error: "User not found" }); return; }

@@ -97,7 +97,7 @@ export const GROWTH_STUDIO_TOOLS = [
   },
   {
     id: 'campaign-gen',
-    title: 'Campaign Generator',
+    title: 'Create Ad',
     desc: 'Generate marketing content and campaigns.',
     icon: 'trending-up',
     accent: '#F472B6',

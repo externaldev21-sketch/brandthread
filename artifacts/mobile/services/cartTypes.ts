@@ -183,6 +183,9 @@ export interface CheckoutSession {
    */
   paidGroups?: Record<string, {
     stripeSessionId: string;
+    /** Server-assigned UUID / numeric order ID — used for all API calls and navigation. */
+    orderId?: string;
+    /** Human-readable display reference (e.g. "BT-1234"). Never used as an API key. */
     orderNumber?: string;
     amountTotalCents?: number;
     guestAccessToken?: string;

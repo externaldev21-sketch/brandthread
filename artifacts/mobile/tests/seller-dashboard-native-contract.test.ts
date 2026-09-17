@@ -32,7 +32,7 @@ describe('seller dashboard native interaction contract', () => {
       'Mockup to Model',
       'Remove Background',
       'AI Design',
-      'Campaign Generator',
+      'Create Ad',
       'AI Photoshoot',
     ]) {
       expect(deviceFlow).toContain(`'${label}'`);

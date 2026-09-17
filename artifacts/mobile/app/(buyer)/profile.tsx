@@ -188,14 +188,10 @@ export default function ProfileScreen() {
     setMenuOpen(true);
   };
 
-  const handleShareProfile = async () => {
+  const handleShareProfile = () => {
     setMenuOpen(false);
-    const handle = profile?.username
-      ? `@${profile.username}`
-      : (user?.username ? `@${user.username}` : 'Brandthread');
-    try {
-      await Share.share({ message: `Find me on Brandthread: ${handle}`, title: 'Share Profile' });
-    } catch {}
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/share-profile' as never);
   };
 
   const handleSignOut = async () => {
@@ -289,10 +285,20 @@ export default function ProfileScreen() {
           <Text style={styles.topHandle}>{displayHandle}</Text>
         </View>
         <View style={styles.topBarRight}>
-          <TouchableOpacity onPress={() => router.push('/buyer-notifications' as any)} style={styles.iconBtn}>
+          <TouchableOpacity onPress={() => router.push('/buyer-notifications' as any)} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Notifications">
             <Feather name="bell" size={ICON.md} color={FG} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleMenu} style={styles.iconBtn}>
+          <TouchableOpacity
+            onPress={handleShareProfile}
+            style={styles.iconBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Share profile"
+            accessibilityHint="Opens your shareable profile link and QR code"
+            testID="buyer-share-profile-btn"
+          >
+            <Feather name="share-2" size={ICON.md} color={FG} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleMenu} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="More options">
             <Feather name="menu" size={ICON.md} color={FG} />
           </TouchableOpacity>
         </View>
@@ -374,7 +380,13 @@ export default function ProfileScreen() {
               <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/(buyer)/inbox' as never)}>
                 <Text style={styles.actionBtnText}>Messages</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.actionIconBtn} onPress={handleShareProfile}>
+              <TouchableOpacity
+                style={styles.actionIconBtn}
+                onPress={handleShareProfile}
+                accessibilityRole="button"
+                accessibilityLabel="Share profile"
+                accessibilityHint="Opens your shareable profile link and QR code"
+              >
                 <Feather name="share-2" size={ICON.sm} color={FG} />
               </TouchableOpacity>
             </View>

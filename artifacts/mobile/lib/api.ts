@@ -333,6 +333,59 @@ async function uploadVideo<T = any>(
   await clearApiCache(await getCacheScope());
   return data;
 }
+// ─── Ad Campaign Types ────────────────────────────────────────────────────────
+
+export type AdCtaKind =
+  | 'shop_now' | 'learn_more' | 'view_product' | 'sign_up' | 'contact_us';
+
+export type AdCtaDestinationKind = 'product' | 'store' | 'profile' | 'contact';
+
+export type AdFormatKind =
+  | 'story_9x16' | 'square_1x1' | 'portrait_4x5' | 'landscape_16x9';
+
+export type AdMediaKind = 'video' | 'photos';
+
+export type AdCampaignStatus =
+  | 'draft' | 'pending_payment' | 'active' | 'failed' | 'cancelled';
+
+export interface AdCampaign {
+  id: string;
+  sellerId: string;
+  mediaKind: AdMediaKind;
+  mediaObjectPaths: string[];
+  mediaMimeTypes: string[];
+  /** Resolved signed URLs — parallel to mediaObjectPaths */
+  mediaUrls: string[];
+  headline: string | null;
+  description: string | null;
+  ctaKind: AdCtaKind | null;
+  ctaDestinationKind: AdCtaDestinationKind | null;
+  ctaDestinationId: string | null;
+  formats: AdFormatKind[];
+  budgetCents: number;
+  durationDays: number;
+  estimatedReachLow: number;
+  estimatedReachHigh: number;
+  estimatedReach: { low: number; high: number; label: 'estimate' };
+  status: AdCampaignStatus;
+  /** Stripe Checkout Session ID — persisted after /pay */
+  stripeCheckoutSessionId: string | null;
+  paidAt: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  creativeConfig: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Response from POST /api/ad-campaigns/:id/pay */
+export interface AdCampaignCheckoutSession {
+  sessionId: string;
+  url: string;
+  paymentStatus: 'paid' | 'unpaid' | 'no_payment_required';
+  status: AdCampaignStatus;
+}
+
 export interface Freelancer {
   id: string;
   userId: string;
@@ -1746,20 +1799,125 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     boosts: {
       targets: () =>
         get<Array<{
-          id: string; mediaUrl: string | null; mediaType: string | null;
-          caption: string | null; createdAt: string;
+          id: string;
+          mediaUrl: string | null;
+          mediaType: string | null;
+          mediaUrls: string[] | null;
+          mediaPaths: string[] | null;
+          caption: string | null;
+          createdAt: string;
+          /** 'video' | 'slideshow' */
+          mediaKind: 'video' | 'slideshow';
+          /** Number of slides (null for video) */
+          imageCount: number | null;
         }>>('/api/boosts/targets'),
-      list:    (targetId?: string) =>
+      list: (targetId?: string) =>
         get<any[]>(`/api/boosts${targetId ? `?targetId=${encodeURIComponent(targetId)}` : ''}`),
-      create:  (body: {
-        targetType: string; targetId: string; objective: 'views' | 'likes' | 'followers' | 'profile_visits';
-        budgetCents: number; durationDays: number;
+      /**
+       * Create a pending_payment boost.
+       * Does NOT charge — use boosts.pay() after creation to open Stripe Checkout.
+       */
+      create: (body: {
+        targetType: string;
+        targetId: string;
+        objective?: 'views' | 'likes' | 'followers' | 'profile_visits';
+        budgetCents: number;
+        durationDays: number;
       }) =>
         post<any>('/api/boosts', body),
-      update:  (id: string, body: { status: 'paused' | 'cancelled' }) =>
+      /**
+       * Create (or reuse) a Stripe Checkout Session for a pending_payment boost.
+       * Returns { sessionId, url, paymentStatus, status }.
+       * Open `url` with WebBrowser.openAuthSessionAsync; call verify() after return.
+       */
+      pay: (id: string, returnUrl: string) =>
+        post<{
+          sessionId: string;
+          url: string | null;
+          paymentStatus: 'paid' | 'unpaid' | 'no_payment_required';
+          status: string;
+        }>(`/api/boosts/${encodeURIComponent(id)}/pay`, { returnUrl }),
+      /**
+       * Verify payment after the browser returns from Stripe Checkout.
+       * Server validates payment_status=paid and activates the boost idempotently.
+       * Returns the updated boost.
+       */
+      verify: (id: string) =>
+        post<any>(`/api/boosts/${encodeURIComponent(id)}/pay/verify`, {}),
+      update: (id: string, body: { status: 'paused' | 'cancelled' }) =>
         patch<any>(`/api/boosts/${encodeURIComponent(id)}`, body),
       summary: () =>
         get<{ totalImpressions: number; spentCentsThisMonth: number; activeCount: number }>('/api/boosts/summary'),
+    },
+    /** Ad Campaigns — end-to-end Create Ad flow with media upload, payment, and lifecycle. */
+    adCampaigns: {
+      create: () =>
+        post<{ campaign: AdCampaign }>('/api/ad-campaigns', {}),
+      list: () =>
+        get<{ campaigns: AdCampaign[] }>('/api/ad-campaigns'),
+      get: (id: string) =>
+        get<{ campaign: AdCampaign }>(`/api/ad-campaigns/${encodeURIComponent(id)}`),
+      update: (id: string, body: Partial<{
+        headline: string;
+        description: string;
+        ctaKind: AdCtaKind;
+        ctaDestinationKind: AdCtaDestinationKind;
+        ctaDestinationId: string;
+        formats: AdFormatKind[];
+        budgetCents: number;
+        durationDays: number;
+      }>) =>
+        patch<{ campaign: AdCampaign }>(`/api/ad-campaigns/${encodeURIComponent(id)}`, body),
+      cancel: (id: string) =>
+        del<{ ok: boolean }>(`/api/ad-campaigns/${encodeURIComponent(id)}`),
+      uploadMedia: (
+        id: string,
+        blob: Blob,
+        mimeType: string,
+        opts?: { mediaKind?: 'photos' | 'video'; durationSeconds?: number; insertAt?: number },
+      ) => {
+        return request<{ objectPath: string; downloadUrl: string; mimeType: string; insertedAt: number }>(
+          `/api/ad-campaigns/${encodeURIComponent(id)}/media`,
+          {
+            method: 'POST',
+            body: blob,
+            headers: {
+              'Content-Type': mimeType,
+              'X-Media-Kind':  opts?.mediaKind ?? 'photos',
+              ...(opts?.durationSeconds !== undefined ? { 'X-Duration-Seconds': String(opts.durationSeconds) } : {}),
+              ...(opts?.insertAt !== undefined ? { 'X-Media-Index': String(opts.insertAt) } : {}),
+            } as any,
+          },
+          getToken,
+          false,
+          getCacheScope,
+        );
+      },
+      removeMedia: (id: string, index: number) =>
+        del<{ ok: boolean; mediaCount: number }>(`/api/ad-campaigns/${encodeURIComponent(id)}/media/${index}`),
+      reorderMedia: (id: string, order: number[]) =>
+        post<{ ok: boolean }>(`/api/ad-campaigns/${encodeURIComponent(id)}/reorder-media`, { order }),
+      /**
+       * Create (or reuse a still-open) Stripe Checkout Session for the campaign.
+       * The returned `url` must be opened with WebBrowser.openAuthSessionAsync.
+       * Campaign stays pending_payment until /pay/verify confirms payment_status=paid.
+       */
+      pay: (id: string, returnUrl: string) =>
+        post<AdCampaignCheckoutSession>(
+          `/api/ad-campaigns/${encodeURIComponent(id)}/pay`,
+          { returnUrl },
+        ),
+      /**
+       * Call after the browser returns from Stripe Checkout.
+       * Server retrieves the Checkout Session, validates ownership + metadata,
+       * and activates the campaign idempotently only if payment_status=paid.
+       * Never activates on client redirect alone.
+       */
+      verify: (id: string) =>
+        post<{ campaign: AdCampaign }>(
+          `/api/ad-campaigns/${encodeURIComponent(id)}/pay/verify`,
+          {},
+        ),
     },
     /** Buyer loyalty / rewards points. */
     loyalty: {

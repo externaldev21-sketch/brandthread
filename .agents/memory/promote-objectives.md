@@ -3,8 +3,8 @@ name: Promote objective boundary
 description: Defines what the current Boost objective supports and what requires a later delivery system.
 ---
 
-Boost objectives must be persisted with each campaign and shown in campaign reporting. Do not claim that selecting Likes, Followers, or Profile visits currently changes delivery optimization.
+Boost creation defaults to the persisted `views` objective and does not ask sellers to choose Likes, Followers, or Profile visits. Do not claim that current delivery is objective-optimized.
 
-**Why:** The current boost engine lifts eligible content in ranking and counts impressions, but it does not yet attribute likes, follows, or profile visits to a specific boost exposure. Objective-aware optimization would be misleading without those signals.
+**Why:** Sellers asked for a simpler existing-post → budget/duration → payment flow. The delivery engine still lacks reliable exposure-to-like/follow/profile-visit attribution, so additional objective choices would imply unsupported optimization.
 
-**How to apply:** Keep Views, Likes, Followers, and Profile visits in the create contract and history. Add exposure-to-conversion attribution and objective-specific ranking weights before describing delivery as optimized for anything beyond reach.
+**How to apply:** Preserve the objective field for stored-data and API compatibility, but default new Boosts to Views. Add objective choices only after exposure attribution and objective-specific ranking weights are implemented.

@@ -3,6 +3,10 @@
  *
  * Secure proxy between the Expo client and the OpenAI API.
  * API keys never leave the server. Context is validated before forwarding.
+ *
+ * The /chat endpoint builds a permission-scoped seller snapshot from the
+ * verified authentication identity. No client-provided account IDs or
+ * business metrics are trusted.
  */
 
 import { Router, type Request, type Response } from "express";
@@ -11,12 +15,25 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { clerkClient } from "@clerk/express";
 import { db, products, productVariants, orders, posts, storefronts } from "@workspace/db";
 import { eq, and, desc, asc, inArray, sql } from "drizzle-orm";
+import { buildSellerSnapshot, type SellerSnapshot } from "../lib/sellerSnapshot";
+import type { Logger } from "pino";
 
 const router = Router();
 
+// ─── Constants ─────────────────────────────────────────────────────────────────
+
+const MAX_MESSAGES         = 40;
+const MAX_PER_MESSAGE_CHARS = 4000;
+const MIN_CONTENT_CHARS    = 1;
+const CHAT_MODEL           = "gpt-5.4-mini";
+
 // ─── System prompt builder ─────────────────────────────────────────────────────
 
-function buildSystemPrompt(context: Record<string, unknown>, brandMemory?: Record<string, string>): string {
+function buildSystemPrompt(
+  snapshot: SellerSnapshot,
+  context: Record<string, unknown>,
+  brandMemory?: Record<string, string>,
+): string {
   const screen = (context?.screen as string) ?? "general";
 
   const screenContext: Record<string, string> = {
@@ -36,66 +53,147 @@ function buildSystemPrompt(context: Record<string, unknown>, brandMemory?: Recor
     settings:         "The seller is in Settings.",
   };
 
-  const brandSection = brandMemory && Object.keys(brandMemory).length > 0
-    ? `\n\nBrand memory (use this to personalise all advice):\n${Object.entries(brandMemory).map(([k, v]) => `- ${k}: ${v}`).join("\n")}`
-    : "";
-
   const screenNote = screenContext[screen] ?? "The seller is using Brandthread.";
 
+  const brandSection = brandMemory && Object.keys(brandMemory).length > 0
+    ? `\n\nBrand memory (personalise advice accordingly):\n${Object.entries(brandMemory).map(([k, v]) => `- ${k}: ${v}`).join("\n")}`
+    : "";
+
+  // Compact JSON snapshot — null values are preserved to signal unavailability
+  const snapshotJson = JSON.stringify(snapshot, null, 0);
+
   return [
-    "You are Brandthread AI — an intelligent, embedded business assistant for independent fashion brands.",
-    "You are not a generic chatbot. You understand fashion brand operations, streetwear, premium basics, direct-to-consumer commerce, content creation, manufacturing, and retail analytics.",
+    "You are Brandthread AI — an intelligent business assistant embedded in the Brandthread seller platform.",
+    "You have access to a verified, real-time snapshot of this seller's account. Answer questions from this snapshot.",
     "",
-    "Principles:",
-    "- Be direct and specific. No filler text.",
-    "- Give data-grounded advice. When data is unavailable, say so clearly.",
-    "- Never automatically perform destructive actions (price changes, order cancellations, refunds, publishing, sending campaigns).",
-    "- Separate advice from suggested actions. Label estimates clearly as estimates.",
-    "- When suggesting a storefront, product, or copy change, offer a before/after preview.",
-    "- Match the brand voice in the brand memory if provided.",
+    "Core rules:",
+    "1. Answer factual questions about the seller's account using ONLY the verified snapshot below. Never invent or estimate numbers.",
+    "2. When snapshot data for a field is null, say explicitly that the data is unavailable — do not guess.",
+    "3. Clearly distinguish between observed data (from the snapshot) and your suggestions/recommendations.",
+    "4. Label all estimates, projections, or advice as such (e.g. 'Based on industry averages...').",
+    "5. Never reveal customer names, emails, addresses, or any PII from the snapshot.",
+    "6. Never automatically perform destructive actions (price changes, order cancellations, refunds, publishing, campaigns).",
+    "7. If asked about data outside the snapshot scope (e.g. competitor data, future projections), say so clearly.",
+    "8. Revenue figures in the snapshot are gross paid order totals only — always note this when discussing revenue.",
     "",
-    `Current context: ${screenNote}${brandSection}`,
+    `Current screen context: ${screenNote}${brandSection}`,
+    "",
+    `Verified account snapshot (snapshotAt: ${snapshot.snapshotAt}):`,
+    "```json",
+    snapshotJson,
+    "```",
     "",
     "If you want to suggest a structured action the user can approve, include a JSON block at the end of your response in this exact format:",
     "```json:action",
     '{"type":"edit","title":"Short action title","description":"One sentence description","impact":"Expected result","requiresConfirmation":false,"isDestructive":false,"canUndo":true,"payload":{}}',
     "```",
-    "Only include the action block when there is a clear, specific action to take. For general advice, omit it.",
+    "Only include the action block when there is a clear, specific action to take. For general advice or data questions, omit it.",
   ].join("\n");
+}
+
+// ─── Input validation ──────────────────────────────────────────────────────────
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+function validateAndSanitizeMessages(
+  raw: unknown,
+): { messages: ChatMessage[]; error?: undefined } | { messages?: undefined; error: string } {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return { error: "messages array is required." };
+  }
+  if (raw.length > MAX_MESSAGES) {
+    return { error: `Too many messages. Maximum is ${MAX_MESSAGES}.` };
+  }
+
+  const safe: ChatMessage[] = [];
+  for (const m of raw) {
+    if (typeof m !== "object" || m === null) continue;
+    const role = (m as Record<string, unknown>).role;
+    const content = (m as Record<string, unknown>).content;
+    if (role !== "user" && role !== "assistant") continue;
+    if (typeof content !== "string") continue;
+    const trimmed = content.trim();
+    safe.push({
+      role: role as "user" | "assistant",
+      content: content.slice(0, MAX_PER_MESSAGE_CHARS),
+    });
+  }
+
+  if (safe.length === 0) {
+    return { error: "No valid messages provided." };
+  }
+
+  // Verify the last user message is not blank
+  const lastUser = [...safe].reverse().find(m => m.role === "user");
+  if (!lastUser || lastUser.content.trim().length < MIN_CONTENT_CHARS) {
+    return { error: "Message content cannot be blank." };
+  }
+
+  // Preserve turn order — take last MAX_MESSAGES safe messages
+  return { messages: safe.slice(-MAX_MESSAGES) };
 }
 
 // ─── POST /api/ai/chat ─────────────────────────────────────────────────────────
 
 router.post("/chat", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const userId = (req as Request & { clerkUserId?: string }).clerkUserId!;
+  const log = (req as Request & { log?: Logger }).log;
 
-  const { messages, context, brandMemory, maxTokens } = req.body as {
-    messages?: { role: string; content: string }[];
+  // Request-correlated diagnostics — never log message content or PII
+  const reqId = (req as Request & { id?: string }).id ?? "unknown";
+  log?.info({ reqId, userId: "[redacted]", route: "POST /api/ai/chat" }, "ai.chat.start");
+
+  const { messages: rawMessages, context, brandMemory, maxTokens } = req.body as {
+    messages?: unknown;
     context?: Record<string, unknown>;
     brandMemory?: Record<string, string>;
     maxTokens?: number;
   };
 
-  if (!Array.isArray(messages) || messages.length === 0) {
-    res.status(400).json({ error: "messages array is required." });
+  // Validate messages before any expensive operations
+  const validation = validateAndSanitizeMessages(rawMessages);
+  if (validation.error) {
+    res.status(400).json({ error: validation.error });
     return;
   }
+  const safeMessages = validation.messages!;
 
-  // Validate message roles — only allow user and assistant in history
-  const safeMessages = messages
-    .filter(m => m.role === "user" || m.role === "assistant")
-    .slice(-20)
-    .map(m => ({
-      role: m.role as "user" | "assistant",
-      content: String(m.content).slice(0, 4000), // cap per-message length
-    }));
+  // Build a fresh, permission-scoped snapshot from the verified user identity.
+  // This is the only source of account data — client-provided IDs are ignored.
+  let snapshot: SellerSnapshot;
+  try {
+    snapshot = await buildSellerSnapshot(userId);
+    log?.info({ reqId, snapshotAt: snapshot.snapshotAt }, "ai.chat.snapshot_built");
+  } catch (snapshotErr) {
+    log?.error({ reqId, err: snapshotErr }, "ai.chat.snapshot_error");
+    // Safe fallback: proceed with a minimal null snapshot rather than exposing
+    // the error details. The model will report data as unavailable.
+    snapshot = {
+      snapshotAt: new Date().toISOString(),
+      seller: null,
+      storefront: null,
+      products: { totalActive: 0, totalDraft: 0, recent: [] },
+      inventory: { totalVariants: 0, outOfStock: 0, lowStock: 0, lowStockItems: [] },
+      orders: { recentOrders: [], pendingCount: 0, processingCount: 0, fulfilledCount: 0, cancelledCount: 0, oldestUnfulfilledHoursAgo: null },
+      revenue: { allTimeGrossCents: null, last30DaysGrossCents: null, last7DaysGrossCents: null, last30DaysOrderCount: null, currency: "USD", note: "Revenue data temporarily unavailable." },
+      content: { publishedPosts: 0, draftPosts: 0, scheduledCount: 0, recentPublished: [] },
+      customers: { totalCustomers: 0, avgOrdersPerCustomer: null, avgSpentCents: null, topSpendBracket: null },
+      conversations: { totalUnread: 0, activeConversationCount: 0, recentConversations: [] },
+      boosts: { activeBoosts: null, totalBudgetCents: null, totalSpentCents: null, available: false },
+      manufacturerOrders: { pendingQuotes: null, activeRelationships: null, recentRequests: [], available: false },
+      discountCodes: { activeCodes: 0, totalCodes: 0 },
+    };
+  }
 
-  const systemPrompt = buildSystemPrompt(context ?? {}, brandMemory);
+  const systemPrompt = buildSystemPrompt(snapshot, context ?? {}, brandMemory);
 
   try {
     const completion = await openai.chat.completions.create({
-      model:       "gpt-5.4-mini",
-      messages:    [{ role: "system", content: systemPrompt }, ...safeMessages],
+      model:                 CHAT_MODEL,
+      messages:              [{ role: "system", content: systemPrompt }, ...safeMessages],
       max_completion_tokens: Math.min(maxTokens ?? 700, 1500),
     });
 
@@ -112,6 +210,8 @@ router.post("/chat", requireAuth, async (req: Request, res: Response): Promise<v
 
     const content = raw.replace(/```json:action\n[\s\S]*?\n```/g, "").trim();
 
+    log?.info({ reqId, tokensUsed: completion.usage?.total_tokens }, "ai.chat.success");
+
     res.json({
       content,
       actionCard,
@@ -119,10 +219,11 @@ router.post("/chat", requireAuth, async (req: Request, res: Response): Promise<v
     });
   } catch (err: unknown) {
     const e = err as { status?: number; message?: string };
+    log?.error({ reqId, status: e?.status }, "ai.chat.provider_error");
+
     if (e?.status === 429) {
       res.status(429).json({ error: "AI provider rate limit reached. Please try again shortly." });
     } else {
-      // Return an error payload — client falls back to demo mode
       res.status(503).json({ error: "AI service temporarily unavailable." });
     }
   }
@@ -174,7 +275,7 @@ router.post("/brand-memory/rebuild", requireAuth, async (req: Request, res: Resp
 
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-5.4-mini",
+      model: CHAT_MODEL,
       messages: [{ role: "user", content: prompt }],
       max_completion_tokens: 600,
       response_format: { type: "json_object" },

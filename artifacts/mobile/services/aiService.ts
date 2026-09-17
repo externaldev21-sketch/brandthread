@@ -2,17 +2,22 @@
  * Brandthread AI Brain — Service Layer
  *
  * Handles message sending, session management, context building,
- * home suggestions, and next best actions. Falls back to mock
- * responses when the API is unreachable.
+ * home suggestions, and next best actions.
+ *
+ * Design contract (immutable I/O):
+ *  - sendMessage() receives a session snapshot; it does NOT mutate the input.
+ *    It returns a new session with exactly one new user message and one new
+ *    assistant message appended (or throws on abort / hard error).
+ *  - The caller owns UI state; the service owns persistence and message IDs.
+ *  - Sessions are scoped by Clerk userId + store context so account switches
+ *    never bleed state.
+ *  - Empty or duplicate rows are repaired on load.
  *
  * API keys NEVER appear in this file. All AI calls go through
  * the secure API server.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-function nanoid(): string {
-  return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
-}
 import {
   AIMessage, AISession, AIScreenContext, AIChatRequest,
   AIChatResponse, AIActionCard, AISettings, AISuggestion,
@@ -21,15 +26,37 @@ import {
 import { getEnabledMemorySummary } from './aiBrandMemory';
 import { addAuditEntry } from './aiAuditLog';
 
-// ─── AsyncStorage keys ────────────────────────────────────────────────────────
+// ─── ID helper ────────────────────────────────────────────────────────────────
+
+function nanoid(): string {
+  return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+// ─── AsyncStorage key scoping ─────────────────────────────────────────────────
 
 const SETTINGS_KEY = 'bt:ai:settings:v1';
-const SESSION_KEY  = 'bt:ai:session:v1';
 const MAX_STORED   = 50; // max messages kept in AsyncStorage
+
+/**
+ * Returns a per-user, per-store session storage key.
+ * Falls back to a shared key when userId is not yet known (pre-auth).
+ */
+function sessionKey(userId?: string | null, storeContext?: string | null): string {
+  const u = userId ?? 'anon';
+  const s = storeContext ?? 'default';
+  return `bt:ai:session:v2:${u}:${s}`;
+}
+
+function suggestionsKey(userId?: string | null): string {
+  return `bt:ai:suggestions:v1:${userId ?? 'anon'}`;
+}
 
 // ─── In-memory state ──────────────────────────────────────────────────────────
 
 let _activeController: AbortController | null = null;
+
+// Track the last-loaded key so we can detect user/store switches.
+let _lastSessionKey: string | null = null;
 let _currentSession: AISession | null = null;
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
@@ -48,26 +75,73 @@ export async function saveAISettings(settings: AISettings): Promise<void> {
   await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 
+// ─── Session repair ───────────────────────────────────────────────────────────
+
+/**
+ * Remove empty messages and deduplicate consecutive identical messages.
+ * Preserves ordering. Called on every session load.
+ */
+function repairMessages(messages: AIMessage[]): AIMessage[] {
+  const seen = new Set<string>();
+  const out: AIMessage[] = [];
+  for (const m of messages) {
+    // Drop empty non-streaming messages
+    if (!m.isStreaming && !m.content?.trim() && !m.error) continue;
+    // Drop exact content duplicates (same role + content within 2 s)
+    const dedupKey = `${m.role}:${m.content}`;
+    if (seen.has(dedupKey)) continue;
+    seen.add(dedupKey);
+    // Strip any persisted streaming placeholders (should never be stored)
+    if (m.isStreaming) continue;
+    out.push(m);
+  }
+  return out;
+}
+
 // ─── Session management ───────────────────────────────────────────────────────
 
-export async function loadSession(context: AIScreenContext): Promise<AISession> {
-  if (_currentSession) return _currentSession;
+export interface LoadSessionOptions {
+  context: AIScreenContext;
+  userId?: string | null;
+  storeContext?: string | null;
+}
+
+export async function loadSession(
+  context: AIScreenContext,
+  userId?: string | null,
+  storeContext?: string | null,
+): Promise<AISession> {
+  const key = sessionKey(userId, storeContext);
+
+  // Reload from storage when user/store context switches.
+  if (_lastSessionKey !== key) {
+    _currentSession = null;
+    _lastSessionKey = key;
+  }
+
+  if (_currentSession) {
+    _currentSession.context = context;
+    return _currentSession;
+  }
+
   try {
     const settings = await getAISettings();
     if (settings.sessionMemoryEnabled) {
-      const raw = await AsyncStorage.getItem(SESSION_KEY);
+      const raw = await AsyncStorage.getItem(key);
       if (raw) {
-        _currentSession = JSON.parse(raw) as AISession;
-        // Update context to current screen
-        _currentSession.context = context;
+        const parsed = JSON.parse(raw) as AISession;
+        parsed.messages = repairMessages(parsed.messages ?? []);
+        parsed.context = context;
+        _currentSession = parsed;
         return _currentSession;
       }
     }
-  } catch {}
-  return _newSession(context);
+  } catch { /* fall through */ }
+
+  return _newSession(context, key);
 }
 
-function _newSession(context: AIScreenContext): AISession {
+function _newSession(context: AIScreenContext, key?: string): AISession {
   const session: AISession = {
     id: nanoid(),
     messages: [],
@@ -76,206 +150,90 @@ function _newSession(context: AIScreenContext): AISession {
     updatedAt: Date.now(),
   };
   _currentSession = session;
+  _lastSessionKey = key ?? _lastSessionKey;
   return session;
 }
 
 export function startNewSession(context: AIScreenContext): AISession {
   _currentSession = null;
-  return _newSession(context);
+  return _newSession(context, _lastSessionKey ?? undefined);
 }
 
-async function _persistSession(session: AISession): Promise<void> {
+async function _persistSession(
+  session: AISession,
+  userId?: string | null,
+  storeContext?: string | null,
+): Promise<void> {
   try {
     const settings = await getAISettings();
     if (!settings.sessionMemoryEnabled) return;
+    const key = sessionKey(userId, storeContext);
     const toSave: AISession = {
       ...session,
-      messages: session.messages.slice(-MAX_STORED),
+      // Never persist streaming placeholders
+      messages: session.messages
+        .filter(m => !m.isStreaming)
+        .slice(-MAX_STORED),
     };
-    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(toSave));
-  } catch {}
+    await AsyncStorage.setItem(key, JSON.stringify(toSave));
+  } catch { /* persistence is best-effort */ }
 }
 
-export async function clearSession(): Promise<void> {
+export async function clearSession(
+  userId?: string | null,
+  storeContext?: string | null,
+): Promise<void> {
   _currentSession = null;
-  await AsyncStorage.removeItem(SESSION_KEY);
+  const key = sessionKey(userId, storeContext);
+  await AsyncStorage.removeItem(key);
 }
 
 // ─── API call ─────────────────────────────────────────────────────────────────
 
-const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
-
+/**
+ * Call the real AI endpoint.
+ * Throws on abort (AbortError).
+ * Throws on network / auth / provider failures with a concise error message.
+ * Does NOT fall back to fake business data.
+ */
 async function callAI(
   request: AIChatRequest,
   authToken: string | null,
   signal: AbortSignal,
 ): Promise<AIChatResponse> {
-  if (!API_BASE) return _mockResponse(request);
+  const apiBase = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
+  if (!apiBase) {
+    throw new Error('AI service is not configured. Check your API base URL.');
+  }
+  if (!authToken) {
+    throw new Error('Sign in to use Brandthread AI.');
+  }
 
-  try {
-    const res = await fetch(`${API_BASE}/ai/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-      },
-      body: JSON.stringify(request),
-      signal,
-    });
+  const res = await fetch(`${apiBase}/api/v1/ai/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${authToken}`,
+    },
+    body: JSON.stringify(request),
+    signal,
+  });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({})) as { error?: string };
-      if (res.status === 429) return { content: '', error: 'Rate limit reached — please wait a moment.' };
-      if (res.status === 503) return { content: '', error: 'AI service is temporarily unavailable.' };
-      return _mockResponse(request); // fall back silently on server errors
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      throw new Error('Authentication error. Please sign in again.');
     }
-
-    return await res.json() as AIChatResponse;
-  } catch (err: unknown) {
-    if ((err as Error)?.name === 'AbortError') throw err;
-    return _mockResponse(request);
-  }
-}
-
-// ─── Mock responses ───────────────────────────────────────────────────────────
-
-function _mockResponse(req: AIChatRequest): AIChatResponse {
-  const lastMsg = req.messages.filter(m => m.role === 'user').pop()?.content?.toLowerCase() ?? '';
-  const ctx = req.context;
-
-  // Context-aware canned responses
-  if (ctx.screen === 'product_detail') {
-    if (lastMsg.includes('copy') || lastMsg.includes('description') || lastMsg.includes('write')) {
-      const name = (ctx as { productName?: string }).productName ?? 'this product';
-      return {
-        content: `**${name}**\n\nEngineered for those who refuse to compromise. Built from 320gsm heavyweight French terry, each piece arrives pre-washed for instant softness and a relaxed-but-structured silhouette that holds its shape. A barely-there tonal logo, dropped shoulders, and reinforced seams — because the details that matter are the ones you feel, not just see.\n\n• 320gsm 100% combed cotton French terry\n• Pre-washed & preshrunk\n• Dropped shoulder construction\n• Tonal embroidery logo\n• True-to-size`,
-        actionCard: {
-          type: 'edit',
-          title: 'Apply description',
-          description: `Update the product description for ${name}`,
-          requiresConfirmation: false,
-          isDestructive: false,
-          canUndo: true,
-          payload: { field: 'description' },
-        },
-        isDemo: true,
-      };
+    if (res.status === 429) {
+      throw new Error('Rate limit reached — please wait a moment and try again.');
     }
-    if (lastMsg.includes('price') || lastMsg.includes('pricing')) {
-      return {
-        content: `Based on your current margin structure and comparable products in the premium streetwear segment, here's my pricing analysis:\n\n**Current:** Unknown\n**Recommended test:** $119 – $139\n**Rationale:** Premium basics in this category command 2.8–3.5× cost-of-goods. Your brand positioning supports the upper range.\n\n⚠️ *This is an estimate based on typical category benchmarks, not your actual cost data. Confirm your production cost before applying.*\n\n**Expected impact:** +12–18% margin if cost allows. A/B test at $119 first.`,
-        isDemo: true,
-      };
+    if (res.status === 503 || res.status === 502) {
+      throw new Error('AI service is temporarily unavailable. Please try again shortly.');
     }
-    if (lastMsg.includes('convert') || lastMsg.includes('perform')) {
-      return {
-        content: `Looking at this product's profile, a few common conversion killers to check:\n\n1. **Photos** — Is the first image shot on a model at the correct size? Generic flat-lay openings drop conversion ~23%.\n2. **Variant gap** — Missing popular size/color combinations push buyers to competitors.\n3. **Description** — Generic copy signals low quality. Premium copy increases dwell time significantly.\n4. **Price anchoring** — No compare-at price means buyers can't perceive a deal.\n\nStart with the product photo and copy — those are highest-leverage, lowest-cost fixes.`,
-        isDemo: true,
-      };
-    }
+    const body = await res.json().catch(() => ({})) as { error?: string };
+    throw new Error(body.error ?? `AI request failed (${res.status}).`);
   }
 
-  if (ctx.screen === 'analytics') {
-    return {
-      content: `Looking at your performance data, here's what the numbers are telling you:\n\n**Revenue:** $23,840 this week (+8.2% vs. last week)\n**Conversion rate:** 3.1% (down from 3.6% last week)\n\nThe conversion dip is the most interesting signal. Your traffic is up but fewer people are completing purchases. Most likely causes:\n\n1. A top product went out of stock mid-week (check your Oversized Hoodie — typically your #1 driver)\n2. The new checkout flow may have introduced friction for returning customers\n\n**Recommended action:** Check stock levels on your top 5 SKUs, then run a quick 3-item flash sale this weekend to recover conversion rate.\n\n*Note: This analysis uses demo data and benchmarks. Connect your live store data for precise insights.*`,
-      isDemo: true,
-    };
-  }
-
-  if (ctx.screen === 'order_detail') {
-    if (lastMsg.includes('draft') || lastMsg.includes('response') || lastMsg.includes('customer')) {
-      return {
-        content: `Here's a draft response you can review and personalise:\n\n---\nHi [Customer name],\n\nThank you for your order — we appreciate your support. Your order is currently being prepared and you'll receive a shipping notification with tracking details shortly.\n\nIf you have any questions in the meantime, please don't hesitate to reach out.\n\nBest,\nThe [Brand] Team\n---`,
-        actionCard: {
-          type: 'create_draft',
-          title: 'Save as draft reply',
-          description: 'This message will be saved as a draft — you control when it sends.',
-          requiresConfirmation: false,
-          isDestructive: false,
-          canUndo: true,
-          payload: { type: 'customer_reply' },
-        },
-        isDemo: true,
-      };
-    }
-  }
-
-  if (ctx.screen === 'manufacturer_hub') {
-    if (lastMsg.includes('quote') || lastMsg.includes('compare') || lastMsg.includes('best')) {
-      return {
-        content: `Based on the quotes in your hub, here's a side-by-side breakdown:\n\n| Manufacturer | Unit cost | MOQ | Lead time | Quality score |\n|---|---|---|---|---|\n| Apex Garment Co. | $18.50 | 100 | 28 days | ⭐⭐⭐⭐⭐ |\n| Pacific Thread | $15.20 | 200 | 35 days | ⭐⭐⭐⭐ |\n| Meridian Goods | $22.00 | 50 | 21 days | ⭐⭐⭐⭐⭐ |\n\n**Recommendation:** Apex Garment Co. offers the best balance of quality, speed, and cost at your current order volumes. If you can commit to 200 units, Pacific Thread saves ~$660 per run.\n\n*Confirm specs and sample quality before committing to any manufacturer.*`,
-        isDemo: true,
-      };
-    }
-  }
-
-  if (ctx.screen === 'content') {
-    if (lastMsg.includes('hook') || lastMsg.includes('caption') || lastMsg.includes('copy')) {
-      return {
-        content: `Here are 5 hooks for your next post:\n\n1. "We almost didn't release this one."\n2. "The hoodie your wardrobe has been missing — without you knowing it."\n3. "320 grams. Zero compromises."\n4. "Limited. And we mean it this time."\n5. "Quality that outlasts the trend."\n\n**Caption option:**\nDesigned to be worn for years, not seasons. Every stitch is intentional. Every weight is tested. This isn't fast fashion — it's the opposite.\n\nLink in bio.\n\n**Suggested hashtags:** #streetwear #premiumbasics #qualityclothing #slowfashion #limiteddrop`,
-        actionCard: {
-          type: 'create_draft',
-          title: 'Create post draft',
-          description: 'Saves these hooks and caption as a content draft',
-          requiresConfirmation: false,
-          isDestructive: false,
-          canUndo: true,
-          payload: { type: 'content_draft' },
-        },
-        isDemo: true,
-      };
-    }
-  }
-
-  if (ctx.screen === 'inventory') {
-    return {
-      content: `Based on your current inventory levels and sales velocity, here are my restock recommendations:\n\n🔴 **Urgent (< 5 units):**\n• Essential Hoodie — Black M (2 units remaining, ~6-day supply)\n• Classic Tee — White XL (4 units remaining, ~9-day supply)\n\n🟡 **Watch (< 15 units):**\n• Cargo Jogger — Olive S (11 units)\n• Essential Hoodie — Navy L (13 units)\n\n**Suggested order quantity:** 150 units per critical SKU (based on your typical 6-week lead time from Apex Garment Co.)\n\n⚠️ *Stockout estimates are based on your 30-day sales average. Actual sell-through may vary with marketing activity.*`,
-      isDemo: true,
-    };
-  }
-
-  if (ctx.screen === 'marketing') {
-    return {
-      content: `Here's a campaign concept for your next drop:\n\n**Subject line options:**\n1. "This one's been in the vault."\n2. "Limited stock. No restock."\n3. "Your next essential — available now."\n\n**Email body:**\nThis drop is different. We spent 8 months perfecting the weight, the wash, the fit. The result is something we're genuinely proud of — and something we won't be making again in these exact colours.\n\n[Shop the drop →]\n\n**Segment recommendation:** Target your VIP buyers first (24-hour early access), then open to your full list.\n**Estimated open rate:** 34–42% for VIP segment based on your historical data.\n\n⚠️ *This campaign will not be scheduled or sent without your explicit approval.*`,
-      actionCard: {
-        type: 'create_draft',
-        title: 'Save campaign draft',
-        description: 'Creates an email campaign draft — not scheduled or sent.',
-        requiresConfirmation: false,
-        isDestructive: false,
-        canUndo: true,
-        payload: { type: 'email_campaign' },
-      },
-      isDemo: true,
-    };
-  }
-
-  if (ctx.screen === 'store_builder') {
-    return {
-      content: `Here's my recommendation for improving conversion on your homepage:\n\n**Suggested changes:**\n1. Move "Best Sellers" section above the brand story — buyers scan for products first\n2. Increase hero height by 20% — more visual impact on first scroll\n3. Add a "Low stock" badge to your top 3 fastest-moving items — creates urgency without discounting\n4. Simplify navigation to 4 items: Shop, About, Journal, Contact\n\nEach of these can be previewed before applying. Which would you like to start with?`,
-      isDemo: true,
-    };
-  }
-
-  if (ctx.screen === 'customers') {
-    return {
-      content: `Here's a breakdown of your customer landscape:\n\n**VIP (5+ orders or $500+ LTV):** 12 customers — account for 41% of revenue\n**Returning (2–4 orders):** 34 customers — healthy repeat rate\n**At-Risk (no purchase in 60+ days):** 18 customers — prime for a win-back\n\n**Win-back recommendation:** Send a personalised re-engagement email to your at-risk segment with an exclusive early-access offer on your next drop. Estimated recovery rate: 15–25% based on your niche.\n\n*Customer data shown uses demo figures. Connect your live data for precise segmentation.*`,
-      isDemo: true,
-    };
-  }
-
-  // Home / default
-  if (ctx.screen === 'home') {
-    return {
-      content: `Good day! Here's what I'd prioritize right now:\n\n**1. 3 orders are ready to ship** — fulfil before end of day to hit your delivery window.\n**2. Black medium hoodies at ~8-day supply** — consider placing a reorder today.\n**3. Your last Seller video is outperforming average by 3×** — a great time to create a follow-up with the same product.\n\nWant me to draft a reorder message to your manufacturer, or help you plan the follow-up content?`,
-      isDemo: true,
-    };
-  }
-
-  return {
-    content: `I'm here to help with your Brandthread business. Ask me about your products, orders, inventory, content, analytics, or store — and I'll give you clear, data-grounded guidance.\n\n*Note: Running in demo mode. Connect your live data for personalised insights.*`,
-    isDemo: true,
-  };
+  return res.json() as Promise<AIChatResponse>;
 }
 
 // ─── Send message ─────────────────────────────────────────────────────────────
@@ -284,21 +242,36 @@ export interface SendMessageParams {
   userText: string;
   session: AISession;
   authToken: string | null;
-  onToken?: (partial: string) => void; // future: streaming
+  userId?: string | null;
+  storeContext?: string | null;
 }
 
 export interface SendMessageResult {
+  /** New session with userMsg + aiMsg appended. Input session is NOT mutated. */
   session: AISession;
+  /** The assistant message that was appended. */
   response: AIMessage;
 }
 
+/**
+ * Send one user turn and return the updated session + assistant message.
+ *
+ * Contract:
+ *  - Does NOT mutate the input `session`.
+ *  - Returns exactly one new user message and one new assistant message.
+ *  - Throws on abort (re-throws AbortError so caller can clean up).
+ *  - Throws a user-facing Error string on auth/network/provider failures.
+ *  - Never persists empty messages or streaming placeholders.
+ */
 export async function sendMessage(params: SendMessageParams): Promise<SendMessageResult> {
-  const { userText, session, authToken } = params;
+  const { userText, session, authToken, userId, storeContext } = params;
 
-  // Cancel any in-flight request
+  // Cancel any in-flight request from a previous turn.
   _activeController?.abort();
   _activeController = new AbortController();
+  const { signal } = _activeController;
 
+  // Build the user message (not yet added to any session).
   const userMsg: AIMessage = {
     id: nanoid(),
     role: 'user',
@@ -307,25 +280,14 @@ export async function sendMessage(params: SendMessageParams): Promise<SendMessag
     contextLabel: contextLabel(session.context),
   };
 
-  // Add streaming placeholder
-  const assistantId = nanoid();
-  const placeholder: AIMessage = {
-    id: assistantId,
-    role: 'assistant',
-    content: '',
-    ts: Date.now(),
-    isStreaming: true,
-  };
-
-  const updatedMessages = [...session.messages, userMsg, placeholder];
-  session.messages = updatedMessages;
-  session.updatedAt = Date.now();
-
-  // Build request (last 20 messages for context)
-  const history = session.messages
-    .filter(m => !m.isStreaming && m.role !== 'system')
+  // Build history for the API request (excludes the new user message —
+  // we add it explicitly so the server sees it as the latest turn).
+  const history = repairMessages(session.messages)
     .slice(-20)
     .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+
+  // Append the new user turn to the history slice we send.
+  history.push({ role: 'user', content: userText });
 
   const brandMemory = await getEnabledMemorySummary();
 
@@ -336,42 +298,41 @@ export async function sendMessage(params: SendMessageParams): Promise<SendMessag
     maxTokens: 700,
   };
 
+  // --- Network call (may throw) ---
   let response: AIChatResponse;
   try {
-    response = await callAI(request, authToken, _activeController.signal);
+    response = await callAI(request, authToken, signal);
   } catch (err: unknown) {
-    if ((err as Error)?.name === 'AbortError') {
-      // Remove streaming placeholder
-      session.messages = session.messages.filter(m => m.id !== assistantId);
-      session.updatedAt = Date.now();
-      throw err;
-    }
-    response = { content: '', error: 'Connection error. Please try again.' };
+    // Re-throw AbortError — caller strips the streaming placeholder.
+    if ((err as Error)?.name === 'AbortError') throw err;
+    // Any other error: surface to caller as a real error string.
+    throw err;
   }
 
-  // Build final AI message
+  // Build the final assistant message.
+  const assistantId = nanoid();
   const aiMsg: AIMessage = {
     id: assistantId,
     role: 'assistant',
-    content: response.content,
+    content: response.content ?? '',
     ts: Date.now(),
     isStreaming: false,
     error: response.error,
     contextLabel: contextLabel(session.context),
     actionCard: response.actionCard
-      ? {
-          ...response.actionCard,
-          id: nanoid(),
-          status: 'pending',
-        }
+      ? { ...response.actionCard, id: nanoid(), status: 'pending' }
       : undefined,
   };
 
-  // Replace placeholder with final message
-  session.messages = session.messages.map(m => m.id === assistantId ? aiMsg : m);
-  session.updatedAt = Date.now();
+  // Build the new session immutably.
+  const newSession: AISession = {
+    ...session,
+    messages: [...session.messages, userMsg, aiMsg],
+    updatedAt: Date.now(),
+  };
+  _currentSession = newSession;
 
-  // Audit log for action cards
+  // Audit log for action cards.
   if (aiMsg.actionCard) {
     await addAuditEntry({
       eventType: 'suggested',
@@ -379,13 +340,13 @@ export async function sendMessage(params: SendMessageParams): Promise<SendMessag
       actionType: aiMsg.actionCard.type,
       title: aiMsg.actionCard.title,
       canUndo: aiMsg.actionCard.canUndo,
-    });
+    }).catch(() => { /* audit is best-effort */ });
   }
 
-  // Persist session
-  await _persistSession(session);
+  // Persist.
+  await _persistSession(newSession, userId, storeContext);
 
-  return { session, response: aiMsg };
+  return { session: newSession, response: aiMsg };
 }
 
 // ─── Cancel ───────────────────────────────────────────────────────────────────
@@ -393,10 +354,6 @@ export async function sendMessage(params: SendMessageParams): Promise<SendMessag
 export function cancelGeneration(): void {
   _activeController?.abort();
   _activeController = null;
-  // Remove trailing streaming placeholder from active session
-  if (_currentSession) {
-    _currentSession.messages = _currentSession.messages.filter(m => !m.isStreaming);
-  }
 }
 
 // ─── Apply action ─────────────────────────────────────────────────────────────
@@ -405,18 +362,25 @@ export async function applyAction(
   session: AISession,
   messageId: string,
   confirmed: boolean,
+  userId?: string | null,
+  storeContext?: string | null,
 ): Promise<AISession> {
   const msg = session.messages.find(m => m.id === messageId);
   if (!msg?.actionCard) return session;
 
-  const status: AIMessage['actionCard'] = msg.actionCard
-    ? { ...msg.actionCard, status: confirmed ? 'applied' : 'rejected' }
-    : undefined;
+  const updatedCard: AIActionCard = {
+    ...msg.actionCard,
+    status: confirmed ? 'applied' : 'rejected',
+  };
 
-  session.messages = session.messages.map(m =>
-    m.id === messageId ? { ...m, actionCard: status } : m,
-  );
-  session.updatedAt = Date.now();
+  const newSession: AISession = {
+    ...session,
+    messages: session.messages.map(m =>
+      m.id === messageId ? { ...m, actionCard: updatedCard } : m,
+    ),
+    updatedAt: Date.now(),
+  };
+  _currentSession = newSession;
 
   await addAuditEntry({
     eventType: confirmed ? 'approved' : 'rejected',
@@ -424,22 +388,31 @@ export async function applyAction(
     actionType: msg.actionCard.type,
     title: msg.actionCard.title,
     canUndo: msg.actionCard.canUndo,
-  });
+  }).catch(() => { /* best-effort */ });
 
-  await _persistSession(session);
-  return session;
+  await _persistSession(newSession, userId, storeContext);
+  return newSession;
 }
 
-export async function undoAction(session: AISession, messageId: string): Promise<AISession> {
+export async function undoAction(
+  session: AISession,
+  messageId: string,
+  userId?: string | null,
+  storeContext?: string | null,
+): Promise<AISession> {
   const msg = session.messages.find(m => m.id === messageId);
   if (!msg?.actionCard || !msg.actionCard.canUndo) return session;
 
-  session.messages = session.messages.map(m =>
-    m.id === messageId
-      ? { ...m, actionCard: m.actionCard ? { ...m.actionCard, status: 'undone' } : undefined }
-      : m,
-  );
-  session.updatedAt = Date.now();
+  const newSession: AISession = {
+    ...session,
+    messages: session.messages.map(m =>
+      m.id === messageId
+        ? { ...m, actionCard: m.actionCard ? { ...m.actionCard, status: 'undone' as const } : undefined }
+        : m,
+    ),
+    updatedAt: Date.now(),
+  };
+  _currentSession = newSession;
 
   await addAuditEntry({
     eventType: 'undone',
@@ -448,155 +421,86 @@ export async function undoAction(session: AISession, messageId: string): Promise
     title: msg.actionCard.title,
     canUndo: false,
     affectedRecord: messageId,
-  });
+  }).catch(() => { /* best-effort */ });
 
-  await _persistSession(session);
-  return session;
+  await _persistSession(newSession, userId, storeContext);
+  return newSession;
 }
 
 // ─── Home Suggestions ─────────────────────────────────────────────────────────
 
-const SUGGESTIONS_KEY = 'bt:ai:suggestions:v1';
+export async function getAISuggestions(
+  authToken?: string | null,
+  userId?: string | null,
+): Promise<AISuggestion[]> {
+  const storageKey = suggestionsKey(userId);
 
-export async function getAISuggestions(authToken?: string | null): Promise<AISuggestion[]> {
+  const apiBase = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
   // Try real API suggestions first
-  if (API_BASE && authToken) {
+  if (apiBase && authToken) {
     try {
-      const res = await fetch(`${API_BASE}/ai/suggestions`, {
+      const res = await fetch(`${apiBase}/api/v1/ai/suggestions`, {
         headers: { Authorization: `Bearer ${authToken}` },
       });
       if (res.ok) {
         const { suggestions } = await res.json() as { suggestions: AISuggestion[] };
-        if (suggestions.length > 0) {
-          // Merge with any stored dismissals
+        if (Array.isArray(suggestions) && suggestions.length > 0) {
           try {
-            const raw = await AsyncStorage.getItem(SUGGESTIONS_KEY);
+            const raw = await AsyncStorage.getItem(storageKey);
             const stored: AISuggestion[] = raw ? JSON.parse(raw) : [];
             const dismissedIds = new Set(stored.filter(s => s.dismissedAt).map(s => s.id));
             const filtered = suggestions.filter(s => !dismissedIds.has(s.id));
-            // Store merged set for offline use
-            await AsyncStorage.setItem(SUGGESTIONS_KEY, JSON.stringify([
-              ...stored.filter(s => s.dismissedAt), // keep dismissed history
+            await AsyncStorage.setItem(storageKey, JSON.stringify([
+              ...stored.filter(s => s.dismissedAt),
               ...filtered,
             ]));
             return filtered;
           } catch { return suggestions; }
         }
       }
-    } catch { /* fall through to demo */ }
+    } catch { /* fall through — no fake fallback here */ }
   }
 
-  const DEMO: AISuggestion[] = [
-    {
-      id: 'sug_restock',
-      title: 'Restock black medium hoodies',
-      reason: 'At current sales velocity, you have ~8 days of stock remaining.',
-      expectedImpact: 'Prevents ~$2,400 in missed revenue',
-      actionLabel: 'View inventory',
-      actionRoute: '/inventory',
-      category: 'inventory',
-      priority: 'urgent',
-      contextPrompt: 'What should I restock urgently?',
-    },
-    {
-      id: 'sug_ship',
-      title: 'Ship 3 orders before 5 PM',
-      reason: 'Three orders are ready to ship. Two have a 2-day delivery promise.',
-      expectedImpact: 'Protects seller rating and customer satisfaction',
-      actionLabel: 'View orders',
-      actionRoute: '/(tabs)/orders',
-      category: 'orders',
-      priority: 'urgent',
-      contextPrompt: 'Which orders should I ship today?',
-    },
-    {
-      id: 'sug_content',
-      title: 'Create content for your best seller',
-      reason: 'Your Essential Hoodie has a high view-to-purchase rate but limited recent content.',
-      expectedImpact: 'Estimated +18% product page visits',
-      actionLabel: 'Open content creator',
-      actionRoute: '/create-post',
-      category: 'content',
-      priority: 'high',
-      contextPrompt: 'Create a content plan for my best-selling hoodie.',
-    },
-    {
-      id: 'sug_quote',
-      title: 'Review manufacturer quote expiring tomorrow',
-      reason: 'Pacific Thread quote #QT-2041 expires in 22 hours.',
-      expectedImpact: 'Losing this quote delays production by 3–4 weeks',
-      actionLabel: 'View quote',
-      actionRoute: '/manufacturer-hub',
-      category: 'production',
-      priority: 'high',
-      contextPrompt: 'Compare my current manufacturer quotes.',
-    },
-    {
-      id: 'sug_conversion',
-      title: 'Improve a low-converting product page',
-      reason: 'Canvas Cargo Jacket has the highest traffic but lowest add-to-cart rate.',
-      expectedImpact: 'Estimated +$1,800/mo revenue if conversion reaches category average',
-      actionLabel: 'Open product',
-      actionRoute: '/(tabs)/products',
-      category: 'analytics',
-      priority: 'medium',
-      contextPrompt: 'Why is my Canvas Cargo Jacket not converting?',
-    },
-    {
-      id: 'sug_winback',
-      title: 'Send a win-back campaign',
-      reason: '18 customers haven\'t ordered in 60+ days — a win-back typically recovers 15–25%.',
-      expectedImpact: 'Estimated 3–5 recovered customers',
-      actionLabel: 'View customers',
-      actionRoute: '/(tabs)/more',
-      category: 'customers',
-      priority: 'medium',
-      contextPrompt: 'Which customers are at risk of churning?',
-    },
-  ];
-
+  // No API or no token — return cached suggestions or empty
   try {
-    const raw = await AsyncStorage.getItem(SUGGESTIONS_KEY);
-    if (!raw) {
-      await AsyncStorage.setItem(SUGGESTIONS_KEY, JSON.stringify(DEMO));
-      return DEMO;
-    }
+    const raw = await AsyncStorage.getItem(storageKey);
+    if (!raw) return [];
     const stored = JSON.parse(raw) as AISuggestion[];
-    // Merge with demo to add any new suggestions
-    const storedIds = new Set(stored.map(s => s.id));
-    const merged = [...stored, ...DEMO.filter(d => !storedIds.has(d.id))];
-    return merged.filter(s => !s.dismissedAt && !s.completedAt);
+    return stored.filter(s => !s.dismissedAt && !s.completedAt);
   } catch {
-    return DEMO;
+    return [];
   }
 }
 
-export async function dismissSuggestion(id: string): Promise<void> {
+export async function dismissSuggestion(id: string, userId?: string | null): Promise<void> {
   try {
-    const suggestions = await getAISuggestions();
-    const all = await AsyncStorage.getItem(SUGGESTIONS_KEY);
-    const stored: AISuggestion[] = all ? JSON.parse(all) : suggestions;
+    const storageKey = suggestionsKey(userId);
+    const all = await AsyncStorage.getItem(storageKey);
+    const stored: AISuggestion[] = all ? JSON.parse(all) : [];
     const updated = stored.map(s => s.id === id ? { ...s, dismissedAt: Date.now() } : s);
-    await AsyncStorage.setItem(SUGGESTIONS_KEY, JSON.stringify(updated));
-  } catch {}
+    await AsyncStorage.setItem(storageKey, JSON.stringify(updated));
+  } catch { /* best-effort */ }
 }
 
-export async function completeSuggestion(id: string): Promise<void> {
+export async function completeSuggestion(id: string, userId?: string | null): Promise<void> {
   try {
-    const all = await AsyncStorage.getItem(SUGGESTIONS_KEY);
+    const storageKey = suggestionsKey(userId);
+    const all = await AsyncStorage.getItem(storageKey);
     const stored: AISuggestion[] = all ? JSON.parse(all) : [];
     const updated = stored.map(s => s.id === id ? { ...s, completedAt: Date.now() } : s);
-    await AsyncStorage.setItem(SUGGESTIONS_KEY, JSON.stringify(updated));
-  } catch {}
+    await AsyncStorage.setItem(storageKey, JSON.stringify(updated));
+  } catch { /* best-effort */ }
 }
 
 // ─── Next Best Actions ────────────────────────────────────────────────────────
 
-export async function getNextBestActions(authToken?: string | null): Promise<NextBestAction[]> {
-  // Map real suggestions to NextBestAction format when available
+export async function getNextBestActions(
+  authToken?: string | null,
+  userId?: string | null,
+): Promise<NextBestAction[]> {
   if (authToken) {
     try {
-      const suggestions = await getAISuggestions(authToken);
+      const suggestions = await getAISuggestions(authToken, userId);
       if (suggestions.length > 0) {
         const iconMap: Record<string, string> = {
           inventory: 'layers',
@@ -629,15 +533,16 @@ export async function getNextBestActions(authToken?: string | null): Promise<Nex
           category:    s.category as NextBestAction['category'],
         }));
       }
-    } catch { /* fall through to demo */ }
+    } catch { /* fall through */ }
   }
+  return [];
+}
 
-  // Demo fallback
-  return [
-    { id: 'nba_ship',  title: 'Ship 3 orders before 5 PM',                       subtitle: 'Orders ready to ship',              icon: 'package', accentColor: '#F97316', route: '/(tabs)/orders',  priority: 1, category: 'orders'    },
-    { id: 'nba_stock', title: 'Black medium hoodies: ~8-day supply',              subtitle: 'Consider placing reorder today',     icon: 'layers',  accentColor: '#F87171', route: '/inventory',     priority: 2, category: 'inventory' },
-    { id: 'nba_quote', title: 'Manufacturer quote expires tomorrow',              subtitle: 'Pacific Thread QT-2041',            icon: 'clock',   accentColor: '#F59E0B', route: '/manufacturer-hub', priority: 3, category: 'production' },
-    { id: 'nba_video', title: 'Your latest video is driving product clicks',      subtitle: 'Create a follow-up post',           icon: 'video',   accentColor: '#C7CDD5', route: '/create-post',   priority: 4, category: 'content'   },
-    { id: 'nba_conv',  title: 'Canvas Cargo Jacket: high views, low add-to-cart', subtitle: 'Optimise the product page',        icon: 'trending-down', accentColor: '#22D3EE', route: '/(tabs)/products', priority: 5, category: 'analytics' },
-  ];
+// ─── Internal test helpers (not for production use) ───────────────────────────
+
+/** @internal Reset in-memory session state. Used in tests only. */
+export function _resetSessionForTest(): void {
+  _activeController = null;
+  _currentSession = null;
+  _lastSessionKey = null;
 }

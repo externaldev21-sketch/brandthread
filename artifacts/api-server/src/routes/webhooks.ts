@@ -11,6 +11,16 @@ import {
   revenueCatWebhookEvents, manufacturers, sampleOrders, manufacturerActivityEvents,
   stripeTrialWarningEvents,
 } from "@workspace/db";
+import {
+  activateAdCampaignFromCheckoutSession,
+  markAdCampaignCheckoutFailed,
+  activateAdCampaignFromPaymentIntent,
+  markAdCampaignPaymentFailed,
+} from "./ad-campaigns";
+import {
+  activateBoostFromCheckoutSession,
+  markBoostCheckoutFailed,
+} from "./boosts";
 import { eq, and, ne, sql } from "drizzle-orm";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe";
 import { refundJobPayment } from "../lib/freelancerEscrow";
@@ -189,23 +199,78 @@ router.post("/stripe", async (req: Request, res: Response) => {
 
     switch (event.type) {
       // Synchronous payment (cards, wallets) — already captured at session completion
-      case "checkout.session.completed":
-        if (event.data.object.payment_status === "paid") {
-          await handleCheckoutPaid(event.data.object, event.id, new Date(event.created * 1000));
+      case "checkout.session.completed": {
+        const cs = event.data.object as any;
+        const paidAt = new Date(event.created * 1000);
+        // ── Ad campaign checkout ─────────────────────────────────────────────
+        if (cs.metadata?.kind === "ad_campaign") {
+          if (cs.payment_status === "paid" || cs.payment_status === "no_payment_required") {
+            await activateAdCampaignFromCheckoutSession(cs, paidAt);
+          }
+          // payment_status === 'unpaid' → async method; wait for async_payment_succeeded below
+          break;
+        }
+        // ── Boost checkout ───────────────────────────────────────────────────
+        if (cs.metadata?.kind === "boost") {
+          if (cs.payment_status === "paid" || cs.payment_status === "no_payment_required") {
+            await activateBoostFromCheckoutSession(cs, paidAt);
+          }
+          // payment_status === 'unpaid' → async method; wait for async_payment_succeeded below
+          break;
+        }
+        // ── Regular buyer checkout ───────────────────────────────────────────
+        if (cs.payment_status === "paid") {
+          await handleCheckoutPaid(cs, event.id, paidAt);
         }
         // payment_status === 'unpaid' means async method chosen → wait for below
         break;
+      }
 
       // Delayed payment method (ACH bank debit, etc.) captured successfully
-      case "checkout.session.async_payment_succeeded":
-        await handleCheckoutPaid(event.data.object, event.id, new Date(event.created * 1000));
+      case "checkout.session.async_payment_succeeded": {
+        const cs = event.data.object as any;
+        const paidAt = new Date(event.created * 1000);
+        if (cs.metadata?.kind === "ad_campaign") {
+          await activateAdCampaignFromCheckoutSession(cs, paidAt);
+        } else if (cs.metadata?.kind === "boost") {
+          await activateBoostFromCheckoutSession(cs, paidAt);
+        } else {
+          await handleCheckoutPaid(cs, event.id, paidAt);
+        }
         break;
+      }
 
       // Delayed payment failed — release any unused rewards reservation.
       case "checkout.session.async_payment_failed":
-      case "checkout.session.expired":
-        await releaseCheckoutLoyaltyRedemption(event.data.object);
+      case "checkout.session.expired": {
+        const cs = event.data.object as any;
+        if (cs.metadata?.kind === "ad_campaign") {
+          await markAdCampaignCheckoutFailed(cs);
+        } else if (cs.metadata?.kind === "boost") {
+          await markBoostCheckoutFailed(cs);
+        } else {
+          await releaseCheckoutLoyaltyRedemption(cs);
+        }
         break;
+      }
+
+      // ── Ad Campaign PaymentIntent lifecycle (no-ops — ad campaigns use Checkout Sessions) ──
+      // Kept in the switch so old PI events don't fall through to unexpected handlers.
+      case "payment_intent.succeeded": {
+        const pi = event.data.object as any;
+        if (pi.metadata?.kind !== "ad_campaign") {
+          // Not an ad campaign PI — no other PI handler currently needed
+        }
+        break;
+      }
+      case "payment_intent.payment_failed":
+      case "payment_intent.canceled": {
+        const pi = event.data.object as any;
+        if (pi.metadata?.kind !== "ad_campaign") {
+          // Not an ad campaign PI — no other PI handler currently needed
+        }
+        break;
+      }
 
       case "account.updated":
         await handleAccountUpdated(event.data.object, event.id);

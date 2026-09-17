@@ -59,6 +59,11 @@ export default function BuyerOtherProfileScreen() {
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const [storyIds, setStoryIds]         = useState<string[]>([]);
   const [posts, setPosts]               = useState<ProfilePost[]>([]);
+  // Canonical clerkId resolved from the profile API response.
+  // The route `userId` param may be a DB UUID alias when arriving from /u/[username].
+  // After the profile loads, profile.userId is always the canonical clerkId.
+  // Use canonicalUserId for all follow/unfollow/message/block actions.
+  const [canonicalUserId, setCanonicalUserId] = useState<string>(userId);
 
   // Derived display values
   const displayName = profile ? (profile.displayName || profile.name || name) : name;
@@ -73,12 +78,17 @@ export default function BuyerOtherProfileScreen() {
   const loadProfile = useCallback(async () => {
     if (!userId || userId.startsWith('u_')) { setApiLoaded(true); return; }
     try {
-      const [profileData, storiesData, postsData] = await Promise.allSettled([
-        api.social.profile(userId),
-        api.social.storiesForUser(userId),
-        api.social.profilePosts(userId),
+      // Load profile first to get canonical clerkId, then load stories/posts with it.
+      const profileData = await api.social.profile(userId);
+      // profile.userId is always canonical clerkId (set by formatUser on the server).
+      const resolvedId: string = (profileData as any).userId ?? userId;
+      setProfile(profileData as RemoteProfile);
+      setCanonicalUserId(resolvedId);
+      // Now fetch stories and posts using the canonical ID.
+      const [storiesData, postsData] = await Promise.allSettled([
+        api.social.storiesForUser(resolvedId),
+        api.social.profilePosts(resolvedId),
       ]);
-      if (profileData.status === 'fulfilled') setProfile(profileData.value as RemoteProfile);
       if (storiesData.status === 'fulfilled') {
         setStoryIds((storiesData.value as any[]).map((s: any) => s.id));
       }
@@ -103,14 +113,15 @@ export default function BuyerOtherProfileScreen() {
 
   // ── Follow / unfollow ──────────────────────────────────────────────────────
   const handleFollow = async () => {
-    if (!apiLoaded || userId.startsWith('u_')) return;
+    // Use canonical clerkId — the route userId may be a DB UUID alias.
+    if (!apiLoaded || canonicalUserId.startsWith('u_')) return;
     setFollowLoading(true);
     try {
       if (isFollowing) {
-        await api.social.unfollow(userId);
+        await api.social.unfollow(canonicalUserId);
         setProfile(prev => prev ? { ...prev, isFollowing: false, isMutual: false, followersCount: Math.max(0, prev.followersCount - 1) } : prev);
       } else {
-        await api.social.follow(userId);
+        await api.social.follow(canonicalUserId);
         setProfile(prev => prev ? { ...prev, isFollowing: true, isMutual: prev.isFollowedBy, followersCount: prev.followersCount + 1 } : prev);
         void requestContextualPushPermission(currentUserId, api);
       }
@@ -126,9 +137,10 @@ export default function BuyerOtherProfileScreen() {
   const handleMessage = async () => {
     setMsgLoading(true);
     try {
+      // Use canonical clerkId for conversation participant.
       const conv = await createOrGetConversation({
         type: 'buyer_to_buyer',
-        participant: { userId, name: displayName, handle, initials, color, accountType: 'buyer' },
+        participant: { userId: canonicalUserId, name: displayName, handle, initials, color, accountType: 'buyer' },
       });
       router.push(`/buyer-conversation?id=${conv.id}` as any);
     } catch {
@@ -140,29 +152,29 @@ export default function BuyerOtherProfileScreen() {
 
   const iBlockedThem = profile?.iBlockedThem ?? false;
 
-  const handleMute     = async () => { setMoreSheetOpen(false); await muteUser({ userId, name: displayName, handle, initials, color }); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); };
-  const handleRestrict = async () => { setMoreSheetOpen(false); await restrictUser({ userId, name: displayName, handle, initials, color }); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); };
+  const handleMute     = async () => { setMoreSheetOpen(false); await muteUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); };
+  const handleRestrict = async () => { setMoreSheetOpen(false); await restrictUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); };
   const handleBlock = async () => {
     setMoreSheetOpen(false);
     try {
       if (iBlockedThem) {
-        await api.social.unblock(userId);
+        await api.social.unblock(canonicalUserId);
         setProfile(prev => prev ? { ...prev, iBlockedThem: false } : prev);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
-        await api.social.block(userId);
+        await api.social.block(canonicalUserId);
         router.back();
       }
     } catch {
       Alert.alert('Error', 'Could not update block status.');
     }
   };
-  const handleReport = () => { setMoreSheetOpen(false); router.push(`/buyer-report?targetType=profile&targetId=${userId}&targetLabel=${encodeURIComponent(displayName)}&targetUserId=${userId}` as any); };
+  const handleReport = () => { setMoreSheetOpen(false); router.push(`/buyer-report?targetType=profile&targetId=${canonicalUserId}&targetLabel=${encodeURIComponent(displayName)}&targetUserId=${canonicalUserId}` as any); };
 
   const postTypeIcon = (type: string) => type === 'photo' ? 'image' : type === 'slideshow' ? 'layers' : 'video';
 
   function renderFollowButton() {
-    if (!apiLoaded || userId.startsWith('u_')) {
+    if (!apiLoaded || canonicalUserId.startsWith('u_')) {
       return <SecondaryButton label="Follow" onPress={() => {}} disabled style={{ flex: 1 }} />;
     }
     if (followLoading) {

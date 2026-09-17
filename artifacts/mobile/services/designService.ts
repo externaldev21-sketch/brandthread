@@ -21,6 +21,7 @@ import {
   DesignLayer, DesignVersion, DesignVersionMeta, BrandAsset, BrandAssetTypeKind,
   AIGenerationRequest, AIGenerationResult, AIPhotoshootRequest,
   GenerateDesignResult, GenerateMockupResult, GeneratePhotoshootResult,
+  MockupToModelBatchResult,
   AIStyleKind, CampaignFormatKind, CampaignProject, CampaignAsset,
   DesignExport, ExportFormatKind, ExportSizeKind, GarmentType,
 } from './designTypes';
@@ -1333,6 +1334,11 @@ function makeResult(prompt: string, style: AIStyleKind, imageUris: string[]): AI
 export type { GenerateDesignResult } from './designTypes';
 export type { GenerateMockupResult } from './designTypes';
 export type { GeneratePhotoshootResult } from './designTypes';
+export type {
+  MockupToModelBatchResult,
+  MockupToModelRefResult,
+  MockupToModelRefError,
+} from './designTypes';
 
 export async function generateDesignFromText(req: AIGenerationRequest): Promise<GenerateDesignResult> {
   const count = req.count ?? 4;
@@ -1372,23 +1378,67 @@ export async function generateSketchToDesign(req: {
 }
 
 // generateMockupToModel — accepts an object (used by design-mockup-to-model.tsx)
+// New contract: one mockup + 1–5 references → one output per reference.
+// Returns per-reference results with stable indices; surfaces partial failures.
 export async function generateMockupToModel(req: {
   mockupUri: string;
-  modelStyle?: string;
-  sceneStyle?: string;
-  lightingStyle?: string;
-  imageRatio?: string;
-  count?: number;
-}): Promise<GenerateMockupResult> {
-  const count = req.count ?? 4;
-  const prompt = `Fashion model wearing the uploaded garment design. Model: ${req.modelStyle ?? 'female'}. Scene: ${req.sceneStyle ?? 'studio'}. Lighting: ${req.lightingStyle ?? 'natural'}. Professional clothing photography.`;
-  const referenceImage = await imageUriToDataUrl(req.mockupUri);
-  const imageUris = await generateN('/photography/generate', {
-    images: [referenceImage],
-    prompt,
-    mode: 'mockup_to_model',
-  }, count);
-  return makeResult(prompt, 'minimal' as AIStyleKind, imageUris);
+  referenceUris: string[];
+  prompt?: string;
+}): Promise<MockupToModelBatchResult> {
+  if (!req.mockupUri) throw new Error('A garment mockup image is required.');
+  if (!Array.isArray(req.referenceUris) || req.referenceUris.length === 0) {
+    throw new Error('At least one reference model image is required.');
+  }
+  if (req.referenceUris.length > 5) {
+    throw new Error('You can upload at most 5 reference images.');
+  }
+
+  const mockup = await imageUriToDataUrl(req.mockupUri);
+  const references = await Promise.all(req.referenceUris.map(imageUriToDataUrl));
+
+  const data = await serviceRequest<{
+    results: Array<{ refIndex: number; b64_json: string }>;
+    errors?: Array<{ refIndex: number; error: string; retryable: boolean }>;
+  }>('/photography/mockup-to-model', {
+    method: 'POST',
+    body: JSON.stringify({
+      mockup,
+      references,
+      ...(req.prompt ? { prompt: req.prompt } : {}),
+    }),
+  });
+
+  return {
+    results: data.results.map(r => ({
+      refIndex: r.refIndex,
+      imageUri: `data:image/png;base64,${r.b64_json}`,
+    })),
+    errors: data.errors ?? [],
+  };
+}
+
+// retryMockupToModelRef — retry a single failed reference index
+export async function retryMockupToModelRef(req: {
+  mockupUri: string;
+  referenceUri: string;
+  refIndex: number;
+  prompt?: string;
+}): Promise<{ refIndex: number; imageUri: string }> {
+  const mockup = await imageUriToDataUrl(req.mockupUri);
+  const reference = await imageUriToDataUrl(req.referenceUri);
+  const data = await serviceRequest<{ refIndex: number; b64_json: string }>(
+    '/photography/mockup-to-model/retry',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        mockup,
+        reference,
+        refIndex: req.refIndex,
+        ...(req.prompt ? { prompt: req.prompt } : {}),
+      }),
+    },
+  );
+  return { refIndex: data.refIndex, imageUri: `data:image/png;base64,${data.b64_json}` };
 }
 
 // generatePhotoshoot — accepts an object (used by design-ai-photoshoot.tsx)

@@ -27,6 +27,38 @@ let trendingInflight: Promise<void> | null = null;
 const router = Router();
 const objectStorage = new ObjectStorageService();
 
+// ─── ID resolution helper ─────────────────────────────────────────────────────
+// Accepts either users.clerkId (Clerk subject string) or users.id (UUID).
+// Returns the canonical clerkId for use in all downstream queries, or null
+// when the account does not exist, is tombstoned, or has no accountType.
+// This is the ONLY place DB-UUID → clerkId resolution happens for public reads.
+//
+// UUID shape: 8-4-4-4-12 hex chars separated by hyphens.
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function resolveToClerkId(
+  idOrClerkId: string,
+  requiredAccountType?: "buyer" | "seller",
+): Promise<string | null> {
+  if (!idOrClerkId || typeof idOrClerkId !== "string") return null;
+
+  const isUuid = UUID_PATTERN.test(idOrClerkId);
+  const [user] = await db
+    .select({
+      clerkId:     users.clerkId,
+      accountType: users.accountType,
+      deletedAt:   users.deletedAt,
+    })
+    .from(users)
+    .where(isUuid ? eq(users.id, idOrClerkId) : eq(users.clerkId, idOrClerkId))
+    .limit(1);
+
+  if (!user) return null;
+  if (user.deletedAt) return null;
+  if (requiredAccountType && user.accountType !== requiredAccountType) return null;
+  return user.clerkId;
+}
+
 const SEARCH_SORTS = ["relevance", "price_asc", "price_desc", "newest"] as const;
 type SearchSort = typeof SEARCH_SORTS[number];
 
@@ -506,8 +538,13 @@ router.get("/search", async (req, res): Promise<void> => {
 });
 
 // ─── GET /api/public/sellers/:sellerId — public seller storefront ─────────────
+// Accepts either users.clerkId or users.id (UUID) for backward-/forward-compatibility.
 router.get("/sellers/:sellerId", async (req, res) => {
   const { sellerId } = req.params;
+
+  // Resolve to canonical clerkId — accepts UUID alias or clerkId directly.
+  const canonicalClerkId = await resolveToClerkId(sellerId, "seller");
+  if (!canonicalClerkId) return res.status(404).json({ error: "Seller not found" });
 
   const [seller] = await db
     .select({
@@ -526,26 +563,27 @@ router.get("/sellers/:sellerId", async (req, res) => {
       accountType:     users.accountType,
       vacationMode:    users.vacationMode,
       vacationMessage: users.vacationMessage,
+      username:        users.username,
     })
     .from(users)
-    .where(and(eq(users.clerkId, sellerId), eq(users.accountType, "seller")))
+    .where(eq(users.clerkId, canonicalClerkId))
     .limit(1);
 
   if (!seller) return res.status(404).json({ error: "Seller not found" });
-  const vacation = await getSellerVacationStatus(sellerId);
+  const vacation = await getSellerVacationStatus(canonicalClerkId);
 
   const [sellerProducts, sellerPosts] = await Promise.all([
     db
       .select()
       .from(products)
-      .where(and(eq(products.ownerId, sellerId), eq(products.status, "active"), isNull(products.deletedAt)))
+      .where(and(eq(products.ownerId, canonicalClerkId), eq(products.status, "active"), isNull(products.deletedAt)))
       .orderBy(desc(products.createdAt))
       .limit(50),
     db
       .select()
       .from(posts)
       .where(and(
-        eq(posts.userId, sellerId),
+        eq(posts.userId, canonicalClerkId),
         sql<boolean>`coalesce((${posts.visibility}->>'isPublic')::boolean, true) = true`,
         or(
           eq(posts.postStatus, "published"),
@@ -591,6 +629,10 @@ router.get("/sellers/:sellerId", async (req, res) => {
   return res.json({
     profile: {
       ...seller,
+      // Expose the canonical Clerk ID so callers can use it for follow/message/review actions.
+      // This is safe: it's the functional identity needed by downstream authenticated endpoints,
+      // not a secret (Clerk IDs are sent on every authenticated request header).
+      clerkId:      canonicalClerkId,
       verified: deriveSellerVerified(seller),
       vacationMode: vacation.active,
       vacationMessage: vacation.active ? vacation.message : null,
@@ -709,6 +751,7 @@ router.delete("/drops/:id/notify", requireAuth, async (req, res): Promise<void> 
 // POST /api/public/sellers/:sellerId/visit
 // A signed-in shopper is recorded once per seller per UTC day. A separate table
 // prevents arbitrary public traffic from inflating a seller's conversion inputs.
+// Accepts users.clerkId or users.id (UUID alias) — resolves to canonical clerkId.
 router.post("/sellers/:sellerId/visit", requireAuth, async (req, res): Promise<void> => {
   const { sellerId } = req.params;
   const visitorId = (req as any).clerkUserId as string;
@@ -716,25 +759,23 @@ router.post("/sellers/:sellerId/visit", requireAuth, async (req, res): Promise<v
     res.status(400).json({ error: "sellerId required" });
     return;
   }
-  if (sellerId === visitorId) {
-    res.status(204).end();
-    return;
-  }
   try {
-    const [seller] = await db
-      .select({ clerkId: users.clerkId })
-      .from(users)
-      .where(eq(users.clerkId, sellerId))
-      .limit(1);
-    if (!seller) {
+    // Resolve UUID alias or clerkId to canonical clerkId.
+    const canonicalClerkId = await resolveToClerkId(sellerId, "seller");
+    if (!canonicalClerkId) {
       res.status(404).json({ error: "Seller not found" });
+      return;
+    }
+    // Don't count owner visits.
+    if (canonicalClerkId === visitorId) {
+      res.status(204).end();
       return;
     }
 
     const [newVisit] = await db
       .insert(storefrontVisits)
       .values({
-        sellerId,
+        sellerId: canonicalClerkId,
         visitorId,
         visitDate: new Date().toISOString().slice(0, 10),
       })
@@ -748,7 +789,7 @@ router.post("/sellers/:sellerId/visit", requireAuth, async (req, res): Promise<v
           storefrontVisitCount: sql`${users.storefrontVisitCount} + 1`,
           updatedAt: new Date(),
         })
-        .where(eq(users.clerkId, sellerId));
+        .where(eq(users.clerkId, canonicalClerkId));
     }
     res.status(204).end();
   } catch (err) {
@@ -957,6 +998,100 @@ router.get("/trending", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to fetch public trending results");
     return res.status(500).json({ error: "Failed to fetch trending" });
+  }
+});
+
+// ─── GET /api/public/profiles/:username ───────────────────────────────────────
+//
+// Unauthenticated. Resolves a normalized username to a safe public profile DTO.
+//
+// Security guarantees:
+// - No Clerk ID is ever returned in the response.
+// - Deleted / tombstoned accounts (deletedAt IS NOT NULL) → 404.
+// - Accounts with no username or accountType → 404.
+// - Only returns fields safe for public display.
+// - Rate-limited to the "public-read" policy (240 req / 5 min per IP).
+//
+// Response:
+//   { id, username, accountType, displayName, bio, avatarUrl, verified }
+//
+// IMPORTANT: `id` is the opaque internal DB UUID, never the Clerk ID.
+// Public profile read endpoints accept this UUID as an alias and resolve it to the
+// canonical account ID internally before applying ownership, block, and privacy rules.
+router.get("/profiles/:username", async (req, res) => {
+  const rawUsername = req.params.username;
+
+  // Normalize: lowercase, letters/numbers/underscores only, 3–30 chars.
+  if (!rawUsername || typeof rawUsername !== "string") {
+    res.status(400).json({ error: "username is required" });
+    return;
+  }
+  const normalized = rawUsername.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+  if (normalized.length < 3 || normalized.length > 30) {
+    res.status(400).json({ error: "Invalid username format" });
+    return;
+  }
+
+  try {
+    const [user] = await db
+      .select({
+        id:          users.id,
+        username:    users.username,
+        accountType: users.accountType,
+        displayName: users.displayName,
+        name:        users.name,
+        bio:         users.bio,
+        avatarUrl:   users.avatarUrl,
+        profileImageUrl: users.profileImageUrl,
+        verified:    users.verified,
+        deletedAt:   users.deletedAt,
+      })
+      .from(users)
+      // Case-insensitive lookup using the normalized form.
+      .where(sql`lower(${users.username}) = ${normalized}`)
+      .limit(1);
+
+    // Not found.
+    if (!user) {
+      res.status(404).json({ error: "Profile not found" });
+      return;
+    }
+
+    // Tombstoned / deleted account.
+    if (user.deletedAt) {
+      res.status(404).json({ error: "Profile not found" });
+      return;
+    }
+
+    // Must have an accountType and a username.
+    if (!user.accountType || !user.username) {
+      res.status(404).json({ error: "Profile not found" });
+      return;
+    }
+
+    // Resolve public avatar — prefer uploaded image, fall back to Clerk avatar.
+    // Object-storage /objects/ paths are private — never expose them directly.
+    let avatarUrl: string | null = user.avatarUrl ?? null;
+    if (user.profileImageUrl && typeof user.profileImageUrl === "string") {
+      if (user.profileImageUrl.startsWith("http")) {
+        avatarUrl = user.profileImageUrl;
+      }
+    }
+
+    const verified = deriveSellerVerified(user as any);
+
+    res.json({
+      id:          user.id,
+      username:    user.username,
+      accountType: user.accountType,
+      displayName: user.displayName ?? user.name ?? null,
+      bio:         user.bio ?? null,
+      avatarUrl,
+      verified,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Failed to resolve public profile by username");
+    res.status(500).json({ error: "Failed to load profile" });
   }
 });
 

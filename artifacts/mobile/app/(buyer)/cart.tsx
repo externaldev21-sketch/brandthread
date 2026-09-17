@@ -1,6 +1,11 @@
 /**
  * Brandthread Buyer Cart Screen
  * Multi-seller cart with save-for-later, summary, and checkout entry.
+ *
+ * Improvements:
+ * - Per-row pending affordances (spinner overlay) for qty/remove/save actions
+ * - Inline unavailable/low-stock warnings backed by actual CartItem data
+ * - Consistent monochrome Woven design-system tokens throughout
  */
 import React, { useState, useCallback } from 'react';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
@@ -43,36 +48,65 @@ import { formatCents } from '@/lib/money';
 
 const fmtPrice = formatCents;
 
+// ─── Row pending state tracker ────────────────────────────────────────────────
+// Tracks which action is in-flight per item ID so the row can show a localized
+// spinner without blocking the whole cart.
+type RowPendingAction = 'qty_dec' | 'qty_inc' | 'remove' | 'save';
+
 // ─── Quantity Row ─────────────────────────────────────────────────────────────
 
-function QuantityControl({ value, max, onDec, onInc }: {
-  value: number; max: number; onDec: () => void; onInc: () => void;
+function QuantityControl({
+  value, max, onDec, onInc, pendingDec, pendingInc,
+}: {
+  value: number;
+  max: number;
+  onDec: () => void;
+  onInc: () => void;
+  pendingDec?: boolean;
+  pendingInc?: boolean;
 }) {
   return (
     <View style={qc.root}>
-      <PressableScale style={qc.btn} onPress={onDec} accessibilityLabel="Decrease quantity">
-        <Feather name="minus" size={13} color={FG} />
+      <PressableScale
+        style={qc.btn}
+        onPress={onDec}
+        disabled={pendingDec || pendingInc}
+        accessibilityLabel="Decrease quantity"
+        accessibilityState={{ disabled: pendingDec || pendingInc, busy: pendingDec }}
+      >
+        {pendingDec
+          ? <ActivityIndicator size="small" color={FG} style={{ transform: [{ scale: 0.7 }] }} />
+          : <Feather name="minus" size={13} color={FG} />}
       </PressableScale>
       <Text style={qc.val}>{value}</Text>
-      <PressableScale style={[qc.btn, value >= max && qc.btnDisabled]} onPress={onInc} disabled={value >= max} accessibilityLabel="Increase quantity" accessibilityState={{ disabled: value >= max }}>
-        <Feather name="plus" size={13} color={value >= max ? SUBTLE : FG} />
+      <PressableScale
+        style={[qc.btn, value >= max && qc.btnDisabled]}
+        onPress={onInc}
+        disabled={value >= max || pendingDec || pendingInc}
+        accessibilityLabel="Increase quantity"
+        accessibilityState={{ disabled: value >= max || pendingDec || pendingInc, busy: pendingInc }}
+      >
+        {pendingInc
+          ? <ActivityIndicator size="small" color={FG} style={{ transform: [{ scale: 0.7 }] }} />
+          : <Feather name="plus" size={13} color={value >= max ? SUBTLE : FG} />}
       </PressableScale>
     </View>
   );
 }
 const qc = StyleSheet.create({
   root: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  btn:  { width: COMP.minTouchTarget, height: COMP.minTouchTarget, borderRadius: 8, backgroundColor: CARD_ELEVATED_GLASS, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  btn: { width: COMP.minTouchTarget, height: COMP.minTouchTarget, borderRadius: 8, backgroundColor: CARD_ELEVATED_GLASS, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   btnDisabled: { opacity: 0.4 },
-  val:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, minWidth: 20, textAlign: 'center' },
+  val: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, minWidth: 20, textAlign: 'center' },
 });
 
 // ─── Cart Item Row ─────────────────────────────────────────────────────────────
 
 function CartItemRow({
-  item, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
+  item, pendingAction, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
 }: {
   item: CartItem;
+  pendingAction?: RowPendingAction;
   onQtyDec: () => void;
   onQtyInc: () => void;
   onRemove: () => void;
@@ -82,9 +116,22 @@ function CartItemRow({
   const { theme } = useAppTheme();
   const lineTotal = item.priceCents * item.quantity;
   const hasDiscount = item.compareAtPriceCents && item.compareAtPriceCents > item.priceCents;
+  const isRowBusy = pendingAction === 'remove' || pendingAction === 'save';
+
+  // Low stock: warn at ≤ 3 units
+  const isLowStock = item.isAvailable && item.maxQuantity > 0 && item.maxQuantity <= 3;
+  // Very low: highlight differently at 1
+  const isCriticalStock = item.isAvailable && item.maxQuantity === 1;
 
   return (
-    <View style={ir.root}>
+    <View style={[ir.root, isRowBusy && ir.rowBusy]}>
+      {/* Pending overlay for remove/save */}
+      {isRowBusy && (
+        <View style={ir.busyOverlay} pointerEvents="none">
+          <ActivityIndicator size="small" color={MUTED} />
+        </View>
+      )}
+
       <View style={ir.img}>
         {item.imageUri
           ? <Image source={{ uri: item.imageUri }} style={ir.productImage} resizeMode="cover" />
@@ -94,7 +141,12 @@ function CartItemRow({
       {/* Details */}
       <View style={{ flex: 1 }}>
         <Text style={ir.name} numberOfLines={2}>{item.productName}</Text>
-        <PressableScale style={ir.variantRow} onPress={onEditVariant} accessibilityLabel={`Change options for ${item.productName}. Current selection ${item.variantTitle}`}>
+        <PressableScale
+          style={ir.variantRow}
+          onPress={onEditVariant}
+          disabled={isRowBusy}
+          accessibilityLabel={`Change options for ${item.productName}. Current: ${item.variantTitle}`}
+        >
           <Text style={ir.variant}>{item.variantTitle}</Text>
           <Feather name="edit-2" size={11} color={theme.accentLight} />
         </PressableScale>
@@ -108,14 +160,22 @@ function CartItemRow({
           </View>
         )}
 
+        {/* Unavailable warning — prominent, backed by CartItem.isAvailable */}
         {!item.isAvailable && (
-          <View style={ir.unavailBadge}>
-            <Text style={ir.unavailText}>{item.unavailableReason ?? 'Unavailable'}</Text>
+          <View style={ir.unavailBadge} accessibilityRole="alert">
+            <Feather name="alert-circle" size={11} color={RED} />
+            <Text style={ir.unavailText}>{item.unavailableReason ?? 'Unavailable — remove or save for later'}</Text>
           </View>
         )}
 
-        {item.maxQuantity <= 3 && item.isAvailable && (
-          <Text style={ir.stockWarn}>Only {item.maxQuantity} left</Text>
+        {/* Low stock warning — inline, only when actually available */}
+        {isLowStock && (
+          <View style={[ir.stockWarnRow, isCriticalStock && ir.stockWarnCritical]}>
+            <Feather name="alert-triangle" size={10} color={ORANGE} />
+            <Text style={[ir.stockWarn, isCriticalStock && ir.stockWarnCriticalText]}>
+              {isCriticalStock ? 'Last one left!' : `Only ${item.maxQuantity} left`}
+            </Text>
+          </View>
         )}
 
         {/* Price + qty */}
@@ -125,6 +185,8 @@ function CartItemRow({
             max={item.maxQuantity}
             onDec={onQtyDec}
             onInc={onQtyInc}
+            pendingDec={pendingAction === 'qty_dec'}
+            pendingInc={pendingAction === 'qty_inc'}
           />
           <View style={ir.priceBlock}>
             {hasDiscount && (
@@ -136,13 +198,29 @@ function CartItemRow({
 
         {/* Actions */}
         <View style={ir.actions}>
-          <PressableScale style={ir.actionBtn} onPress={onSaveForLater} accessibilityLabel={`Save ${item.productName} for later`}>
-            <Feather name="bookmark" size={12} color={MUTED} />
+          <PressableScale
+            style={ir.actionBtn}
+            onPress={onSaveForLater}
+            disabled={isRowBusy}
+            accessibilityLabel={`Save ${item.productName} for later`}
+            accessibilityState={{ disabled: isRowBusy, busy: pendingAction === 'save' }}
+          >
+            {pendingAction === 'save'
+              ? <ActivityIndicator size="small" color={MUTED} style={{ width: 12, height: 12 }} />
+              : <Feather name="bookmark" size={12} color={MUTED} />}
             <Text style={ir.actionText}>Save</Text>
           </PressableScale>
           <View style={ir.actionDivider} />
-          <PressableScale style={ir.actionBtn} onPress={onRemove} accessibilityLabel={`Remove ${item.productName} from cart`}>
-            <Feather name="trash-2" size={12} color={RED} />
+          <PressableScale
+            style={ir.actionBtn}
+            onPress={onRemove}
+            disabled={isRowBusy}
+            accessibilityLabel={`Remove ${item.productName} from cart`}
+            accessibilityState={{ disabled: isRowBusy, busy: pendingAction === 'remove' }}
+          >
+            {pendingAction === 'remove'
+              ? <ActivityIndicator size="small" color={RED} style={{ width: 12, height: 12 }} />
+              : <Feather name="trash-2" size={12} color={RED} />}
             <Text style={[ir.actionText, { color: RED }]}>Remove</Text>
           </PressableScale>
         </View>
@@ -153,6 +231,11 @@ function CartItemRow({
 
 const ir = StyleSheet.create({
   root: { flexDirection: 'row', gap: SP.sm, paddingVertical: SP.sm },
+  rowBusy: { opacity: 0.7 },
+  busyOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    zIndex: 10, alignItems: 'center', justifyContent: 'center',
+  },
   img: {
     width: 80, height: 100, borderRadius: RADIUS.md,
     backgroundColor: CARD_ELEVATED_GLASS, borderWidth: 1, borderColor: BORDER,
@@ -161,12 +244,24 @@ const ir = StyleSheet.create({
   productImage: { width: '100%', height: '100%' },
   name: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginBottom: 4, lineHeight: 18 },
   variantRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
-  variant: { fontSize: FS.xs, fontFamily: FONT.regular },
+  variant: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   preOrderBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
   preOrderText: { fontSize: FS.xs, fontFamily: FONT.medium },
-  unavailBadge: { backgroundColor: RED_DIM, borderRadius: RADIUS.xs, paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start', marginBottom: 4 },
-  unavailText: { fontSize: FS.xs, fontFamily: FONT.medium, color: RED },
-  stockWarn: { fontSize: FS.xs, fontFamily: FONT.medium, color: ORANGE, marginBottom: 4 },
+  unavailBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: RED_DIM, borderRadius: RADIUS.xs,
+    paddingHorizontal: 6, paddingVertical: 3,
+    alignSelf: 'flex-start', marginBottom: 4,
+  },
+  unavailText: { fontSize: FS.xs, fontFamily: FONT.medium, color: RED, flex: 1, flexShrink: 1 },
+  stockWarnRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4,
+    backgroundColor: ORANGE_DIM, borderRadius: RADIUS.xs,
+    paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start',
+  },
+  stockWarnCritical: { backgroundColor: RED_DIM },
+  stockWarn: { fontSize: FS.xs, fontFamily: FONT.medium, color: ORANGE },
+  stockWarnCriticalText: { color: RED },
   bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   priceBlock: { alignItems: 'flex-end' },
   comparePrice: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textDecorationLine: 'line-through' },
@@ -181,9 +276,10 @@ const ir = StyleSheet.create({
 // ─── Seller Group ─────────────────────────────────────────────────────────────
 
 function SellerGroup({
-  group, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
+  group, pendingByItemId, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
 }: {
   group: CartSellerGroup;
+  pendingByItemId: Record<string, RowPendingAction>;
   onQtyDec: (itemId: string) => void;
   onQtyInc: (itemId: string) => void;
   onRemove: (itemId: string) => void;
@@ -218,6 +314,7 @@ function SellerGroup({
           {idx > 0 && <View style={sg.divider} />}
           <CartItemRow
             item={item}
+            pendingAction={pendingByItemId[item.id]}
             onQtyDec={() => onQtyDec(item.id)}
             onQtyInc={() => onQtyInc(item.id)}
             onRemove={() => onRemove(item.id)}
@@ -282,10 +379,21 @@ function SavedItemRow({ item, onMove, onRemove }: {
           <Text style={si.unavail}>No longer available</Text>
         )}
         <View style={si.actions}>
-          <PressableScale style={[si.btn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]} onPress={onMove} accessibilityLabel={`Move ${item.productName} to cart`}>
-            <Text style={[si.btnText, { color: theme.accentLight }, !item.isAvailable && { color: SUBTLE }]}>Move to Cart</Text>
+          <PressableScale
+            style={[si.btn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}
+            onPress={onMove}
+            accessibilityLabel={`Move ${item.productName} to cart`}
+            disabled={!item.isAvailable}
+          >
+            <Text style={[si.btnText, { color: theme.accentLight }, !item.isAvailable && { color: SUBTLE }]}>
+              Move to Cart
+            </Text>
           </PressableScale>
-          <PressableScale style={si.btnGhost} onPress={onRemove} accessibilityLabel={`Remove ${item.productName} from saved items`}>
+          <PressableScale
+            style={si.btnGhost}
+            onPress={onRemove}
+            accessibilityLabel={`Remove ${item.productName} from saved items`}
+          >
             <Text style={si.btnGhostText}>Remove</Text>
           </PressableScale>
         </View>
@@ -382,6 +490,14 @@ export default function CartScreen() {
   const [loyaltyRedemption, setLoyaltyRedemption] = useState<CheckoutLoyaltyRedemption | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Per-row pending actions: itemId → action
+  const [pendingByItemId, setPendingByItemId] = useState<Record<string, RowPendingAction>>({});
+
+  const setPending = (itemId: string, action: RowPendingAction) =>
+    setPendingByItemId(prev => ({ ...prev, [itemId]: action }));
+  const clearPending = (itemId: string) =>
+    setPendingByItemId(prev => { const next = { ...prev }; delete next[itemId]; return next; });
+
   const load = useCallback(async () => {
     try {
       const nextCart = await getCart();
@@ -438,46 +554,70 @@ export default function CartScreen() {
   const displayedTotal = Math.max(0, summary.totalCents - (loyaltyRedemption?.discountCents ?? 0));
 
   async function handleQtyDec(itemId: string) {
+    if (pendingByItemId[itemId]) return;
     Haptics.selectionAsync();
     const item = cart.items.find(i => i.id === itemId);
     if (!item) return;
     const snapshot = cart;
-    const newCart = await updateCartItemQuantity(itemId, item.quantity - 1);
-    setCart(newCart);
-    if (item.quantity === 1) {
-      showUndo({
-        message: `"${item.productName}" removed`,
-        undo: async () => setCart(await restoreCartSnapshot(snapshot)),
-      });
+    setPending(itemId, 'qty_dec');
+    try {
+      const newCart = await updateCartItemQuantity(itemId, item.quantity - 1);
+      setCart(newCart);
+      if (item.quantity === 1) {
+        showUndo({
+          message: `"${item.productName}" removed`,
+          undo: async () => setCart(await restoreCartSnapshot(snapshot)),
+        });
+      }
+    } finally {
+      clearPending(itemId);
     }
   }
 
   async function handleQtyInc(itemId: string) {
+    if (pendingByItemId[itemId]) return;
     Haptics.selectionAsync();
     const item = cart.items.find(i => i.id === itemId);
     if (!item) return;
-    const newCart = await updateCartItemQuantity(itemId, item.quantity + 1);
-    setCart(newCart);
+    setPending(itemId, 'qty_inc');
+    try {
+      const newCart = await updateCartItemQuantity(itemId, item.quantity + 1);
+      setCart(newCart);
+    } finally {
+      clearPending(itemId);
+    }
   }
 
   async function handleRemove(itemId: string) {
+    if (pendingByItemId[itemId]) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const removed = cart.items.find(item => item.id === itemId);
     const snapshot = cart;
-    const newCart = await removeCartItem(itemId);
-    setCart(newCart);
-    if (removed) {
-      showUndo({
-        message: `"${removed.productName}" removed`,
-        undo: async () => setCart(await restoreCartSnapshot(snapshot)),
-      });
+    setPending(itemId, 'remove');
+    try {
+      const newCart = await removeCartItem(itemId);
+      setCart(newCart);
+      if (removed) {
+        showUndo({
+          message: `"${removed.productName}" removed`,
+          undo: async () => setCart(await restoreCartSnapshot(snapshot)),
+        });
+      }
+    } finally {
+      clearPending(itemId);
     }
   }
 
   async function handleSaveForLater(itemId: string) {
+    if (pendingByItemId[itemId]) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const newCart = await saveForLater(itemId);
-    setCart(newCart);
+    setPending(itemId, 'save');
+    try {
+      const newCart = await saveForLater(itemId);
+      setCart(newCart);
+    } finally {
+      clearPending(itemId);
+    }
   }
 
   async function handleMoveToCart(savedId: string) {
@@ -656,6 +796,7 @@ export default function CartScreen() {
               <SellerGroup
                 key={group.sellerId}
                 group={group}
+                pendingByItemId={pendingByItemId}
                 onQtyDec={handleQtyDec}
                 onQtyInc={handleQtyInc}
                 onRemove={handleRemove}
@@ -726,7 +867,7 @@ export default function CartScreen() {
                       {groups.length !== 1
                         ? 'Rewards apply to one seller checkout at a time.'
                         : loyaltyPreviewCents > 0
-                          ? `You’ll save ${fmtPrice(loyaltyPreviewCents)} at checkout.`
+                          ? `You'll save ${fmtPrice(loyaltyPreviewCents)} at checkout.`
                           : `Use up to ${maxRedeemablePoints.toLocaleString()} points on this order.`}
                     </Text>
                   </>
@@ -867,6 +1008,7 @@ const s = StyleSheet.create({
     gap: SP.sm,
     height: COMP.buttonH,
     borderRadius: RADIUS.lg,
+    paddingHorizontal: SP.md,
   },
   checkoutText: { fontSize: FS.base, fontFamily: FONT.bold },
   checkoutSpacer: { flex: 1 },

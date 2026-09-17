@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
-  Dimensions, Animated, Alert, Share, TextInput, Modal,
+  Dimensions, Animated, Share, TextInput, Modal,
   Platform, ScrollView, RefreshControl, ActivityIndicator, KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -39,6 +39,14 @@ import {
   URGENCY_UNITS_THRESHOLD,
   type CommerceSignalData,
 } from '@/components/CommerceSignal';
+import { ShopProductSheet } from '@/components/ShopProductSheet';
+import type { ShopSheetSelection } from '@/components/ShopProductSheet';
+import {
+  EngagementButton,
+  FeedToastProvider,
+  useFeedToast,
+} from '@/components/EngagementButton';
+import { formatCount } from '@/lib/engagementUtils';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const THREAD_PAGE_SIZE = 30;
@@ -253,6 +261,8 @@ interface SpotlightItem {
   productId?: string;
   sellerId?: string;
   productTags?: { productId: string; productName: string; priceCents: number }[];
+  /** Authoritative comment count from the server (preferred over local comments array length) */
+  commentsCount?: number;
 }
 type SpotlightProductTag = NonNullable<SpotlightItem['productTags']>[number];
 
@@ -376,10 +386,7 @@ const DEFAULT_ENGAGEMENT: EngagementState = {
   liked: false, likes: 0, saved: false, saves: 0, reposted: false, reposts: 0, following: false, comments: [],
 };
 
-function formatCount(n: number) {
-  if (n >= 1000) return `${(n / 1000).toFixed(n % 1000 >= 100 ? 1 : 0)}K`;
-  return String(n);
-}
+// formatCount is imported from @/components/EngagementButton
 
 // ─── Full-screen media page ───────────────────────────────────────────────────
 
@@ -433,11 +440,11 @@ function SpotlightPage({
   item: SpotlightItem;
   isActive: boolean;
   engagement: EngagementState | undefined;
-  onLike: (id: string) => void;
+  onLike: (id: string) => Promise<void>;
   onDoubleTapLike: (id: string) => void;
-  onSave: (id: string) => void;
-  onRepost: (id: string) => void;
-  onFollow: (id: string) => void;
+  onSave: (id: string) => Promise<void>;
+  onRepost: (id: string) => Promise<void>;
+  onFollow: (id: string) => Promise<void>;
   onOpenComments: (id: string) => void;
   onShop: (item: SpotlightItem) => void;
   onShopTag: (item: SpotlightItem, tag: { productId: string; productName: string; priceCents: number }) => void;
@@ -534,6 +541,7 @@ function SpotlightPage({
 
       {/* ─ Right action rail ─ */}
       <View style={[styles.rail, { bottom: tabBarClearance }]}>
+        {/* Avatar + follow badge */}
         <View style={styles.railAvatarWrap}>
           <TouchableOpacity
             activeOpacity={0.8}
@@ -541,94 +549,126 @@ function SpotlightPage({
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               router.push(('/seller-profile?id=' + encodeURIComponent(item.sellerId ?? item.id)) as never);
             }}
+            accessibilityRole="button"
+            accessibilityLabel={`View ${item.creator}'s profile`}
           >
             <View style={[styles.railAvatar, { backgroundColor: item.avatarColor }]}>
               <Text style={styles.railAvatarText}>{item.initials}</Text>
             </View>
           </TouchableOpacity>
           {!(engagement?.following) && (
-            <TouchableOpacity
-              onPress={() => onFollow(item.id)}
-              activeOpacity={0.8}
+            <EngagementButton
+              icon="plus"
+              iconSize={11}
+              active={false}
+              accessibilityLabel={`Follow ${item.creator}`}
               style={[styles.railFollowBadge, { backgroundColor: item.accentColor }]}
-            >
-              <Feather name="plus" size={11} color={ON_DARK} />
-            </TouchableOpacity>
+              onPress={async () => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                await onFollow(item.id);
+              }}
+              testID={`follow-btn-${item.id}`}
+            />
           )}
         </View>
 
-        <TouchableOpacity
-          style={styles.railBtn}
-          activeOpacity={0.7}
+        {/* Like */}
+        <EngagementButton
+          icon="heart"
+          iconSize={30}
+          count={formatCount(engagement?.likes ?? 0)}
+          active={engagement?.liked ?? false}
+          activeColor="#EF4444"
+          inactiveColor="#FFFFFF"
+          accessibilityLabel={`${engagement?.liked ? 'Unlike' : 'Like'}, ${formatCount(engagement?.likes ?? 0)} likes`}
+          accessibilityState={{ checked: engagement?.liked ?? false }}
+          scaleAnim={heartScale}
+          onPress={async () => {
+            bumpHeart();
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            await onLike(item.id);
+          }}
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-          onPress={() => { onLike(item.id); bumpHeart(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
-        >
-          <Animated.View style={{ transform: [{ scale: heartScale }] }}>
-            <Feather name="heart" size={30} color={engagement?.liked ? '#EF4444' : '#FFFFFF'} />
-          </Animated.View>
-          <Text style={styles.railCount}>{formatCount(engagement?.likes ?? 0)}</Text>
-        </TouchableOpacity>
+          testID={`like-btn-${item.id}`}
+        />
 
+        {/* Comments — not async, opens navigation */}
         <TouchableOpacity
           style={styles.railBtn}
           activeOpacity={0.7}
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
           onPress={() => onOpenComments(item.id)}
+          accessibilityRole="button"
+          accessibilityLabel={`Comments, ${formatCount(item.commentsCount ?? (engagement?.comments ?? []).length)}`}
         >
           <Feather name="message-circle" size={26} color="#FFFFFF" />
-          <Text style={styles.railCount}>{formatCount((engagement?.comments ?? []).length)}</Text>
+          <Text style={styles.railCount}>{formatCount(item.commentsCount ?? (engagement?.comments ?? []).length)}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.railBtn}
-          activeOpacity={0.7}
-          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-          onPress={() => {
-            onRepost(item.id);
+        {/* Repost */}
+        <EngagementButton
+          icon="repeat"
+          iconSize={28}
+          count={formatCount(engagement?.reposts ?? 0)}
+          active={engagement?.reposted ?? false}
+          activeColor={theme.accent}
+          inactiveColor="#FFFFFF"
+          accessibilityLabel={`${engagement?.reposted ? 'Undo repost' : 'Repost'}, ${formatCount(engagement?.reposts ?? 0)} reposts`}
+          accessibilityState={{ checked: engagement?.reposted ?? false }}
+          onPress={async () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            await onRepost(item.id);
           }}
-        >
-          <Feather name="repeat" size={28} color={engagement?.reposted ? theme.accent : '#FFFFFF'} />
-          <Text style={styles.railCount}>{formatCount(engagement?.reposts ?? 0)}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.railBtn}
-          activeOpacity={0.7}
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-          onPress={() => { onSave(item.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
-        >
-          <Feather name="bookmark" size={27} color={engagement?.saved ? theme.accent : '#FFFFFF'} />
-          <Text style={styles.railCount}>{formatCount(engagement?.saves ?? item.saves)}</Text>
-        </TouchableOpacity>
+          testID={`repost-btn-${item.id}`}
+        />
 
+        {/* Save */}
+        <EngagementButton
+          icon="bookmark"
+          iconSize={27}
+          count={formatCount(engagement?.saves ?? item.saves)}
+          active={engagement?.saved ?? false}
+          activeColor={theme.accent}
+          inactiveColor="#FFFFFF"
+          accessibilityLabel={`${engagement?.saved ? 'Unsave' : 'Save'}, ${formatCount(engagement?.saves ?? item.saves)} saves`}
+          accessibilityState={{ checked: engagement?.saved ?? false }}
+          onPress={async () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            await onSave(item.id);
+          }}
+          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
+          testID={`save-btn-${item.id}`}
+        />
+
+        {/* Share — fire-and-forget native sheet, not an engagement action */}
         <TouchableOpacity
           style={styles.railBtn}
           activeOpacity={0.7}
           hitSlop={{ top: 6, bottom: 10, left: 10, right: 10 }}
+          accessibilityRole="button"
+          accessibilityLabel="Share post"
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            Share.share({ message: `Check out ${item.productName} by ${item.creator} — ${item.productPrice} on Brandthread` });
+            const shareMsg = item.productName
+              ? `${item.productName} by ${item.creator} on Brandthread`
+              : `Check out ${item.creator}'s post on Brandthread`;
+            void Share.share({ message: shareMsg });
           }}
         >
           <Feather name="share-2" size={27} color="#FFFFFF" />
           <Text style={styles.railCount}>{formatCount(item.shares)}</Text>
         </TouchableOpacity>
 
-        {(item as any).productTags && (item as any).productTags.length > 0 && (
+        {/* Shop */}
+        {(item.productTags?.length ?? 0) > 0 && (
           <TouchableOpacity
             style={styles.railBtn}
             activeOpacity={0.7}
             hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-               const tags = (item as any).productTags as Array<{ productId: string; productName: string; priceCents: number }>;
-              if (tags.length === 1) {
-                push(('/thread-product-detail?productId=' + tags[0].productId) as never);
-              } else {
-                Alert.alert('Shop this post', tags.map(t => t.productName).join('\n'));
-              }
-            }}
+            onPress={() => onShop(item)}
+            accessibilityRole="button"
+            accessibilityLabel={`Shop — ${(item.productTags?.length ?? 1)} product${(item.productTags?.length ?? 1) > 1 ? 's' : ''} tagged`}
           >
             <Feather name="shopping-bag" size={27} color="#FFFFFF" />
             <Text style={styles.railCount}>Shop</Text>
@@ -725,95 +765,11 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     productId: tag?.productId,
     sellerId: post.authorId,
     productTags: post.productTags ?? [],
+    commentsCount: post.commentsCount,
   };
 }
 
-function ShopProductSheet({
-  selection,
-  onClose,
-  onBuy,
-}: {
-  selection: { item: SpotlightItem; tag?: SpotlightProductTag };
-  onClose: () => void;
-  onBuy: () => void;
-}) {
-  const { theme } = useAppTheme();
-  const insets = useSafeAreaInsets();
-  const [size, setSize] = useState('M');
-  const [color, setColor] = useState(0);
-  const product = selection.tag;
-  const name = product?.productName ?? selection.item.productName;
-  const price = product ? formatCents(product.priceCents) : selection.item.productPrice;
-  const swatches = [FG, SURFACE, MUTED, SUBTLE];
-
-  return (
-    <Modal transparent animationType="slide" visible onRequestClose={onClose}>
-      <View style={styles.shopSheetBackdrop}>
-        <TouchableWithoutFeedback onPress={onClose}>
-          <View style={StyleSheet.absoluteFill} />
-        </TouchableWithoutFeedback>
-        <View style={[styles.shopSheet, { paddingBottom: insets.bottom + SP.sm }]}>
-          <View style={styles.commentsHandle} />
-          <View style={styles.shopSheetHeader}>
-            <Text style={styles.shopSheetEyebrow}>SHOP THE POST</Text>
-            <TouchableOpacity style={styles.shopSheetClose} onPress={onClose} accessibilityLabel="Close shop preview">
-              <Feather name="x" size={18} color={FG} />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.shopProductRow}>
-            <CachedImage
-              source={{ uri: selection.item.mediaUris[0] }}
-              style={styles.shopProductImage}
-              contentFit="cover"
-            />
-            <View style={styles.shopProductCopy}>
-              <Text style={styles.shopProductName} numberOfLines={2}>{name}</Text>
-              <Text style={[styles.shopProductPrice, { color: theme.accent }]}>{price}</Text>
-              <Text style={styles.shopProductSeller}>From @{selection.item.handle.replace(/^@/, '')}</Text>
-            </View>
-          </View>
-          <Text style={styles.shopOptionLabel}>Color</Text>
-          <View style={styles.shopSwatches}>
-            {swatches.map((swatch, index) => (
-              <TouchableOpacity
-                key={swatch}
-                onPress={() => setColor(index)}
-                style={[styles.shopSwatch, color === index && { borderColor: theme.accent }]}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: color === index }}
-              >
-                <View style={[styles.shopSwatchDot, { backgroundColor: swatch }]} />
-              </TouchableOpacity>
-            ))}
-          </View>
-          <View style={styles.shopOptionHeader}>
-            <Text style={styles.shopOptionLabel}>Size</Text>
-            <Text style={styles.shopSizeGuide}>Size guide</Text>
-          </View>
-          <View style={styles.shopSizes}>
-            {['XS', 'S', 'M', 'L', 'XL'].map(option => (
-              <TouchableOpacity
-                key={option}
-                onPress={() => setSize(option)}
-                style={[styles.shopSize, size === option && { borderColor: theme.accent, backgroundColor: theme.accentDim }]}
-              >
-                <Text style={[styles.shopSizeText, size === option && { color: theme.accent }]}>{option}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <TouchableOpacity
-            style={[styles.shopBuyButton, { backgroundColor: theme.accent }]}
-            onPress={onBuy}
-            activeOpacity={0.85}
-          >
-            <Text style={[styles.shopBuyText, { color: theme.onAccent }]}>Buy now</Text>
-            <Feather name="arrow-right" size={17} color={theme.onAccent} />
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
-}
+// ShopProductSheet is now imported from @/components/ShopProductSheet
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 // buyerMode = false: standard seller/shared feed — no demand sentinel.
@@ -827,6 +783,7 @@ export default function FeedScreen({ buyerMode = false }: { buyerMode?: boolean 
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { push } = useThreadPull();
+  const { showToast } = useFeedToast();
 
   const [engagements, setEngagements] = useState<Record<string, EngagementState>>({});
   const [activeIndex, setActiveIndex] = useState(0);
@@ -834,7 +791,8 @@ export default function FeedScreen({ buyerMode = false }: { buyerMode?: boolean 
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifs, setShowNotifs] = useState(false);
   const [feedTab, setFeedTab] = useState<'following' | 'for-you'>('for-you');
-  const [shopSelection, setShopSelection] = useState<{ item: SpotlightItem; tag?: SpotlightProductTag } | null>(null);
+  const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
+  const [cartCount, setCartCount] = useState(0);
   const [hasUnread, setHasUnread] = useState(true);
   const [sellerFeedPosts, setSellerFeedPosts] = useState<SpotlightItem[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
@@ -1018,58 +976,91 @@ export default function FeedScreen({ buyerMode = false }: { buyerMode?: boolean 
     });
   }
 
-  const handleLike = useCallback((id: string) => {
-    const currentlyLiked = engagements[id]?.liked ?? false;
-    update(id, e => ({ liked: !e.liked, likes: e.liked ? e.likes - 1 : e.likes + 1 }));
-    // Fire-and-forget — real posts get persisted; demo IDs are silently ignored server-side
-    try {
-      const { api } = require('@/lib/api');
-      api.posts.interact(id, { type: 'like', value: currentlyLiked ? 'remove' : 'add' }).catch(() => {});
-    } catch {}
-  }, [engagements]);
+  const handleLike = useCallback(async (id: string): Promise<void> => {
+    const snapshot = engagements[id] ?? DEFAULT_ENGAGEMENT;
+    const willLike = !snapshot.liked;
+    // Optimistic update
+    update(id, e => ({ liked: willLike, likes: willLike ? e.likes + 1 : Math.max(0, e.likes - 1) }));
+    // Real post interaction — rollback on failure
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (isUUID) {
+      try {
+        const { api: _api } = require('@/lib/api');
+        await _api.posts.interact(id, { type: 'like', value: willLike ? 'add' : 'remove' });
+      } catch {
+        // Rollback on failure
+        update(id, () => ({ liked: snapshot.liked, likes: snapshot.likes }));
+        showToast('Could not update like. Try again.', 'error');
+      }
+    }
+  }, [engagements, showToast]);
 
   const handleDoubleTapLike = useCallback((id: string) => {
     setEngagements(prev => {
       const e = prev[id] ?? DEFAULT_ENGAGEMENT;
       if (e.liked) return prev;
-      try { const { api } = require('@/lib/api'); api.posts.interact(id, { type: 'like' }).catch(() => {}); } catch {}
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      if (isUUID) {
+        try { const { api: _api } = require('@/lib/api'); _api.posts.interact(id, { type: 'like' }).catch(() => {}); } catch {}
+      }
       return { ...prev, [id]: { ...e, liked: true, likes: e.likes + 1 } };
     });
   }, []);
 
-  const handleSave = useCallback((id: string) => {
-    // Read current saved state before toggling so we know which API to call
-    setEngagements(prev => {
-      const cur = prev[id] ?? DEFAULT_ENGAGEMENT;
+  const handleSave = useCallback(async (id: string): Promise<void> => {
+    const cur = engagements[id] ?? DEFAULT_ENGAGEMENT;
+    const willSave = !cur.saved;
+    const snapshot = { saved: cur.saved, saves: cur.saves };
+    // Optimistic update
+    update(id, e => ({ saved: willSave, saves: willSave ? e.saves + 1 : Math.max(0, e.saves - 1) }));
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (isUUID) {
       try {
-        const { api } = require('@/lib/api');
-        if (cur.saved) {
-          api.saved.remove(id).catch(() => {});
+        const { api: _api } = require('@/lib/api');
+        if (willSave) {
+          await _api.saved.add({ targetId: id, targetType: 'post' });
         } else {
-          api.saved.add({ targetId: id, targetType: 'post' }).catch(() => {});
+          await _api.saved.remove(id);
         }
-      } catch {}
-      return { ...prev, [id]: { ...cur, saved: !cur.saved, saves: cur.saved ? Math.max(0, cur.saves - 1) : cur.saves + 1 } };
-    });
-  }, []);
+      } catch {
+        // Rollback
+        update(id, () => ({ saved: snapshot.saved, saves: snapshot.saves }));
+        showToast('Could not update save. Try again.', 'error');
+      }
+    }
+  }, [engagements, showToast]);
 
-  const handleRepost = useCallback((id: string) => {
-    update(id, e => ({ reposted: !e.reposted, reposts: e.reposted ? e.reposts - 1 : e.reposts + 1 }));
-    try { const { api } = require('@/lib/api'); api.posts.interact(id, { type: 'repost' }).catch(() => {}); } catch {}
-  }, []);
+  const handleRepost = useCallback(async (id: string): Promise<void> => {
+    const snapshot = engagements[id] ?? DEFAULT_ENGAGEMENT;
+    const willRepost = !snapshot.reposted;
+    update(id, e => ({ reposted: willRepost, reposts: willRepost ? e.reposts + 1 : Math.max(0, e.reposts - 1) }));
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (isUUID) {
+      try {
+        const { api: _api } = require('@/lib/api');
+        await _api.posts.interact(id, { type: 'repost' });
+      } catch {
+        // Rollback
+        update(id, () => ({ reposted: snapshot.reposted, reposts: snapshot.reposts }));
+        showToast('Could not repost. Try again.', 'error');
+      }
+    }
+  }, [engagements, showToast]);
 
-  const handleFollow = useCallback((id: string) => {
+  const handleFollow = useCallback(async (id: string): Promise<void> => {
     const item = sellerFeedPosts.find(post => post.id === id);
     if (!item?.sellerId) return;
     const sellerId = item.sellerId;
     const wasFollowing = engagements[id]?.following ?? false;
+    // Optimistic — flip all posts by this seller
     setEngagements(prev => Object.fromEntries(Object.entries(prev).map(([postId, state]) => [
       postId,
       sellerFeedPosts.find(post => post.id === postId)?.sellerId === sellerId
         ? { ...state, following: !wasFollowing }
         : state,
     ])));
-    void setSellerFollowing(sellerId, !wasFollowing).then((state) => {
+    try {
+      const state = await setSellerFollowing(sellerId, !wasFollowing);
       setEngagements(prev => Object.fromEntries(Object.entries(prev).map(([postId, engagement]) => [
         postId,
         sellerFeedPosts.find(post => post.id === postId)?.sellerId === sellerId
@@ -1077,16 +1068,17 @@ export default function FeedScreen({ buyerMode = false }: { buyerMode?: boolean 
           : engagement,
       ])));
       if (feedTab === 'following' && !state.isFollowing) void loadFeed();
-    }).catch(() => {
+    } catch {
+      // Rollback
       setEngagements(prev => Object.fromEntries(Object.entries(prev).map(([postId, engagement]) => [
         postId,
         sellerFeedPosts.find(post => post.id === postId)?.sellerId === sellerId
           ? { ...engagement, following: wasFollowing }
           : engagement,
       ])));
-      Alert.alert('Could not update follow', 'Check your connection and try again.');
-    });
-  }, [engagements, feedTab, loadFeed, sellerFeedPosts]);
+      showToast('Could not update follow. Check your connection.', 'error');
+    }
+  }, [engagements, feedTab, loadFeed, sellerFeedPosts, showToast]);
 
   useEffect(() => {
     const sellerIds = [...new Set(sellerFeedPosts.map(post => post.sellerId).filter((id): id is string => !!id))];
@@ -1125,12 +1117,32 @@ export default function FeedScreen({ buyerMode = false }: { buyerMode?: boolean 
 
   function handleShop(item: SpotlightItem) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setShopSelection({ item });
+    const tags = (item.productTags ?? []).length > 0
+      ? (item.productTags as Array<{ productId: string; productName: string; priceCents: number }>)
+      : item.productId
+        ? [{ productId: item.productId, productName: item.productName, priceCents: 0, tagId: item.productId }]
+        : [];
+    if (tags.length === 0) return;
+    setShopSelection({
+      postId: item.id,
+      postSellerId: item.sellerId,
+      tags,
+      activeTagIndex: 0,
+    });
   }
 
   function handleShopTag(item: SpotlightItem, tag: { productId: string; productName: string; priceCents: number }) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setShopSelection({ item, tag });
+    const allTags = (item.productTags ?? []).length > 0
+      ? (item.productTags as Array<{ productId: string; productName: string; priceCents: number }>)
+      : [tag];
+    const tagIdx = allTags.findIndex(t => t.productId === tag.productId);
+    setShopSelection({
+      postId: item.id,
+      postSellerId: item.sellerId,
+      tags: allTags,
+      activeTagIndex: Math.max(0, tagIdx),
+    });
   }
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -1142,6 +1154,7 @@ export default function FeedScreen({ buyerMode = false }: { buyerMode?: boolean 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
 
   return (
+    <FeedToastProvider>
     <View style={styles.container}>
       {feedLoading && (
         <FeedSkeleton
@@ -1353,18 +1366,12 @@ export default function FeedScreen({ buyerMode = false }: { buyerMode?: boolean 
         <ShopProductSheet
           selection={shopSelection}
           onClose={() => setShopSelection(null)}
-          onBuy={() => {
-            const productId = shopSelection.tag?.productId ?? shopSelection.item.productId ?? shopSelection.item.id;
-            const productName = shopSelection.tag?.productName ?? shopSelection.item.productName;
-            const sourcePostId = shopSelection.item.id;
-            setShopSelection(null);
-            push(('/thread-product-detail?productId=' + encodeURIComponent(productId) +
-              '&productName=' + encodeURIComponent(productName) + '&sourcePostId=' + encodeURIComponent(sourcePostId)) as never);
-          }}
+          onCartUpdated={(newCount) => setCartCount(newCount)}
         />
       )}
 
     </View>
+    </FeedToastProvider>
   );
 }
 
@@ -1459,31 +1466,6 @@ const styles = StyleSheet.create({
   commentSendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
 
   notifRow: { fontSize: 13.5, fontFamily: FONT.regular, color: FG, paddingBottom: 14 },
-  shopSheetBackdrop: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },
-  shopSheet: {
-    backgroundColor: SURFACE, borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingHorizontal: SP.md, paddingTop: SP.sm, borderTopWidth: 1, borderColor: BORDER,
-  },
-  shopSheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.md },
-  shopSheetEyebrow: { fontFamily: FONT.bold, fontSize: FS.xs, color: MUTED, letterSpacing: 1.2 },
-  shopSheetClose: { width: 34, height: 34, borderRadius: 17, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
-  shopProductRow: { flexDirection: 'row', gap: SP.md, alignItems: 'center', marginBottom: SP.md },
-  shopProductImage: { width: 92, height: 112, borderRadius: RADIUS.md, backgroundColor: CARD },
-  shopProductCopy: { flex: 1, gap: 5 },
-  shopProductName: { fontFamily: FONT.bold, fontSize: FS.md, color: FG, lineHeight: 21 },
-  shopProductPrice: { fontFamily: FONT.bold, fontSize: FS.lg },
-  shopProductSeller: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs },
-  shopOptionLabel: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, marginBottom: SP.sm },
-  shopOptionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.md },
-  shopSizeGuide: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.xs },
-  shopSwatches: { flexDirection: 'row', gap: 12 },
-  shopSwatch: { width: 36, height: 36, borderRadius: 18, borderWidth: 2, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  shopSwatchDot: { width: 24, height: 24, borderRadius: 12 },
-  shopSizes: { flexDirection: 'row', gap: 8, marginBottom: SP.md },
-  shopSize: { width: 44, height: 38, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  shopSizeText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: FG },
-  shopBuyButton: { minHeight: 52, borderRadius: RADIUS.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  shopBuyText: { fontFamily: FONT.bold, fontSize: FS.base },
   feedFooter: {
     width: SCREEN_W, height: 72, alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#000000',

@@ -58,6 +58,7 @@ import {
   URGENCY_UNITS_THRESHOLD,
   type CommerceSignalData,
 } from '@/components/CommerceSignal';
+import { SectionError } from '@/components/InlineFeedback';
 
 // ─── API-backed types ──────────────────────────────────────────────────────────
 
@@ -519,7 +520,7 @@ export default function DiscoverScreen() {
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
-  // ─ Each section has independent loading and data ─────────────────
+  // ─ Each section has independent loading, error, and data ──────────
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -527,15 +528,19 @@ export default function DiscoverScreen() {
   // Never sourced from trending posts. Empty array = nothing qualifies.
   const [highDemandItems,   setHighDemandItems]   = useState<HighDemandRowItem[]>([]);
   const [highDemandLoading, setHighDemandLoading] = useState(true);
+  const [highDemandError,   setHighDemandError]   = useState<string | null>(null);
 
   const [forYouItems,    setForYouItems]    = useState<ProductCardItem[]>([]);
   const [forYouLoading,  setForYouLoading]  = useState(true);
+  const [forYouError,    setForYouError]    = useState<string | null>(null);
 
   const [dropsItems,   setDropsItems]   = useState<DropRowItem[]>([]);
   const [dropsLoading, setDropsLoading] = useState(true);
+  const [dropsError,   setDropsError]   = useState<string | null>(null);
 
   const [trendingItems,   setTrendingItems]   = useState<TrendingRowItem[]>([]);
   const [trendingLoading, setTrendingLoading] = useState(true);
+  const [trendingError,   setTrendingError]   = useState<string | null>(null);
 
   // ─ Fetch High Demand ────────────────────────────────────────────────────
   // publicProducts.highDemand(limit) → any[] (direct array, no wrapper)
@@ -543,6 +548,7 @@ export default function DiscoverScreen() {
   // No fallback to publicProducts.list() — empty array shows empty state.
   const fetchHighDemand = useCallback(async () => {
     setHighDemandLoading(true);
+    setHighDemandError(null);
     try {
       const rows = await api.publicProducts.highDemand(6);
       const safe = Array.isArray(rows) ? rows : [];
@@ -568,6 +574,7 @@ export default function DiscoverScreen() {
       }));
     } catch {
       // Do NOT reset highDemandItems — keep previous data visible if available
+      setHighDemandError('Could not load high demand products. Tap to retry.');
     } finally {
       setHighDemandLoading(false);
     }
@@ -578,6 +585,7 @@ export default function DiscoverScreen() {
   // publicProducts.list returns any[] directly — no {items} wrapper.
   const fetchProducts = useCallback(async () => {
     setForYouLoading(true);
+    setForYouError(null);
     try {
       const rows = await api.publicProducts.list({ limit: 8 });
       const safe: LiveProduct[] = Array.isArray(rows) ? rows : [];
@@ -604,6 +612,7 @@ export default function DiscoverScreen() {
       }));
     } catch {
       // Do NOT reset forYouItems — keep previous data visible if available
+      setForYouError('Could not load products. Tap to retry.');
     } finally {
       setForYouLoading(false);
     }
@@ -613,6 +622,7 @@ export default function DiscoverScreen() {
   // ─ Fetch Drops ────────────────────────────────────────────────────────
   const fetchDrops = useCallback(async () => {
     setDropsLoading(true);
+    setDropsError(null);
     try {
       const rows = await (api as any).publicDrops?.list?.() ?? [];
       const safe: LiveDrop[] = Array.isArray(rows)
@@ -647,6 +657,7 @@ export default function DiscoverScreen() {
       }));
     } catch {
       // Do NOT reset dropsItems — keep previous data visible if available
+      setDropsError('Could not load drops. Tap to retry.');
     } finally {
       setDropsLoading(false);
     }
@@ -661,6 +672,7 @@ export default function DiscoverScreen() {
   // finalScore/organicScore are NOT mapped to demandCount (they are post metrics, not demand signals).
   const fetchTrending = useCallback(async () => {
     setTrendingLoading(true);
+    setTrendingError(null);
     try {
       // Correct signature: get(limit: number) — not get({ limit })
       const data = await api.publicTrending.get(20);
@@ -680,6 +692,7 @@ export default function DiscoverScreen() {
       })));
     } catch {
       // Do NOT reset trendingItems — keep previous data visible if available
+      setTrendingError('Could not load trending posts. Tap to retry.');
     } finally {
       setTrendingLoading(false);
     }
@@ -755,6 +768,8 @@ export default function DiscoverScreen() {
           <View style={{ gap: 10 }}>
             {[0, 1, 2].map(i => <SkeletonRow key={i} />)}
           </View>
+        ) : highDemandError ? (
+          <SectionError message={highDemandError} onRetry={fetchHighDemand} />
         ) : highDemandItems.length === 0 ? (
           <View style={s.emptyRow}>
             <Feather name="trending-up" size={22} color={SUBTLE} />
@@ -788,6 +803,10 @@ export default function DiscoverScreen() {
         >
           {[0, 1, 2].map(i => <SkeletonCard key={i} />)}
         </ScrollView>
+      ) : forYouError ? (
+        <View style={{ paddingHorizontal: 20, marginBottom: 32 }}>
+          <SectionError message={forYouError} onRetry={fetchProducts} />
+        </View>
       ) : forYouItems.length === 0 ? (
         <View style={[s.emptyRow, { marginBottom: 32 }]}>
           <Feather name="package" size={24} color={SUBTLE} />
@@ -816,6 +835,8 @@ export default function DiscoverScreen() {
       <View style={{ paddingHorizontal: 20, gap: 10, marginBottom: 32 }}>
         {dropsLoading ? (
           [0, 1, 2].map(i => <SkeletonRow key={i} />)
+        ) : dropsError ? (
+          <SectionError message={dropsError} onRetry={fetchDrops} />
         ) : dropsItems.length === 0 ? (
           <View style={s.emptyRow}>
             <Feather name="calendar" size={22} color={SUBTLE} />
@@ -836,6 +857,8 @@ export default function DiscoverScreen() {
       <View style={{ paddingHorizontal: 20, gap: 10, marginBottom: 32 }}>
         {trendingLoading ? (
           [0, 1, 2].map(i => <SkeletonRow key={i} />)
+        ) : trendingError ? (
+          <SectionError message={trendingError} onRetry={fetchTrending} />
         ) : trendingItems.length === 0 ? (
           <View style={s.emptyRow}>
             <Feather name="activity" size={22} color={SUBTLE} />
