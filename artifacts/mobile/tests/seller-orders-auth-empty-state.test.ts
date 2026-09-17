@@ -19,9 +19,11 @@ describe('seller orders read state', () => {
   });
 
   it('uses the honest empty state without connection or API error banners', () => {
-    expect(ordersSource).toContain('>No orders yet</Text>');
-    expect(ordersSource).toContain('style={s.plainEmptyText}');
-    expect(ordersSource).not.toContain('<EmptyState');
+    expect(ordersSource).toContain('<EmptyState');
+    expect(ordersSource).toContain('icon="shopping-bag"');
+    expect(ordersSource).toContain('title="Your first order will show up here."');
+    expect(ordersSource).not.toContain('<BrandedLoader');
+    expect(ordersSource).not.toContain('name="scissors"');
     expect(ordersSource).not.toContain('Orders unavailable right now');
     expect(ordersSource).not.toContain('accessibilityLabel="Create order"');
     expect(ordersSource).not.toContain('<Feather name="plus"');
