@@ -489,7 +489,7 @@ export default function CreatePostScreen() {
           </TouchableOpacity>
           <View style={ts.mpToolDivider} />
           <TouchableOpacity style={ts.mpToolBtn} activeOpacity={0.7}>
-            <Feather name="zap-off" size={22} color={FG} />
+            <Text style={ts.mpTextTool}>Aa</Text>
           </TouchableOpacity>
           <TouchableOpacity style={ts.mpToolBtn} activeOpacity={0.7}>
             <Feather name="clock" size={22} color={FG} />
@@ -1463,6 +1463,7 @@ const ts = StyleSheet.create({
     alignItems: 'center', gap: 2,
   },
   mpToolBtn:     { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  mpTextTool:    { color: FG, fontSize: 18, fontFamily: FONT.bold },
   mpToolDivider: { width: 24, height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: 4 },
 
   // Canvas (fills between top bar and bottom zone)
