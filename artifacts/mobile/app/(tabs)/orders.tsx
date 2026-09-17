@@ -13,7 +13,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BG, SCREEN_BG, SURFACE, CARD, CARD_GLASS, CARD_ELEVATED_GLASS, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, CYAN, CYAN_DIM, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
-import { IconButton, FilterChip, StatusBadge, SearchBar, BrandedLoader } from '@/components/BrandthreadUI';
+import { IconButton, FilterChip, StatusBadge, SearchBar, BrandedLoader, EmptyState } from '@/components/BrandthreadUI';
 import { filterOrders, sortOrders } from '@/services/orderService';
 import { Order, OrderFilterKey, OrderSortKey, OrderAddress, OrderCustomer, FulfillmentStatus, FulfillmentType, OrderStatus, PaymentStatus, CancellationReason, CANCELLATION_REASONS } from '@/services/orderTypes';
 import { useApi } from '@/hooks/useApi';
@@ -863,7 +863,13 @@ export default function OrdersScreen() {
   const ListEmptyComponent = useCallback(() => {
     if (loading || readUnavailable) return null;
     return (
-      <Text style={s.plainEmptyText}>No orders yet</Text>
+      <View style={s.emptyStateContainer}>
+        <EmptyState
+          icon="shopping-bag"
+          title="Your first order will show up here."
+          description="When a customer places an order, you can manage payment and fulfillment here."
+        />
+      </View>
     );
   }, [loading, readUnavailable]);
 
@@ -1142,12 +1148,10 @@ const s = StyleSheet.create({
     fontFamily: FONT.medium,
     color: SUBTLE,
   },
-  plainEmptyText: {
-    marginTop: SP.lg,
-    textAlign: 'center',
-    color: MUTED,
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingBottom: SP.xl,
   },
   sortIndicator: {
     fontSize: FS.xs,
