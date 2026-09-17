@@ -565,7 +565,6 @@ export default function OrdersScreen() {
   const [orders, setOrders] = useState<OrderListOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [readUnavailable, setReadUnavailable] = useState(false);
   const [updatesPaused, setUpdatesPaused] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<OrderListFilter>('all');
@@ -594,7 +593,6 @@ export default function OrdersScreen() {
       setOrders(all);
       setOrdersOwnerId(requestOwnerId);
       setStats(computeStats(all));
-      setReadUnavailable(false);
       setUpdatesPaused(false);
       consecutiveFailuresRef.current = 0;
     } catch (e) {
@@ -603,7 +601,6 @@ export default function OrdersScreen() {
       setOrders([]);
       setOrdersOwnerId(requestOwnerId);
       setStats(computeStats([]));
-      setReadUnavailable(true);
       consecutiveFailuresRef.current += 1;
       if (consecutiveFailuresRef.current >= 3) {
         setUpdatesPaused(true);
@@ -634,7 +631,6 @@ export default function OrdersScreen() {
       const generation = ++generationRef.current;
       consecutiveFailuresRef.current = 0;
       setUpdatesPaused(false);
-      setReadUnavailable(false);
       if (!hasLoadedRef.current) setLoading(true);
       loadData(generation);
       timerRef.current = setInterval(() => loadData(generation), 30_000);
@@ -861,7 +857,7 @@ export default function OrdersScreen() {
   ), [filtered.length, activeFilter, sort, currentSortLabel]);
 
   const ListEmptyComponent = useCallback(() => {
-    if (loading || readUnavailable) return null;
+    if (loading) return null;
     return (
       <View style={s.emptyStateContainer}>
         <EmptyState
@@ -871,7 +867,7 @@ export default function OrdersScreen() {
         />
       </View>
     );
-  }, [loading, readUnavailable]);
+  }, [loading]);
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -1135,9 +1131,13 @@ const s = StyleSheet.create({
     color: SUBTLE,
   },
   emptyStateContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingBottom: SP.xl,
+    marginHorizontal: SP.md,
+    backgroundColor: CARD,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: BORDER,
+    overflow: 'hidden',
+    marginBottom: SP.sm,
   },
   sortIndicator: {
     fontSize: FS.xs,
