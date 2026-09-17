@@ -5,7 +5,6 @@ import {
   Text,
   View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Tabs, useRouter } from 'expo-router';
@@ -164,7 +163,7 @@ function CustomTabBar({ state, descriptors, navigation, onOpenStudio }: any) {
       style={[
         styles.bar,
         {
-          height: 86 + insets.bottom,
+          height: 72 + insets.bottom,
           paddingBottom: insets.bottom,
         },
       ]}
@@ -176,7 +175,7 @@ function CustomTabBar({ state, descriptors, navigation, onOpenStudio }: any) {
         onPress={onOpenStudio}
         style={({ pressed }) => [styles.sideButton, pressed && styles.pressed]}
       >
-        <Feather name="zap" size={23} color={FG} />
+        <Feather name="zap" size={20} color={FG} />
       </Pressable>
 
       <View style={styles.centerBar}>
@@ -234,9 +233,6 @@ function CustomTabBar({ state, descriptors, navigation, onOpenStudio }: any) {
               )}
             </View>
 
-            <Text style={[styles.label, { color }]} numberOfLines={1}>
-              {tabDef.label}
-            </Text>
           </Pressable>
         );
       })}
@@ -247,11 +243,9 @@ function CustomTabBar({ state, descriptors, navigation, onOpenStudio }: any) {
         accessibilityRole="button"
         accessibilityLabel="Open Brandthread AI"
         onPress={openAI}
-        style={({ pressed }) => [styles.aiButton, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.sideButton, pressed && styles.pressed]}
       >
-        <LinearGradient colors={[...theme.primaryGradient]} style={styles.aiGradient}>
-          <BrandthreadLogo size={22} opacity={1} />
-        </LinearGradient>
+        <BrandthreadLogo size={20} opacity={1} />
       </Pressable>
     </View>
   );
@@ -305,56 +299,39 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 8,
     backgroundColor: 'transparent',
-    paddingTop: 10,
+    paddingTop: 8,
     paddingHorizontal: 12,
   },
   centerBar: {
     flex: 1,
-    height: 58,
+    height: 48,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 5,
-    borderRadius: 29,
+    paddingHorizontal: 4,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: BORDER,
     backgroundColor: SURFACE_GLASS,
   },
   sideButton: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: SURFACE_GLASS,
-  },
-  aiButton: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    overflow: 'hidden',
-  },
-  aiGradient: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: BG,
   },
   pressed: { opacity: 0.82, transform: [{ scale: 0.95 }] },
   tab: {
     flex:           1,
     alignItems:     'center',
     justifyContent: 'center',
-    gap:            3,
-    minHeight:      44,
-    borderRadius: 23,
+    minHeight:      40,
+    borderRadius: 20,
   },
   tabActive: { backgroundColor: 'rgba(255,255,255,0.08)' },
-  label: {
-    fontSize:   10,
-    fontFamily: FONT.medium,
-    lineHeight: 12,
-  },
   iconWrap: {
     position: 'relative',
   },
