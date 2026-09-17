@@ -333,6 +333,18 @@ export const posts = pgTable('posts', {
   mediaUrl: text('media_url').notNull(),
   thumbnailUrl: text('thumbnail_url'),
   mediaUrls: json('media_urls').$type<string[]>().notNull().default([]),
+  /** Ordered object storage paths for each composed slideshow slide (empty for video/photo) */
+  mediaPaths: json('media_paths').$type<string[]>().notNull().default([]),
+  /** Per-slide overlay metadata. Each entry: { slideIndex, overlays: TextOverlay[] } */
+  slideOverlays: json('slide_overlays').$type<Array<{
+    slideIndex: number;
+    overlays: Array<{
+      id: string; text: string; x: number; y: number;
+      color: string; fontStyle: string; align: string;
+      bgStyle: string; fontSize: number;
+      startTime?: number; endTime?: number;
+    }>;
+  }>>().notNull().default([]),
   mediaType: text('media_type').notNull().default('photo'), // 'photo' | 'video' | 'slideshow'
   aspectRatio: text('aspect_ratio').notNull().default('9:16'),
   caption: text('caption'),

@@ -19,12 +19,21 @@ import postVideoRouter, {
   mediaUrl as composedMediaUrl,
   setComposedMediaVisibility,
 } from "./post-video";
+import postSlideRouter from "./post-slide";
+import { validateSlideOverlays, MAX_SLIDES } from "../lib/slideValidation";
 
 const router = Router();
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const POST_STATUSES = ["draft", "scheduled", "published", "archived", "deleted"] as const;
 type PostStatus = typeof POST_STATUSES[number];
+const OBJECT_PATH_RE = /^\/objects\/uploads\/[A-Za-z0-9._/-]+$/;
+
+function validObjectPath(value: unknown): value is string {
+  return typeof value === "string" &&
+    OBJECT_PATH_RE.test(value) &&
+    !value.split("/").includes("..");
+}
 
 function visiblePostCondition(now = new Date()) {
   return and(
@@ -76,6 +85,7 @@ async function sellerExists(clerkId: string): Promise<boolean> {
 }
 
 router.use("/", postVideoRouter);
+router.use("/", postSlideRouter);
 
 async function postDetails(postRows: typeof posts.$inferSelect[]) {
   if (postRows.length === 0) return [];
@@ -345,13 +355,17 @@ router.post("/", requireAuth, async (req, res) => {
   // ───────────────────────────────────────────────────────────────────────────
 
   const {
-    mediaUrl: requestedMediaUrl, thumbnailUrl: requestedThumbnailUrl, mediaPath, thumbnailPath, mediaUrls, mediaType, aspectRatio, caption, hashtags, styleTags,
+    mediaUrl: requestedMediaUrl, thumbnailUrl: requestedThumbnailUrl, mediaPath, thumbnailPath,
+    mediaPaths: requestedMediaPaths, slideOverlays: requestedSlideOverlays,
+    mediaUrls, mediaType, aspectRatio, caption, hashtags, styleTags,
     sound, visibility, taggedProductIds, isDraft, scheduledAt,
   } = req.body as {
     mediaUrl?:          string;
     thumbnailUrl?:      string;
     mediaPath?:         string;
     thumbnailPath?:     string;
+    mediaPaths?:        string[];
+    slideOverlays?:     unknown;
     mediaUrls?:         string[];
     mediaType?:         string;
     aspectRatio?:       string;
@@ -376,6 +390,24 @@ router.post("/", requireAuth, async (req, res) => {
     !Array.isArray(mediaUrls) || mediaUrls.some((url) => typeof url !== "string")
   )) {
     return res.status(400).json({ error: "mediaUrls must be an array of strings" });
+  }
+  // Validate mediaPaths — all must be valid owned object paths; max MAX_SLIDES entries; no duplicates
+  let resolvedMediaPaths: string[] = [];
+  if (requestedMediaPaths !== undefined) {
+    if (!Array.isArray(requestedMediaPaths)) {
+      return res.status(400).json({ error: "mediaPaths must be an array" });
+    }
+    if (requestedMediaPaths.length > MAX_SLIDES) {
+      return res.status(400).json({ error: `mediaPaths: max ${MAX_SLIDES} entries` });
+    }
+    if (requestedMediaPaths.some((p) => !validObjectPath(p))) {
+      return res.status(400).json({ error: "mediaPaths must be an array of valid object paths" });
+    }
+    const unique = new Set(requestedMediaPaths);
+    if (unique.size !== requestedMediaPaths.length) {
+      return res.status(400).json({ error: "mediaPaths must not contain duplicates" });
+    }
+    resolvedMediaPaths = requestedMediaPaths;
   }
   if (hashtags !== undefined && (
     !Array.isArray(hashtags) || hashtags.some((tag) => typeof tag !== "string")
@@ -420,11 +452,20 @@ router.post("/", requireAuth, async (req, res) => {
     allowReposts: true,
     showLikeCount: true,
   };
+  // Strictly validate slideOverlays — must pass even if compose-slideshow was bypassed
+  const slideOverlaysResult = validateSlideOverlays(requestedSlideOverlays);
+  if (!slideOverlaysResult.ok) {
+    return res.status(400).json({ error: slideOverlaysResult.error });
+  }
+  const safeSlideOverlays = slideOverlaysResult.records;
+
   const [post] = await db.insert(posts).values({
     userId:    clerkId,
     mediaUrl,
     thumbnailUrl: thumbnailUrl ?? null,
-    mediaUrls: mediaPath ? [mediaUrl] : (mediaUrls ?? (mediaUrl ? [mediaUrl] : [])),
+    mediaUrls: mediaPath ? [mediaUrl] : (resolvedMediaPaths.length > 0 ? [] : (mediaUrls ?? (mediaUrl ? [mediaUrl] : []))),
+    mediaPaths: resolvedMediaPaths,
+    slideOverlays: safeSlideOverlays as any,
     mediaType: (mediaType as any) ?? "photo",
     aspectRatio: aspectRatio ?? "9:16",
     caption:   caption   ?? "",
@@ -438,11 +479,17 @@ router.post("/", requireAuth, async (req, res) => {
     updatedAt: now,
   }).returning();
 
-  if (mediaPath || thumbnailPath) {
+  // Determine which composed paths to set ACL on
+  const allComposedPaths = [
+    ...(mediaPath ? [mediaPath] : []),
+    ...(thumbnailPath ? [thumbnailPath] : []),
+    ...resolvedMediaPaths,
+  ];
+  if (allComposedPaths.length > 0) {
     try {
       await setComposedMediaVisibility(
         clerkId,
-        [mediaPath, thumbnailPath],
+        allComposedPaths,
         postStatus === "published" && resolvedVisibility.isPublic !== false
           ? "public"
           : "private",
@@ -532,6 +579,30 @@ router.patch("/:id", requireAuth, async (req, res) => {
     updates.mediaUrls = body.mediaUrls as string[];
     updates.mediaUrl = (body.mediaUrls as string[])[0] ?? "";
   }
+  if (body.mediaPaths !== undefined) {
+    if (!Array.isArray(body.mediaPaths)) {
+      return res.status(400).json({ error: "mediaPaths must be an array" });
+    }
+    if ((body.mediaPaths as unknown[]).length > MAX_SLIDES) {
+      return res.status(400).json({ error: `mediaPaths: max ${MAX_SLIDES} entries` });
+    }
+    if ((body.mediaPaths as unknown[]).some((p) => !validObjectPath(p))) {
+      return res.status(400).json({ error: "mediaPaths must be an array of valid object paths" });
+    }
+    const patchPaths = body.mediaPaths as string[];
+    if (new Set(patchPaths).size !== patchPaths.length) {
+      return res.status(400).json({ error: "mediaPaths must not contain duplicates" });
+    }
+    updates.mediaPaths = patchPaths;
+  }
+  if (body.slideOverlays !== undefined) {
+    // Strictly validate — cannot trust caller bypassed compose-slideshow
+    const patchOverlayResult = validateSlideOverlays(body.slideOverlays);
+    if (!patchOverlayResult.ok) {
+      return res.status(400).json({ error: patchOverlayResult.error });
+    }
+    updates.slideOverlays = patchOverlayResult.records as any;
+  }
   if (body.mediaType !== undefined) {
     if (typeof body.mediaType !== "string" || body.mediaType.trim() === "") {
       return res.status(400).json({ error: "mediaType must be a non-empty string" });
@@ -615,10 +686,14 @@ router.patch("/:id", requireAuth, async (req, res) => {
   updates.publishedAt = nextStatus === "published" ? (existing.publishedAt ?? now) : existing.publishedAt;
   updates.updatedAt = now;
   const nextVisibility = (updates.visibility ?? existing.visibility) as typeof posts.$inferInsert.visibility;
-  const nextMediaPaths = composedMediaPaths({
-    mediaUrl: (updates.mediaUrl as string | undefined) ?? existing.mediaUrl,
-    thumbnailUrl: (updates.thumbnailUrl as string | null | undefined) ?? existing.thumbnailUrl,
-  });
+  const nextMediaPaths = [
+    ...composedMediaPaths({
+      mediaUrl: (updates.mediaUrl as string | undefined) ?? existing.mediaUrl,
+      thumbnailUrl: (updates.thumbnailUrl as string | null | undefined) ?? existing.thumbnailUrl,
+    }),
+    // Include all slide media paths (new or existing)
+    ...((updates.mediaPaths as string[] | undefined) ?? existing.mediaPaths ?? []),
+  ].filter((p): p is string => !!p);
 
   const taggedProductIds = body.taggedProductIds;
   if (taggedProductIds !== undefined && (
@@ -668,11 +743,27 @@ router.delete("/:id", requireAuth, async (req, res) => {
   if (typeof id !== "string" || !UUID_RE.test(id)) {
     return res.status(404).json({ error: "Post not found" });
   }
+  // Fetch existing post to get all media paths for cleanup
+  const [existing] = await db.select().from(posts)
+    .where(and(eq(posts.id, id), eq(posts.userId, clerkId))).limit(1);
+  if (!existing) return res.status(404).json({ error: "Post not found" });
+
   const [deleted] = await db.update(posts)
     .set({ postStatus: "deleted", scheduledAt: null, updatedAt: new Date() })
     .where(and(eq(posts.id, id), eq(posts.userId, clerkId)))
     .returning({ id: posts.id });
   if (!deleted) return res.status(404).json({ error: "Post not found" });
+
+  // Fire-and-forget: clean up all composed slide media paths
+  const slidePaths = (existing.mediaPaths ?? []).filter(Boolean);
+  if (slidePaths.length > 0) {
+    Promise.all(
+      slidePaths.map((p) =>
+        setComposedMediaVisibility(clerkId, [p], "private").catch(() => {}),
+      ),
+    ).catch(() => {});
+  }
+
   return res.json({ id: deleted.id, deleted: true });
 });
 

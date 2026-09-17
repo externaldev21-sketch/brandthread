@@ -49,6 +49,9 @@ import { useCanUseMarketing } from '@/contexts/CookieConsentContext';
 import { setMarketingPixelConsent, trackMarketingPixelEvent } from '@/lib/marketingPixels';
 import { captureNotificationEvent, flushNotificationEvents } from '@/lib/notificationEventOutbox';
 import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
+import { SellerGlobalTabBar } from '@/components/SellerGlobalTabBar';
+import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
+import { SellerShellProvider, useSellerShell } from '@/contexts/SellerShellContext';
 
 const TRANSPARENT_NAVIGATION_THEME = {
   ...DarkTheme,
@@ -65,6 +68,81 @@ function IsolatedStackScene({ children }: { children: React.ReactNode }) {
     <View style={{ flex: 1, backgroundColor: '#0A0A0B' }}>
       {children}
     </View>
+  );
+}
+
+// ─── Seller tab bar exclusion list ───────────────────────────────────────────
+// The bar shows on EVERY authenticated seller screen by default.
+// Only exclude routes where the seller identity/shell does not exist at all:
+//   • Boot/auth/onboarding (no session yet)
+//   • Legal public pages (reachable without auth)
+//   • The Expo Router root index (BootScreen redirect — no segment)
+//   • The navigation isolation test probe (CI only)
+//   • The buyer app group — buyer accounts never see the seller shell
+//     (role gating already prevents this; explicit exclusion avoids any flash)
+//
+// Full-screen seller routes (create-post, camera-capture, seller-go-live,
+// seller-live, buyer-live, buyer-story-*, plans, team-invite, seller-profile,
+// buyer-product-detail, buyer-checkout, buyer-post-comments, buyer-report, etc.)
+// are intentionally NOT excluded — the bar is a normal flex sibling and does
+// not physically overlay these screens. Role gating prevents buyer accounts
+// from seeing it on buyer-facing screens.
+const SELLER_TAB_BAR_EXCLUDED_SEGMENTS = new Set([
+  // Boot: "/" renders BootScreen with no segment; AuthGate redirects immediately
+  'index',
+  // Auth flow — no seller session
+  'splash',
+  'sign-in',
+  'forgot-password',
+  // Onboarding — session incomplete, role not yet confirmed
+  'onboarding',
+  // Post-onboarding buyer screen — not a seller route
+  'thread-explainer',
+  // Legal public pages — reachable without any session
+  'privacy',
+  'terms',
+  // CI navigation isolation probe
+  'navigation-isolation-probe',
+  // Buyer app group — buyer sessions only; seller role gating prevents cross-exposure
+  '(buyer)',
+]);
+
+// ─── SellerBarGate ────────────────────────────────────────────────────────────
+// Renders the global seller tab bar + Studio radial menu when:
+//   1. SellerShellContext reports an active seller session (set by AuthGate after
+//      it resolves onboarding completion and role from AsyncStorage/server), OR
+//   2. PREVIEW_ROLE === 'seller' in the dev web bypass (no Clerk required).
+//
+// AuthGate is the single authority that reads AsyncStorage and the server
+// profile. SellerBarGate consumes SellerShellContext — no parallel read.
+//
+// The exclusion list is intentionally minimal (boot/auth/onboarding/legal/buyer
+// group only). Every normal seller screen — including full-screen modals that
+// are flex siblings of the bar — shows the tab bar.
+
+function SellerBarGate() {
+  const { isActiveSeller } = useSellerShell();
+  const segments = useSegments();
+  const [studioOpenRequestKey, setStudioOpenRequestKey] = useState(0);
+
+  // Honor the dev web preview bypass: PREVIEW_ROLE is evaluated at module load
+  // time (before Clerk resolves) so it must be checked independently of
+  // isActiveSeller. It is inert in production builds (__DEV__ guard in PREVIEW_ROLE).
+  const isPreviewSeller = PREVIEW_ROLE === 'seller';
+
+  const showBar = isActiveSeller || isPreviewSeller;
+
+  // Check exclusion list: first segment determines the route
+  const firstSegment = (segments[0] as string | undefined) ?? '';
+  const isExcluded = SELLER_TAB_BAR_EXCLUDED_SEGMENTS.has(firstSegment);
+
+  if (!showBar || isExcluded) return null;
+
+  return (
+    <>
+      <SellerGlobalTabBar onOpenStudio={() => setStudioOpenRequestKey((k) => k + 1)} />
+      <SellerStudioRadialMenu hideTrigger openRequestKey={studioOpenRequestKey} />
+    </>
   );
 }
 
@@ -160,6 +238,9 @@ function AuthGate() {
   const devForcedRef = useRef(false);
   const topSegment = segments[0];
 
+  // Shared seller-shell state — consumed by SellerBarGate with no extra read.
+  const { setActiveSeller } = useSellerShell();
+
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [onboardingDone, setOnboardingDone]       = useState(false);
   const [storedRole, setStoredRole]               = useState<string | null>(null);
@@ -179,6 +260,7 @@ function AuthGate() {
     if (prev === true && !isSignedIn) {
       clearSocialCache().catch(() => {});
       clearCartCache().catch(() => {});
+      setActiveSeller(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignedIn, isLoaded]);
@@ -283,6 +365,9 @@ function AuthGate() {
       setStoredRole(role);
       setThreadExplainerSeen(role !== 'buyer' || pairs[3][1] === 'true');
       setOnboardingChecked(true);
+      // Publish authoritative seller state to SellerShellContext so
+      // SellerBarGate can consume it without a parallel AsyncStorage read.
+      setActiveSeller(done && role === 'seller');
     })();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -613,7 +698,7 @@ function RootLayoutNav() {
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, flexDirection: 'column' }}>
       <StoreContextBanner />
       <NetworkNoticeBanner />
       <Pressable onPress={Keyboard.dismiss} accessible={false} style={{ flex: 1 }}>
@@ -853,6 +938,7 @@ function RootLayoutNav() {
       </Stack>
         </View>
       </Pressable>
+      <SellerBarGate />
       <AuthGate />
       <ServiceConfigurer />
       <PushRegistrar />
@@ -893,17 +979,19 @@ export default function RootLayout() {
             <CookieConsentProvider>
             <AppThemeProvider>
               <RoleProvider>
-                <RevenueCatProvider>
-                  <FeatureFlagProvider>
-                    <UndoToastProvider>
-                      <NavigationThemeProvider value={TRANSPARENT_NAVIGATION_THEME}>
-                        <ThreadPullProvider>
-                          <RootLayoutNav />
-                        </ThreadPullProvider>
-                      </NavigationThemeProvider>
-                    </UndoToastProvider>
-                  </FeatureFlagProvider>
-                </RevenueCatProvider>
+                <SellerShellProvider>
+                  <RevenueCatProvider>
+                    <FeatureFlagProvider>
+                      <UndoToastProvider>
+                        <NavigationThemeProvider value={TRANSPARENT_NAVIGATION_THEME}>
+                          <ThreadPullProvider>
+                            <RootLayoutNav />
+                          </ThreadPullProvider>
+                        </NavigationThemeProvider>
+                      </UndoToastProvider>
+                    </FeatureFlagProvider>
+                  </RevenueCatProvider>
+                </SellerShellProvider>
               </RoleProvider>
             </AppThemeProvider>
             </CookieConsentProvider>

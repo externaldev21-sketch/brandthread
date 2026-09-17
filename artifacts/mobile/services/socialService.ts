@@ -449,6 +449,17 @@ export interface SellerThreadPost {
   likedByMe:         boolean;
   savedByMe:         boolean;
   repostedByMe:      boolean;
+  /** Ordered object storage paths for composed slideshow slides (empty for video/photo posts) */
+  mediaPaths?:       string[];
+  /** Per-slide overlay metadata — used to restore draft editors */
+  slideOverlays?:    Array<{
+    slideIndex: number;
+    overlays: Array<{
+      id: string; text: string; x: number; y: number;
+      color: string; fontStyle: string; align: string;
+      bgStyle: string; fontSize: number;
+    }>;
+  }>;
 }
 
 async function ensureSellerPostsSeed(k: SocialKeys = K()): Promise<void> {
@@ -463,6 +474,12 @@ function mapOwnedApiPost(p: any, userId: string): SellerThreadPost {
     ? p.postStatus
     : 'published') as SellerThreadPost['postStatus'];
   const authorName = p.seller?.brandName ?? p.seller?.displayName ?? 'Seller';
+  // Derive canonical mediaUris: prefer mediaPaths-derived mediaUrls for slideshows, then mediaUrls, then mediaUrl
+  const apiMediaUris: string[] = Array.isArray(p.mediaUrls) && p.mediaUrls.length > 0
+    ? p.mediaUrls
+    : Array.isArray(p.mediaUris) && p.mediaUris.length > 0
+      ? p.mediaUris
+      : (p.mediaUrl ? [p.mediaUrl] : []);
   return {
     id:              p.id,
     authorId:        p.userId ?? userId,
@@ -477,11 +494,7 @@ function mapOwnedApiPost(p: any, userId: string): SellerThreadPost {
     caption:         p.caption ?? '',
     hashtags:        Array.isArray(p.hashtags) ? p.hashtags : [],
     styleTags:       Array.isArray(p.styleTags) ? p.styleTags : [],
-    mediaUris:       Array.isArray(p.mediaUrls) && p.mediaUrls.length > 0
-      ? p.mediaUrls
-      : Array.isArray(p.mediaUris) && p.mediaUris.length > 0
-        ? p.mediaUris
-        : (p.mediaUrl ? [p.mediaUrl] : []),
+    mediaUris:       apiMediaUris,
     thumbnailUri:    p.thumbnailUrl ?? p.thumbnailUri ?? undefined,
     aspectRatio:     p.aspectRatio ?? '9:16',
     contentType:     p.mediaType ?? p.contentType ?? 'video',
@@ -510,6 +523,9 @@ function mapOwnedApiPost(p: any, userId: string): SellerThreadPost {
     likedByMe:       false,
     savedByMe:       false,
     repostedByMe:    false,
+    // Slideshow persistence fields
+    mediaPaths:      Array.isArray(p.mediaPaths) && p.mediaPaths.length > 0 ? p.mediaPaths : undefined,
+    slideOverlays:   Array.isArray(p.slideOverlays) && p.slideOverlays.length > 0 ? p.slideOverlays : undefined,
   };
 }
 
@@ -533,6 +549,10 @@ export async function createSellerPost(params: {
   visibility?: { allowComments: boolean; allowReposts: boolean; showLikeCount: boolean };
   isDraft?: boolean;
   scheduledAt?: string | null;
+  /** Ordered object storage paths for slideshow slides */
+  mediaPaths?: string[];
+  /** Per-slide overlay metadata */
+  slideOverlays?: Array<{ slideIndex: number; overlays: any[] }>;
 }): Promise<SellerThreadPost> {
   const k = K();
   const created = await serviceRequest<any>('/api/posts', {
@@ -544,6 +564,8 @@ export async function createSellerPost(params: {
       mediaPath: params.mediaPath,
       thumbnailPath: params.thumbnailPath,
       mediaUrls: params.mediaUris ?? [],
+      mediaPaths: params.mediaPaths ?? [],
+      slideOverlays: params.slideOverlays ?? [],
       mediaType: params.contentType,
       aspectRatio: params.aspectRatio ?? '9:16',
       caption: params.caption,
@@ -562,13 +584,17 @@ export async function createSellerPost(params: {
   const existing = await load<SellerThreadPost[]>(k.sellerPosts, []);
   const post = {
     ...mapOwnedApiPost(created, k.userId),
-    mediaUris: created.mediaUrl ? [created.mediaUrl] : params.mediaUris ?? [],
+    mediaUris: Array.isArray(created.mediaUrls) && created.mediaUrls.length > 0
+      ? created.mediaUrls
+      : (created.mediaUrl ? [created.mediaUrl] : params.mediaUris ?? []),
     thumbnailUri: created.thumbnailUrl ?? params.thumbnailUri,
     aspectRatio: params.aspectRatio ?? '9:16',
     styleTags: params.styleTags ?? [],
     sound: params.sound ?? undefined,
     productTags: params.productTags ?? [],
     visibility: params.visibility ?? { allowComments: true, allowReposts: true, showLikeCount: true },
+    mediaPaths: params.mediaPaths,
+    slideOverlays: params.slideOverlays,
   };
   if (_socialUserId === k.userId) await save(k.sellerPosts, [post, ...existing.filter(p => p.id !== post.id)]);
   notify();

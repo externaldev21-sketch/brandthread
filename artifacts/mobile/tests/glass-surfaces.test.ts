@@ -30,10 +30,12 @@ describe('glass surfaces and translucency', () => {
   });
 
   it('uses glass tokens for tab bars', () => {
-    const sellerLayout = readFileSync(appPath('(tabs)/_layout.tsx'), 'utf8');
+    // The seller tab bar was extracted to SellerGlobalTabBar.tsx (global shell);
+    // (tabs)/_layout.tsx delegates rendering to that component.
+    const sellerTabBar = readFileSync(compPath('SellerGlobalTabBar.tsx'), 'utf8');
     const buyerLayout = readFileSync(appPath('(buyer)/_layout.tsx'), 'utf8');
     
-    expect(sellerLayout).toContain('backgroundColor: SURFACE_GLASS');
+    expect(sellerTabBar).toContain('SURFACE_GLASS');
     expect(buyerLayout).toContain('pillBg       = \'rgba(12, 12, 23, 0.65)\'');
   });
 

@@ -1,29 +1,32 @@
 /**
  * Brandthread Design Studio — Gallery & Canvas Management
  *
- * Procreate Pocket is used as a structural reference only (not colors).
- * All colors come from @/lib/theme Brandthread tokens.
+ * Visual reference: Procreate Pocket iOS gallery screenshots (structure only, not branding).
  *
- * Fix notes:
- *  - useFocusEffect (expo-router) reloads active projects every time this
- *    screen regains focus after creating/editing a canvas.
- *  - ProjectThumbnail delegates to DesignLayerCompositor which uses exactly
- *    the same layer-rendering semantics as the canvas editor (order, visibility,
- *    transforms, opacity, eraser mask, image, text, shape, blend modes).
- *  - Photo/Import on web converts blob: URLs to bounded base64 data URLs via
- *    makeDurableUri() before persisting. Native copies into Paths.document.
- *  - RecentlyDeletedSection re-fetches when expanded or when a
- *    restoration/deletion occurs (via refreshToken prop).
+ * Gallery:
+ *  - Large bold left-aligned "Design Studio" title directly below safe-area inset.
+ *  - Compact action row flush below title: "Select  Import  Photo" (FG color, no dividers)
+ *    with a bare "+" pushed to the far right at the same baseline.
+ *  - Three-column artwork grid. Thumbnails fill each cell with no card chrome.
+ *    Name + "W × H px" dims text left-aligned beneath each thumbnail.
+ *  - No dashboard chrome, banners, or button-pill rows on the gallery surface.
+ *
+ * Recovery modal (Procreate screenshots 1 & 2 as structural reference):
+ *  - Full-screen, opaque BG. "Cancel" top-right in accent blue.
+ *  - Prompt phase: large rounded-rect icon box, bold app name, descriptor text,
+ *    two full-width dark-fill buttons (Recover / Not Now).
+ *  - Running/Done phase: large bold centered title, muted subtitle, large filled
+ *    blue circle with checkmark (done) or ActivityIndicator (running).
+ *  - Error phase: triangle icon + retry / dismiss.
+ *
+ * All service contracts, recovery semantics, and account/store scoping preserved.
  */
 
-import React, {
-  useState, useCallback, useRef,
-} from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   Alert, ActivityIndicator, FlatList, Modal, TextInput,
-  Dimensions, Pressable,
-  Linking,
+  Dimensions, Pressable, Linking, Platform,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -36,11 +39,9 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_SUBTLE, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
-  RED,
-  SUCCESS,
+  RED, SUCCESS,
   FONT, FS, SP, RADIUS, ICON, COMP, OVERLAY,
 } from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   getProjects, softDeleteProject, duplicateProject,
   updateProject, createProject, getDeletedProjects,
@@ -57,7 +58,29 @@ import { makeDurableUri } from '@/lib/imageUri';
 import { validateBtJson } from '@/lib/btLayerValidator';
 import { validateJsonByteLength } from '@/lib/fileValidator';
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+// Recovery accent — mirrors iOS system blue for the Cancel button and success circle.
+// Brandthread is monochrome; this single semantic blue is used only in the recovery
+// modal (Cancel label + success mark) — not on gallery chrome.
+const RECOVERY_ACCENT = '#0A84FF';
+
+// ─── Grid geometry ─────────────────────────────────────────────────────────────
+// 3 columns, flush horizontal padding of 16px each side, 8px inter-column gaps.
+// DesignLayerCompositor accepts a square displaySize; we pass CELL_SIZE and let
+// the compositor handle any aspect-ratio letterboxing internally.
+const GRID_COLUMNS = 3;
+const GRID_GAP     = SP.sm;                          // 8px between columns
+const GRID_H_PAD   = SP.md;                          // 16px left/right page margin
+const SCREEN_W     = Dimensions.get('window').width;
+const CELL_SIZE    = Math.floor(
+  (SCREEN_W - GRID_H_PAD * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS,
+);
+// Aspect: ~1.4 portrait ratio (like phone screen art). Matches the tall thumbnails
+// visible in screenshot 0.
+const THUMB_H      = Math.round(CELL_SIZE * 1.4);
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 let _uid = 0;
 function uid(): string { return `uid_${Date.now()}_${++_uid}`; }
@@ -72,9 +95,320 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+// "1847 × 4000px" — uses narrow multiplication sign (U+00D7) matching the reference
 function dimsLabel(p: DesignProject): string {
-  return `${p.canvas.width} x ${p.canvas.height}`;
+  return `${p.canvas.width} \u00D7 ${p.canvas.height}px`;
 }
+
+const HIT = { top: 10, bottom: 10, left: 10, right: 10 };
+
+// ─── Recovery Modal ───────────────────────────────────────────────────────────
+// Full-screen, slides up. Matches screenshots 1 and 2 in structure:
+//   • Cancel top-right (blue)
+//   • Prompt: icon box, title, descriptor text, two dark-fill buttons
+//   • Running/Done: large title centred at ~40% height, subtitle, large circle mark
+//   • Error: triangle mark, retry / dismiss
+
+type RecoveryPhase = 'prompt' | 'running' | 'done' | 'error';
+
+interface RecoveryModalProps {
+  visible: boolean;
+  count: number;
+  onClose: () => void;
+  onRecovered: () => void;
+}
+
+function RecoveryModal({ visible, count, onClose, onRecovered }: RecoveryModalProps) {
+  const insets = useSafeAreaInsets();
+  const [phase, setPhase] = useState<RecoveryPhase>('prompt');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  // Reset to prompt whenever the modal opens
+  const prevVisRef = useRef(false);
+  if (prevVisRef.current !== visible) {
+    prevVisRef.current = visible;
+    if (visible) { setPhase('prompt'); setErrorMsg(''); }
+  }
+
+  async function startRecovery() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setPhase('running');
+    try {
+      await recoverLegacyDesignProjects();
+      setPhase('done');
+    } catch (e: unknown) {
+      setErrorMsg(e instanceof Error ? e.message : 'Recovery failed. Your original projects were not changed.');
+      setPhase('error');
+    }
+  }
+
+  function handleDone() {
+    onRecovered();   // re-fetches gallery
+    onClose();
+  }
+
+  // Web inset: 67px status bar + 34px home bar
+  const topPad    = Platform.OS === 'web' ? 67  : insets.top;
+  const bottomPad = Platform.OS === 'web' ? 34  : insets.bottom;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent={false}
+      animationType="slide"
+      onRequestClose={onClose}
+      testID="recovery-modal"
+    >
+      <View style={[rm.screen, { paddingTop: topPad, paddingBottom: bottomPad }]}>
+
+        {/* Cancel — top-right, accent blue (matches iOS style in ref screenshots) */}
+        <View style={rm.topBar}>
+          <View style={{ flex: 1 }} />
+          <TouchableOpacity
+            onPress={onClose}
+            hitSlop={HIT}
+            style={rm.cancelTouchable}
+            accessibilityLabel="Cancel recovery"
+            accessibilityRole="button"
+            testID="recovery-cancel"
+          >
+            <Text style={rm.cancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Prompt phase ───────────────────────────────────────────────── */}
+        {phase === 'prompt' && (
+          <View style={rm.promptBody}>
+            {/* Brandthread icon block — white rounded-rect, like screenshot 1 icon box */}
+            <View style={rm.iconBlock}>
+              <View style={rm.iconInner}>
+                <Feather name="layers" size={44} color={BG} />
+              </View>
+            </View>
+
+            <Text style={rm.promptTitle}>Design Studio</Text>
+
+            <Text style={rm.promptDesc}>
+              {count} design{count === 1 ? '' : 's'} saved on this device before account sync.{'\n'}
+              Recover only if they belong to the selected store.
+            </Text>
+
+            <View style={rm.promptActions}>
+              <TouchableOpacity
+                style={rm.darkBtn}
+                onPress={startRecovery}
+                activeOpacity={0.75}
+                accessibilityLabel="Recover projects from this device"
+                accessibilityRole="button"
+                testID="recovery-start"
+              >
+                <Text style={rm.darkBtnLabel}>Recover Projects</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={rm.darkBtn}
+                onPress={onClose}
+                activeOpacity={0.75}
+                accessibilityLabel="Not now, dismiss recovery"
+                accessibilityRole="button"
+                testID="recovery-not-now"
+              >
+                <Text style={rm.darkBtnLabel}>Not Now</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* ── Running phase ───────────────────────────────────────────────── */}
+        {phase === 'running' && (
+          <View style={rm.progressBody}>
+            <Text style={rm.progressTitle}>Project Recovery</Text>
+            <Text style={rm.progressSub}>Scanning for device designs</Text>
+            <View style={rm.circleMark}>
+              <ActivityIndicator size="large" color={FG} />
+            </View>
+          </View>
+        )}
+
+        {/* ── Done phase ─────────────────────────────────────────────────── */}
+        {phase === 'done' && (
+          <View style={rm.progressBody}>
+            <Text style={rm.progressTitle}>Recovery Complete</Text>
+            <Text style={rm.progressSub}>Projects added to your Design Studio</Text>
+            {/* Large blue filled circle with white checkmark — matches screenshot 2 */}
+            <View style={[rm.circleMark, rm.circleBlue]}>
+              <Feather name="check" size={36} color="#FFFFFF" />
+            </View>
+            <TouchableOpacity
+              style={[rm.darkBtn, rm.doneBtn]}
+              onPress={handleDone}
+              activeOpacity={0.75}
+              accessibilityLabel="Done, return to gallery"
+              accessibilityRole="button"
+              testID="recovery-done"
+            >
+              <Text style={rm.darkBtnLabel}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ── Error phase ─────────────────────────────────────────────────── */}
+        {phase === 'error' && (
+          <View style={rm.progressBody}>
+            <Text style={rm.progressTitle}>Recovery Failed</Text>
+            <Text style={rm.progressSub}>
+              {errorMsg || 'Your original projects were not changed.'}
+            </Text>
+            <View style={rm.circleMark}>
+              <Feather name="alert-triangle" size={32} color={MUTED} />
+            </View>
+            <View style={[rm.promptActions, { marginTop: SP.xl }]}>
+              <TouchableOpacity
+                style={rm.darkBtn}
+                onPress={() => { setPhase('prompt'); setErrorMsg(''); }}
+                activeOpacity={0.75}
+                accessibilityLabel="Try recovery again"
+                accessibilityRole="button"
+                testID="recovery-retry"
+              >
+                <Text style={rm.darkBtnLabel}>Try Again</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={rm.darkBtn}
+                onPress={onClose}
+                activeOpacity={0.75}
+                accessibilityLabel="Dismiss recovery error"
+                accessibilityRole="button"
+                testID="recovery-dismiss"
+              >
+                <Text style={rm.darkBtnLabel}>Dismiss</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </View>
+    </Modal>
+  );
+}
+
+const rm = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: BG },
+
+  // Cancel bar
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SP.lg,
+    minHeight: COMP.buttonHSm,
+    paddingTop: SP.xs,
+  },
+  cancelTouchable: {
+    minHeight: COMP.buttonHSm,
+    justifyContent: 'center',
+    paddingLeft: SP.sm,
+  },
+  cancelText: {
+    fontFamily: FONT.regular,
+    fontSize: FS.base,
+    color: RECOVERY_ACCENT,
+  },
+
+  // Prompt layout
+  promptBody: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SP.xl,
+    paddingBottom: SP.xxl,
+  },
+  iconBlock: { marginBottom: SP.lg },
+  iconInner: {
+    width: 120,
+    height: 120,
+    borderRadius: RADIUS.xl,
+    backgroundColor: FG,            // white block (Brandthread FG)
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  promptTitle: {
+    fontFamily: FONT.bold,
+    fontSize: FS.h2,
+    color: FG,
+    textAlign: 'center',
+    marginBottom: SP.md,
+  },
+  promptDesc: {
+    fontFamily: FONT.regular,
+    fontSize: FS.sm,
+    color: MUTED,
+    textAlign: 'center',
+    lineHeight: 20,
+    maxWidth: 300,
+    marginBottom: SP.xl,
+  },
+  promptActions: {
+    width: '100%',
+    gap: SP.sm,
+  },
+
+  // Dark-fill action button (matches the "Restore Example Artworks" / "Start Gallery Recovery"
+  // buttons in screenshot 1 — dark rounded-rect, centered white text)
+  darkBtn: {
+    height: COMP.buttonH,
+    borderRadius: RADIUS.md,
+    backgroundColor: CARD_ELEVATED,
+    borderWidth: 1,
+    borderColor: BORDER,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  darkBtnLabel: {
+    fontFamily: FONT.regular,
+    fontSize: FS.base,
+    color: FG,
+  },
+
+  // Progress / result layout — content centred at ~40% from top (not dead-center)
+  progressBody: {
+    flex: 1,
+    alignItems: 'center',
+    // Bias upward: use paddingBottom to shift centroid up
+    paddingBottom: '30%',
+    justifyContent: 'center',
+    paddingHorizontal: SP.xl,
+  },
+  progressTitle: {
+    fontFamily: FONT.bold,
+    fontSize: FS.h2,
+    color: FG,
+    textAlign: 'center',
+  },
+  progressSub: {
+    fontFamily: FONT.regular,
+    fontSize: FS.base,
+    color: MUTED,
+    textAlign: 'center',
+    marginTop: SP.xs,
+    marginBottom: SP.xl,
+    maxWidth: 280,
+  },
+  // Large circle mark — grey by default, blue for success
+  circleMark: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: CARD,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  circleBlue: {
+    backgroundColor: RECOVERY_ACCENT,
+  },
+  doneBtn: {
+    marginTop: SP.xl,
+    width: '100%',
+  },
+});
 
 // ─── New Canvas Sheet ─────────────────────────────────────────────────────────
 
@@ -87,7 +421,6 @@ const SCREEN_QUICK_CHOICES = [
   { label: 'Tablet',  width: 2048, height: 2732, desc: 'iPad Pro 12.9"' },
   { label: 'Desktop', width: 2560, height: 1600, desc: '13" MacBook' },
 ];
-
 const DPI_OPTIONS = [72, 150, 300];
 
 interface NewCanvasSheetProps {
@@ -106,51 +439,35 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
   const [dpi, setDpi] = useState(72);
   const [customTitle, setCustomTitle] = useState('');
   const [creating, setCreating] = useState(false);
-  const [clipboardState, setClipboardState] = useState<
+  const [clipState, setClipState] = useState<
     'idle' | 'checking' | 'has_image' | 'has_text' | 'empty' | 'unsupported'
   >('idle');
 
-  // Reset clipboard state whenever sheet opens to clipboard tab
-  const prevTabRef = useRef<NewCanvasTab>('presets');
-  if (prevTabRef.current !== tab) {
-    prevTabRef.current = tab;
-    if (tab === 'clipboard' && visible) {
-      // async kick-off without being in render body — schedule via ref
-    }
-  }
-
-  // Clipboard tab: check on tab switch or sheet open
-  const checkClipboardRef = useRef<(() => Promise<void>) | null>(null);
-  checkClipboardRef.current = async () => {
-    setClipboardState('checking');
+  const checkClipRef = useRef<(() => Promise<void>) | null>(null);
+  checkClipRef.current = async () => {
+    setClipState('checking');
     try {
-      const hasImg = await Clipboard.hasImageAsync();
-      if (hasImg) { setClipboardState('has_image'); return; }
+      if (await Clipboard.hasImageAsync()) { setClipState('has_image'); return; }
       const txt = await Clipboard.getStringAsync();
-      if (txt && txt.trim().startsWith('{')) {
+      if (txt?.trim().startsWith('{')) {
         try {
-          const parsed = JSON.parse(txt.trim());
-          if (parsed && parsed.id && parsed.canvas && parsed.layers) {
-            setClipboardState('has_text');
-            return;
-          }
-        } catch { /* not valid JSON */ }
+          const p = JSON.parse(txt.trim());
+          if (p?.id && p?.canvas && p?.layers) { setClipState('has_text'); return; }
+        } catch { /* ignore */ }
       }
-      setClipboardState('empty');
+      setClipState('empty');
     } catch {
-      setClipboardState('unsupported');
+      setClipState('unsupported');
     }
   };
 
   function switchTab(t: NewCanvasTab) {
     Haptics.selectionAsync();
     setTab(t);
-    if (t === 'clipboard') {
-      checkClipboardRef.current?.();
-    }
+    if (t === 'clipboard') checkClipRef.current?.();
   }
 
-  function toPixels(val: string): number {
+  function toPx(val: string): number {
     const n = parseFloat(val) || 0;
     return unit === 'in' ? n * dpi : n;
   }
@@ -159,42 +476,28 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
     if (creating) return;
     setCreating(true);
     try {
-      const project = await createProject('canvas', preset.label, {
-        width: preset.width,
-        height: preset.height,
+      const proj = await createProject('canvas', preset.label, {
+        width: preset.width, height: preset.height,
         backgroundHex: preset.transparentBg ? 'transparent' : '#000000',
       });
-      onClose();
-      onCreated(project.id);
-    } catch {
-      Alert.alert('Error', 'Could not create canvas.');
-    } finally {
-      setCreating(false);
-    }
+      onClose(); onCreated(proj.id);
+    } catch { Alert.alert('Error', 'Could not create canvas.'); }
+    finally { setCreating(false); }
   }
 
   async function createCustom() {
-    const w = toPixels(customW);
-    const h = toPixels(customH);
-    if (!Number.isSafeInteger(w) || !Number.isSafeInteger(h) ||
-        w < 8 || h < 8 || w > 16384 || h > 16384) {
-      Alert.alert('Invalid size', 'Width and height must resolve to whole pixels between 8 and 16384.');
+    const w = toPx(customW), h = toPx(customH);
+    if (!Number.isSafeInteger(w) || !Number.isSafeInteger(h) || w < 8 || h < 8 || w > 16384 || h > 16384) {
+      Alert.alert('Invalid size', 'Width and height must be whole pixels between 8 and 16384.');
       return;
     }
     if (creating) return;
     setCreating(true);
     try {
-      const name = customTitle.trim() || `${w} x ${h}`;
-      const project = await createProject('canvas', name, {
-        width: w, height: h, backgroundHex: '#000000',
-      });
-      onClose();
-      onCreated(project.id);
-    } catch {
-      Alert.alert('Error', 'Could not create canvas.');
-    } finally {
-      setCreating(false);
-    }
+      const proj = await createProject('canvas', customTitle.trim() || `${w} \u00D7 ${h}`, { width: w, height: h, backgroundHex: '#000000' });
+      onClose(); onCreated(proj.id);
+    } catch { Alert.alert('Error', 'Could not create canvas.'); }
+    finally { setCreating(false); }
   }
 
   async function createFromClipboardImage() {
@@ -204,13 +507,10 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
       const img = await Clipboard.getImageAsync({ format: 'png' });
       if (!img?.data) { Alert.alert('No image', 'Could not read image from clipboard.'); return; }
       const dataUri = `data:image/png;base64,${img.data}`;
-      const w = img.size?.width  || 1080;
-      const h = img.size?.height || 1080;
-      const project = await createProject('canvas', 'From Clipboard', {
-        width: w, height: h, backgroundHex: '#000000',
-      });
+      const w = img.size?.width || 1080, h = img.size?.height || 1080;
+      const proj = await createProject('canvas', 'From Clipboard', { width: w, height: h, backgroundHex: '#000000' });
       const now = new Date().toISOString();
-      await updateProject(project.id, {
+      await updateProject(proj.id, {
         layers: [{
           id: uid(), name: 'Clipboard Image', type: 'image',
           visible: true, locked: false, order: 0, opacity: 1,
@@ -219,13 +519,9 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
           createdAt: now, updatedAt: now,
         }],
       });
-      onClose();
-      onCreated(project.id);
-    } catch {
-      Alert.alert('Error', 'Could not create from clipboard image.');
-    } finally {
-      setCreating(false);
-    }
+      onClose(); onCreated(proj.id);
+    } catch { Alert.alert('Error', 'Could not create from clipboard image.'); }
+    finally { setCreating(false); }
   }
 
   async function importClipboardJSON() {
@@ -240,328 +536,241 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
       if (!validation.ok) throw new Error(validation.reason);
       const parsed = JSON.parse(txt.trim());
       if (!parsed.canvas || typeof parsed.canvas !== 'object') throw new Error('Invalid project JSON');
-      const width = Number(parsed.canvas.width);
-      const height = Number(parsed.canvas.height);
-      if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) ||
-          width < 1 || height < 1 || width > 16384 || height > 16384) {
+      const width = Number(parsed.canvas.width), height = Number(parsed.canvas.height);
+      if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1 || width > 16384 || height > 16384)
         throw new Error('Invalid canvas dimensions');
-      }
       const now = new Date().toISOString();
-      const project = await createProject(
-        'canvas',
-        `${parsed.name || 'Imported'} (imported)`,
-        {
-          width,
-          height,
-          backgroundHex: typeof parsed.canvas.backgroundHex === 'string'
-            ? parsed.canvas.backgroundHex
-            : '#000000',
-        },
-      );
-      await updateProject(project.id, {
-        layers: validation.layers,
-        createdAt: now,
-        updatedAt: now,
+      const proj = await createProject('canvas', `${parsed.name || 'Imported'} (imported)`, {
+        width, height,
+        backgroundHex: typeof parsed.canvas.backgroundHex === 'string' ? parsed.canvas.backgroundHex : '#000000',
       });
-      onClose();
-      onCreated(project.id);
-    } catch {
-      Alert.alert('Error', 'Clipboard does not contain a valid Brandthread project.');
-    } finally {
-      setCreating(false);
-    }
+      await updateProject(proj.id, { layers: validation.layers, createdAt: now, updatedAt: now });
+      onClose(); onCreated(proj.id);
+    } catch { Alert.alert('Error', 'Clipboard does not contain a valid Brandthread project.'); }
+    finally { setCreating(false); }
   }
 
-  const TAB_LABELS: { key: NewCanvasTab; label: string }[] = [
-    { key: 'presets',   label: 'Size'      },
-    { key: 'custom',    label: 'Custom'    },
+  const TABS: { key: NewCanvasTab; label: string }[] = [
+    { key: 'presets', label: 'Size' },
+    { key: 'custom', label: 'Custom' },
     { key: 'clipboard', label: 'Clipboard' },
   ];
 
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={s.sheetOverlay} onPress={onClose} />
-      <View style={[s.sheet, { paddingBottom: insets.bottom + SP.lg }]}>
-        <View style={s.sheetHandle} />
+  const sheetBottom = Platform.OS === 'web' ? 34 : insets.bottom;
 
-        <View style={s.sheetHeader}>
-          <TouchableOpacity onPress={onClose} hitSlop={HIT} style={s.sheetCloseBtn}>
-            <Text style={s.sheetCancelText}>Cancel</Text>
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} testID="new-canvas-sheet">
+      <Pressable style={sh.overlay} onPress={onClose} accessibilityLabel="Close new canvas sheet" />
+      <View style={[sh.sheet, { paddingBottom: sheetBottom + SP.lg }]}>
+        <View style={sh.handle} />
+        <View style={sh.header}>
+          <TouchableOpacity
+            onPress={onClose} hitSlop={HIT} style={sh.cancelBtn}
+            accessibilityLabel="Cancel new canvas" accessibilityRole="button" testID="new-canvas-cancel"
+          >
+            <Text style={sh.cancelTxt}>Cancel</Text>
           </TouchableOpacity>
-          <Text style={s.sheetTitle}>New Canvas</Text>
+          <Text style={sh.title}>New Canvas</Text>
           <View style={{ width: 60 }} />
         </View>
 
-        <View style={s.tabRow}>
-          {TAB_LABELS.map(t => (
+        <View style={sh.tabRow}>
+          {TABS.map(t => (
             <TouchableOpacity
               key={t.key}
-              style={[s.tabBtn, tab === t.key && { borderBottomColor: FG, borderBottomWidth: 2 }]}
+              style={[sh.tabBtn, tab === t.key && sh.tabBtnActive]}
               onPress={() => switchTab(t.key)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: tab === t.key }}
+              accessibilityLabel={`${t.label} tab`}
+              testID={`new-canvas-tab-${t.key}`}
             >
-              <Text style={[s.tabLabel, tab === t.key && { color: FG }]}>{t.label}</Text>
+              <Text style={[sh.tabLbl, tab === t.key && sh.tabLblActive]}>{t.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
         <FlatList
           data={[null]}
-          keyExtractor={() => 'content'}
+          keyExtractor={() => 'c'}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: SP.lg, paddingTop: SP.md, paddingBottom: SP.xxl }}
+          contentContainerStyle={sh.tabContent}
           renderItem={() => (
             <View>
-              {/* ── Presets tab ── */}
+              {/* ── Presets ── */}
               {tab === 'presets' && (
                 <>
-                  <Text style={s.sectionTitle}>Screen sizes</Text>
+                  <Text style={sh.sectionHd}>Screen sizes</Text>
                   {SCREEN_QUICK_CHOICES.map(qc => (
                     <TouchableOpacity
-                      key={qc.label}
-                      style={s.presetRow}
-                      onPress={() => createFromPreset({
-                        id: qc.label.toLowerCase(),
-                        label: qc.label,
-                        description: qc.desc,
-                        width: qc.width,
-                        height: qc.height,
-                        dpi: 72,
-                        colorProfile: 'sRGB',
-                      })}
+                      key={qc.label} style={sh.presetRow}
+                      onPress={() => createFromPreset({ id: qc.label.toLowerCase(), label: qc.label, description: qc.desc, width: qc.width, height: qc.height, dpi: 72, colorProfile: 'sRGB' })}
                       activeOpacity={0.75}
+                      accessibilityLabel={`Create ${qc.label} canvas, ${qc.width} by ${qc.height}`}
+                      accessibilityRole="button"
+                      testID={`preset-${qc.label.toLowerCase()}`}
                     >
-                      <View style={s.presetIcon}>
-                        <Feather name="monitor" size={ICON.md} color={MUTED} />
+                      <View style={sh.presetIcon}><Feather name="monitor" size={ICON.md} color={MUTED} /></View>
+                      <View style={sh.presetInfo}>
+                        <Text style={sh.presetLbl}>{qc.label}</Text>
+                        <Text style={sh.presetDim}>{qc.width} \u00D7 {qc.height} — {qc.desc}</Text>
                       </View>
-                      <View style={s.presetInfo}>
-                        <Text style={s.presetLabel}>{qc.label}</Text>
-                        <Text style={s.presetDims}>{qc.width} x {qc.height} — {qc.desc}</Text>
-                      </View>
-                      {creating
-                        ? <ActivityIndicator size="small" color={MUTED} />
-                        : <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />
-                      }
+                      {creating ? <ActivityIndicator size="small" color={MUTED} /> : <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />}
                     </TouchableOpacity>
                   ))}
-
-                  <Text style={[s.sectionTitle, { marginTop: SP.lg }]}>Seller presets</Text>
+                  <Text style={[sh.sectionHd, { marginTop: SP.lg }]}>Seller presets</Text>
                   {SELLER_CANVAS_PRESETS.map(preset => (
                     <TouchableOpacity
-                      key={preset.id}
-                      style={s.presetRow}
+                      key={preset.id} style={sh.presetRow}
                       onPress={() => createFromPreset(preset)}
                       activeOpacity={0.75}
+                      accessibilityLabel={`Create ${preset.label} canvas`}
+                      accessibilityRole="button"
+                      testID={`preset-${preset.id}`}
                     >
-                      <View style={[s.presetIcon, { backgroundColor: CARD_ELEVATED }]}>
+                      <View style={[sh.presetIcon, { backgroundColor: CARD_ELEVATED }]}>
                         <Feather
-                          name={
-                            preset.id === 'logo_sticker' ? 'star' :
-                            preset.id === 'tshirt_print' ? 'layers' :
-                            preset.id.startsWith('ig') ? 'instagram' : 'image'
-                          }
-                          size={ICON.md}
-                          color={FG}
+                          name={preset.id === 'logo_sticker' ? 'star' : preset.id === 'tshirt_print' ? 'layers' : preset.id.startsWith('ig') ? 'instagram' : 'image'}
+                          size={ICON.md} color={FG}
                         />
                       </View>
-                      <View style={s.presetInfo}>
-                        <Text style={s.presetLabel}>{preset.label}</Text>
-                        <Text style={s.presetDims}>{preset.description}</Text>
+                      <View style={sh.presetInfo}>
+                        <Text style={sh.presetLbl}>{preset.label}</Text>
+                        <Text style={sh.presetDim}>{preset.description}</Text>
                       </View>
-                      {creating
-                        ? <ActivityIndicator size="small" color={MUTED} />
-                        : <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />
-                      }
+                      {creating ? <ActivityIndicator size="small" color={MUTED} /> : <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />}
                     </TouchableOpacity>
                   ))}
                 </>
               )}
 
-              {/* ── Custom tab ── */}
+              {/* ── Custom ── */}
               {tab === 'custom' && (
                 <>
-                  <Text style={s.sectionTitle}>Canvas title</Text>
+                  <Text style={sh.sectionHd}>Canvas title</Text>
                   <TextInput
-                    style={s.input}
-                    placeholder="e.g. Summer Drop Banner"
-                    placeholderTextColor={MUTED}
-                    value={customTitle}
-                    onChangeText={setCustomTitle}
+                    style={sh.input} placeholder="e.g. Summer Drop Banner" placeholderTextColor={MUTED}
+                    value={customTitle} onChangeText={setCustomTitle}
+                    accessibilityLabel="Canvas title" testID="custom-title-input"
                   />
-
-                  <Text style={[s.sectionTitle, { marginTop: SP.md }]}>Unit</Text>
-                  <View style={s.segRow}>
+                  <Text style={[sh.sectionHd, { marginTop: SP.md }]}>Unit</Text>
+                  <View style={sh.segRow}>
                     {(['px', 'in'] as SizeUnit[]).map(u => (
-                      <TouchableOpacity
-                        key={u}
-                        style={[s.segBtn, unit === u && s.segBtnActive]}
-                        onPress={() => setUnit(u)}
-                      >
-                        <Text style={[s.segLabel, unit === u && s.segLabelActive]}>{u}</Text>
+                      <TouchableOpacity key={u} style={[sh.segBtn, unit === u && sh.segBtnOn]} onPress={() => setUnit(u)}
+                        accessibilityRole="radio" accessibilityState={{ checked: unit === u }} accessibilityLabel={u === 'px' ? 'Pixels' : 'Inches'}>
+                        <Text style={[sh.segLbl, unit === u && sh.segLblOn]}>{u}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
-
-                  <Text style={[s.sectionTitle, { marginTop: SP.md }]}>Dimensions</Text>
-                  <View style={s.dimRow}>
-                    <View style={s.dimField}>
-                      <Text style={s.dimLabel}>Width</Text>
-                      <TextInput
-                        style={s.dimInput}
-                        keyboardType="numeric"
-                        value={customW}
-                        onChangeText={setCustomW}
-                        selectTextOnFocus
-                      />
+                  <Text style={[sh.sectionHd, { marginTop: SP.md }]}>Dimensions</Text>
+                  <View style={sh.dimRow}>
+                    <View style={sh.dimField}>
+                      <Text style={sh.dimLbl}>Width</Text>
+                      <TextInput style={sh.dimInput} keyboardType="numeric" value={customW} onChangeText={setCustomW} selectTextOnFocus
+                        accessibilityLabel="Canvas width" testID="custom-width-input" />
                     </View>
-                    <Text style={s.dimX}>x</Text>
-                    <View style={s.dimField}>
-                      <Text style={s.dimLabel}>Height</Text>
-                      <TextInput
-                        style={s.dimInput}
-                        keyboardType="numeric"
-                        value={customH}
-                        onChangeText={setCustomH}
-                        selectTextOnFocus
-                      />
+                    <Text style={sh.dimX}>\u00D7</Text>
+                    <View style={sh.dimField}>
+                      <Text style={sh.dimLbl}>Height</Text>
+                      <TextInput style={sh.dimInput} keyboardType="numeric" value={customH} onChangeText={setCustomH} selectTextOnFocus
+                        accessibilityLabel="Canvas height" testID="custom-height-input" />
                     </View>
                   </View>
-
                   {unit === 'in' && (
                     <>
-                      <Text style={[s.sectionTitle, { marginTop: SP.md }]}>Resolution (DPI)</Text>
-                      <View style={s.segRow}>
+                      <Text style={[sh.sectionHd, { marginTop: SP.md }]}>Resolution (DPI)</Text>
+                      <View style={sh.segRow}>
                         {DPI_OPTIONS.map(d => (
-                          <TouchableOpacity
-                            key={d}
-                            style={[s.segBtn, dpi === d && s.segBtnActive]}
-                            onPress={() => setDpi(d)}
-                          >
-                            <Text style={[s.segLabel, dpi === d && s.segLabelActive]}>{d}</Text>
+                          <TouchableOpacity key={d} style={[sh.segBtn, dpi === d && sh.segBtnOn]} onPress={() => setDpi(d)}
+                            accessibilityRole="radio" accessibilityState={{ checked: dpi === d }} accessibilityLabel={`${d} DPI`}>
+                            <Text style={[sh.segLbl, dpi === d && sh.segLblOn]}>{d}</Text>
                           </TouchableOpacity>
                         ))}
                       </View>
                     </>
                   )}
-
-                  <Text style={[s.sectionTitle, { marginTop: SP.md }]}>Color profile</Text>
-                  <View style={s.segRow}>
+                  <Text style={[sh.sectionHd, { marginTop: SP.md }]}>Color profile</Text>
+                  <View style={sh.segRow}>
                     {(['sRGB', 'P3'] as ColorProfile[]).map(cp => (
-                      <TouchableOpacity
-                        key={cp}
-                        style={[s.segBtn, colorProfile === cp && s.segBtnActive]}
-                        onPress={() => setColorProfile(cp)}
-                      >
-                        <Text style={[s.segLabel, colorProfile === cp && s.segLabelActive]}>{cp}</Text>
+                      <TouchableOpacity key={cp} style={[sh.segBtn, colorProfile === cp && sh.segBtnOn]} onPress={() => setColorProfile(cp)}
+                        accessibilityRole="radio" accessibilityState={{ checked: colorProfile === cp }} accessibilityLabel={cp}>
+                        <Text style={[sh.segLbl, colorProfile === cp && sh.segLblOn]}>{cp}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
-
-                  <View style={s.dimPreview}>
-                    <Text style={s.dimPreviewText}>
-                      {toPixels(customW)} x {toPixels(customH)} px
-                      {unit === 'in'
-                        ? `  (${customW || 0} x ${customH || 0} in @ ${dpi} dpi)`
-                        : ''}
+                  <View style={sh.dimPreview}>
+                    <Text style={sh.dimPreviewTxt}>
+                      {toPx(customW)} \u00D7 {toPx(customH)} px{unit === 'in' ? `  (${customW || 0} \u00D7 ${customH || 0} in @ ${dpi} dpi)` : ''}
                     </Text>
                   </View>
-
-                  <TouchableOpacity
-                    style={[s.createBtn, creating && { opacity: 0.6 }]}
-                    onPress={createCustom}
-                    activeOpacity={0.8}
-                    disabled={creating}
-                  >
-                    {creating
-                      ? <ActivityIndicator size="small" color={BG} />
-                      : <Text style={s.createBtnLabel}>Create Canvas</Text>
-                    }
+                  <TouchableOpacity style={[sh.createBtn, creating && { opacity: 0.5 }]} onPress={createCustom} activeOpacity={0.8} disabled={creating}
+                    accessibilityLabel="Create custom canvas" accessibilityRole="button" testID="custom-create-btn">
+                    {creating ? <ActivityIndicator size="small" color={BG} /> : <Text style={sh.createBtnLbl}>Create Canvas</Text>}
                   </TouchableOpacity>
                 </>
               )}
 
-              {/* ── Clipboard tab ── */}
+              {/* ── Clipboard ── */}
               {tab === 'clipboard' && (
                 <>
-                  {clipboardState === 'checking' && (
-                    <View style={s.clipCenter}>
+                  {clipState === 'checking' && (
+                    <View style={sh.clipCenter}>
                       <ActivityIndicator color={FG} size="large" />
-                      <Text style={[s.clipMsg, { marginTop: SP.md }]}>Checking clipboard…</Text>
+                      <Text style={[sh.clipMsg, { marginTop: SP.md }]}>Checking clipboard</Text>
                     </View>
                   )}
-
-                  {clipboardState === 'has_image' && (
+                  {clipState === 'has_image' && (
                     <>
-                      <View style={s.clipRow}>
+                      <View style={sh.clipRow}>
                         <Feather name="image" size={ICON.lg} color={FG} />
                         <View style={{ flex: 1 }}>
-                          <Text style={s.clipTitle}>Image found</Text>
-                          <Text style={s.clipSub}>
-                            Clipboard contains an image. A new canvas will be created with it as the base layer.
-                          </Text>
+                          <Text style={sh.clipTitle}>Image found</Text>
+                          <Text style={sh.clipSub}>A new canvas will be created with it as the base layer.</Text>
                         </View>
                       </View>
-                      <TouchableOpacity
-                        style={[s.createBtn, creating && { opacity: 0.6 }]}
-                        onPress={createFromClipboardImage}
-                        disabled={creating}
-                        activeOpacity={0.8}
-                      >
-                        {creating
-                          ? <ActivityIndicator size="small" color={BG} />
-                          : <Text style={s.createBtnLabel}>Create from Image</Text>
-                        }
+                      <TouchableOpacity style={[sh.createBtn, creating && { opacity: 0.5 }]} onPress={createFromClipboardImage} disabled={creating} activeOpacity={0.8}
+                        accessibilityLabel="Create canvas from clipboard image" accessibilityRole="button" testID="clip-create-image">
+                        {creating ? <ActivityIndicator size="small" color={BG} /> : <Text style={sh.createBtnLbl}>Create from Image</Text>}
                       </TouchableOpacity>
                     </>
                   )}
-
-                  {clipboardState === 'has_text' && (
+                  {clipState === 'has_text' && (
                     <>
-                      <View style={s.clipRow}>
+                      <View style={sh.clipRow}>
                         <Feather name="file-text" size={ICON.lg} color={FG} />
                         <View style={{ flex: 1 }}>
-                          <Text style={s.clipTitle}>Brandthread project found</Text>
-                          <Text style={s.clipSub}>
-                            Clipboard contains a Brandthread project JSON. Import it as a new project.
-                          </Text>
+                          <Text style={sh.clipTitle}>Brandthread project found</Text>
+                          <Text style={sh.clipSub}>Clipboard contains a Brandthread project JSON.</Text>
                         </View>
                       </View>
-                      <TouchableOpacity
-                        style={[s.createBtn, creating && { opacity: 0.6 }]}
-                        onPress={importClipboardJSON}
-                        disabled={creating}
-                        activeOpacity={0.8}
-                      >
-                        {creating
-                          ? <ActivityIndicator size="small" color={BG} />
-                          : <Text style={s.createBtnLabel}>Import Project</Text>
-                        }
+                      <TouchableOpacity style={[sh.createBtn, creating && { opacity: 0.5 }]} onPress={importClipboardJSON} disabled={creating} activeOpacity={0.8}
+                        accessibilityLabel="Import project from clipboard" accessibilityRole="button" testID="clip-import-json">
+                        {creating ? <ActivityIndicator size="small" color={BG} /> : <Text style={sh.createBtnLbl}>Import Project</Text>}
                       </TouchableOpacity>
                     </>
                   )}
-
-                  {clipboardState === 'empty' && (
-                    <View style={s.clipCenter}>
+                  {clipState === 'empty' && (
+                    <View style={sh.clipCenter}>
                       <Feather name="clipboard" size={ICON.xxl} color={SUBTLE} />
-                      <Text style={[s.clipMsg, { marginTop: SP.md }]}>Clipboard is empty</Text>
-                      <Text style={[s.clipSub, { textAlign: 'center', marginTop: SP.xs }]}>
+                      <Text style={[sh.clipMsg, { marginTop: SP.md }]}>Clipboard is empty</Text>
+                      <Text style={[sh.clipSub, { textAlign: 'center', marginTop: SP.xs }]}>
                         Copy an image or a Brandthread project JSON, then return here.
                       </Text>
                     </View>
                   )}
-
-                  {clipboardState === 'unsupported' && (
-                    <View style={s.clipCenter}>
+                  {clipState === 'unsupported' && (
+                    <View style={sh.clipCenter}>
                       <Feather name="alert-circle" size={ICON.xxl} color={MUTED} />
-                      <Text style={[s.clipMsg, { marginTop: SP.md }]}>Clipboard access unavailable</Text>
-                      <Text style={[s.clipSub, { textAlign: 'center', marginTop: SP.xs }]}>
-                        Clipboard reading is not supported in the current environment. Use Photo import or choose a preset instead.
+                      <Text style={[sh.clipMsg, { marginTop: SP.md }]}>Clipboard access unavailable</Text>
+                      <Text style={[sh.clipSub, { textAlign: 'center', marginTop: SP.xs }]}>
+                        Use Photo import or choose a preset instead.
                       </Text>
                     </View>
                   )}
-
-                  {clipboardState === 'idle' && (
-                    <TouchableOpacity style={s.createBtn} onPress={() => checkClipboardRef.current?.()}>
-                      <Text style={s.createBtnLabel}>Check Clipboard</Text>
+                  {clipState === 'idle' && (
+                    <TouchableOpacity style={sh.createBtn} onPress={() => checkClipRef.current?.()}
+                      accessibilityLabel="Check clipboard for image or project" accessibilityRole="button" testID="clip-check-btn">
+                      <Text style={sh.createBtnLbl}>Check Clipboard</Text>
                     </TouchableOpacity>
                   )}
                 </>
@@ -573,6 +782,49 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
     </Modal>
   );
 }
+
+// Sheet styles (prefixed sh)
+const sh = StyleSheet.create({
+  overlay:  { ...StyleSheet.absoluteFill, backgroundColor: OVERLAY },
+  sheet:    { position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '90%', backgroundColor: SURFACE, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, borderTopWidth: 1, borderColor: BORDER },
+  handle:   { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER_ACTIVE, alignSelf: 'center', marginTop: SP.sm, marginBottom: SP.xs, opacity: 0.3 },
+  header:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.lg, paddingBottom: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE },
+  cancelBtn: { minWidth: 60, minHeight: COMP.iconBtn, justifyContent: 'center' },
+  cancelTxt: { fontFamily: FONT.regular, fontSize: FS.base, color: MUTED },
+  title:    { flex: 1, textAlign: 'center', fontFamily: FONT.semibold, fontSize: FS.base, color: FG },
+  tabRow:   { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE, marginHorizontal: SP.lg },
+  tabBtn:   { flex: 1, alignItems: 'center', paddingVertical: SP.sm, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabBtnActive: { borderBottomColor: FG },
+  tabLbl:   { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
+  tabLblActive: { color: FG },
+  tabContent: { paddingHorizontal: SP.lg, paddingTop: SP.md, paddingBottom: SP.xxl },
+  sectionHd: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SP.sm },
+  presetRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE, minHeight: COMP.buttonHSm },
+  presetIcon: { width: 40, height: 40, borderRadius: RADIUS.sm, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
+  presetInfo: { flex: 1 },
+  presetLbl: { fontFamily: FONT.medium, fontSize: FS.base, color: FG },
+  presetDim: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
+  input:     { height: COMP.inputH, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, paddingHorizontal: SP.md, fontFamily: FONT.regular, fontSize: FS.base, color: FG, backgroundColor: CARD },
+  segRow:    { flexDirection: 'row', gap: SP.xs },
+  segBtn:    { flex: 1, height: 40, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', backgroundColor: CARD },
+  segBtnOn:  { borderColor: FG, backgroundColor: FG },
+  segLbl:    { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
+  segLblOn:  { color: BG },
+  dimRow:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
+  dimField:  { flex: 1 },
+  dimLbl:    { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginBottom: SP.xs },
+  dimInput:  { height: COMP.buttonHSm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, paddingHorizontal: SP.md, fontFamily: FONT.regular, fontSize: FS.base, color: FG, backgroundColor: CARD, textAlign: 'center' },
+  dimX:      { fontFamily: FONT.regular, fontSize: FS.base, color: MUTED, marginTop: SP.lg },
+  dimPreview: { backgroundColor: CARD, borderRadius: RADIUS.md, padding: SP.sm, marginVertical: SP.md, alignItems: 'center' },
+  dimPreviewTxt: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED },
+  createBtn: { height: COMP.buttonH, borderRadius: RADIUS.md, backgroundColor: FG, alignItems: 'center', justifyContent: 'center', marginTop: SP.sm },
+  createBtnLbl: { fontFamily: FONT.semibold, fontSize: FS.base, color: BG },
+  clipCenter: { alignItems: 'center', paddingVertical: SP.xxl },
+  clipRow:   { flexDirection: 'row', gap: SP.md, alignItems: 'flex-start', backgroundColor: CARD, borderRadius: RADIUS.lg, padding: SP.md, marginBottom: SP.md },
+  clipTitle: { fontFamily: FONT.semibold, fontSize: FS.base, color: FG, marginBottom: SP.xs },
+  clipMsg:   { fontFamily: FONT.semibold, fontSize: FS.base, color: FG },
+  clipSub:   { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, lineHeight: 20 },
+});
 
 // ─── Rename Sheet ─────────────────────────────────────────────────────────────
 
@@ -589,13 +841,11 @@ function RenameSheet({ visible, project, onClose, onRenamed }: RenameSheetProps)
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<TextInput>(null);
 
-  // Track visibility changes without useEffect to avoid import — use a ref guard
-  const prevVisibleRef = useRef(false);
-  if (prevVisibleRef.current !== visible) {
-    prevVisibleRef.current = visible;
+  const prevVisRef = useRef(false);
+  if (prevVisRef.current !== visible) {
+    prevVisRef.current = visible;
     if (visible && project) {
       setName(project.name);
-      // Focus after modal animation
       setTimeout(() => inputRef.current?.focus(), 220);
     }
   }
@@ -614,21 +864,21 @@ function RenameSheet({ visible, project, onClose, onRenamed }: RenameSheetProps)
     }
   }
 
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={s.sheetOverlay} onPress={onClose} />
-      <View style={[s.renameSheet, { paddingBottom: insets.bottom + SP.lg }]}>
-        <View style={s.sheetHandle} />
+  const sheetBottom = Platform.OS === 'web' ? 34 : insets.bottom;
 
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} testID="rename-sheet">
+      <Pressable style={sh.overlay} onPress={onClose} accessibilityLabel="Dismiss rename" />
+      <View style={[rn.sheet, { paddingBottom: sheetBottom + SP.lg }]}>
+        <View style={sh.handle} />
         {project && (
-          <View style={s.renameThumbWrap}>
+          <View style={rn.thumbWrap}>
             <DesignLayerCompositor project={project} displaySize={120} borderRadius={RADIUS.md} />
           </View>
         )}
-
         <TextInput
           ref={inputRef}
-          style={s.renameInput}
+          style={rn.input}
           value={name}
           onChangeText={setName}
           selectTextOnFocus
@@ -636,25 +886,28 @@ function RenameSheet({ visible, project, onClose, onRenamed }: RenameSheetProps)
           onSubmitEditing={save}
           placeholder="Project name"
           placeholderTextColor={MUTED}
+          accessibilityLabel="Project name"
+          testID="rename-input"
         />
-
-        <Text style={s.renameDims}>{project ? dimsLabel(project) : ''}</Text>
-
+        <Text style={rn.dims}>{project ? dimsLabel(project) : ''}</Text>
         <TouchableOpacity
-          style={[s.createBtn, saving && { opacity: 0.6 }]}
-          onPress={save}
-          disabled={saving}
-          activeOpacity={0.8}
+          style={[sh.createBtn, saving && { opacity: 0.5 }]}
+          onPress={save} disabled={saving} activeOpacity={0.8}
+          accessibilityLabel="Save project name" accessibilityRole="button" testID="rename-save"
         >
-          {saving
-            ? <ActivityIndicator size="small" color={BG} />
-            : <Text style={s.createBtnLabel}>Done</Text>
-          }
+          {saving ? <ActivityIndicator size="small" color={BG} /> : <Text style={sh.createBtnLbl}>Done</Text>}
         </TouchableOpacity>
       </View>
     </Modal>
   );
 }
+
+const rn = StyleSheet.create({
+  sheet:    { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: SURFACE, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, borderTopWidth: 1, borderColor: BORDER, paddingHorizontal: SP.lg },
+  thumbWrap: { alignItems: 'center', paddingTop: SP.lg, paddingBottom: SP.md },
+  input:    { height: COMP.inputH, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER_ACTIVE, paddingHorizontal: SP.md, fontFamily: FONT.semibold, fontSize: FS.md, color: FG, backgroundColor: CARD, textAlign: 'center', marginBottom: SP.xs },
+  dims:     { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, textAlign: 'center', marginBottom: SP.md },
+});
 
 // ─── Artwork Preview Modal ────────────────────────────────────────────────────
 
@@ -669,61 +922,57 @@ function ArtworkPreviewModal({ visible, project, onClose, onEdit }: PreviewModal
   const insets = useSafeAreaInsets();
   const [masterLoading, setMasterLoading] = useState(false);
   if (!project) return null;
-  const previewSize = Math.min(Dimensions.get('window').width - SP.xl * 2, 420);
+  const previewSize = Math.min(SCREEN_W - SP.xl * 2, 420);
+  const topInset = Platform.OS === 'web' ? 67 : insets.top;
+  const botInset = Platform.OS === 'web' ? 34 : insets.bottom;
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} testID="preview-modal">
       <View style={[StyleSheet.absoluteFill, { backgroundColor: BG }]}>
         <TouchableOpacity
-          style={[s.previewClose, { top: insets.top + SP.sm }]}
-          onPress={onClose}
-          hitSlop={HIT}
+          style={[pv.closeBtn, { top: topInset + SP.sm }]}
+          onPress={onClose} hitSlop={HIT}
+          accessibilityLabel="Close preview" accessibilityRole="button" testID="preview-close"
         >
           <Feather name="x" size={ICON.lg} color={FG} />
         </TouchableOpacity>
 
-        <View style={s.previewArtWrap}>
-          <DesignLayerCompositor
-            project={project}
-            displaySize={previewSize}
-            borderRadius={RADIUS.md}
-          />
+        <View style={pv.artWrap}>
+          <DesignLayerCompositor project={project} displaySize={previewSize} borderRadius={RADIUS.md} />
         </View>
 
-        <View style={s.previewInfo}>
-          <Text style={s.previewName}>{project.name}</Text>
-          <Text style={s.previewDims}>{dimsLabel(project)} — edited {timeAgo(project.updatedAt)}</Text>
+        <View style={pv.info}>
+          <Text style={pv.name}>{project.name}</Text>
+          <Text style={pv.dims}>{dimsLabel(project)} — edited {timeAgo(project.updatedAt)}</Text>
         </View>
 
-        <View style={[s.previewActions, { paddingBottom: insets.bottom + SP.lg }]}>
+        <View style={[pv.actions, { paddingBottom: botInset + SP.lg }]}>
           <TouchableOpacity
-            style={[s.previewEditBtn, { backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER }]}
+            style={[pv.btn, { backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER }]}
             disabled={masterLoading}
             onPress={async () => {
               setMasterLoading(true);
               try {
-                const master = (await getSyncedDesignAssets(project.id))
-                  .find(asset => asset.kind === 'master');
-                if (!master) {
-                  Alert.alert('No cloud master yet', 'Export this project once to save a full-quality master.');
-                  return;
-                }
+                const master = (await getSyncedDesignAssets(project.id)).find(a => a.kind === 'master');
+                if (!master) { Alert.alert('No cloud master yet', 'Export this project once to save a full-quality master.'); return; }
                 await Linking.openURL(master.downloadUrl);
-              } catch {
-                Alert.alert('Could not open master', 'Check your connection and try again.');
-              } finally {
-                setMasterLoading(false);
-              }
+              } catch { Alert.alert('Could not open master', 'Check your connection and try again.'); }
+              finally { setMasterLoading(false); }
             }}
             activeOpacity={0.8}
+            accessibilityLabel="Download cloud master" accessibilityRole="button" testID="preview-cloud-master"
           >
-            {masterLoading
-              ? <ActivityIndicator color={FG} />
-              : <Feather name="download" size={ICON.md} color={FG} />}
-            <Text style={[s.previewEditLabel, { color: FG }]}>Cloud Master</Text>
+            {masterLoading ? <ActivityIndicator color={FG} /> : <Feather name="download" size={ICON.md} color={FG} />}
+            <Text style={[pv.btnLbl, { color: FG }]}>Cloud Master</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.previewEditBtn} onPress={onEdit} activeOpacity={0.8}>
+
+          <TouchableOpacity
+            style={[pv.btn, { marginTop: SP.sm }]}
+            onPress={onEdit} activeOpacity={0.8}
+            accessibilityLabel="Open canvas editor" accessibilityRole="button" testID="preview-open-canvas"
+          >
             <Feather name="edit-2" size={ICON.md} color={BG} />
-            <Text style={s.previewEditLabel}>Open Canvas</Text>
+            <Text style={pv.btnLbl}>Open Canvas</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -731,130 +980,106 @@ function ArtworkPreviewModal({ visible, project, onClose, onEdit }: PreviewModal
   );
 }
 
-// ─── Recently Deleted section ─────────────────────────────────────────────────
+const pv = StyleSheet.create({
+  closeBtn: { position: 'absolute', right: SP.md, zIndex: 10, width: COMP.iconBtn, height: COMP.iconBtn, alignItems: 'center', justifyContent: 'center' },
+  artWrap:  { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
+  info:     { paddingHorizontal: SP.lg, paddingVertical: SP.md, gap: SP.xs },
+  name:     { fontFamily: FONT.bold, fontSize: FS.xl, color: FG },
+  dims:     { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED },
+  actions:  { paddingHorizontal: SP.lg },
+  btn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, height: COMP.buttonH, borderRadius: RADIUS.md, backgroundColor: FG },
+  btnLbl:   { fontFamily: FONT.semibold, fontSize: FS.base, color: BG },
+});
+
+// ─── Recently Deleted ─────────────────────────────────────────────────────────
 
 interface DeletedSectionProps {
   expanded: boolean;
   onToggle: () => void;
   onDataChanged: () => void;
-  /** Increment to trigger a re-fetch of deleted projects. */
   refreshToken: number;
 }
 
-function RecentlyDeletedSection({
-  expanded, onToggle, onDataChanged, refreshToken,
-}: DeletedSectionProps) {
+function RecentlyDeletedSection({ expanded, onToggle, onDataChanged, refreshToken }: DeletedSectionProps) {
   const [deleted, setDeleted] = useState<DesignProject[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Reload whenever expanded becomes true OR refreshToken changes while expanded
   const load = useCallback(async () => {
     if (!expanded) return;
     setLoading(true);
-    try {
-      setDeleted(await getDeletedProjects());
-    } finally {
-      setLoading(false);
-    }
+    try { setDeleted(await getDeletedProjects()); }
+    finally { setLoading(false); }
   }, [expanded, refreshToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Trigger load on dependency change
   const loadRef = useRef(load);
   loadRef.current = load;
-  // Using a ref-based effect pattern to avoid importing useEffect from react
-  // (it's already in scope via React namespace) — call directly
   React.useEffect(() => { loadRef.current(); }, [load]);
 
-  async function handleRestore(project: DesignProject) {
+  async function handleRestore(p: DesignProject) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try {
-      await restoreDeletedProject(project.id);
-      setDeleted(prev => prev.filter(p => p.id !== project.id));
-      onDataChanged();
-    } catch {
-      Alert.alert('Error', 'Could not restore project.');
-    }
+    try { await restoreDeletedProject(p.id); setDeleted(prev => prev.filter(x => x.id !== p.id)); onDataChanged(); }
+    catch { Alert.alert('Error', 'Could not restore project.'); }
   }
 
-  async function handlePermanentDelete(project: DesignProject) {
+  async function handlePermanentDelete(p: DesignProject) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    Alert.alert(
-      'Delete permanently?',
-      `"${project.name}" will be removed forever and cannot be recovered.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete Forever', style: 'destructive',
-          onPress: async () => {
-            await deleteProject(project.id);
-            setDeleted(prev => prev.filter(p => p.id !== project.id));
-          },
-        },
-      ],
-    );
+    Alert.alert('Delete permanently?', `"${p.name}" will be removed forever.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete Forever', style: 'destructive', onPress: async () => { await deleteProject(p.id); setDeleted(prev => prev.filter(x => x.id !== p.id)); } },
+    ]);
   }
 
   async function handlePurgeAll() {
-    Alert.alert(
-      'Delete all?',
-      'All items in Recently Deleted will be permanently removed.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete All', style: 'destructive',
-          onPress: async () => {
-            await purgeDeletedProjects();
-            setDeleted([]);
-          },
-        },
-      ],
-    );
+    Alert.alert('Delete all?', 'All items in Recently Deleted will be permanently removed.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete All', style: 'destructive', onPress: async () => { await purgeDeletedProjects(); setDeleted([]); } },
+    ]);
   }
 
   return (
-    <View style={s.deletedSection}>
-      <TouchableOpacity style={s.deletedHeader} onPress={onToggle} activeOpacity={0.7}>
+    <View style={dl.section}>
+      <TouchableOpacity
+        style={dl.header} onPress={onToggle} activeOpacity={0.7}
+        accessibilityLabel={expanded ? 'Collapse recently deleted' : 'Expand recently deleted'}
+        accessibilityRole="button" testID="deleted-toggle"
+      >
         <Feather name="trash-2" size={ICON.sm} color={MUTED} />
-        <Text style={s.deletedHeaderLabel}>Recently Deleted</Text>
+        <Text style={dl.headerLbl}>Recently Deleted</Text>
         <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={SUBTLE} />
       </TouchableOpacity>
 
       {expanded && (
         <>
           {loading && <ActivityIndicator color={MUTED} style={{ marginVertical: SP.md }} />}
-
-          {!loading && deleted.length === 0 && (
-            <Text style={s.deletedEmpty}>No recently deleted projects.</Text>
-          )}
-
+          {!loading && deleted.length === 0 && <Text style={dl.empty}>No recently deleted projects.</Text>}
           {!loading && deleted.length > 0 && (
             <>
               {deleted.map(p => (
-                <View key={p.id} style={s.deletedItem}>
+                <View key={p.id} style={dl.item}>
                   <DesignLayerCompositor project={p} displaySize={52} borderRadius={RADIUS.xs} />
-                  <View style={s.deletedItemInfo}>
-                    <Text style={s.deletedItemName} numberOfLines={1}>{p.name}</Text>
-                    <Text style={s.deletedItemTime}>Deleted {timeAgo(p.deletedAt!)}</Text>
+                  <View style={dl.itemInfo}>
+                    <Text style={dl.itemName} numberOfLines={1}>{p.name}</Text>
+                    <Text style={dl.itemTime}>Deleted {timeAgo(p.deletedAt!)}</Text>
                   </View>
                   <TouchableOpacity
-                    style={s.deletedRestoreBtn}
-                    onPress={() => handleRestore(p)}
-                    hitSlop={HIT}
+                    style={dl.restoreBtn} onPress={() => handleRestore(p)} hitSlop={HIT}
+                    accessibilityLabel={`Restore ${p.name}`} accessibilityRole="button" testID={`restore-${p.id}`}
                   >
-                    <Text style={s.deletedRestoreLabel}>Restore</Text>
+                    <Text style={dl.restoreLbl}>Restore</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={s.deletedDeleteBtn}
-                    onPress={() => handlePermanentDelete(p)}
-                    hitSlop={HIT}
+                    style={dl.deleteBtn} onPress={() => handlePermanentDelete(p)} hitSlop={HIT}
+                    accessibilityLabel={`Permanently delete ${p.name}`} accessibilityRole="button" testID={`perm-delete-${p.id}`}
                   >
                     <Feather name="x" size={ICON.sm} color={RED} />
                   </TouchableOpacity>
                 </View>
               ))}
-
-              <TouchableOpacity style={s.purgeBtn} onPress={handlePurgeAll}>
-                <Text style={s.purgeBtnLabel}>Delete All</Text>
+              <TouchableOpacity
+                style={dl.purgeBtn} onPress={handlePurgeAll}
+                accessibilityLabel="Delete all recently deleted projects" accessibilityRole="button" testID="purge-all"
+              >
+                <Text style={dl.purgeLbl}>Delete All</Text>
               </TouchableOpacity>
             </>
           )}
@@ -864,13 +1089,25 @@ function RecentlyDeletedSection({
   );
 }
 
-// ─── Project Grid Item ────────────────────────────────────────────────────────
+const dl = StyleSheet.create({
+  section:    { marginHorizontal: GRID_H_PAD, marginTop: SP.xl, marginBottom: SP.md, borderTopWidth: 1, borderTopColor: BORDER_SUBTLE, paddingTop: SP.md },
+  header:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: COMP.buttonHSm },
+  headerLbl:  { flex: 1, fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
+  empty:      { fontFamily: FONT.regular, fontSize: FS.sm, color: SUBTLE, paddingVertical: SP.md },
+  item:       { flexDirection: 'row', alignItems: 'center', paddingVertical: SP.sm, gap: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE },
+  itemInfo:   { flex: 1 },
+  itemName:   { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
+  itemTime:   { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, marginTop: 2 },
+  restoreBtn: { minHeight: COMP.buttonHSm, justifyContent: 'center', paddingHorizontal: SP.sm },
+  restoreLbl: { fontFamily: FONT.medium, fontSize: FS.sm, color: SUCCESS },
+  deleteBtn:  { minHeight: COMP.buttonHSm, width: COMP.buttonHSm, alignItems: 'center', justifyContent: 'center' },
+  purgeBtn:   { marginTop: SP.sm, alignItems: 'center', paddingVertical: SP.sm, minHeight: COMP.buttonHSm, justifyContent: 'center' },
+  purgeLbl:   { fontFamily: FONT.medium, fontSize: FS.sm, color: RED },
+});
 
-const GRID_COLUMNS = 2;
-const GRID_GAP = SP.sm;
-const SCREEN_W = Dimensions.get('window').width;
-const CELL_SIZE = Math.floor((SCREEN_W - SP.lg * 2 - GRID_GAP) / GRID_COLUMNS);
-const THUMB_SIZE = CELL_SIZE - SP.md * 2;
+// ─── Grid Item ────────────────────────────────────────────────────────────────
+// Thumbnail fills cell edge-to-edge (no card padding). Name + dims text below,
+// left-aligned, matching screenshot 0 exactly.
 
 interface GridItemProps {
   project: DesignProject;
@@ -884,39 +1121,72 @@ interface GridItemProps {
 function GridItem({ project, selected, selectionMode, onPress, onLongPress, onNamePress }: GridItemProps) {
   return (
     <TouchableOpacity
-      style={[
-        s.gridItem,
-        { width: CELL_SIZE },
-        selected && { borderColor: FG, borderWidth: 2 },
-      ]}
+      style={[g.cell, selected && g.cellSelected]}
       onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={400}
-      activeOpacity={0.82}
+      activeOpacity={0.80}
+      accessibilityLabel={`${project.name}, ${dimsLabel(project)}`}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      testID={`grid-item-${project.id}`}
     >
+      {/* Selection checkbox — top-right over the thumbnail */}
       {selectionMode && (
-        <View style={[s.gridCheckbox, selected && { backgroundColor: FG }]}>
-          {selected && <Feather name="check" size={12} color={BG} />}
+        <View style={[g.checkbox, selected && g.checkboxOn]}>
+          {selected && <Feather name="check" size={10} color={BG} />}
         </View>
       )}
 
-      <View style={s.gridThumbWrap}>
-        <DesignLayerCompositor project={project} displaySize={THUMB_SIZE} borderRadius={RADIUS.xs} />
+      {/* Thumbnail — fills cell width, portrait-ratio height, rounded corners */}
+      <View style={g.thumb}>
+        <DesignLayerCompositor
+          project={project}
+          displaySize={CELL_SIZE}
+          borderRadius={RADIUS.sm}
+        />
       </View>
 
+      {/* Name + dims — tapping opens rename sheet when not in selection mode */}
       <TouchableOpacity
-        style={s.gridNameRow}
+        style={g.meta}
         onPress={selectionMode ? onPress : onNamePress}
         hitSlop={HIT}
+        accessibilityLabel={`Rename ${project.name}`}
+        accessibilityRole="button"
+        testID={`grid-meta-${project.id}`}
       >
-        <Text style={s.gridName} numberOfLines={1}>{project.name}</Text>
-        <Text style={s.gridDims}>{dimsLabel(project)}</Text>
+        <Text style={g.name} numberOfLines={1}>{project.name}</Text>
+        <Text style={g.dims}>{dimsLabel(project)}</Text>
       </TouchableOpacity>
     </TouchableOpacity>
   );
 }
 
-// ─── Multi-select toolbar ─────────────────────────────────────────────────────
+const g = StyleSheet.create({
+  cell:        { width: CELL_SIZE, position: 'relative' },
+  cellSelected: { opacity: 0.70 },
+  thumb:       {
+    width: CELL_SIZE,
+    height: THUMB_H,
+    borderRadius: RADIUS.sm,
+    overflow: 'hidden',
+    backgroundColor: CARD,   // visible while compositor renders
+  },
+  meta:        { paddingTop: 5, paddingBottom: SP.xs, paddingHorizontal: 2 },
+  name:        { fontFamily: FONT.medium, fontSize: FS.xs, color: FG, lineHeight: 16 },
+  dims:        { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, lineHeight: 15, marginTop: 1 },
+  checkbox:    {
+    position: 'absolute', top: SP.xs, right: SP.xs, zIndex: 10,
+    width: 20, height: 20, borderRadius: 10,
+    borderWidth: 1.5, borderColor: FG,
+    backgroundColor: 'transparent',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  checkboxOn:  { backgroundColor: FG },
+});
+
+// ─── Selection Toolbar ────────────────────────────────────────────────────────
 
 interface SelectionToolbarProps {
   count: number;
@@ -929,39 +1199,46 @@ interface SelectionToolbarProps {
 
 function SelectionToolbar({ count, canRename, onRename, onDuplicate, onSoftDelete, onCancel }: SelectionToolbarProps) {
   const insets = useSafeAreaInsets();
+  const botPad = Platform.OS === 'web' ? 34 : insets.bottom;
   return (
-    <View style={[s.selToolbar, { paddingBottom: insets.bottom + SP.sm }]}>
-      <Text style={s.selCount}>{count} selected</Text>
-      <View style={s.selActions}>
+    <View style={[tb.bar, { paddingBottom: botPad + SP.sm }]} testID="selection-toolbar">
+      <Text style={tb.count}>{count} selected</Text>
+      <View style={tb.actions}>
         {canRename && (
-          <TouchableOpacity style={s.selBtn} onPress={onRename} hitSlop={HIT}>
+          <TouchableOpacity style={tb.btn} onPress={onRename} hitSlop={HIT}
+            accessibilityLabel="Rename selected" accessibilityRole="button" testID="sel-rename">
             <Feather name="edit-2" size={ICON.sm} color={FG} />
-            <Text style={s.selBtnLabel}>Rename</Text>
+            <Text style={tb.btnLbl}>Rename</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity style={s.selBtn} onPress={onDuplicate} hitSlop={HIT}>
+        <TouchableOpacity style={tb.btn} onPress={onDuplicate} hitSlop={HIT}
+          accessibilityLabel="Duplicate selected" accessibilityRole="button" testID="sel-duplicate">
           <Feather name="copy" size={ICON.sm} color={FG} />
-          <Text style={s.selBtnLabel}>Duplicate</Text>
+          <Text style={tb.btnLbl}>Duplicate</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[s.selBtn, { opacity: count > 0 ? 1 : 0.4 }]}
-          onPress={onSoftDelete}
-          hitSlop={HIT}
-        >
+          style={[tb.btn, { opacity: count > 0 ? 1 : 0.4 }]}
+          onPress={onSoftDelete} hitSlop={HIT}
+          accessibilityLabel="Delete selected" accessibilityRole="button" testID="sel-delete">
           <Feather name="trash-2" size={ICON.sm} color={RED} />
-          <Text style={[s.selBtnLabel, { color: RED }]}>Delete</Text>
+          <Text style={[tb.btnLbl, { color: RED }]}>Delete</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.selBtn} onPress={onCancel} hitSlop={HIT}>
-          <Text style={s.selBtnLabel}>Cancel</Text>
+        <TouchableOpacity style={tb.btn} onPress={onCancel} hitSlop={HIT}
+          accessibilityLabel="Cancel selection" accessibilityRole="button" testID="sel-cancel">
+          <Text style={tb.btnLbl}>Cancel</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-// ─── HIT SLOP ────────────────────────────────────────────────────────────────
-
-const HIT = { top: 10, bottom: 10, left: 10, right: 10 };
+const tb = StyleSheet.create({
+  bar:     { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: CARD_ELEVATED, borderTopWidth: 1, borderTopColor: BORDER, paddingTop: SP.sm, paddingHorizontal: SP.lg },
+  count:   { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, textAlign: 'center', marginBottom: SP.xs },
+  actions: { flexDirection: 'row', justifyContent: 'space-around' },
+  btn:     { alignItems: 'center', gap: SP.xs, minHeight: COMP.iconBtn, justifyContent: 'center', paddingHorizontal: SP.sm },
+  btnLbl:  { fontFamily: FONT.regular, fontSize: FS.xs, color: FG },
+});
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
@@ -969,30 +1246,34 @@ export default function DesignGalleryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const [projects, setProjects] = useState<DesignProject[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [recoverableLegacyCount, setRecoverableLegacyCount] = useState(0);
-  const [selectionMode, setSelectionMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [projects, setProjects]               = useState<DesignProject[]>([]);
+  const [loading, setLoading]                 = useState(true);
+  const [recoverableCount, setRecoverableCount] = useState(0);
+  const [selectionMode, setSelectionMode]     = useState(false);
+  const [selectedIds, setSelectedIds]         = useState<Set<string>>(new Set());
   const [deletedExpanded, setDeletedExpanded] = useState(false);
-  // Incrementing this refreshes RecentlyDeletedSection after restore/delete
-  const [deletedRefreshToken, setDeletedRefreshToken] = useState(0);
+  const [deletedToken, setDeletedToken]       = useState(0);
 
   const [newCanvasVisible, setNewCanvasVisible] = useState(false);
-  const [renameProject, setRenameProject] = useState<DesignProject | null>(null);
-  const [previewProject, setPreviewProject] = useState<DesignProject | null>(null);
+  const [renameProject, setRenameProject]       = useState<DesignProject | null>(null);
+  const [previewProject, setPreviewProject]     = useState<DesignProject | null>(null);
+  const [recoveryVisible, setRecoveryVisible]   = useState(false);
 
-  // ── Focus-aware data load ─────────────────────────────────────────────────
-  // Reloads every time the screen regains focus (e.g. returning from canvas editor).
+  // Safe area — web gets hardcoded insets per SKILL.md
+  const topInset = Platform.OS === 'web' ? 67 : insets.top;
+  const botInset = Platform.OS === 'web' ? 34 : insets.bottom;
+
+  // ── Data load ──────────────────────────────────────────────────────────────
+
   const loadData = useCallback(async () => {
+    setLoading(true);
     try {
-      setLoading(true);
       const [nextProjects, legacyCount] = await Promise.all([
         getProjects(),
         getRecoverableLegacyProjectCount(),
       ]);
       setProjects(nextProjects);
-      setRecoverableLegacyCount(legacyCount);
+      setRecoverableCount(legacyCount);
     } finally {
       setLoading(false);
     }
@@ -1001,20 +1282,18 @@ export default function DesignGalleryScreen() {
   useFocusEffect(
     useCallback(() => {
       loadData();
-      // Optionally also refresh deleted section if it's expanded
-      if (deletedExpanded) {
-        setDeletedRefreshToken(t => t + 1);
-      }
-      return () => { /* no cleanup needed */ };
+      if (deletedExpanded) setDeletedToken(t => t + 1);
+      return () => {};
     }, [loadData, deletedExpanded]),
   );
 
-  // ── Selection helpers ──────────────────────────────────────────────────────
+  // ── Selection ──────────────────────────────────────────────────────────────
 
-  function enterSelection(projectId?: string) {
+  function enterSelection(id?: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSelectionMode(true);
-    if (projectId) setSelectedIds(new Set([projectId]));
+    if (id) setSelectedIds(new Set([id]));
+    else setSelectedIds(new Set());
   }
 
   function cancelSelection() {
@@ -1025,29 +1304,25 @@ export default function DesignGalleryScreen() {
   function toggleSelect(id: string) {
     setSelectedIds(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
   }
 
   function handleGridPress(project: DesignProject) {
-    if (selectionMode) {
-      toggleSelect(project.id);
-    } else {
-      setPreviewProject(project);
-    }
+    if (selectionMode) toggleSelect(project.id);
+    else setPreviewProject(project);
   }
 
   function handleGridLongPress(project: DesignProject) {
     if (!selectionMode) enterSelection(project.id);
+    else toggleSelect(project.id);
   }
 
-  // ── Bulk actions ──────────────────────────────────────────────────────────
+  // ── Bulk actions ───────────────────────────────────────────────────────────
 
   async function bulkDuplicate() {
-    for (const id of selectedIds) {
-      await duplicateProject(id);
-    }
+    for (const id of selectedIds) await duplicateProject(id);
     cancelSelection();
     loadData();
   }
@@ -1055,51 +1330,36 @@ export default function DesignGalleryScreen() {
   async function bulkSoftDelete() {
     if (selectedIds.size === 0) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    for (const id of selectedIds) {
-      await softDeleteProject(id);
-    }
+    for (const id of selectedIds) await softDeleteProject(id);
     cancelSelection();
     loadData();
-    // Refresh Recently Deleted if expanded
-    setDeletedRefreshToken(t => t + 1);
+    setDeletedToken(t => t + 1);
   }
 
   function handleRenameSelected() {
     if (selectedIds.size !== 1) return;
     const [id] = [...selectedIds];
     const project = projects.find(p => p.id === id);
-    if (project) {
-      setRenameProject(project);
-      cancelSelection();
-    }
+    if (project) { setRenameProject(project); cancelSelection(); }
   }
 
-  // ── Photo import ──────────────────────────────────────────────────────────
+  // ── Photo import ───────────────────────────────────────────────────────────
 
   async function handlePhotoImport() {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 1,
+        allowsEditing: false, quality: 1,
       });
       if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
       let durable: string;
-      try {
-        durable = await makeDurableUri(asset.uri);
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        Alert.alert('Import failed', msg);
-        return;
-      }
-      const w = asset.width || 1080;
-      const h = asset.height || 1080;
-      const project = await createProject('canvas', 'Photo Canvas', {
-        width: w, height: h, backgroundHex: '#000000',
-      });
+      try { durable = await makeDurableUri(asset.uri); }
+      catch (e: unknown) { Alert.alert('Import failed', e instanceof Error ? e.message : String(e)); return; }
+      const w = asset.width || 1080, h = asset.height || 1080;
+      const proj = await createProject('canvas', 'Photo Canvas', { width: w, height: h, backgroundHex: '#000000' });
       const now = new Date().toISOString();
-      await updateProject(project.id, {
+      await updateProject(proj.id, {
         layers: [{
           id: uid(), name: 'Photo', type: 'image',
           visible: true, locked: false, order: 0, opacity: 1,
@@ -1108,15 +1368,13 @@ export default function DesignGalleryScreen() {
           createdAt: now, updatedAt: now,
         }],
       });
-      router.push(`/design-canvas?id=${project.id}`);
-    } catch {
-      Alert.alert('Error', 'Could not import photo.');
-    }
+      router.push(`/design-canvas?id=${proj.id}`);
+    } catch { Alert.alert('Error', 'Could not import photo.'); }
   }
 
-  // ── Image-only import ─────────────────────────────────────────────────────
+  // ── Import (image or clipboard JSON) ──────────────────────────────────────
 
-  async function handleImport() {
+  function handleImport() {
     Alert.alert(
       'Import',
       'Import an image to start a new canvas, or paste a Brandthread project JSON from clipboard.',
@@ -1125,27 +1383,17 @@ export default function DesignGalleryScreen() {
           text: 'Import Image',
           onPress: async () => {
             const result = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Images,
-              allowsEditing: false,
-              quality: 1,
+              mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: false, quality: 1,
             });
             if (result.canceled || !result.assets?.[0]) return;
             const asset = result.assets[0];
             let durable: string;
-            try {
-              durable = await makeDurableUri(asset.uri);
-            } catch (e: unknown) {
-              const msg = e instanceof Error ? e.message : String(e);
-              Alert.alert('Import failed', msg);
-              return;
-            }
-            const w = asset.width || 1080;
-            const h = asset.height || 1080;
-            const project = await createProject('canvas', 'Imported Image', {
-              width: w, height: h, backgroundHex: '#000000',
-            });
+            try { durable = await makeDurableUri(asset.uri); }
+            catch (e: unknown) { Alert.alert('Import failed', e instanceof Error ? e.message : String(e)); return; }
+            const w = asset.width || 1080, h = asset.height || 1080;
+            const proj = await createProject('canvas', 'Imported Image', { width: w, height: h, backgroundHex: '#000000' });
             const now = new Date().toISOString();
-            await updateProject(project.id, {
+            await updateProject(proj.id, {
               layers: [{
                 id: uid(), name: 'Image', type: 'image',
                 visible: true, locked: false, order: 0, opacity: 1,
@@ -1154,13 +1402,10 @@ export default function DesignGalleryScreen() {
                 createdAt: now, updatedAt: now,
               }],
             });
-            router.push(`/design-canvas?id=${project.id}`);
+            router.push(`/design-canvas?id=${proj.id}`);
           },
         },
-        {
-          text: 'Import from Clipboard',
-          onPress: () => setNewCanvasVisible(true),
-        },
+        { text: 'Import from Clipboard', onPress: () => setNewCanvasVisible(true) },
         { text: 'Cancel', style: 'cancel' },
       ],
     );
@@ -1169,84 +1414,122 @@ export default function DesignGalleryScreen() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <View style={[s.screen, { backgroundColor: BG }]}>
-      {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
-        <TouchableOpacity onPress={() => router.back()} style={s.headerBack} hitSlop={HIT}>
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
+    <View style={s.screen} testID="design-gallery-screen">
+
+      {/*
+       * ── Gallery header ──────────────────────────────────────────────────
+       *
+       * Layout (screenshot 0):
+       *   [insets.top gap]
+       *   [large bold title "Design Studio"  ]
+       *   [Select  Import  Photo          [+]]   ← same row, spaced right
+       *
+       * Tight vertical rhythm: title → actions without extra padding between them.
+       * Horizontal alignment: both flush to GRID_H_PAD.
+       */}
+      <View style={[s.header, { paddingTop: topInset }]}>
+        {/* Back arrow — taps router.back() when history exists, else goes to seller dashboard */}
+        <TouchableOpacity
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)/' as never);
+            }
+          }}
+          hitSlop={HIT}
+          style={s.backBtn}
+          accessibilityLabel="Back"
+          accessibilityRole="button"
+          testID="design-gallery-back"
+        >
+          <Text style={s.backArrow}>←</Text>
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Design Studio</Text>
-        {selectionMode ? (
-          <TouchableOpacity onPress={cancelSelection} hitSlop={HIT}>
-            <Text style={s.headerAction}>Cancel</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity onPress={() => enterSelection()} hitSlop={HIT}>
-            <Text style={s.headerAction}>Select</Text>
-          </TouchableOpacity>
-        )}
+
+        <Text
+          style={s.title}
+          accessibilityRole="header"
+          testID="gallery-title"
+        >
+          Design Studio
+        </Text>
+
+        <View style={s.actionRow}>
+          {selectionMode ? (
+            /* In selection mode the only header action is Cancel */
+            <TouchableOpacity
+              onPress={cancelSelection} hitSlop={HIT}
+              accessibilityLabel="Cancel selection" accessibilityRole="button" testID="header-cancel-select"
+            >
+              <Text style={s.actionBtn}>Cancel</Text>
+            </TouchableOpacity>
+          ) : (
+            <>
+              <TouchableOpacity
+                onPress={() => enterSelection()} hitSlop={HIT}
+                accessibilityLabel="Enter selection mode" accessibilityRole="button" testID="header-select"
+              >
+                <Text style={s.actionBtn}>Select</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleImport} hitSlop={HIT}
+                accessibilityLabel="Import image or project" accessibilityRole="button" testID="header-import"
+              >
+                <Text style={s.actionBtn}>Import</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handlePhotoImport} hitSlop={HIT}
+                accessibilityLabel="Import from photo library" accessibilityRole="button" testID="header-photo"
+              >
+                <Text style={s.actionBtn}>Photo</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {/* Spacer */}
+          <View style={{ flex: 1 }} />
+
+          {/* Plus — bare icon, top-right, same baseline as action text */}
+          {!selectionMode && (
+            <TouchableOpacity
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                setNewCanvasVisible(true);
+              }}
+              hitSlop={HIT}
+              style={s.plusBtn}
+              accessibilityLabel="New canvas" accessibilityRole="button" testID="header-new-canvas"
+            >
+              <Feather name="plus" size={ICON.xl} color={FG} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
-      {/* Action row */}
-      {!selectionMode && (
-        <View style={s.actionRow}>
-          <TouchableOpacity style={s.actionBtn} onPress={handleImport} activeOpacity={0.75}>
-            <Feather name="download" size={ICON.md} color={FG} />
-            <Text style={s.actionBtnLabel}>Import</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.actionBtn} onPress={handlePhotoImport} activeOpacity={0.75}>
-            <Feather name="camera" size={ICON.md} color={FG} />
-            <Text style={s.actionBtnLabel}>Photo</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.actionBtn, s.actionBtnPrimary]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              setNewCanvasVisible(true);
-            }}
-            activeOpacity={0.8}
-          >
-            <Feather name="plus" size={ICON.md} color={BG} />
-            <Text style={[s.actionBtnLabel, { color: BG }]}>New Canvas</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {!selectionMode && recoverableLegacyCount > 0 && (
+      {/* Recovery entry point — only shown when recoverable projects exist */}
+      {!selectionMode && recoverableCount > 0 && (
         <TouchableOpacity
-          style={{ marginHorizontal: SP.lg, marginTop: SP.sm, padding: SP.md, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md }}
-          onPress={() => Alert.alert(
-            'Recover projects from this device?',
-            `${recoverableLegacyCount} project${recoverableLegacyCount === 1 ? '' : 's'} were saved before account sync. Recover them into the selected store only if they belong to this store.`,
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Recover',
-                onPress: async () => {
-                  try {
-                    await recoverLegacyDesignProjects();
-                    await loadData();
-                  } catch {
-                    Alert.alert('Recovery failed', 'Your original device projects were not changed. Try again.');
-                  }
-                },
-              },
-            ],
-          )}
+          style={s.recoveryRow}
+          onPress={() => setRecoveryVisible(true)}
+          activeOpacity={0.75}
+          accessibilityLabel={`Recover ${recoverableCount} design${recoverableCount !== 1 ? 's' : ''} from this device`}
+          accessibilityRole="button"
+          testID="recovery-entry"
         >
-          <Text style={{ color: FG, fontSize: FS.sm, fontFamily: FONT.medium }}>
-            Recover {recoverableLegacyCount} project{recoverableLegacyCount === 1 ? '' : 's'} from this device
+          <Feather name="refresh-cw" size={ICON.sm} color={MUTED} />
+          <Text style={s.recoveryRowText}>
+            {recoverableCount} design{recoverableCount !== 1 ? 's' : ''} available to recover
           </Text>
-          <Text style={{ color: MUTED, fontSize: FS.xs, marginTop: SP.xs }}>
-            Confirm they belong to the selected store before syncing.
-          </Text>
+          <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />
         </TouchableOpacity>
       )}
 
-      {/* Project grid */}
+      {/* ── Project grid ── */}
       {loading ? (
-        <View style={s.loadingBox}>
-          <ActivityIndicator color={FG} size="large" />
+        <View style={s.loadingBox} testID="gallery-loading">
+          <ActivityIndicator color={MUTED} size="large" />
         </View>
       ) : (
         <FlatList
@@ -1254,13 +1537,14 @@ export default function DesignGalleryScreen() {
           keyExtractor={p => p.id}
           numColumns={GRID_COLUMNS}
           columnWrapperStyle={s.gridRow}
-          contentContainerStyle={[s.gridContent, { paddingBottom: insets.bottom + 120 }]}
+          contentContainerStyle={[s.gridContent, { paddingBottom: botInset + 120 }]}
           showsVerticalScrollIndicator={false}
+          testID="gallery-grid"
           ListEmptyComponent={
-            <View style={s.emptyBox}>
+            <View style={s.emptyBox} testID="gallery-empty">
               <Feather name="edit-3" size={ICON.xxl} color={SUBTLE} />
               <Text style={s.emptyTitle}>No artworks yet</Text>
-              <Text style={s.emptyDesc}>Tap New Canvas to start your first design.</Text>
+              <Text style={s.emptyDesc}>Tap + to create your first design.</Text>
             </View>
           }
           ListFooterComponent={
@@ -1268,11 +1552,11 @@ export default function DesignGalleryScreen() {
               expanded={deletedExpanded}
               onToggle={() => setDeletedExpanded(v => {
                 const next = !v;
-                if (next) setDeletedRefreshToken(t => t + 1);
+                if (next) setDeletedToken(t => t + 1);
                 return next;
               })}
               onDataChanged={loadData}
-              refreshToken={deletedRefreshToken}
+              refreshToken={deletedToken}
             />
           }
           renderItem={({ item }) => (
@@ -1288,7 +1572,7 @@ export default function DesignGalleryScreen() {
         />
       )}
 
-      {/* Selection toolbar */}
+      {/* Selection toolbar — floats above bottom */}
       {selectionMode && (
         <SelectionToolbar
           count={selectedIds.size}
@@ -1300,11 +1584,11 @@ export default function DesignGalleryScreen() {
         />
       )}
 
-      {/* Sheets / modals */}
+      {/* ── Modals / sheets ── */}
       <NewCanvasSheet
         visible={newCanvasVisible}
         onClose={() => setNewCanvasVisible(false)}
-        onCreated={(id) => router.push(`/design-canvas?id=${id}`)}
+        onCreated={id => router.push(`/design-canvas?id=${id}`)}
       />
 
       <RenameSheet
@@ -1324,126 +1608,107 @@ export default function DesignGalleryScreen() {
           if (id) router.push(`/design-canvas?id=${id}`);
         }}
       />
+
+      <RecoveryModal
+        visible={recoveryVisible}
+        count={recoverableCount}
+        onClose={() => setRecoveryVisible(false)}
+        onRecovered={loadData}
+      />
     </View>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── Gallery styles ───────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  screen:       { flex: 1, backgroundColor: BG },
+  screen: { flex: 1, backgroundColor: BG },
 
-  // Header
-  header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingBottom: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE },
-  headerBack:   { minWidth: COMP.iconBtn, minHeight: COMP.iconBtn, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:  { flex: 1, fontFamily: FONT.semibold, fontSize: FS.base, color: FG, textAlign: 'center' },
-  headerAction: { fontFamily: FONT.medium, fontSize: FS.sm, color: FG, minWidth: COMP.iconBtn, textAlign: 'right', minHeight: COMP.iconBtn, lineHeight: COMP.iconBtn },
+  // Header block — left-aligned, flush to grid horizontal padding
+  header: {
+    paddingHorizontal: GRID_H_PAD,
+    paddingBottom: SP.sm,
+  },
 
-  // Action row
-  actionRow:        { flexDirection: 'row', paddingHorizontal: SP.lg, paddingVertical: SP.md, gap: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE },
-  actionBtn:        { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.xs, minHeight: COMP.buttonHSm, borderRadius: RADIUS.md, backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER, paddingHorizontal: SP.sm },
-  actionBtnPrimary: { flex: 1.4, backgroundColor: FG, borderColor: FG },
-  actionBtnLabel:   { fontFamily: FONT.medium, fontSize: FS.sm, color: FG },
+  // Back arrow — sits above the title, minimum 44×44 touch target
+  backBtn: {
+    width: COMP.iconBtn,
+    height: COMP.iconBtn,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    marginLeft: -SP.xs,   // align icon visually with title text
+    marginBottom: SP.xs,
+  },
+  backArrow: {
+    color: FG,
+    fontFamily: FONT.medium,
+    fontSize: 28,
+    lineHeight: 32,
+  },
+
+  // Large bold left-aligned title (screenshot 0: ~34pt, bold, white)
+  title: {
+    fontFamily: FONT.bold,
+    fontSize: FS.h2,         // 30pt — closest to the reference without being h1
+    color: FG,
+    letterSpacing: -0.5,
+    marginBottom: SP.xs,     // 4px gap before action row
+  },
+
+  // Action row: text buttons flush left, + icon pushed right
+  // No dividers between buttons — plain FG text with 16px gaps
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.md,              // 16px between action buttons (Select / Import / Photo)
+    paddingBottom: SP.xs,
+  },
+  actionBtn: {
+    fontFamily: FONT.regular,
+    fontSize: FS.base,       // 15pt — matches action text in screenshot 0
+    color: FG,               // full white, not MUTED — matching reference
+    paddingVertical: SP.xs,  // 4px tap height padding
+  },
+  plusBtn: {
+    // Same height as action text row; bare icon aligned to right edge
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: COMP.iconBtn,
+    height: COMP.iconBtn,
+  },
+
+  // Recovery entry — compact single-line row, minimal chrome
+  recoveryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    marginHorizontal: GRID_H_PAD,
+    marginBottom: SP.sm,
+    paddingVertical: SP.xs,
+  },
+  recoveryRowText: {
+    flex: 1,
+    fontFamily: FONT.regular,
+    fontSize: FS.sm,
+    color: MUTED,
+  },
 
   // Grid
-  gridContent:   { paddingHorizontal: SP.lg, paddingTop: SP.md, gap: GRID_GAP },
-  gridRow:       { gap: GRID_GAP, marginBottom: GRID_GAP },
-  gridItem:      { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden', position: 'relative' },
-  gridThumbWrap: { padding: SP.sm, alignItems: 'center', justifyContent: 'center' },
-  gridNameRow:   { paddingHorizontal: SP.sm, paddingBottom: SP.sm, gap: 2 },
-  gridName:      { fontFamily: FONT.medium, fontSize: FS.sm, color: FG },
-  gridDims:      { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
-  gridCheckbox:  { position: 'absolute', top: SP.sm, right: SP.sm, width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: FG, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+  gridContent: {
+    paddingHorizontal: GRID_H_PAD,
+    paddingTop: SP.sm,
+  },
+  gridRow: {
+    gap: GRID_GAP,
+    marginBottom: GRID_GAP,
+    justifyContent: 'flex-start',
+  },
 
-  // Loading / empty
+  // Loading
   loadingBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
+  // Empty state
   emptyBox:   { alignItems: 'center', paddingTop: 80, gap: SP.sm },
   emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: FG },
-  emptyDesc:  { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center' },
-
-  // Selection toolbar
-  selToolbar:  { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: CARD_ELEVATED, borderTopWidth: 1, borderTopColor: BORDER, paddingTop: SP.sm, paddingHorizontal: SP.lg },
-  selCount:    { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, textAlign: 'center', marginBottom: SP.xs },
-  selActions:  { flexDirection: 'row', justifyContent: 'space-around' },
-  selBtn:      { alignItems: 'center', gap: SP.xs, minHeight: COMP.iconBtn, justifyContent: 'center', paddingHorizontal: SP.sm },
-  selBtnLabel: { fontFamily: FONT.regular, fontSize: FS.xs, color: FG },
-
-  // Sheet shared
-  sheetOverlay: { ...StyleSheet.absoluteFill, backgroundColor: OVERLAY },
-  sheetHandle:  { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER_ACTIVE, alignSelf: 'center', marginTop: SP.sm, marginBottom: SP.xs, opacity: 0.3 },
-  sheetHeader:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.lg, paddingBottom: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE },
-  sheetCloseBtn: { minWidth: 60, minHeight: COMP.iconBtn, justifyContent: 'center' },
-  sheetCancelText: { fontFamily: FONT.regular, fontSize: FS.base, color: MUTED },
-  sheetTitle:   { flex: 1, textAlign: 'center', fontFamily: FONT.semibold, fontSize: FS.base, color: FG },
-
-  // New canvas sheet
-  sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '90%', backgroundColor: SURFACE, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, borderTopWidth: 1, borderColor: BORDER },
-
-  // Tabs
-  tabRow:   { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE, marginHorizontal: SP.lg },
-  tabBtn:   { flex: 1, alignItems: 'center', paddingVertical: SP.sm, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabLabel: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
-
-  // Preset rows
-  sectionTitle: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SP.sm },
-  presetRow:    { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE, minHeight: COMP.buttonHSm },
-  presetIcon:   { width: 40, height: 40, borderRadius: RADIUS.sm, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
-  presetInfo:   { flex: 1 },
-  presetLabel:  { fontFamily: FONT.medium, fontSize: FS.base, color: FG },
-  presetDims:   { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
-
-  // Custom tab
-  input:         { height: COMP.inputH, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, paddingHorizontal: SP.md, fontFamily: FONT.regular, fontSize: FS.base, color: FG, backgroundColor: CARD },
-  segRow:        { flexDirection: 'row', gap: SP.xs },
-  segBtn:        { flex: 1, height: 40, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', backgroundColor: CARD },
-  segBtnActive:  { borderColor: FG, backgroundColor: FG },
-  segLabel:      { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
-  segLabelActive: { color: BG },
-  dimRow:        { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-  dimField:      { flex: 1 },
-  dimLabel:      { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginBottom: SP.xs },
-  dimInput:      { height: COMP.buttonHSm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, paddingHorizontal: SP.md, fontFamily: FONT.regular, fontSize: FS.base, color: FG, backgroundColor: CARD, textAlign: 'center' },
-  dimX:          { fontFamily: FONT.regular, fontSize: FS.base, color: MUTED, marginTop: SP.lg },
-  dimPreview:    { backgroundColor: CARD, borderRadius: RADIUS.md, padding: SP.sm, marginVertical: SP.md, alignItems: 'center' },
-  dimPreviewText: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED },
-  createBtn:     { height: COMP.buttonH, borderRadius: RADIUS.md, backgroundColor: FG, alignItems: 'center', justifyContent: 'center', marginTop: SP.sm },
-  createBtnLabel: { fontFamily: FONT.semibold, fontSize: FS.base, color: BG },
-
-  // Clipboard tab
-  clipCenter: { alignItems: 'center', paddingVertical: SP.xxl },
-  clipRow:    { flexDirection: 'row', gap: SP.md, alignItems: 'flex-start', backgroundColor: CARD, borderRadius: RADIUS.lg, padding: SP.md, marginBottom: SP.md },
-  clipTitle:  { fontFamily: FONT.semibold, fontSize: FS.base, color: FG, marginBottom: SP.xs },
-  clipMsg:    { fontFamily: FONT.semibold, fontSize: FS.base, color: FG },
-  clipSub:    { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, lineHeight: 20 },
-
-  // Rename sheet
-  renameSheet:    { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: SURFACE, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, borderTopWidth: 1, borderColor: BORDER, paddingHorizontal: SP.lg },
-  renameThumbWrap: { alignItems: 'center', paddingTop: SP.lg, paddingBottom: SP.md },
-  renameInput:    { height: COMP.inputH, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER_ACTIVE, paddingHorizontal: SP.md, fontFamily: FONT.semibold, fontSize: FS.md, color: FG, backgroundColor: CARD, textAlign: 'center', marginBottom: SP.xs },
-  renameDims:     { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, textAlign: 'center', marginBottom: SP.md },
-
-  // Artwork preview modal
-  previewClose:    { position: 'absolute', right: SP.md, zIndex: 10, width: COMP.iconBtn, height: COMP.iconBtn, alignItems: 'center', justifyContent: 'center' },
-  previewArtWrap:  { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
-  previewInfo:     { paddingHorizontal: SP.lg, paddingVertical: SP.md, gap: SP.xs },
-  previewName:     { fontFamily: FONT.bold, fontSize: FS.xl, color: FG },
-  previewDims:     { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED },
-  previewActions:  { paddingHorizontal: SP.lg },
-  previewEditBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, height: COMP.buttonH, borderRadius: RADIUS.md, backgroundColor: FG },
-  previewEditLabel: { fontFamily: FONT.semibold, fontSize: FS.base, color: BG },
-
-  // Recently deleted
-  deletedSection:     { marginHorizontal: SP.lg, marginTop: SP.xl, marginBottom: SP.md, borderTopWidth: 1, borderTopColor: BORDER_SUBTLE, paddingTop: SP.md },
-  deletedHeader:      { flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: COMP.buttonHSm },
-  deletedHeaderLabel: { flex: 1, fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
-  deletedEmpty:       { fontFamily: FONT.regular, fontSize: FS.sm, color: SUBTLE, paddingVertical: SP.md },
-  deletedItem:        { flexDirection: 'row', alignItems: 'center', paddingVertical: SP.sm, gap: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE },
-  deletedItemInfo:    { flex: 1 },
-  deletedItemName:    { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
-  deletedItemTime:    { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, marginTop: 2 },
-  deletedRestoreBtn:  { minHeight: COMP.buttonHSm, justifyContent: 'center', paddingHorizontal: SP.sm },
-  deletedRestoreLabel: { fontFamily: FONT.medium, fontSize: FS.sm, color: SUCCESS },
-  deletedDeleteBtn:   { minHeight: COMP.buttonHSm, width: COMP.buttonHSm, alignItems: 'center', justifyContent: 'center' },
-  purgeBtn:           { marginTop: SP.sm, alignItems: 'center', paddingVertical: SP.sm, minHeight: COMP.buttonHSm, justifyContent: 'center' },
-  purgeBtnLabel:      { fontFamily: FONT.medium, fontSize: FS.sm, color: RED },
+  emptyDesc:  { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', maxWidth: 240 },
 });

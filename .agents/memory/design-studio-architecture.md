@@ -69,3 +69,9 @@ Verified master uploads use an enqueue-before-send FIFO contract. Queue IDs must
 **Why:** Direct best-effort uploads can lose files after a connection drop, while concurrent retries can reorder masters or duplicate a request whose response was lost.
 
 **How to apply:** Persist exact encoded bytes and metadata before networking, return control to export immediately, serialize retries by account/store, and discard bytes only after confirmed success or an explicit terminal rejection.
+
+The Design Studio gallery uses Procreate Pocket as its interaction reference: a large left-aligned title, compact text actions, a clean three-column artwork grid with names and dimensions, and focused full-screen recovery states.
+
+**Why:** The user explicitly selected a three-screen Procreate Pocket gallery and recovery reference for this surface.
+
+**How to apply:** Keep gallery chrome sparse and artwork-led. Preserve Brandthread identity and recovery safety while avoiding dashboard cards, oversized action buttons, or list-heavy project presentation.

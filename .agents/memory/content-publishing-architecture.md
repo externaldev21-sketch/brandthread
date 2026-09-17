@@ -48,9 +48,14 @@ Drop Society, FORM Studio, Midnight Thread — seeded on first `getSellerPosts()
 - "Posts" tab: `!isDraft && !isArchived`; "Drafts": `isDraft && !isArchived`; "Scheduled": `!isDraft && !isArchived && !!scheduledAt`
 
 ## What's NOT built yet
-- Draft update pattern (createSellerPost always creates new; no draftId state)
 - Variant picker in product tag modal (only productId/name/price stored)
 - Video duration validation before publish
 - Archive/delete UI on seller profile post grid
 - Scheduled posts time-gating (stored correctly but no scheduler)
 - Seller profile navigation from Thread (tapping seller avatar navigates but uses wrong id format)
+
+Draft saves must be confirmed by the server as draft status before leaving Create Post, then open the Content library on its Draft filter. Scheduling uses a touch calendar plus 12-hour time and AM/PM controls, never a typed timestamp.
+
+**Why:** A success alert followed by generic back navigation made saved drafts appear missing, and manual date-format entry was too burdensome on mobile.
+
+**How to apply:** Disable duplicate draft submissions, fail explicitly on a non-draft response, deep-link to the Draft filter after success, and convert the selected local date/time to ISO only at the persistence boundary.

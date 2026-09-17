@@ -1277,19 +1277,42 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     /** Thread-feed posts — create with product tags, read, like/repost */
     posts: {
       create: (body: {
-        mediaUrl?: string; thumbnailUrl?: string; mediaPath?: string; thumbnailPath?: string; mediaType?: string; caption?: string;
-        styleTags?: string[]; taggedProductIds?: string[];
+        mediaUrl?: string; thumbnailUrl?: string; mediaPath?: string; thumbnailPath?: string;
+        mediaPaths?: string[]; slideOverlays?: unknown;
+        mediaUrls?: string[]; mediaType?: string; aspectRatio?: string; caption?: string;
+        hashtags?: string[]; styleTags?: string[]; taggedProductIds?: string[];
+        sound?: unknown; visibility?: unknown; isDraft?: boolean; scheduledAt?: string | null;
       }) => post<any>('/api/posts', body),
+      patch: (id: string, body: {
+        mediaUrl?: string; thumbnailUrl?: string | null; mediaUrls?: string[];
+        mediaPaths?: string[]; slideOverlays?: unknown;
+        mediaType?: string; aspectRatio?: string; caption?: string;
+        hashtags?: string[]; styleTags?: string[]; taggedProductIds?: string[];
+        sound?: unknown; visibility?: unknown; isDraft?: boolean; postStatus?: string;
+        scheduledAt?: string | null;
+      }) => patch<any>(`/api/posts/${encodeURIComponent(id)}`, body),
       uploadVideoClip: (uri: string, mimeType?: string | null) =>
         uploadVideo<{
           objectPath: string;
           contentType: string;
           size: number;
         }>('/api/posts/video-clips', { uri, mimeType }, getToken, getCacheScope),
+      /** Upload a single raw photo slide (JPEG/PNG/WEBP) for slideshow composition */
+      uploadPhotoSlide: (uri: string, mimeType?: string | null) =>
+        uploadImage<{
+          objectPath: string;
+          contentType: string;
+          size: number;
+        }>('/api/posts/photo-slides', { uri, mimeType }, getToken, getCacheScope),
       composeVideo: (body: {
         clips: Array<{ objectPath: string; duration?: number; speed?: number; filter?: 'none' | 'warm' | 'cool' | 'mono' }>;
         trimStart: number;
         trimEnd: number;
+        textOverlays?: Array<{
+          id: string; text: string; x: number; y: number; color: string;
+          fontStyle: string; align: string; bgStyle: string; fontSize: number;
+          startTime?: number; endTime?: number;
+        }>;
       }) => post<{
         mediaUrl: string;
         mediaPath: string;
@@ -1298,6 +1321,22 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         duration: number;
         clipCount: number;
       }>('/api/posts/compose-video', body),
+      /** Compose ordered photo slides with per-slide text overlays into portrait rendered images */
+      composeSlideshow: (body: {
+        slides: Array<{
+          objectPath: string;
+          overlays?: Array<{
+            id: string; text: string; x: number; y: number; color: string;
+            fontStyle: string; align: string; bgStyle: string; fontSize: number;
+          }>;
+        }>;
+      }) => post<{
+        mediaPaths: string[];
+        mediaUrls: string[];
+        thumbnailPath: string;
+        thumbnailUrl: string;
+        slideCount: number;
+      }>('/api/posts/compose-slideshow', body),
       publicList: (ownerId?: string) =>
         get<any[]>(`/api/public/posts${ownerId ? `?ownerId=${encodeURIComponent(ownerId)}` : ''}`),
       get: (id: string) => get<any>(`/api/posts/${encodeURIComponent(id)}`),

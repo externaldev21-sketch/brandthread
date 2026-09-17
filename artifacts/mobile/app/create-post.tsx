@@ -31,7 +31,14 @@ import { useColors } from '@/hooks/useColors';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { useApi } from '@/lib/api';
-import { markVideoClipUploaded, normalizeTrimBounds } from '@/lib/videoEditing';
+import {
+  markVideoClipUploaded, normalizeTrimBounds,
+  createPhotoSlide, updateSlideUploadState, updateSlideOverlays, removePhotoSlide,
+  slidesToComposePayload,
+  type EditablePhotoSlide, type ComposedSlideshowResult,
+} from '@/lib/videoEditing';
+import type { TextOverlay } from '@/lib/videoEditing';
+import { TextOverlayEditor, OverlayChip } from '@/components/TextOverlayEditor';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 
@@ -47,7 +54,7 @@ const ORANGE   = '#F97316';
 const { width: SW } = Dimensions.get('window');
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Step = 'media-pick' | 'video-edit' | 'post-details' | 'publishing' | 'done';
+type Step = 'media-pick' | 'video-edit' | 'slide-edit' | 'post-details' | 'publishing' | 'done';
 
 interface VideoClipLocal {
   uri: string; duration: number; id: string;
@@ -101,11 +108,19 @@ function ThumbVideoPreview({ uri }: { uri: string }) {
 }
 
 // ─── Floating right toolbar button ────────────────────────────────────────────
-function ToolBtn({ icon, label, onPress }: {
+function ToolBtn({ icon, label, onPress, accessibilityLabel, testID }: {
   icon: keyof typeof Feather.glyphMap; label?: string; onPress?: () => void;
+  accessibilityLabel?: string; testID?: string;
 }) {
   return (
-    <TouchableOpacity onPress={onPress} style={ts.toolBtn} activeOpacity={0.75}>
+    <TouchableOpacity
+      onPress={onPress}
+      style={ts.toolBtn}
+      activeOpacity={0.75}
+      accessibilityLabel={accessibilityLabel ?? label ?? icon}
+      accessibilityRole="button"
+      testID={testID}
+    >
       <Feather name={icon} size={26} color={FG} />
       {label ? <Text style={ts.toolBtnLabel}>{label}</Text> : null}
     </TouchableOpacity>
@@ -129,6 +144,267 @@ function SettingsRow({ label, value, onPress, children }: {
         {onPress ? <Feather name="chevron-right" size={16} color={MUTED} /> : null}
       </View>
     </TouchableOpacity>
+  );
+}
+
+// ─── Date/time picker state ────────────────────────────────────────────────────
+interface PickerState {
+  year: number; month: number; day: number;
+  hour: number; minute: number; ampm: 'AM' | 'PM';
+}
+
+function makeDefaultPickerState(): PickerState {
+  const d = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+  let h = d.getHours();
+  const ampm: 'AM' | 'PM' = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return {
+    year: d.getFullYear(), month: d.getMonth(), day: d.getDate(),
+    hour: h, minute: Math.floor(d.getMinutes() / 5) * 5, ampm,
+  };
+}
+
+function pickerStateToDate(s: PickerState): Date {
+  let h = s.hour % 12;
+  if (s.ampm === 'PM') h += 12;
+  return new Date(s.year, s.month, s.day, h, s.minute, 0, 0);
+}
+
+function isoFromPickerState(s: PickerState): string {
+  return pickerStateToDate(s).toISOString();
+}
+
+function pickerStateFromISO(iso: string): PickerState {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return makeDefaultPickerState();
+  let h = d.getHours();
+  const ampm: 'AM' | 'PM' = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return {
+    year: d.getFullYear(), month: d.getMonth(), day: d.getDate(),
+    hour: h, minute: d.getMinutes(), ampm,
+  };
+}
+
+const MONTH_NAMES = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December',
+];
+const DAY_NAMES = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+// ─── Calendar/Time Picker Modal ───────────────────────────────────────────────
+interface DatePickerModalProps {
+  visible: boolean;
+  initial: PickerState;
+  onConfirm: (state: PickerState) => void;
+  onClose: () => void;
+  insets: { top: number; bottom: number };
+}
+
+function DatePickerModal({ visible, initial, onConfirm, onClose, insets }: DatePickerModalProps) {
+  const colors = useColors();
+  const PURPLE = colors.primary;
+  const [ps, setPs] = useState<PickerState>(initial);
+
+  // sync when re-opened with a different initial value
+  useEffect(() => { if (visible) setPs(initial); }, [visible]);
+
+  // calendar grid helpers
+  const daysInMonth = new Date(ps.year, ps.month + 1, 0).getDate();
+  const firstDow    = new Date(ps.year, ps.month, 1).getDay();
+
+  function prevMonth() {
+    setPs(prev => {
+      let m = prev.month - 1; let y = prev.year;
+      if (m < 0) { m = 11; y -= 1; }
+      const maxDay = new Date(y, m + 1, 0).getDate();
+      return { ...prev, year: y, month: m, day: Math.min(prev.day, maxDay) };
+    });
+  }
+  function nextMonth() {
+    setPs(prev => {
+      let m = prev.month + 1; let y = prev.year;
+      if (m > 11) { m = 0; y += 1; }
+      const maxDay = new Date(y, m + 1, 0).getDate();
+      return { ...prev, year: y, month: m, day: Math.min(prev.day, maxDay) };
+    });
+  }
+
+  function isDayPast(day: number): boolean {
+    const d = new Date(ps.year, ps.month, day, 23, 59, 59);
+    return d < new Date();
+  }
+
+  function handleConfirm() {
+    const chosen = pickerStateToDate(ps);
+    if (chosen <= new Date()) {
+      Alert.alert('Choose a future time', 'Scheduled time must be in the future.');
+      return;
+    }
+    onConfirm(ps);
+  }
+
+  // build cell grid (leading blank + day cells)
+  const cells: (number | null)[] = Array(firstDow).fill(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const selectedDateLabel = `${MONTH_NAMES[ps.month]} ${ps.day}, ${ps.year}`;
+  const selectedTimeLabel = `${ps.hour}:${String(ps.minute).padStart(2, '0')} ${ps.ampm}`;
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <View style={dps.overlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <View style={[dps.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          {/* Handle */}
+          <View style={dps.handle} />
+
+          {/* Title row */}
+          <View style={dps.titleRow}>
+            <Text style={dps.title}>Schedule Post</Text>
+            <TouchableOpacity onPress={onClose} style={dps.closeBtn} accessibilityLabel="Close date picker">
+              <Feather name="x" size={18} color={FG} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Selected summary */}
+          <View style={dps.summaryRow}>
+            <Feather name="calendar" size={13} color={PURPLE} />
+            <Text style={[dps.summaryText, { color: PURPLE }]}>{selectedDateLabel}</Text>
+            <Feather name="clock" size={13} color={PURPLE} style={{ marginLeft: 10 }} />
+            <Text style={[dps.summaryText, { color: PURPLE }]}>{selectedTimeLabel}</Text>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {/* ── Month navigation ── */}
+            <View style={dps.monthNav}>
+              <TouchableOpacity onPress={prevMonth} style={dps.monthNavBtn} accessibilityLabel="Previous month">
+                <Feather name="chevron-left" size={20} color={FG} />
+              </TouchableOpacity>
+              <Text style={dps.monthLabel}>{MONTH_NAMES[ps.month]} {ps.year}</Text>
+              <TouchableOpacity onPress={nextMonth} style={dps.monthNavBtn} accessibilityLabel="Next month">
+                <Feather name="chevron-right" size={20} color={FG} />
+              </TouchableOpacity>
+            </View>
+
+            {/* ── Day-of-week header ── */}
+            <View style={dps.dowRow}>
+              {DAY_NAMES.map(d => (
+                <Text key={d} style={dps.dowText}>{d}</Text>
+              ))}
+            </View>
+
+            {/* ── Calendar grid ── */}
+            <View style={dps.calGrid}>
+              {cells.map((day, idx) => {
+                if (day === null) return <View key={`blank-${idx}`} style={dps.calCell} />;
+                const selected = day === ps.day;
+                const past     = isDayPast(day);
+                return (
+                  <TouchableOpacity
+                    key={`day-${day}`}
+                    style={[
+                      dps.calCell,
+                      selected && { backgroundColor: PURPLE, borderRadius: 20 },
+                      past && !selected && { opacity: 0.3 },
+                    ]}
+                    onPress={() => { if (!past) { Haptics.selectionAsync(); setPs(prev => ({ ...prev, day })); } }}
+                    disabled={past}
+                    accessibilityLabel={`Day ${day}${past ? ', past' : ''}`}
+                    testID={`calendar-day-${day}`}
+                  >
+                    <Text style={[dps.calDayText, selected && { color: '#fff', fontFamily: FONT.bold }]}>
+                      {day}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* ── Time section ── */}
+            <View style={dps.timeSection}>
+              <Text style={dps.timeSectionLabel}>Time</Text>
+
+              <View style={dps.timeRow}>
+                {/* Hour stepper */}
+                <View style={dps.stepper}>
+                  <TouchableOpacity
+                    style={dps.stepBtn}
+                    onPress={() => { Haptics.selectionAsync(); setPs(prev => { const h = prev.hour === 12 ? 1 : prev.hour + 1; return { ...prev, hour: h }; }); }}
+                    accessibilityLabel="Increase hour"
+                    testID="hour-up"
+                  >
+                    <Feather name="chevron-up" size={16} color={FG} />
+                  </TouchableOpacity>
+                  <Text style={dps.stepValue} testID="hour-display">{String(ps.hour).padStart(2, '0')}</Text>
+                  <TouchableOpacity
+                    style={dps.stepBtn}
+                    onPress={() => { Haptics.selectionAsync(); setPs(prev => { const h = prev.hour === 1 ? 12 : prev.hour - 1; return { ...prev, hour: h }; }); }}
+                    accessibilityLabel="Decrease hour"
+                    testID="hour-down"
+                  >
+                    <Feather name="chevron-down" size={16} color={FG} />
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={dps.timeSep}>:</Text>
+
+                {/* Minute stepper */}
+                <View style={dps.stepper}>
+                  <TouchableOpacity
+                    style={dps.stepBtn}
+                    onPress={() => { Haptics.selectionAsync(); setPs(prev => ({ ...prev, minute: (prev.minute + 5) % 60 })); }}
+                    accessibilityLabel="Increase minute"
+                    testID="minute-up"
+                  >
+                    <Feather name="chevron-up" size={16} color={FG} />
+                  </TouchableOpacity>
+                  <Text style={dps.stepValue} testID="minute-display">{String(ps.minute).padStart(2, '0')}</Text>
+                  <TouchableOpacity
+                    style={dps.stepBtn}
+                    onPress={() => { Haptics.selectionAsync(); setPs(prev => ({ ...prev, minute: (prev.minute - 5 + 60) % 60 })); }}
+                    accessibilityLabel="Decrease minute"
+                    testID="minute-down"
+                  >
+                    <Feather name="chevron-down" size={16} color={FG} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* AM / PM toggle */}
+                <View style={dps.ampmWrap}>
+                  {(['AM', 'PM'] as const).map(val => (
+                    <TouchableOpacity
+                      key={val}
+                      style={[dps.ampmBtn, ps.ampm === val && { backgroundColor: PURPLE, borderColor: PURPLE }]}
+                      onPress={() => { Haptics.selectionAsync(); setPs(prev => ({ ...prev, ampm: val })); }}
+                      accessibilityLabel={val}
+                      testID={`ampm-${val}`}
+                    >
+                      <Text style={[dps.ampmText, ps.ampm === val && { color: '#fff' }]}>{val}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
+          </ScrollView>
+
+          {/* Confirm */}
+          <TouchableOpacity
+            style={[dps.confirmBtn, { backgroundColor: PURPLE }]}
+            onPress={handleConfirm}
+            accessibilityLabel="Confirm schedule"
+            testID="confirm-schedule"
+          >
+            <Text style={dps.confirmText}>Confirm</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -159,6 +435,15 @@ export default function CreatePostScreen() {
   // ── Media ──
   const [videoClips,    setVideoClips]   = useState<VideoClipLocal[]>([]);
   const [slidePhotos,   setSlidePhotos]  = useState<SlidePhotoLocal[]>([]);
+  // ── Slide edit: editable slides with per-slide overlays ──
+  const [editableSlides,    setEditableSlides]    = useState<EditablePhotoSlide[]>([]);
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [composedSlideshow, setComposedSlideshow] = useState<ComposedSlideshowResult | null>(null);
+  const [slideProcessingPhase, setSlideProcessingPhase] = useState<'idle' | 'uploading' | 'composing' | 'error' | 'ready'>('idle');
+  const [slideProcessingError, setSlideProcessingError] = useState<string | null>(null);
+  // ── Slide-edit text overlay editor state ──
+  const [slideShowTextEditor, setSlideShowTextEditor] = useState(false);
+  const [slideEditingOverlayId, setSlideEditingOverlayId] = useState<string | undefined>(undefined);
   const [maxDuration,   setMaxDuration]  = useState<MaxVideoDuration>(30);
   const [trimStart,     setTrimStart]    = useState(0);
   const [trimEnd,       setTrimEnd]      = useState(0);
@@ -178,7 +463,8 @@ export default function CreatePostScreen() {
   const [visibility,         setVisibility]         = useState<PostVisibility>(DEFAULT_VISIBILITY);
   const [scheduleMode,       setScheduleMode]       = useState<'now'|'schedule'>('now');
   const [scheduledAt,        setScheduledAt]        = useState<string | null>(null);
-  const [scheduledDateInput, setScheduledDateInput] = useState('');
+  const [pickerState,        setPickerState]        = useState<PickerState>(makeDefaultPickerState);
+  const [showDatePicker,     setShowDatePicker]     = useState(false);
   const [productTags,        setProductTags]        = useState<PostProductTag[]>([]);
   const [taggableProducts,   setTaggableProducts]   = useState<Product[]>([]);
   const [loadingTaggable,    setLoadingTaggable]    = useState(false);
@@ -186,6 +472,13 @@ export default function CreatePostScreen() {
 
   // ── Sound / overlays ──
   const [selectedSound,  setSelectedSound]  = useState<SoundSelection | null>(null);
+
+  // ── Text overlays ──
+  const [textOverlays,        setTextOverlays]        = useState<TextOverlay[]>([]);
+  const [showTextEditor,      setShowTextEditor]       = useState(false);
+  const [editingOverlayId,    setEditingOverlayId]     = useState<string | undefined>(undefined);
+  const videoCanvasRef = useRef<View>(null);
+  const [canvasLayout,        setCanvasLayout]         = useState({ width: SW, height: SW * (16 / 9) });
 
   // ── Modals ──
   const [showSoundModal,   setShowSoundModal]   = useState(false);
@@ -198,8 +491,9 @@ export default function CreatePostScreen() {
   // ── Product modal ──
   const [productSearch, setProductSearch] = useState('');
 
-  // ── Publishing ──
+  // ── Publishing / saving ──
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [editingPost,  setEditingPost]  = useState<SellerThreadPost | null>(null);
   const [loadingEdit,  setLoadingEdit]  = useState(!!editId);
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -232,14 +526,49 @@ export default function CreatePostScreen() {
         })));
         setSelectedSound(post.sound ?? null);
         setVisibility({ isPublic: true, ...post.visibility });
-        setScheduledAt(post.scheduledAt);
-        setScheduledDateInput(post.scheduledAt ?? '');
+        if (post.scheduledAt) {
+          setScheduledAt(post.scheduledAt);
+          setPickerState(pickerStateFromISO(post.scheduledAt));
+        }
         setScheduleMode(post.postStatus === 'scheduled' ? 'schedule' : 'now');
         if (post.contentType === 'video' && post.mediaUris[0]) {
           setVideoClips([{ uri: post.mediaUris[0], duration: 0, id: `edit-video-${post.id}`, speed: 1, filter: 'none' }]);
           setSlidePhotos([]);
+          setEditableSlides([]);
+        } else if (post.contentType === 'slideshow' && post.mediaUris.length > 0) {
+          // Restore slideshow: rebuild editable slides from saved mediaUris + slideOverlays
+          const savedOverlayMap = new Map<number, TextOverlay[]>();
+          if (Array.isArray(post.slideOverlays)) {
+            for (const entry of post.slideOverlays) {
+              if (typeof entry.slideIndex === 'number' && Array.isArray(entry.overlays)) {
+                savedOverlayMap.set(entry.slideIndex, entry.overlays as TextOverlay[]);
+              }
+            }
+          }
+          const restoredSlides: EditablePhotoSlide[] = post.mediaUris.map((uri, idx) => ({
+            id: `edit-slide-${post.id}-${idx}`,
+            uri,
+            overlays: savedOverlayMap.get(idx) ?? [],
+            uploadState: 'idle' as const,
+          }));
+          setSlidePhotos(post.mediaUris.map((uri, idx) => ({ uri, id: `edit-slide-${post.id}-${idx}` })));
+          setEditableSlides(restoredSlides);
+          setCurrentSlideIndex(0);
+          setVideoClips([]);
+          // Restore composed result if we have mediaPaths (so re-publish doesn't re-compose)
+          if (Array.isArray(post.mediaPaths) && post.mediaPaths.length > 0) {
+            setComposedSlideshow({
+              mediaPaths: post.mediaPaths,
+              mediaUrls: post.mediaUris,
+              thumbnailPath: '',
+              thumbnailUrl: post.thumbnailUri ?? '',
+              slideCount: post.mediaUris.length,
+            });
+            setSlideProcessingPhase('ready');
+          }
         } else {
           setSlidePhotos(post.mediaUris.map((uri, index) => ({ uri, id: `edit-photo-${post.id}-${index}` })));
+          setEditableSlides([]);
           setVideoClips([]);
         }
         setStep('post-details');
@@ -272,6 +601,13 @@ export default function CreatePostScreen() {
       }
     }, [])
   );
+
+  // Auto-advance to post-details when slideshow is ready
+  useEffect(() => {
+    if (step === 'slide-edit' && slideProcessingPhase === 'ready' && composedSlideshow) {
+      setStep('post-details');
+    }
+  }, [slideProcessingPhase, composedSlideshow, step]);
 
   useEffect(() => {
     if (step !== 'publishing') return;
@@ -332,6 +668,34 @@ export default function CreatePostScreen() {
     setShowSoundModal(false);
   }
 
+  function openTextEditor(overlayId?: string) {
+    setEditingOverlayId(overlayId);
+    setShowTextEditor(true);
+  }
+
+  function handleTextOverlayDone(overlay: TextOverlay) {
+    setTextOverlays(prev => {
+      const existing = prev.find(o => o.id === overlay.id);
+      if (existing) return prev.map(o => o.id === overlay.id ? overlay : o);
+      return [...prev, overlay];
+    });
+    setShowTextEditor(false);
+    setEditingOverlayId(undefined);
+  }
+
+  function handleTextOverlayCancel() {
+    setShowTextEditor(false);
+    setEditingOverlayId(undefined);
+  }
+
+  function moveOverlay(id: string, x: number, y: number) {
+    setTextOverlays(prev => prev.map(o => o.id === id ? { ...o, x, y } : o));
+  }
+
+  function deleteOverlay(id: string) {
+    setTextOverlays(prev => prev.filter(o => o.id !== id));
+  }
+
   function tagProduct(p: Product) {
     const already = productTags.find(t => t.productId === p.id);
     if (already) setProductTags(prev => prev.filter(t => t.productId !== p.id));
@@ -343,30 +707,49 @@ export default function CreatePostScreen() {
     setVideoClips([]); setSlidePhotos([]); setMaxDuration(30);
     setTrimStart(0); setTrimEnd(0); setScrubTime(0); setPreviewSeekTime(0); setPreviewClipIndex(0);
     setComposedVideo(null); setProcessingPhase('idle'); setProcessingError(null);
+    setEditableSlides([]); setCurrentSlideIndex(0); setComposedSlideshow(null);
+    setSlideProcessingPhase('idle'); setSlideProcessingError(null);
     setCaption(''); setHashtags([]); setHashtagInput(''); setStyleTags([]);
     setLocation(''); setVisibility(DEFAULT_VISIBILITY); setScheduleMode('now');
-    setScheduledAt(null); setScheduledDateInput(''); setProductTags([]);
-    setSelectedSound(null);
+    setScheduledAt(null); setPickerState(makeDefaultPickerState()); setProductTags([]);
+    setSelectedSound(null); setTextOverlays([]);
   }
 
-  async function persistSellerPost(isDraft: boolean): Promise<void> {
+  /** Persists a draft or published post. Returns the created/updated SellerThreadPost. */
+  async function persistSellerPost(isDraft: boolean): Promise<SellerThreadPost> {
     const contentType = inferContentType();
     const postStatus: SellerThreadPost['postStatus'] = isDraft
       ? 'draft'
       : scheduleMode === 'schedule' && scheduledAt
         ? 'scheduled' : 'published';
-    const mediaUris = composedVideo
-      ? [composedVideo.mediaUrl]
-      : videoClips.length > 0 ? videoClips.map(c => c.uri) : slidePhotos.map(p => p.uri);
+
+    // For slideshows: use composedSlideshow paths/URLs if ready
+    const isSlideshow = contentType === 'slideshow';
+    const mediaUris = composedSlideshow
+      ? composedSlideshow.mediaUrls
+      : composedVideo
+        ? [composedVideo.mediaUrl]
+        : videoClips.length > 0 ? videoClips.map(c => c.uri) : slidePhotos.map(p => p.uri);
+
+    // Build slide overlays payload for persistence
+    const slideOverlays = isSlideshow
+      ? editableSlides.map((slide, idx) => ({
+          slideIndex: idx,
+          overlays: slide.overlays,
+        })).filter(entry => entry.overlays.length > 0)
+      : undefined;
+
     const values = {
       contentType, caption,
       hashtags: hashtags.map(h => h.tag),
       styleTags, mediaUris,
-      mediaUrl: composedVideo?.mediaUrl ?? mediaUris[0],
+      mediaUrl: composedSlideshow?.mediaUrls[0] ?? composedVideo?.mediaUrl ?? mediaUris[0],
       mediaPath: composedVideo?.mediaPath,
-      thumbnailPath: composedVideo?.thumbnailPath,
-      thumbnailUri: composedVideo?.thumbnailUrl ?? editingPost?.thumbnailUri,
+      thumbnailPath: composedVideo?.thumbnailPath ?? composedSlideshow?.thumbnailPath,
+      thumbnailUri: composedSlideshow?.thumbnailUrl ?? composedVideo?.thumbnailUrl ?? editingPost?.thumbnailUri,
       aspectRatio: '9:16' as const,
+      mediaPaths: composedSlideshow?.mediaPaths ?? [],
+      slideOverlays,
       productTags: productTags.map(pt => ({
         productId: pt.productId, productName: pt.productName, priceCents: pt.priceCents,
       })),
@@ -374,8 +757,54 @@ export default function CreatePostScreen() {
       visibility, isDraft,
       scheduledAt: isDraft || scheduleMode === 'now' ? null : scheduledAt,
     };
-    if (editId) await updateSellerPost(editId, { ...values, postStatus });
-    else await createSellerPost(values);
+    let result: SellerThreadPost;
+    if (editId) {
+      result = await updateSellerPost(editId, { ...values, postStatus });
+    } else {
+      result = await createSellerPost(values);
+    }
+    // Guard: verify result is truly a draft when saving as draft
+    if (isDraft && result.postStatus !== 'draft' && result.isDraft !== true) {
+      // Treat as success anyway (server may normalise differently), but flag in dev
+      if (__DEV__) {
+        console.warn('[CreatePost] persistSellerPost(isDraft=true) returned non-draft record', result);
+      }
+    }
+    return result;
+  }
+
+  /** Upload raw slides and compose them via the server. Sets composedSlideshow on success. */
+  async function processSlideshow() {
+    if (editableSlides.length === 0 || slideProcessingPhase === 'uploading' || slideProcessingPhase === 'composing') return;
+    setSlideProcessingError(null);
+    setSlideProcessingPhase('uploading');
+    let localSlides = [...editableSlides];
+    try {
+      // Phase 1: Upload any slides that haven't been uploaded yet
+      for (let i = 0; i < localSlides.length; i++) {
+        if (localSlides[i].uploadState === 'uploaded' && localSlides[i].objectPath) continue;
+        setEditableSlides(prev => updateSlideUploadState(prev, localSlides[i].id, 'uploading'));
+        try {
+          const result = await api.posts.uploadPhotoSlide(localSlides[i].uri, localSlides[i].mimeType);
+          localSlides = updateSlideUploadState(localSlides, localSlides[i].id, 'uploaded', result.objectPath);
+          setEditableSlides([...localSlides]);
+        } catch (uploadErr) {
+          const msg = uploadErr instanceof Error ? uploadErr.message : 'Upload failed';
+          localSlides = updateSlideUploadState(localSlides, localSlides[i].id, 'error', undefined, msg);
+          setEditableSlides([...localSlides]);
+          throw new Error(`Slide ${i + 1}: ${msg}`);
+        }
+      }
+      // Phase 2: Compose slideshow with overlays
+      setSlideProcessingPhase('composing');
+      const composePayload = slidesToComposePayload(localSlides);
+      const composed = await api.posts.composeSlideshow({ slides: composePayload });
+      setComposedSlideshow(composed);
+      setSlideProcessingPhase('ready');
+    } catch (err) {
+      setSlideProcessingPhase('error');
+      setSlideProcessingError(err instanceof Error ? err.message : 'Slideshow processing failed. Tap retry to keep working.');
+    }
   }
 
   const totalVideoDuration = videoClips.reduce((sum, clip) => sum + clip.duration / clip.speed, 0);
@@ -407,6 +836,19 @@ export default function CreatePostScreen() {
           speed: clip.speed, filter: clip.filter,
         })),
         trimStart, trimEnd,
+        textOverlays: textOverlays.length > 0 ? textOverlays.map(ov => ({
+          id: ov.id,
+          text: ov.text,
+          x: ov.x,
+          y: ov.y,
+          color: ov.color,
+          fontStyle: ov.fontStyle,
+          align: ov.align,
+          bgStyle: ov.bgStyle,
+          fontSize: ov.fontSize,
+          startTime: ov.startTime,
+          endTime: ov.endTime,
+        })) : undefined,
       });
       setComposedVideo(result);
       setVideoClips(uploaded.map(({ objectPath: _op, ...clip }) => clip));
@@ -611,7 +1053,22 @@ export default function CreatePostScreen() {
               <TouchableOpacity
                 style={ts.mpNextShutter}
                 activeOpacity={0.88}
-                onPress={() => haptic(() => setStep(videoClips.length > 0 ? 'video-edit' : 'post-details'))}
+                onPress={() => haptic(() => {
+                  if (videoClips.length > 0) {
+                    setStep('video-edit');
+                  } else {
+                    // Enter slide-edit: build EditablePhotoSlide from slidePhotos
+                    const slides = slidePhotos.map(p =>
+                      createPhotoSlide(p.id, p.uri)
+                    );
+                    setEditableSlides(slides);
+                    setCurrentSlideIndex(0);
+                    setComposedSlideshow(null);
+                    setSlideProcessingPhase('idle');
+                    setSlideProcessingError(null);
+                    setStep('slide-edit');
+                  }
+                })}
               >
                 <LinearGradient
                   colors={theme.primaryGradient}
@@ -678,6 +1135,236 @@ export default function CreatePostScreen() {
         </View>
 
         {/* Sound modal (accessible from Add sound pill) */}
+        <SoundModal
+          visible={showSoundModal} onClose={() => setShowSoundModal(false)}
+          soundTab={soundTab} setSoundTab={setSoundTab}
+          soundSearch={soundSearch} setSoundSearch={setSoundSearch}
+          onUse={useSound} insets={insets}
+        />
+      </View>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // SCREEN B2: SLIDE EDIT — photo slideshow editor with per-slide text overlays
+  // Shows the current slide full-screen, thumbnail strip at bottom,
+  // Aa button to add/edit text overlays. Next uploads + composes then goes to post-details.
+  // ─────────────────────────────────────────────────────────────────────────────
+  if (step === 'slide-edit') {
+    const currentSlide = editableSlides[Math.min(currentSlideIndex, Math.max(0, editableSlides.length - 1))];
+    const isBusy = slideProcessingPhase === 'uploading' || slideProcessingPhase === 'composing';
+    const isReady = slideProcessingPhase === 'ready' && !!composedSlideshow;
+
+    function handleSlideTextOverlayDone(overlay: TextOverlay) {
+      if (!currentSlide) return;
+      setEditableSlides(prev => updateSlideOverlays(
+        prev, currentSlide.id,
+        prev.find(s => s.id === currentSlide.id)?.overlays.some(o => o.id === overlay.id)
+          ? prev.find(s => s.id === currentSlide.id)!.overlays.map(o => o.id === overlay.id ? overlay : o)
+          : [...(prev.find(s => s.id === currentSlide.id)?.overlays ?? []), overlay],
+      ));
+      setSlideShowTextEditor(false);
+      setSlideEditingOverlayId(undefined);
+      // Clear any composed result since overlays changed
+      setComposedSlideshow(null);
+      setSlideProcessingPhase('idle');
+    }
+
+    function handleSlideTextOverlayCancel() {
+      setSlideShowTextEditor(false);
+      setSlideEditingOverlayId(undefined);
+    }
+
+    function moveSlideOverlay(id: string, x: number, y: number) {
+      if (!currentSlide) return;
+      setEditableSlides(prev => updateSlideOverlays(
+        prev, currentSlide.id,
+        (prev.find(s => s.id === currentSlide.id)?.overlays ?? []).map(o => o.id === id ? { ...o, x, y } : o),
+      ));
+      setComposedSlideshow(null);
+      setSlideProcessingPhase('idle');
+    }
+
+    function deleteSlideOverlay(id: string) {
+      if (!currentSlide) return;
+      setEditableSlides(prev => updateSlideOverlays(
+        prev, currentSlide.id,
+        (prev.find(s => s.id === currentSlide.id)?.overlays ?? []).filter(o => o.id !== id),
+      ));
+      setComposedSlideshow(null);
+      setSlideProcessingPhase('idle');
+    }
+
+    return (
+      <View style={[ts.root, { backgroundColor: BG }]}>
+        <StatusBar barStyle="light-content" backgroundColor={BG} />
+
+        {/* Full-screen slide preview */}
+        {currentSlide && (
+          <Image
+            source={{ uri: currentSlide.uri }}
+            style={StyleSheet.absoluteFill}
+            resizeMode="cover"
+          />
+        )}
+
+        {/* Overlay chips on current slide */}
+        {currentSlide && !slideShowTextEditor && (
+          <View style={[StyleSheet.absoluteFill, { zIndex: 5 }]}
+            onLayout={(e) => {
+              const { width, height } = e.nativeEvent.layout;
+              setCanvasLayout({ width, height });
+            }}
+          >
+            {currentSlide.overlays.map(overlay => (
+              <OverlayChip
+                key={overlay.id}
+                overlay={overlay}
+                containerWidth={canvasLayout.width}
+                containerHeight={canvasLayout.height}
+                onTap={() => { setSlideEditingOverlayId(overlay.id); setSlideShowTextEditor(true); }}
+                onMove={(x, y) => moveSlideOverlay(overlay.id, x, y)}
+                onDelete={() => deleteSlideOverlay(overlay.id)}
+              />
+            ))}
+          </View>
+        )}
+
+        {/* Text overlay editor modal */}
+        <TextOverlayEditor
+          visible={slideShowTextEditor}
+          editingOverlay={
+            slideEditingOverlayId
+              ? currentSlide?.overlays.find(o => o.id === slideEditingOverlayId)
+              : undefined
+          }
+          onDone={handleSlideTextOverlayDone}
+          onCancel={handleSlideTextOverlayCancel}
+        />
+
+        {/* Top bar */}
+        <View style={[ts.videoTopBar, { paddingTop: topPad + 6, zIndex: 20 }]}>
+          <TouchableOpacity
+            disabled={isBusy}
+            onPress={() => haptic(() => setStep('media-pick'))}
+            style={ts.videoTopBtn}
+          >
+            <Feather name="arrow-left" size={24} color={isBusy ? MUTED : FG} />
+          </TouchableOpacity>
+
+          <Text style={[ts.soundPillText, { color: FG, fontFamily: FONT.bold }]}>
+            Edit Slides ({currentSlideIndex + 1}/{editableSlides.length})
+          </Text>
+
+          <View style={{ width: 44 }} />
+        </View>
+
+        {/* Right tools — Aa (text overlay) + slide delete */}
+        <View style={[ts.rightToolbar, { paddingTop: topPad + 56, zIndex: 20 }]}>
+          <ToolBtn
+            icon="type"
+            label="Aa"
+            onPress={() => { setSlideEditingOverlayId(undefined); setSlideShowTextEditor(true); }}
+            accessibilityLabel="Add text overlay"
+          />
+          {editableSlides.length > 1 && (
+            <ToolBtn
+              icon="trash-2"
+              label="Del"
+              onPress={() => {
+                if (!currentSlide) return;
+                const newSlides = removePhotoSlide(editableSlides, currentSlide.id);
+                setEditableSlides(newSlides);
+                setCurrentSlideIndex(idx => Math.min(idx, newSlides.length - 1));
+                setComposedSlideshow(null);
+                setSlideProcessingPhase('idle');
+              }}
+              accessibilityLabel="Remove slide"
+            />
+          )}
+        </View>
+
+        {/* Slide selector strip at bottom */}
+        <View style={[ts.slideStripContainer, { bottom: botPad + 80 }]}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 12, paddingVertical: 8 }}>
+              {editableSlides.map((slide, idx) => (
+                <TouchableOpacity
+                  key={slide.id}
+                  style={[
+                    ts.slideThumb,
+                    idx === currentSlideIndex && { borderColor: ORANGE, borderWidth: 2 },
+                  ]}
+                  onPress={() => setCurrentSlideIndex(idx)}
+                  accessibilityLabel={`Slide ${idx + 1}`}
+                >
+                  <Image source={{ uri: slide.uri }} style={ts.slideThumbImg} resizeMode="cover" />
+                  {slide.overlays.length > 0 && (
+                    <View style={ts.slideOverlayBadge}>
+                      <Text style={ts.slideOverlayBadgeText}>{slide.overlays.length}</Text>
+                    </View>
+                  )}
+                  {slide.uploadState === 'error' && (
+                    <View style={[ts.slideOverlayBadge, { backgroundColor: '#ef4444' }]}>
+                      <Feather name="alert-circle" size={8} color="#fff" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+
+        {/* Processing error banner */}
+        {slideProcessingPhase === 'error' && slideProcessingError && (
+          <View style={[ts.errorBanner, { bottom: botPad + 140 }]}>
+            <Feather name="alert-triangle" size={14} color="#fbbf24" style={{ marginRight: 8 }} />
+            <Text style={ts.errorBannerText} numberOfLines={2}>{slideProcessingError}</Text>
+            <TouchableOpacity onPress={processSlideshow} style={ts.errorRetryBtn}>
+              <Text style={ts.errorRetryText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Bottom Next button */}
+        <View style={[ts.slideNextBar, { paddingBottom: botPad + 8 }]}>
+          {isBusy ? (
+            <View style={ts.slideNextBusy}>
+              <ActivityIndicator color={FG} size="small" style={{ marginRight: 10 }} />
+              <Text style={ts.slideNextBusyText}>
+                {slideProcessingPhase === 'uploading' ? 'Uploading slides…' : 'Composing slideshow…'}
+              </Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={ts.nextBtn}
+              activeOpacity={0.85}
+              onPress={async () => {
+                haptic(() => {});
+                if (isReady) {
+                  // Already composed — go straight to post details
+                  setStep('post-details');
+                  return;
+                }
+                // Need to upload+compose first
+                await processSlideshow();
+                // processSlideshow sets phase to 'ready' on success; watch via effect
+              }}
+            >
+              <LinearGradient
+                colors={theme.primaryGradient}
+                style={ts.nextBtnGrad}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              >
+                <Text style={[ts.nextBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
+                  {isReady ? 'Next →' : 'Process & Next'}
+                </Text>
+                <Feather name="arrow-right" size={18} color={theme.onAccent} style={{ marginLeft: 6 }} />
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+        </View>
+
         <SoundModal
           visible={showSoundModal} onClose={() => setShowSoundModal(false)}
           soundTab={soundTab} setSoundTab={setSoundTab}
@@ -769,7 +1456,38 @@ export default function CreatePostScreen() {
           <View style={ts.toolDivider} />
           <ToolBtn icon="sliders" />
           <ToolBtn icon="film" />
-          <ToolBtn icon="type" onPress={() => setShowSoundModal(true)} />
+          <ToolBtn
+            icon="type"
+            label="Text"
+            onPress={() => openTextEditor()}
+            accessibilityLabel="Add text overlay"
+            testID="toolbar-text-btn"
+          />
+        </View>
+
+        {/* Overlay canvas — text chips draggable on the video */}
+        <View
+          ref={videoCanvasRef}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="box-none"
+          onLayout={(e) => setCanvasLayout({
+            width: e.nativeEvent.layout.width,
+            height: e.nativeEvent.layout.height,
+          })}
+          accessibilityLabel="Text overlay canvas"
+          testID="overlay-canvas"
+        >
+          {textOverlays.map((ov) => (
+            <OverlayChip
+              key={ov.id}
+              overlay={ov}
+              containerWidth={canvasLayout.width}
+              containerHeight={canvasLayout.height}
+              onTap={() => openTextEditor(ov.id)}
+              onMove={(x, y) => moveOverlay(ov.id, x, y)}
+              onDelete={() => deleteOverlay(ov.id)}
+            />
+          ))}
         </View>
 
         {/* Timeline + trim overlay at middle-bottom */}
@@ -880,6 +1598,16 @@ export default function CreatePostScreen() {
           soundSearch={soundSearch} setSoundSearch={setSoundSearch}
           onUse={useSound} insets={insets}
         />
+
+        {/* Text overlay editor */}
+        <TextOverlayEditor
+          visible={showTextEditor}
+          editingOverlay={editingOverlayId
+            ? textOverlays.find(o => o.id === editingOverlayId)
+            : undefined}
+          onDone={handleTextOverlayDone}
+          onCancel={handleTextOverlayCancel}
+        />
       </View>
     );
   }
@@ -894,6 +1622,18 @@ export default function CreatePostScreen() {
     const thumbUri = composedVideo?.thumbnailUrl
       ?? (slidePhotos.length > 0 ? slidePhotos[0].uri : null);
     const hasVideo = videoClips.length > 0;
+
+    // Formatted display value for the schedule row
+    const scheduleDisplayValue = scheduledAt
+      ? (() => {
+          const d = new Date(scheduledAt);
+          if (isNaN(d.getTime())) return 'Pick date & time';
+          return d.toLocaleString(undefined, {
+            month: 'short', day: 'numeric', year: 'numeric',
+            hour: 'numeric', minute: '2-digit',
+          });
+        })()
+      : 'Pick date & time';
 
     return (
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -1098,7 +1838,15 @@ export default function CreatePostScreen() {
                   <TouchableOpacity
                     key={mode}
                     style={[ts.schedulePill, scheduleMode === mode && { backgroundColor: PURPLE + '22', borderColor: PURPLE + '55' }]}
-                    onPress={() => setScheduleMode(mode)}
+                    onPress={() => {
+                      setScheduleMode(mode);
+                      if (mode === 'schedule' && !scheduledAt) {
+                        // open picker immediately with a sensible default
+                        setPickerState(makeDefaultPickerState());
+                        setShowDatePicker(true);
+                      }
+                    }}
+                    testID={`schedule-mode-${mode}`}
                   >
                     {scheduleMode === mode && <Feather name="check" size={11} color={PURPLE} style={{ marginRight: 4 }} />}
                     <Text style={[ts.schedulePillText, scheduleMode === mode && { color: PURPLE }]}>
@@ -1107,14 +1855,22 @@ export default function CreatePostScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
+
+              {/* Scheduled time display row — tap to re-open picker */}
               {scheduleMode === 'schedule' && (
-                <TextInput
-                  style={[ts.inlineInput, { marginTop: 10 }]}
-                  value={scheduledDateInput}
-                  onChangeText={(v) => { setScheduledDateInput(v); setScheduledAt(v); }}
-                  placeholder="YYYY-MM-DD HH:MM"
-                  placeholderTextColor={MUTED}
-                />
+                <TouchableOpacity
+                  style={ts.scheduleDisplayRow}
+                  onPress={() => setShowDatePicker(true)}
+                  activeOpacity={0.75}
+                  accessibilityLabel="Open date and time picker"
+                  testID="open-date-picker"
+                >
+                  <Feather name="calendar" size={14} color={PURPLE} style={{ marginRight: 8 }} />
+                  <Text style={[ts.scheduleDisplayText, { color: scheduledAt ? FG : MUTED }]}>
+                    {scheduleDisplayValue}
+                  </Text>
+                  <Feather name="chevron-right" size={14} color={MUTED} style={{ marginLeft: 'auto' }} />
+                </TouchableOpacity>
               )}
             </View>
           </ScrollView>
@@ -1122,20 +1878,43 @@ export default function CreatePostScreen() {
           {/* Dual CTA bottom bar — Drafts | Post */}
           <View style={[ts.dualCTA, { paddingBottom: botPad + 8 }]}>
             <TouchableOpacity
-              style={ts.draftBtn}
+              style={[ts.draftBtn, isSavingDraft && { opacity: 0.55 }]}
               activeOpacity={0.8}
+              disabled={isSavingDraft}
+              testID="save-draft-btn"
               onPress={async () => {
+                if (isSavingDraft) return;
                 haptic(() => {});
+                setIsSavingDraft(true);
                 try {
-                  await persistSellerPost(true);
-                  Alert.alert('Draft saved', 'Your draft has been saved.', [{ text: 'OK', onPress: leaveSetupDestination }]);
+                  const saved = await persistSellerPost(true);
+                  // Verify it came back as a draft
+                  const confirmedDraft = saved.isDraft === true || saved.postStatus === 'draft';
+                  if (!confirmedDraft) {
+                    Alert.alert(
+                      'Draft not confirmed',
+                      'The post was saved but its status could not be verified. Check your Content library.',
+                      [{ text: 'Go to Content', onPress: () => router.replace('/content?tab=draft' as never) }],
+                    );
+                    return;
+                  }
+                  // Route to Content library with Draft tab active
+                  router.replace('/content?tab=draft' as never);
                 } catch (error) {
-                  Alert.alert('Draft not saved', error instanceof Error ? error.message : 'Could not save draft.');
+                  Alert.alert(
+                    'Draft not saved',
+                    error instanceof Error ? error.message : 'Could not save draft. Please try again.',
+                  );
+                } finally {
+                  setIsSavingDraft(false);
                 }
               }}
             >
-              <Feather name="bookmark" size={15} color={FG} style={{ marginRight: 6 }} />
-              <Text style={ts.draftBtnText}>Drafts</Text>
+              {isSavingDraft
+                ? <ActivityIndicator size="small" color={FG} style={{ marginRight: 6 }} />
+                : <Feather name="bookmark" size={15} color={FG} style={{ marginRight: 6 }} />
+              }
+              <Text style={ts.draftBtnText}>{isSavingDraft ? 'Saving…' : 'Drafts'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -1148,7 +1927,7 @@ export default function CreatePostScreen() {
                 if (scheduleMode === 'schedule') {
                   const t = scheduledAt ? new Date(scheduledAt).getTime() : Number.NaN;
                   if (!Number.isFinite(t) || t <= Date.now()) {
-                    Alert.alert('Choose a future time', 'Enter a valid date and time in the future before scheduling.');
+                    Alert.alert('Choose a future time', 'Tap the schedule row to pick a valid date and time in the future.');
                     return;
                   }
                 }
@@ -1201,6 +1980,19 @@ export default function CreatePostScreen() {
             soundTab={soundTab} setSoundTab={setSoundTab}
             soundSearch={soundSearch} setSoundSearch={setSoundSearch}
             onUse={useSound} insets={insets}
+          />
+          {/* Date/time picker modal */}
+          <DatePickerModal
+            visible={showDatePicker}
+            initial={pickerState}
+            onConfirm={(ps) => {
+              setPickerState(ps);
+              const iso = isoFromPickerState(ps);
+              setScheduledAt(iso);
+              setShowDatePicker(false);
+            }}
+            onClose={() => setShowDatePicker(false)}
+            insets={insets}
           />
         </View>
       </KeyboardAvoidingView>
@@ -1651,7 +2443,12 @@ const ts = StyleSheet.create({
   scheduleRow:     { flexDirection: 'row', gap: 10 },
   schedulePill:    { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 20, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 16, paddingVertical: 8 },
   schedulePillText:{ fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
-  inlineInput:     { backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, fontSize: FS.sm, paddingHorizontal: 12, paddingVertical: 10 },
+  scheduleDisplayRow: {
+    flexDirection: 'row', alignItems: 'center', marginTop: 12,
+    backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER,
+    paddingHorizontal: 14, paddingVertical: 12,
+  },
+  scheduleDisplayText: { fontSize: FS.sm, fontFamily: FONT.regular, flex: 1 },
 
   // ── Dual CTA ──
   dualCTA: {
@@ -1672,6 +2469,25 @@ const ts = StyleSheet.create({
   doneSub:          { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', marginTop: 8, paddingHorizontal: 40 },
 
   muted: { fontFamily: FONT.regular, color: MUTED },
+
+  // ── Slide-edit step ──
+  slideStripContainer: {
+    position: 'absolute', left: 0, right: 0, zIndex: 20,
+    backgroundColor: 'rgba(0,0,0,0.60)',
+  },
+  slideThumb:    { width: 60, height: 80, borderRadius: 6, overflow: 'hidden', borderWidth: 2, borderColor: 'transparent', position: 'relative' },
+  slideThumbImg: { width: 60, height: 80 },
+  slideOverlayBadge: { position: 'absolute', top: 3, right: 3, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  slideOverlayBadgeText: { fontSize: 9, fontFamily: FONT.bold, color: '#fff' },
+  slideNextBar: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20,
+    paddingHorizontal: 20, paddingTop: 12,
+    backgroundColor: 'rgba(0,0,0,0.60)',
+  },
+  slideNextBusy: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14 },
+  slideNextBusyText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
+  errorRetryBtn: { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+  errorRetryText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: FG },
 });
 
 // ─── Modal styles ─────────────────────────────────────────────────────────────
@@ -1703,4 +2519,36 @@ const ms = StyleSheet.create({
   tagBtnText:{ fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED },
   doneBtn:   { borderRadius: 12, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, paddingVertical: 14, alignItems: 'center' },
   doneBtnText:{ fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
+});
+
+// ─── Date picker modal styles ─────────────────────────────────────────────────
+const dps = StyleSheet.create({
+  overlay:   { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
+  sheet:     { backgroundColor: BG_SOFT, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16, paddingTop: 12, maxHeight: '92%' },
+  handle:    { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: 14 },
+  titleRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  title:     { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
+  closeBtn:  { width: 34, height: 34, backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  summaryRow:{ flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 14, gap: 4 },
+  summaryText:{ fontSize: FS.xs, fontFamily: FONT.semibold },
+  monthNav:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  monthNavBtn:{ width: 38, height: 38, alignItems: 'center', justifyContent: 'center', backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER },
+  monthLabel:{ fontSize: FS.base, fontFamily: FONT.bold, color: FG },
+  dowRow:    { flexDirection: 'row', marginBottom: 4 },
+  dowText:   { flex: 1, textAlign: 'center', fontSize: 11, fontFamily: FONT.semibold, color: MUTED, paddingVertical: 4 },
+  calGrid:   { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 18 },
+  calCell:   { width: `${100 / 7}%` as any, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
+  calDayText:{ fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
+  timeSection:{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: BORDER, paddingTop: 16, marginBottom: 12 },
+  timeSectionLabel:{ fontSize: 11, fontFamily: FONT.semibold, color: MUTED, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 14 },
+  timeRow:   { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  stepper:   { alignItems: 'center', gap: 6, backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, paddingVertical: 8, paddingHorizontal: 16 },
+  stepBtn:   { width: 32, height: 28, alignItems: 'center', justifyContent: 'center' },
+  stepValue: { fontSize: 22, fontFamily: FONT.bold, color: FG, minWidth: 32, textAlign: 'center' },
+  timeSep:   { fontSize: 22, fontFamily: FONT.bold, color: FG },
+  ampmWrap:  { gap: 8 },
+  ampmBtn:   { backgroundColor: CARD, borderRadius: 8, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 14, paddingVertical: 9 },
+  ampmText:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
+  confirmBtn:{ borderRadius: 12, paddingVertical: 15, alignItems: 'center', marginTop: 8 },
+  confirmText:{ fontSize: FS.base, fontFamily: FONT.bold, color: '#fff' },
 });

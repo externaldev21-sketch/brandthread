@@ -21,12 +21,23 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
   },
 }));
 
+vi.mock('expo-crypto', () => ({
+  randomUUID: () => `test-${Math.random().toString(36).slice(2)}`,
+}));
+
 vi.mock('@/lib/serviceConfig', () => ({
   serviceRequest: vi.fn(),
 }));
 
 vi.mock('@/lib/imageDimensions', () => ({
   getImageDimensions: () => Promise.resolve({ width: 1, height: 1 }),
+}));
+
+vi.mock('@/lib/designCloudImageCache', () => ({
+  cacheDesignCloudImage: (_projectId: string, _objectPath: string, uri: string) => Promise.resolve(uri),
+  readRetainedDesignUploadAsset: () => Promise.resolve(new Uint8Array()),
+  removeRetainedDesignUploadAsset: () => Promise.resolve(),
+  retainDesignUploadAsset: (uri: string) => Promise.resolve(uri),
 }));
 
 // ─── imports after mocks ──────────────────────────────────────────────────────

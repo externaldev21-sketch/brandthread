@@ -7,7 +7,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import type { ContentPost, ContentType, ContentStatus } from '@/services/types';
 import {
@@ -53,6 +53,8 @@ function typeIcon(t: ContentType): keyof typeof Feather.glyphMap {
   return map[t];
 }
 
+const VALID_TABS: FilterTab[] = ['all', 'published', 'scheduled', 'draft', 'archived'];
+
 export default function ContentScreen() {
   const colors = useColors();
   const contentTypes = React.useMemo(() => getContentTypes(colors.primary, colors.info), [colors.primary, colors.info]);
@@ -60,7 +62,23 @@ export default function ContentScreen() {
   const router  = useRouter();
   const topPad  = Platform.OS === 'web' ? 20 : insets.top;
 
-  const [tab, setTab] = useState<FilterTab>('all');
+  // Read optional tab query param (e.g. from /content?tab=draft)
+  const params  = useLocalSearchParams<{ tab?: string }>();
+  const initialTab: FilterTab = (
+    params.tab && VALID_TABS.includes(params.tab as FilterTab)
+      ? params.tab as FilterTab
+      : 'all'
+  );
+
+  const [tab, setTab] = useState<FilterTab>(initialTab);
+
+  // Keep tab in sync if the route param changes (e.g. router.replace('/content?tab=draft'))
+  useEffect(() => {
+    if (params.tab && VALID_TABS.includes(params.tab as FilterTab)) {
+      setTab(params.tab as FilterTab);
+    }
+  }, [params.tab]);
+
   const [content, setContent] = useState<ContentPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);

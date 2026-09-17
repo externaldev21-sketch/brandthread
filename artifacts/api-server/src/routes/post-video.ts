@@ -23,6 +23,24 @@ const MAX_TOTAL_DURATION_SECONDS = 600;
 const COMPOSED_PREVIEW_TTL_SECONDS = 60 * 60;
 const OBJECT_PATH_RE = /^\/objects\/uploads\/[A-Za-z0-9._/-]+$/;
 
+// ─── Text overlay constants ────────────────────────────────────────────────
+const MAX_TEXT_OVERLAYS = 10;
+const MAX_TEXT_LENGTH = 200;
+const VALID_FONT_STYLES = new Set(["classic", "elegance", "retro", "vintage", "postcard", "script", "technic"]);
+const VALID_ALIGN = new Set(["left", "center", "right"]);
+const VALID_BG_STYLES = new Set(["none", "solid", "semi"]);
+const HEX_COLOR_RE = /^#[0-9A-Fa-f]{6}$/;
+const MIN_FONT_SIZE = 10;
+const MAX_FONT_SIZE = 120;
+
+// Safe colours that are always accepted in addition to validated hex strings.
+const ALLOWED_NAMED_COLORS = new Set([
+  "#ffffff", "#000000", "#ff0000", "#ff4500", "#ffa500",
+  "#ffff00", "#00cc00", "#008000", "#00cccc", "#0088ff",
+  "#0000ff", "#5555ff", "#8800ff", "#ff55ff", "#ff66aa",
+  "#aaaaaa",
+]);
+
 async function isSeller(clerkId: string): Promise<boolean> {
   const [user] = await db.select({ accountType: users.accountType })
     .from(users).where(eq(users.clerkId, clerkId)).limit(1);
@@ -94,6 +112,222 @@ export async function publishComposedMedia(
   return setComposedMediaVisibility(clerkId, paths, "public");
 }
 
+// ─── Discover a stable font path via fc-match with explicit fallback ────────
+const FALLBACK_FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+const FALLBACK_FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
+
+async function discoverFont(style: string): Promise<string> {
+  const wantBold = style === "retro" || style === "postcard" || style === "technic" || style === "classic";
+  const preferred = wantBold ? FALLBACK_FONT_BOLD : FALLBACK_FONT;
+  try {
+    const { stdout } = await exec("fc-match", ["--format=%{file}", "sans-serif"], {
+      timeout: 5_000, maxBuffer: 1024 * 256,
+    });
+    const found = String(stdout).trim();
+    if (found && found.endsWith(".ttf")) return found;
+  } catch {
+    // fall through
+  }
+  // Verify preferred fallback exists
+  try {
+    await fs.access(preferred);
+    return preferred;
+  } catch {
+    await fs.access(FALLBACK_FONT);
+    return FALLBACK_FONT;
+  }
+}
+
+// ─── Text overlay validation ───────────────────────────────────────────────
+interface RawOverlay {
+  id?: unknown;
+  text?: unknown;
+  x?: unknown;
+  y?: unknown;
+  color?: unknown;
+  fontStyle?: unknown;
+  align?: unknown;
+  bgStyle?: unknown;
+  fontSize?: unknown;
+  startTime?: unknown;
+  endTime?: unknown;
+}
+
+interface ValidatedOverlay {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  color: string;
+  fontStyle: string;
+  align: string;
+  bgStyle: string;
+  fontSize: number;
+  startTime?: number;
+  endTime?: number;
+}
+
+function validateOverlays(raw: unknown): { ok: true; overlays: ValidatedOverlay[] } | { ok: false; error: string } {
+  if (raw === undefined || raw === null) return { ok: true, overlays: [] };
+  if (!Array.isArray(raw)) return { ok: false, error: "textOverlays must be an array" };
+  if (raw.length > MAX_TEXT_OVERLAYS) {
+    return { ok: false, error: `Max ${MAX_TEXT_OVERLAYS} text overlays allowed` };
+  }
+  const overlays: ValidatedOverlay[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const item = raw[i] as RawOverlay;
+    if (!item || typeof item !== "object") return { ok: false, error: `Overlay ${i} is not an object` };
+
+    const id = typeof item.id === "string" ? item.id.slice(0, 64) : `overlay_${i}`;
+    const text = typeof item.text === "string" ? item.text : "";
+    if (text.length === 0) return { ok: false, error: `Overlay ${i} has empty text` };
+    if (text.length > MAX_TEXT_LENGTH) {
+      return { ok: false, error: `Overlay ${i} text exceeds ${MAX_TEXT_LENGTH} characters` };
+    }
+
+    const x = Number(item.x);
+    const y = Number(item.y);
+    if (!Number.isFinite(x) || x < 0 || x > 1) {
+      return { ok: false, error: `Overlay ${i} x must be 0–1` };
+    }
+    if (!Number.isFinite(y) || y < 0 || y > 1) {
+      return { ok: false, error: `Overlay ${i} y must be 0–1` };
+    }
+
+    const color = typeof item.color === "string" ? item.color.toLowerCase() : "#ffffff";
+    if (!HEX_COLOR_RE.test(color)) {
+      return { ok: false, error: `Overlay ${i} color must be a 6-digit hex string (#rrggbb)` };
+    }
+
+    const fontStyle = typeof item.fontStyle === "string" ? item.fontStyle : "classic";
+    if (!VALID_FONT_STYLES.has(fontStyle)) {
+      return { ok: false, error: `Overlay ${i} fontStyle must be one of: ${[...VALID_FONT_STYLES].join(", ")}` };
+    }
+
+    const align = typeof item.align === "string" ? item.align : "center";
+    if (!VALID_ALIGN.has(align)) {
+      return { ok: false, error: `Overlay ${i} align must be left, center, or right` };
+    }
+
+    const bgStyle = typeof item.bgStyle === "string" ? item.bgStyle : "none";
+    if (!VALID_BG_STYLES.has(bgStyle)) {
+      return { ok: false, error: `Overlay ${i} bgStyle must be none, solid, or semi` };
+    }
+
+    const fontSize = Number(item.fontSize);
+    if (!Number.isFinite(fontSize) || fontSize < MIN_FONT_SIZE || fontSize > MAX_FONT_SIZE) {
+      return { ok: false, error: `Overlay ${i} fontSize must be ${MIN_FONT_SIZE}–${MAX_FONT_SIZE}` };
+    }
+
+    let startTime: number | undefined;
+    let endTime: number | undefined;
+    if (item.startTime !== undefined && item.startTime !== null) {
+      startTime = Number(item.startTime);
+      if (!Number.isFinite(startTime) || startTime < 0) {
+        return { ok: false, error: `Overlay ${i} startTime must be >= 0` };
+      }
+    }
+    if (item.endTime !== undefined && item.endTime !== null) {
+      endTime = Number(item.endTime);
+      if (!Number.isFinite(endTime) || endTime < 0) {
+        return { ok: false, error: `Overlay ${i} endTime must be >= 0` };
+      }
+    }
+
+    overlays.push({ id, text, x, y, color, fontStyle, align, bgStyle, fontSize, startTime, endTime });
+  }
+  return { ok: true, overlays };
+}
+
+/**
+ * Escape text for FFmpeg drawtext filter using a temporary text file.
+ * We write the text to a temp file and pass it via textfile= to avoid
+ * ANY interpolation of user content into the filter string.
+ * Returns the path of the temp file.
+ */
+async function writeOverlayTextFile(dir: string, id: string, text: string): Promise<string> {
+  const safe = id.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 32);
+  const textPath = join(dir, `overlay_${safe}.txt`);
+  await fs.writeFile(textPath, text, "utf8");
+  return textPath;
+}
+
+/**
+ * Map our font style preset to a bold flag for DejaVu.
+ * All weight variation is handled via the font file choice.
+ */
+function fontPathForStyle(style: string, regularFont: string, boldFont: string): string {
+  const bold = ["retro", "postcard", "technic", "classic"];
+  return bold.includes(style) ? boldFont : regularFont;
+}
+
+/**
+ * Build the drawtext filter fragment for a single overlay.
+ * Uses textfile= to prevent any shell/FFmpeg filter injection.
+ * Positions are normalized (0–1) and scaled to output dimensions (720×1280).
+ */
+function buildDrawtextFilter(
+  overlay: ValidatedOverlay,
+  textFile: string,
+  outputDuration: number,
+  fontPath: string,
+): string {
+  const VW = 720;
+  const VH = 1280;
+
+  // Convert hex color to FFmpeg format (0xRRGGBB)
+  const hexRaw = overlay.color.replace("#", "");
+  const ffColor = `0x${hexRaw}`;
+
+  // Background alpha
+  const bgAlpha = overlay.bgStyle === "solid" ? 1.0 : overlay.bgStyle === "semi" ? 0.55 : 0;
+
+  // Derive background box color (same color at 0 opacity for "none", black for solid/semi)
+  const boxColor = bgAlpha > 0 ? `black@${bgAlpha}` : "black@0";
+  const boxEnabled = bgAlpha > 0 ? 1 : 0;
+
+  // X position: normalized * VW, but for center/right we adjust inside drawtext
+  // FFmpeg drawtext positions from top-left of the text bounding box
+  // We use x/y as center of the text area
+  let xExpr: string;
+  if (overlay.align === "center") {
+    xExpr = `${Math.round(overlay.x * VW)}-text_w/2`;
+  } else if (overlay.align === "right") {
+    xExpr = `${Math.round(overlay.x * VW)}-text_w`;
+  } else {
+    xExpr = String(Math.round(overlay.x * VW));
+  }
+  const yExpr = `${Math.round(overlay.y * VH)}-text_h/2`;
+
+  // Timing — default to whole video
+  const tStart = typeof overlay.startTime === "number" ? Math.max(0, overlay.startTime) : 0;
+  const tEnd = typeof overlay.endTime === "number"
+    ? Math.min(outputDuration, overlay.endTime)
+    : outputDuration;
+  const enableExpr = `between(t,${tStart.toFixed(3)},${tEnd.toFixed(3)})`;
+
+  // Escape colons in the font path (FFmpeg filter uses : as separator)
+  const safeFont = fontPath.replace(/\\/g, "/").replace(/:/g, "\\:");
+  // Escape the text file path (pass it as textfile)
+  const safeTextFile = textFile.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
+
+  const parts = [
+    `textfile='${safeTextFile}'`,
+    `fontfile='${safeFont}'`,
+    `fontsize=${Math.round(overlay.fontSize)}`,
+    `fontcolor=${ffColor}`,
+    `box=${boxEnabled}`,
+    `boxcolor=${boxColor}`,
+    `boxborderw=8`,
+    `x=${xExpr}`,
+    `y=${yExpr}`,
+    `enable='${enableExpr}'`,
+    `line_spacing=2`,
+  ].join(":");
+
+  return `drawtext=${parts}`;
+}
+
 router.post(
   "/video-clips",
   requireAuth,
@@ -130,6 +364,7 @@ router.post("/compose-video", requireAuth, async (req, res) => {
     clips?: Array<{ objectPath?: string; speed?: number; filter?: string }>;
     trimStart?: number;
     trimEnd?: number;
+    textOverlays?: unknown;
   };
   const clips = body.clips;
   if (!Array.isArray(clips) || clips.length === 0 || clips.length > MAX_CLIPS) {
@@ -141,9 +376,19 @@ router.post("/compose-video", requireAuth, async (req, res) => {
     (clip.filter !== undefined && !FILTERS.has(clip.filter))
   ))) return res.status(400).json({ error: "Invalid clip settings" });
 
+  // Validate text overlays
+  const overlayResult = validateOverlays(body.textOverlays);
+  if (!overlayResult.ok) {
+    return res.status(400).json({ error: overlayResult.error });
+  }
+  const validOverlays = overlayResult.overlays;
+
   const dir = await fs.mkdtemp(join(tmpdir(), "brandthread-video-"));
   let outputObject: string | null = null;
   let thumbnailObject: string | null = null;
+  // Track temp text files for cleanup
+  const textFiles: string[] = [];
+
   try {
     const inputs: string[] = [];
     const durations: number[] = [];
@@ -215,19 +460,57 @@ router.post("/compose-video", requireAuth, async (req, res) => {
         : `anullsrc=channel_layout=stereo:sample_rate=44100,atrim=duration=${durations[index] / speed}[a${index}]`;
     });
     const concat = inputs.map((_, index) => `[v${index}][a${index}]`).join("");
-    const filter = [
+    const trimmedDuration = end - start;
+
+    // Build base filter chain (concat + trim)
+    const baseFilters = [
       ...videoFilters, ...audioFilters,
       `${concat}concat=n=${inputs.length}:v=1:a=1[combinedv][combineda]`,
-      `[combinedv]trim=start=${start}:end=${end},setpts=PTS-STARTPTS[outv]`,
+      `[combinedv]trim=start=${start}:end=${end},setpts=PTS-STARTPTS[outv_base]`,
       `[combineda]atrim=start=${start}:end=${end},asetpts=PTS-STARTPTS[outa]`,
-    ].join(";");
+    ];
+
+    // Build drawtext overlays
+    let finalVideoLabel = "[outv_base]";
+
+    if (validOverlays.length > 0) {
+      // Discover font once for all overlays
+      const regularFont = await discoverFont("regular");
+      const boldFont = await discoverFont("bold");
+
+      for (let oi = 0; oi < validOverlays.length; oi++) {
+        const ov = validOverlays[oi];
+        const inputLabel = oi === 0 ? "[outv_base]" : `[overlaid_${oi - 1}]`;
+        const outputLabel = oi === validOverlays.length - 1 ? "[outv]" : `[overlaid_${oi}]`;
+
+        const textFile = await writeOverlayTextFile(dir, ov.id, ov.text);
+        textFiles.push(textFile);
+
+        const fontPath = fontPathForStyle(ov.fontStyle, regularFont, boldFont);
+        const drawtextFilter = buildDrawtextFilter(ov, textFile, trimmedDuration, fontPath);
+
+        baseFilters.push(`${inputLabel}${drawtextFilter}${outputLabel}`);
+      }
+      finalVideoLabel = "[outv]";
+    } else {
+      // Rename outv_base to outv if no overlays
+      baseFilters[baseFilters.length - 3] = `${concat}concat=n=${inputs.length}:v=1:a=1[combinedv][combineda]`;
+      baseFilters[baseFilters.length - 2] = `[combinedv]trim=start=${start}:end=${end},setpts=PTS-STARTPTS[outv]`;
+      finalVideoLabel = "[outv]";
+    }
+
+    const filter = baseFilters.join(";");
     const output = join(dir, "composed.mp4");
+
     await exec("ffmpeg", [
       "-y", ...inputs.flatMap(path => ["-i", path]),
-      "-filter_complex", filter, "-map", "[outv]", "-map", "[outa]",
+      "-filter_complex", filter,
+      "-map", finalVideoLabel,
+      "-map", "[outa]",
       "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
       "-c:a", "aac", "-movflags", "+faststart", output,
-    ], { timeout: 120_000, maxBuffer: 8 * 1024 * 1024 });
+    ], { timeout: 180_000, maxBuffer: 8 * 1024 * 1024 });
+
     const outputDuration = await duration(output);
     const thumbnail = join(dir, "thumbnail.jpg");
     await exec("ffmpeg", [
@@ -264,6 +547,10 @@ router.post("/compose-video", requireAuth, async (req, res) => {
     req.log.error({ err, clerkId }, "Could not compose post video");
     return res.status(500).json({ error: "Video could not be composed" });
   } finally {
+    // Clean up temp text files
+    for (const tf of textFiles) {
+      await fs.unlink(tf).catch(() => {});
+    }
     await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
   }
 });
