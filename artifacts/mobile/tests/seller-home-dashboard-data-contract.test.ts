@@ -45,6 +45,6 @@ describe('seller home dashboard data contract', () => {
     expect(source).toContain('payoutAttemptKeyRef.current');
     expect(source).toContain('AsyncStorage.setItem(storageKey');
     expect(source).toContain('subscribeStoreContext');
-    expect(source).toContain('accessibilityLabel="Cash out available balance"');
+    expect(source).toContain('accessibilityLabel="Withdraw available balance"');
   });
 });

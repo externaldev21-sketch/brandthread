@@ -550,7 +550,7 @@ export default function SellerHomeCommerceDashboard({
               disabled={financeLoading || cashingOut}
               onPress={requestCashOut}
               accessibilityRole="button"
-              accessibilityLabel="Cash out available balance"
+              accessibilityLabel="Withdraw available balance"
               accessibilityState={{ disabled: financeLoading || cashingOut }}
             >
               {cashingOut ? (
@@ -559,7 +559,7 @@ export default function SellerHomeCommerceDashboard({
                 <Feather name="dollar-sign" size={15} color={BG} />
               )}
               <Text style={[styles.dashboardButtonText, { color: BG }]}>
-                {cashingOut ? 'Cashing out…' : 'Cash out'}
+                {cashingOut ? 'Withdrawing…' : 'Withdraw'}
               </Text>
             </TouchableOpacity>
           )}
