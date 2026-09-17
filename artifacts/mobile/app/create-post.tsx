@@ -63,13 +63,6 @@ interface SoundSelection {
   soundId: string; soundTitle: string; artist: string; startTime: number; volume: number;
 }
 
-// ─── Purpose chips (sellers only) ────────────────────────────────────────────
-const getPurposeChips = (accent: string) => [
-  { label: 'Drop Announcement',    icon: 'bell'   as const, color: ORANGE, contentType: 'countdown'     as ContentType },
-  { label: 'Behind the Scenes',    icon: 'camera' as const, color: '#A1A1AA', contentType: 'behind_scenes' as ContentType },
-  { label: 'Product Announcement', icon: 'tag'    as const, color: accent, contentType: 'announcement'  as ContentType },
-];
-
 const DEFAULT_VISIBILITY: PostVisibility = {
   isPublic: true, allowComments: true, allowReposts: true, showLikeCount: true,
 };
@@ -144,7 +137,6 @@ export default function CreatePostScreen() {
   const colors   = useColors();
   const { theme } = useAppTheme();
   const PURPLE   = colors.primary;
-  const PURPOSE_CHIPS = React.useMemo(() => getPurposeChips(colors.primary), [colors.primary]);
   const insets   = useSafeAreaInsets();
   const router   = useRouter();
   const api      = useApi();
@@ -177,9 +169,6 @@ export default function CreatePostScreen() {
   const [processingPhase, setProcessingPhase] = useState<'idle'|'uploading'|'processing'|'error'|'ready'>('idle');
   const [processingError, setProcessingError] = useState<string | null>(null);
   const timelineWidthRef = useRef(1);
-
-  // ── Purpose ──
-  const [activePurpose, setActivePurpose] = useState<typeof PURPOSE_CHIPS[0] | null>(null);
 
   // ── Post details ──
   const [caption,            setCaption]            = useState('');
@@ -253,7 +242,6 @@ export default function CreatePostScreen() {
           setSlidePhotos(post.mediaUris.map((uri, index) => ({ uri, id: `edit-photo-${post.id}-${index}` })));
           setVideoClips([]);
         }
-        setActivePurpose(PURPOSE_CHIPS.find(chip => chip.contentType === post.contentType) ?? null);
         setStep('post-details');
       })
       .catch(() => { if (!active) return; leaveSetupDestination(); })
@@ -299,13 +287,13 @@ export default function CreatePostScreen() {
 
   // ── Derived ──
   const hasMedia   = videoClips.length > 0 || slidePhotos.length > 0;
-  const canProceed = hasMedia || (!isBuyer && activePurpose !== null);
+  const canProceed = hasMedia;
 
   function inferContentType(): ContentType {
     if (isBuyer) return 'story';
     if (videoClips.length > 0) return 'video';
     if (slidePhotos.length > 0) return 'slideshow';
-    return activePurpose?.contentType ?? 'video';
+    return 'video';
   }
 
   function haptic(fn: () => void) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); fn(); }
@@ -355,7 +343,7 @@ export default function CreatePostScreen() {
     setVideoClips([]); setSlidePhotos([]); setMaxDuration(30);
     setTrimStart(0); setTrimEnd(0); setScrubTime(0); setPreviewSeekTime(0); setPreviewClipIndex(0);
     setComposedVideo(null); setProcessingPhase('idle'); setProcessingError(null);
-    setActivePurpose(null); setCaption(''); setHashtags([]); setHashtagInput(''); setStyleTags([]);
+    setCaption(''); setHashtags([]); setHashtagInput(''); setStyleTags([]);
     setLocation(''); setVisibility(DEFAULT_VISIBILITY); setScheduleMode('now');
     setScheduledAt(null); setScheduledDateInput(''); setProductTags([]);
     setSelectedSound(null);
@@ -440,200 +428,262 @@ export default function CreatePostScreen() {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // SCREEN A: MEDIA PICK — full-screen black, bottom sheet row
+  // SCREEN A: MEDIA PICK — camera-composer layout (ref: screenshot 1)
+  // Pure black. X top-left. Sound pill top-center. Right-edge tool column.
+  // Large canvas. Duration row above shutter. Effects | Shutter | Upload bottom.
+  // Camera / Story mode labels. Once media picked: full preview + Next pill.
   // ─────────────────────────────────────────────────────────────────────────────
   if (step === 'media-pick') {
-    const DURATIONS: MaxVideoDuration[] = [10, 15, 30, 60];
+    const DURATIONS: MaxVideoDuration[] = [15, 30, 60];
+    const durLabel: Record<number, string> = { 15: '15s', 30: '30s', 60: '60s' };
+
+    // ── State for selected tab label (no functional routing — just visual) ──
+    const modeLabels = isBuyer
+      ? ['Story']
+      : ['Camera', 'Story'];
 
     return (
       <View style={[ts.root, { backgroundColor: BG }]}>
         <StatusBar barStyle="light-content" backgroundColor={BG} />
 
-        {/* Floating header */}
-        <View style={[ts.floatingHeader, { paddingTop: topPad + 8 }]}>
-          <TouchableOpacity onPress={() => haptic(leaveSetupDestination)} style={ts.headerIconBtn}>
-            <Feather name="x" size={24} color={FG} />
+        {/* ── TOP BAR ─────────────────────────────────────────── */}
+        <View style={[ts.mpTopBar, { paddingTop: topPad + 4 }]}>
+          {/* X close */}
+          <TouchableOpacity
+            onPress={() => haptic(leaveSetupDestination)}
+            style={ts.mpTopBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Feather name="x" size={26} color={FG} />
           </TouchableOpacity>
-          <Text style={ts.headerTitle}>
-            {isBuyer ? 'Add to Story' : editId ? 'Edit Post' : 'New Post'}
-          </Text>
-          <View style={{ width: 44 }} />
+
+          {/* Sound pill */}
+          <TouchableOpacity
+            style={ts.mpSoundPill}
+            onPress={() => setShowSoundModal(true)}
+            activeOpacity={0.8}
+          >
+            <Feather name="music" size={13} color={FG} style={{ marginRight: 6 }} />
+            <Text style={ts.mpSoundPillText} numberOfLines={1}>
+              {selectedSound ? selectedSound.soundTitle : 'Add sound'}
+            </Text>
+            {selectedSound && (
+              <TouchableOpacity
+                onPress={() => setSelectedSound(null)}
+                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                style={{ marginLeft: 6 }}
+              >
+                <Feather name="x" size={12} color={MUTED} />
+              </TouchableOpacity>
+            )}
+          </TouchableOpacity>
+
+          {/* Right-top placeholder (keeps pill centered) */}
+          <View style={ts.mpTopBtn} />
         </View>
 
-        {/* Main area — either empty/purpose or media preview */}
-        <View style={ts.mediaPad}>
-          {!hasMedia && (
-            <View style={ts.emptyMedia}>
-              {/* Text-only purpose chips for sellers */}
-              {!isBuyer && (
-                <View style={ts.purposeSection}>
-                  <Text style={ts.purposeSectionLabel}>Text-only post</Text>
-                  <View style={ts.purposeChipRow}>
-                    {PURPOSE_CHIPS.map((chip) => {
-                      const active = activePurpose?.label === chip.label;
-                      return (
-                        <TouchableOpacity
-                          key={chip.label}
-                          style={[ts.purposeChip, active && { backgroundColor: chip.color + '25', borderColor: chip.color + '60' }]}
-                          activeOpacity={0.8}
-                          onPress={() => { Haptics.selectionAsync(); setActivePurpose(active ? null : chip); }}
-                        >
-                          <Feather name={chip.icon} size={14} color={active ? chip.color : MUTED} />
-                          <Text style={[ts.purposeChipText, active && { color: chip.color }]}>{chip.label}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-              )}
-            </View>
-          )}
+        {/* ── RIGHT-EDGE TOOL COLUMN ───────────────────────────── */}
+        <View style={[ts.mpRightTools, { top: topPad + 60 }]}>
+          <TouchableOpacity style={ts.mpToolBtn} activeOpacity={0.7}>
+            <Feather name="refresh-cw" size={22} color={FG} />
+          </TouchableOpacity>
+          <View style={ts.mpToolDivider} />
+          <TouchableOpacity style={ts.mpToolBtn} activeOpacity={0.7}>
+            <Feather name="zap-off" size={22} color={FG} />
+          </TouchableOpacity>
+          <TouchableOpacity style={ts.mpToolBtn} activeOpacity={0.7}>
+            <Feather name="clock" size={22} color={FG} />
+          </TouchableOpacity>
+          <TouchableOpacity style={ts.mpToolBtn} activeOpacity={0.7}>
+            <Feather name="minimize-2" size={22} color={FG} />
+          </TouchableOpacity>
+          <TouchableOpacity style={ts.mpToolBtn} activeOpacity={0.7}>
+            <Feather name="sun" size={22} color={FG} />
+          </TouchableOpacity>
+        </View>
 
-          {/* Video preview in media-pick (full-frame 9:16 crop) */}
+        {/* ── CANVAS ──────────────────────────────────────────── */}
+        <View style={ts.mpCanvas}>
           {videoClips.length > 0 && (
-            <View style={ts.mediaPickPreview}>
+            <>
               <FullVideoPreview uri={videoClips[0].uri} />
-              {/* Replace overlay */}
-              <TouchableOpacity style={ts.replaceOverlay} onPress={pickFromLibrary} activeOpacity={0.8}>
-                <Feather name="refresh-cw" size={14} color={FG} />
-                <Text style={ts.replaceOverlayText}>Replace</Text>
+              {/* Replace chip */}
+              <TouchableOpacity
+                style={ts.mpReplaceChip}
+                onPress={pickFromLibrary}
+                activeOpacity={0.8}
+              >
+                <Feather name="refresh-cw" size={12} color={FG} />
+                <Text style={ts.mpReplaceChipText}>Replace</Text>
               </TouchableOpacity>
-              {/* Duration chips overlay */}
-              <View style={ts.durationOverlay}>
-                {DURATIONS.map((d) => {
-                  const sel = maxDuration === d;
-                  return (
-                    <TouchableOpacity
-                      key={d}
-                      style={[ts.durationChip, sel && { backgroundColor: PURPLE, borderColor: PURPLE }]}
-                      onPress={() => { Haptics.selectionAsync(); setMaxDuration(d); }}
-                    >
-                      <Text style={[ts.durationChipText, sel && { color: '#000' }]}>{d}s</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
+            </>
           )}
-
-          {/* Photo strip in media-pick */}
           {slidePhotos.length > 0 && (
-            <View style={ts.mediaPickPreview}>
-              {/* Show first photo large */}
-              <Image source={{ uri: slidePhotos[0].uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-              {/* Strip of remaining thumbnails bottom */}
-              <View style={ts.photoStripOverlay}>
+            <>
+              <Image
+                source={{ uri: slidePhotos[0].uri }}
+                style={StyleSheet.absoluteFill}
+                resizeMode="cover"
+              />
+              {/* Thumbnail strip */}
+              <View style={ts.mpPhotoStrip}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={{ flexDirection: 'row', gap: 6, padding: 6 }}>
+                  <View style={{ flexDirection: 'row', gap: 5, paddingHorizontal: 8, paddingVertical: 6 }}>
                     {slidePhotos.map((photo, idx) => (
-                      <View key={photo.id} style={ts.photoThumb}>
-                        <Image source={{ uri: photo.uri }} style={ts.photoThumbImg} resizeMode="cover" />
+                      <View key={photo.id} style={ts.mpPhotoThumb}>
+                        <Image source={{ uri: photo.uri }} style={ts.mpPhotoThumbImg} resizeMode="cover" />
                         <TouchableOpacity
-                          style={ts.removeChip}
+                          style={ts.mpRemoveChip}
                           onPress={() => setSlidePhotos(prev => prev.filter(p => p.id !== photo.id))}
                         >
-                          <Feather name="x" size={10} color={FG} />
+                          <Feather name="x" size={9} color={FG} />
                         </TouchableOpacity>
                         {idx === 0 && (
-                          <View style={ts.coverLabel}><Text style={ts.coverLabelText}>Cover</Text></View>
+                          <View style={ts.mpCoverBadge}>
+                            <Text style={ts.mpCoverBadgeText}>cover</Text>
+                          </View>
                         )}
                       </View>
                     ))}
+                    {/* Add more */}
+                    <TouchableOpacity
+                      style={ts.mpAddMoreThumb}
+                      onPress={pickFromLibrary}
+                      activeOpacity={0.8}
+                    >
+                      <Feather name="plus" size={20} color={MUTED} />
+                    </TouchableOpacity>
                   </View>
                 </ScrollView>
               </View>
-              {/* Replace overlay */}
-              <TouchableOpacity style={ts.replaceOverlay} onPress={pickFromLibrary} activeOpacity={0.8}>
-                <Feather name="plus" size={14} color={FG} />
-                <Text style={ts.replaceOverlayText}>Add more</Text>
+              {/* Replace chip */}
+              <TouchableOpacity
+                style={ts.mpReplaceChip}
+                onPress={pickFromLibrary}
+                activeOpacity={0.8}
+              >
+                <Feather name="plus" size={12} color={FG} />
+                <Text style={ts.mpReplaceChipText}>Add more</Text>
               </TouchableOpacity>
-            </View>
+            </>
           )}
         </View>
 
-        {/* Bottom sheet — upload / camera / type badge */}
-        <View style={[ts.bottomSheet, { paddingBottom: botPad + 8 }]}>
-          {/* Action row */}
-          <View style={ts.bottomActionRow}>
-            <TouchableOpacity
-              style={ts.bottomActionBtn}
-              activeOpacity={0.8}
-              onPress={pickFromLibrary}
-            >
-              <View style={[ts.bottomActionIcon, { backgroundColor: '#1C1C1E' }]}>
-                <Feather name="image" size={22} color={FG} />
-              </View>
-              <Text style={ts.bottomActionLabel}>Upload</Text>
-            </TouchableOpacity>
+        {/* ── BOTTOM COMPOSER ZONE ─────────────────────────────── */}
+        <View style={[ts.mpBottom, { paddingBottom: botPad + 4 }]}>
 
+          {/* Duration selector row — always visible, above shutter */}
+          <View style={ts.mpDurationRow}>
+            {DURATIONS.map((d) => {
+              const sel = maxDuration === d;
+              return (
+                <TouchableOpacity
+                  key={d}
+                  onPress={() => { Haptics.selectionAsync(); setMaxDuration(d); }}
+                  style={ts.mpDurationBtn}
+                >
+                  <Text style={[ts.mpDurationText, sel && { color: FG, fontFamily: FONT.bold }]}>
+                    {durLabel[d]}
+                  </Text>
+                  {sel && <View style={ts.mpDurationUnderline} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Shutter row: Effects | Shutter | Upload */}
+          <View style={ts.mpShutterRow}>
+            {/* Effects (left) */}
             <TouchableOpacity
-              style={ts.bottomActionBtn}
+              style={ts.mpEffectsBtn}
               activeOpacity={0.8}
               onPress={() => router.push((`/camera-capture?maxDuration=${maxDuration}`) as never)}
             >
-              <View style={[ts.bottomActionIcon, { backgroundColor: FG }]}>
-                <Feather name="camera" size={22} color={BG} />
+              <View style={ts.mpEffectsIcon}>
+                <Feather name="sliders" size={22} color={FG} />
               </View>
-              <Text style={ts.bottomActionLabel}>Camera</Text>
+              <Text style={ts.mpEffectsLabel}>Effects</Text>
             </TouchableOpacity>
 
-            {!isBuyer && !hasMedia && (
+            {/* Shutter / Next (center) */}
+            {hasMedia ? (
+              /* Media selected — shutter becomes a Next pill */
               <TouchableOpacity
-                style={ts.bottomActionBtn}
-                activeOpacity={0.8}
-                onPress={() => setActivePurpose(activePurpose ? null : PURPOSE_CHIPS[0])}
+                style={ts.mpNextShutter}
+                activeOpacity={0.88}
+                onPress={() => haptic(() => setStep(videoClips.length > 0 ? 'video-edit' : 'post-details'))}
               >
-                <View style={[ts.bottomActionIcon, { backgroundColor: '#1C1C1E' }]}>
-                  <Feather name="type" size={22} color={FG} />
-                </View>
-                <Text style={ts.bottomActionLabel}>Text</Text>
+                <LinearGradient
+                  colors={theme.primaryGradient}
+                  style={ts.mpNextShutterGrad}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                >
+                  <Text style={[ts.mpNextShutterText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
+                    Next
+                  </Text>
+                  <Feather name="arrow-right" size={18} color={theme.onAccent} style={{ marginLeft: 6 }} />
+                </LinearGradient>
+              </TouchableOpacity>
+            ) : (
+              /* No media — white shutter ring */
+              <TouchableOpacity
+                style={ts.mpShutter}
+                activeOpacity={0.85}
+                onPress={() => router.push((`/camera-capture?maxDuration=${maxDuration}`) as never)}
+              >
+                <View style={ts.mpShutterInner} />
               </TouchableOpacity>
             )}
+
+            {/* Upload (right) */}
+            <TouchableOpacity
+              style={ts.mpUploadBtn}
+              activeOpacity={0.8}
+              onPress={pickFromLibrary}
+            >
+              {slidePhotos.length > 0 ? (
+                /* Show last-selected thumbnail */
+                <Image
+                  source={{ uri: slidePhotos[slidePhotos.length - 1].uri }}
+                  style={ts.mpUploadThumb}
+                  resizeMode="cover"
+                />
+              ) : videoClips.length > 0 ? (
+                <View style={[ts.mpUploadThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#1c1c1e' }]}>
+                  <Feather name="video" size={18} color={FG} />
+                </View>
+              ) : (
+                <View style={ts.mpUploadThumb}>
+                  <Feather name="image" size={18} color={MUTED} />
+                </View>
+              )}
+              <Text style={ts.mpUploadLabel}>Upload</Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Type badge if media selected */}
-          {hasMedia && (
-            <View style={ts.typeBadgeRow}>
-              <View style={[ts.typeBadge, { borderColor: PURPLE + '55' }]}>
-                <Feather
-                  name={videoClips.length > 0 ? 'video' : slidePhotos.length > 1 ? 'layers' : 'image'}
-                  size={12} color={PURPLE}
-                />
-                <Text style={[ts.typeBadgeText, { color: PURPLE }]}>
-                  {videoClips.length > 0
-                    ? 'Video'
-                    : slidePhotos.length > 1
-                    ? `Slideshow (${slidePhotos.length})`
-                    : 'Photo'}
-                </Text>
-              </View>
-            </View>
-          )}
-
-          {/* Next button */}
-          <TouchableOpacity
-            style={[ts.nextBtn, !canProceed && { opacity: 0.35 }]}
-            activeOpacity={0.85}
-            disabled={!canProceed}
-            onPress={() => haptic(() => setStep(videoClips.length > 0 ? 'video-edit' : 'post-details'))}
-          >
-            <LinearGradient
-              colors={canProceed ? theme.primaryGradient : ['#333', '#333']}
-              style={ts.nextBtnGrad}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            >
-              <Text style={[ts.nextBtnText, { color: canProceed ? theme.onAccent : MUTED }]}>
-                {videoClips.length > 0 ? 'Next' : 'Next'}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          {!canProceed && (
-            <Text style={ts.hintText}>
-              {isBuyer ? 'Add a photo or video to continue' : 'Add media or select a post type'}
-            </Text>
-          )}
+          {/* Mode tabs: Camera / Story */}
+          <View style={ts.mpModeRow}>
+            {modeLabels.map((label, i) => {
+              const active = i === 0;
+              return (
+                <View key={label} style={ts.mpModeItem}>
+                  <Text style={[ts.mpModeText, active && ts.mpModeTextActive]}>
+                    {label}
+                  </Text>
+                  {active && <View style={ts.mpModeDot} />}
+                </View>
+              );
+            })}
+          </View>
         </View>
+
+        {/* Sound modal (accessible from Add sound pill) */}
+        <SoundModal
+          visible={showSoundModal} onClose={() => setShowSoundModal(false)}
+          soundTab={soundTab} setSoundTab={setSoundTab}
+          soundSearch={soundSearch} setSoundSearch={setSoundSearch}
+          onUse={useSound} insets={insets}
+        />
       </View>
     );
   }
@@ -968,29 +1018,6 @@ export default function CreatePostScreen() {
                       </TouchableOpacity>
                     </View>
                   ))}
-                </View>
-              </View>
-            )}
-
-            {/* Purpose chips (sellers) */}
-            {!isBuyer && (
-              <View style={ts.sectionBlock}>
-                <Text style={ts.sectionLabel}>Content type (optional)</Text>
-                <View style={ts.purposeChipRow}>
-                  {PURPOSE_CHIPS.map((chip) => {
-                    const active = activePurpose?.label === chip.label;
-                    return (
-                      <TouchableOpacity
-                        key={chip.label}
-                        style={[ts.purposeChip, active && { backgroundColor: chip.color + '25', borderColor: chip.color + '60' }]}
-                        activeOpacity={0.8}
-                        onPress={() => { Haptics.selectionAsync(); setActivePurpose(active ? null : chip); }}
-                      >
-                        <Feather name={chip.icon} size={13} color={active ? chip.color : MUTED} />
-                        <Text style={[ts.purposeChipText, active && { color: chip.color }]}>{chip.label}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
                 </View>
               </View>
             )}
@@ -1396,12 +1423,7 @@ const ts = StyleSheet.create({
   root:   { flex: 1 },
   center: { alignItems: 'center', justifyContent: 'center' },
 
-  // ── Shared header ──
-  floatingHeader: {
-    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingBottom: 12,
-  },
+  // ── Shared: post-details header ──
   detailsHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingBottom: 12,
@@ -1410,64 +1432,122 @@ const ts = StyleSheet.create({
   headerIconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerTitle:   { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
 
-  // ── Media pick ──
-  mediaPad: { flex: 1, marginTop: 80 },
-  emptyMedia: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 40 },
-  purposeSection: { width: '100%', paddingHorizontal: 24 },
-  purposeSectionLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12, textAlign: 'center' },
-
-  mediaPickPreview: { flex: 1, backgroundColor: '#111' },
-
-  photoStripOverlay: {
-    position: 'absolute', bottom: 70, left: 0, right: 0,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
-  photoThumb:    { width: 80, height: 80, borderRadius: 8, overflow: 'hidden', position: 'relative' },
-  photoThumbImg: { width: 80, height: 80 },
-  removeChip:    { position: 'absolute', top: 4, right: 4, backgroundColor: '#00000099', borderRadius: 10, width: 18, height: 18, alignItems: 'center', justifyContent: 'center' },
-  coverLabel:    { position: 'absolute', bottom: 4, left: 4, backgroundColor: '#000000AA', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
-  coverLabelText:{ fontSize: 9, fontFamily: FONT.bold, color: FG },
-
-  replaceOverlay: {
-    position: 'absolute', top: 14, right: 14,
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: 'rgba(0,0,0,0.60)', borderRadius: 20,
-    paddingHorizontal: 12, paddingVertical: 7,
-  },
-  replaceOverlayText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: FG },
-
-  durationOverlay: {
-    position: 'absolute', bottom: 14, left: 14,
-    flexDirection: 'row', gap: 6,
-  },
-  durationChip:     { backgroundColor: 'rgba(0,0,0,0.65)', borderRadius: 16, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 6 },
-  durationChipText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: FG },
-
-  typeBadgeRow: { flexDirection: 'row', justifyContent: 'center', marginBottom: 10 },
-  typeBadge:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 5 },
-  typeBadgeText:{ fontSize: FS.xs, fontFamily: FONT.semibold },
-
-  // ── Purpose chips ──
-  purposeChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  purposeChip:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 20, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 14, paddingVertical: 9 },
-  purposeChipText:{ fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
-
-  // ── Bottom sheet (media pick) ──
-  bottomSheet: {
-    paddingHorizontal: 20, paddingTop: 16,
-    backgroundColor: BG_SOFT,
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: BORDER,
-  },
-  bottomActionRow: { flexDirection: 'row', justifyContent: 'center', gap: 32, marginBottom: 18 },
-  bottomActionBtn: { alignItems: 'center', gap: 8 },
-  bottomActionIcon:{ width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' },
-  bottomActionLabel:{ fontSize: FS.xs, fontFamily: FONT.medium, color: FG },
-
-  // ── Next / Post buttons ──
+  // ── Next / Post buttons (reused in done screen) ──
   nextBtn:     { borderRadius: 12, overflow: 'hidden' },
   nextBtnGrad: { paddingVertical: 15, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
   nextBtnText: { fontSize: FS.base, fontFamily: FONT.bold },
-  hintText:    { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', marginTop: 10 },
+
+  // ══════════════════════════════════════════════════════════════════
+  // SCREEN A — camera composer (mp = media-pick)
+  // ══════════════════════════════════════════════════════════════════
+
+  // Top bar: X | sound pill | spacer
+  mpTopBar: {
+    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 14, paddingBottom: 10,
+  },
+  mpTopBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  mpSoundPill: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(40,40,40,0.88)',
+    borderRadius: 22, paddingHorizontal: 14, paddingVertical: 9,
+    marginHorizontal: 8, maxWidth: SW * 0.52,
+    alignSelf: 'center',
+  },
+  mpSoundPillText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: FG, flex: 1 },
+
+  // Right-edge tool column
+  mpRightTools: {
+    position: 'absolute', right: 10, zIndex: 25,
+    alignItems: 'center', gap: 2,
+  },
+  mpToolBtn:     { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  mpToolDivider: { width: 24, height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: 4 },
+
+  // Canvas (fills between top bar and bottom zone)
+  mpCanvas: { flex: 1 },
+
+  // Media-in-canvas overlays
+  mpReplaceChip: {
+    position: 'absolute', top: 14, right: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: 'rgba(0,0,0,0.62)', borderRadius: 18,
+    paddingHorizontal: 11, paddingVertical: 6,
+  },
+  mpReplaceChipText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: FG },
+
+  mpPhotoStrip: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: 'rgba(0,0,0,0.52)',
+  },
+  mpPhotoThumb:    { width: 70, height: 70, borderRadius: 6, overflow: 'hidden', position: 'relative' },
+  mpPhotoThumbImg: { width: 70, height: 70 },
+  mpRemoveChip:    { position: 'absolute', top: 4, right: 4, width: 16, height: 16, borderRadius: 8, backgroundColor: '#000000AA', alignItems: 'center', justifyContent: 'center' },
+  mpCoverBadge:    { position: 'absolute', bottom: 4, left: 4, backgroundColor: '#000000AA', borderRadius: 3, paddingHorizontal: 4, paddingVertical: 1 },
+  mpCoverBadgeText:{ fontSize: 8, fontFamily: FONT.bold, color: FG },
+  mpAddMoreThumb:  { width: 70, height: 70, borderRadius: 6, borderWidth: 1, borderColor: BORDER, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+
+  // Bottom composer zone
+  mpBottom: {
+    backgroundColor: BG,
+    paddingTop: 10,
+  },
+
+  // Duration row (above shutter)
+  mpDurationRow: {
+    flexDirection: 'row', justifyContent: 'center',
+    gap: 0, marginBottom: 14, paddingHorizontal: 16,
+  },
+  mpDurationBtn:      { alignItems: 'center', paddingHorizontal: 14, paddingBottom: 4 },
+  mpDurationText:     { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  mpDurationUnderline:{ height: 2, width: 20, backgroundColor: FG, borderRadius: 1, marginTop: 4, alignSelf: 'center' },
+
+  // Shutter row: Effects | Shutter/Next | Upload
+  mpShutterRow: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 28, marginBottom: 18,
+  },
+
+  // Effects button (left)
+  mpEffectsBtn:   { alignItems: 'center', gap: 6, width: 70 },
+  mpEffectsIcon:  { width: 52, height: 52, borderRadius: 14, backgroundColor: '#1C1C1E', alignItems: 'center', justifyContent: 'center' },
+  mpEffectsLabel: { fontSize: 11, fontFamily: FONT.medium, color: FG },
+
+  // White shutter ring (no media)
+  mpShutter: {
+    width: 76, height: 76, borderRadius: 38,
+    borderWidth: 4, borderColor: FG,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  mpShutterInner: {
+    width: 60, height: 60, borderRadius: 30,
+    backgroundColor: FG,
+  },
+
+  // Gradient Next pill (media selected, replaces shutter)
+  mpNextShutter: {
+    width: 130, height: 52, borderRadius: 26,
+    overflow: 'hidden',
+  },
+  mpNextShutterGrad: {
+    flex: 1, flexDirection: 'row',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  mpNextShutterText: { fontSize: FS.base, fontFamily: FONT.bold },
+
+  // Upload thumbnail (right)
+  mpUploadBtn:   { alignItems: 'center', gap: 6, width: 70 },
+  mpUploadThumb: { width: 52, height: 52, borderRadius: 10, backgroundColor: '#1C1C1E', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  mpUploadLabel: { fontSize: 11, fontFamily: FONT.medium, color: FG },
+
+  // Camera / Story mode tabs
+  mpModeRow:       { flexDirection: 'row', justifyContent: 'center', gap: 28, paddingBottom: 6 },
+  mpModeItem:      { alignItems: 'center', gap: 5 },
+  mpModeText:      { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  mpModeTextActive:{ fontSize: FS.sm, fontFamily: FONT.bold, color: FG },
+  mpModeDot:       { width: 4, height: 4, borderRadius: 2, backgroundColor: FG },
 
   // ── Video edit ──
   videoTopBar: {
