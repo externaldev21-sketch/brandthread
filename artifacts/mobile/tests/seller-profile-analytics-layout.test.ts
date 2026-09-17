@@ -13,7 +13,7 @@ const analyticsSource = fs.readFileSync(
 
 describe('seller profile action layout', () => {
   it('keeps only My Profile and Messages in the quick-action row', () => {
-    expect(profileSource).toContain("label: 'My Profile'");
+    expect(profileSource).toContain("label: 'My Profile',    route: '/edit-profile'");
     expect(profileSource).toContain("label: 'Messages'");
     expect(profileSource).not.toContain("label: 'Brand Assets'");
     expect(profileSource).not.toContain("label: 'Add Product'");

@@ -43,7 +43,7 @@ interface SocialCounts {
 }
 
 const QUICK_ACTIONS: { icon: keyof typeof Feather.glyphMap; label: string; route: string }[] = [
-  { icon: 'user',       label: 'My Profile',    route: '/seller-profile?isOwner=true' },
+  { icon: 'user',       label: 'My Profile',    route: '/edit-profile' },
   { icon: 'message-circle', label: 'Messages',  route: '/seller-inbox' },
 ];
 
