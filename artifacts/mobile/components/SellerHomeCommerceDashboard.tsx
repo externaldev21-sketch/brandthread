@@ -556,7 +556,7 @@ export default function SellerHomeCommerceDashboard({
               {cashingOut ? (
                 <ActivityIndicator size="small" color={BG} />
               ) : (
-                <Feather name="dollar-sign" size={15} color={BG} />
+                <Text style={[styles.dashboardButtonIcon, { color: BG }]}>$</Text>
               )}
               <Text style={[styles.dashboardButtonText, { color: BG }]}>
                 {cashingOut ? 'Withdrawing…' : 'Withdraw'}
@@ -660,7 +660,7 @@ export default function SellerHomeCommerceDashboard({
               {toFulfill === 0 && toCapture === 0 && (
                 <View style={styles.emptyActions}>
                   <View style={[styles.emptyActionsIcon, { backgroundColor: SUCCESS_DIM }]}>
-                    <Feather name="check" size={16} color={SUCCESS} />
+                    <Feather name="check" size={16} color="#41C72A" />
                   </View>
                   <Text style={styles.emptyActionsText}>All caught up</Text>
                 </View>
@@ -846,6 +846,7 @@ const styles = StyleSheet.create({
   },
   dashboardButtonDisabled: { opacity: 0.55 },
   dashboardButtonText: { fontFamily: FONT.bold, fontSize: FS.sm },
+  dashboardButtonIcon: { fontFamily: FONT.bold, fontSize: FS.sm, lineHeight: FS.sm },
 
   // ── Chart card
   chartCard: {

@@ -175,7 +175,7 @@ function CustomTabBar({ state, descriptors, navigation, onOpenStudio }: any) {
         onPress={onOpenStudio}
         style={({ pressed }) => [styles.sideButton, pressed && styles.pressed]}
       >
-        <Feather name="zap" size={20} color={FG} />
+        <Feather name="menu" size={20} color={FG} />
       </Pressable>
 
       <View style={styles.centerBar}>

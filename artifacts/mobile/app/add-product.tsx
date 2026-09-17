@@ -2,8 +2,7 @@
  * Add Product — single-scroll product creation
  *
  * Essential sections (always open): Photos, Basic Information, Pricing, Inventory
- * Advanced sections (collapsible):  Variants, Sales Model, Fulfillment,
- *                                   Manufacturing, Storefront & SEO
+ * Advanced sections (collapsible):  Variants, Sales Model
  *
  * Seller can fill photo + title + price + stock and publish without clicking
  * through wizard steps.
@@ -22,7 +21,6 @@ import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUB
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, FilterChip, StatusBadge, SectionHeader, FormInput, ProgressCard, EmptyState } from '@/components/BrandthreadUI';
-import StyleTagsPicker from '@/components/StyleTagsPicker';
 
 import { getProduct, saveDraft, loadDraft, deleteDraft, getCollections } from '@/services/productService';
 import { useApi } from '@/hooks/useApi';
@@ -806,14 +804,6 @@ export default function AddProductScreen() {
           }}
           placeholder="streetwear, hoodie, oversized"
         />
-        <View style={{ marginTop: SP.xs }}>
-          <SectionHeader title="Style Tags" style={s.sectionHdr} />
-          <StyleTagsPicker
-            selected={draftData.styleTags ?? []}
-            onChange={v => patchDraft({ styleTags: v })}
-            max={5}
-          />
-        </View>
         {collections.length > 0 && (
           <>
             <SectionHeader title="Collection" style={s.sectionHdr} />
@@ -1309,15 +1299,6 @@ export default function AddProductScreen() {
     );
   }
 
-  // ── Live validation warnings (shown above publish button) ──
-  const liveWarnings = validateForPublish({
-    name: draftData.name ?? '',
-    description: draftData.description ?? '',
-    pricing: { priceCents: parseDecimalToCents(priceStr) ?? 0 },
-    media: draftData.media ?? [],
-    variants: localVariants,
-  });
-
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -1400,50 +1381,10 @@ export default function AddProductScreen() {
             {renderSalesModel()}
           </CollapsibleSection>
 
-          <CollapsibleSection
-            title="Fulfillment"
-            icon="truck"
-            expanded={expandedSections.fulfillment}
-            onToggle={() => toggleSection('fulfillment')}
-            hint="Shipping weight and dimensions"
-          >
-            {renderFulfillment()}
-          </CollapsibleSection>
-
-          <CollapsibleSection
-            title="Manufacturing"
-            icon="tool"
-            expanded={expandedSections.manufacturing}
-            onToggle={() => toggleSection('manufacturing')}
-            hint={mfgMode === 'existing' ? `Assigned: ${mfgName || '—'}` : mfgMode === 'quote' ? 'Quote requested' : 'Link to a manufacturer or request a quote'}
-          >
-            {renderManufacturing()}
-          </CollapsibleSection>
-
-          <CollapsibleSection
-            title="Storefront & SEO"
-            icon="globe"
-            expanded={expandedSections.storefront}
-            onToggle={() => toggleSection('storefront')}
-            hint="Visibility, collections, and search settings"
-          >
-            {renderStorefront()}
-          </CollapsibleSection>
-
         </ScrollView>
         {/* The action area is outside the scroll view so publishing is always
             available without losing the form's draft state or scroll position. */}
         <View style={[s.stickyFooter, { paddingBottom: Math.max(insets.bottom, SP.sm) }]}>
-          {liveWarnings.length > 0 && (
-            <BrandthreadCard style={s.warningsCard}>
-              {liveWarnings.map((w, i) => (
-                <View key={i} style={s.warningRow}>
-                  <Feather name="alert-circle" size={14} color={ORANGE} />
-                  <Text style={s.warningText}>{w}</Text>
-                </View>
-              ))}
-            </BrandthreadCard>
-          )}
           <View style={s.publishButtons}>
             <SecondaryButton label="Save draft" onPress={handleSaveDraftAndExit} style={{ flex: 1 }} />
             <PrimaryButton
@@ -1575,23 +1516,6 @@ const s = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: BORDER,
     backgroundColor: BG,
-  },
-  warningsCard: {
-    gap: SP.xs,
-    borderColor: ORANGE + '55',
-  },
-  warningRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: SP.xs,
-    paddingVertical: 2,
-  },
-  warningText: {
-    fontSize: FS.sm,
-    fontFamily: FONT.regular,
-    color: ORANGE,
-    flex: 1,
-    lineHeight: 18,
   },
   publishButtons: {
     flexDirection: 'row',
