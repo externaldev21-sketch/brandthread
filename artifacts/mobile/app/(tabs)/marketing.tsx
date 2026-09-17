@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import AIBrainFAB from '@/components/AIBrainFAB';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Switch } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -234,7 +233,6 @@ export default function MarketingScreen() {
         <Feather name="chevron-right" size={16} color={colors.primary} />
       </View>
     </ScrollView>
-    <AIBrainFAB context={{ screen: 'marketing' as const }} bottomOffset={72} />
     </View>
   );
 }

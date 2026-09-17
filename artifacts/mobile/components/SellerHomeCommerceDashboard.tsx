@@ -14,8 +14,6 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import AIBrainFAB from '@/components/AIBrainFAB';
-import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
@@ -728,8 +726,6 @@ export default function SellerHomeCommerceDashboard({
         />
       </ScrollView>
 
-      <SellerStudioRadialMenu />
-      <AIBrainFAB context={{ screen: 'home' as const }} bottomOffset={72} />
     </View>
   );
 }

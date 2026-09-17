@@ -4,7 +4,6 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import AIBrainFAB from '@/components/AIBrainFAB';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions, Alert, ActivityIndicator } from 'react-native';
@@ -353,7 +352,6 @@ export default function StudioScreen() {
         </ScrollView>
 
       </ScrollView>
-      <AIBrainFAB context={{ screen: 'design_studio' as const }} bottomOffset={72} />
       {/* Plan upsell modal — shown when Starter seller taps a Growth-only tool */}
       <PlanUpsellModal
         visible={upsellVisible}

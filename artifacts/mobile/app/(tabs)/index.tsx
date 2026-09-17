@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import AIBrainFAB from '@/components/AIBrainFAB';
-import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 import SellerHomeCommerceDashboard from '@/components/SellerHomeCommerceDashboard';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
 import { View, Text, ScrollView, StyleSheet, Animated, Modal, TextInput, FlatList, Alert, Pressable, TouchableOpacity, Linking, StyleProp, ViewStyle } from 'react-native';
@@ -871,8 +869,6 @@ export default function SellerHomeScreen() {
 
       </Animated.ScrollView>
 
-      <SellerStudioRadialMenu />
-      <AIBrainFAB context={{ screen: 'home' as const }} bottomOffset={72} />
 
       <Modal visible={commandModal} animationType="slide" transparent>
         <View style={s.modalOverlay}>

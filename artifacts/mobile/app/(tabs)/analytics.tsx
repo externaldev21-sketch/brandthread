@@ -5,7 +5,6 @@
  * getSalesAnalytics. No fabricated data, no fabricated trends.
  */
 import React, { useState, useCallback, useRef } from 'react';
-import AIBrainFAB from '@/components/AIBrainFAB';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   RefreshControl, Platform, useWindowDimensions, ActivityIndicator,
@@ -599,7 +598,6 @@ export default function AnalyticsScreen() {
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      <AIBrainFAB context={{ screen: 'analytics' as const }} bottomOffset={72} />
     </View>
   );
 }

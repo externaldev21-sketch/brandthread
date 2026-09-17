@@ -84,7 +84,15 @@ const ALL_ACTIONS  = [...STUDIO_ACTIONS, ...SHORTCUT_ACTIONS];
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function SellerStudioRadialMenu() {
+interface SellerStudioRadialMenuProps {
+  hideTrigger?: boolean;
+  openRequestKey?: number;
+}
+
+export default function SellerStudioRadialMenu({
+  hideTrigger = false,
+  openRequestKey = 0,
+}: SellerStudioRadialMenuProps) {
   const router   = useRouter();
   const insets   = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
@@ -134,6 +142,10 @@ export default function SellerStudioRadialMenu() {
       });
     });
   };
+
+  useEffect(() => {
+    if (openRequestKey > 0 && !open) expand();
+  }, [openRequestKey]);
 
   // ── Close ─────────────────────────────────────────────────────────────────
 
@@ -221,7 +233,7 @@ export default function SellerStudioRadialMenu() {
   return (
     <>
       {/* Lightning-bolt trigger — hidden while modal is open */}
-      {!open && (
+      {!hideTrigger && !open && (
         <Pressable
           testID="seller-studio-menu-open"
           accessibilityRole="button"

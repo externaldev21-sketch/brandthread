@@ -4,7 +4,6 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import AIBrainFAB from '@/components/AIBrainFAB';
 import { View, Text, ScrollView, FlatList, StyleSheet, Alert, Share, Modal, Pressable, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -634,7 +633,6 @@ export default function ProductsScreen() {
         onClose={() => setSortModalVisible(false)}
       />
 
-      <AIBrainFAB context={{ screen: 'products' as const }} bottomOffset={72} />
 
       {loading && (
         <View style={s.loadingOverlay} pointerEvents="none">

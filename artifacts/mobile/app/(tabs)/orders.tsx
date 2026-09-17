@@ -4,7 +4,6 @@
  */
 
 import React, { useState, useCallback, useMemo, useRef } from 'react';
-import AIBrainFAB from '@/components/AIBrainFAB';
 import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, Share, SectionList } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -1013,7 +1012,6 @@ export default function OrdersScreen() {
         onClose={() => setFilterSheetVisible(false)}
       />
 
-      <AIBrainFAB context={{ screen: 'orders' as const }} bottomOffset={72} />
     </View>
   );
 }

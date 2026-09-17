@@ -5,6 +5,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Tabs, useRouter } from 'expo-router';
@@ -30,6 +31,8 @@ import {
 } from '@/lib/orderBadgeStore';
 import { getSellerOrderBadgeCount } from '@/lib/sellerOrderBadge';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
+import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
@@ -48,7 +51,7 @@ const INACTIVE_COLOR = 'rgba(244,244,255,0.40)';
 
 // ─── Custom Tab Bar ───────────────────────────────────────────────────────────
 
-function CustomTabBar({ state, descriptors, navigation }: any) {
+function CustomTabBar({ state, descriptors, navigation, onOpenStudio }: any) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
@@ -144,19 +147,40 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
     };
   }, [api, userId]);
 
+  const openAI = () => {
+    const routeName = state.routes[state.index]?.name;
+    const screen =
+      routeName === 'products' ? 'products' :
+      routeName === 'orders' ? 'orders' :
+      'home';
+    router.push({
+      pathname: '/ai-brain',
+      params: { context: JSON.stringify({ screen }) },
+    });
+  };
+
   return (
     <View
       style={[
         styles.bar,
         {
-          height: 72 + insets.bottom,
+          height: 86 + insets.bottom,
           paddingBottom: insets.bottom,
-          backgroundColor: SURFACE_GLASS,
-          borderTopColor: BORDER,
         },
       ]}
     >
-      {state.routes.map((route: any, index: number) => {
+      <Pressable
+        testID="seller-bottom-menu"
+        accessibilityRole="button"
+        accessibilityLabel="Open Studio tools"
+        onPress={onOpenStudio}
+        style={({ pressed }) => [styles.sideButton, pressed && styles.pressed]}
+      >
+        <Feather name="zap" size={23} color={FG} />
+      </Pressable>
+
+      <View style={styles.centerBar}>
+        {state.routes.map((route: any, index: number) => {
         const descriptor = descriptors[route.key];
         // Only render routes that are in our visible TABS list
         const tabDef = TABS.find((t) => t.name === route.name);
@@ -196,13 +220,8 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
             accessibilityLabel={showOrderBadge ? `${tabDef.label} tab, ${newOrderCount} new orders` : `${tabDef.label} tab`}
             onPress={onPress}
             onLongPress={onLongPress}
-            style={styles.tab}
+            style={[styles.tab, isFocused && styles.tabActive]}
           >
-            {/* Purple pill indicator above icon */}
-            <View style={styles.pillWrap}>
-              {isFocused && <View style={[styles.pill, { backgroundColor: theme.accent }]} />}
-            </View>
-
             {/* Icon + optional new-order badge */}
             <View style={styles.iconWrap}>
               <Feather name={tabDef.icon} size={22} color={color} />
@@ -221,6 +240,19 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           </Pressable>
         );
       })}
+      </View>
+
+      <Pressable
+        testID="seller-bottom-ai"
+        accessibilityRole="button"
+        accessibilityLabel="Open Brandthread AI"
+        onPress={openAI}
+        style={({ pressed }) => [styles.aiButton, pressed && styles.pressed]}
+      >
+        <LinearGradient colors={[...theme.primaryGradient]} style={styles.aiGradient}>
+          <BrandthreadLogo size={22} opacity={1} />
+        </LinearGradient>
+      </Pressable>
     </View>
   );
 }
@@ -228,11 +260,18 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
 export default function TabLayout() {
+  const [studioOpenRequestKey, setStudioOpenRequestKey] = useState(0);
+
   return (
     <>
       <Tabs
         detachInactiveScreens
-        tabBar={(props) => <CustomTabBar {...props} />}
+        tabBar={(props) => (
+          <CustomTabBar
+            {...props}
+            onOpenStudio={() => setStudioOpenRequestKey((key) => key + 1)}
+          />
+        )}
         screenOptions={{
           freezeOnBlur: true,
           headerShown: false,
@@ -253,6 +292,7 @@ export default function TabLayout() {
         <Tabs.Screen name="analytics" options={{ href: null }} />
         <Tabs.Screen name="marketing" options={{ href: null }} />
       </Tabs>
+      <SellerStudioRadialMenu hideTrigger openRequestKey={studioOpenRequestKey} />
     </>
   );
 }
@@ -262,29 +302,54 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   bar: {
     flexDirection:   'row',
-    backgroundColor: '#0A0A0B',
-    borderTopWidth:  StyleSheet.hairlineWidth,
-    borderTopColor:  'rgba(255,255,255,0.07)',
-    paddingTop:      8,
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: 'transparent',
+    paddingTop: 10,
+    paddingHorizontal: 12,
   },
+  centerBar: {
+    flex: 1,
+    height: 58,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 5,
+    borderRadius: 29,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: SURFACE_GLASS,
+  },
+  sideButton: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: SURFACE_GLASS,
+  },
+  aiButton: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    overflow: 'hidden',
+  },
+  aiGradient: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pressed: { opacity: 0.82, transform: [{ scale: 0.95 }] },
   tab: {
     flex:           1,
     alignItems:     'center',
-    justifyContent: 'flex-start',
-    gap:            4,
+    justifyContent: 'center',
+    gap:            3,
     minHeight:      44,
+    borderRadius: 23,
   },
-  pillWrap: {
-    height:      3,
-    width:       '100%',
-    alignItems:  'center',
-    marginBottom: 6,
-  },
-  pill: {
-    width:           28,
-    height:          3,
-    borderRadius:    1.5,
-  },
+  tabActive: { backgroundColor: 'rgba(255,255,255,0.08)' },
   label: {
     fontSize:   10,
     fontFamily: FONT.medium,
