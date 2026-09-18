@@ -1807,7 +1807,7 @@ export default function FeedScreen({
       />
 
       {/* ─ Top bar overlay ─ */}
-      <View style={[styles.topBar, { paddingTop: insets.top + 6 }]} pointerEvents="box-none">
+      <View style={[styles.topBar, { paddingTop: insets.top + 2 }]} pointerEvents="box-none">
         {showSearch ? (
           <View style={styles.searchRow}>
             <TextInput
@@ -1848,7 +1848,7 @@ export default function FeedScreen({
               hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowSearch(true); }}
             >
-              <Feather name="search" size={21} color={ON_DARK} />
+                <Feather name="search" size={19} color={ON_DARK} />
             </TouchableOpacity>
 
             <Text style={styles.topTitle}>Thread</Text>
@@ -1865,7 +1865,7 @@ export default function FeedScreen({
               accessibilityRole="button"
               accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
             >
-              <Feather name="shopping-cart" size={22} color={ON_DARK} />
+              <Feather name="shopping-cart" size={20} color={ON_DARK} />
               {cartCount > 0 && (
                 <View style={[styles.cartCountBadge, { backgroundColor: theme.accent }]}>
                   <Text style={[styles.cartCountText, { color: theme.onAccent }]}>
@@ -2069,25 +2069,25 @@ const styles = StyleSheet.create({
   soundRow: { height: 16, flexDirection: 'row', alignItems: 'center', gap: 6 },
   soundText: { fontSize: FS.xs, fontFamily: FONT.regular, color: '#FFFFFFCC', flexShrink: 1 },
 
-  topBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 14, paddingBottom: 8 },
+  topBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 12, paddingBottom: 4 },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  topAvatarBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  topAvatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  topAvatarBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+  topAvatar: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   unreadDot: { position: 'absolute', top: 4, right: 4, width: 9, height: 9, borderRadius: 4.5, backgroundColor: RED, borderWidth: 1.5, borderColor: BG },
-  topIconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  cartHeaderBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  topIconBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+  cartHeaderBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   cartCountBadge: {
     position: 'absolute', top: 1, right: -1, minWidth: 17, height: 17,
     borderRadius: 9, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: BG,
   },
   cartCountText: { fontSize: 9, lineHeight: 12, fontFamily: FONT.bold },
-  topTitle: { flex: 1, textAlign: 'center', fontSize: FS.md, fontFamily: FONT.bold, color: '#FFFFFF' },
-  feedTabs: { alignSelf: 'center', flexDirection: 'row', gap: 26, marginTop: 2, paddingBottom: 2 },
-  feedTab: { paddingHorizontal: 4, paddingVertical: 5, alignItems: 'center' },
-  feedTabText: { color: ON_DARK, opacity: 0.6, fontFamily: FONT.semibold, fontSize: FS.sm },
+  topTitle: { flex: 1, textAlign: 'center', fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
+  feedTabs: { alignSelf: 'center', flexDirection: 'row', gap: 22, marginTop: 0, paddingBottom: 1 },
+  feedTab: { paddingHorizontal: 4, paddingVertical: 3, alignItems: 'center' },
+  feedTabText: { color: ON_DARK, opacity: 0.6, fontFamily: FONT.semibold, fontSize: FS.xs },
   feedTabTextActive: { color: ON_DARK, opacity: 1 },
-  feedTabUnderline: { height: 2, width: 24, borderRadius: 2, marginTop: 5 },
+  feedTabUnderline: { height: 2, width: 22, borderRadius: 2, marginTop: 3 },
 
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   searchInput: {
