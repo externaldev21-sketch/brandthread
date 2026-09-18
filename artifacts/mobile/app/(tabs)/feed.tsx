@@ -896,20 +896,29 @@ function SpotlightPage({
 
       {/* ─ Product tags live on the media surface ─ */}
       {!!item.productTags?.length && (
-        <View style={[styles.mediaTags, { top: insets.top + 84 }]} pointerEvents="box-none">
-          {item.productTags.slice(0, 3).map(tag => (
+        <View style={[styles.mediaTags, { bottom: tabBarClearance + 194 }]} pointerEvents="box-none">
+          {item.productTags.slice(0, 1).map(tag => (
             <TouchableOpacity
               key={tag.productId}
-              style={[styles.mediaTag, { borderColor: `${item.accentColor}99` }]}
+              style={styles.mediaTag}
               activeOpacity={0.82}
               onPress={() => onShopTag(item, tag)}
+              accessibilityRole="button"
+              accessibilityLabel={`Shop ${tag.productName} for ${formatCents(tag.priceCents)}`}
             >
-              <Feather name="shopping-bag" size={13} color="#FFFFFF" />
-              <View style={styles.mediaTagCopy}>
-                <Text style={styles.mediaTagName} numberOfLines={1}>{tag.productName}</Text>
-                <Text style={styles.mediaTagPrice}>{formatCents(tag.priceCents)}</Text>
+              <View style={styles.mediaTagIcon}>
+                <Feather name="shopping-bag" size={19} color="#111111" />
               </View>
-              <Feather name="chevron-right" size={14} color="#FFFFFFBB" />
+              <View style={styles.mediaTagCopy}>
+                <Text style={styles.mediaTagName} numberOfLines={1}>
+                  Shop · {tag.productName}
+                </Text>
+                <Text style={styles.mediaTagMeta} numberOfLines={1}>
+                  {formatCents(tag.priceCents)} · Creator pick
+                  {item.productTags!.length > 1 ? `s (${item.productTags!.length})` : ''}
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={18} color="#FFFFFFCC" />
             </TouchableOpacity>
           ))}
         </View>
@@ -1820,15 +1829,21 @@ const styles = StyleSheet.create({
   mediaDots: { position: 'absolute', top: '50%', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 5 },
   mediaDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#FFFFFF80' },
   mediaDotActive: { width: 18, backgroundColor: '#FFFFFF' },
-  mediaTags: { position: 'absolute', left: 14, right: 76, gap: 8 },
+  mediaTags: { position: 'absolute', left: 16, right: 78 },
   mediaTag: {
-    alignSelf: 'flex-start', maxWidth: '100%', flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderWidth: 1, borderRadius: 15, paddingVertical: 8, paddingHorizontal: 10,
-    backgroundColor: '#120F18CC',
+    width: '100%', minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 11,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', borderRadius: 14,
+    paddingVertical: 9, paddingHorizontal: 10, backgroundColor: 'rgba(12,12,14,0.76)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.28,
+    shadowRadius: 8, elevation: 7,
   },
-  mediaTagCopy: { flexShrink: 1 },
-  mediaTagName: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: FS.xs },
-  mediaTagPrice: { color: '#FFFFFFCC', fontFamily: FONT.bold, fontSize: 12, marginTop: 1 },
+  mediaTagIcon: {
+    width: 42, height: 42, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  mediaTagCopy: { flex: 1, minWidth: 0 },
+  mediaTagName: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: 14, lineHeight: 19 },
+  mediaTagMeta: { color: '#FFFFFFB8', fontFamily: FONT.medium, fontSize: 12, lineHeight: 17, marginTop: 1 },
 
   rail: {
     position: 'absolute', right: 10, bottom: 116, alignItems: 'center', gap: 18,
