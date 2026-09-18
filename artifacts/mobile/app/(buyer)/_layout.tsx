@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View, useColorScheme, type ColorValue } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View, useColorScheme, useWindowDimensions, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
@@ -215,7 +215,9 @@ function BuyerBottomTabBar({
   onAccent: string;
 }) {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const activeRoute = state.routes[state.index]?.name;
+  const sellerCenterBarWidth = Math.max(0, windowWidth - 144);
 
   const openTab = (name: string) => {
     Haptics.selectionAsync().catch(() => {});
@@ -235,9 +237,7 @@ function BuyerBottomTabBar({
       ]}
       testID="buyer-bottom-tab-bar"
     >
-      <View style={buyerBarStyles.sideSpacer} />
-
-      <View style={buyerBarStyles.centerBar}>
+      <View style={[buyerBarStyles.centerBar, { width: sellerCenterBarWidth }]}>
         {BUYER_NAV_ITEMS.map((item) => {
           const focused = activeRoute === item.name;
           const color = focused ? accent : BUYER_INACTIVE_COLOR;
@@ -293,7 +293,8 @@ const buyerBarStyles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
+    justifyContent: 'center',
+    gap: 12,
     backgroundColor: 'transparent',
     paddingTop: 8,
     paddingHorizontal: 12,
@@ -319,7 +320,8 @@ const buyerBarStyles = StyleSheet.create({
     lineHeight: 10,
   },
   centerBar: {
-    flex: 1,
+    flexGrow: 0,
+    flexShrink: 0,
     height: 48,
     flexDirection: 'row',
     alignItems: 'center',
@@ -329,13 +331,9 @@ const buyerBarStyles = StyleSheet.create({
     borderColor: BORDER,
     backgroundColor: SURFACE_GLASS,
   },
-  sideSpacer: {
-    width: 48,
-    height: 48,
-  },
   tab: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 44,
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',

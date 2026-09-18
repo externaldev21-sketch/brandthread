@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection:    'row',
     alignItems:       'flex-start',
-    gap:              8,
+    gap:              12,
     backgroundColor:  'transparent',
     paddingTop:       8,
     paddingHorizontal: 12,
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
     flex:           1,
     alignItems:     'center',
     justifyContent: 'center',
-    minHeight:      40,
+    minHeight:      44,
     borderRadius:   20,
     gap:            1,
   },
