@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Linking,
   Modal,
@@ -61,6 +62,7 @@ export function ThreadShareSheet({
   const [busy, setBusy] = useState<BusyAction>(null);
   const [savingProgress, setSavingProgress] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const actionInFlightRef = useRef(false);
 
   const postUrl = ExpoLinking.createURL('/buyer-post-viewer', {
     queryParams: { postId },
@@ -83,13 +85,15 @@ export function ThreadShareSheet({
   }, [visible]);
 
   async function runAction(name: string, action: () => Promise<void>) {
-    if (busy) return;
+    if (actionInFlightRef.current) return;
+    actionInFlightRef.current = true;
     setBusy(name);
     try {
       await action();
     } catch {
       onFeedback('Could not share this post. Try again.', 'error');
     } finally {
+      actionInFlightRef.current = false;
       setBusy(null);
     }
   }
@@ -155,6 +159,7 @@ export function ThreadShareSheet({
     onClose();
     const controller = new AbortController();
     abortRef.current = controller;
+    let destination: InstanceType<typeof import('expo-file-system').File> | null = null;
     try {
       const [{ File, Paths }, MediaLibrary] = await Promise.all([
         import('expo-file-system'),
@@ -162,9 +167,28 @@ export function ThreadShareSheet({
       ]);
       const permission = await MediaLibrary.requestPermissionsAsync();
       if (!permission.granted) {
-        throw new Error('Photos permission is required to save videos.');
+        if (!permission.canAskAgain) {
+          Alert.alert(
+            'Photos access is off',
+            'Allow Brandthread to add videos in Settings, then try again.',
+            [
+              { text: 'Not now', style: 'cancel' },
+              {
+                text: 'Open Settings',
+                onPress: () => {
+                  void Linking.openSettings().catch(() => {
+                    onFeedback('Open Settings and allow Photos access for Brandthread.', 'error');
+                  });
+                },
+              },
+            ],
+          );
+        } else {
+          onFeedback('Photos permission is required to save this video.', 'error');
+        }
+        return;
       }
-      const destination = new File(Paths.cache, `brandthread-${postId}-${Date.now()}.mp4`);
+      destination = new File(Paths.cache, `brandthread-${postId}-${Date.now()}.mp4`);
       let downloaded;
       if (/^https?:\/\//i.test(mediaUri)) {
         downloaded = await File.downloadFileAsync(mediaUri, destination, {
@@ -186,10 +210,19 @@ export function ThreadShareSheet({
       setSavingProgress(100);
       onFeedback('Video saved to Photos.', 'info');
     } catch (error) {
-      if ((error as Error)?.name !== 'AbortError') {
+      if ((error as Error)?.name === 'AbortError') {
+        onFeedback('Video save cancelled.', 'info');
+      } else {
         onFeedback(error instanceof Error ? error.message : 'Could not save video.', 'error');
       }
     } finally {
+      if (destination?.exists) {
+        try {
+          destination.delete();
+        } catch {
+          // The temporary file may already be unavailable after a native handoff.
+        }
+      }
       abortRef.current = null;
       setTimeout(() => setSavingProgress(null), 450);
     }
@@ -203,7 +236,7 @@ export function ThreadShareSheet({
           <View style={styles.header}>
             <View style={styles.headerSpacer} />
             <Text style={styles.title}>Share to</Text>
-            <Pressable onPress={onClose} style={styles.close} accessibilityLabel="Close share menu">
+            <Pressable onPress={onClose} style={styles.close} accessibilityLabel="Close share menu" testID="thread-share-close">
               <Feather name="x" size={20} color={FG} />
             </Pressable>
           </View>
@@ -261,7 +294,12 @@ export function ThreadShareSheet({
         <View style={[styles.progressWrap, { bottom: insets.bottom + 70 }]}>
           <View style={styles.progressLabels}>
             <Text style={styles.progressText}>{savingProgress}% Saving…</Text>
-            <Pressable onPress={() => abortRef.current?.abort()}>
+            <Pressable
+              onPress={() => abortRef.current?.abort()}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel saving video"
+              testID="thread-share-save-cancel"
+            >
               <Text style={styles.cancelText}>Cancel</Text>
             </Pressable>
           </View>
@@ -290,7 +328,14 @@ function ShareAction({
   avatar?: { initials: string; color: string };
 }) {
   return (
-    <Pressable style={styles.action} onPress={onPress} disabled={busy} accessibilityRole="button" accessibilityLabel={label}>
+    <Pressable
+      style={styles.action}
+      onPress={onPress}
+      disabled={busy}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      testID={`thread-share-${label.toLowerCase().replace(/\s+/g, '-')}`}
+    >
       <View style={[styles.actionCircle, muted && styles.actionCircleMuted, avatar && { backgroundColor: avatar.color }]}>
         {busy ? <ActivityIndicator color={ON_DARK} /> : avatar ? (
           <Text style={styles.avatarText}>{avatar.initials}</Text>

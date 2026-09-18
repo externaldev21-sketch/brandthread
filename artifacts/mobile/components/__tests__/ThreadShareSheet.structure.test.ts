@@ -27,6 +27,7 @@ describe('Thread video sharing flow', () => {
     }
     expect(source).toContain('createOrGetConversation');
     expect(source).toContain('sendMessage(');
+    expect(source).toContain('actionInFlightRef.current');
     expect(source).toContain('Clipboard.setStringAsync');
     expect(source).toContain('File.downloadFileAsync');
     expect(source).toContain('MediaLibrary.Asset.create');
@@ -35,6 +36,21 @@ describe('Thread video sharing flow', () => {
   it('shows cancellable save progress above the bottom tab bar', () => {
     expect(source).toContain('{savingProgress}% Saving…');
     expect(source).toContain("abortRef.current?.abort()");
+    expect(source).toContain("onFeedback('Video save cancelled.'");
+    expect(source).toContain('destination.delete()');
     expect(source).toContain('bottom: insets.bottom + 70');
+  });
+
+  it('handles permanent Photos denial without requesting permission before Save video is tapped', () => {
+    const saveVideoStart = source.indexOf('async function saveVideo()');
+    const permissionRequest = source.indexOf('MediaLibrary.requestPermissionsAsync()', saveVideoStart);
+    const saveAction = source.indexOf('label="Save video"');
+
+    expect(saveVideoStart).toBeGreaterThan(-1);
+    expect(permissionRequest).toBeGreaterThan(saveVideoStart);
+    expect(saveAction).toBeGreaterThan(permissionRequest);
+    expect(source).toContain('if (!permission.canAskAgain)');
+    expect(source).toContain('Linking.openSettings()');
+    expect(source).toContain('Photos access is off');
   });
 });

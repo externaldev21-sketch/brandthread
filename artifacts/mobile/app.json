@@ -212,7 +212,7 @@
         "expo-media-library",
         {
           "photosPermission": "Brandthread needs access to your photos so you can post them to your story.",
-          "savePhotosPermission": "Brandthread needs access to save photos.",
+          "savePhotosPermission": "Brandthread needs access to save videos you choose from Thread.",
           "isAccessMediaLocationEnabled": false
         }
       ],
