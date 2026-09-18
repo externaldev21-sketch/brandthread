@@ -5,7 +5,7 @@ import {
   Platform, ScrollView, RefreshControl, ActivityIndicator, KeyboardAvoidingView, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Feather, FontAwesome6 } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import {
   createThreadFeedCursor,
@@ -86,7 +86,7 @@ interface HighDemandProduct {
   commerce: CommerceSignalData;
 }
 
-function BuyerHighDemandPage() {
+function BuyerHighDemandPage({ pageHeight }: { pageHeight: number }) {
   const { theme } = useAppTheme();
   const { push } = useThreadPull();
   const api = useApi();
@@ -130,7 +130,7 @@ function BuyerHighDemandPage() {
   const topPad = insets.top + 20;
 
   return (
-    <View style={{ width: SCREEN_W, height: SCREEN_H, backgroundColor: BG }}>
+    <View style={{ width: SCREEN_W, height: pageHeight, backgroundColor: BG }}>
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: topPad, paddingHorizontal: 20, paddingBottom: 100 }}
@@ -615,7 +615,7 @@ interface LiveStreamFeedItem {
 // Union of all possible displayable items in the FlatList
 type FeedItem = SpotlightItem | LiveStreamFeedItem | BuyerDemandPageItem;
 
-function LiveStreamPage({ stream, onJoin }: { stream: LiveStreamFeedItem; onJoin: () => void }) {
+function LiveStreamPage({ stream, onJoin, pageHeight }: { stream: LiveStreamFeedItem; onJoin: () => void; pageHeight: number }) {
   const { theme } = useAppTheme();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
@@ -630,11 +630,11 @@ function LiveStreamPage({ stream, onJoin }: { stream: LiveStreamFeedItem; onJoin
   }, []);
 
   return (
-    <View style={{ width: SCREEN_W, height: SCREEN_H, backgroundColor: '#0a0209' }}>
+    <View style={{ width: SCREEN_W, height: pageHeight, backgroundColor: '#0a0209' }}>
       {/* Gradient background */}
       <View style={{ ...StyleSheet.absoluteFill, backgroundColor: 'rgba(10,80,100,0.18)' }} />
       {/* Centre glow */}
-      <View style={{ position: 'absolute', top: SCREEN_H * 0.25, alignSelf: 'center', width: 280, height: 280, borderRadius: 140, backgroundColor: theme.accentDim }} />
+      <View style={{ position: 'absolute', top: pageHeight * 0.25, alignSelf: 'center', width: 280, height: 280, borderRadius: 140, backgroundColor: theme.accentDim }} />
 
       {/* Top bar */}
       <View style={{ position: 'absolute', top: 52, left: 16, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -775,7 +775,7 @@ function VideoVisual({
   );
 }
 
-function PhotoVisual({ uris }: { uris: string[] }) {
+function PhotoVisual({ uris, pageHeight }: { uris: string[]; pageHeight: number }) {
   const pages = uris.length > 0 ? uris : [''];
   return (
     <FlatList
@@ -788,7 +788,7 @@ function PhotoVisual({ uris }: { uris: string[] }) {
       directionalLockEnabled
       nestedScrollEnabled
       renderItem={({ item: uri }) => (
-        <View style={{ width: SCREEN_W, height: SCREEN_H }}>
+        <View style={{ width: SCREEN_W, height: pageHeight }}>
           {uri ? <CachedImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" /> : (
             <View style={[StyleSheet.absoluteFill, styles.mediaPlaceholder]}>
               <Feather name="image" size={42} color="#FFFFFF99" />
@@ -802,10 +802,12 @@ function PhotoVisual({ uris }: { uris: string[] }) {
 }
 
 function SpotlightPage({
-  item, isActive, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShop, onShopTag,
+  item, isActive, pageHeight, bottomClearance, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag,
 }: {
   item: SpotlightItem;
   isActive: boolean;
+  pageHeight: number;
+  bottomClearance: number;
   engagement: EngagementState | undefined;
   onLike: (id: string) => Promise<void>;
   onDoubleTapLike: (id: string) => void;
@@ -813,15 +815,12 @@ function SpotlightPage({
   onRepost: (id: string) => Promise<void>;
   onFollow: (id: string) => Promise<void>;
   onOpenComments: (id: string) => void;
-  onShop: (item: SpotlightItem) => void;
   onShopTag: (item: SpotlightItem, tag: { productId: string; productName: string; priceCents: number }) => void;
 }) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { push } = useThreadPull();
-  // Clear the floating pill tab bar (see (tabs)/_layout.tsx: bottomOffset + height 72 + margin).
-  const tabBarClearance = Math.max(insets.bottom, 8) + 12 + 72 + 14;
   const [paused, setPaused] = useState(false);
   const heartBurst = useRef(new Animated.Value(0)).current;
   const heartScale = useRef(new Animated.Value(1)).current;
@@ -862,7 +861,7 @@ function SpotlightPage({
   }
 
   return (
-    <View style={{ width: SCREEN_W, height: SCREEN_H, backgroundColor: '#000' }}>
+    <View style={{ width: SCREEN_W, height: pageHeight, backgroundColor: '#000' }}>
       <TouchableWithoutFeedback onPress={handlePress}>
         <View style={StyleSheet.absoluteFill}>
           {item.contentType === 'video'
@@ -876,7 +875,7 @@ function SpotlightPage({
                 posterSource={item.videoPosterSource}
               />
             )
-            : <PhotoVisual uris={item.mediaUris} />}
+            : <PhotoVisual uris={item.mediaUris} pageHeight={pageHeight} />}
           {item.contentType !== 'video' && item.mediaUris.length > 1 && (
             <View style={styles.mediaDots} pointerEvents="none">
               {item.mediaUris.slice(0, 5).map((_, index) => <View key={index} style={[styles.mediaDot, index === 0 && styles.mediaDotActive]} />)}
@@ -896,7 +895,7 @@ function SpotlightPage({
 
       {/* ─ Product tags live on the media surface ─ */}
       {!!item.productTags?.length && (
-        <View style={[styles.mediaTags, { bottom: tabBarClearance + 194 }]} pointerEvents="box-none">
+        <View style={[styles.mediaTags, { bottom: bottomClearance + 112 }]} pointerEvents="box-none">
           {item.productTags.slice(0, 1).map(tag => (
             <TouchableOpacity
               key={tag.productId}
@@ -925,7 +924,7 @@ function SpotlightPage({
       )}
 
       {/* ─ Right action rail ─ */}
-      <View style={[styles.rail, { bottom: tabBarClearance }]}>
+      <View style={[styles.rail, { bottom: bottomClearance }]}>
         {/* Avatar + follow badge */}
         <View style={styles.railAvatarWrap}>
           <TouchableOpacity
@@ -960,7 +959,8 @@ function SpotlightPage({
         {/* Like */}
         <EngagementButton
           icon="heart"
-          iconSize={30}
+          solidIcon="heart"
+          iconSize={22}
           count={formatCount(engagement?.likes ?? 0)}
           active={engagement?.liked ?? false}
           activeColor="#EF4444"
@@ -968,6 +968,7 @@ function SpotlightPage({
           accessibilityLabel={`${engagement?.liked ? 'Unlike' : 'Like'}, ${formatCount(engagement?.likes ?? 0)} likes`}
           accessibilityState={{ checked: engagement?.liked ?? false }}
           scaleAnim={heartScale}
+          style={styles.railActionContent}
           onPress={async () => {
             bumpHeart();
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -986,20 +987,22 @@ function SpotlightPage({
           accessibilityRole="button"
           accessibilityLabel={`Comments, ${formatCount(item.commentsCount ?? (engagement?.comments ?? []).length)}`}
         >
-          <Feather name="message-circle" size={26} color="#FFFFFF" />
+          <FontAwesome6 name="comment" size={21} color="#FFFFFF" />
           <Text style={styles.railCount}>{formatCount(item.commentsCount ?? (engagement?.comments ?? []).length)}</Text>
         </TouchableOpacity>
 
         {/* Repost */}
         <EngagementButton
           icon="repeat"
-          iconSize={28}
+          solidIcon="retweet"
+          iconSize={22}
           count={formatCount(engagement?.reposts ?? 0)}
           active={engagement?.reposted ?? false}
           activeColor={theme.accent}
           inactiveColor="#FFFFFF"
           accessibilityLabel={`${engagement?.reposted ? 'Undo repost' : 'Repost'}, ${formatCount(engagement?.reposts ?? 0)} reposts`}
           accessibilityState={{ checked: engagement?.reposted ?? false }}
+          style={styles.railActionContent}
           onPress={async () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             await onRepost(item.id);
@@ -1011,13 +1014,15 @@ function SpotlightPage({
         {/* Save */}
         <EngagementButton
           icon="bookmark"
-          iconSize={27}
+          solidIcon="bookmark"
+          iconSize={21}
           count={formatCount(engagement?.saves ?? item.saves)}
           active={engagement?.saved ?? false}
           activeColor={theme.accent}
           inactiveColor="#FFFFFF"
           accessibilityLabel={`${engagement?.saved ? 'Unsave' : 'Save'}, ${formatCount(engagement?.saves ?? item.saves)} saves`}
           accessibilityState={{ checked: engagement?.saved ?? false }}
+          style={styles.railActionContent}
           onPress={async () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             await onSave(item.id);
@@ -1028,7 +1033,7 @@ function SpotlightPage({
 
         {/* Share — fire-and-forget native sheet, not an engagement action */}
         <TouchableOpacity
-          style={styles.shareRailBtn}
+          style={styles.railBtn}
           activeOpacity={0.7}
           hitSlop={{ top: 6, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
@@ -1041,41 +1046,14 @@ function SpotlightPage({
             void Share.share({ message: shareMsg });
           }}
         >
-          <View style={styles.shareRailIcon}>
-            <Feather name="send" size={21} color="#111111" />
-          </View>
+          <FontAwesome6 name="paper-plane" size={20} color="#FFFFFF" />
           <Text style={styles.railCount}>{formatCount(item.shares)}</Text>
         </TouchableOpacity>
 
-        {/* Shop */}
-        {(item.productTags?.length ?? 0) > 0 && (
-          <TouchableOpacity
-            style={styles.railBtn}
-            activeOpacity={0.7}
-            hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-            onPress={() => onShop(item)}
-            accessibilityRole="button"
-            accessibilityLabel={`Shop — ${(item.productTags?.length ?? 1)} product${(item.productTags?.length ?? 1) > 1 ? 's' : ''} tagged`}
-          >
-            <Feather name="shopping-bag" size={27} color="#FFFFFF" />
-            <Text style={styles.railCount}>Shop</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
       {/* ─ Bottom-left overlay: shop CTA, creator, caption, sound ─ */}
-      <View style={[styles.bottomInfo, { bottom: tabBarClearance }]} pointerEvents="box-none">
-        <TouchableOpacity
-          style={styles.shopBtn}
-          activeOpacity={0.85}
-          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-          onPress={() => onShop(item)}
-        >
-          <Feather name="shopping-bag" size={17} color="#111111" />
-          <Text style={styles.shopBtnText}>Shop look</Text>
-          <Feather name="arrow-up-right" size={15} color="#111111" />
-        </TouchableOpacity>
-
+      <View style={[styles.bottomInfo, { bottom: bottomClearance }]} pointerEvents="box-none">
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={() => {
@@ -1092,12 +1070,6 @@ function SpotlightPage({
           </View>
         </TouchableOpacity>
 
-         <View style={[styles.locationRow, !item.location && styles.infoSlotHidden]}>
-            <Feather name="map-pin" size={12} color={`${theme.onAccent}CC`} />
-            <Text style={[styles.locationText, { color: `${theme.onAccent}CC` }]} numberOfLines={1}>
-              {item.location ?? '\u00A0'}
-            </Text>
-         </View>
          <Text style={styles.caption} numberOfLines={2}>
            {item.caption}
             {item.caption.length > 86 && <Text style={[styles.moreText, { color: theme.onAccent }]}> more</Text>}
@@ -1218,6 +1190,7 @@ export default function FeedScreen({
 
   const [engagements, setEngagements] = useState<Record<string, EngagementState>>({});
   const [activeIndex, setActiveIndex] = useState(0);
+  const [pageHeight, setPageHeight] = useState(SCREEN_H);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifs, setShowNotifs] = useState(false);
@@ -1550,25 +1523,6 @@ export default function FeedScreen({
     router.push(('/buyer-post-comments?' + qs) as never);
   }
 
-  function handleShop(item: SpotlightItem) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const tags = (item.productTags ?? []).length > 0
-      ? (item.productTags as Array<{ productId: string; productName: string; priceCents: number }>)
-      : item.productId
-        ? [{ productId: item.productId, productName: item.productName, priceCents: 0, tagId: item.productId }]
-        : [];
-    if (tags.length === 0) return;
-    setShopSelection({
-      postId: item.id,
-      postSellerId: item.sellerId,
-      tags,
-      activeTagIndex: 0,
-      previewProduct: item.id.startsWith('preview-fashion-')
-        ? buildPreviewShopProduct(item, tags[0])
-        : undefined,
-    });
-  }
-
   function handleShopTag(item: SpotlightItem, tag: { productId: string; productName: string; priceCents: number }) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const allTags = (item.productTags ?? []).length > 0
@@ -1593,10 +1547,19 @@ export default function FeedScreen({
   }).current;
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
+  const bottomClearance = showFashionPreview
+    ? 12
+    : Math.max(insets.bottom, 8) + 12 + 72 + 14;
 
   return (
     <FeedToastProvider>
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      onLayout={({ nativeEvent }) => {
+        const measuredHeight = Math.round(nativeEvent.layout.height);
+        if (measuredHeight > 0 && measuredHeight !== pageHeight) setPageHeight(measuredHeight);
+      }}
+    >
       {feedLoading && (
         <FeedSkeleton
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 5 }}
@@ -1608,14 +1571,14 @@ export default function FeedScreen({
         pagingEnabled
         disableIntervalMomentum
         showsVerticalScrollIndicator={false}
-        snapToInterval={SCREEN_H}
+        snapToInterval={pageHeight}
         snapToAlignment="start"
         decelerationRate="fast"
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         onEndReached={loadMoreFeed}
         onEndReachedThreshold={0.5}
-        getItemLayout={(_, index) => ({ length: SCREEN_H, offset: SCREEN_H * index, index })}
+        getItemLayout={(_, index) => ({ length: pageHeight, offset: pageHeight * index, index })}
         refreshControl={
           <RefreshControl
             refreshing={feedRefreshing}
@@ -1626,14 +1589,14 @@ export default function FeedScreen({
         }
         ListEmptyComponent={
           searchQuery.trim() ? (
-            <View style={{ width: SCREEN_W, height: SCREEN_H, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+            <View style={{ width: SCREEN_W, height: pageHeight, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
               <Feather name="search" size={32} color="#8C8577" />
               <Text style={{ fontSize: FS.base, fontFamily: FONT.medium, color: '#8C8577' }}>
                 No results for "{searchQuery}"
               </Text>
             </View>
           ) : !feedLoading ? (
-            <View style={{ width: SCREEN_W, height: SCREEN_H, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 40 }}>
+            <View style={{ width: SCREEN_W, height: pageHeight, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 40 }}>
               <Feather name="film" size={40} color={MUTED} />
               <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center' }}>
                 {feedTab === 'following' ? 'No posts from followed sellers yet' : 'No posts yet'}
@@ -1658,13 +1621,14 @@ export default function FeedScreen({
         renderItem={({ item, index }) => {
           // Buyer demand page — full-screen at index 0 in buyer mode
           if (isDemandPageItem(item as FeedItem)) {
-            return <BuyerHighDemandPage />;
+            return <BuyerHighDemandPage pageHeight={pageHeight} />;
           }
           if ((item as any)._isLive) {
             const live = item as unknown as LiveStreamFeedItem;
             return (
               <LiveStreamPage
                 stream={live}
+                pageHeight={pageHeight}
                 onJoin={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   router.push(`/buyer-live?streamId=${encodeURIComponent(live.streamId)}` as never);
@@ -1681,6 +1645,8 @@ export default function FeedScreen({
             <SpotlightPage
               item={spotlight}
               isActive={contentIndex === activeContentIndex && !showNotifs}
+              pageHeight={pageHeight}
+              bottomClearance={bottomClearance}
               engagement={engagements[spotlight.id] ?? initialEngagement(spotlight)}
               onLike={handleLike}
               onDoubleTapLike={handleDoubleTapLike}
@@ -1688,7 +1654,6 @@ export default function FeedScreen({
               onRepost={handleRepost}
               onFollow={handleFollow}
               onOpenComments={handleOpenComments}
-              onShop={handleShop}
               onShopTag={handleShopTag}
             />
           );
@@ -1768,7 +1733,7 @@ export default function FeedScreen({
           <View style={styles.feedTabs}>
             {([
               ['following', 'Following'],
-              ['for-you', 'For You'],
+              ['for-you', 'Thread'],
             ] as const).map(([key, label]) => (
               <TouchableOpacity
                 key={key}
@@ -1829,56 +1794,40 @@ const styles = StyleSheet.create({
   mediaDots: { position: 'absolute', top: '50%', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 5 },
   mediaDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#FFFFFF80' },
   mediaDotActive: { width: 18, backgroundColor: '#FFFFFF' },
-  mediaTags: { position: 'absolute', left: 16, right: 78 },
+  mediaTags: { position: 'absolute', left: 16, right: 86, alignItems: 'flex-start' },
   mediaTag: {
-    width: '100%', minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 11,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', borderRadius: 14,
-    paddingVertical: 9, paddingHorizontal: 10, backgroundColor: 'rgba(12,12,14,0.76)',
+    maxWidth: 270, minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', borderRadius: 11,
+    paddingVertical: 7, paddingHorizontal: 8, backgroundColor: 'rgba(12,12,14,0.72)',
     shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.28,
     shadowRadius: 8, elevation: 7,
   },
   mediaTagIcon: {
-    width: 42, height: 42, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+    width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#FFFFFF',
   },
   mediaTagCopy: { flex: 1, minWidth: 0 },
-  mediaTagName: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: 14, lineHeight: 19 },
-  mediaTagMeta: { color: '#FFFFFFB8', fontFamily: FONT.medium, fontSize: 12, lineHeight: 17, marginTop: 1 },
+  mediaTagName: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: 13, lineHeight: 16 },
+  mediaTagMeta: { color: '#FFFFFFB8', fontFamily: FONT.medium, fontSize: 11, lineHeight: 14 },
 
   rail: {
-    position: 'absolute', right: 10, bottom: 116, alignItems: 'center', gap: 18,
+    position: 'absolute', right: 8, width: 48, bottom: 116, alignItems: 'center', gap: 11,
   },
-  railAvatarWrap: { alignItems: 'center', marginBottom: 4 },
-  railAvatar: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
-  railAvatarText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
+  railAvatarWrap: { alignItems: 'center', marginBottom: 2 },
+  railAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#FFFFFF' },
+  railAvatarText: { fontSize: FS.sm, fontFamily: FONT.bold, color: '#FFFFFF' },
   railFollowBadge: {
     position: 'absolute', bottom: -8, width: 19, height: 19, borderRadius: 10,
     alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000',
   },
-  railBtn: { alignItems: 'center', gap: 3 },
-  shareRailBtn: { alignItems: 'center', gap: 5 },
-  shareRailIcon: {
-    width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FFFFFFCC',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 5, elevation: 5,
-  },
-  railCount: { fontSize: FS.xs, fontFamily: FONT.semibold, color: '#FFFFFF' },
-
-  shopBtn: {
-    alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6,
-    minHeight: 44, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 14, marginBottom: 2,
-    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FFFFFFCC',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8,
-  },
-  shopBtnText: { fontSize: FS.sm, fontFamily: FONT.bold, color: '#111111', letterSpacing: 0.1 },
+  railBtn: { width: 48, alignItems: 'center', gap: 2 },
+  railActionContent: { width: 48, alignItems: 'center', gap: 2 },
+  railCount: { fontSize: 11, lineHeight: 13, fontFamily: FONT.bold, color: '#FFFFFF' },
 
   bottomInfo: {
-    position: 'absolute', left: 16, right: 84, bottom: 26, height: 184,
+    position: 'absolute', left: 16, right: 84, bottom: 26, height: 104,
     justifyContent: 'flex-end', gap: 8,
   },
-  locationRow: { height: 16, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  infoSlotHidden: { opacity: 0 },
-  locationText: { fontSize: FS.xs, fontFamily: FONT.medium, color: ON_DARK },
   caption: {
     height: 38, fontSize: 14, fontFamily: FONT.regular, color: '#FFFFFF',
     lineHeight: 19,

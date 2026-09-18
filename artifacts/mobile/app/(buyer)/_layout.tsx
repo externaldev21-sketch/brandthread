@@ -287,20 +287,15 @@ function BuyerBottomTabBar({
   );
 }
 
-const BUYER_INACTIVE_COLOR = 'rgba(244,244,255,0.40)';
+const BUYER_INACTIVE_COLOR = 'rgba(244,244,255,0.72)';
 
 const buyerBarStyles = StyleSheet.create({
   bar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 30,
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'center',
     gap: 12,
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(8,8,10,0.18)',
     paddingTop: 8,
     paddingHorizontal: 12,
   },
@@ -312,7 +307,7 @@ const buyerBarStyles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(8,8,10,0.58)',
+    backgroundColor: 'rgba(8,8,10,0.42)',
     paddingTop: 4,
   },
   profileButtonActive: {
@@ -320,9 +315,9 @@ const buyerBarStyles = StyleSheet.create({
   },
   profileLabel: {
     color: FG,
-    fontFamily: FONT.medium,
-    fontSize: 8,
-    lineHeight: 10,
+    fontFamily: FONT.bold,
+    fontSize: 10,
+    lineHeight: 12,
   },
   centerBar: {
     flexGrow: 0,
@@ -334,7 +329,7 @@ const buyerBarStyles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(8,8,10,0.58)',
+    backgroundColor: 'rgba(8,8,10,0.42)',
   },
   tab: {
     flex: 1,
@@ -349,9 +344,9 @@ const buyerBarStyles = StyleSheet.create({
   },
   tabLabel: {
     maxWidth: '100%',
-    fontFamily: FONT.medium,
-    fontSize: 8,
-    lineHeight: 10,
+    fontFamily: FONT.bold,
+    fontSize: 10,
+    lineHeight: 12,
   },
   pressed: {
     opacity: 0.82,

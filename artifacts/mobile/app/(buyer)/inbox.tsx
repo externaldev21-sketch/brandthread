@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, FlatList, ScrollView, TouchableOpacity,
+  View, Text, FlatList, TouchableOpacity,
   Alert, StyleSheet,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -15,11 +15,10 @@ import {
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
-  getConversations, getStories, markConversationRead, archiveConversation,
-  subscribeSocial, MY_USER_ID, MY_COLOR, MY_INITIALS, MY_NAME,
-  getNotifications,
+  getConversations, markConversationRead, archiveConversation,
+  subscribeSocial, getNotifications, markNotificationRead,
 } from '@/services/socialService';
-import type { Conversation, Story } from '@/services/socialTypes';
+import type { Conversation, Notification } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 import SwipeActionRow from '@/components/SwipeActionRow';
 
@@ -45,11 +44,11 @@ function previewText(lastMessage: string | undefined, fallback: string): string 
 
 // ─── Segment tabs ─────────────────────────────────────────────────────────────
 
-const TABS = ['Highlights', 'Messages', 'Requests'] as const;
+const TABS = ['Follows', 'Messages', 'Requests'] as const;
 type Tab = typeof TABS[number];
 
 const EMPTY_MESSAGES: Record<Tab, { icon: keyof typeof Feather.glyphMap; title: string; subtitle: string }> = {
-  Highlights: { icon: 'star', title: 'No highlights yet', subtitle: 'Unread conversations appear here' },
+  Follows: { icon: 'user-plus', title: 'No new followers', subtitle: 'New followers appear here' },
   Messages: { icon: 'message-circle', title: 'No messages yet', subtitle: 'Start a conversation' },
   Requests: { icon: 'mail', title: 'No message requests', subtitle: 'Requests from new senders appear here' },
 };
@@ -66,7 +65,7 @@ export default function InboxScreen() {
   accountRef.current = userId;
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [stories, setStories] = useState<Story[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>('Messages');
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [requestActionLoading, setRequestActionLoading] = useState<string | null>(null);
@@ -76,22 +75,22 @@ export default function InboxScreen() {
   const loadData = useCallback(async () => {
     if (!userId) {
       setConversations([]);
-      setStories([]);
+      setNotifications([]);
       setUnreadNotifCount(0);
       setLoading(false);
       return;
     }
     setLoadError(false);
     try {
-      const [convs, strs, notifs] = await Promise.all([getConversations(), getStories(), getNotifications()]);
+      const [convs, notifs] = await Promise.all([getConversations(), getNotifications()]);
       if (accountRef.current !== userId) return;
       setConversations(convs);
-      setStories(strs);
+      setNotifications(notifs);
       setUnreadNotifCount(notifs.filter(n => !n.isRead).length);
     } catch {
       setLoadError(false);
       setConversations([]);
-      setStories([]);
+      setNotifications([]);
       setUnreadNotifCount(0);
     } finally {
       setLoading(false);
@@ -113,7 +112,7 @@ export default function InboxScreen() {
     // Tab filter
     let tabMatch = false;
     switch (activeTab) {
-      case 'Highlights': tabMatch = !conv.isArchived && !conv.isRequest && conv.unreadCount > 0; break;
+      case 'Follows': tabMatch = false; break;
       case 'Messages': tabMatch = !conv.isArchived && !conv.isRequest; break;
       case 'Requests': tabMatch = conv.isRequest === true && !conv.isArchived; break;
     }
@@ -121,9 +120,7 @@ export default function InboxScreen() {
     return true;
   });
 
-  const myStories = stories.filter(s => s.authorId === MY_USER_ID);
-  const otherStories = stories.filter(s => s.authorId !== MY_USER_ID);
-  const allStoryIds = stories.map(s => s.id);
+  const followNotifications = notifications.filter(notif => notif.type === 'new_follower' && !notif.isMuted);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
@@ -201,6 +198,19 @@ export default function InboxScreen() {
       'Start a conversation with:',
       [{ text: 'Cancel', style: 'cancel' }],
     );
+  }
+
+  function openFollow(notif: Notification) {
+    Haptics.selectionAsync();
+    if (!notif.isRead) {
+      markNotificationRead(notif.id);
+      setNotifications(prev => prev.map(item =>
+        item.id === notif.id ? { ...item, isRead: true } : item
+      ));
+    }
+    if (notif.targetId) {
+      router.push(`/buyer-other-profile?userId=${encodeURIComponent(notif.targetId)}` as never);
+    }
   }
 
   // ── Render helpers ──────────────────────────────────────────────────────────
@@ -316,6 +326,38 @@ export default function InboxScreen() {
     );
   }
 
+  function renderFollowRow({ item: notif }: { item: Notification }) {
+    const isUnread = !notif.isRead;
+    return (
+      <TouchableOpacity
+        style={s.convRow}
+        onPress={() => openFollow(notif)}
+        activeOpacity={0.75}
+        accessibilityRole="button"
+        accessibilityLabel={notif.title}
+      >
+        <View style={s.avatarContainer}>
+          <View style={[s.avatar48, { backgroundColor: notif.actorColor ?? CARD }]}>
+            <Text style={s.avatarInitials}>{notif.actorInitials ?? '?'}</Text>
+          </View>
+          {isUnread && <View style={[s.unreadDot, { backgroundColor: theme.accent }]} />}
+        </View>
+        <View style={s.convCenter}>
+          <View style={s.convNameRow}>
+            <Text style={[s.convName, { fontFamily: isUnread ? FONT.bold : FONT.semibold }]} numberOfLines={1}>
+              {notif.actorName ?? notif.title}
+            </Text>
+            <Text style={s.convTime}>{timeAgo(new Date(notif.createdAt).getTime())}</Text>
+          </View>
+          <Text style={[s.convPreview, isUnread && { color: FG }]} numberOfLines={2}>
+            {notif.body || 'Started following you'}
+          </Text>
+        </View>
+        <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
+      </TouchableOpacity>
+    );
+  }
+
   function renderEmptyState() {
     if (loading) return <View style={s.emptyState}><Text style={s.emptySubtitle}>Loading conversations…</Text></View>;
     const { icon, title, subtitle } = EMPTY_MESSAGES[activeTab];
@@ -356,62 +398,14 @@ export default function InboxScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Stories row */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.storiesContent}
-        style={s.storiesRow}
-      >
-        {/* Your story circle */}
-        <TouchableOpacity
-          style={s.storyItem}
-          onPress={() => router.push('/buyer-story-create' as never)}
-          activeOpacity={0.8}
-        >
-          <View style={[s.storyCircle, { backgroundColor: MY_COLOR }]}>
-            <Text style={s.storyInitials}>{MY_INITIALS}</Text>
-            <View style={[s.storyAddBadge, { backgroundColor: theme.accent }]}>
-              <Feather name="plus" size={10} color={theme.onAccent} />
-            </View>
-          </View>
-          <Text style={s.storyLabel} numberOfLines={1}>Your story</Text>
-        </TouchableOpacity>
-
-        {/* Other stories */}
-        {otherStories.map(story => {
-          const viewed = story.viewers.some(v => v.userId === MY_USER_ID);
-          return (
-            <TouchableOpacity
-              key={story.id}
-              style={s.storyItem}
-              onPress={() => {
-                const allIds = allStoryIds.join(',');
-                router.push(`/buyer-story-viewer?storyId=${story.id}&allStoryIds=${allIds}` as never);
-              }}
-              activeOpacity={0.8}
-            >
-              <View style={[s.storyRing, { borderColor: viewed ? MUTED : theme.accent }]}>
-                <View style={[s.storyCircleInner, { backgroundColor: story.authorColor }]}>
-                  <Text style={s.storyInitials}>{story.authorInitials}</Text>
-                </View>
-              </View>
-              <Text style={s.storyLabel} numberOfLines={1}>
-                {story.authorName.split(' ')[0]}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
-      {/* Reference-style message categories */}
+      {/* Inbox categories */}
       <View style={s.primaryTabs}>
         {TABS.map(tab => {
           const isActive = activeTab === tab;
           const count = tab === 'Requests'
             ? conversations.filter(conv => conv.isRequest && !conv.isArchived).length
-            : tab === 'Highlights'
-              ? conversations.filter(conv => !conv.isRequest && !conv.isArchived && conv.unreadCount > 0).length
+            : tab === 'Follows'
+              ? followNotifications.filter(notif => !notif.isRead).length
               : conversations.filter(conv => !conv.isRequest && !conv.isArchived).length;
           return (
             <TouchableOpacity
@@ -430,16 +424,28 @@ export default function InboxScreen() {
       </View>
 
       {/* Conversations list */}
-      <FlatList
-        data={filteredConvs}
-        keyExtractor={item => item.id}
-        renderItem={renderConvRow}
-        ListEmptyComponent={renderEmptyState}
-        style={s.listSurface}
-        contentContainerStyle={[s.listContent, filteredConvs.length === 0 && s.listEmptyContainer]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      />
+      {activeTab === 'Follows' ? (
+        <FlatList
+          data={followNotifications}
+          keyExtractor={item => item.id}
+          renderItem={renderFollowRow}
+          ListEmptyComponent={renderEmptyState}
+          style={s.listSurface}
+          contentContainerStyle={[s.listContent, followNotifications.length === 0 && s.listEmptyContainer]}
+          showsVerticalScrollIndicator={false}
+        />
+      ) : (
+        <FlatList
+          data={filteredConvs}
+          keyExtractor={item => item.id}
+          renderItem={renderConvRow}
+          ListEmptyComponent={renderEmptyState}
+          style={s.listSurface}
+          contentContainerStyle={[s.listContent, filteredConvs.length === 0 && s.listEmptyContainer]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        />
+      )}
     </View>
   );
 }
@@ -510,72 +516,6 @@ const s = StyleSheet.create({
     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: FG,
-  },
-
-  // Stories
-  storiesRow: {
-    flexGrow: 0,
-    backgroundColor: 'transparent',
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-  },
-  storiesContent: {
-    paddingHorizontal: SP.md,
-    paddingTop: 12,
-    paddingBottom: 11,
-    gap: 14,
-  },
-  storyItem: {
-    alignItems: 'center',
-    gap: SP.xs,
-    width: 62,
-  },
-  storyCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  storyInitials: {
-    fontSize: FS.sm,
-    fontFamily: FONT.bold,
-    color: '#FFFFFF',
-  },
-  storyAddBadge: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: BG,
-  },
-  storyRing: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 2,
-  },
-  storyCircleInner: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  storyLabel: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: MUTED,
-    textAlign: 'center',
   },
 
   // Tabs

@@ -105,7 +105,7 @@ const TABS: {
   },
 ];
 
-const INACTIVE_COLOR = 'rgba(244,244,255,0.40)';
+const INACTIVE_COLOR = 'rgba(244,244,255,0.72)';
 
 // ─── Route → active tab classification ───────────────────────────────────────
 // Maps the first or second segment to the closest primary tab.
@@ -416,15 +416,15 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     maxWidth:   '100%',
-    fontFamily: FONT.medium,
-    fontSize:   8,
-    lineHeight: 10,
+    fontFamily: FONT.bold,
+    fontSize:   10,
+    lineHeight: 12,
   },
   sideLabel: {
     color:      FG,
-    fontFamily: FONT.medium,
-    fontSize:   8,
-    lineHeight: 10,
+    fontFamily: FONT.bold,
+    fontSize:   10,
+    lineHeight: 12,
   },
   badge: {
     position:         'absolute',
