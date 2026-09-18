@@ -19,6 +19,7 @@ function BuyerTabLayout() {
   const isDark  = colorScheme === 'dark';
   const isIOS   = Platform.OS === 'ios';
   const insets  = useSafeAreaInsets();
+  const bottomInset = Platform.OS === 'web' ? 34 : insets.bottom;
   const { theme } = useAppTheme();
   const [inboxBadgeCount, setInboxBadgeCount] = useState(0);
 
@@ -52,8 +53,8 @@ function BuyerTabLayout() {
 
   const tabBarStyle = {
     position: 'relative' as const,
-    height: 64 + insets.bottom,
-    paddingBottom: insets.bottom,
+    height: 64 + bottomInset,
+    paddingBottom: bottomInset,
     paddingTop: 4,
     borderRadius: 0,
     borderTopWidth: 1,
@@ -215,6 +216,7 @@ function BuyerBottomTabBar({
   onAccent: string;
 }) {
   const insets = useSafeAreaInsets();
+  const bottomInset = Platform.OS === 'web' ? 34 : insets.bottom;
   const activeRoute = state.routes[state.index]?.name;
 
   const openTab = (name: string) => {
@@ -229,8 +231,8 @@ function BuyerBottomTabBar({
       style={[
         buyerBarStyles.bar,
         {
-          height: 72 + insets.bottom,
-          paddingBottom: insets.bottom,
+          height: 72 + bottomInset,
+          paddingBottom: bottomInset,
         },
       ]}
       testID="buyer-bottom-tab-bar"
@@ -256,7 +258,7 @@ function BuyerBottomTabBar({
               testID={`buyer-tab-${item.name}`}
             >
               <TabBadge count={showInboxBadge ? inboxBadgeCount : 0} accent={accent} onAccent={onAccent}>
-                <Feather name={item.icon} size={18} color={color} />
+                <Feather name={item.icon} size={22} color={color} />
               </TabBadge>
               <Text numberOfLines={1} style={[buyerBarStyles.tabLabel, { color }]}>
                 {item.label}
@@ -292,22 +294,22 @@ const buyerBarStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(8,8,10,0.18)',
-    paddingTop: 6,
-    paddingHorizontal: 8,
+    gap: 12,
+    backgroundColor: 'transparent',
+    paddingTop: 8,
+    paddingHorizontal: 12,
   },
   profileButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(8,8,10,0.42)',
+    backgroundColor: 'rgba(8,8,10,0.58)',
     gap: 1,
-    paddingTop: 2,
+    paddingTop: 4,
   },
   profileButtonActive: {
     backgroundColor: 'rgba(255,255,255,0.14)',
@@ -315,24 +317,24 @@ const buyerBarStyles = StyleSheet.create({
   profileLabel: {
     color: FG,
     fontFamily: FONT.bold,
-    fontSize: 9,
-    lineHeight: 11,
+    fontSize: 10,
+    lineHeight: 12,
   },
   centerBar: {
     flex: 1,
-    height: 56,
+    height: 48,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 4,
-    borderRadius: 28,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(8,8,10,0.42)',
+    backgroundColor: 'rgba(8,8,10,0.58)',
   },
   tab: {
     flex: 1,
-    minHeight: 52,
-    borderRadius: 24,
+    minHeight: 44,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 1,
@@ -343,8 +345,8 @@ const buyerBarStyles = StyleSheet.create({
   tabLabel: {
     maxWidth: '100%',
     fontFamily: FONT.bold,
-    fontSize: 9,
-    lineHeight: 11,
+    fontSize: 10,
+    lineHeight: 12,
   },
   pressed: {
     opacity: 0.82,

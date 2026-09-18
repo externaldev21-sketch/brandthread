@@ -1253,6 +1253,8 @@ export default function FeedScreen({
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
   const insets = useSafeAreaInsets();
+  const previewTopInset = Platform.OS === 'web' ? 67 : insets.top;
+  const previewBottomInset = Platform.OS === 'web' ? 34 : insets.bottom;
   const router = useRouter();
   const { userId } = useAuth();
   const { push } = useThreadPull();
@@ -1695,7 +1697,7 @@ export default function FeedScreen({
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
   const bottomClearance = showFashionPreview
     ? 12
-    : Math.max(insets.bottom, 8) + 12 + 84 + 14;
+    : Math.max(previewBottomInset, 8) + 12 + 72 + 14;
 
   return (
     <FeedToastProvider>
@@ -1807,7 +1809,7 @@ export default function FeedScreen({
       />
 
       {/* ─ Top bar overlay ─ */}
-      <View style={[styles.topBar, { paddingTop: insets.top + 2 }]} pointerEvents="box-none">
+      <View style={[styles.topBar, { paddingTop: previewTopInset + 2 }]} pointerEvents="box-none">
         {showSearch ? (
           <View style={styles.searchRow}>
             <TextInput
@@ -1908,7 +1910,7 @@ export default function FeedScreen({
           <TouchableWithoutFeedback onPress={() => setShowNotifs(false)}>
             <View style={StyleSheet.absoluteFill} />
           </TouchableWithoutFeedback>
-          <View style={[styles.commentsSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <View style={[styles.commentsSheet, { paddingBottom: Math.max(previewBottomInset, 16) }]}>
             <View style={styles.commentsHandle} />
             <Text style={styles.commentsTitle}>Notifications</Text>
             <View style={{ gap: 14, paddingTop: 4 }}>
@@ -1930,7 +1932,7 @@ export default function FeedScreen({
           <TouchableWithoutFeedback onPress={() => setShowRepostEducation(false)}>
             <View style={StyleSheet.absoluteFill} />
           </TouchableWithoutFeedback>
-          <View style={[styles.repostEducationSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <View style={[styles.repostEducationSheet, { paddingBottom: Math.max(previewBottomInset, 16) }]}>
             <TouchableOpacity
               style={styles.repostEducationClose}
               onPress={() => setShowRepostEducation(false)}
