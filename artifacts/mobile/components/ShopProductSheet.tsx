@@ -8,6 +8,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -52,6 +53,13 @@ import type {
   BuyerProductVariant,
   CheckoutAttribution,
 } from '@/services/cartTypes';
+import {
+  getCartFlightVector,
+  getSuccessfulCartCount,
+  measureCartTarget,
+  shouldAnimateCartSuccess,
+  type CartFlightPoint,
+} from '@/lib/cartFlight';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -74,6 +82,8 @@ interface ShopProductSheetProps {
   selection: ShopSheetSelection;
   onClose: () => void;
   onCartUpdated?: (newCount: number) => void;
+  cartTargetRef?: RefObject<View | null>;
+  reduceMotion: boolean | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -260,6 +270,8 @@ export function ShopProductSheet({
   selection,
   onClose,
   onCartUpdated,
+  cartTargetRef,
+  reduceMotion,
 }: ShopProductSheetProps) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -278,6 +290,7 @@ export function ShopProductSheet({
   const [variantError, setVariantError] = useState('');
   const [flyingToCart, setFlyingToCart] = useState(false);
   const [showAddedConfirmation, setShowAddedConfirmation] = useState(false);
+  const [cartTarget, setCartTarget] = useState<CartFlightPoint | null>(null);
   const addedConfirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Slide-up animation
@@ -285,13 +298,17 @@ export function ShopProductSheet({
   const cartFlyProgress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (!shouldAnimateCartSuccess(reduceMotion)) {
+      slideY.setValue(0);
+      return;
+    }
     Animated.spring(slideY, {
       toValue: 0,
       useNativeDriver: true,
       speed: 18,
       bounciness: 3,
     }).start();
-  }, []);
+  }, [reduceMotion, slideY]);
 
   useEffect(() => () => {
     if (addedConfirmationTimer.current) clearTimeout(addedConfirmationTimer.current);
@@ -299,6 +316,10 @@ export function ShopProductSheet({
 
   // Dismiss animation
   function dismissSheet(cb?: () => void) {
+    if (!shouldAnimateCartSuccess(reduceMotion)) {
+      cb?.();
+      return;
+    }
     Animated.timing(slideY, {
       toValue: 500,
       duration: 220,
@@ -310,23 +331,38 @@ export function ShopProductSheet({
     dismissSheet(onClose);
   }
 
-  function flyProductToCart(newCount: number) {
+  function showCartSuccess(newCount: number) {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    onCartUpdated?.(newCount);
+    setShowAddedConfirmation(true);
+    addedConfirmationTimer.current = setTimeout(() => {
+      setShowAddedConfirmation(false);
+      addedConfirmationTimer.current = null;
+    }, 1200);
+  }
+
+  async function flyProductToCart(newCount: number) {
+    if (!shouldAnimateCartSuccess(reduceMotion)) {
+      showCartSuccess(newCount);
+      return;
+    }
+    const target = await measureCartTarget(
+      cartTargetRef?.current?.measureInWindow.bind(cartTargetRef.current),
+      safeFallbackTarget,
+    );
+    setCartTarget(target);
     setFlyingToCart(true);
     cartFlyProgress.setValue(0);
-    Animated.timing(cartFlyProgress, {
-      toValue: 1,
-      duration: 720,
-      easing: Easing.inOut(Easing.cubic),
-      useNativeDriver: true,
-    }).start(() => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      onCartUpdated?.(newCount);
-      setFlyingToCart(false);
-      setShowAddedConfirmation(true);
-      addedConfirmationTimer.current = setTimeout(() => {
-        setShowAddedConfirmation(false);
-        addedConfirmationTimer.current = null;
-      }, 1200);
+    requestAnimationFrame(() => {
+      Animated.timing(cartFlyProgress, {
+        toValue: 1,
+        duration: 720,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      }).start(() => {
+        setFlyingToCart(false);
+        showCartSuccess(newCount);
+      });
     });
   }
 
@@ -447,22 +483,24 @@ export function ShopProductSheet({
       return;
     }
     setVariantError('');
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (selection.previewProduct) {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setPhase('added');
-      flyProductToCart(qty);
+      void flyProductToCart(qty);
       return;
     }
     setPhase('adding');
     try {
       const result = await addToCart({ product, variant, quantity: qty, attribution });
-      if (!result.success) {
+      const newCount = getSuccessfulCartCount(result);
+      if (newCount == null) {
         setPhase('ready');
         setVariantError(result.message ?? 'Could not add to cart.');
         return;
       }
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setPhase('added');
-      flyProductToCart(result.cart.items.reduce((s, i) => s + i.quantity, 0));
+      void flyProductToCart(newCount);
     } catch (err) {
       setPhase('ready');
       setVariantError(err instanceof Error ? err.message : 'Could not add to cart.');
@@ -513,6 +551,11 @@ export function ShopProductSheet({
 
   const accent = theme.accent;
   const isBusy = phase === 'adding' || phase === 'buying';
+  const flyStartLeft = windowWidth / 2 - 24;
+  const flyStartTop = windowHeight - Math.min(330, windowHeight * 0.4);
+  const safeFallbackTarget = { x: windowWidth - 54, y: insets.top + 26 };
+  const resolvedCartTarget = cartTarget ?? safeFallbackTarget;
+  const flightVector = getCartFlightVector(flyStartLeft, flyStartTop, resolvedCartTarget);
   // Capture phase as string to allow comparison across JSX blocks without narrowing conflicts
   const currentPhase: string = phase;
 
@@ -784,8 +827,8 @@ export function ShopProductSheet({
           style={[
             ss.cartFlyItem,
             {
-              left: windowWidth / 2 - 24,
-              top: windowHeight - Math.min(330, windowHeight * 0.4),
+              left: flyStartLeft,
+              top: flyStartTop,
               opacity: cartFlyProgress.interpolate({
                 inputRange: [0, 0.82, 1],
                 outputRange: [1, 1, 0],
@@ -794,13 +837,17 @@ export function ShopProductSheet({
                 {
                   translateX: cartFlyProgress.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0, windowWidth / 2 - 78],
+                    outputRange: [0, flightVector.x],
                   }),
                 },
                 {
                   translateY: cartFlyProgress.interpolate({
                     inputRange: [0, 0.55, 1],
-                    outputRange: [0, -windowHeight * 0.27, -(windowHeight - Math.min(330, windowHeight * 0.4) - insets.top - 26)],
+                    outputRange: [
+                      0,
+                      -Math.min(windowHeight * 0.27, Math.max(48, flyStartTop - resolvedCartTarget.y) * 0.45),
+                      flightVector.y,
+                    ],
                   }),
                 },
                 {

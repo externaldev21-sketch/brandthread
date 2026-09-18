@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
   Dimensions, Animated, TextInput, Modal,
-  Platform, ScrollView, RefreshControl, ActivityIndicator, KeyboardAvoidingView, Image,
+  AccessibilityInfo, Platform, ScrollView, RefreshControl, ActivityIndicator, KeyboardAvoidingView, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, FontAwesome } from '@expo/vector-icons';
@@ -54,6 +54,7 @@ import {
 } from '@/components/EngagementButton';
 import { formatCount } from '@/lib/engagementUtils';
 import { ThreadShareSheet } from '@/components/ThreadShareSheet';
+import { shouldAnimateCartSuccess } from '@/lib/cartFlight';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const THREAD_PAGE_SIZE = 30;
@@ -1267,6 +1268,7 @@ export default function FeedScreen({
   const [feedTab, setFeedTab] = useState<'following' | 'for-you'>('for-you');
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
   const [cartCount, setCartCount] = useState(0);
+  const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
   const [hasUnread, setHasUnread] = useState(true);
   const [sellerFeedPosts, setSellerFeedPosts] = useState<SpotlightItem[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
@@ -1282,6 +1284,19 @@ export default function FeedScreen({
   const feedHasMoreRef = useRef(true);
   const repostPendingRef = useRef(new Set<string>());
   const cartPulse = useRef(new Animated.Value(1)).current;
+  const cartTargetRef = useRef<View>(null);
+
+  useEffect(() => {
+    let active = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then(enabled => {
+      if (active) setReduceMotion(enabled);
+    });
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []);
 
   // Load published seller posts and subscribe to real-time changes
   const loadFeed = useCallback(async (initial = false) => {
@@ -1375,12 +1390,13 @@ export default function FeedScreen({
 
   const handleCartUpdated = useCallback((newCount: number) => {
     setCartCount(newCount);
+    if (!shouldAnimateCartSuccess(reduceMotion)) return;
     cartPulse.setValue(0.78);
     Animated.sequence([
       Animated.spring(cartPulse, { toValue: 1.18, speed: 28, bounciness: 8, useNativeDriver: true }),
       Animated.spring(cartPulse, { toValue: 1, speed: 24, bounciness: 4, useNativeDriver: true }),
     ]).start();
-  }, [cartPulse]);
+  }, [cartPulse, reduceMotion]);
 
   const handleRefresh = useCallback(() => {
     if (feedRefreshing) return;
@@ -1837,7 +1853,7 @@ export default function FeedScreen({
 
             <Text style={styles.topTitle}>Thread</Text>
 
-            <Animated.View style={{ transform: [{ scale: cartPulse }] }}>
+            <Animated.View ref={cartTargetRef} style={{ transform: [{ scale: cartPulse }] }}>
             <TouchableOpacity
               style={styles.cartHeaderBtn}
               activeOpacity={0.7}
@@ -1970,6 +1986,8 @@ export default function FeedScreen({
           selection={shopSelection}
           onClose={() => setShopSelection(null)}
           onCartUpdated={handleCartUpdated}
+          cartTargetRef={cartTargetRef}
+          reduceMotion={reduceMotion}
         />
       )}
 

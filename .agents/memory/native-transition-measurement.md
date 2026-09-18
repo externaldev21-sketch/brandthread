@@ -3,8 +3,8 @@ name: Native transition measurement
 description: Reliable boundaries for physical-device transition and keyboard performance checks.
 ---
 
-Measure JavaScript scheduling and animation completion inside the app rather than using device-automation request time as a paint metric. Use native screen recordings to detect visible frozen frames, and confirm delayed focus through the input's focus event plus native keyboard visibility.
+Measure JavaScript scheduling and animation completion inside the app rather than using device-automation request time as a paint metric. Use native screen recordings to detect visible frozen frames, and confirm delayed focus through the input's focus event plus native keyboard visibility. When an animation targets a measured native view, await `measureInWindow` (with a bounded fallback) before mounting or starting a native-driver animation; a late coordinate state update cannot reliably retarget one already in flight.
 
-**Why:** Appium command and accessibility polling latency varies independently of app performance. A timer callback that calls `focus()` also does not prove the input focused or the keyboard opened.
+**Why:** Appium command and accessibility polling latency varies independently of app performance. A timer callback that calls `focus()` also does not prove the input focused or the keyboard opened. Native measurement callbacks are asynchronous, and starting first can lock in a fallback destination or create a visible jump.
 
 **How to apply:** For release-gating mobile transition checks, combine development-only app timing markers with physical-device recordings and native state assertions. Keep production behavior inaccessible through compile-time development guards.
