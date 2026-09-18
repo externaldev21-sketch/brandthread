@@ -341,7 +341,7 @@ export default function InboxScreen() {
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >
-          <Feather name="arrow-left" size={22} color="#111111" />
+          <Feather name="arrow-left" size={22} color={FG} />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Inbox</Text>
         <TouchableOpacity
@@ -351,7 +351,7 @@ export default function InboxScreen() {
           accessibilityRole="button"
           accessibilityLabel="New conversation"
         >
-          <Feather name="edit-3" size={21} color="#111111" />
+          <Feather name="edit-3" size={21} color={FG} />
           {unreadNotifCount > 0 && <View style={[s.headerUnreadDot, { backgroundColor: theme.accent }]} />}
         </TouchableOpacity>
       </View>
@@ -456,9 +456,9 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: SP.sm,
     paddingBottom: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
     borderBottomWidth: 1,
-    borderBottomColor: '#1C1C1E',
+    borderBottomColor: BORDER,
   },
   headerSide: {
     width: 44,
@@ -470,18 +470,18 @@ const s = StyleSheet.create({
   headerTitle: {
     fontSize: FS.md,
     fontFamily: FONT.semibold,
-    color: '#111111',
+    color: FG,
   },
   headerUnreadDot: {
     position: 'absolute', top: 8, right: 7, width: 7, height: 7, borderRadius: 4,
-    borderWidth: 1.5, borderColor: '#FFFFFF',
+    borderWidth: 1.5, borderColor: BG,
   },
   primaryTabs: {
     flexDirection: 'row',
     minHeight: 48,
     borderBottomWidth: 1,
-    borderBottomColor: '#E1E1E1',
-    backgroundColor: '#FFFFFF',
+    borderBottomColor: BORDER,
+    backgroundColor: 'transparent',
     paddingHorizontal: SP.sm,
   },
   primaryTab: {
@@ -492,9 +492,9 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     gap: 3,
   },
-  primaryTabText: { fontSize: 13, fontFamily: FONT.regular, color: '#8A8A8E' },
-  primaryTabTextActive: { fontFamily: FONT.semibold, color: '#111111' },
-  primaryTabCount: { fontSize: 13, fontFamily: FONT.semibold, color: '#E23B45' },
+  primaryTabText: { fontSize: 13, fontFamily: FONT.regular, color: MUTED },
+  primaryTabTextActive: { fontFamily: FONT.semibold, color: FG },
+  primaryTabCount: { fontSize: 13, fontFamily: FONT.semibold, color: RED },
   notifBadge: {
     position: 'absolute',
     top: 4,
@@ -515,9 +515,9 @@ const s = StyleSheet.create({
   // Stories
   storiesRow: {
     flexGrow: 0,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
     borderBottomWidth: 1,
-    borderBottomColor: '#ECECEC',
+    borderBottomColor: BORDER,
   },
   storiesContent: {
     paddingHorizontal: SP.md,
@@ -574,7 +574,7 @@ const s = StyleSheet.create({
   storyLabel: {
     fontSize: FS.xs,
     fontFamily: FONT.regular,
-    color: '#5A5A5F',
+    color: MUTED,
     textAlign: 'center',
   },
 
@@ -599,12 +599,13 @@ const s = StyleSheet.create({
   requestCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginHorizontal: 10,
-    marginTop: 10,
+    marginHorizontal: 0,
+    marginTop: 0,
     paddingHorizontal: SP.md,
     paddingVertical: SP.md,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+    backgroundColor: 'transparent',
     gap: SP.md,
   },
   requestActions: {
@@ -647,13 +648,14 @@ const s = StyleSheet.create({
   convRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 10,
-    marginTop: 10,
+    marginHorizontal: 0,
+    marginTop: 0,
     paddingHorizontal: SP.md,
     paddingVertical: SP.md,
     minHeight: 78,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+    backgroundColor: 'transparent',
   },
   avatarContainer: {
     position: 'relative',
@@ -692,12 +694,12 @@ const s = StyleSheet.create({
   convName: {
     flex: 1,
     fontSize: FS.base,
-    color: '#111111',
+    color: FG,
   },
   convTime: {
     fontSize: FS.xs,
     fontFamily: FONT.regular,
-    color: '#8A8A8E',
+    color: MUTED,
     marginLeft: SP.xs,
   },
   orderPill: {
@@ -714,7 +716,7 @@ const s = StyleSheet.create({
   convPreview: {
     fontSize: FS.sm,
     fontFamily: FONT.regular,
-    color: '#5A5A5F',
+    color: MUTED,
   },
   unreadBadge: {
     minWidth: 20,
@@ -732,7 +734,7 @@ const s = StyleSheet.create({
   },
 
   // Empty state
-  listSurface: { flex: 1, backgroundColor: '#F5F5F5' },
+  listSurface: { flex: 1, backgroundColor: 'transparent' },
   listContent: { paddingBottom: 112 },
   listEmptyContainer: {
     flex: 1,
