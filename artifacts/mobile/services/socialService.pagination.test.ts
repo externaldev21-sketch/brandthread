@@ -139,4 +139,41 @@ describe('Thread feed pagination', () => {
       .rejects.toThrow('offline');
     expect(serviceRequest).toHaveBeenCalledTimes(1);
   });
+
+  it('maps only server-approved friend repost context and own repost state', async () => {
+    const postId = '11111111-1111-4111-8111-111111111111';
+    serviceRequest.mockImplementation(async (path: string) => {
+      if (path.startsWith('/api/posts/feed')) return [apiPost(postId)];
+      if (path.startsWith('/api/posts/repost-context')) {
+        return {
+          [postId]: {
+            repostedByMe: true,
+            reposters: [{
+              userId: 'friend-1',
+              displayName: 'Mutual Friend',
+              avatarUrl: 'https://images.example/friend.jpg',
+              createdAt: '2026-09-18T01:00:00.000Z',
+            }],
+          },
+        };
+      }
+      return [];
+    });
+
+    const page = await getThreadPostsPage(createThreadFeedCursor(), 2, 'following');
+
+    expect(page.posts[0]).toMatchObject({
+      id: postId,
+      repostedByMe: true,
+      friendReposts: [{
+        userId: 'friend-1',
+        displayName: 'Mutual Friend',
+        avatarUrl: 'https://images.example/friend.jpg',
+      }],
+    });
+    expect(serviceRequest.mock.calls.map(([path]) => path)).toEqual([
+      '/api/posts/feed?limit=2&offset=0',
+      `/api/posts/repost-context?postIds=${postId}`,
+    ]);
+  });
 });

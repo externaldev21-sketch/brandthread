@@ -14,11 +14,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
-  KeyboardAvoidingView, Platform, StyleSheet,
-  Animated,
+  KeyboardAvoidingView, Platform, StyleSheet, Animated,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
@@ -34,6 +33,7 @@ import type { Comment } from '@/services/socialTypes';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { InlineSpinner, InlineError } from '@/components/InlineFeedback';
+import { CachedImage } from '@/components/CachedImage';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -46,6 +46,8 @@ function timeAgo(iso: string): string {
   if (hrs < 24) return `${hrs}h`;
   return `${Math.floor(hrs / 24)}d`;
 }
+
+const QUICK_EMOJIS = ['😁', '🥰', '😂', '😮', '😉', '😅', '🥺'] as const;
 
 // ─── Comment skeleton row ─────────────────────────────────────────────────────
 
@@ -83,11 +85,13 @@ const csk = StyleSheet.create({
 
 function CommentRow({
   comment,
+  postAuthorId,
   onLike,
   onReply,
   onDelete,
 }: {
   comment: Comment;
+  postAuthorId: string;
   onLike: (id: string) => void;
   onReply: (comment: Comment) => void;
   onDelete: (id: string) => void;
@@ -95,6 +99,7 @@ function CommentRow({
   const { theme } = useAppTheme();
   const s = makeStyles(theme);
   const isOwn = comment.authorId === MY_USER_ID;
+  const isCreator = !!postAuthorId && comment.authorId === postAuthorId;
   const isReply = !!comment.replyToId;
   /** Optimistic comments carry a tmp_ prefix — show a subtle pending indicator */
   const isPending = comment.id.startsWith('tmp_');
@@ -131,38 +136,39 @@ function CommentRow({
         {/* Header */}
         <View style={s.commentHeader}>
           <Text style={s.authorName}>{comment.authorName}</Text>
-          {isPending ? (
-            <View style={s.pendingDot} />
-          ) : (
-            <Text style={s.commentTime}>{timeAgo(comment.createdAt)}</Text>
-          )}
+          {isCreator && <Text style={[s.creatorBadge, { color: theme.accent }]}>· Creator</Text>}
+          {isPending && <View style={s.pendingDot} />}
         </View>
 
         {/* Text */}
         <Text style={s.commentText}>{comment.text}</Text>
 
         {/* Actions — hidden while pending */}
-        {!isPending && (
-          <View style={s.commentActions}>
-            <TouchableOpacity style={s.actionBtn} onPress={() => onLike(comment.id)}>
-              <Feather
-                name="heart"
-                size={13}
-                color={comment.likedByMe ? RED : MUTED}
-              />
-              {comment.likesCount > 0 && (
-                <Text style={[s.actionLabel, comment.likedByMe && { color: RED }]}>
-                  {comment.likesCount}
-                </Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity style={s.actionBtn} onPress={() => onReply(comment)}>
+        <View style={s.commentMeta}>
+          <Text style={s.commentTime}>{isPending ? 'Posting…' : timeAgo(comment.createdAt)}</Text>
+          {!isPending && (
+            <TouchableOpacity style={s.replyBtn} onPress={() => onReply(comment)}>
               <Text style={s.replyLabel}>Reply</Text>
             </TouchableOpacity>
-          </View>
-        )}
+          )}
+        </View>
       </View>
+
+      {!isPending && (
+        <TouchableOpacity
+          style={s.commentLike}
+          onPress={() => onLike(comment.id)}
+          accessibilityRole="button"
+          accessibilityLabel={`${comment.likedByMe ? 'Unlike' : 'Like'} comment`}
+        >
+          <Feather name="heart" size={19} color={comment.likedByMe ? RED : MUTED} />
+          {comment.likesCount > 0 && (
+            <Text style={[s.actionLabel, comment.likedByMe && { color: RED }]}>
+              {comment.likesCount}
+            </Text>
+          )}
+        </TouchableOpacity>
+      )}
     </TouchableOpacity>
   );
 }
@@ -178,23 +184,33 @@ export default function BuyerPostCommentsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
     postId: string;
+    postAuthorId?: string;
     postAuthorName?: string;
     postAuthorInitials?: string;
     postAuthorColor?: string;
     postCaption?: string;
+    postMediaUri?: string;
     postMediaColor1?: string;
     postMediaColor2?: string;
     postType?: string;
   }>();
 
   const postId = params.postId ?? '';
+  const postAuthorId = params.postAuthorId ?? '';
   const authorName = params.postAuthorName ?? '';
   const authorInitials = params.postAuthorInitials ?? '?';
   const authorColor = params.postAuthorColor ?? PURPLE;
   const caption = params.postCaption ?? '';
-  const mediaColor1 = params.postMediaColor1 ?? '#111113';
-  const mediaColor2 = params.postMediaColor2 ?? '#0A0A0B';
+  const mediaUri = params.postMediaUri ?? '';
   const postType = params.postType ?? 'photo';
+  const mediaPlayer = useVideoPlayer(
+    mediaUri && postType === 'video' ? { uri: mediaUri } : null,
+    player => {
+      player.loop = true;
+      player.muted = true;
+      player.play();
+    },
+  );
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [inputText, setInputText] = useState('');
@@ -281,10 +297,10 @@ export default function BuyerPostCommentsScreen() {
       likesCount: 0,
       createdAt: new Date().toISOString(),
     };
-    setComments(prev => [...prev, optimistic]);
+    setComments(prev => [optimistic, ...prev]);
     setInputText('');
     setReplyingTo(null);
-    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+    requestAnimationFrame(() => inputRef.current?.focus());
 
     try {
       await postComment({
@@ -311,156 +327,167 @@ export default function BuyerPostCommentsScreen() {
   const realCount = comments.filter(c => !c.id.startsWith('tmp_')).length;
 
   return (
-    <KeyboardAvoidingView
-      style={[s.container, { backgroundColor: 'transparent' }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={0}
-    >
-      {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="x" size={ICON.lg} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Comments</Text>
-        <View style={{ width: ICON.lg }} />
-      </View>
-
-      <FlatList
-        ref={listRef}
-        data={loading ? [] : comments}
-        keyExtractor={c => c.id}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: SP.xl }}
-        ListHeaderComponent={() => (
-          <>
-            {/* Post summary */}
-            <View style={s.postSummary}>
-              <LinearGradient
-                colors={[mediaColor1, mediaColor2] as [string, string]}
-                style={s.postThumb}
-              >
-                <Feather
-                  name={postType === 'video' ? 'video' : 'image'}
-                  size={20}
-                  color="rgba(255,255,255,0.35)"
-                />
-              </LinearGradient>
-              <View style={{ flex: 1 }}>
-                <View style={s.postAuthorRow}>
-                  <View style={[s.postAvatar, { backgroundColor: authorColor }]}>
-                    <Text style={s.postAvatarText}>{authorInitials}</Text>
-                  </View>
-                  <Text style={s.postAuthorName}>{authorName}</Text>
-                </View>
-                {caption ? (
-                  <Text style={s.postCaption} numberOfLines={2}>{caption}</Text>
-                ) : null}
-              </View>
-            </View>
-
-            {/* Divider + count */}
-            <View style={s.countRow}>
-              <View style={s.divider} />
-              <Text style={s.countLabel}>
-                {loading
-                  ? '…'
-                  : realCount === 0
-                    ? 'No comments yet — drop the first one.'
-                    : `${realCount} comment${realCount !== 1 ? 's' : ''}`}
-              </Text>
-              <View style={s.divider} />
-            </View>
-
-            {/* First-load skeleton */}
-            {loading && (
-              <View style={{ gap: 0 }}>
-                {[0, 1, 2, 3].map(i => <CommentSkeletonRow key={i} />)}
-              </View>
-            )}
-
-            {/* Fetch error with retry */}
-            {!loading && fetchError ? (
-              <InlineError
-                message={fetchError}
-                onRetry={load}
-              />
-            ) : null}
-          </>
-        )}
-        renderItem={({ item }) => (
-          <CommentRow
-            comment={item}
-            onLike={handleLike}
-            onReply={handleReply}
-            onDelete={handleDelete}
+    <View style={s.overlay}>
+      {mediaUri ? (
+        postType === 'video' ? (
+          <VideoView
+            player={mediaPlayer}
+            style={s.mediaBackdrop}
+            contentFit="cover"
+            nativeControls={false}
           />
-        )}
-        ListEmptyComponent={loading || fetchError ? null : undefined}
+        ) : (
+          <CachedImage source={{ uri: mediaUri }} style={s.mediaBackdrop} contentFit="cover" />
+        )
+      ) : null}
+      <TouchableOpacity
+        style={s.backdrop}
+        activeOpacity={1}
+        onPress={() => router.back()}
+        accessibilityRole="button"
+        accessibilityLabel="Close comments"
       />
-
-      {/* Input area */}
-      <View style={[s.inputWrap, { paddingBottom: insets.bottom + SP.sm }]}>
-        {/* Send error */}
-        {sendError ? (
-          <TouchableOpacity
-            style={s.sendErrorBanner}
-            onPress={() => { setSendError(null); }}
-            accessibilityRole="button"
-            accessibilityLabel="Dismiss send error"
-          >
-            <Feather name="alert-circle" size={12} color={RED} />
-            <Text style={s.sendErrorText} numberOfLines={1}>{sendError}</Text>
-            <Feather name="x" size={12} color={RED} />
-          </TouchableOpacity>
-        ) : null}
-
-        {/* Reply banner */}
-        {replyingTo ? (
-          <View style={s.replyingBanner}>
-            <Text style={s.replyingLabel} numberOfLines={1}>
-              Replying to <Text style={[s.replyingName, { color: theme.accent }]}>{replyingTo.authorName}</Text>
-            </Text>
-            <TouchableOpacity onPress={handleCancelReply} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-              <Feather name="x" size={14} color={MUTED} />
-            </TouchableOpacity>
+      <KeyboardAvoidingView
+        style={s.sheet}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
+        <View style={s.postSummary}>
+          <View style={[s.postAvatar, { backgroundColor: authorColor }]}>
+            <Text style={s.postAvatarText}>{authorInitials}</Text>
           </View>
-        ) : null}
-
-        <View style={s.inputRow}>
-          {/* My avatar */}
-          <View style={[s.inputAvatar, { backgroundColor: MY_COLOR }]}>
-            <Text style={s.inputAvatarText}>{MY_INITIALS}</Text>
+          <View style={s.postSummaryCopy}>
+            <Text style={s.postAuthorName} numberOfLines={1}>{authorName || 'Post'}</Text>
+            <Text style={s.postCaption} numberOfLines={1}>{caption || 'View the conversation'}</Text>
           </View>
+          <Feather name={postType === 'video' ? 'play' : 'image'} size={16} color={MUTED} />
+        </View>
 
-          <TextInput
-            ref={inputRef}
-            style={s.input}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder={replyingTo ? `Reply to ${replyingTo.authorName}…` : 'Add a comment…'}
-            placeholderTextColor={MUTED}
-            multiline
-            maxLength={500}
-            returnKeyType="default"
-          />
-
-          {/* Send button: spinner while sending, send icon otherwise */}
+        <View style={s.header}>
+          <View style={s.headerSide} />
+          <Text style={s.headerTitle}>
+            {loading ? 'Comments' : `${realCount} comment${realCount === 1 ? '' : 's'}`}
+          </Text>
           <TouchableOpacity
-            style={[s.sendBtn, (!inputText.trim() || sending) && s.sendBtnDisabled]}
-            onPress={handleSend}
-            disabled={!inputText.trim() || sending}
+            style={s.headerSide}
+            onPress={() => router.back()}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
-            accessibilityLabel={sending ? 'Posting comment' : 'Send comment'}
+            accessibilityLabel="Close comments"
           >
-            {sending ? (
-              <InlineSpinner style={{ paddingVertical: 0 }} />
-            ) : (
-              <Feather name="send" size={ICON.md} color={!inputText.trim() ? MUTED : PURPLE} />
-            )}
+            <Feather name="x" size={22} color={FG} />
           </TouchableOpacity>
         </View>
-      </View>
-    </KeyboardAvoidingView>
+
+        <FlatList
+          ref={listRef}
+          data={loading ? [] : comments}
+          keyExtractor={comment => comment.id}
+          showsVerticalScrollIndicator={false}
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={s.listContent}
+          ListHeaderComponent={() => (
+            <>
+              {loading && [0, 1, 2, 3].map(i => <CommentSkeletonRow key={i} />)}
+              {!loading && fetchError ? <InlineError message={fetchError} onRetry={load} /> : null}
+            </>
+          )}
+          renderItem={({ item }) => (
+            <CommentRow
+              comment={item}
+              postAuthorId={postAuthorId}
+              onLike={handleLike}
+              onReply={handleReply}
+              onDelete={handleDelete}
+            />
+          )}
+          ListEmptyComponent={
+            !loading && !fetchError
+              ? <View style={s.emptyState}><Text style={s.emptyTitle}>Start the conversation</Text><Text style={s.emptyText}>Be the first to comment.</Text></View>
+              : null
+          }
+        />
+
+        <View style={[s.inputWrap, { paddingBottom: Math.max(insets.bottom, SP.sm) }]}>
+          {sendError ? (
+            <TouchableOpacity style={s.sendErrorBanner} onPress={() => setSendError(null)}>
+              <Feather name="alert-circle" size={12} color={RED} />
+              <Text style={s.sendErrorText} numberOfLines={1}>{sendError}</Text>
+              <Feather name="x" size={12} color={RED} />
+            </TouchableOpacity>
+          ) : null}
+          {replyingTo ? (
+            <View style={s.replyingBanner}>
+              <Text style={s.replyingLabel} numberOfLines={1}>
+                Replying to <Text style={[s.replyingName, { color: theme.accent }]}>{replyingTo.authorName}</Text>
+              </Text>
+              <TouchableOpacity onPress={handleCancelReply} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                <Feather name="x" size={14} color={MUTED} />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
+          <View style={s.emojiRow}>
+            {QUICK_EMOJIS.map(emoji => (
+              <TouchableOpacity
+                key={emoji}
+                style={s.emojiBtn}
+                onPress={() => {
+                  setInputText(value => `${value}${emoji}`);
+                  inputRef.current?.focus();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Add ${emoji}`}
+              >
+                <Text style={s.emoji}>{emoji}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={s.inputRow}>
+            <View style={[s.inputAvatar, { backgroundColor: MY_COLOR }]}>
+              <Text style={s.inputAvatarText}>{MY_INITIALS}</Text>
+            </View>
+            <View style={s.inputShell}>
+              <TextInput
+                ref={inputRef}
+                style={s.input}
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder={replyingTo ? `Reply to ${replyingTo.authorName}…` : 'Add comment…'}
+                placeholderTextColor={MUTED}
+                multiline
+                maxLength={500}
+                returnKeyType="default"
+              />
+              <TouchableOpacity
+                style={s.inputTool}
+                onPress={() => {
+                  setInputText(value => value.endsWith(' ') || !value ? `${value}@` : `${value} @`);
+                  inputRef.current?.focus();
+                }}
+                accessibilityLabel="Mention someone"
+              >
+                <Text style={s.mentionIcon}>@</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.inputTool} onPress={() => inputRef.current?.focus()} accessibilityLabel="Choose emoji">
+                <Feather name="smile" size={21} color={FG} />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={[s.sendBtn, { backgroundColor: theme.accent }, (!inputText.trim() || sending) && s.sendBtnDisabled]}
+              onPress={handleSend}
+              disabled={!inputText.trim() || sending}
+              accessibilityRole="button"
+              accessibilityLabel={sending ? 'Posting comment' : 'Send comment'}
+            >
+              {sending ? <InlineSpinner style={{ paddingVertical: 0 }} /> : <Feather name="arrow-up" size={18} color={theme.onAccent} />}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -471,38 +498,69 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE_DIM = theme.accentDim;
   return StyleSheet.create({
   container: { flex: 1 },
+  overlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.14)',
+  },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  },
+  mediaBackdrop: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    left: 0,
+    height: '31%',
+  },
+  sheet: {
+    height: '73%',
+    overflow: 'hidden',
+    backgroundColor: CARD,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: BORDER,
+  },
 
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
+    height: 52,
+    paddingHorizontal: SP.sm,
     borderBottomWidth: 1,
     borderBottomColor: BORDER,
   },
+  headerSide: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   headerTitle: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.base,
+    fontFamily: FONT.bold,
+    fontSize: FS.sm,
     color: FG,
   },
 
   // Post summary
   postSummary: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: SP.sm,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.md,
-  },
-  postThumb: {
-    width: 52,
-    height: 52,
-    borderRadius: RADIUS.md,
     alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
+    gap: 10,
+    paddingHorizontal: SP.md,
+    minHeight: 62,
+    paddingVertical: SP.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
   },
+  postSummaryCopy: { flex: 1, minWidth: 0 },
   postAuthorRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -510,28 +568,33 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginBottom: 4,
   },
   postAvatar: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },
   postAvatarText: {
     fontFamily: FONT.bold,
-    fontSize: 9,
+    fontSize: FS.xs,
     color: ON_DARK,
   },
   postAuthorName: {
-    fontFamily: FONT.semibold,
+    fontFamily: FONT.bold,
     fontSize: FS.sm,
     color: FG,
   },
   postCaption: {
     fontFamily: FONT.regular,
-    fontSize: FS.sm,
+    fontSize: FS.xs,
     color: MUTED,
-    lineHeight: 18,
+    lineHeight: 16,
+    marginTop: 2,
   },
+  listContent: { paddingTop: 4, paddingBottom: SP.md, flexGrow: 1 },
+  emptyState: { flex: 1, minHeight: 180, alignItems: 'center', justifyContent: 'center', gap: 5 },
+  emptyTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.base },
+  emptyText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm },
 
   countRow: {
     flexDirection: 'row',
@@ -550,20 +613,21 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // Comment rows
   commentRow: {
     flexDirection: 'row',
-    gap: SP.sm,
+    alignItems: 'flex-start',
+    gap: 10,
     paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
+    paddingVertical: 10,
   },
   commentRowIndented: {
-    paddingLeft: SP.md + 32 + SP.sm,
+    paddingLeft: SP.md + 42,
   },
   commentRowPending: {
     opacity: 0.6,
   },
   avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -573,7 +637,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: FS.xs,
     color: ON_DARK,
   },
-  commentBody: { flex: 1 },
+  commentBody: { flex: 1, minWidth: 0 },
 
   replyBanner: {
     flexDirection: 'row',
@@ -592,13 +656,14 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.xs,
-    marginBottom: 2,
+    marginBottom: 3,
   },
   authorName: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.sm,
-    color: FG,
+    fontFamily: FONT.medium,
+    fontSize: 13,
+    color: MUTED,
   },
+  creatorBadge: { fontFamily: FONT.semibold, fontSize: 13 },
   commentTime: {
     fontFamily: FONT.regular,
     fontSize: FS.xs,
@@ -612,11 +677,14 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginLeft: 2,
   },
   commentText: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
+    fontFamily: FONT.medium,
+    fontSize: 14,
     color: FG,
-    lineHeight: 20,
+    lineHeight: 19,
   },
+  commentMeta: { flexDirection: 'row', alignItems: 'center', gap: SP.md, marginTop: 5 },
+  replyBtn: { paddingVertical: 2, paddingRight: SP.sm },
+  commentLike: { width: 38, minHeight: 44, alignItems: 'center', justifyContent: 'center', gap: 2 },
   commentActions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -632,6 +700,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontFamily: FONT.regular,
     fontSize: FS.xs,
     color: MUTED,
+    textAlign: 'center',
   },
   replyLabel: {
     fontFamily: FONT.medium,
@@ -644,8 +713,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderTopWidth: 1,
     borderTopColor: BORDER,
     backgroundColor: CARD,
-    paddingTop: SP.sm,
-    paddingHorizontal: SP.md,
+    paddingTop: 6,
+    paddingHorizontal: 12,
   },
   sendErrorBanner: {
     flexDirection: 'row',
@@ -684,17 +753,40 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   inputRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: SP.sm,
+    alignItems: 'center',
+    gap: 8,
   },
   inputAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-    marginBottom: 4,
+  },
+  emojiRow: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  emojiBtn: {
+    width: 40,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emoji: { fontSize: 23 },
+  inputShell: {
+    flex: 1,
+    minHeight: 42,
+    maxHeight: 96,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: CARD_ELEVATED,
+    borderRadius: 21,
+    paddingLeft: 12,
+    paddingRight: 4,
   },
   inputAvatarText: {
     fontFamily: FONT.bold,
@@ -703,19 +795,28 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   input: {
     flex: 1,
-    backgroundColor: CARD_ELEVATED,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: RADIUS.lg,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
+    paddingHorizontal: 0,
+    paddingVertical: 9,
     fontFamily: FONT.regular,
     fontSize: FS.sm,
     color: FG,
-    maxHeight: 100,
-    minHeight: 40,
+    maxHeight: 88,
+    minHeight: 42,
   },
-  sendBtn: { padding: SP.xs, marginBottom: 4, minWidth: 32, alignItems: 'center' },
-  sendBtnDisabled: { opacity: 0.4 },
+  inputTool: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mentionIcon: { color: FG, fontFamily: FONT.bold, fontSize: 22, lineHeight: 24 },
+  sendBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendBtnDisabled: { opacity: 0.28 },
   });
 };

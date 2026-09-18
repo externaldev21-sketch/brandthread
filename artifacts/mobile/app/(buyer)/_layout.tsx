@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View, useColorScheme, useWindowDimensions, type ColorValue } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View, useColorScheme, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
@@ -215,9 +215,7 @@ function BuyerBottomTabBar({
   onAccent: string;
 }) {
   const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
   const activeRoute = state.routes[state.index]?.name;
-  const sellerCenterBarWidth = Math.max(0, windowWidth - 144);
 
   const openTab = (name: string) => {
     Haptics.selectionAsync().catch(() => {});
@@ -231,13 +229,13 @@ function BuyerBottomTabBar({
       style={[
         buyerBarStyles.bar,
         {
-          height: 72 + insets.bottom,
+          height: 84 + insets.bottom,
           paddingBottom: insets.bottom,
         },
       ]}
       testID="buyer-bottom-tab-bar"
     >
-      <View style={[buyerBarStyles.centerBar, { width: sellerCenterBarWidth }]}>
+      <View style={buyerBarStyles.centerBar}>
         {BUYER_NAV_ITEMS.map((item) => {
           const focused = activeRoute === item.name;
           const color = focused ? accent : BUYER_INACTIVE_COLOR;
@@ -280,7 +278,7 @@ function BuyerBottomTabBar({
         ]}
         testID="buyer-tab-profile"
       >
-        <Feather name="user" size={20} color={profileFocused ? accent : FG} />
+        <Feather name="user" size={24} color={profileFocused ? accent : FG} />
         <Text style={[buyerBarStyles.profileLabel, profileFocused && { color: accent }]}>Profile</Text>
       </Pressable>
     </View>
@@ -294,20 +292,21 @@ const buyerBarStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'center',
-    gap: 12,
+    gap: 8,
     backgroundColor: 'rgba(8,8,10,0.18)',
     paddingTop: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
   },
   profileButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
     backgroundColor: 'rgba(8,8,10,0.42)',
+    gap: 2,
     paddingTop: 4,
   },
   profileButtonActive: {
@@ -316,25 +315,24 @@ const buyerBarStyles = StyleSheet.create({
   profileLabel: {
     color: FG,
     fontFamily: FONT.bold,
-    fontSize: 10,
-    lineHeight: 12,
+    fontSize: 11,
+    lineHeight: 14,
   },
   centerBar: {
-    flexGrow: 0,
-    flexShrink: 0,
-    height: 48,
+    flex: 1,
+    height: 64,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 4,
-    borderRadius: 24,
+    borderRadius: 32,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
     backgroundColor: 'rgba(8,8,10,0.42)',
   },
   tab: {
     flex: 1,
-    minHeight: 44,
-    borderRadius: 20,
+    minHeight: 60,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 1,

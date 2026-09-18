@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
-  Dimensions, Animated, Share, TextInput, Modal,
+  Dimensions, Animated, TextInput, Modal,
   Platform, ScrollView, RefreshControl, ActivityIndicator, KeyboardAvoidingView, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather, FontAwesome6 } from '@expo/vector-icons';
+import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   createThreadFeedCursor,
   getSellerFollowState,
@@ -44,12 +46,14 @@ import {
 import { ShopProductSheet } from '@/components/ShopProductSheet';
 import type { ShopSheetSelection } from '@/components/ShopProductSheet';
 import type { BuyerProduct } from '@/services/cartTypes';
+import { getCart } from '@/services/cartService';
 import {
   EngagementButton,
   FeedToastProvider,
   useFeedToast,
 } from '@/components/EngagementButton';
 import { formatCount } from '@/lib/engagementUtils';
+import { ThreadShareSheet } from '@/components/ThreadShareSheet';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const THREAD_PAGE_SIZE = 30;
@@ -260,6 +264,8 @@ interface SpotlightItem {
   likes: number;
   comments: { id: string; user: string; text: string }[];
   reposts: number;
+  repostedByMe?: boolean;
+  friendReposts?: SellerThreadPost['friendReposts'];
   shares: number;
   saves: number;
   location?: string;
@@ -709,7 +715,7 @@ function initialEngagement(item: SpotlightItem): EngagementState {
   return {
     liked: false, likes: item.likes,
     saved: false, saves: item.saves,
-    reposted: false, reposts: item.reposts,
+    reposted: item.repostedByMe === true, reposts: item.reposts,
     following: false,
     comments: item.comments,
   };
@@ -822,10 +828,21 @@ function SpotlightPage({
   const router = useRouter();
   const { push } = useThreadPull();
   const [paused, setPaused] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const { showToast } = useFeedToast();
   const heartBurst = useRef(new Animated.Value(0)).current;
   const heartScale = useRef(new Animated.Value(1)).current;
   const lastTap = useRef(0);
   const pauseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const friendReposts = item.friendReposts ?? [];
+  const hasRepostIdentity = engagement?.reposted === true || friendReposts.length > 0;
+  const repostLabel = engagement?.reposted
+    ? friendReposts.length > 0
+      ? `You and ${friendReposts[0].displayName} reposted`
+      : 'You reposted'
+    : friendReposts.length > 1
+      ? `${friendReposts[0].displayName} and ${friendReposts.length - 1} friend${friendReposts.length === 2 ? '' : 's'} reposted`
+      : `${friendReposts[0]?.displayName ?? 'A friend'} reposted`;
 
   React.useEffect(() => () => { if (pauseTimer.current) clearTimeout(pauseTimer.current); }, []);
 
@@ -895,7 +912,7 @@ function SpotlightPage({
 
       {/* ─ Product tags live on the media surface ─ */}
       {!!item.productTags?.length && (
-        <View style={[styles.mediaTags, { bottom: bottomClearance + 112 }]} pointerEvents="box-none">
+        <View style={[styles.mediaTags, { bottom: bottomClearance + (hasRepostIdentity ? 148 : 112) }]} pointerEvents="box-none">
           {item.productTags.slice(0, 1).map(tag => (
             <TouchableOpacity
               key={tag.productId}
@@ -987,7 +1004,7 @@ function SpotlightPage({
           accessibilityRole="button"
           accessibilityLabel={`Comments, ${formatCount(item.commentsCount ?? (engagement?.comments ?? []).length)}`}
         >
-          <FontAwesome6 name="comment" size={21} color="#FFFFFF" />
+          <FontAwesome name="commenting" size={21} color="#FFFFFF" />
           <Text style={styles.railCount}>{formatCount(item.commentsCount ?? (engagement?.comments ?? []).length)}</Text>
         </TouchableOpacity>
 
@@ -1031,7 +1048,7 @@ function SpotlightPage({
           testID={`save-btn-${item.id}`}
         />
 
-        {/* Share — fire-and-forget native sheet, not an engagement action */}
+        {/* Share */}
         <TouchableOpacity
           style={styles.railBtn}
           activeOpacity={0.7}
@@ -1040,20 +1057,69 @@ function SpotlightPage({
           accessibilityLabel="Share post"
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            const shareMsg = item.productName
-              ? `${item.productName} by ${item.creator} on Brandthread`
-              : `Check out ${item.creator}'s post on Brandthread`;
-            void Share.share({ message: shareMsg });
+            setShareOpen(true);
           }}
         >
-          <FontAwesome6 name="paper-plane" size={20} color="#FFFFFF" />
+          <FontAwesome name="share" size={21} color="#FFFFFF" />
           <Text style={styles.railCount}>{formatCount(item.shares)}</Text>
         </TouchableOpacity>
 
       </View>
 
+      <ThreadShareSheet
+        visible={shareOpen}
+        postId={item.id}
+        creator={item.creator}
+        caption={item.caption}
+        productName={item.productName}
+        mediaUri={item.mediaUris[0]}
+        isVideo={item.contentType === 'video'}
+        onClose={() => setShareOpen(false)}
+        onReport={() => router.push(`/buyer-report?targetType=post&targetId=${encodeURIComponent(item.id)}&targetLabel=Post` as never)}
+        onNotInterested={() => showToast('We’ll show you fewer posts like this.', 'info')}
+        onFeedback={showToast}
+      />
+
       {/* ─ Bottom-left overlay: shop CTA, creator, caption, sound ─ */}
-      <View style={[styles.bottomInfo, { bottom: bottomClearance }]} pointerEvents="box-none">
+      <View style={[styles.bottomInfo, hasRepostIdentity && styles.bottomInfoWithRepost, { bottom: bottomClearance }]} pointerEvents="box-none">
+        {hasRepostIdentity && (
+          <TouchableOpacity
+            style={styles.repostIdentity}
+            activeOpacity={friendReposts.length > 0 ? 0.8 : 1}
+            disabled={friendReposts.length === 0}
+            onPress={() => {
+              const friend = friendReposts[0];
+              if (friend) router.push(('/buyer-other-profile?id=' + encodeURIComponent(friend.userId)) as never);
+            }}
+            accessibilityRole={friendReposts.length > 0 ? 'button' : 'text'}
+            accessibilityLabel={repostLabel}
+          >
+            <View style={styles.repostAvatarStack}>
+              {friendReposts.slice(0, 3).map((friend, index) => (
+                <View
+                  key={friend.userId}
+                  style={[styles.repostAvatar, { marginLeft: index === 0 ? 0 : -7, zIndex: 3 - index }]}
+                >
+                  {friend.avatarUrl ? (
+                    <CachedImage source={{ uri: friend.avatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                  ) : (
+                    <View style={[StyleSheet.absoluteFill, styles.repostAvatarFallback]}>
+                      <Text style={styles.repostAvatarInitials}>
+                        {friend.displayName.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              ))}
+              {friendReposts.length === 0 && (
+                <View style={[styles.repostAvatar, styles.repostAvatarFallback]}>
+                  <Feather name="user" size={13} color="#FFFFFF" />
+                </View>
+              )}
+            </View>
+            <Text style={styles.repostIdentityText} numberOfLines={1}>{repostLabel}</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={() => {
@@ -1119,6 +1185,8 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     likes: post.likesCount,
     comments: [],
     reposts: post.repostsCount,
+    repostedByMe: post.repostedByMe,
+    friendReposts: post.friendReposts,
     shares: 0,
     saves: Number((post as any).savedCount ?? (post as any).savesCount ?? 0),
     location: (post as any).location ?? (post as any).locationName ?? undefined,
@@ -1185,6 +1253,7 @@ export default function FeedScreen({
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { userId } = useAuth();
   const { push } = useThreadPull();
   const { showToast } = useFeedToast();
 
@@ -1194,6 +1263,7 @@ export default function FeedScreen({
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifs, setShowNotifs] = useState(false);
+  const [showRepostEducation, setShowRepostEducation] = useState(false);
   const [feedTab, setFeedTab] = useState<'following' | 'for-you'>('for-you');
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
   const [cartCount, setCartCount] = useState(0);
@@ -1210,6 +1280,8 @@ export default function FeedScreen({
   const feedLoadKeyRef = useRef<string | null>(null);
   const feedLoadingMoreRef = useRef(false);
   const feedHasMoreRef = useRef(true);
+  const repostPendingRef = useRef(new Set<string>());
+  const cartPulse = useRef(new Animated.Value(1)).current;
 
   // Load published seller posts and subscribe to real-time changes
   const loadFeed = useCallback(async (initial = false) => {
@@ -1290,6 +1362,26 @@ export default function FeedScreen({
     return unsub;
   }, [loadFeed]);
 
+  useEffect(() => {
+    let active = true;
+    setCartCount(0);
+    void getCart()
+      .then(cart => {
+        if (active) setCartCount(cart.items.reduce((total, item) => total + item.quantity, 0));
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [userId]);
+
+  const handleCartUpdated = useCallback((newCount: number) => {
+    setCartCount(newCount);
+    cartPulse.setValue(0.78);
+    Animated.sequence([
+      Animated.spring(cartPulse, { toValue: 1.18, speed: 28, bounciness: 8, useNativeDriver: true }),
+      Animated.spring(cartPulse, { toValue: 1, speed: 24, bounciness: 4, useNativeDriver: true }),
+    ]).start();
+  }, [cartPulse]);
+
   const handleRefresh = useCallback(() => {
     if (feedRefreshing) return;
     void loadFeed();
@@ -1326,7 +1418,17 @@ export default function FeedScreen({
     if (sellerFeedPosts.length === 0) return;
     setEngagements(prev => {
       const next = { ...prev };
-      sellerFeedPosts.forEach(item => { if (!next[item.id]) next[item.id] = initialEngagement(item); });
+      sellerFeedPosts.forEach(item => {
+        if (!next[item.id]) {
+          next[item.id] = initialEngagement(item);
+        } else if (!repostPendingRef.current.has(item.id)) {
+          next[item.id] = {
+            ...next[item.id],
+            reposted: item.repostedByMe === true,
+            reposts: item.reposts,
+          };
+        }
+      });
       return next;
     });
   }, [sellerFeedPosts]);
@@ -1438,22 +1540,48 @@ export default function FeedScreen({
     }
   }, [engagements, showToast]);
 
+  const showRepostEducationOnce = useCallback(async () => {
+    const key = `bt:repost-education:${userId ?? 'preview'}:v1`;
+    try {
+      if (await AsyncStorage.getItem(key)) return;
+      await AsyncStorage.setItem(key, 'true');
+    } catch {
+      // The education sheet is still useful if device storage is unavailable;
+      // it may appear again on a later repost because persistence failed.
+    }
+    setShowRepostEducation(true);
+  }, [userId]);
+
   const handleRepost = useCallback(async (id: string): Promise<void> => {
+    if (repostPendingRef.current.has(id)) return;
+    repostPendingRef.current.add(id);
     const snapshot = engagements[id] ?? DEFAULT_ENGAGEMENT;
     const willRepost = !snapshot.reposted;
     update(id, e => ({ reposted: willRepost, reposts: willRepost ? e.reposts + 1 : Math.max(0, e.reposts - 1) }));
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
     if (isUUID) {
       try {
-        const { api: _api } = require('@/lib/api');
-        await _api.posts.interact(id, { type: 'repost' });
+        const result = await api.posts.interact(id, {
+          type: 'repost',
+          value: willRepost ? undefined : 'remove',
+        });
+        if ((result.action === 'added') !== willRepost) {
+          update(id, e => ({
+            reposted: result.action === 'added',
+            reposts: typeof result.count === 'number' ? result.count : e.reposts,
+          }));
+        }
+        if (result.action === 'added') await showRepostEducationOnce();
       } catch {
         // Rollback
         update(id, () => ({ reposted: snapshot.reposted, reposts: snapshot.reposts }));
         showToast('Could not repost. Try again.', 'error');
       }
+    } else if (willRepost) {
+      await showRepostEducationOnce();
     }
-  }, [engagements, showToast]);
+    repostPendingRef.current.delete(id);
+  }, [api, engagements, showRepostEducationOnce, showToast]);
 
   const handleFollow = useCallback(async (id: string): Promise<void> => {
     const item = sellerFeedPosts.find(post => post.id === id);
@@ -1512,10 +1640,12 @@ export default function FeedScreen({
     if (!item || isLiveStreamItem(item)) return;
     const qs = [
       'postId=' + encodeURIComponent(item.id),
+      'postAuthorId=' + encodeURIComponent(item.sellerId ?? ''),
       'postAuthorName=' + encodeURIComponent(item.creator),
       'postAuthorInitials=' + encodeURIComponent(item.initials),
       'postAuthorColor=' + encodeURIComponent(item.avatarColor),
       'postCaption=' + encodeURIComponent(item.caption),
+      'postMediaUri=' + encodeURIComponent(item.mediaUris[0] ?? ''),
       'postMediaColor1=' + encodeURIComponent('#0a0a0a'),
       'postMediaColor2=' + encodeURIComponent('#1a1a1a'),
       'postType=video',
@@ -1549,7 +1679,7 @@ export default function FeedScreen({
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
   const bottomClearance = showFashionPreview
     ? 12
-    : Math.max(insets.bottom, 8) + 12 + 72 + 14;
+    : Math.max(insets.bottom, 8) + 12 + 84 + 14;
 
   return (
     <FeedToastProvider>
@@ -1707,26 +1837,29 @@ export default function FeedScreen({
 
             <Text style={styles.topTitle}>Thread</Text>
 
+            <Animated.View style={{ transform: [{ scale: cartPulse }] }}>
             <TouchableOpacity
-              style={styles.topIconBtn}
+              style={styles.cartHeaderBtn}
               activeOpacity={0.7}
               hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                (async () => { const { Share } = await import('react-native'); Share.share({ message: 'Join me on Brandthread! https://brandthread.app' }); })();
+                router.push('/(buyer)/cart' as never);
               }}
+              accessibilityRole="button"
+              accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
             >
-              <Feather name="user-plus" size={20} color={ON_DARK} />
+              <Feather name="shopping-cart" size={22} color={ON_DARK} />
+              {cartCount > 0 && (
+                <View style={[styles.cartCountBadge, { backgroundColor: theme.accent }]}>
+                  <Text style={[styles.cartCountText, { color: theme.onAccent }]}>
+                    {cartCount > 99 ? '99+' : cartCount}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
+            </Animated.View>
 
-            <TouchableOpacity
-              style={styles.topIconBtn}
-              activeOpacity={0.7}
-              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/create-post' as never); }}
-            >
-              <Feather name="plus-square" size={21} color={ON_DARK} />
-            </TouchableOpacity>
           </View>
         )}
         {!showSearch && (
@@ -1770,11 +1903,73 @@ export default function FeedScreen({
           </View>
         </View>
       </Modal>
+      <Modal
+        visible={showRepostEducation}
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+        onRequestClose={() => setShowRepostEducation(false)}
+      >
+        <View style={styles.repostEducationBackdrop}>
+          <TouchableWithoutFeedback onPress={() => setShowRepostEducation(false)}>
+            <View style={StyleSheet.absoluteFill} />
+          </TouchableWithoutFeedback>
+          <View style={[styles.repostEducationSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+            <TouchableOpacity
+              style={styles.repostEducationClose}
+              onPress={() => setShowRepostEducation(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Close repost information"
+            >
+              <Feather name="x" size={24} color={FG} />
+            </TouchableOpacity>
+            <View style={styles.repostEducationPreview}>
+              <View style={styles.repostEducationPreviewMedia}>
+                <View style={styles.repostEducationPreviewBadge}>
+                  <View style={styles.repostEducationPreviewAvatar}>
+                    <Feather name="user" size={11} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.repostEducationPreviewBadgeText}>You reposted</Text>
+                </View>
+                <Feather name="more-horizontal" size={18} color="#FFFFFF99" style={styles.repostEducationPreviewMore} />
+                <View style={styles.repostEducationPreviewLines}>
+                  <View style={styles.repostEducationPreviewLineShort} />
+                  <View style={styles.repostEducationPreviewLineLong} />
+                </View>
+                <Feather name="corner-up-right" size={30} color="#FFFFFF99" style={styles.repostEducationPreviewShare} />
+              </View>
+            </View>
+            <Text style={styles.repostEducationTitle}>Introduce this post to others by reposting</Text>
+            <View style={styles.repostEducationPoint}>
+              <Feather name="users" size={22} color={FG} />
+              <Text style={styles.repostEducationPointText}>Your repost can appear to friends in their Thread.</Text>
+            </View>
+            <View style={styles.repostEducationPoint}>
+              <Feather name="repeat" size={22} color={FG} />
+              <Text style={styles.repostEducationPointText}>Use the Repost button again at any time to remove it.</Text>
+            </View>
+            <View style={styles.repostEducationPrivacy}>
+              <Feather name="lock" size={15} color={MUTED} />
+              <Text style={styles.repostEducationPrivacyText}>
+                Only mutual friends can see your profile on a repost.
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.repostEducationOkay, { backgroundColor: theme.accent }]}
+              onPress={() => setShowRepostEducation(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Got it"
+            >
+              <Text style={[styles.repostEducationOkayText, { color: theme.onAccent }]}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       {shopSelection && (
         <ShopProductSheet
           selection={shopSelection}
           onClose={() => setShopSelection(null)}
-          onCartUpdated={(newCount) => setCartCount(newCount)}
+          onCartUpdated={handleCartUpdated}
         />
       )}
 
@@ -1811,7 +2006,7 @@ const styles = StyleSheet.create({
   mediaTagMeta: { color: '#FFFFFFB8', fontFamily: FONT.medium, fontSize: 11, lineHeight: 14 },
 
   rail: {
-    position: 'absolute', right: 8, width: 48, bottom: 116, alignItems: 'center', gap: 11,
+    position: 'absolute', right: 8, width: 48, bottom: 116, alignItems: 'center', gap: 15,
   },
   railAvatarWrap: { alignItems: 'center', marginBottom: 2 },
   railAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#FFFFFF' },
@@ -1828,6 +2023,22 @@ const styles = StyleSheet.create({
     position: 'absolute', left: 16, right: 84, bottom: 26, height: 104,
     justifyContent: 'flex-end', gap: 8,
   },
+  bottomInfoWithRepost: { height: 140 },
+  repostIdentity: {
+    alignSelf: 'flex-start', maxWidth: '100%', minHeight: 32,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(8,8,10,0.78)', borderRadius: 7,
+    paddingHorizontal: 7, paddingVertical: 5,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+  },
+  repostAvatarStack: { minWidth: 22, height: 22, flexDirection: 'row', alignItems: 'center' },
+  repostAvatar: {
+    width: 22, height: 22, borderRadius: 11, overflow: 'hidden',
+    borderWidth: 1.5, borderColor: '#FFFFFF',
+  },
+  repostAvatarFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#35353A' },
+  repostAvatarInitials: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 7 },
+  repostIdentityText: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: 12, flexShrink: 1 },
   caption: {
     height: 38, fontSize: 14, fontFamily: FONT.regular, color: '#FFFFFF',
     lineHeight: 19,
@@ -1846,6 +2057,13 @@ const styles = StyleSheet.create({
   topAvatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   unreadDot: { position: 'absolute', top: 4, right: 4, width: 9, height: 9, borderRadius: 4.5, backgroundColor: RED, borderWidth: 1.5, borderColor: BG },
   topIconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  cartHeaderBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  cartCountBadge: {
+    position: 'absolute', top: 1, right: -1, minWidth: 17, height: 17,
+    borderRadius: 9, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: BG,
+  },
+  cartCountText: { fontSize: 9, lineHeight: 12, fontFamily: FONT.bold },
   topTitle: { flex: 1, textAlign: 'center', fontSize: FS.md, fontFamily: FONT.bold, color: '#FFFFFF' },
   feedTabs: { alignSelf: 'center', flexDirection: 'row', gap: 26, marginTop: 2, paddingBottom: 2 },
   feedTab: { paddingHorizontal: 4, paddingVertical: 5, alignItems: 'center' },
@@ -1860,6 +2078,53 @@ const styles = StyleSheet.create({
   },
 
   modalBackdrop: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },
+  repostEducationBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.56)', justifyContent: 'flex-end' },
+  repostEducationSheet: {
+    backgroundColor: CARD, borderTopLeftRadius: 22, borderTopRightRadius: 22,
+    paddingHorizontal: 24, paddingTop: 22,
+    borderWidth: 1, borderBottomWidth: 0, borderColor: BORDER,
+  },
+  repostEducationClose: {
+    position: 'absolute', top: 12, right: 12, zIndex: 2,
+    width: 42, height: 42, alignItems: 'center', justifyContent: 'center',
+  },
+  repostEducationPreview: { alignItems: 'center', marginBottom: 20 },
+  repostEducationPreviewMedia: {
+    width: 220, height: 150, borderRadius: 18, backgroundColor: '#313136',
+    overflow: 'hidden', padding: 14, justifyContent: 'flex-end',
+  },
+  repostEducationPreviewBadge: {
+    position: 'absolute', left: 14, top: 54, flexDirection: 'row', alignItems: 'center',
+    gap: 5, backgroundColor: '#FFFFFF', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 4,
+  },
+  repostEducationPreviewAvatar: {
+    width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#8B8B91',
+  },
+  repostEducationPreviewBadgeText: { color: '#151517', fontFamily: FONT.semibold, fontSize: 11 },
+  repostEducationPreviewMore: { position: 'absolute', right: 15, top: 52 },
+  repostEducationPreviewLines: { gap: 7, marginRight: 52 },
+  repostEducationPreviewLineShort: { height: 8, width: 68, borderRadius: 4, backgroundColor: '#FFFFFF24' },
+  repostEducationPreviewLineLong: { height: 8, width: 130, borderRadius: 4, backgroundColor: '#FFFFFF24' },
+  repostEducationPreviewShare: { position: 'absolute', right: 16, bottom: 19 },
+  repostEducationTitle: {
+    color: FG, fontFamily: FONT.bold, fontSize: 26, lineHeight: 32,
+    textAlign: 'center', paddingHorizontal: 12, marginBottom: 22,
+  },
+  repostEducationPoint: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingHorizontal: 6, marginBottom: 16,
+  },
+  repostEducationPointText: { flex: 1, color: FG, fontFamily: FONT.regular, fontSize: 15, lineHeight: 20 },
+  repostEducationPrivacy: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 7, marginTop: 1, marginBottom: 18,
+  },
+  repostEducationPrivacyText: { color: MUTED, fontFamily: FONT.regular, fontSize: 12 },
+  repostEducationOkay: {
+    minHeight: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+  },
+  repostEducationOkayText: { fontFamily: FONT.bold, fontSize: FS.base },
   commentsSheet: {
     backgroundColor: SURFACE, borderTopLeftRadius: 20, borderTopRightRadius: 20,
     paddingTop: 10, paddingHorizontal: 18,

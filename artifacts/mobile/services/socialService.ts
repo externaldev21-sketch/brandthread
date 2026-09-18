@@ -301,10 +301,12 @@ export async function repostPost(id: string, friendMeta?: FriendPostMeta): Promi
   const posts = await getMyPosts(k);
   const idx = posts.findIndex(p => p.id === id);
   const reposts = await load<RepostRecord[]>(k.reposts, []);
+  let willRepost = false;
 
   if (idx >= 0) {
     // Own post — toggle repostedByMe flag in the posts store
     posts[idx].repostedByMe = !posts[idx].repostedByMe;
+    willRepost = posts[idx].repostedByMe;
     posts[idx].repostsCount += posts[idx].repostedByMe ? 1 : -1;
     await save(k.posts, posts);
     if (posts[idx].repostedByMe) {
@@ -322,6 +324,7 @@ export async function repostPost(id: string, friendMeta?: FriendPostMeta): Promi
     } else if (friendMeta) {
       // Not yet reposted → repost: create a new record using provided metadata
       reposts.unshift({ id: uid(), reposterId: k.userId, originalPostId: id, originalAuthorId: friendMeta.authorId, originalAuthorName: friendMeta.authorName, originalAuthorHandle: friendMeta.authorHandle, originalCaption: friendMeta.caption, feedEligibility: 'profile_only', createdAt: iso() });
+      willRepost = true;
     }
   }
   await save(k.reposts, reposts);
@@ -334,7 +337,7 @@ export async function repostPost(id: string, friendMeta?: FriendPostMeta): Promi
       serviceRequest('/api/posts/' + id + '/interact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'repost' }),
+        body: JSON.stringify({ type: 'repost', value: willRepost ? undefined : 'remove' }),
       }).catch(() => {});
     }
   } catch {
@@ -449,6 +452,13 @@ export interface SellerThreadPost {
   likedByMe:         boolean;
   savedByMe:         boolean;
   repostedByMe:      boolean;
+  /** Server-authorized mutual buyer friends who reposted this post (newest first). */
+  friendReposts:     Array<{
+    userId: string;
+    displayName: string;
+    avatarUrl: string | null;
+    createdAt: string;
+  }>;
   /** Ordered object storage paths for composed slideshow slides (empty for video/photo posts) */
   mediaPaths?:       string[];
   /** Per-slide overlay metadata — used to restore draft editors */
@@ -523,6 +533,7 @@ function mapOwnedApiPost(p: any, userId: string): SellerThreadPost {
     likedByMe:       false,
     savedByMe:       false,
     repostedByMe:    false,
+    friendReposts:   [],
     // Slideshow persistence fields
     mediaPaths:      Array.isArray(p.mediaPaths) && p.mediaPaths.length > 0 ? p.mediaPaths : undefined,
     slideOverlays:   Array.isArray(p.slideOverlays) && p.slideOverlays.length > 0 ? p.slideOverlays : undefined,
@@ -740,7 +751,24 @@ function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
     savedCount:    0,
     likedByMe:     false,
     savedByMe:     false,
-    repostedByMe:  false,
+    repostedByMe:  p.repostedByMe === true,
+    friendReposts: Array.isArray(p.friendReposts)
+      ? p.friendReposts.slice(0, 5).flatMap((reposter: any) => {
+          if (!reposter || typeof reposter.userId !== 'string') return [];
+          return [{
+            userId: reposter.userId,
+            displayName: typeof reposter.displayName === 'string' && reposter.displayName.trim()
+              ? reposter.displayName.trim()
+              : 'Friend',
+            avatarUrl: typeof reposter.avatarUrl === 'string' && reposter.avatarUrl.trim()
+              ? reposter.avatarUrl
+              : null,
+            createdAt: typeof reposter.createdAt === 'string'
+              ? reposter.createdAt
+              : now,
+          }];
+        })
+      : [],
   };
 }
 
@@ -1360,9 +1388,41 @@ export async function getThreadPostsPage(
     if (general.length < pageLimit) next.generalDone = true;
   }
 
+  let repostContext: Record<string, {
+    repostedByMe?: boolean;
+    reposters?: Array<{
+      userId: string;
+      displayName: string | null;
+      avatarUrl: string | null;
+      createdAt: string;
+    }>;
+  }> = {};
+  const contextPostIds = rows
+    .map(row => row?.id)
+    .filter((id): id is string => typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id));
+  if (contextPostIds.length > 0) {
+    try {
+      repostContext = await serviceRequest<typeof repostContext>(
+        `/api/posts/repost-context?postIds=${encodeURIComponent(contextPostIds.join(','))}`,
+      );
+    } catch {
+      // Repost identity is optional feed context. Never replace a valid feed
+      // page with an error or infer identities client-side when it is missing.
+      repostContext = {};
+    }
+  }
+  const rowsWithRepostContext = rows.map(row => {
+    const context = repostContext[row.id];
+    return context ? {
+      ...row,
+      repostedByMe: context.repostedByMe === true,
+      friendReposts: Array.isArray(context.reposters) ? context.reposters : [],
+    } : row;
+  });
+
   next.seenPostIds = [...seen];
   return {
-    posts: rows.map((post, index) => mapApiPostToSellerThreadPost(post, index)),
+    posts: rowsWithRepostContext.map((post, index) => mapApiPostToSellerThreadPost(post, index)),
     cursor: next,
     hasMore: !next.followedDone || !next.generalDone,
   };

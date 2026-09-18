@@ -9,7 +9,7 @@
  */
 import { Router } from "express";
 import {
-  db, posts, postTaggedProducts, products, users, interactions, follows, boosts,
+  db, posts, postTaggedProducts, products, users, interactions, follows, boosts, blocks,
   savedItems, orders,
 } from "@workspace/db";
 import { eq, and, inArray, count, sql, desc, lte, lt, gte, or } from "drizzle-orm";
@@ -86,6 +86,125 @@ async function sellerExists(clerkId: string): Promise<boolean> {
 
 router.use("/", postVideoRouter);
 router.use("/", postSlideRouter);
+
+// ─── GET /api/posts/repost-context ────────────────────────────────────────────
+// Returns only the small, privacy-safe avatar context needed for Thread cards.
+// Repost identity is intentionally not part of public post responses: mutual
+// friendship is evaluated here against the authenticated viewer.
+const MAX_REPOST_CONTEXT_POSTS = 50;
+const MAX_REPOST_CONTEXT_ACTORS = 5;
+
+router.get("/repost-context", requireAuth, async (req, res) => {
+  const viewerId = (req as any).clerkUserId as string;
+  const rawPostIds = req.query.postIds;
+  if (typeof rawPostIds !== "string" || rawPostIds.trim() === "") {
+    return res.status(400).json({ error: "postIds is required" });
+  }
+
+  const postIds = [...new Set(rawPostIds.split(",").map((value) => value.trim()).filter(Boolean))];
+  if (postIds.length === 0 || postIds.length > MAX_REPOST_CONTEXT_POSTS) {
+    return res.status(400).json({ error: `postIds must contain 1-${MAX_REPOST_CONTEXT_POSTS} IDs` });
+  }
+  if (postIds.some((postId) => !UUID_RE.test(postId))) {
+    return res.status(400).json({ error: "postIds must contain UUIDs" });
+  }
+
+  try {
+    const [viewer] = await db
+      .select({ accountType: users.accountType })
+      .from(users)
+      .where(eq(users.clerkId, viewerId))
+      .limit(1);
+    if (viewer?.accountType !== "buyer") {
+      return res.status(403).json({ error: "Buyer account required" });
+    }
+
+    const postIdList = sql.join(postIds.map((postId) => sql`${postId}::uuid`), sql`, `);
+    const [rows, ownRows] = await Promise.all([
+      db.execute(sql`
+      SELECT
+        i.post_id,
+        u.clerk_id AS user_id,
+        COALESCE(NULLIF(u.display_name, ''), NULLIF(u.name, '')) AS display_name,
+        COALESCE(NULLIF(u.profile_image_url, ''), NULLIF(u.avatar_url, '')) AS avatar_url,
+        i.created_at
+      FROM interactions i
+      INNER JOIN posts p ON p.id = i.post_id
+      INNER JOIN users u ON u.clerk_id = i.user_id
+      WHERE i.type = 'repost'
+        AND i.post_id IN (${postIdList})
+        AND COALESCE((p.visibility->>'isPublic')::boolean, true) = true
+        AND (
+          p.post_status = 'published'
+          OR (p.post_status = 'scheduled' AND p.scheduled_at <= NOW())
+        )
+        AND u.account_type = 'buyer'
+        AND i.user_id <> ${viewerId}
+        AND EXISTS (
+          SELECT 1
+          FROM follows viewer_follows
+          INNER JOIN follows actor_follows
+            ON actor_follows.follower_id = viewer_follows.following_id
+           AND actor_follows.following_id = viewer_follows.follower_id
+          WHERE viewer_follows.follower_id = ${viewerId}
+            AND viewer_follows.following_id = i.user_id
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM blocks b
+          WHERE (b.blocker_id = ${viewerId} AND b.blocked_id = i.user_id)
+             OR (b.blocker_id = i.user_id AND b.blocked_id = ${viewerId})
+        )
+      ORDER BY i.created_at DESC
+    `),
+      db.execute(sql`
+        SELECT i.post_id
+        FROM interactions i
+        INNER JOIN posts p ON p.id = i.post_id
+        WHERE i.type = 'repost'
+          AND i.user_id = ${viewerId}
+          AND i.post_id IN (${postIdList})
+          AND COALESCE((p.visibility->>'isPublic')::boolean, true) = true
+          AND (
+            p.post_status = 'published'
+            OR (p.post_status = 'scheduled' AND p.scheduled_at <= NOW())
+          )
+      `),
+    ]);
+
+    const ownPostIds = new Set(
+      ((((ownRows as any).rows ?? []) as any[]).map((row) => String(row.post_id))),
+    );
+    const context: Record<string, {
+      repostedByMe: boolean;
+      reposters: Array<{
+      userId: string;
+      displayName: string | null;
+      avatarUrl: string | null;
+      createdAt: Date;
+      }>;
+    }> = Object.fromEntries(postIds.map((postId) => [
+      postId,
+      { repostedByMe: ownPostIds.has(postId), reposters: [] },
+    ]));
+    for (const row of (((rows as any).rows ?? []) as any[])) {
+      const postId = String(row.post_id);
+      const actors = context[postId]?.reposters;
+      if (!actors) continue;
+      if (actors.length >= MAX_REPOST_CONTEXT_ACTORS) continue;
+      actors.push({
+        userId: String(row.user_id),
+        displayName: row.display_name == null ? null : String(row.display_name),
+        avatarUrl: row.avatar_url == null ? null : String(row.avatar_url),
+        createdAt: row.created_at,
+      });
+    }
+    return res.json(context);
+  } catch (err) {
+    req.log.error({ err, viewerId }, "Failed to fetch repost context");
+    return res.status(500).json({ error: "Failed to fetch repost context" });
+  }
+});
 
 async function postDetails(postRows: typeof posts.$inferSelect[]) {
   if (postRows.length === 0) return [];
@@ -996,20 +1115,24 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
     return res.json({ action: removing ? "removed" : "added", count: newCount });
   }
 
-  // Toggle for repost
-  const [existing] = await db
-    .select({ id: interactions.id })
-    .from(interactions)
-    .where(and(eq(interactions.userId, clerkId), eq(interactions.postId, id), eq(interactions.type, type)))
-    .limit(1);
-
-  let action: string;
-  if (existing) {
-    await db.delete(interactions).where(eq(interactions.id, existing.id));
-    action = "removed";
+  // Reposts are explicit and idempotent. Omitted value means add; callers that
+  // need to undo a repost send value="remove". The partial unique index is the
+  // serialization boundary for retries and rapid concurrent taps.
+  const removing = value === "remove";
+  if (removing) {
+    await db.delete(interactions).where(and(
+      eq(interactions.userId, clerkId),
+      eq(interactions.postId, id),
+      eq(interactions.type, type),
+    ));
   } else {
-    await db.insert(interactions).values({ userId: clerkId, postId: id, type, value: null });
-    action = "added";
+    await db
+      .insert(interactions)
+      .values({ userId: clerkId, postId: id, type, value: null })
+      .onConflictDoNothing({
+        target: [interactions.userId, interactions.postId],
+        where: sql`type = 'repost' AND post_id IS NOT NULL`,
+      });
   }
 
   const [{ count: newCount }] = await db
@@ -1017,7 +1140,7 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
     .from(interactions)
     .where(and(eq(interactions.postId, id), eq(interactions.type, type)));
 
-  return res.json({ action, count: newCount });
+  return res.json({ action: removing ? "removed" : "added", count: newCount });
 });
 
 export default router;

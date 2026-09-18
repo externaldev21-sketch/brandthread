@@ -2,7 +2,7 @@
  * ShopProductSheet — Compact shoppable-video drawer
  *
  * Hydrates product from the public buyer API, shows image/name/price/seller/trust cues,
- * handles variant selection, quantity, Add to bag (with attribution), and Buy Now.
+ * handles variant selection, quantity, Add to cart (with attribution), and Buy Now.
  * Supports multi-tag switching, sold-out, unavailable, loading, success, and retry states.
  * Preserves video/feed position behind the drawer.
  */
@@ -11,6 +11,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Easing,
+  Image,
   Modal,
   PanResponder,
   ScrollView,
@@ -18,6 +20,7 @@ import {
   Text,
   TouchableOpacity,
   TouchableWithoutFeedback,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -260,6 +263,7 @@ export function ShopProductSheet({
 }: ShopProductSheetProps) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const router = useRouter();
   const { push } = useThreadPull();
 
@@ -272,9 +276,13 @@ export function ShopProductSheet({
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [qty, setQty] = useState(1);
   const [variantError, setVariantError] = useState('');
+  const [flyingToCart, setFlyingToCart] = useState(false);
+  const [showAddedConfirmation, setShowAddedConfirmation] = useState(false);
+  const addedConfirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Slide-up animation
   const slideY = useRef(new Animated.Value(400)).current;
+  const cartFlyProgress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.spring(slideY, {
@@ -283,6 +291,10 @@ export function ShopProductSheet({
       speed: 18,
       bounciness: 3,
     }).start();
+  }, []);
+
+  useEffect(() => () => {
+    if (addedConfirmationTimer.current) clearTimeout(addedConfirmationTimer.current);
   }, []);
 
   // Dismiss animation
@@ -296,6 +308,26 @@ export function ShopProductSheet({
 
   function handleClose() {
     dismissSheet(onClose);
+  }
+
+  function flyProductToCart(newCount: number) {
+    setFlyingToCart(true);
+    cartFlyProgress.setValue(0);
+    Animated.timing(cartFlyProgress, {
+      toValue: 1,
+      duration: 720,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      onCartUpdated?.(newCount);
+      setFlyingToCart(false);
+      setShowAddedConfirmation(true);
+      addedConfirmationTimer.current = setTimeout(() => {
+        setShowAddedConfirmation(false);
+        addedConfirmationTimer.current = null;
+      }, 1200);
+    });
   }
 
   // Swipe-down to close
@@ -399,11 +431,11 @@ export function ShopProductSheet({
     channel: 'thread',
   };
 
-  // Add to bag
+  // Add to cart
   async function handleAddToCart() {
     if (!product) return;
     if (!allOptionsSelected) {
-      setVariantError('Please select all options before adding to bag.');
+      setVariantError('Please select all options before adding to cart.');
       return;
     }
     if (!variant) {
@@ -418,26 +450,22 @@ export function ShopProductSheet({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (selection.previewProduct) {
       setPhase('added');
-      onCartUpdated?.(qty);
-      const t = setTimeout(() => { dismissSheet(onClose); }, 1400);
-      return () => clearTimeout(t);
+      flyProductToCart(qty);
+      return;
     }
     setPhase('adding');
     try {
       const result = await addToCart({ product, variant, quantity: qty, attribution });
       if (!result.success) {
         setPhase('ready');
-        setVariantError(result.message ?? 'Could not add to bag.');
+        setVariantError(result.message ?? 'Could not add to cart.');
         return;
       }
       setPhase('added');
-      onCartUpdated?.(result.cart.items.reduce((s, i) => s + i.quantity, 0));
-      // Auto-close after 1.4s
-      const t = setTimeout(() => { dismissSheet(onClose); }, 1400);
-      return () => clearTimeout(t);
+      flyProductToCart(result.cart.items.reduce((s, i) => s + i.quantity, 0));
     } catch (err) {
       setPhase('ready');
-      setVariantError(err instanceof Error ? err.message : 'Could not add to bag.');
+      setVariantError(err instanceof Error ? err.message : 'Could not add to cart.');
     }
   }
 
@@ -454,12 +482,6 @@ export function ShopProductSheet({
     }
     setVariantError('');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    if (selection.previewProduct) {
-      setPhase('added');
-      onCartUpdated?.(qty);
-      const t = setTimeout(() => { dismissSheet(onClose); }, 1400);
-      return () => clearTimeout(t);
-    }
     setPhase('buying');
     try {
       const cart = await getCart();
@@ -480,6 +502,12 @@ export function ShopProductSheet({
       push(
         `/thread-product-detail?productId=${encodeURIComponent(activeTag.productId)}&sourcePostId=${encodeURIComponent(selection.postId)}` as never,
       );
+    });
+  }
+
+  function handleViewCart() {
+    dismissSheet(() => {
+      router.push('/(buyer)/cart' as never);
     });
   }
 
@@ -596,23 +624,7 @@ export function ShopProductSheet({
           </View>
         )}
 
-        {phase === 'added' && product && (
-          <View>
-            <ProductHeader
-              product={product}
-              variantPrice={variantPrice}
-              variantCompare={variantCompare}
-              hasDiscount={hasDiscount}
-              accent={accent}
-            />
-            <View style={[ss.statusBanner, { backgroundColor: SUCCESS_DIM }]}>
-              <Feather name="check-circle" size={14} color={SUCCESS} />
-              <Text style={[ss.statusText, { color: SUCCESS }]}>Added to your bag!</Text>
-            </View>
-          </View>
-        )}
-
-        {(phase === 'ready' || phase === 'adding' || phase === 'buying') && product && (
+        {(phase === 'ready' || phase === 'adding' || phase === 'buying' || phase === 'added') && product && (
           <ScrollView
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -627,6 +639,13 @@ export function ShopProductSheet({
               accent={accent}
               onViewDetail={handleViewDetail}
             />
+
+            <View style={ss.descriptionSection}>
+              <Text style={ss.descriptionLabel}>Description</Text>
+              <Text style={ss.descriptionText}>
+                {product.description.trim() || 'Product details are not available.'}
+              </Text>
+            </View>
 
             {/* Variant options */}
             {product.options.map((option: BuyerProductOption) => (
@@ -702,19 +721,19 @@ export function ShopProductSheet({
             {/* Action buttons */}
             <View style={ss.actions}>
               <TouchableOpacity
-                onPress={handleAddToCart}
+                onPress={phase === 'added' ? handleViewCart : handleAddToCart}
                 disabled={isBusy || currentPhase === 'sold_out'}
                 activeOpacity={0.85}
                 style={[ss.addBtn, isBusy && { opacity: 0.6 }]}
                 accessibilityRole="button"
-                accessibilityLabel="Add to bag"
+                accessibilityLabel={phase === 'added' ? 'View cart' : 'Add to cart'}
               >
                 {phase === 'adding' ? (
                   <ActivityIndicator color={FG} size="small" />
                 ) : (
                   <>
-                    <Feather name="shopping-bag" size={17} color={FG} />
-                    <Text style={ss.addBtnText}>Add to bag</Text>
+                    <Feather name="shopping-cart" size={17} color={FG} />
+                    <Text style={ss.addBtnText}>{phase === 'added' ? 'View cart' : 'Add to cart'}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -731,7 +750,7 @@ export function ShopProductSheet({
                   <ActivityIndicator color={theme.onAccent} size="small" />
                 ) : (
                   <>
-                    <Feather name="zap" size={17} color={theme.onAccent} />
+                    <Feather name="arrow-right-circle" size={18} color={theme.onAccent} />
                     <Text style={[ss.buyBtnText, { color: theme.onAccent }]}>Buy now</Text>
                   </>
                 )}
@@ -758,6 +777,66 @@ export function ShopProductSheet({
           </View>
         )}
       </Animated.View>
+
+      {flyingToCart && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            ss.cartFlyItem,
+            {
+              left: windowWidth / 2 - 24,
+              top: windowHeight - Math.min(330, windowHeight * 0.4),
+              opacity: cartFlyProgress.interpolate({
+                inputRange: [0, 0.82, 1],
+                outputRange: [1, 1, 0],
+              }),
+              transform: [
+                {
+                  translateX: cartFlyProgress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, windowWidth / 2 - 78],
+                  }),
+                },
+                {
+                  translateY: cartFlyProgress.interpolate({
+                    inputRange: [0, 0.55, 1],
+                    outputRange: [0, -windowHeight * 0.27, -(windowHeight - Math.min(330, windowHeight * 0.4) - insets.top - 26)],
+                  }),
+                },
+                {
+                  scale: cartFlyProgress.interpolate({
+                    inputRange: [0, 0.7, 1],
+                    outputRange: [1, 0.72, 0.28],
+                  }),
+                },
+                {
+                  rotate: cartFlyProgress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0deg', '10deg'],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          {product?.imageUris?.[0] ? (
+            <Image source={{ uri: product.imageUris[0] }} style={ss.cartFlyImage} />
+          ) : (
+            <View style={[ss.cartFlyFallback, { backgroundColor: theme.accent }]}>
+              <Feather name="shopping-bag" size={21} color={theme.onAccent} />
+            </View>
+          )}
+        </Animated.View>
+      )}
+
+      {showAddedConfirmation && (
+        <View style={ss.addedConfirmationOverlay} pointerEvents="none" accessibilityLiveRegion="polite">
+          <View style={ss.addedConfirmationContent}>
+            <Feather name="shopping-cart" size={36} color={ON_DARK} />
+            <Text style={ss.addedConfirmationText}>Added to cart</Text>
+          </View>
+        </View>
+      )}
     </Modal>
   );
 }
@@ -843,6 +922,44 @@ function TrustCue({ icon, label }: { icon: string; label: string }) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const ss = StyleSheet.create({
+  cartFlyItem: {
+    position: 'absolute',
+    zIndex: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: ON_DARK,
+    shadowColor: BG,
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 12,
+  },
+  cartFlyImage: { width: '100%', height: '100%' },
+  cartFlyFallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addedConfirmationOverlay: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.42)',
+  },
+  addedConfirmationContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  addedConfirmationText: {
+    color: ON_DARK,
+    fontFamily: FONT.bold,
+    fontSize: FS.lg,
+  },
   backdrop: {
     ...StyleSheet.absoluteFill,
     backgroundColor: OVERLAY,
@@ -992,6 +1109,27 @@ const ss = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   sellerName: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  descriptionSection: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: BORDER_SUBTLE,
+    gap: 6,
+  },
+  descriptionLabel: {
+    fontSize: FS.xs,
+    fontFamily: FONT.bold,
+    color: FG,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  descriptionText: {
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    color: MUTED,
+    lineHeight: 20,
+  },
 
   // Options
   optionSection: { paddingHorizontal: 16, marginBottom: 14 },

@@ -7,4 +7,6 @@ Every buyer purchase—whether started from a Thread video, Discover, a seller p
 
 **Why:** The user explicitly chose the supplied Depop purchase journey as the interaction model that checkout should always follow. Separate source-specific checkout UIs would drift in behavior and presentation.
 
-**How to apply:** Preserve source attribution and buy-now/cart session differences, but route them into the canonical checkout screen and shared state contract. Address entry, summary, payment, confirmation, purchase detail, and delivered-order rating remain one consistent journey styled with Brandthread’s design system.
+**How to apply:** Preserve source attribution and buy-now/cart session differences, but route them into the canonical checkout screen and shared state contract. The confirmed sequence is options → add confirmation → updated cart badge/View cart → seller-grouped cart → address → item/shipping/total review → Stripe → confirmation with Message seller, View purchase, delivery estimate, and recommendations. Keep the sequence consistent across purchase sources and style it with Brandthread’s design system.
+
+Thread commerce actions stay distinct: Add to cart mutates the cart and updates its badge; Buy now must not touch the cart and instead creates a direct-purchase session before opening the full canonical checkout. Product descriptions appear before variant and quantity choices.

@@ -24,7 +24,7 @@ import {
   Animated,
   StyleSheet,
 } from 'react-native';
-import { Feather, FontAwesome6 } from '@expo/vector-icons';
+import { Feather, FontAwesome } from '@expo/vector-icons';
 import type { FeatherNames } from '@/lib/featherNames';
 import {
   FONT,
@@ -174,7 +174,7 @@ export interface EngagementButtonProps {
   /** Feather icon name shown when active (toggled on). Defaults to icon. */
   activeIcon?: FeatherNames;
   /** Optional solid Font Awesome icon used instead of the Feather outline icon. */
-  solidIcon?: React.ComponentProps<typeof FontAwesome6>['name'];
+  solidIcon?: React.ComponentProps<typeof FontAwesome>['name'];
   /** Formatted count label; omit to show no count */
   count?: string;
   /** Whether the button is in the "active" (liked/saved/reposted/following) state */
@@ -262,7 +262,7 @@ export function EngagementButton({
   const displayIcon = active && activeIcon ? activeIcon : icon;
   const iconColor = active ? activeColor : inactiveColor;
   const iconNode = solidIcon
-    ? <FontAwesome6 name={solidIcon} size={iconSize} color={iconColor} />
+    ? <FontAwesome name={solidIcon} size={iconSize} color={iconColor} />
     : <Feather name={displayIcon} size={iconSize} color={iconColor} />;
 
   const innerContent = (
