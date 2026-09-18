@@ -107,3 +107,4 @@
 - [Persistent seller navigation](persistent-seller-navigation.md) — the seller tab bar is app-shell navigation and remains visible on every signed-in seller route.
 - [Reference-app adaptation](reference-app-adaptation.md) — audit reference archives for useful micro-interactions as well as major flows; adapt them without replacing Brandthread’s layout.
 - [Canonical buyer checkout](canonical-buyer-checkout.md) — every buyer purchase source uses one Brandthread checkout, confirmation, purchase-detail, and rating journey.
+- [Expo video screenshot capture](expo-video-screenshot-capture.md) — static preview screenshots may show black hardware-video planes; verify bundled clips through player logs and extracted frames.

@@ -291,6 +291,11 @@ const BUYER_INACTIVE_COLOR = 'rgba(244,244,255,0.40)';
 
 const buyerBarStyles = StyleSheet.create({
   bar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 30,
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'center',
@@ -306,12 +311,12 @@ const buyerBarStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: BG,
+    borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(8,8,10,0.58)',
     paddingTop: 4,
   },
   profileButtonActive: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.14)',
   },
   profileLabel: {
     color: FG,
@@ -328,8 +333,8 @@ const buyerBarStyles = StyleSheet.create({
     paddingHorizontal: 4,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: SURFACE_GLASS,
+    borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(8,8,10,0.58)',
   },
   tab: {
     flex: 1,
@@ -340,7 +345,7 @@ const buyerBarStyles = StyleSheet.create({
     gap: 1,
   },
   tabActive: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.14)',
   },
   tabLabel: {
     maxWidth: '100%',

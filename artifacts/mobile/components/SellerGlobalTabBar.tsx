@@ -367,6 +367,11 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
 
 const styles = StyleSheet.create({
   bar: {
+    position:         'absolute',
+    left:             0,
+    right:            0,
+    bottom:           0,
+    zIndex:           30,
     flexDirection:    'row',
     alignItems:       'flex-start',
     gap:              12,
@@ -382,8 +387,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     borderRadius:     24,
     borderWidth:      1,
-    borderColor:      BORDER,
-    backgroundColor:  SURFACE_GLASS,
+    borderColor:      'rgba(255,255,255,0.14)',
+    backgroundColor:  'rgba(8,8,10,0.58)',
   },
   sideButton: {
     width:           48,
@@ -392,8 +397,8 @@ const styles = StyleSheet.create({
     alignItems:      'center',
     justifyContent:  'center',
     borderWidth:     1,
-    borderColor:     BORDER,
-    backgroundColor: BG,
+    borderColor:     'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(8,8,10,0.58)',
     paddingTop:       4,
   },
   pressed: { opacity: 0.82, transform: [{ scale: 0.95 }] },
@@ -405,7 +410,7 @@ const styles = StyleSheet.create({
     borderRadius:   20,
     gap:            1,
   },
-  tabActive: { backgroundColor: 'rgba(255,255,255,0.08)' },
+  tabActive: { backgroundColor: 'rgba(255,255,255,0.14)' },
   iconWrap: {
     position: 'relative',
   },

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
   Dimensions, Animated, Share, TextInput, Modal,
-  Platform, ScrollView, RefreshControl, ActivityIndicator, KeyboardAvoidingView,
+  Platform, ScrollView, RefreshControl, ActivityIndicator, KeyboardAvoidingView, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -16,9 +16,10 @@ import {
 } from '@/services/socialService';
 import type { SellerThreadPost } from '@/services/socialService';
 import * as Haptics from 'expo-haptics';
-import { useVideoPlayer, VideoView } from 'expo-video';
+import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
 import { Asset } from 'expo-asset';
 import type { ViewToken } from 'react-native';
+import type { ImageSourcePropType } from 'react-native';
 import { useApi } from '@/lib/api';
 import {
   BG, SCREEN_BG, SURFACE, CARD, OVERLAY,
@@ -42,6 +43,7 @@ import {
 } from '@/components/CommerceSignal';
 import { ShopProductSheet } from '@/components/ShopProductSheet';
 import type { ShopSheetSelection } from '@/components/ShopProductSheet';
+import type { BuyerProduct } from '@/services/cartTypes';
 import {
   EngagementButton,
   FeedToastProvider,
@@ -245,6 +247,9 @@ interface SpotlightItem {
   initials: string;
   verified: boolean;
   mediaUris: string[];
+  videoSource?: VideoSource;
+  videoPosterUri?: string;
+  videoPosterSource?: ImageSourcePropType;
   contentType: 'photo' | 'slideshow' | 'video';
   caption: string;
   sound: string;
@@ -267,9 +272,39 @@ interface SpotlightItem {
 }
 type SpotlightProductTag = NonNullable<SpotlightItem['productTags']>[number];
 
-const FASHION_PREVIEW_VIDEO_URI = Asset.fromModule(
-  require('../../assets/videos/fashion_walk.mp4'),
-).uri;
+const FASHION_PREVIEW_VIDEO_SOURCES: VideoSource[] = [
+  require('../../assets/videos/fashion_runway_01.mp4'),
+  require('../../assets/videos/fashion_runway_02.mp4'),
+  require('../../assets/videos/fashion_runway_03.mp4'),
+  require('../../assets/videos/fashion_runway_04.mp4'),
+  require('../../assets/videos/fashion_runway_05.mp4'),
+  require('../../assets/videos/fashion_runway_06.mp4'),
+  require('../../assets/videos/fashion_runway_07.mp4'),
+  require('../../assets/videos/fashion_runway_08.mp4'),
+  require('../../assets/videos/fashion_runway_09.mp4'),
+  require('../../assets/videos/fashion_runway_10.mp4'),
+];
+
+const FASHION_PREVIEW_VIDEO_URIS = FASHION_PREVIEW_VIDEO_SOURCES.map(
+  module => Asset.fromModule(module as number).uri,
+);
+
+const FASHION_PREVIEW_POSTER_SOURCES = [
+  require('../../assets/videos/fashion_runway_01.png'),
+  require('../../assets/videos/fashion_runway_02.png'),
+  require('../../assets/videos/fashion_runway_03.png'),
+  require('../../assets/videos/fashion_runway_04.png'),
+  require('../../assets/videos/fashion_runway_05.png'),
+  require('../../assets/videos/fashion_runway_06.png'),
+  require('../../assets/videos/fashion_runway_07.png'),
+  require('../../assets/videos/fashion_runway_08.png'),
+  require('../../assets/videos/fashion_runway_09.png'),
+  require('../../assets/videos/fashion_runway_10.png'),
+];
+
+const FASHION_PREVIEW_POSTER_URIS = FASHION_PREVIEW_POSTER_SOURCES.map(
+  module => Asset.fromModule(module).uri,
+);
 
 const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
   {
@@ -279,7 +314,10 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     avatarColor: '#232323',
     initials: 'AN',
     verified: true,
-    mediaUris: [FASHION_PREVIEW_VIDEO_URI],
+    mediaUris: [FASHION_PREVIEW_VIDEO_URIS[0]],
+    videoSource: FASHION_PREVIEW_VIDEO_SOURCES[0],
+    videoPosterUri: FASHION_PREVIEW_POSTER_URIS[0],
+    videoPosterSource: FASHION_PREVIEW_POSTER_SOURCES[0],
     contentType: 'video',
     caption: 'Preview · Midnight tailoring, cut for movement.',
     sound: 'After Dark · Atelier Noire',
@@ -305,7 +343,10 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     avatarColor: '#474747',
     initials: 'MV',
     verified: true,
-    mediaUris: [FASHION_PREVIEW_VIDEO_URI],
+    mediaUris: [FASHION_PREVIEW_VIDEO_URIS[1]],
+    videoSource: FASHION_PREVIEW_VIDEO_SOURCES[1],
+    videoPosterUri: FASHION_PREVIEW_POSTER_URIS[1],
+    videoPosterSource: FASHION_PREVIEW_POSTER_SOURCES[1],
     contentType: 'video',
     caption: 'Preview · Silver lines and a clean architectural silhouette.',
     sound: 'Chrome Room · Vela Studios',
@@ -331,7 +372,10 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     avatarColor: '#171717',
     initials: 'SR',
     verified: true,
-    mediaUris: [FASHION_PREVIEW_VIDEO_URI],
+    mediaUris: [FASHION_PREVIEW_VIDEO_URIS[2]],
+    videoSource: FASHION_PREVIEW_VIDEO_SOURCES[2],
+    videoPosterUri: FASHION_PREVIEW_POSTER_URIS[2],
+    videoPosterSource: FASHION_PREVIEW_POSTER_SOURCES[2],
     contentType: 'video',
     caption: 'Preview · Street tailoring with couture proportions.',
     sound: 'Concrete Waltz · Saint Rue',
@@ -357,7 +401,10 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     avatarColor: '#626262',
     initials: 'OR',
     verified: false,
-    mediaUris: [FASHION_PREVIEW_VIDEO_URI],
+    mediaUris: [FASHION_PREVIEW_VIDEO_URIS[3]],
+    videoSource: FASHION_PREVIEW_VIDEO_SOURCES[3],
+    videoPosterUri: FASHION_PREVIEW_POSTER_URIS[3],
+    videoPosterSource: FASHION_PREVIEW_POSTER_SOURCES[3],
     contentType: 'video',
     caption: 'Preview · A study in ivory, volume, and soft structure.',
     sound: 'Still Form · Orison',
@@ -383,7 +430,10 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     avatarColor: '#0F0F0F',
     initials: 'KL',
     verified: true,
-    mediaUris: [FASHION_PREVIEW_VIDEO_URI],
+    mediaUris: [FASHION_PREVIEW_VIDEO_URIS[4]],
+    videoSource: FASHION_PREVIEW_VIDEO_SOURCES[4],
+    videoPosterUri: FASHION_PREVIEW_POSTER_URIS[4],
+    videoPosterSource: FASHION_PREVIEW_POSTER_SOURCES[4],
     contentType: 'video',
     caption: 'Preview · Monochrome layers designed from every angle.',
     sound: 'Parallel · Kuro Line',
@@ -409,7 +459,10 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     avatarColor: '#353535',
     initials: 'F2',
     verified: false,
-    mediaUris: [FASHION_PREVIEW_VIDEO_URI],
+    mediaUris: [FASHION_PREVIEW_VIDEO_URIS[5]],
+    videoSource: FASHION_PREVIEW_VIDEO_SOURCES[5],
+    videoPosterUri: FASHION_PREVIEW_POSTER_URIS[5],
+    videoPosterSource: FASHION_PREVIEW_POSTER_SOURCES[5],
     contentType: 'video',
     caption: 'Preview · Draped jersey meets precision hardware.',
     sound: 'Soft Machine · Forme 22',
@@ -435,7 +488,10 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     avatarColor: '#555555',
     initials: 'AS',
     verified: true,
-    mediaUris: [FASHION_PREVIEW_VIDEO_URI],
+    mediaUris: [FASHION_PREVIEW_VIDEO_URIS[6]],
+    videoSource: FASHION_PREVIEW_VIDEO_SOURCES[6],
+    videoPosterUri: FASHION_PREVIEW_POSTER_URIS[6],
+    videoPosterSource: FASHION_PREVIEW_POSTER_SOURCES[6],
     contentType: 'video',
     caption: 'Preview · Evening light caught in hand-finished crystal.',
     sound: 'Glass Light · Astrae',
@@ -461,7 +517,10 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     avatarColor: '#292929',
     initials: 'NA',
     verified: true,
-    mediaUris: [FASHION_PREVIEW_VIDEO_URI],
+    mediaUris: [FASHION_PREVIEW_VIDEO_URIS[7]],
+    videoSource: FASHION_PREVIEW_VIDEO_SOURCES[7],
+    videoPosterUri: FASHION_PREVIEW_POSTER_URIS[7],
+    videoPosterSource: FASHION_PREVIEW_POSTER_SOURCES[7],
     contentType: 'video',
     caption: 'Preview · Archival shapes, reconstructed for now.',
     sound: 'Reissue 08 · Noma Archive',
@@ -487,7 +546,10 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     avatarColor: '#404040',
     initials: 'EC',
     verified: false,
-    mediaUris: [FASHION_PREVIEW_VIDEO_URI],
+    mediaUris: [FASHION_PREVIEW_VIDEO_URIS[8]],
+    videoSource: FASHION_PREVIEW_VIDEO_SOURCES[8],
+    videoPosterUri: FASHION_PREVIEW_POSTER_URIS[8],
+    videoPosterSource: FASHION_PREVIEW_POSTER_SOURCES[8],
     contentType: 'video',
     caption: 'Preview · Sharp shoulders. Fluid finish. No compromise.',
     sound: 'Forward Motion · Echelon',
@@ -513,7 +575,10 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     avatarColor: '#1E1E1E',
     initials: 'VS',
     verified: true,
-    mediaUris: [FASHION_PREVIEW_VIDEO_URI],
+    mediaUris: [FASHION_PREVIEW_VIDEO_URIS[9]],
+    videoSource: FASHION_PREVIEW_VIDEO_SOURCES[9],
+    videoPosterUri: FASHION_PREVIEW_POSTER_URIS[9],
+    videoPosterSource: FASHION_PREVIEW_POSTER_SOURCES[9],
     contentType: 'video',
     caption: 'Preview · Closing look: black silk, sculpted by hand.',
     sound: 'Finale · Vale Studio',
@@ -658,15 +723,49 @@ const DEFAULT_ENGAGEMENT: EngagementState = {
 
 // ─── Full-screen media page ───────────────────────────────────────────────────
 
-function VideoVisual({ uri, isActive, paused }: { uri: string; isActive: boolean; paused: boolean }) {
-  const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; });
+function VideoVisual({
+  source,
+  isActive,
+  paused,
+  muted = false,
+  posterUri,
+  posterSource,
+}: {
+  source: VideoSource;
+  isActive: boolean;
+  paused: boolean;
+  muted?: boolean;
+  posterUri?: string;
+  posterSource?: ImageSourcePropType;
+}) {
+  const player = useVideoPlayer(source, p => { p.loop = true; p.muted = muted; });
+  const [hasStarted, setHasStarted] = useState(false);
+  const showPoster = Boolean(posterSource || posterUri) && !hasStarted;
+  React.useEffect(() => {
+    const subscription = player.addListener('playingChange', ({ isPlaying }) => {
+      if (isPlaying) setHasStarted(true);
+    });
+    return () => subscription.remove();
+  }, [player]);
   React.useEffect(() => {
     if (isActive && !paused) player.play();
     else player.pause();
   }, [isActive, paused, player]);
   return (
     <>
-      <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
+      {showPoster && (
+        <Image
+          source={posterSource ?? { uri: posterUri! }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+        />
+      )}
+      <VideoView
+        player={player}
+        style={[StyleSheet.absoluteFill, showPoster && { opacity: 0 }]}
+        contentFit="cover"
+        nativeControls={false}
+      />
       {paused && (
         <View style={styles.pauseOverlay}>
           <Feather name="play" size={56} color="#FFFFFFCC" />
@@ -767,7 +866,16 @@ function SpotlightPage({
       <TouchableWithoutFeedback onPress={handlePress}>
         <View style={StyleSheet.absoluteFill}>
           {item.contentType === 'video'
-            ? <VideoVisual uri={item.mediaUris[0]} isActive={isActive} paused={paused} />
+            ? (
+              <VideoVisual
+                source={item.videoSource ?? item.mediaUris[0]}
+                isActive={isActive}
+                paused={paused}
+                muted={item.videoSource != null}
+                posterUri={item.videoPosterUri}
+                posterSource={item.videoPosterSource}
+              />
+            )
             : <PhotoVisual uris={item.mediaUris} />}
           {item.contentType !== 'video' && item.mediaUris.length > 1 && (
             <View style={styles.mediaDots} pointerEvents="none">
@@ -911,7 +1019,7 @@ function SpotlightPage({
 
         {/* Share — fire-and-forget native sheet, not an engagement action */}
         <TouchableOpacity
-          style={styles.railBtn}
+          style={styles.shareRailBtn}
           activeOpacity={0.7}
           hitSlop={{ top: 6, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
@@ -924,7 +1032,9 @@ function SpotlightPage({
             void Share.share({ message: shareMsg });
           }}
         >
-          <Feather name="share-2" size={27} color="#FFFFFF" />
+          <View style={styles.shareRailIcon}>
+            <Feather name="send" size={21} color="#111111" />
+          </View>
           <Text style={styles.railCount}>{formatCount(item.shares)}</Text>
         </TouchableOpacity>
 
@@ -947,13 +1057,14 @@ function SpotlightPage({
       {/* ─ Bottom-left overlay: shop CTA, creator, caption, sound ─ */}
       <View style={[styles.bottomInfo, { bottom: tabBarClearance }]} pointerEvents="box-none">
         <TouchableOpacity
-          style={[styles.shopBtn, { backgroundColor: theme.accent }]}
+          style={styles.shopBtn}
           activeOpacity={0.85}
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
           onPress={() => onShop(item)}
         >
-          <Feather name="shopping-bag" size={18} color="#FFFFFF" />
-          <Text style={styles.shopBtnText}>SHOP</Text>
+          <Feather name="shopping-bag" size={17} color="#111111" />
+          <Text style={styles.shopBtnText}>Shop look</Text>
+          <Feather name="arrow-up-right" size={15} color="#111111" />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -972,12 +1083,12 @@ function SpotlightPage({
           </View>
         </TouchableOpacity>
 
-         {!!item.location && (
-           <View style={styles.locationRow}>
-              <Feather name="map-pin" size={12} color={`${theme.onAccent}CC`} />
-              <Text style={[styles.locationText, { color: `${theme.onAccent}CC` }]} numberOfLines={1}>{item.location}</Text>
-           </View>
-         )}
+         <View style={[styles.locationRow, !item.location && styles.infoSlotHidden]}>
+            <Feather name="map-pin" size={12} color={`${theme.onAccent}CC`} />
+            <Text style={[styles.locationText, { color: `${theme.onAccent}CC` }]} numberOfLines={1}>
+              {item.location ?? '\u00A0'}
+            </Text>
+         </View>
          <Text style={styles.caption} numberOfLines={2}>
            {item.caption}
             {item.caption.length > 86 && <Text style={[styles.moreText, { color: theme.onAccent }]}> more</Text>}
@@ -1037,6 +1148,43 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
   };
 }
 
+function buildPreviewShopProduct(
+  item: SpotlightItem,
+  tag: { productId: string; productName: string; priceCents: number },
+): BuyerProduct {
+  const optionId = `${tag.productId}-size`;
+  const sizes = ['XS', 'S', 'M', 'L'].map(label => ({
+    id: `${optionId}-${label.toLowerCase()}`,
+    label,
+  }));
+  return {
+    id: tag.productId,
+    sellerId: item.sellerId ?? `preview-seller-${item.id}`,
+    sellerName: item.creator,
+    sellerHandle: item.handle,
+    name: tag.productName,
+    description: item.caption.replace(/^Preview ·\s*/, ''),
+    priceCents: tag.priceCents,
+    imageUris: item.videoPosterUri ? [item.videoPosterUri] : [],
+    category: 'High Fashion',
+    isPreOrder: false,
+    cancellationPolicy: 'Preview item — no real order will be placed.',
+    refundPolicy: 'Preview item — no payment will be collected.',
+    options: [{ id: optionId, name: 'Size', values: sizes }],
+    variants: sizes.map((size, index) => ({
+      id: `${tag.productId}-variant-${size.label.toLowerCase()}`,
+      title: size.label,
+      optionValues: [{ optionId, valueId: size.id }],
+      priceCents: tag.priceCents,
+      inventoryQuantity: 3 + index * 2,
+      isAvailable: true,
+      imageUri: item.videoPosterUri,
+    })),
+    isActive: true,
+    tags: ['runway', 'preview', 'high-fashion'],
+  };
+}
+
 // ShopProductSheet is now imported from @/components/ShopProductSheet
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
@@ -1045,7 +1193,13 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
 //   Index 0 renders BuyerHighDemandPage; indices 1+ are regular SpotlightPage/LiveStreamPage items.
 //   getItemLayout is uniform (length: SCREEN_H, offset: SCREEN_H * index) for all items.
 
-export default function FeedScreen({ buyerMode = false }: { buyerMode?: boolean }) {
+export default function FeedScreen({
+  buyerMode = false,
+  showFashionPreview = false,
+}: {
+  buyerMode?: boolean;
+  showFashionPreview?: boolean;
+}) {
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
   const insets = useSafeAreaInsets();
@@ -1199,7 +1353,7 @@ export default function FeedScreen({ buyerMode = false }: { buyerMode?: boolean 
   // Production and seller feeds remain real published seller posts only.
   // Live streams are woven in at roughly 1 per 10 regular posts (occasional, not dominant).
   const allItems = useMemo(() => {
-    const previewPosts = __DEV__ && buyerMode && feedTab === 'for-you'
+    const previewPosts = __DEV__ && (buyerMode || showFashionPreview) && feedTab === 'for-you'
       ? FASHION_PREVIEW_POSTS
       : [];
     const regular: (SpotlightItem | LiveStreamFeedItem)[] = [...previewPosts, ...sellerFeedPosts];
@@ -1212,7 +1366,7 @@ export default function FeedScreen({ buyerMode = false }: { buyerMode?: boolean 
       result.splice(insertAt, 0, liveItem);
     });
     return result;
-  }, [sellerFeedPosts, activeLiveStreams, feedTab]);
+  }, [sellerFeedPosts, activeLiveStreams, buyerMode, feedTab, showFashionPreview]);
 
   // filteredContentItems: regular spotlight/live items after search filter
   const filteredContentItems = searchQuery.trim()
@@ -1400,6 +1554,9 @@ export default function FeedScreen({ buyerMode = false }: { buyerMode?: boolean 
       postSellerId: item.sellerId,
       tags,
       activeTagIndex: 0,
+      previewProduct: item.id.startsWith('preview-fashion-')
+        ? buildPreviewShopProduct(item, tags[0])
+        : undefined,
     });
   }
 
@@ -1414,6 +1571,9 @@ export default function FeedScreen({ buyerMode = false }: { buyerMode?: boolean 
       postSellerId: item.sellerId,
       tags: allTags,
       activeTagIndex: Math.max(0, tagIdx),
+      previewProduct: item.id.startsWith('preview-fashion-')
+        ? buildPreviewShopProduct(item, tag)
+        : undefined,
     });
   }
 
@@ -1437,8 +1597,10 @@ export default function FeedScreen({ buyerMode = false }: { buyerMode?: boolean 
         data={displayItems}
         keyExtractor={item => item.id}
         pagingEnabled
+        disableIntervalMomentum
         showsVerticalScrollIndicator={false}
         snapToInterval={SCREEN_H}
+        snapToAlignment="start"
         decelerationRate="fast"
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
@@ -1679,25 +1841,39 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000',
   },
   railBtn: { alignItems: 'center', gap: 3 },
+  shareRailBtn: { alignItems: 'center', gap: 5 },
+  shareRailIcon: {
+    width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FFFFFFCC',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 5, elevation: 5,
+  },
   railCount: { fontSize: FS.xs, fontFamily: FONT.semibold, color: '#FFFFFF' },
 
   shopBtn: {
     alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingVertical: 10, paddingHorizontal: 18, borderRadius: 24, marginBottom: 2,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.35, shadowRadius: 6, elevation: 8,
+    minHeight: 44, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 14, marginBottom: 2,
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FFFFFFCC',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8,
   },
-  shopBtnText: { fontSize: FS.sm, fontFamily: FONT.bold, color: '#FFFFFF', letterSpacing: 0.4 },
+  shopBtnText: { fontSize: FS.sm, fontFamily: FONT.bold, color: '#111111', letterSpacing: 0.1 },
 
-  bottomInfo: { position: 'absolute', left: 16, right: 84, bottom: 26, gap: 8 },
-  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  bottomInfo: {
+    position: 'absolute', left: 16, right: 84, bottom: 26, height: 184,
+    justifyContent: 'flex-end', gap: 8,
+  },
+  locationRow: { height: 16, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  infoSlotHidden: { opacity: 0 },
   locationText: { fontSize: FS.xs, fontFamily: FONT.medium, color: ON_DARK },
-  caption: { fontSize: 14, fontFamily: FONT.regular, color: '#FFFFFF', lineHeight: 19 },
+  caption: {
+    height: 38, fontSize: 14, fontFamily: FONT.regular, color: '#FFFFFF',
+    lineHeight: 19,
+  },
   moreText: { fontFamily: FONT.semibold, color: ON_DARK },
-  creatorRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 8 },
+  creatorRow: { height: 28, flexDirection: 'row', alignItems: 'center', gap: 8 },
   creatorAvatar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#FFFFFF' },
   creatorAvatarText: { fontSize: 10, fontFamily: FONT.bold, color: '#FFFFFF' },
   creatorName: { fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
-  soundRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  soundRow: { height: 16, flexDirection: 'row', alignItems: 'center', gap: 6 },
   soundText: { fontSize: FS.xs, fontFamily: FONT.regular, color: '#FFFFFFCC', flexShrink: 1 },
 
   topBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 14, paddingBottom: 8 },

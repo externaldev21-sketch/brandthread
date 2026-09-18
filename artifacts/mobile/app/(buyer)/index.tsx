@@ -7,5 +7,5 @@ import FeedScreen from '../(tabs)/feed';
 import React from 'react';
 
 export default function ThreadScreen() {
-  return <FeedScreen />;
+  return <FeedScreen showFashionPreview />;
 }

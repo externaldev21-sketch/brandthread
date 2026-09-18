@@ -64,6 +64,7 @@ export interface ShopSheetSelection {
   postSellerId?: string;
   tags: ShopTag[];
   activeTagIndex: number;
+  previewProduct?: BuyerProduct;
 }
 
 interface ShopProductSheetProps {
@@ -327,6 +328,18 @@ export function ShopProductSheet({
     setSelections({});
     setQty(1);
     setVariantError('');
+    if (selection.previewProduct && tag.productId === selection.previewProduct.id) {
+      const preview = selection.previewProduct;
+      setProduct(preview);
+      const firstVariant = preview.variants.find(candidate => candidate.isAvailable);
+      if (firstVariant) {
+        setSelections(Object.fromEntries(firstVariant.optionValues.map(ov => [ov.optionId, ov.valueId])));
+        setPhase('ready');
+      } else {
+        setPhase('sold_out');
+      }
+      return;
+    }
     try {
       const p = await getBuyerProduct(tag.productId);
       if (!p) {
@@ -403,6 +416,12 @@ export function ShopProductSheet({
     }
     setVariantError('');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (selection.previewProduct) {
+      setPhase('added');
+      onCartUpdated?.(qty);
+      const t = setTimeout(() => { dismissSheet(onClose); }, 1400);
+      return () => clearTimeout(t);
+    }
     setPhase('adding');
     try {
       const result = await addToCart({ product, variant, quantity: qty, attribution });
@@ -435,6 +454,12 @@ export function ShopProductSheet({
     }
     setVariantError('');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    if (selection.previewProduct) {
+      setPhase('added');
+      onCartUpdated?.(qty);
+      const t = setTimeout(() => { dismissSheet(onClose); }, 1400);
+      return () => clearTimeout(t);
+    }
     setPhase('buying');
     try {
       const cart = await getCart();
