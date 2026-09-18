@@ -108,6 +108,7 @@ describe("guest checkout", () => {
     const body = {
       items: [{ productId, variantId, quantity: 1 }],
       contactEmail: guestEmail,
+      contactPhone: "+1 503 555 0100",
       shippingAddress: {
         name: "Guest Buyer",
         street: "123 Test Street",
@@ -115,6 +116,7 @@ describe("guest checkout", () => {
         state: "OR",
         zip: "97205",
         country: "US",
+        phone: "+1 503 555 0100",
       },
       successUrl: "https://brandthread.test/success",
       cancelUrl: "https://brandthread.test/cancel",
@@ -170,7 +172,8 @@ describe("guest checkout", () => {
     const result = await post("/api/guest/checkout/session", {
       items: [{ productId, variantId, quantity: 1 }],
       contactEmail: `deleted-${suffix}@test.local`,
-      shippingAddress: { name: "Guest Buyer", street: "123 Test Street", city: "Portland", state: "OR", zip: "97205", country: "US" },
+      contactPhone: "+1 503 555 0100",
+      shippingAddress: { name: "Guest Buyer", street: "123 Test Street", city: "Portland", state: "OR", zip: "97205", country: "US", phone: "+1 503 555 0100" },
       successUrl: "https://brandthread.test/success",
       cancelUrl: "https://brandthread.test/cancel",
       clientIdempotencyKey: `guest-deleted-${suffix}`,

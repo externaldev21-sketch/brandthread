@@ -9,9 +9,11 @@ export function getCheckoutBlockingSection(
   session: Pick<CheckoutSession, 'deliveryGroups' | 'acknowledgments'>,
 ): CheckoutBlockingSection | null {
   const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email ?? '');
+  const validPhone = /^[0-9+(). -]{7,32}$/.test((contact.phone ?? '').trim());
   const validPostalCode = (address.postalCode ?? '').trim().length >= 3;
   if (
     !validEmail
+    || !validPhone
     || !address.firstName
     || !address.lastName
     || !address.line1

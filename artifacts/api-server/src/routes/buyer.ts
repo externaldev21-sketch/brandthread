@@ -59,12 +59,20 @@ const checkoutBodySchema = z.object({
   items: z.array(checkoutItemSchema).min(1).max(100),
   successUrl: requestPrimitives.url,
   cancelUrl: requestPrimitives.url,
-  contactEmail: z.union([z.literal(""), requestPrimitives.email]).optional(),
-  shippingAddress: addressBodySchema.omit({ label: true, isDefault: true }).optional(),
+  contactEmail: requestPrimitives.email,
+  contactPhone: z.string().trim().regex(/^[0-9+(). -]{7,32}$/),
+  shippingAddress: addressBodySchema.omit({ label: true, isDefault: true }),
   clientIdempotencyKey: z.string().trim().min(8).max(160).optional(),
   dropId: requestPrimitives.uuid.nullable().optional(),
   loyaltyToken: z.string().trim().min(1).max(512).optional(),
 }).passthrough();
+const addressSuggestionQuerySchema = z.object({
+  q: z.string().trim().min(3).max(160),
+  country: z.string().trim().length(2).default("US"),
+});
+const addressSuggestionParamsSchema = z.object({
+  placeId: z.string().trim().min(1).max(500),
+});
 const cartValidationBodySchema = z.object({
   items: z.array(checkoutItemSchema).min(1).max(100),
   discountCodes: z.array(z.string().trim().min(1).max(64)).max(20).optional(),
@@ -119,6 +127,96 @@ router.get("/addresses", async (req, res) => {
     .orderBy(desc(buyerAddresses.isDefault), desc(buyerAddresses.updatedAt));
   res.json(rows);
 });
+
+router.get(
+  "/address-suggestions",
+  validateRequest({ query: addressSuggestionQuerySchema }),
+  async (req, res) => {
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      res.status(503).json({ error: "Address suggestions are not configured" });
+      return;
+    }
+    try {
+      const response = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask": "suggestions.placePrediction.placeId,suggestions.placePrediction.text.text",
+        },
+        body: JSON.stringify({
+          input: String(req.query.q),
+          includedRegionCodes: [String(req.query.country ?? "US").toLowerCase()],
+        }),
+      });
+      if (!response.ok) throw new Error(`Google Places autocomplete failed with ${response.status}`);
+      const body = await response.json() as any;
+      const suggestions = Array.isArray(body?.suggestions)
+        ? body.suggestions.flatMap((item: any) => {
+            const prediction = item?.placePrediction;
+            const placeId = typeof prediction?.placeId === "string" ? prediction.placeId : "";
+            const label = typeof prediction?.text?.text === "string" ? prediction.text.text : "";
+            return placeId && label ? [{ placeId, label }] : [];
+          }).slice(0, 5)
+        : [];
+      res.json(suggestions);
+    } catch (error) {
+      logger.error({ err: error }, "address autocomplete failed");
+      res.status(502).json({ error: "Address suggestions are temporarily unavailable" });
+    }
+  },
+);
+
+router.get(
+  "/address-suggestions/:placeId",
+  validateRequest({ params: addressSuggestionParamsSchema }),
+  async (req, res) => {
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      res.status(503).json({ error: "Address suggestions are not configured" });
+      return;
+    }
+    try {
+      const response = await fetch(
+        `https://places.googleapis.com/v1/places/${encodeURIComponent(String(req.params.placeId))}`,
+        {
+          headers: {
+            "X-Goog-Api-Key": apiKey,
+            "X-Goog-FieldMask": "addressComponents,formattedAddress",
+          },
+        },
+      );
+      if (!response.ok) throw new Error(`Google Places details failed with ${response.status}`);
+      const body = await response.json() as any;
+      const components = Array.isArray(body?.addressComponents) ? body.addressComponents : [];
+      const getComponent = (types: string[], short = false) => {
+        const component = components.find((entry: any) =>
+          Array.isArray(entry?.types) && types.some(type => entry.types.includes(type)),
+        );
+        return String(short ? component?.shortText ?? "" : component?.longText ?? "").trim();
+      };
+      const streetNumber = getComponent(["street_number"]);
+      const route = getComponent(["route"]);
+      const line1 = [streetNumber, route].filter(Boolean).join(" ").trim();
+      const city = getComponent(["locality", "postal_town", "sublocality_level_1"]);
+      const state = getComponent(["administrative_area_level_1"], true);
+      const postalCode = [
+        getComponent(["postal_code"]),
+        getComponent(["postal_code_suffix"]),
+      ].filter(Boolean).join("-");
+      const country = getComponent(["country"], true).toUpperCase();
+      if (!line1 || !city || !state || !postalCode || !country) {
+        res.status(422).json({ error: "Select a complete deliverable street address" });
+        return;
+      }
+      res.json({ line1, city, state, postalCode, country });
+    } catch (error) {
+      logger.error({ err: error }, "address suggestion resolution failed");
+      res.status(502).json({ error: "Could not load that address" });
+    }
+  },
+);
 
 router.post("/addresses", validateRequest({ body: addressBodySchema }), async (req, res) => {
   try {
@@ -364,7 +462,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     const stripe = requireStripe();
     const buyerId = (req as any).clerkUserId as string;
     const {
-      items, successUrl, cancelUrl, contactEmail, shippingAddress,
+      items, successUrl, cancelUrl, contactEmail, contactPhone, shippingAddress,
       clientIdempotencyKey, dropId, loyaltyToken,
     } = req.body;
 
@@ -379,10 +477,16 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     const normalizedContactEmail =
       typeof contactEmail === "string" ? contactEmail.trim() : "";
     if (
-      normalizedContactEmail &&
+      !normalizedContactEmail ||
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedContactEmail)
     ) {
       res.status(400).json({ error: "A valid contactEmail is required" });
+      return;
+    }
+    const normalizedContactPhone =
+      typeof contactPhone === "string" ? contactPhone.trim() : "";
+    if (!/^[0-9+(). -]{7,32}$/.test(normalizedContactPhone)) {
+      res.status(400).json({ error: "A valid contactPhone is required" });
       return;
     }
 
@@ -529,18 +633,17 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     checkoutIdempotencyKey = hasKey ? clientIdempotencyKey : null;
 
     // Validated shipping DTO (set once, used below)
-    const validatedShipping = shippingAddress && typeof shippingAddress === "object"
-      && shippingAddress.street && shippingAddress.city && shippingAddress.state && shippingAddress.postalCode
-      ? {
-          name:    shippingAddress.recipientName,
-          street:  shippingAddress.street,
-          line2:   shippingAddress.line2 ?? null,
-          city:    shippingAddress.city,
-          state:   shippingAddress.state,
-          zip:     shippingAddress.postalCode,
-          country: shippingAddress.country ?? "US",
-        }
-      : undefined;
+    const normalizedShipping = normalizeAddress(shippingAddress);
+    const validatedShipping = {
+      name: normalizedShipping.recipientName,
+      street: normalizedShipping.street,
+      line2: normalizedShipping.line2,
+      city: normalizedShipping.city,
+      state: normalizedShipping.state,
+      zip: normalizedShipping.postalCode,
+      country: normalizedShipping.country,
+      phone: normalizedContactPhone,
+    };
 
     // ── Server-side idempotency (when client supplies a key) ──────────────
     //
@@ -659,6 +762,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       buyerId,
       normalizedContactEmail || undefined,
       validatedShipping,
+      normalizedContactPhone,
     );
 
     // ── Compute platform application fee (5% of order subtotal) ──────────

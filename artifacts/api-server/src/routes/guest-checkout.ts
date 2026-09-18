@@ -28,6 +28,7 @@ const shippingAddressSchema = z.object({
   zip: z.string().trim().min(2).max(20).optional(),
   postalCode: z.string().trim().min(2).max(20).optional(),
   country: z.string().trim().length(2).default("US"),
+  phone: z.string().trim().regex(/^[0-9+(). -]{7,32}$/),
 }).refine((value) => Boolean(value.name ?? value.recipientName), {
   message: "A recipient name is required",
   path: ["name"],
@@ -44,6 +45,7 @@ const guestCheckoutSchema = z.object({
   successUrl: requestPrimitives.url,
   cancelUrl: requestPrimitives.url,
   contactEmail: requestPrimitives.email,
+  contactPhone: z.string().trim().regex(/^[0-9+(). -]{7,32}$/),
   shippingAddress: shippingAddressSchema,
   clientIdempotencyKey: z.string().trim().min(8).max(160),
   dropId: requestPrimitives.uuid.nullable().optional(),
@@ -86,6 +88,7 @@ function shipping(raw: any) {
     city: text(raw.city, "shippingAddress.city", true)!,
     state: text(raw.state, "shippingAddress.state", true)!,
     zip, country,
+    phone: text(raw.phone, "shippingAddress.phone", true, 32)!,
   };
 }
 
@@ -94,9 +97,11 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
   let stripeStarted = false;
   try {
     const stripe = requireStripe();
-    const { items, successUrl, cancelUrl, contactEmail, shippingAddress, clientIdempotencyKey, dropId } = req.body ?? {};
+    const { items, successUrl, cancelUrl, contactEmail, contactPhone, shippingAddress, clientIdempotencyKey, dropId } = req.body ?? {};
     const email = typeof contactEmail === "string" ? contactEmail.trim().toLowerCase() : "";
     if (!emailPattern.test(email)) return res.status(400).json({ error: "A valid contactEmail is required" });
+    const phone = typeof contactPhone === "string" ? contactPhone.trim() : "";
+    if (!/^[0-9+(). -]{7,32}$/.test(phone)) return res.status(400).json({ error: "A valid contactPhone is required" });
     if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: "items required" });
     if (typeof successUrl !== "string" || typeof cancelUrl !== "string" || !successUrl || !cancelUrl) {
       return res.status(400).json({ error: "successUrl and cancelUrl required" });

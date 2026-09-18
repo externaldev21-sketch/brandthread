@@ -41,6 +41,7 @@ export async function ensureStripeCustomer(
     zip: string;
     country: string;
   },
+  preferredPhone?: string,
 ): Promise<string> {
   return db.transaction(async (tx) => {
     const [user] = await tx
@@ -61,6 +62,7 @@ export async function ensureStripeCustomer(
       if (preferredEmail || shippingAddress) {
         await stripeClient.customers.update(user.stripeCustomerId, {
           ...(preferredEmail ? { email: preferredEmail } : {}),
+          ...(preferredPhone ? { phone: preferredPhone } : {}),
           ...(shippingAddress ? {
             shipping: {
               name: shippingAddress.name ?? user.name,
@@ -81,6 +83,7 @@ export async function ensureStripeCustomer(
 
     const customer = await stripeClient.customers.create({
       email: preferredEmail ?? user.email,
+      ...(preferredPhone ? { phone: preferredPhone } : {}),
       name: user.name,
       metadata: { clerkUserId },
       ...(shippingAddress ? {

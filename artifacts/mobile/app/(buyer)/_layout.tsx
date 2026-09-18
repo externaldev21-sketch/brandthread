@@ -229,7 +229,7 @@ function BuyerBottomTabBar({
       style={[
         buyerBarStyles.bar,
         {
-          height: 84 + insets.bottom,
+          height: 72 + insets.bottom,
           paddingBottom: insets.bottom,
         },
       ]}
@@ -256,7 +256,7 @@ function BuyerBottomTabBar({
               testID={`buyer-tab-${item.name}`}
             >
               <TabBadge count={showInboxBadge ? inboxBadgeCount : 0} accent={accent} onAccent={onAccent}>
-                <Feather name={item.icon} size={20} color={color} />
+                <Feather name={item.icon} size={18} color={color} />
               </TabBadge>
               <Text numberOfLines={1} style={[buyerBarStyles.tabLabel, { color }]}>
                 {item.label}
@@ -278,7 +278,7 @@ function BuyerBottomTabBar({
         ]}
         testID="buyer-tab-profile"
       >
-        <Feather name="user" size={24} color={profileFocused ? accent : FG} />
+        <Feather name="user" size={20} color={profileFocused ? accent : FG} />
         <Text style={[buyerBarStyles.profileLabel, profileFocused && { color: accent }]}>Profile</Text>
       </Pressable>
     </View>
@@ -294,20 +294,20 @@ const buyerBarStyles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     backgroundColor: 'rgba(8,8,10,0.18)',
-    paddingTop: 8,
+    paddingTop: 6,
     paddingHorizontal: 8,
   },
   profileButton: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
     backgroundColor: 'rgba(8,8,10,0.42)',
-    gap: 2,
-    paddingTop: 4,
+    gap: 1,
+    paddingTop: 2,
   },
   profileButtonActive: {
     backgroundColor: 'rgba(255,255,255,0.14)',
@@ -315,24 +315,24 @@ const buyerBarStyles = StyleSheet.create({
   profileLabel: {
     color: FG,
     fontFamily: FONT.bold,
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 9,
+    lineHeight: 11,
   },
   centerBar: {
     flex: 1,
-    height: 64,
+    height: 56,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 4,
-    borderRadius: 32,
+    borderRadius: 28,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
     backgroundColor: 'rgba(8,8,10,0.42)',
   },
   tab: {
     flex: 1,
-    minHeight: 60,
-    borderRadius: 28,
+    minHeight: 52,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 1,
@@ -343,8 +343,8 @@ const buyerBarStyles = StyleSheet.create({
   tabLabel: {
     maxWidth: '100%',
     fontFamily: FONT.bold,
-    fontSize: 10,
-    lineHeight: 12,
+    fontSize: 9,
+    lineHeight: 11,
   },
   pressed: {
     opacity: 0.82,

@@ -893,6 +893,18 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     buyer: {
       addresses: {
         list:   () => get<any[]>('/api/buyer/addresses'),
+        autocomplete: (query: string, country = 'US') =>
+          get<Array<{ placeId: string; label: string }>>(
+            `/api/buyer/address-suggestions?q=${encodeURIComponent(query)}&country=${encodeURIComponent(country)}`,
+          ),
+        resolveSuggestion: (placeId: string) =>
+          get<{
+            line1: string;
+            city: string;
+            state: string;
+            postalCode: string;
+            country: string;
+          }>(`/api/buyer/address-suggestions/${encodeURIComponent(placeId)}`),
         create: (body: any) => post<any>('/api/buyer/addresses', body),
         update: (id: string, body: any) => patch<any>(`/api/buyer/addresses/${encodeURIComponent(id)}`, body),
         delete: (id: string) => del<void>(`/api/buyer/addresses/${encodeURIComponent(id)}`),
@@ -903,10 +915,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         createSession: (
           items: { variantId: string; productId: string; quantity: number }[],
           opts: {
-            contactEmail?: string;
+            contactEmail: string;
+            contactPhone: string;
             shippingAddress?: {
-              name?: string; street: string; line2?: string; city: string;
-              state: string; zip: string; country?: string;
+              recipientName: string; street: string; line2?: string; city: string;
+              state: string; postalCode: string; country?: string; phone: string;
             };
             /** Per-seller idempotency key (format: {checkoutSessionId}_{sellerId}).
              *  The server uses this to detect and reuse an identical in-flight session
@@ -915,13 +928,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             clientIdempotencyKey?: string;
             /** One-time rewards token created by /api/loyalty/redeem. */
             loyaltyToken?: string;
-          } = {},
+          },
         ) =>
           post<{ sessionId: string; url: string }>('/api/buyer/checkout/session', {
             items,
             successUrl: 'mobile://checkout/return?session_id={CHECKOUT_SESSION_ID}',
             cancelUrl:  'mobile://checkout/cancel',
             ...(opts.contactEmail          ? { contactEmail:          opts.contactEmail          } : {}),
+            ...(opts.contactPhone          ? { contactPhone:          opts.contactPhone          } : {}),
             ...(opts.shippingAddress       ? { shippingAddress:       opts.shippingAddress       } : {}),
             ...(opts.clientIdempotencyKey  ? { clientIdempotencyKey:  opts.clientIdempotencyKey  } : {}),
             ...(opts.loyaltyToken          ? { loyaltyToken:          opts.loyaltyToken          } : {}),
@@ -983,13 +997,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         createSession: (
           items: { variantId: string; productId: string; quantity: number }[],
           opts: {
-            contactEmail?: string;
+            contactEmail: string;
+            contactPhone: string;
             shippingAddress?: {
               name?: string; street: string; line2?: string; city: string;
-              state: string; zip: string; country?: string;
+              state: string; zip: string; country?: string; phone: string;
             };
             clientIdempotencyKey?: string;
-          } = {},
+          },
         ) => post<{ sessionId: string; url: string; guestAccessToken: string }>('/api/guest/checkout/session', {
           items,
           successUrl: 'mobile://checkout/return?session_id={CHECKOUT_SESSION_ID}',

@@ -133,6 +133,16 @@ function checkoutBody(overrides: Record<string, unknown> = {}) {
     successUrl: "https://brandthread.test/checkout/success",
     cancelUrl: "https://brandthread.test/checkout/cancel",
     contactEmail: "buyer@test.local",
+    contactPhone: "+1 503 555 0100",
+    shippingAddress: {
+      recipientName: "Checkout Buyer",
+      street: "123 Tax Street",
+      city: "Portland",
+      state: "OR",
+      postalCode: "97205",
+      country: "US",
+      phone: "+1 503 555 0100",
+    },
     ...overrides,
   };
 }
@@ -230,6 +240,7 @@ describe("POST /api/buyer/checkout/session", () => {
         state: "OR",
         postalCode: "97205",
         country: "US",
+        phone: "+1 503 555 0100",
       },
     }));
 
@@ -242,6 +253,7 @@ describe("POST /api/buyer/checkout/session", () => {
     expect(fakeStripe.customerCreates).toHaveLength(1);
     expect(fakeStripe.customerCreates[0].params).toMatchObject({
       email: "buyer@test.local",
+      phone: "+1 503 555 0100",
       name: "Checkout Integration Buyer",
       shipping: {
         name: "Checkout Buyer",
@@ -395,12 +407,24 @@ describe("POST /api/buyer/checkout/session", () => {
 
     expect(result.status).toBe(200);
     expect(fakeStripe.customerCreates).toHaveLength(0);
-    expect(fakeStripe.customerUpdates).toEqual([
-      {
-        id: `cus_existing_${TEST_SUFFIX}`,
-        params: { email: "orders+delivery@test.local" },
+    expect(fakeStripe.customerUpdates).toHaveLength(1);
+    expect(fakeStripe.customerUpdates[0]).toMatchObject({
+      id: `cus_existing_${TEST_SUFFIX}`,
+      params: {
+        email: "orders+delivery@test.local",
+        phone: "+1 503 555 0100",
+        shipping: {
+          name: "Checkout Buyer",
+          address: {
+            line1: "123 Tax Street",
+            city: "Portland",
+            state: "OR",
+            postal_code: "97205",
+            country: "US",
+          },
+        },
       },
-    ]);
+    });
     expect(fakeStripe.sessionCreates[0].params.customer).toBe(
       `cus_existing_${TEST_SUFFIX}`,
     );

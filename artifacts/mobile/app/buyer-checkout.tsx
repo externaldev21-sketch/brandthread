@@ -45,6 +45,7 @@ import {
   mergeCheckoutFormState,
 } from '@/lib/checkoutReadiness';
 import { CheckoutSkeleton, HapticSwitch } from '@/components/BrandthreadUI';
+import { AddressAutocompleteInput } from '@/components/AddressAutocompleteInput';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -376,8 +377,16 @@ function AddressEditor({
   };
 
   const handlePreviewConfirm = () => {
+    if (!address.firstName?.trim() || !address.lastName?.trim()) {
+      Alert.alert('Name required', 'Enter your first and last name for delivery.');
+      return;
+    }
     if (!contact.email?.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) {
       Alert.alert('Email required', 'Enter a valid email address to receive order confirmation.');
+      return;
+    }
+    if (!contact.phone?.trim() || !/^[0-9+(). -]{7,32}$/.test(contact.phone.trim())) {
+      Alert.alert('Phone required', 'Enter a valid phone number for delivery updates.');
       return;
     }
     onDone();
@@ -453,7 +462,19 @@ function AddressEditor({
           </TouchableOpacity>
         )}
 
-        <Input label="Address line 1" value={address.line1 ?? ''} onChange={v => onAddress({ ...address, line1: v })} />
+        <AddressAutocompleteInput
+          value={address.line1 ?? ''}
+          country={address.country ?? 'US'}
+          onChangeText={v => onAddress({ ...address, line1: v })}
+          onSelect={selected => onAddress({
+            ...address,
+            line1: selected.line1,
+            city: selected.city,
+            state: selected.state,
+            postalCode: selected.postalCode,
+            country: selected.country,
+          })}
+        />
         <Input label="Address line 2" placeholder="Optional" value={address.line2 ?? ''} onChange={v => onAddress({ ...address, line2: v })} />
         <Input label="City" value={address.city ?? ''} onChange={v => onAddress({ ...address, city: v })} />
 
@@ -539,7 +560,6 @@ function AddressEditor({
 
       <Input
         label="Phone number"
-        placeholder="Optional"
         value={contact.phone ?? ''}
         keyboardType="phone-pad"
         autoCapitalize="none"
@@ -618,7 +638,7 @@ function Information({
           onChange={v => onContact({ ...contact, email: v })}
         />
         <Input
-          label="Phone (optional)"
+          label="Phone"
           value={contact.phone ?? ''}
           keyboardType="phone-pad"
           onChange={v => onContact({ ...contact, phone: v })}
@@ -1281,8 +1301,15 @@ export default function BuyerCheckoutScreen() {
       // Load saved addresses for authenticated users
       if (isSignedIn) {
         try {
-          const addresses = await api.buyer.addresses.list();
+          const [addresses, profile] = await Promise.all([
+            api.buyer.addresses.list(),
+            api.auth.me(),
+          ]);
           setSavedAddresses(addresses);
+          setContact(previous => ({
+            ...previous,
+            email: previous.email?.trim() || profile.email || '',
+          }));
           if (addresses.length > 0 && !next.shippingAddress) {
             const defaultAddr = addresses.find((a: any) => a.isDefault) || addresses[0];
             handleSelectAddress(defaultAddr);
@@ -1313,6 +1340,10 @@ export default function BuyerCheckoutScreen() {
       country: addr.country,
       saveAddress: false,
     });
+    setContact(previous => ({
+      ...previous,
+      phone: addr.phone || previous.phone || '',
+    }));
   };
 
   const persist = async (next: CheckoutSession) => {
@@ -1325,9 +1356,10 @@ export default function BuyerCheckoutScreen() {
 
   const validateInformation = () => {
     const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email ?? '');
+    const validPhone = /^[0-9+(). -]{7,32}$/.test((contact.phone ?? '').trim());
     const validZip = (address.postalCode ?? '').trim().length >= 3;
-    if (!validEmail || !address.firstName || !address.lastName || !address.line1 || !address.city || !address.state || !validZip || !address.country) {
-      Alert.alert('Check your information', 'Enter a valid email and complete every required shipping address field.');
+    if (!validEmail || !validPhone || !address.firstName || !address.lastName || !address.line1 || !address.city || !address.state || !validZip || !address.country) {
+      Alert.alert('Check your information', 'Enter your first and last name, a valid email and phone number, and every required shipping address field.');
       return false;
     }
     return true;
@@ -1410,15 +1442,17 @@ export default function BuyerCheckoutScreen() {
           result = await api.buyer.checkout.createSession(
             group.items.map(item => ({ variantId: item.variantId, productId: item.productId, quantity: item.quantity })),
             {
-              contactEmail: contact.email,
+              contactEmail: contact.email!,
+              contactPhone: contact.phone!,
               shippingAddress: {
-                name: `${address.firstName} ${address.lastName}`.trim(),
+                recipientName: `${address.firstName} ${address.lastName}`.trim(),
                 street: address.line1!,
                 line2: address.line2,
                 city: address.city!,
                 state: address.state!,
-                zip: address.postalCode!,
+                postalCode: address.postalCode!,
                 country: address.country || 'US',
+                phone: contact.phone!,
               },
               clientIdempotencyKey: `${current.idempotencyKey}_${group.sellerId}`,
               ...(current.loyaltyRedemption && current.deliveryGroups.length === 1
@@ -1430,7 +1464,8 @@ export default function BuyerCheckoutScreen() {
           result = await api.guest.checkout.createSession(
             group.items.map(item => ({ variantId: item.variantId, productId: item.productId, quantity: item.quantity })),
             {
-              contactEmail: contact.email,
+              contactEmail: contact.email!,
+              contactPhone: contact.phone!,
               shippingAddress: {
                 name: `${address.firstName} ${address.lastName}`.trim(),
                 street: address.line1!,
@@ -1439,6 +1474,7 @@ export default function BuyerCheckoutScreen() {
                 state: address.state!,
                 zip: address.postalCode!,
                 country: address.country || 'US',
+                phone: contact.phone!,
               },
               clientIdempotencyKey: `${current.idempotencyKey}_${group.sellerId}`,
             },

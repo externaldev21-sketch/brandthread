@@ -75,6 +75,7 @@ function BuyerLiveNativeScreen() {
   const [checkoutError, setCheckoutError] = useState('');
   const [buyerEmail, setBuyerEmail]       = useState(user?.primaryEmailAddress?.emailAddress ?? '');
   const [buyerName, setBuyerName]         = useState(user?.fullName ?? '');
+  const [buyerPhone, setBuyerPhone]       = useState('');
   const [street, setStreet]               = useState('');
   const [city, setCity]                   = useState('');
   const [region, setRegion]               = useState('');
@@ -223,8 +224,8 @@ function BuyerLiveNativeScreen() {
       setCheckoutError('Choose an available option first.');
       return;
     }
-    if (!buyerEmail.trim() || !buyerName.trim() || !street.trim() || !city.trim() || !region.trim() || !postalCode.trim()) {
-      setCheckoutError('Add your email and shipping address to continue.');
+    if (!buyerEmail.trim() || !buyerName.trim() || !/^[0-9+(). -]{7,32}$/.test(buyerPhone.trim()) || !street.trim() || !city.trim() || !region.trim() || !postalCode.trim()) {
+      setCheckoutError('Add your name, email, phone number, and shipping address to continue.');
       return;
     }
     setCheckoutBusy(true);
@@ -234,13 +235,15 @@ function BuyerLiveNativeScreen() {
         [{ variantId: selectedVariantId, productId: purchaseProduct.id, quantity: 1 }],
         {
           contactEmail: buyerEmail.trim(),
+          contactPhone: buyerPhone.trim(),
           shippingAddress: {
-            name: buyerName.trim(),
+            recipientName: buyerName.trim(),
             street: street.trim(),
             city: city.trim(),
             state: region.trim(),
-            zip: postalCode.trim(),
+            postalCode: postalCode.trim(),
             country: 'US',
+            phone: buyerPhone.trim(),
           },
           clientIdempotencyKey: `live_${params.streamId}_${purchaseProduct.id}_${Date.now()}`,
         },
@@ -449,6 +452,7 @@ function BuyerLiveNativeScreen() {
               <Text style={s.fieldLabel}>Delivery</Text>
               <TextInput value={buyerEmail} onChangeText={setBuyerEmail} placeholder="Email" placeholderTextColor={SUBTLE} keyboardType="email-address" autoCapitalize="none" style={s.purchaseInput} />
               <TextInput value={buyerName} onChangeText={setBuyerName} placeholder="Full name" placeholderTextColor={SUBTLE} style={s.purchaseInput} />
+              <TextInput value={buyerPhone} onChangeText={setBuyerPhone} placeholder="Phone number" placeholderTextColor={SUBTLE} keyboardType="phone-pad" style={s.purchaseInput} />
               <TextInput value={street} onChangeText={setStreet} placeholder="Street address" placeholderTextColor={SUBTLE} style={s.purchaseInput} />
               <View style={s.addressRow}>
                 <TextInput value={city} onChangeText={setCity} placeholder="City" placeholderTextColor={SUBTLE} style={[s.purchaseInput, { flex: 1 }]} />

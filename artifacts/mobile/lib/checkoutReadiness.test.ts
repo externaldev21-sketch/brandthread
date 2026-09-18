@@ -6,7 +6,7 @@ import {
   mergeCheckoutFormState,
 } from './checkoutReadiness';
 
-const contact = { email: 'buyer@example.com' };
+const contact = { email: 'buyer@example.com', phone: '+1 512 555 0100' };
 const address = {
   firstName: 'Buyer',
   lastName: 'One',
