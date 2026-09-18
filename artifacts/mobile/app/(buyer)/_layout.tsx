@@ -4,8 +4,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
+import * as Haptics from 'expo-haptics';
 
-import { BORDER, SUBTLE } from '@/lib/theme';
+import { BG, BORDER, FG, FONT, SUBTLE, SURFACE_GLASS } from '@/lib/theme';
 import { getDeactivationStatus, reactivate } from '@/lib/accountService';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getConversations, getNotifications, subscribeSocial } from '@/services/socialService';
@@ -65,6 +66,14 @@ function BuyerTabLayout() {
   return (
     <Tabs
       detachInactiveScreens
+      tabBar={(props) => (
+        <BuyerBottomTabBar
+          {...props}
+          inboxBadgeCount={inboxBadgeCount}
+          accent={theme.accent}
+          onAccent={theme.onAccent}
+        />
+      )}
       screenOptions={{
         freezeOnBlur: true,
         tabBarActiveTintColor: activeTint,
@@ -182,6 +191,170 @@ function BuyerTabLayout() {
     </Tabs>
   );
 }
+
+const BUYER_NAV_ITEMS: {
+  name: 'index' | 'discover' | 'friends' | 'inbox';
+  label: string;
+  icon: keyof typeof Feather.glyphMap;
+}[] = [
+  { name: 'index', label: 'Thread', icon: 'play-circle' },
+  { name: 'discover', label: 'Discover', icon: 'compass' },
+  { name: 'friends', label: 'Friends', icon: 'users' },
+  { name: 'inbox', label: 'Inbox', icon: 'message-circle' },
+];
+
+function BuyerBottomTabBar({
+  state,
+  navigation,
+  inboxBadgeCount,
+  accent,
+  onAccent,
+}: any & {
+  inboxBadgeCount: number;
+  accent: string;
+  onAccent: string;
+}) {
+  const insets = useSafeAreaInsets();
+  const activeRoute = state.routes[state.index]?.name;
+
+  const openTab = (name: string) => {
+    Haptics.selectionAsync().catch(() => {});
+    navigation.navigate(name);
+  };
+
+  const profileFocused = activeRoute === 'profile';
+
+  return (
+    <View
+      style={[
+        buyerBarStyles.bar,
+        {
+          height: 72 + insets.bottom,
+          paddingBottom: insets.bottom,
+        },
+      ]}
+      testID="buyer-bottom-tab-bar"
+    >
+      <View style={buyerBarStyles.sideSpacer} />
+
+      <View style={buyerBarStyles.centerBar}>
+        {BUYER_NAV_ITEMS.map((item) => {
+          const focused = activeRoute === item.name;
+          const color = focused ? accent : BUYER_INACTIVE_COLOR;
+          const showInboxBadge = item.name === 'inbox' && inboxBadgeCount > 0;
+
+          return (
+            <Pressable
+              key={item.name}
+              accessibilityRole="tab"
+              accessibilityLabel={
+                showInboxBadge
+                  ? `${item.label} tab, ${inboxBadgeCount} unread items`
+                  : `${item.label} tab`
+              }
+              accessibilityState={focused ? { selected: true } : {}}
+              onPress={() => openTab(item.name)}
+              style={[buyerBarStyles.tab, focused && buyerBarStyles.tabActive]}
+              testID={`buyer-tab-${item.name}`}
+            >
+              <TabBadge count={showInboxBadge ? inboxBadgeCount : 0} accent={accent} onAccent={onAccent}>
+                <Feather name={item.icon} size={20} color={color} />
+              </TabBadge>
+              <Text numberOfLines={1} style={[buyerBarStyles.tabLabel, { color }]}>
+                {item.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Pressable
+        accessibilityRole="tab"
+        accessibilityLabel="Profile tab"
+        accessibilityState={profileFocused ? { selected: true } : {}}
+        onPress={() => openTab('profile')}
+        style={({ pressed }) => [
+          buyerBarStyles.profileButton,
+          profileFocused && buyerBarStyles.profileButtonActive,
+          pressed && buyerBarStyles.pressed,
+        ]}
+        testID="buyer-tab-profile"
+      >
+        <Feather name="user" size={20} color={profileFocused ? accent : FG} />
+        <Text style={[buyerBarStyles.profileLabel, profileFocused && { color: accent }]}>Profile</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+const BUYER_INACTIVE_COLOR = 'rgba(244,244,255,0.40)';
+
+const buyerBarStyles = StyleSheet.create({
+  bar: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: 'transparent',
+    paddingTop: 8,
+    paddingHorizontal: 12,
+  },
+  profileButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: BG,
+    paddingTop: 4,
+  },
+  profileButtonActive: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  profileLabel: {
+    color: FG,
+    fontFamily: FONT.medium,
+    fontSize: 8,
+    lineHeight: 10,
+  },
+  centerBar: {
+    flex: 1,
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: SURFACE_GLASS,
+  },
+  sideSpacer: {
+    width: 48,
+    height: 48,
+  },
+  tab: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 1,
+  },
+  tabActive: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  tabLabel: {
+    maxWidth: '100%',
+    fontFamily: FONT.medium,
+    fontSize: 8,
+    lineHeight: 10,
+  },
+  pressed: {
+    opacity: 0.82,
+    transform: [{ scale: 0.95 }],
+  },
+});
 
 function TabBadge({
   count,

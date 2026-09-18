@@ -16,9 +16,9 @@ Keep test and spec modules outside Expo Router's `app/` directory.
 - Put route regression tests in a top-level test directory, never beside route files under `app/`. Expo Router can evaluate those files while building the route graph; a Vitest import outside its runner makes static rendering return HTTP 500.
 
 ## Dev preview bypass
-Development web previews default to the seller role, seed local onboarding/role state at module scope, and skip the Clerk gate + auth redirects. `?bt_preview=buyer` explicitly switches design review to the buyer role. Group segments are stripped from web URLs (`/(buyer)/discover` → `/discover`); bare `/` redirects to the effective preview role's home.
+Development web previews default to the buyer role, seed local onboarding/role state at module scope, and skip the Clerk gate + auth redirects. `?bt_preview=seller` explicitly switches design review to the seller role. Group segments are stripped from web URLs (`/(buyer)/discover` → `/discover`); bare `/` redirects to the effective preview role's home.
 **Why:** the screenshot browser and canvas iframes are stateless — no Clerk session, no localStorage — so without this, no auth-gated screen can ever be shown or captured outside a tester run.
-**How to apply:** use the bare preview URL for seller review and add `?bt_preview=buyer` for buyer review. Screens tied to the Clerk user render fallbacks. The bypass is web + development only and never changes production or native end-user onboarding.
+**How to apply:** use the bare preview URL for buyer review and add `?bt_preview=seller` for seller review. Screens tied to the Clerk user render fallbacks. The bypass is web + development only and never changes production or native end-user onboarding.
 
 Authenticated seller tools cannot treat this navigation bypass as a real Clerk session. In dev web seller preview, initialize review-only UI state synchronously from the route role and skip protected API calls; keep uploads, writes, checkout, and activation behind real authentication.
 

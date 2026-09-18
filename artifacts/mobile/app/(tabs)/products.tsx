@@ -44,6 +44,7 @@ function statusLabel(status: string): string {
 interface Stats {
   active: number;
   draft: number;
+  archived: number;
   lowStock: number;
   outOfStock: number;
   preOrder: number;
@@ -363,6 +364,7 @@ export default function ProductsScreen() {
       setStats({
         active: s.active,
         draft: s.draft,
+        archived: s.archived,
         lowStock: s.lowStock,
         outOfStock: s.outOfStock,
         preOrder: s.preOrder,
@@ -586,11 +588,15 @@ export default function ProductsScreen() {
           {filterPills.map(pill => (
             <FilterChip
               key={pill.value}
-              label={pill.value === 'active' && stats ? `Active (${stats.active})` :
-                     pill.value === 'draft' && stats ? `Draft (${stats.draft})` :
-                     pill.label}
+              label={pill.label}
               active={filter === pill.value}
               onPress={() => setFilter(pill.value)}
+              count={
+                pill.value === 'active' ? stats?.active ?? 0 :
+                pill.value === 'draft' ? stats?.draft ?? 0 :
+                pill.value === 'archived' ? stats?.archived ?? 0 :
+                undefined
+              }
             />
           ))}
         </ScrollView>
