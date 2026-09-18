@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, ScrollView, TouchableOpacity,
-  TextInput, Alert, StyleSheet, Dimensions,
+  Alert, StyleSheet,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -46,10 +45,11 @@ function previewText(lastMessage: string | undefined, fallback: string): string 
 
 // ─── Segment tabs ─────────────────────────────────────────────────────────────
 
-const TABS = ['Messages', 'Requests'] as const;
+const TABS = ['Highlights', 'Messages', 'Requests'] as const;
 type Tab = typeof TABS[number];
 
 const EMPTY_MESSAGES: Record<Tab, { icon: keyof typeof Feather.glyphMap; title: string; subtitle: string }> = {
+  Highlights: { icon: 'star', title: 'No highlights yet', subtitle: 'Unread conversations appear here' },
   Messages: { icon: 'message-circle', title: 'No messages yet', subtitle: 'Start a conversation' },
   Requests: { icon: 'mail', title: 'No message requests', subtitle: 'Requests from new senders appear here' },
 };
@@ -68,7 +68,6 @@ export default function InboxScreen() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>('Messages');
-  const [searchQuery, setSearchQuery] = useState('');
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [requestActionLoading, setRequestActionLoading] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -114,16 +113,11 @@ export default function InboxScreen() {
     // Tab filter
     let tabMatch = false;
     switch (activeTab) {
+      case 'Highlights': tabMatch = !conv.isArchived && !conv.isRequest && conv.unreadCount > 0; break;
       case 'Messages': tabMatch = !conv.isArchived && !conv.isRequest; break;
       case 'Requests': tabMatch = conv.isRequest === true && !conv.isArchived; break;
     }
     if (!tabMatch) return false;
-    // Search filter
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const participant = getParticipant(conv);
-      return participant?.name.toLowerCase().includes(q) || participant?.handle.toLowerCase().includes(q);
-    }
     return true;
   });
 
@@ -310,12 +304,12 @@ export default function InboxScreen() {
         </View>
 
         {/* Trailing */}
-        {isUnread ? (
+          {isUnread ? (
           <View style={[s.unreadBadge, { backgroundColor: theme.accent }]}>
             <Text style={[s.unreadBadgeText, { color: theme.onAccent }]}>{conv.unreadCount > 99 ? '99+' : conv.unreadCount}</Text>
           </View>
         ) : (
-          <Feather name="camera" size={ICON.sm} color={MUTED} />
+            <Feather name="chevron-right" size={ICON.sm} color="#8A8A8E" />
         )}
         </TouchableOpacity>
       </SwipeActionRow>
@@ -340,53 +334,26 @@ export default function InboxScreen() {
     <View style={s.root}>
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
+        <TouchableOpacity
+          style={s.headerSide}
+          onPress={() => router.back()}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Feather name="arrow-left" size={22} color="#111111" />
+        </TouchableOpacity>
         <Text style={s.headerTitle}>Inbox</Text>
-        <View style={s.headerRight}>
-          {/* Notifications bell */}
-          <TouchableOpacity
-            style={s.headerIconBtn}
-            onPress={() => router.push('/buyer-notifications' as never)}
-            activeOpacity={0.7}
-          >
-            <Feather name="bell" size={ICON.lg} color={FG} />
-            {unreadNotifCount > 0 && (
-              <View style={[s.notifBadge, { backgroundColor: theme.accent }]}>
-                <Text style={[s.notifBadgeText, { color: theme.onAccent }]}>
-                  {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          {/* Compose */}
-          <TouchableOpacity
-            style={s.headerIconBtn}
-            onPress={openCompose}
-            activeOpacity={0.7}
-          >
-            <Feather name="edit-2" size={ICON.lg} color={MUTED} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Primary Social tabs */}
-      <View style={s.primaryTabs}>
-        {TABS.map(tab => {
-          const isActive = activeTab === tab;
-          const count = tab === 'Requests' ? conversations.filter(conv => conv.isRequest && !conv.isArchived).length : conversations.filter(conv => !conv.isRequest && !conv.isArchived && conv.unreadCount > 0).length;
-          return (
-            <TouchableOpacity
-              key={tab}
-              style={[s.primaryTab, isActive && { borderBottomColor: theme.accent }]}
-              onPress={() => setActiveTab(tab)}
-              activeOpacity={0.8}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: isActive }}
-            >
-              <Text style={[s.primaryTabText, isActive && { color: FG }]}>{tab}</Text>
-              {count > 0 && <View style={[s.primaryTabBadge, { backgroundColor: theme.accent }]}><Text style={[s.primaryTabBadgeText, { color: theme.onAccent }]}>{count > 9 ? '9+' : count}</Text></View>}
-            </TouchableOpacity>
-          );
-        })}
+        <TouchableOpacity
+          style={s.headerSide}
+          onPress={openCompose}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="New conversation"
+        >
+          <Feather name="edit-3" size={21} color="#111111" />
+          {unreadNotifCount > 0 && <View style={[s.headerUnreadDot, { backgroundColor: theme.accent }]} />}
+        </TouchableOpacity>
       </View>
 
       {/* Stories row */}
@@ -437,23 +404,29 @@ export default function InboxScreen() {
         })}
       </ScrollView>
 
-      {/* Search bar */}
-      <View style={s.searchBar}>
-        <Feather name="search" size={ICON.sm} color={SUBTLE} style={{ marginRight: SP.sm }} />
-        <TextInput
-          style={s.searchInput}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="Search conversations..."
-          placeholderTextColor={SUBTLE}
-          returnKeyType="search"
-          autoCorrect={false}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Feather name="x" size={ICON.sm} color={MUTED} />
-          </TouchableOpacity>
-        )}
+      {/* Reference-style message categories */}
+      <View style={s.primaryTabs}>
+        {TABS.map(tab => {
+          const isActive = activeTab === tab;
+          const count = tab === 'Requests'
+            ? conversations.filter(conv => conv.isRequest && !conv.isArchived).length
+            : tab === 'Highlights'
+              ? conversations.filter(conv => !conv.isRequest && !conv.isArchived && conv.unreadCount > 0).length
+              : conversations.filter(conv => !conv.isRequest && !conv.isArchived).length;
+          return (
+            <TouchableOpacity
+              key={tab}
+              style={s.primaryTab}
+              onPress={() => setActiveTab(tab)}
+              activeOpacity={0.8}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+            >
+              <Text style={[s.primaryTabText, isActive && s.primaryTabTextActive]}>{tab}</Text>
+              {count > 0 && <Text style={s.primaryTabCount}>{count > 99 ? '99+' : count}</Text>}
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {/* Conversations list */}
@@ -462,7 +435,8 @@ export default function InboxScreen() {
         keyExtractor={item => item.id}
         renderItem={renderConvRow}
         ListEmptyComponent={renderEmptyState}
-        contentContainerStyle={filteredConvs.length === 0 ? s.listEmptyContainer : undefined}
+        style={s.listSurface}
+        contentContainerStyle={[s.listContent, filteredConvs.length === 0 && s.listEmptyContainer]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       />
@@ -479,46 +453,48 @@ const s = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
+    justifyContent: 'space-between',
+    paddingHorizontal: SP.sm,
+    paddingBottom: 10,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#1C1C1E',
   },
-  headerTitle: {
-    flex: 1,
-    fontSize: FS.lg,
-    fontFamily: FONT.bold,
-    color: FG,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.xs,
-  },
-  headerIconBtn: {
-    width: 40,
-    height: 40,
+  headerSide: {
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
+  headerTitle: {
+    fontSize: FS.md,
+    fontFamily: FONT.semibold,
+    color: '#111111',
+  },
+  headerUnreadDot: {
+    position: 'absolute', top: 8, right: 7, width: 7, height: 7, borderRadius: 4,
+    borderWidth: 1.5, borderColor: '#FFFFFF',
+  },
   primaryTabs: {
     flexDirection: 'row',
+    minHeight: 48,
     borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-    marginTop: SP.xs,
+    borderBottomColor: '#E1E1E1',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: SP.sm,
   },
   primaryTab: {
     flex: 1,
-    minHeight: 46,
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: SP.xs,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+    gap: 3,
   },
-  primaryTabText: { fontSize: FS.base, fontFamily: FONT.semibold, color: MUTED },
-  primaryTabBadge: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  primaryTabBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold },
+  primaryTabText: { fontSize: 13, fontFamily: FONT.regular, color: '#8A8A8E' },
+  primaryTabTextActive: { fontFamily: FONT.semibold, color: '#111111' },
+  primaryTabCount: { fontSize: 13, fontFamily: FONT.semibold, color: '#E23B45' },
   notifBadge: {
     position: 'absolute',
     top: 4,
@@ -537,16 +513,22 @@ const s = StyleSheet.create({
   },
 
   // Stories
-  storiesRow: { flexGrow: 0 },
+  storiesRow: {
+    flexGrow: 0,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ECECEC',
+  },
   storiesContent: {
     paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-    gap: SP.md,
+    paddingTop: 12,
+    paddingBottom: 11,
+    gap: 14,
   },
   storyItem: {
     alignItems: 'center',
     gap: SP.xs,
-    width: 60,
+    width: 62,
   },
   storyCircle: {
     width: 48,
@@ -592,29 +574,8 @@ const s = StyleSheet.create({
   storyLabel: {
     fontSize: FS.xs,
     fontFamily: FONT.regular,
-    color: MUTED,
+    color: '#5A5A5F',
     textAlign: 'center',
-  },
-
-  // Search
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: SP.md,
-    marginBottom: SP.sm,
-    height: 40,
-    backgroundColor: CARD,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingHorizontal: SP.md,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: FS.sm,
-    fontFamily: FONT.regular,
-    color: FG,
-    height: '100%',
   },
 
   // Tabs
@@ -638,10 +599,12 @@ const s = StyleSheet.create({
   requestCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    marginHorizontal: 10,
+    marginTop: 10,
     paddingHorizontal: SP.md,
     paddingVertical: SP.md,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
     gap: SP.md,
   },
   requestActions: {
@@ -684,10 +647,13 @@ const s = StyleSheet.create({
   convRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginHorizontal: 10,
+    marginTop: 10,
     paddingHorizontal: SP.md,
     paddingVertical: SP.md,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
+    minHeight: 78,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
   },
   avatarContainer: {
     position: 'relative',
@@ -726,12 +692,12 @@ const s = StyleSheet.create({
   convName: {
     flex: 1,
     fontSize: FS.base,
-    color: FG,
+    color: '#111111',
   },
   convTime: {
     fontSize: FS.xs,
     fontFamily: FONT.regular,
-    color: MUTED,
+    color: '#8A8A8E',
     marginLeft: SP.xs,
   },
   orderPill: {
@@ -748,7 +714,7 @@ const s = StyleSheet.create({
   convPreview: {
     fontSize: FS.sm,
     fontFamily: FONT.regular,
-    color: MUTED,
+    color: '#5A5A5F',
   },
   unreadBadge: {
     minWidth: 20,
@@ -766,6 +732,8 @@ const s = StyleSheet.create({
   },
 
   // Empty state
+  listSurface: { flex: 1, backgroundColor: '#F5F5F5' },
+  listContent: { paddingBottom: 112 },
   listEmptyContainer: {
     flex: 1,
   },
