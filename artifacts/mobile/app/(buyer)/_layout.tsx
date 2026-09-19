@@ -19,7 +19,7 @@ function BuyerTabLayout() {
   const isDark  = colorScheme === 'dark';
   const isIOS   = Platform.OS === 'ios';
   const insets  = useSafeAreaInsets();
-  const bottomInset = Platform.OS === 'web' ? 34 : insets.bottom;
+  const bottomInset = insets.bottom;
   const { theme } = useAppTheme();
   const [inboxBadgeCount, setInboxBadgeCount] = useState(0);
 
@@ -216,7 +216,7 @@ function BuyerBottomTabBar({
   onAccent: string;
 }) {
   const insets = useSafeAreaInsets();
-  const bottomInset = Platform.OS === 'web' ? 34 : insets.bottom;
+  const bottomInset = insets.bottom;
   const activeRoute = state.routes[state.index]?.name;
 
   const openTab = (name: string) => {

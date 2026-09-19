@@ -1254,7 +1254,7 @@ export default function FeedScreen({
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
   const insets = useSafeAreaInsets();
   const previewTopInset = Platform.OS === 'web' ? 67 : insets.top;
-  const previewBottomInset = Platform.OS === 'web' ? 34 : insets.bottom;
+  const previewBottomInset = insets.bottom;
   const router = useRouter();
   const { userId } = useAuth();
   const { push } = useThreadPull();
