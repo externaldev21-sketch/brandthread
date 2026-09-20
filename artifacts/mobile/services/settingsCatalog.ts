@@ -8,7 +8,7 @@ export interface SettingsCatalogItem {
   aliases: string[];
   icon: keyof typeof Feather.glyphMap;
   route?: string;
-  action?: 'sign-out' | 'delete-account';
+  action?: 'sign-out' | 'delete-account' | 'account-scope';
   destructive?: boolean;
   requiresGrowth?: boolean;
   audience: SettingsAudience;
@@ -51,6 +51,7 @@ export const SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     title: 'Seller settings',
     items: [
       { label: 'Store settings', description: 'Manage storefront presentation, checkout, and store policies', aliases: ['store', 'storefront', 'shop', 'website'], icon: 'home', route: '/store-settings', audience: 'seller' },
+      { label: 'Account reach', description: 'Choose a global account or limit it to the United States', aliases: ['global', 'united states', 'country', 'region', 'market'], icon: 'globe', action: 'account-scope', audience: 'seller' },
       { label: 'Brand Assets', description: 'Manage your logos, colors, fonts, and saved brand assets', aliases: ['brand kit', 'logos', 'fonts', 'colors'], icon: 'layers', route: '/design-brand-assets', audience: 'seller', requiresGrowth: true },
       { label: 'Vacation mode', description: 'Pause your store and tell buyers when you will return', aliases: ['away', 'pause store', 'holiday'], icon: 'sun', route: '/vacation-mode', audience: 'seller' },
       { label: 'Payouts', description: 'Manage your bank account and payout history', aliases: ['money', 'bank', 'withdrawals'], icon: 'dollar-sign', route: '/payouts', audience: 'seller' },

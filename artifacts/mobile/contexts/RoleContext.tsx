@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type UserRole = 'buyer' | 'seller' | null;
@@ -17,18 +18,31 @@ const RoleContext = createContext<RoleContextValue>({
   isLoaded: false,
 });
 
+function getDevPreviewRole(): UserRole {
+  if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  const value = new URLSearchParams(window.location.search).get('bt_preview');
+  return value === 'seller' ? 'seller' : 'buyer';
+}
+
 export function RoleProvider({ children }: { children: React.ReactNode }) {
-  const [role, setRoleState] = useState<UserRole>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const previewRole = getDevPreviewRole();
+  const [role, setRoleState] = useState<UserRole>(previewRole);
+  const [isLoaded, setIsLoaded] = useState(previewRole !== null);
 
   useEffect(() => {
+    if (previewRole) {
+      setRoleState(previewRole);
+      setIsLoaded(true);
+      void AsyncStorage.setItem(ROLE_KEY, previewRole);
+      return;
+    }
     AsyncStorage.getItem(ROLE_KEY).then((val) => {
       if (val === 'buyer' || val === 'seller') {
         setRoleState(val);
       }
       setIsLoaded(true);
     });
-  }, []);
+  }, [previewRole]);
 
   async function setRole(r: UserRole) {
     setRoleState(r);

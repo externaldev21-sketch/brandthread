@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, Alert } from 'react-native';
+import { ActivityIndicator, Modal, ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, Alert } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -11,13 +11,14 @@ import { SETTINGS_CATALOG, SettingsCatalogGroup, SettingsCatalogItem } from '@/s
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
+import { useApi } from '@/hooks/useApi';
 
 
 interface SettingsItem {
   label: string;
   icon: keyof typeof Feather.glyphMap;
   route?: string;
-  action?: string;
+  action?: 'sign-out' | 'delete-account' | 'account-scope';
   destructive?: boolean;
 }
 
@@ -65,7 +66,7 @@ const STATIC_GROUPS: SettingsGroup[] = [
       { label: 'Taxes and duties',           icon: 'percent',       route: '/taxes-duties' },
       { label: 'Locations',                  icon: 'map-pin',       route: '/locations' },
       { label: 'Bundles',                    icon: 'package',       route: '/product-bundles' },
-      { label: 'Domains',                    icon: 'globe' },
+      { label: 'Account reach',              icon: 'globe',         action: 'account-scope' },
       { label: 'Integrations',              icon: 'link',          route: '/integrations' },
       { label: 'Customer events',            icon: 'activity',      route: '/customer-events' },
       { label: 'Notifications',             icon: 'bell',          route: '/notifications-settings' },
@@ -88,12 +89,17 @@ export default function SettingsScreen() {
   const colors  = useColors();
   const insets  = useSafeAreaInsets();
   const router  = useRouter();
+  const api = useApi();
   const { signOut } = useAuth();
   const { user } = useUser();
   const { role, isLoaded: isRoleLoaded } = useRole();
   const { hasPlan, loading: planLoading, error: planError, retry: retryPlan } = useSubscriptionPlan();
   const [query, setQuery]       = useState('');
   const [upsellFeature, setUpsellFeature] = useState<string | null>(null);
+  const [scopeVisible, setScopeVisible] = useState(false);
+  const [accountScope, setAccountScope] = useState<'global' | 'us'>('global');
+  const [scopeLoading, setScopeLoading] = useState(false);
+  const [scopeSaving, setScopeSaving] = useState<'global' | 'us' | null>(null);
 
   const topPad = Platform.OS === 'web' ? 24 : insets.top;
   const profileName = user?.fullName || user?.username || 'Your Brandthread profile';
@@ -102,6 +108,39 @@ export default function SettingsScreen() {
 
   function haptic() { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }
   function handleClose() { haptic(); router.back(); }
+
+  async function openAccountScope() {
+    setScopeVisible(true);
+    setScopeLoading(true);
+    try {
+      const data = await api.seller.getSettings();
+      setAccountScope(data.settings?.accountScope === 'us' ? 'us' : 'global');
+    } catch {
+      Alert.alert('Could not load account reach', 'Check your connection and try again.');
+      setScopeVisible(false);
+    } finally {
+      setScopeLoading(false);
+    }
+  }
+
+  async function chooseAccountScope(nextScope: 'global' | 'us') {
+    if (scopeSaving) return;
+    if (nextScope === accountScope) {
+      setScopeVisible(false);
+      return;
+    }
+    haptic();
+    setScopeSaving(nextScope);
+    try {
+      await api.seller.updateSettings({ accountScope: nextScope });
+      setAccountScope(nextScope);
+      setScopeVisible(false);
+    } catch {
+      Alert.alert('Could not save account reach', 'Your previous selection is still active. Please try again.');
+    } finally {
+      setScopeSaving(null);
+    }
+  }
 
   async function handleItem(item: SettingsItem | SettingsCatalogItem) {
     haptic();
@@ -130,6 +169,10 @@ export default function SettingsScreen() {
     }
     if (item.action === 'delete-account') {
       router.push('/buyer-account-control' as never);
+      return;
+    }
+    if (item.action === 'account-scope') {
+      await openAccountScope();
       return;
     }
     if (item.route) router.push(item.route as never);
@@ -261,6 +304,105 @@ export default function SettingsScreen() {
           router.push('/subscription' as never);
         }}
       />
+      <Modal
+        visible={scopeVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!scopeSaving) setScopeVisible(false);
+        }}
+      >
+        <View style={styles.scopeBackdrop}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            accessibilityRole="button"
+            accessibilityLabel="Close account reach options"
+            onPress={() => {
+              if (!scopeSaving) setScopeVisible(false);
+            }}
+          />
+          <View style={[styles.scopeCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.scopeHeader}>
+              <View style={styles.scopeHeaderCopy}>
+                <Text style={[styles.scopeTitle, { color: colors.foreground }]}>Account reach</Text>
+                <Text style={[styles.scopeSubtitle, { color: colors.mutedForeground }]}>
+                  Choose where your seller account is available.
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.scopeClose, { borderColor: colors.border }]}
+                onPress={() => setScopeVisible(false)}
+                disabled={!!scopeSaving}
+                accessibilityRole="button"
+                accessibilityLabel="Close account reach options"
+              >
+                <Feather name="x" size={18} color={colors.foreground} />
+              </TouchableOpacity>
+            </View>
+
+            {scopeLoading ? (
+              <View style={styles.scopeLoading}>
+                <ActivityIndicator color={colors.primary} />
+              </View>
+            ) : (
+              <View style={styles.scopeOptions} accessibilityRole="radiogroup">
+                {([
+                  {
+                    value: 'global',
+                    label: 'Global account',
+                    description: 'Make your account available worldwide.',
+                    icon: 'globe',
+                  },
+                  {
+                    value: 'us',
+                    label: 'United States only',
+                    description: 'Limit your account to the United States.',
+                    icon: 'map-pin',
+                  },
+                ] as const).map((option) => {
+                  const selected = accountScope === option.value;
+                  const saving = scopeSaving === option.value;
+                  return (
+                    <TouchableOpacity
+                      key={option.value}
+                      activeOpacity={0.75}
+                      disabled={!!scopeSaving}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected, disabled: !!scopeSaving }}
+                      onPress={() => chooseAccountScope(option.value)}
+                      style={[
+                        styles.scopeOption,
+                        { borderColor: selected ? colors.primary : colors.border },
+                        selected && { backgroundColor: colors.secondary },
+                      ]}
+                    >
+                      <View style={[styles.scopeOptionIcon, { backgroundColor: colors.secondary }]}>
+                        <Feather name={option.icon} size={18} color={colors.foreground} />
+                      </View>
+                      <View style={styles.scopeOptionCopy}>
+                        <Text style={[styles.scopeOptionTitle, { color: colors.foreground }]}>{option.label}</Text>
+                        <Text style={[styles.scopeOptionDescription, { color: colors.mutedForeground }]}>
+                          {option.description}
+                        </Text>
+                      </View>
+                      {saving ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : (
+                        <Feather
+                          name={selected ? 'check-circle' : 'circle'}
+                          size={20}
+                          color={selected ? colors.primary : colors.mutedForeground}
+                        />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -297,4 +439,57 @@ const styles = StyleSheet.create({
   rowLabel: { fontSize: 14, fontFamily: 'Inter_500Medium' },
   rowDescription: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
   versionText: { fontSize: 12, fontFamily: 'Inter_400Regular', textAlign: 'center', marginTop: 4 },
+  scopeBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.68)',
+  },
+  scopeCard: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 32,
+  },
+  scopeHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 16,
+    marginBottom: 18,
+  },
+  scopeHeaderCopy: { flex: 1 },
+  scopeTitle: { fontSize: 20, fontFamily: 'Inter_700Bold' },
+  scopeSubtitle: { fontSize: 13, lineHeight: 18, fontFamily: 'Inter_400Regular', marginTop: 4 },
+  scopeClose: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scopeLoading: { minHeight: 150, alignItems: 'center', justifyContent: 'center' },
+  scopeOptions: { gap: 10 },
+  scopeOption: {
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  scopeOptionIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scopeOptionCopy: { flex: 1 },
+  scopeOptionTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  scopeOptionDescription: { fontSize: 12, lineHeight: 17, fontFamily: 'Inter_400Regular', marginTop: 2 },
 });
