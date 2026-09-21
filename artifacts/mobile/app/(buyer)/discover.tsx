@@ -225,12 +225,15 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
   const { push } = useThreadPull();
   const { theme } = useAppTheme();
   const { width: viewportWidth } = useWindowDimensions();
+  const [listWidth, setListWidth] = useState(viewportWidth);
   const [activeIndex, setActiveIndex] = useState(0);
   const [savedIds, setSavedIds] = useState<Record<string, boolean>>({});
   const scrollX = useRef(new Animated.Value(0)).current;
-  const cardWidth = Math.min(viewportWidth - 54, 370);
+  const measuredWidth = Math.max(1, listWidth);
+  const cardWidth = Math.min(Math.max(measuredWidth - 54, 1), 370);
   const snapInterval = cardWidth + SHOWCASE_GAP;
-  const sideInset = Math.max(20, (viewportWidth - cardWidth) / 2);
+  const sideInset = Math.max(0, (measuredWidth - cardWidth) / 2);
+  const snapOffsets = items.map((_, index) => index * snapInterval);
 
   function openProduct(item: ProductCardItem) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -239,18 +242,27 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
   }
 
   return (
-    <View style={showcase.shell}>
+    <View
+      style={showcase.shell}
+      onLayout={({ nativeEvent }) => {
+        const nextWidth = Math.round(nativeEvent.layout.width);
+        if (nextWidth > 0 && nextWidth !== listWidth) setListWidth(nextWidth);
+      }}
+    >
       <Animated.FlatList
         horizontal
         data={items}
         keyExtractor={item => item.id}
         showsHorizontalScrollIndicator={false}
         decelerationRate="fast"
-        snapToInterval={snapInterval}
+        snapToOffsets={snapOffsets}
         snapToAlignment="start"
         disableIntervalMomentum
+        nestedScrollEnabled
+        removeClippedSubviews={false}
         bounces={items.length > 1}
-        contentContainerStyle={{ paddingHorizontal: sideInset }}
+        ListHeaderComponent={<View style={{ width: sideInset }} />}
+        ListFooterComponent={<View style={{ width: sideInset }} />}
         ItemSeparatorComponent={() => <View style={{ width: SHOWCASE_GAP }} />}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { x: scrollX } } }],

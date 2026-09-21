@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
-  Dimensions, Animated, TextInput, Modal,
+  Animated, TextInput, Modal,
   AccessibilityInfo, Platform, ScrollView, RefreshControl, ActivityIndicator, KeyboardAvoidingView, Image,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, FontAwesome } from '@expo/vector-icons';
@@ -56,13 +57,12 @@ import { formatCount } from '@/lib/engagementUtils';
 import { ThreadShareSheet } from '@/components/ThreadShareSheet';
 import { shouldAnimateCartSuccess } from '@/lib/cartFlight';
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const THREAD_PAGE_SIZE = 30;
 
 // ─── Buyer demand page — sentinel and type guard ──────────────────────────────
 // The sentinel is the first element in displayItems when buyerMode=true.
 // It is never stored in the DB and is never passed through the regular feed
-// pipeline. getItemLayout is uniform (length: SCREEN_H) for all items including
+// pipeline. getItemLayout is uniform for all items, using the measured tab scene
 // the sentinel so snapping works with zero per-index special cases.
 
 const DEMAND_PAGE_SENTINEL: { _isDemandPage: true; id: string } = {
@@ -91,7 +91,7 @@ interface HighDemandProduct {
   commerce: CommerceSignalData;
 }
 
-function BuyerHighDemandPage({ pageHeight }: { pageHeight: number }) {
+function BuyerHighDemandPage({ pageWidth, pageHeight }: { pageWidth: number; pageHeight: number }) {
   const { theme } = useAppTheme();
   const { push } = useThreadPull();
   const api = useApi();
@@ -135,7 +135,7 @@ function BuyerHighDemandPage({ pageHeight }: { pageHeight: number }) {
   const topPad = insets.top + 20;
 
   return (
-    <View style={{ width: SCREEN_W, height: pageHeight, backgroundColor: BG }}>
+    <View style={{ width: pageWidth, height: pageHeight, backgroundColor: BG }}>
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: topPad, paddingHorizontal: 20, paddingBottom: 100 }}
@@ -622,7 +622,17 @@ interface LiveStreamFeedItem {
 // Union of all possible displayable items in the FlatList
 type FeedItem = SpotlightItem | LiveStreamFeedItem | BuyerDemandPageItem;
 
-function LiveStreamPage({ stream, onJoin, pageHeight }: { stream: LiveStreamFeedItem; onJoin: () => void; pageHeight: number }) {
+function LiveStreamPage({
+  stream,
+  onJoin,
+  pageWidth,
+  pageHeight,
+}: {
+  stream: LiveStreamFeedItem;
+  onJoin: () => void;
+  pageWidth: number;
+  pageHeight: number;
+}) {
   const { theme } = useAppTheme();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
@@ -637,7 +647,7 @@ function LiveStreamPage({ stream, onJoin, pageHeight }: { stream: LiveStreamFeed
   }, []);
 
   return (
-    <View style={{ width: SCREEN_W, height: pageHeight, backgroundColor: '#0a0209' }}>
+    <View style={{ width: pageWidth, height: pageHeight, backgroundColor: '#0a0209' }}>
       {/* Gradient background */}
       <View style={{ ...StyleSheet.absoluteFill, backgroundColor: 'rgba(10,80,100,0.18)' }} />
       {/* Centre glow */}
@@ -764,13 +774,13 @@ function VideoVisual({
         <Image
           source={posterSource ?? { uri: posterUri! }}
           style={StyleSheet.absoluteFill}
-          resizeMode="cover"
+        resizeMode="contain"
         />
       )}
       <VideoView
         player={player}
         style={[StyleSheet.absoluteFill, showPoster && { opacity: 0 }]}
-        contentFit="cover"
+        contentFit="contain"
         nativeControls={false}
       />
       {paused && (
@@ -782,7 +792,7 @@ function VideoVisual({
   );
 }
 
-function PhotoVisual({ uris, pageHeight }: { uris: string[]; pageHeight: number }) {
+function PhotoVisual({ uris, pageWidth, pageHeight }: { uris: string[]; pageWidth: number; pageHeight: number }) {
   const pages = uris.length > 0 ? uris : [''];
   return (
     <FlatList
@@ -795,24 +805,25 @@ function PhotoVisual({ uris, pageHeight }: { uris: string[]; pageHeight: number 
       directionalLockEnabled
       nestedScrollEnabled
       renderItem={({ item: uri }) => (
-        <View style={{ width: SCREEN_W, height: pageHeight }}>
-          {uri ? <CachedImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" /> : (
+        <View style={{ width: pageWidth, height: pageHeight }}>
+          {uri ? <CachedImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="contain" /> : (
             <View style={[StyleSheet.absoluteFill, styles.mediaPlaceholder]}>
               <Feather name="image" size={42} color="#FFFFFF99" />
             </View>
           )}
         </View>
       )}
-      getItemLayout={(_, index) => ({ length: SCREEN_W, offset: SCREEN_W * index, index })}
+      getItemLayout={(_, index) => ({ length: pageWidth, offset: pageWidth * index, index })}
     />
   );
 }
 
 function SpotlightPage({
-  item, isActive, pageHeight, bottomClearance, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag,
+  item, isActive, pageWidth, pageHeight, bottomClearance, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag,
 }: {
   item: SpotlightItem;
   isActive: boolean;
+  pageWidth: number;
   pageHeight: number;
   bottomClearance: number;
   engagement: EngagementState | undefined;
@@ -879,7 +890,7 @@ function SpotlightPage({
   }
 
   return (
-    <View style={{ width: SCREEN_W, height: pageHeight, backgroundColor: '#000' }}>
+    <View style={{ width: pageWidth, height: pageHeight, backgroundColor: '#000' }}>
       <TouchableWithoutFeedback onPress={handlePress}>
         <View style={StyleSheet.absoluteFill}>
           {item.contentType === 'video'
@@ -893,7 +904,7 @@ function SpotlightPage({
                 posterSource={item.videoPosterSource}
               />
             )
-            : <PhotoVisual uris={item.mediaUris} pageHeight={pageHeight} />}
+            : <PhotoVisual uris={item.mediaUris} pageWidth={pageWidth} pageHeight={pageHeight} />}
           {item.contentType !== 'video' && item.mediaUris.length > 1 && (
             <View style={styles.mediaDots} pointerEvents="none">
               {item.mediaUris.slice(0, 5).map((_, index) => <View key={index} style={[styles.mediaDot, index === 0 && styles.mediaDotActive]} />)}
@@ -1129,9 +1140,6 @@ function SpotlightPage({
           }}
         >
           <View style={styles.creatorRow}>
-            <View style={[styles.creatorAvatar, { backgroundColor: item.avatarColor }]}>
-              <Text style={styles.creatorAvatarText}>{item.initials}</Text>
-            </View>
             <Text style={styles.creatorName}>{item.creator}</Text>
             {item.verified && <Feather name="check-circle" size={13} color="#4FA8FF" style={{ marginLeft: 4 }} />}
           </View>
@@ -1241,7 +1249,7 @@ function buildPreviewShopProduct(
 // buyerMode = false: standard seller/shared feed — no demand sentinel.
 // buyerMode = true:  buyer feed — [DEMAND_PAGE_SENTINEL, ...contentItems].
 //   Index 0 renders BuyerHighDemandPage; indices 1+ are regular SpotlightPage/LiveStreamPage items.
-//   getItemLayout is uniform (length: SCREEN_H, offset: SCREEN_H * index) for all items.
+//   getItemLayout is uniform for all items and uses the measured tab scene.
 
 export default function FeedScreen({
   buyerMode = false,
@@ -1251,6 +1259,7 @@ export default function FeedScreen({
   showFashionPreview?: boolean;
 }) {
   const { theme } = useAppTheme();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
   const insets = useSafeAreaInsets();
   const previewTopInset = Platform.OS === 'web' ? 67 : insets.top;
@@ -1262,7 +1271,10 @@ export default function FeedScreen({
 
   const [engagements, setEngagements] = useState<Record<string, EngagementState>>({});
   const [activeIndex, setActiveIndex] = useState(0);
-  const [pageHeight, setPageHeight] = useState(SCREEN_H);
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+  const pageWidth = viewportSize.width || windowWidth;
+  const pageHeight = viewportSize.height || windowHeight;
+  const viewportReady = viewportSize.width > 0 && viewportSize.height > 0;
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifs, setShowNotifs] = useState(false);
@@ -1486,7 +1498,7 @@ export default function FeedScreen({
 
   // displayItems: sentinel at index 0 only when buyerMode=true.
   // Seller mode: if (!buyerMode) — sentinel never enters the array.
-  // getItemLayout stays uniform (length: SCREEN_H, offset: SCREEN_H * index) for all items.
+  // getItemLayout stays uniform using the measured tab-scene height for all items.
   const displayItems: FeedItem[] = useMemo(() => {
     if (!buyerMode) return filteredContentItems as FeedItem[];
     return [DEMAND_PAGE_SENTINEL, ...filteredContentItems] as FeedItem[];
@@ -1697,15 +1709,22 @@ export default function FeedScreen({
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
   const bottomClearance = showFashionPreview
     ? 12
-    : Math.max(previewBottomInset, 8) + 12 + 72 + 14;
+    : Math.max(previewBottomInset, 8) + 14;
 
   return (
     <FeedToastProvider>
     <View
       style={styles.container}
       onLayout={({ nativeEvent }) => {
+        const measuredWidth = Math.round(nativeEvent.layout.width);
         const measuredHeight = Math.round(nativeEvent.layout.height);
-        if (measuredHeight > 0 && measuredHeight !== pageHeight) setPageHeight(measuredHeight);
+        if (
+          measuredWidth > 0 &&
+          measuredHeight > 0 &&
+          (measuredWidth !== viewportSize.width || measuredHeight !== viewportSize.height)
+        ) {
+          setViewportSize({ width: measuredWidth, height: measuredHeight });
+        }
       }}
     >
       {feedLoading && (
@@ -1713,14 +1732,13 @@ export default function FeedScreen({
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 5 }}
         />
       )}
-      <FlatList
+      {viewportReady && <FlatList
+        key={`thread-${pageWidth}x${pageHeight}`}
         data={displayItems}
         keyExtractor={item => item.id}
         pagingEnabled
         disableIntervalMomentum
         showsVerticalScrollIndicator={false}
-        snapToInterval={pageHeight}
-        snapToAlignment="start"
         decelerationRate="fast"
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
@@ -1737,14 +1755,14 @@ export default function FeedScreen({
         }
         ListEmptyComponent={
           searchQuery.trim() ? (
-            <View style={{ width: SCREEN_W, height: pageHeight, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+            <View style={{ width: pageWidth, height: pageHeight, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
               <Feather name="search" size={32} color="#8C8577" />
               <Text style={{ fontSize: FS.base, fontFamily: FONT.medium, color: '#8C8577' }}>
                 No results for "{searchQuery}"
               </Text>
             </View>
           ) : !feedLoading ? (
-            <View style={{ width: SCREEN_W, height: pageHeight, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 40 }}>
+            <View style={{ width: pageWidth, height: pageHeight, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 40 }}>
               <Feather name="film" size={40} color={MUTED} />
               <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center' }}>
                 {feedTab === 'following' ? 'No posts from followed sellers yet' : 'No posts yet'}
@@ -1769,13 +1787,14 @@ export default function FeedScreen({
         renderItem={({ item, index }) => {
           // Buyer demand page — full-screen at index 0 in buyer mode
           if (isDemandPageItem(item as FeedItem)) {
-            return <BuyerHighDemandPage pageHeight={pageHeight} />;
+            return <BuyerHighDemandPage pageWidth={pageWidth} pageHeight={pageHeight} />;
           }
           if ((item as any)._isLive) {
             const live = item as unknown as LiveStreamFeedItem;
             return (
               <LiveStreamPage
                 stream={live}
+                pageWidth={pageWidth}
                 pageHeight={pageHeight}
                 onJoin={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -1793,6 +1812,7 @@ export default function FeedScreen({
             <SpotlightPage
               item={spotlight}
               isActive={contentIndex === activeContentIndex && !showNotifs}
+                pageWidth={pageWidth}
               pageHeight={pageHeight}
               bottomClearance={bottomClearance}
               engagement={engagements[spotlight.id] ?? initialEngagement(spotlight)}
@@ -1806,7 +1826,7 @@ export default function FeedScreen({
             />
           );
         }}
-      />
+      />}
 
       {/* ─ Top bar overlay ─ */}
       <View style={[styles.topBar, { paddingTop: previewTopInset + 2 }]} pointerEvents="box-none">
@@ -2065,8 +2085,6 @@ const styles = StyleSheet.create({
   },
   moreText: { fontFamily: FONT.semibold, color: ON_DARK },
   creatorRow: { height: 28, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  creatorAvatar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#FFFFFF' },
-  creatorAvatarText: { fontSize: 10, fontFamily: FONT.bold, color: '#FFFFFF' },
   creatorName: { fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
   soundRow: { height: 16, flexDirection: 'row', alignItems: 'center', gap: 6 },
   soundText: { fontSize: FS.xs, fontFamily: FONT.regular, color: '#FFFFFFCC', flexShrink: 1 },
@@ -2164,7 +2182,7 @@ const styles = StyleSheet.create({
 
   notifRow: { fontSize: 13.5, fontFamily: FONT.regular, color: FG, paddingBottom: 14 },
   feedFooter: {
-    width: SCREEN_W, height: 72, alignItems: 'center', justifyContent: 'center',
+    width: '100%', height: 72, alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#000000',
   },
   feedFooterText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },

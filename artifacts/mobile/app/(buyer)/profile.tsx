@@ -266,7 +266,6 @@ export default function ProfileScreen() {
   };
 
   const joinedYear = profile ? new Date(profile.createdAt).getFullYear() : '';
-  const isPrivate = privacySettings?.profileVisibility === 'private';
   const clerkName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.username || '';
   const displayName = profile?.name || clerkName || 'Your profile';
   const displayHandle = profile?.username
@@ -280,10 +279,20 @@ export default function ProfileScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Top Bar */}
       <View style={styles.topBar}>
-        <View style={styles.topBarLeft}>
-          <Feather name={isPrivate ? 'lock' : 'globe'} size={ICON.sm} color={MUTED} />
-          <Text style={styles.topHandle}>{displayHandle}</Text>
-        </View>
+        <TouchableOpacity
+          style={styles.topBarLeft}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push('/account-switcher' as never);
+          }}
+          activeOpacity={0.75}
+          accessibilityRole="button"
+          accessibilityLabel="Switch account"
+          testID="buyer-profile-account-switcher"
+        >
+          <Text style={styles.topHandle} numberOfLines={1}>{displayName}</Text>
+          <Feather name="chevron-down" size={16} color={FG} />
+        </TouchableOpacity>
         <View style={styles.topBarRight}>
           <TouchableOpacity onPress={() => router.push('/buyer-notifications' as any)} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Notifications">
             <Feather name="bell" size={ICON.md} color={FG} />

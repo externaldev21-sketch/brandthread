@@ -21,4 +21,15 @@ describe('buyer Thread chrome', () => {
     expect(layout).toContain('fontSize: 11');
     expect(layout).toContain('lineHeight: 14');
   });
+
+  it('fits every Thread page to the measured tab scene without cropping media', () => {
+    expect(feed).toContain('const [viewportSize, setViewportSize]');
+    expect(feed).toContain('const viewportReady = viewportSize.width > 0 && viewportSize.height > 0');
+    expect(feed).toContain('{viewportReady && <FlatList');
+    expect(feed).toContain('width: pageWidth, height: pageHeight');
+    expect(feed).toContain('length: pageHeight, offset: pageHeight * index');
+    expect(feed).not.toContain('snapToInterval={pageHeight}');
+    expect(feed).not.toContain("Dimensions.get('window')");
+    expect(feed).toContain('contentFit="contain"');
+  });
 });

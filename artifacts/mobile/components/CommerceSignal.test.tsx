@@ -605,10 +605,10 @@ describe('Blocker 1 — API call signatures are correct', () => {
 });
 
 // ─── Blocker 2: FlatList pager integrity ─────────────────────────────────────
-// Demand page is index-0 FlatList item with SCREEN_H, not a sibling View.
-// getItemLayout must cover all indices uniformly at SCREEN_H.
+// Demand page is index-0 FlatList item, not a sibling View.
+// getItemLayout must cover all indices uniformly at the measured scene height.
 
-describe('Blocker 2 — FlatList pager integrity (SCREEN_H per item)', () => {
+describe('Blocker 2 — FlatList pager integrity (measured scene per item)', () => {
   it('DEMAND_PAGE_SENTINEL is a FlatList data item, not a sibling View', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
@@ -621,24 +621,20 @@ describe('Blocker 2 — FlatList pager integrity (SCREEN_H per item)', () => {
     expect(source).not.toContain('BuyerHighDemandSection');  // renamed to BuyerHighDemandPage
   });
 
-  it('BuyerHighDemandPage has SCREEN_H geometry', async () => {
+  it('BuyerHighDemandPage uses the measured scene geometry', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const source = readFileSync(resolve(__dirname, '../app/(tabs)/feed.tsx'), 'utf8');
-    // BuyerHighDemandPage style must set height: SCREEN_H
-    expect(source).toContain('height: SCREEN_H');
-    expect(source).toContain('width: SCREEN_W');
+    expect(source).toContain('width: pageWidth, height: pageHeight');
   });
 
-  it('getItemLayout is uniform: SCREEN_H per item for all indices', async () => {
+  it('getItemLayout is uniform: measured pageHeight per item for all indices', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const source = readFileSync(resolve(__dirname, '../app/(tabs)/feed.tsx'), 'utf8');
-    // getItemLayout function: length: SCREEN_H, offset: SCREEN_H * index
-    expect(source).toMatch(/length:\s*SCREEN_H/);
-    expect(source).toMatch(/offset:\s*SCREEN_H\s*\*\s*index/);
-    // No conditional offset for buyerMode — all items are uniform height
-    expect(source).not.toMatch(/offset:\s*SCREEN_H\s*\*\s*\(\s*index\s*[+-]/);
+    expect(source).toMatch(/length:\s*pageHeight/);
+    expect(source).toMatch(/offset:\s*pageHeight\s*\*\s*index/);
+    expect(source).not.toMatch(/offset:\s*pageHeight\s*\*\s*\(\s*index\s*[+-]/);
   });
 
   it('seller mode never inserts the demand sentinel into displayItems', async () => {
@@ -745,7 +741,7 @@ describe('Discover — swipeable product showcase', () => {
 
     expect(source).toContain('function ProductShowcase');
     expect(source).toContain('<Animated.FlatList');
-    expect(source).toContain('snapToInterval={snapInterval}');
+    expect(source).toContain('snapToOffsets={snapOffsets}');
     expect(source).toContain('decelerationRate="fast"');
     expect(source).toContain('disableIntervalMomentum');
     expect(source).toContain('onMomentumScrollEnd=');

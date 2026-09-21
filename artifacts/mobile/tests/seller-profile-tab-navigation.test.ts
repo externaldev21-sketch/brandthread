@@ -11,4 +11,15 @@ describe('seller Profile tab navigation', () => {
     expect(tabBar).toContain("'/(tabs)/profile'");
     expect(tabBar).toContain("router.replace(tabDef.destination as never)");
   });
+
+  it('lets buyers switch profiles from their name in the profile header', () => {
+    const buyerProfile = readFileSync(resolve(process.cwd(), 'app/(buyer)/profile.tsx'), 'utf8');
+
+    expect(buyerProfile).toContain('testID="buyer-profile-account-switcher"');
+    expect(buyerProfile).toContain('accessibilityLabel="Switch account"');
+    expect(buyerProfile).toContain("router.push('/account-switcher' as never)");
+    expect(buyerProfile).toContain('{displayName}</Text>');
+    expect(buyerProfile).toContain('name="chevron-down"');
+    expect(buyerProfile).not.toContain("name={isPrivate ? 'lock' : 'globe'}");
+  });
 });
