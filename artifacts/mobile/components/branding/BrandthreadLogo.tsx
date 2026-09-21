@@ -14,6 +14,8 @@ interface BrandthreadLogoProps {
   width?: number;
   height?: number;
   opacity?: number;
+  /** Applies a flat color treatment while preserving the logo silhouette. */
+  tintColor?: string;
   /** Fade-in entrance animation. */
   animated?: boolean;
   /** Soft theme glow halo behind the logo. */
@@ -29,6 +31,7 @@ export default function BrandthreadLogo({
   width,
   height,
   opacity = 1,
+  tintColor,
   animated = false,
   showGlow = false,
   glowColor = '#DDE2E8',
@@ -82,6 +85,7 @@ export default function BrandthreadLogo({
       <Image
         source={LOGO_SOURCE}
         style={{ width: w, height: h, opacity }}
+        tintColor={tintColor}
         resizeMode="contain"
         accessible={false}
       />

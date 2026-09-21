@@ -5,16 +5,13 @@
  */
 
 import React from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
-import { useAppTheme } from '@/contexts/AppThemeContext';
 
 export default function BootScreen() {
-  const { theme } = useAppTheme();
   return (
     <View style={styles.root}>
-      <BrandthreadLogo size={96} showGlow />
-      <ActivityIndicator size="small" color={theme.accent} style={styles.spinner} />
+      <BrandthreadLogo size={150} tintColor="#FFFFFF" />
     </View>
   );
 }
@@ -25,8 +22,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#0A0A0B',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  spinner: {
-    marginTop: 28,
   },
 });
