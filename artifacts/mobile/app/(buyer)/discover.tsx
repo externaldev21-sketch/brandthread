@@ -29,6 +29,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -204,7 +205,7 @@ const hd = StyleSheet.create({
   price:    { fontSize: 13, fontFamily: FONT.bold, color: FG },
 });
 
-// ─── Product card (For You) ───────────────────────────────────────────────────
+// ─── Swipeable product showcase (For You) ─────────────────────────────────────
 
 interface ProductCardItem {
   id: string;
@@ -218,94 +219,172 @@ interface ProductCardItem {
   commerce: CommerceSignalData;
 }
 
-function ProductCard({ item }: { item: ProductCardItem }) {
+const SHOWCASE_GAP = 12;
+
+function ProductShowcase({ items }: { items: ProductCardItem[] }) {
   const { push } = useThreadPull();
   const { theme } = useAppTheme();
-  const [saved, setSaved] = useState(false);
+  const { width: viewportWidth } = useWindowDimensions();
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [savedIds, setSavedIds] = useState<Record<string, boolean>>({});
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const cardWidth = Math.min(viewportWidth - 54, 370);
+  const snapInterval = cardWidth + SHOWCASE_GAP;
+  const sideInset = Math.max(20, (viewportWidth - cardWidth) / 2);
 
-  const isUrgent =
-    (item.commerce.remainingUnits ?? 0) > 0 &&
-    (item.commerce.remainingUnits ?? 0) <= URGENCY_UNITS_THRESHOLD;
-
-  function handlePress() {
+  function openProduct(item: ProductCardItem) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const pid = encodeURIComponent(item.productId ?? item.id);
     push((`/thread-product-detail?productId=${pid}&productName=${encodeURIComponent(item.name)}`) as never);
   }
 
   return (
-    <TouchableOpacity
-      style={[pc.card, { borderColor: isUrgent ? `${theme.accent}44` : BORDER }]}
-      activeOpacity={0.86}
-      accessibilityRole="button"
-      accessibilityLabel={`${item.name} by ${item.brand}`}
-      onPress={handlePress}
-    >
-      <View style={[pc.visual, { backgroundColor: item.colorHex }]}>
-        {item.imageUri ? (
-          <CachedImage source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, pc.visualFallback]}>
-            <Text style={pc.initials}>{item.initials}</Text>
-          </View>
+    <View style={showcase.shell}>
+      <Animated.FlatList
+        horizontal
+        data={items}
+        keyExtractor={item => item.id}
+        showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
+        snapToInterval={snapInterval}
+        snapToAlignment="start"
+        disableIntervalMomentum
+        bounces={items.length > 1}
+        contentContainerStyle={{ paddingHorizontal: sideInset }}
+        ItemSeparatorComponent={() => <View style={{ width: SHOWCASE_GAP }} />}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+          { useNativeDriver: true },
         )}
-        {item.tag && (
-          <View style={pc.tag}>
-            <Text style={pc.tagText}>{item.tag}</Text>
-          </View>
-        )}
-      </View>
-      <View style={pc.body}>
-        <Text style={pc.brand} numberOfLines={1}>{item.brand}</Text>
-        <Text style={pc.name} numberOfLines={2}>{item.name}</Text>
-        {item.commerce.currentPriceCents != null && (
-          <Text style={[pc.price, isUrgent && { color: theme.accent }]}>
-            {formatCents(item.commerce.currentPriceCents)}
-          </Text>
-        )}
-        <ClaimedRemainingLabel
-          claimedUnits={item.commerce.claimedUnits ?? 0}
-          remainingUnits={item.commerce.remainingUnits ?? 0}
-          urgent={isUrgent}
-          accent={theme.accent}
-          style={{ marginTop: 4 }}
-        />
-        {!!item.commerce.endsAt && (
-          <TimeRemainingLabel endsAt={item.commerce.endsAt} accent={theme.accent} />
-        )}
-        {isUrgent && (
-          <UrgencyBar
-            claimedUnits={item.commerce.claimedUnits ?? 0}
-            remainingUnits={item.commerce.remainingUnits ?? 0}
-            accentColor={theme.accent}
-          />
-        )}
-      </View>
-      <TouchableOpacity
-        style={pc.save}
-        onPress={() => { setSaved(v => !v); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        accessibilityRole="button"
-        accessibilityLabel={saved ? 'Remove from saved' : 'Save product'}
-      >
-        <Feather name="bookmark" size={16} color={saved ? theme.accent : MUTED} />
-      </TouchableOpacity>
-    </TouchableOpacity>
+        scrollEventThrottle={16}
+        onMomentumScrollEnd={event => {
+          const nextIndex = Math.round(event.nativeEvent.contentOffset.x / snapInterval);
+          setActiveIndex(Math.max(0, Math.min(items.length - 1, nextIndex)));
+          Haptics.selectionAsync();
+        }}
+        renderItem={({ item, index }) => {
+          const isUrgent =
+            (item.commerce.remainingUnits ?? 0) > 0 &&
+            (item.commerce.remainingUnits ?? 0) <= URGENCY_UNITS_THRESHOLD;
+          const saved = !!savedIds[item.id];
+          const inputRange = [
+            (index - 1) * snapInterval,
+            index * snapInterval,
+            (index + 1) * snapInterval,
+          ];
+          const scale = scrollX.interpolate({
+            inputRange,
+            outputRange: [0.92, 1, 0.92],
+            extrapolate: 'clamp',
+          });
+          const opacity = scrollX.interpolate({
+            inputRange,
+            outputRange: [0.64, 1, 0.64],
+            extrapolate: 'clamp',
+          });
+
+          return (
+            <Animated.View style={{ width: cardWidth, opacity, transform: [{ scale }] }}>
+              <TouchableOpacity
+                style={[showcase.card, { borderColor: isUrgent ? `${theme.accent}55` : BORDER }]}
+                activeOpacity={0.92}
+                accessibilityRole="button"
+                accessibilityLabel={`${item.name} by ${item.brand}${item.commerce.currentPriceCents != null ? `, ${formatCents(item.commerce.currentPriceCents)}` : ''}`}
+                onPress={() => openProduct(item)}
+              >
+                <View style={showcase.topline}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={showcase.brand} numberOfLines={1}>{item.brand}</Text>
+                    <Text style={showcase.name} numberOfLines={1}>{item.name}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={showcase.save}
+                    onPress={() => {
+                      setSavedIds(current => ({ ...current, [item.id]: !current[item.id] }));
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={saved ? 'Remove from saved' : 'Save product'}
+                  >
+                    <Feather name="bookmark" size={18} color={saved ? FG : MUTED} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={showcase.visual}>
+                  {item.imageUri ? (
+                    <CachedImage source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} contentFit="contain" />
+                  ) : (
+                    <View style={[StyleSheet.absoluteFill, showcase.visualFallback, { backgroundColor: item.colorHex }]}>
+                      <Text style={showcase.initials}>{item.initials}</Text>
+                    </View>
+                  )}
+                  {item.tag && (
+                    <View style={showcase.tag}>
+                      <Text style={showcase.tagText}>{item.tag}</Text>
+                    </View>
+                  )}
+                  {item.commerce.currentPriceCents != null && (
+                    <View style={showcase.pricePill}>
+                      <Text style={showcase.priceText}>{formatCents(item.commerce.currentPriceCents)}</Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={showcase.signalRow}>
+                  <ClaimedRemainingLabel
+                    claimedUnits={item.commerce.claimedUnits ?? 0}
+                    remainingUnits={item.commerce.remainingUnits ?? 0}
+                    urgent={isUrgent}
+                    accent={theme.accent}
+                  />
+                  {!!item.commerce.endsAt && (
+                    <TimeRemainingLabel endsAt={item.commerce.endsAt} accent={theme.accent} />
+                  )}
+                </View>
+                {isUrgent && (
+                  <UrgencyBar
+                    claimedUnits={item.commerce.claimedUnits ?? 0}
+                    remainingUnits={item.commerce.remainingUnits ?? 0}
+                    accentColor={theme.accent}
+                  />
+                )}
+              </TouchableOpacity>
+            </Animated.View>
+          );
+        }}
+      />
+      {items.length > 1 && (
+        <View style={showcase.pagination} accessibilityLabel={`Product ${activeIndex + 1} of ${items.length}`}>
+          {items.map((item, index) => (
+            <View
+              key={item.id}
+              style={[showcase.dot, index === activeIndex && showcase.dotActive]}
+            />
+          ))}
+        </View>
+      )}
+    </View>
   );
 }
 
-const pc = StyleSheet.create({
-  card:        { width: 158, borderRadius: RADIUS.sm, overflow: 'hidden', backgroundColor: CARD, borderWidth: 1 },
-  visual:      { height: 130, position: 'relative' },
+const showcase = StyleSheet.create({
+  shell:          { marginBottom: 32 },
+  card:           { overflow: 'hidden', borderRadius: RADIUS.md, borderWidth: 1, backgroundColor: CARD, padding: 14 },
+  topline:        { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  brand:          { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
+  name:           { marginTop: 2, fontSize: 16, fontFamily: FONT.bold, color: FG, letterSpacing: -0.2 },
+  save:           { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER },
+  visual:         { height: 330, marginTop: 8, position: 'relative', overflow: 'hidden', borderRadius: RADIUS.sm, backgroundColor: SURFACE },
   visualFallback: { alignItems: 'center', justifyContent: 'center' },
-  initials:    { fontSize: 22, fontFamily: FONT.bold, color: ON_DARK },
-  tag:         { position: 'absolute', top: 8, left: 8, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.65)' },
-  tagText:     { fontSize: 9, fontFamily: FONT.bold, color: ON_DARK, letterSpacing: 0.5 },
-  body:        { padding: 10, gap: 3 },
-  brand:       { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
-  name:        { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  price:       { fontSize: FS.sm, fontFamily: FONT.bold, color: FG, marginTop: 2 },
-  save:        { position: 'absolute', top: 8, right: 8, width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
+  initials:       { fontSize: 56, fontFamily: FONT.bold, color: ON_DARK },
+  tag:            { position: 'absolute', top: 12, left: 12, paddingHorizontal: 9, paddingVertical: 5, borderRadius: RADIUS.xs, backgroundColor: 'rgba(0,0,0,0.72)' },
+  tagText:        { fontSize: 10, fontFamily: FONT.bold, color: ON_DARK, letterSpacing: 0.7, textTransform: 'uppercase' },
+  pricePill:      { position: 'absolute', bottom: 12, alignSelf: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: FG, borderWidth: 3, borderColor: CARD },
+  priceText:      { fontSize: FS.sm, fontFamily: FONT.bold, color: BG },
+  signalRow:      { minHeight: 34, paddingTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  pagination:     { height: 22, marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  dot:            { width: 5, height: 5, borderRadius: 3, backgroundColor: SUBTLE },
+  dotActive:      { width: 18, backgroundColor: FG },
 });
 
 // ─── Drop row ─────────────────────────────────────────────────────────────────
@@ -813,14 +892,7 @@ export default function DiscoverScreen() {
           <Text style={s.emptyText}>No products available right now</Text>
         </View>
       ) : (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 20, gap: 12, paddingBottom: 4 }}
-          style={{ marginBottom: 32 }}
-        >
-          {forYouItems.map(item => <ProductCard key={item.id} item={item} />)}
-        </ScrollView>
+        <ProductShowcase items={forYouItems} />
       )}
 
       {/* ─ Drops ─ */}

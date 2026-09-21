@@ -737,6 +737,34 @@ describe('Discover — section-level error states and retry', () => {
   });
 });
 
+describe('Discover — swipeable product showcase', () => {
+  it('keeps the For You products in a centered snapping carousel', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
+
+    expect(source).toContain('function ProductShowcase');
+    expect(source).toContain('<Animated.FlatList');
+    expect(source).toContain('snapToInterval={snapInterval}');
+    expect(source).toContain('decelerationRate="fast"');
+    expect(source).toContain('disableIntervalMomentum');
+    expect(source).toContain('onMomentumScrollEnd=');
+    expect(source).toContain('setActiveIndex(');
+    expect(source).toContain('<ProductShowcase items={forYouItems} />');
+  });
+
+  it('shows the real product price and preserves product-detail navigation', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
+
+    expect(source).toContain('formatCents(item.commerce.currentPriceCents)');
+    expect(source).toContain('item.productId ?? item.id');
+    expect(source).toContain('/thread-product-detail?productId=');
+    expect(source).toContain('accessibilityLabel={`Product ${activeIndex + 1} of ${items.length}`}');
+  });
+});
+
 // ─── highDemand API endpoint tests ────────────────────────────────────────────
 
 describe('highDemand API — correct endpoint, no ordinary-product fallback', () => {
