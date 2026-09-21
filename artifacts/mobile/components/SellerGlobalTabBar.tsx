@@ -285,7 +285,7 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
       style={[
         styles.bar,
         {
-          height: 72 + insets.bottom,
+          height: 76 + insets.bottom,
           paddingBottom: insets.bottom,
         },
       ]}
@@ -298,7 +298,7 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
         onPress={onOpenStudio}
         style={({ pressed }) => [styles.sideButton, pressed && styles.pressed]}
       >
-        <Feather name="menu" size={18} color={FG} />
+        <Feather name="menu" size={20} color={FG} />
         <Text style={styles.sideLabel}>Studio</Text>
       </Pressable>
 
@@ -329,7 +329,7 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
               testID={`seller-tab-${tabDef.name}`}
             >
               <View style={styles.iconWrap}>
-                <Feather name={tabDef.icon} size={22} color={color} />
+                <Feather name={tabDef.icon} size={24} color={color} />
                 {showOrderBadge && (
                   <View style={[styles.badge, { backgroundColor: theme.accent, borderColor: BG }]}>
                     <Text style={styles.badgeText}>
@@ -356,7 +356,7 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
         onPress={openAI}
         style={({ pressed }) => [styles.sideButton, pressed && styles.pressed]}
       >
-        <BrandthreadLogo size={20} opacity={1} />
+        <BrandthreadLogo size={22} opacity={1} />
         <Text style={styles.sideLabel}>AI</Text>
       </Pressable>
     </View>
@@ -381,19 +381,19 @@ const styles = StyleSheet.create({
   },
   centerBar: {
     flex:             1,
-    height:           48,
+    height:           52,
     flexDirection:    'row',
     alignItems:       'center',
     paddingHorizontal: 4,
-    borderRadius:     24,
+    borderRadius:     26,
     borderWidth:      1,
     borderColor:      'rgba(255,255,255,0.14)',
     backgroundColor:  'rgba(8,8,10,0.58)',
   },
   sideButton: {
-    width:           48,
-    height:          48,
-    borderRadius:    24,
+    width:           52,
+    height:          52,
+    borderRadius:    26,
     alignItems:      'center',
     justifyContent:  'center',
     borderWidth:     1,
@@ -406,8 +406,8 @@ const styles = StyleSheet.create({
     flex:           1,
     alignItems:     'center',
     justifyContent: 'center',
-    minHeight:      44,
-    borderRadius:   20,
+    minHeight:      48,
+    borderRadius:   22,
     gap:            1,
   },
   tabActive: { backgroundColor: 'rgba(255,255,255,0.14)' },
@@ -417,14 +417,14 @@ const styles = StyleSheet.create({
   tabLabel: {
     maxWidth:   '100%',
     fontFamily: FONT.bold,
-    fontSize:   10,
-    lineHeight: 12,
+    fontSize:   11,
+    lineHeight: 13,
   },
   sideLabel: {
     color:      FG,
     fontFamily: FONT.bold,
-    fontSize:   10,
-    lineHeight: 12,
+    fontSize:   11,
+    lineHeight: 13,
   },
   badge: {
     position:         'absolute',
