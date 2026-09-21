@@ -1,7 +1,7 @@
 /**
  * Buyer Post Comments Screen
- * Full-screen modal: shows a post summary at the top, then a scrollable
- * comment thread below, with one-level reply support.
+ * TikTok-style split modal: keeps the active post media visible above a
+ * half-height comment thread, with one-level reply support.
  *
  * Interaction quality:
  *  - First-load: skeleton rows while fetching
@@ -30,7 +30,6 @@ import {
   subscribeSocial, MY_USER_ID, MY_COLOR, MY_INITIALS, MY_NAME, MY_HANDLE,
 } from '@/services/socialService';
 import type { Comment } from '@/services/socialTypes';
-import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { InlineSpinner, InlineError } from '@/components/InlineFeedback';
 import { CachedImage } from '@/components/CachedImage';
@@ -176,9 +175,7 @@ function CommentRow({
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function BuyerPostCommentsScreen() {
-  const colors = useColors();
   const { theme } = useAppTheme();
-  const PURPLE = colors.primary;
   const s = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -197,10 +194,6 @@ export default function BuyerPostCommentsScreen() {
 
   const postId = params.postId ?? '';
   const postAuthorId = params.postAuthorId ?? '';
-  const authorName = params.postAuthorName ?? '';
-  const authorInitials = params.postAuthorInitials ?? '?';
-  const authorColor = params.postAuthorColor ?? PURPLE;
-  const caption = params.postCaption ?? '';
   const mediaUri = params.postMediaUri ?? '';
   const postType = params.postType ?? 'photo';
   const mediaPlayer = useVideoPlayer(
@@ -335,6 +328,7 @@ export default function BuyerPostCommentsScreen() {
             style={s.mediaBackdrop}
             contentFit="cover"
             nativeControls={false}
+            testID="comments-video-preview"
           />
         ) : (
           <CachedImage source={{ uri: mediaUri }} style={s.mediaBackdrop} contentFit="cover" />
@@ -351,18 +345,8 @@ export default function BuyerPostCommentsScreen() {
         style={s.sheet}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
+        testID="comments-sheet"
       >
-        <View style={s.postSummary}>
-          <View style={[s.postAvatar, { backgroundColor: authorColor }]}>
-            <Text style={s.postAvatarText}>{authorInitials}</Text>
-          </View>
-          <View style={s.postSummaryCopy}>
-            <Text style={s.postAuthorName} numberOfLines={1}>{authorName || 'Post'}</Text>
-            <Text style={s.postCaption} numberOfLines={1}>{caption || 'View the conversation'}</Text>
-          </View>
-          <Feather name={postType === 'video' ? 'play' : 'image'} size={16} color={MUTED} />
-        </View>
-
         <View style={s.header}>
           <View style={s.headerSide} />
           <Text style={s.headerTitle}>
@@ -515,10 +499,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     top: 0,
     right: 0,
     left: 0,
-    height: '31%',
+    height: '50%',
   },
   sheet: {
-    height: '73%',
+    height: '52%',
     overflow: 'hidden',
     backgroundColor: CARD,
     borderTopLeftRadius: 20,
@@ -549,48 +533,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     color: FG,
   },
 
-  // Post summary
-  postSummary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: SP.md,
-    minHeight: 62,
-    paddingVertical: SP.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-  },
-  postSummaryCopy: { flex: 1, minWidth: 0 },
-  postAuthorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.xs,
-    marginBottom: 4,
-  },
-  postAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  postAvatarText: {
-    fontFamily: FONT.bold,
-    fontSize: FS.xs,
-    color: ON_DARK,
-  },
-  postAuthorName: {
-    fontFamily: FONT.bold,
-    fontSize: FS.sm,
-    color: FG,
-  },
-  postCaption: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    color: MUTED,
-    lineHeight: 16,
-    marginTop: 2,
-  },
   listContent: { paddingTop: 4, paddingBottom: SP.md, flexGrow: 1 },
   emptyState: { flex: 1, minHeight: 180, alignItems: 'center', justifyContent: 'center', gap: 5 },
   emptyTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.base },

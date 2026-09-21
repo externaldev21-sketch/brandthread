@@ -1666,7 +1666,7 @@ export default function FeedScreen({
       'postMediaUri=' + encodeURIComponent(item.mediaUris[0] ?? ''),
       'postMediaColor1=' + encodeURIComponent('#0a0a0a'),
       'postMediaColor2=' + encodeURIComponent('#1a1a1a'),
-      'postType=video',
+      'postType=' + encodeURIComponent(item.contentType),
     ].join('&');
     router.push(('/buyer-post-comments?' + qs) as never);
   }
