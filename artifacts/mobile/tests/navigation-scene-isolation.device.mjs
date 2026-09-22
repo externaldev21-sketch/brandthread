@@ -47,9 +47,46 @@ async function findByAccessibilityId(label) {
   return value['element-6066-11e4-a52e-4f735466cecf'];
 }
 
+async function elementAttribute(elementId, name) {
+  return request(`/session/${sessionId}/element/${elementId}/attribute/${name}`, undefined, 'GET');
+}
+
 async function tap(label) {
   const elementId = await findByAccessibilityId(label);
   await request(`/session/${sessionId}/element/${elementId}/click`, {});
+}
+
+async function waitForSelected(label, timeout = 15_000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    try {
+      const elementId = await findByAccessibilityId(label);
+      if (String(await elementAttribute(elementId, 'selected')) === 'true') return;
+    } catch {
+      // The destination may still be mounting.
+    }
+    await sleep(250);
+  }
+  throw new Error(`Timed out waiting for selected destination "${label}"`);
+}
+
+async function typeInto(label, value) {
+  const elementId = await findByAccessibilityId(label);
+  await request(`/session/${sessionId}/element/${elementId}/click`, {});
+  await request(`/session/${sessionId}/element/${elementId}/value`, { text: value, value: [...value] });
+}
+
+async function expectMissing(label, timeout = 1_500) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    try {
+      await findByAccessibilityId(label);
+    } catch {
+      return;
+    }
+    await sleep(150);
+  }
+  throw new Error(`Expected accessibility label "${label}" to be absent`);
 }
 
 async function waitFor(label, timeout = 15_000) {
@@ -70,6 +107,71 @@ async function openProbe() {
     args: [{ url: 'brandthread://navigation-isolation-probe', package: bundleId }],
   });
   await waitFor('Buyer card');
+}
+
+async function openBuyerHome() {
+  await request(`/session/${sessionId}/execute/sync`, {
+    script: 'mobile: deepLink',
+    args: [{ url: 'brandthread://', package: bundleId }],
+  });
+  await waitFor('Home tab');
+}
+
+async function verifyBuyerSearchNavigation() {
+  await openBuyerHome();
+
+  const destinations = [
+    ['buyer-tab-index', 'buyer-tab-index'],
+    ['buyer-tab-discover', 'buyer-tab-discover'],
+    ['buyer-tab-inbox', 'buyer-tab-inbox'],
+    ['buyer-tab-profile', 'buyer-tab-profile'],
+  ];
+  for (const [control] of destinations) {
+    await waitFor(control);
+  }
+  await waitFor('buyer-tab-search');
+
+  for (const [control, selected] of destinations.slice(1)) {
+    await tap(control);
+    await waitForSelected(selected);
+  }
+  await tap('buyer-tab-index');
+  await waitForSelected('buyer-tab-index');
+
+  const standardPath = resolve(outputDir, 'buyer-search-standard.png');
+  const transitionPath = resolve(outputDir, 'buyer-search-transition.png');
+  const expandedPath = resolve(outputDir, 'buyer-search-expanded.png');
+  await captureNativeScreenshot(standardPath);
+  await tap('buyer-tab-search');
+  await captureNativeScreenshot(transitionPath);
+  await waitFor('Search Brandthread');
+  await sleep(700);
+  await captureNativeScreenshot(expandedPath);
+  if (pixelHash(standardPath) === pixelHash(transitionPath) || pixelHash(transitionPath) === pixelHash(expandedPath)) {
+    throw new Error('Buyer Search tab did not produce a visible animated transition');
+  }
+
+  for (const destination of ['Search Brandthread', 'Open search filters']) {
+    await waitFor(destination);
+  }
+
+  await typeInto('Search Brandthread', 'linen');
+  await waitFor('Search results for linen');
+  await waitFor('Clear search');
+  await tap('Clear search');
+  await waitFor('Search is empty');
+
+  await tap('Open search filters');
+  await waitFor('Filter and sort');
+  await tap('Close filters');
+
+  await tap('buyer-search-home');
+  await waitForSelected('buyer-tab-index');
+  for (const [destination] of destinations) {
+    await waitFor(destination);
+  }
+  await waitFor('buyer-tab-search');
+  await expectMissing('Search Brandthread');
 }
 
 function captureNativeScreenshot(filePath) {
@@ -181,7 +283,9 @@ try {
     }
   }
 
-  console.log(`Captured and verified ${flows.length * progressPoints.length} interrupted native gesture frames in ${outputDir}.`);
+  await verifyBuyerSearchNavigation();
+
+  console.log(`Captured and verified ${flows.length * progressPoints.length} interrupted native gesture frames and the buyer search navigation flow in ${outputDir}.`);
 } finally {
   if (sessionId) {
     await request(`/session/${sessionId}`, undefined, 'DELETE').catch(() => {});

@@ -45,6 +45,7 @@ describe('buyer bottom navigation layout', () => {
   it('exposes Home tab in Search mode', () => {
     expect(layout).toContain('testID="buyer-search-home"');
     expect(layout).toContain('testID="buyer-tab-search-input"');
+    expect(layout).toContain('testID="buyer-tab-search-clear"');
     expect(layout).toContain('testID="buyer-tab-search-filters"');
     expect(layout).toContain('searchMode');
     expect(layout).toContain('searchField');
