@@ -2,17 +2,17 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View, useColorScheme, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 
-import { BG, BORDER, FG, FONT, SUBTLE, SURFACE_GLASS } from '@/lib/theme';
+import { BORDER, SUBTLE } from '@/lib/theme';
 import { getDeactivationStatus, reactivate } from '@/lib/accountService';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getConversations, getNotifications, subscribeSocial } from '@/services/socialService';
 
 // ─── Buyer tab layout ─────────────────────────────────────────────────────────
-// Tabs: Thread · Discover · Friends · Inbox · Profile
+// Tabs: Thread · Search · Create · Inbox · Profile
 
 function BuyerTabLayout() {
   const colorScheme = useColorScheme();
@@ -194,14 +194,14 @@ function BuyerTabLayout() {
 }
 
 const BUYER_NAV_ITEMS: {
-  name: 'index' | 'discover' | 'friends' | 'inbox';
+  name: 'index' | 'search' | 'inbox' | 'profile';
   label: string;
   icon: keyof typeof Feather.glyphMap;
 }[] = [
-  { name: 'index', label: 'Thread', icon: 'play-circle' },
-  { name: 'discover', label: 'Discover', icon: 'compass' },
-  { name: 'friends', label: 'Friends', icon: 'users' },
-  { name: 'inbox', label: 'Inbox', icon: 'message-circle' },
+  { name: 'index', label: 'Thread', icon: 'home' },
+  { name: 'search', label: 'Search', icon: 'search' },
+  { name: 'inbox', label: 'Inbox', icon: 'bell' },
+  { name: 'profile', label: 'Profile', icon: 'user' },
 ];
 
 function BuyerBottomTabBar({
@@ -216,6 +216,7 @@ function BuyerBottomTabBar({
   onAccent: string;
 }) {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const bottomInset = insets.bottom;
   const activeRoute = state.routes[state.index]?.name;
 
@@ -224,132 +225,104 @@ function BuyerBottomTabBar({
     navigation.navigate(name);
   };
 
-  const profileFocused = activeRoute === 'profile';
-
   return (
     <View
       style={[
         buyerBarStyles.bar,
         {
-          height: 72 + bottomInset,
+          height: 64 + bottomInset,
           paddingBottom: bottomInset,
         },
       ]}
       testID="buyer-bottom-tab-bar"
     >
-      <View style={buyerBarStyles.centerBar}>
-        {BUYER_NAV_ITEMS.map((item) => {
+      {BUYER_NAV_ITEMS.map((item, index) => {
+          const isCenterGap = index === 2;
           const focused = activeRoute === item.name;
-          const color = focused ? accent : BUYER_INACTIVE_COLOR;
+          const color = focused ? '#FFFFFF' : BUYER_INACTIVE_COLOR;
           const showInboxBadge = item.name === 'inbox' && inboxBadgeCount > 0;
 
           return (
-            <Pressable
-              key={item.name}
-              accessibilityRole="tab"
-              accessibilityLabel={
-                showInboxBadge
-                  ? `${item.label} tab, ${inboxBadgeCount} unread items`
-                  : `${item.label} tab`
-              }
-              accessibilityState={focused ? { selected: true } : {}}
-              onPress={() => openTab(item.name)}
-              style={[buyerBarStyles.tab, focused && buyerBarStyles.tabActive]}
-              testID={`buyer-tab-${item.name}`}
-            >
-              <TabBadge count={showInboxBadge ? inboxBadgeCount : 0} accent={accent} onAccent={onAccent}>
-                <Feather name={item.icon} size={22} color={color} />
-              </TabBadge>
-              <Text numberOfLines={1} style={[buyerBarStyles.tabLabel, { color }]}>
-                {item.label}
-              </Text>
-            </Pressable>
+            <React.Fragment key={item.name}>
+              {isCenterGap && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Create post"
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                    router.push('/create-post?accountType=buyer' as never);
+                  }}
+                  style={({ pressed }) => [buyerBarStyles.createButton, pressed && buyerBarStyles.pressed]}
+                  testID="buyer-tab-create"
+                >
+                  <Feather name="plus" size={29} color="#050505" />
+                </Pressable>
+              )}
+              <Pressable
+                accessibilityRole="tab"
+                accessibilityLabel={
+                  showInboxBadge
+                    ? `${item.label} tab, ${inboxBadgeCount} unread items`
+                    : `${item.label} tab`
+                }
+                accessibilityState={focused ? { selected: true } : {}}
+                onPress={() => openTab(item.name)}
+                style={({ pressed }) => [buyerBarStyles.tab, pressed && buyerBarStyles.pressed]}
+                testID={`buyer-tab-${item.name}`}
+              >
+                <TabBadge count={showInboxBadge ? inboxBadgeCount : 0} accent={accent} onAccent={onAccent}>
+                  <View style={[buyerBarStyles.iconShell, item.name === 'profile' && buyerBarStyles.profileIcon]}>
+                    <Feather name={item.icon} size={item.name === 'profile' ? 18 : 25} color={color} />
+                  </View>
+                </TabBadge>
+                {focused && <View style={buyerBarStyles.activeDot} />}
+              </Pressable>
+            </React.Fragment>
           );
         })}
-      </View>
-
-      <Pressable
-        accessibilityRole="tab"
-        accessibilityLabel="Profile tab"
-        accessibilityState={profileFocused ? { selected: true } : {}}
-        onPress={() => openTab('profile')}
-        style={({ pressed }) => [
-          buyerBarStyles.profileButton,
-          profileFocused && buyerBarStyles.profileButtonActive,
-          pressed && buyerBarStyles.pressed,
-        ]}
-        testID="buyer-tab-profile"
-      >
-        <Feather name="user" size={20} color={profileFocused ? accent : FG} />
-        <Text style={[buyerBarStyles.profileLabel, profileFocused && { color: accent }]}>Profile</Text>
-      </Pressable>
     </View>
   );
 }
 
-const BUYER_INACTIVE_COLOR = 'rgba(244,244,255,0.72)';
+const BUYER_INACTIVE_COLOR = 'rgba(255,255,255,0.48)';
 
 const buyerBarStyles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-    gap: 12,
-    backgroundColor: 'transparent',
-    paddingTop: 8,
-    paddingHorizontal: 12,
-  },
-  profileButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(8,8,10,0.58)',
-    gap: 1,
+    justifyContent: 'space-around',
+    backgroundColor: '#050505',
     paddingTop: 4,
+    paddingHorizontal: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.12)',
   },
-  profileButtonActive: {
-    backgroundColor: 'rgba(255,255,255,0.14)',
-  },
-  profileLabel: {
-    color: FG,
-    fontFamily: FONT.bold,
-    fontSize: 10,
-    lineHeight: 12,
-  },
-  centerBar: {
-    flex: 1,
-    height: 48,
-    flexDirection: 'row',
+  createButton: {
+    width: 48,
+    height: 38,
+    borderRadius: 12,
     alignItems: 'center',
-    paddingHorizontal: 4,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(8,8,10,0.58)',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
   },
   tab: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 1,
+    gap: 3,
   },
-  tabActive: {
-    backgroundColor: 'rgba(255,255,255,0.14)',
+  iconShell: { alignItems: 'center', justifyContent: 'center' },
+  profileIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
   },
-  tabLabel: {
-    maxWidth: '100%',
-    fontFamily: FONT.bold,
-    fontSize: 10,
-    lineHeight: 12,
-  },
+  activeDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#FFFFFF' },
   pressed: {
-    opacity: 0.82,
+    opacity: 0.72,
     transform: [{ scale: 0.95 }],
   },
 });
