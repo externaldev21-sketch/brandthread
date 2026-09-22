@@ -10,6 +10,7 @@ import {
   FlatList, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -165,6 +166,7 @@ export default function FollowingScreen() {
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const insets = useSafeAreaInsets();
+  const barInset = useBuyerTabBarInset();
   const router = useRouter();
   const api = useApi();
 
@@ -271,7 +273,7 @@ export default function FollowingScreen() {
         <FlatList
           data={drops}
           keyExtractor={d => d.id}
-          contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: Math.max(120, barInset + SP.md) }}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <DropCard

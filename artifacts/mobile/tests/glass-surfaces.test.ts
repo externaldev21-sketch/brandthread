@@ -33,10 +33,11 @@ describe('glass surfaces and translucency', () => {
     // The seller tab bar was extracted to SellerGlobalTabBar.tsx (global shell);
     // (tabs)/_layout.tsx delegates rendering to that component.
     const sellerTabBar = readFileSync(compPath('SellerGlobalTabBar.tsx'), 'utf8');
-    const buyerLayout = readFileSync(appPath('(buyer)/_layout.tsx'), 'utf8');
+    const buyerTabBar = readFileSync(compPath('buyer-nav/BuyerTabBar.tsx'), 'utf8');
     
     expect(sellerTabBar).toContain('SURFACE_GLASS');
-    expect(buyerLayout).toContain('const pillBg       = colors.tabBarBackground');
+    expect(buyerTabBar).toContain('<BlurView');
+    expect(buyerTabBar).toContain('`${theme.background}8C`');
   });
 
   it('uses transparent overlays for product loading', () => {

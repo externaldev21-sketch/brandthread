@@ -7,6 +7,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -177,6 +178,7 @@ function PostCard({
 export default function FriendsScreen() {
   const { theme } = useAppTheme();
   const insets  = useSafeAreaInsets();
+  const barInset = useBuyerTabBarInset();
   const router  = useRouter();
   const api     = useApi();
   const { userId } = useAuth();
@@ -350,7 +352,7 @@ export default function FriendsScreen() {
         data={feedPosts}
         keyExtractor={p => p.id}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
+        contentContainerStyle={{ paddingBottom: barInset + SP.md }}
         ListEmptyComponent={loading ? <View style={s.emptyState}><Text style={s.emptyBody}>Loading activity…</Text></View> : null}
         ListHeaderComponent={() => (
           <>

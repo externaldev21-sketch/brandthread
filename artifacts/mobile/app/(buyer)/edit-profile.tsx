@@ -4,6 +4,7 @@ import {
   Platform, TextInput, Switch, Modal, Image, Alert, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -87,6 +88,7 @@ function GenderPicker({
 
 export default function BuyerEditProfileScreen() {
   const insets = useSafeAreaInsets();
+  const barInset = useBuyerTabBarInset();
   const router = useRouter();
   const { theme } = useAppTheme();
 
@@ -264,7 +266,7 @@ export default function BuyerEditProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: barInset + SP.lg }}>
         {/* Avatar */}
         <View style={styles.avatarSection}>
           <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
