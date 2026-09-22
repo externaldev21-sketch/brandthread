@@ -20,7 +20,7 @@
 - [Expo dependency repair](expo-dependency-repair.md) — never interrupt pnpm’s forced mobile relink; run long repairs in background and restart Metro only after package links return.
 - [Expo Go native module boundary](expo-go-native-module-boundary.md) — Expo Go startup must not statically import custom native modules absent from its client; keep those behind compatible fallbacks.
 - [Expo root navigation readiness](expo-root-navigation-readiness.md) — defer preview redirects until Expo Router registers the root Stack or web preview crashes before first paint.
-- [Expo tunnel fallback](expo-tunnel-fallback.md) — prefer Expo tunnel startup, but fall back to proxied LAN mode when Ngrok fails before Metro opens the artifact port.
+- [Expo proxied device startup](expo-tunnel-fallback.md) — use direct proxied LAN startup; an Ngrok-first handoff can leave Expo Go white even when Metro later recovers.
 - [Expo native prebuild guards](expo-native-prebuild-guards.md) — package lifecycle scripts do not intercept direct `expo prebuild`; invariant checks belong in Expo config plugins.
 - [DB package project references](db-project-references.md) — lib/db uses composite:true + emitDeclarationOnly; must run tsc --build in lib/db before api-server TypeScript checks will see new exports.
 - [Buyer post privacy](buyer-post-privacy.md) — buyer profile posts are friend-only until the database has an enforceable per-post visibility field; never infer public visibility.

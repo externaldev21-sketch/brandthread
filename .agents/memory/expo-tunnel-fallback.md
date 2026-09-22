@@ -1,10 +1,10 @@
 ---
-name: Expo tunnel fallback
-description: Resilient Brandthread development startup when Expo's Ngrok tunnel provider is unavailable.
+name: Expo proxied device startup
+description: Reliable Brandthread device startup through Replit's managed Expo proxy without an Ngrok-first handoff.
 ---
 
-Prefer Expo tunnel mode for normal native-device access, but let the managed artifact workflow fall back to LAN mode on an ordinary tunnel startup failure. Keep the injected port and external packager hostname in both modes. Do not start the fallback when the first process exits because of a shutdown signal.
+Start Brandthread's managed artifact workflow in Expo LAN mode while keeping Replit's injected port, external packager hostname, and packager proxy URL. Replit's managed Expo domain provides external device access; do not add an Ngrok-first handoff unless the managed proxy stops serving manifests or native bundles.
 
-**Why:** Expo's tunnel command can fail before Metro starts when Ngrok returns an invalid or unavailable response. Replit-managed Expo account names can also make Ngrok's generated subdomain label exceed DNS's 63-character limit. Repeating the same workflow restart leaves the artifact down even though Metro and the Replit artifact proxy work correctly without that tunnel.
+**Why:** Expo's tunnel command repeatedly failed before Metro with an invalid Ngrok response. Its later LAN fallback served a valid manifest and full iOS bundle, but the failed handoff left Expo Go showing a white screen. Direct proxied LAN startup removed that race.
 
-**How to apply:** Preserve a guarded tunnel-to-LAN fallback in the mobile development command. Continue honoring the workflow-provided port; never hardcode or replace the managed artifact workflow.
+**How to apply:** Keep direct LAN startup in the managed mobile development command. Continue honoring the workflow-provided port and proxy environment variables; never hardcode or replace the managed artifact workflow. Verify the public Expo endpoint serves a manifest and native launch bundle after startup.
