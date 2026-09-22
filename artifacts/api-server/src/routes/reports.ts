@@ -1,15 +1,32 @@
 /**
- * Content reports (post / product / profile / seller / message).
- * POST /api/reports           — submit a report (requireAuth)
- * GET  /api/reports           — list all reports for moderation (requireAuth)
+ * Member reports (App Store guideline 1.2).
+ *
+ * POST  /api/reports              — report a post, video, live stream, comment,
+ *                                   live chat message, story, product, profile or DM
+ * GET   /api/reports              — moderators: raw report list (legacy; the
+ *                                   moderation queue lives at /api/moderation)
+ * PATCH /api/reports/:id/status   — moderators: legacy status update
+ *
+ * Reasons: spam | harassment | nudity | hate | violence | ip_counterfeit | scam | other.
+ * "other" requires a note. The reported content's owner and a snapshot of the
+ * content are resolved server-side and stored for moderators.
  */
 import { Router } from "express";
-import { conversationParticipants, conversations, db, messageReports, messages, reports } from "@workspace/db";
-import { desc, eq, and, sql } from "drizzle-orm";
+import { conversationParticipants, conversations, db, messageReports, reports } from "@workspace/db";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { requireAuth, requireModerator } from "../middlewares/requireAuth";
+import {
+  REPORT_REASONS,
+  REPORT_TARGET_TYPES,
+  normalizeReportReason,
+  normalizeTargetType,
+  resolveReportTarget,
+} from "../lib/reportTargets";
 
 const router = Router();
 router.use(requireAuth);
+
+export const MAX_REPORT_NOTE_LENGTH = 1000;
 
 function serializeReportForClient(report: typeof reports.$inferSelect) {
   const { reporterId: _reporterId, ...safeReport } = report;
@@ -19,84 +36,118 @@ function serializeReportForClient(report: typeof reports.$inferSelect) {
 // POST /api/reports
 router.post("/", async (req, res) => {
   const reporterId = (req as any).clerkUserId as string;
-  const { targetType, targetId, targetLabel, reason, description } = req.body as {
-    targetType:   string;
-    targetId:     string;
-    targetLabel?: string;
-    reason:       string;
-    description?: string;
+  const body = (req.body ?? {}) as {
+    targetType?: unknown; targetId?: unknown; reason?: unknown;
+    note?: unknown; description?: unknown;
   };
 
-  if (!targetType || !targetId || !reason) {
-    return res.status(400).json({ error: "targetType, targetId and reason are required" });
+  const targetType = normalizeTargetType(body.targetType);
+  if (!targetType) {
+    return res.status(400).json({
+      error: `targetType must be one of: ${REPORT_TARGET_TYPES.join(", ")}`,
+      code: "VALIDATION_ERROR",
+    });
+  }
+  const targetId = typeof body.targetId === "string" ? body.targetId.trim() : "";
+  if (!targetId) return res.status(400).json({ error: "targetId is required", code: "VALIDATION_ERROR" });
+
+  const reason = normalizeReportReason(body.reason);
+  if (!reason) {
+    return res.status(400).json({
+      error: `reason must be one of: ${REPORT_REASONS.join(", ")}`,
+      code: "VALIDATION_ERROR",
+    });
+  }
+  const rawNote = typeof body.note === "string" ? body.note : typeof body.description === "string" ? body.description : "";
+  const note = rawNote.trim();
+  if (note.length > MAX_REPORT_NOTE_LENGTH) {
+    return res.status(400).json({ error: `Notes can be up to ${MAX_REPORT_NOTE_LENGTH} characters.`, code: "VALIDATION_ERROR" });
+  }
+  if (reason === "other" && note.length < 3) {
+    return res.status(400).json({ error: "Tell us a little about what's wrong so we can review it.", code: "NOTE_REQUIRED" });
   }
 
-  const VALID_TARGET_TYPES = ["post", "product", "profile", "story", "message", "seller"];
-  if (!VALID_TARGET_TYPES.includes(targetType)) {
-    return res.status(400).json({ error: `targetType must be one of: ${VALID_TARGET_TYPES.join(", ")}` });
-  }
-
-  if (targetType === "message") {
-    const [message] = await db
-      .select({ id: messages.id, conversationId: messages.conversationId })
-      .from(messages)
-      .where(eq(messages.id, targetId))
-      .limit(1);
-    if (!message) return res.status(404).json({ error: "Message not found" });
-
-    const [participant] = await db
-      .select({ userId: conversationParticipants.userId })
-      .from(conversationParticipants)
-      .where(and(
-        eq(conversationParticipants.conversationId, message.conversationId),
-        eq(conversationParticipants.userId, reporterId),
-      ))
-      .limit(1);
-    if (!participant) return res.status(403).json({ error: "Only conversation participants can report a message" });
-
-    const [createdMessageReport] = await db.insert(messageReports)
-      .values({ messageId: message.id, reporterId, reason, description: description ?? null })
-      .onConflictDoNothing()
-      .returning({ id: messageReports.id });
-    if (!createdMessageReport) {
-      return res.status(200).json({ status: "already_reported" });
+  try {
+    const target = await resolveReportTarget(targetType, targetId);
+    if (!target) return res.status(404).json({ error: "That content is no longer available." });
+    if (target.ownerId && target.ownerId === reporterId) {
+      return res.status(400).json({ error: "You can't report your own content.", code: "SELF_REPORT" });
     }
 
-    const now = new Date();
-    await Promise.all([
-      db.update(messages)
-        .set({ moderationStatus: "reported", reportedAt: now })
-        .where(eq(messages.id, message.id)),
-      db.update(conversations)
-        .set({
-          moderationStatus: "reported",
-          reportedAt: now,
-          reportCount: sql`${conversations.reportCount} + 1`,
-          updatedAt: now,
-        })
-        .where(eq(conversations.id, message.conversationId)),
-    ]);
+    if (targetType === "message") {
+      const [participant] = await db
+        .select({ userId: conversationParticipants.userId })
+        .from(conversationParticipants)
+        .where(and(
+          eq(conversationParticipants.conversationId, target.containerId!),
+          eq(conversationParticipants.userId, reporterId),
+        ))
+        .limit(1);
+      if (!participant) return res.status(403).json({ error: "Only conversation participants can report a message" });
+
+      const [createdMessageReport] = await db.insert(messageReports)
+        .values({ messageId: target.targetId, reporterId, reason, description: note || null })
+        .onConflictDoNothing()
+        .returning({ id: messageReports.id });
+      if (!createdMessageReport) {
+        return res.status(200).json({ status: "already_reported" });
+      }
+
+      const now = new Date();
+      await Promise.all([
+        db.execute(sql`UPDATE messages SET moderation_status = 'reported', reported_at = ${now}
+          WHERE id = ${target.targetId} AND moderation_status <> 'removed'`),
+        db.update(conversations)
+          .set({
+            moderationStatus: "reported",
+            reportedAt: now,
+            reportCount: sql`${conversations.reportCount} + 1`,
+            updatedAt: now,
+          })
+          .where(eq(conversations.id, target.containerId!)),
+      ]);
+    }
+
+    // One open report per person per item: repeat taps are acknowledged
+    // without growing the queue.
+    const [existing] = await db
+      .select({ id: reports.id })
+      .from(reports)
+      .where(and(
+        eq(reports.reporterId, reporterId),
+        eq(reports.targetType, targetType),
+        eq(reports.targetId, target.targetId),
+        eq(reports.status, "pending"),
+      ))
+      .limit(1);
+    if (existing) return res.status(200).json({ status: "already_reported", id: existing.id });
+
+    const [report] = await db
+      .insert(reports)
+      .values({
+        reporterId,
+        targetType,
+        targetId: target.targetId,
+        targetLabel: target.label,
+        targetOwnerId: target.ownerId,
+        contentExcerpt: target.excerpt,
+        reason,
+        description: note || null,
+        source: "user",
+      })
+      .returning();
+
+    return res.status(201).json(serializeReportForClient(report));
+  } catch (err) {
+    req.log.error({ err, targetType, targetId }, "Failed to create report");
+    return res.status(500).json({ error: "We couldn't send your report. Please try again." });
   }
-
-  const [report] = await db
-    .insert(reports)
-    .values({
-      reporterId,
-      targetType,
-      targetId,
-      targetLabel: targetLabel ?? null,
-      reason,
-      description: description ?? null,
-    })
-    .returning();
-
-  return res.status(201).json(serializeReportForClient(report));
 });
 
-// GET /api/reports — admin/moderation list
+// GET /api/reports — moderators only (legacy list)
 router.get("/", requireModerator, async (req, res) => {
-  const limit  = Math.min(parseInt(String(req.query.limit  ?? 50),  10), 200);
-  const offset = parseInt(String(req.query.offset ?? 0), 10);
+  const limit  = Math.min(Math.max(parseInt(String(req.query.limit ?? 50), 10) || 50, 1), 200);
+  const offset = Math.max(parseInt(String(req.query.offset ?? 0), 10) || 0, 0);
   const status = req.query.status as string | undefined;
 
   const rows = await db
@@ -107,12 +158,10 @@ router.get("/", requireModerator, async (req, res) => {
     .limit(limit)
     .offset(offset);
 
-  // Reporter identity is moderation-only information. This route is shared by
-  // authenticated clients, so never reveal it to another conversation member.
   return res.json(rows.map(serializeReportForClient));
 });
 
-// PATCH /api/reports/:id/status — update report status (actioned/dismissed/reviewed)
+// PATCH /api/reports/:id/status — moderators only (legacy)
 router.patch("/:id/status", requireModerator, async (req, res) => {
   const reportId = String(req.params.id);
   const { status } = req.body as { status: string };
@@ -120,9 +169,14 @@ router.patch("/:id/status", requireModerator, async (req, res) => {
   if (!VALID.includes(status)) {
     return res.status(400).json({ error: `status must be one of: ${VALID.join(", ")}` });
   }
+  const moderatorId = (req as any).clerkUserId as string;
   const [updated] = await db
     .update(reports)
-    .set({ status })
+    .set({
+      status,
+      resolvedBy: status === "pending" ? null : moderatorId,
+      resolvedAt: status === "pending" ? null : new Date(),
+    })
     .where(eq(reports.id, reportId))
     .returning();
   if (!updated) return res.status(404).json({ error: "Report not found" });

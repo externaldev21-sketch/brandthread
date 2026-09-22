@@ -551,6 +551,397 @@ export interface ManufacturerPaymentActivity {
   createdAt: string;
 }
 
+export interface OkResponse {
+  ok: boolean;
+}
+
+export interface ProfileSummary {
+  userId: string;
+  name: string;
+  handle: string;
+  initials: string;
+  /** @nullable */
+  avatarUrl?: string | null;
+  /** @nullable */
+  accountType?: string | null;
+  suspended: boolean;
+  deleted: boolean;
+}
+
+export interface Comment {
+  id: string;
+  postId: string;
+  /** @nullable */
+  parentId: string | null;
+  body: string;
+  createdAt: string;
+  author: ProfileSummary;
+  /** @minimum 0 */
+  likesCount: number;
+  likedByMe: boolean;
+  isMine: boolean;
+  canDelete: boolean;
+  /** Held by the content filter; only the author can see it until a moderator reviews it. */
+  pendingReview: boolean;
+  replies: Comment[];
+}
+
+export interface CommentThread {
+  comments: Comment[];
+  /** @minimum 0 */
+  total: number;
+  /** @minimum 0 */
+  hiddenByMutedWords: number;
+  commentsDisabled: boolean;
+  canComment: boolean;
+  /** @nullable */
+  nextCursor: string | null;
+}
+
+export interface CreateCommentInput {
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  body: string;
+  /** @nullable */
+  parentId?: string | null;
+}
+
+export type CreatedCommentModerationStatus = typeof CreatedCommentModerationStatus[keyof typeof CreatedCommentModerationStatus];
+
+
+export const CreatedCommentModerationStatus = {
+  visible: 'visible',
+  held: 'held',
+} as const;
+
+export type CreatedCommentModeration = {
+  status: CreatedCommentModerationStatus;
+  message?: string;
+};
+
+export interface CreatedComment {
+  comment: Comment;
+  moderation: CreatedCommentModeration;
+}
+
+export type ContentRejectedCategory = typeof ContentRejectedCategory[keyof typeof ContentRejectedCategory];
+
+
+export const ContentRejectedCategory = {
+  spam_scam: 'spam_scam',
+  explicit_sexual: 'explicit_sexual',
+  harassment: 'harassment',
+  hate_speech: 'hate_speech',
+  profanity: 'profanity',
+  abuse: 'abuse',
+} as const;
+
+export type ContentRejectedCode = typeof ContentRejectedCode[keyof typeof ContentRejectedCode];
+
+
+export const ContentRejectedCode = {
+  CONTENT_REJECTED: 'CONTENT_REJECTED',
+} as const;
+
+export interface ContentRejected {
+  error: string;
+  category: ContentRejectedCategory;
+  code: ContentRejectedCode;
+}
+
+export type ReportTargetType = typeof ReportTargetType[keyof typeof ReportTargetType];
+
+
+export const ReportTargetType = {
+  post: 'post',
+  video: 'video',
+  live: 'live',
+  live_comment: 'live_comment',
+  comment: 'comment',
+  story: 'story',
+  product: 'product',
+  profile: 'profile',
+  message: 'message',
+} as const;
+
+export type ReportReason = typeof ReportReason[keyof typeof ReportReason];
+
+
+export const ReportReason = {
+  spam: 'spam',
+  harassment: 'harassment',
+  nudity: 'nudity',
+  hate: 'hate',
+  violence: 'violence',
+  ip_counterfeit: 'ip_counterfeit',
+  scam: 'scam',
+  other: 'other',
+} as const;
+
+export interface CreateReportInput {
+  targetType: ReportTargetType;
+  targetId: string;
+  reason: ReportReason;
+  /**
+     * Required when reason is "other".
+     * @maxLength 1000
+     */
+  note?: string;
+}
+
+export type ReportStatus = typeof ReportStatus[keyof typeof ReportStatus];
+
+
+export const ReportStatus = {
+  pending: 'pending',
+  reviewed: 'reviewed',
+  actioned: 'actioned',
+  dismissed: 'dismissed',
+} as const;
+
+export type ReportSource = typeof ReportSource[keyof typeof ReportSource];
+
+
+export const ReportSource = {
+  user: 'user',
+  auto_filter: 'auto_filter',
+} as const;
+
+export interface Report {
+  id: string;
+  targetType: string;
+  targetId: string;
+  /** @nullable */
+  targetLabel?: string | null;
+  /** @nullable */
+  targetOwnerId?: string | null;
+  /** @nullable */
+  contentExcerpt?: string | null;
+  reason: string;
+  /** @nullable */
+  description?: string | null;
+  status: ReportStatus;
+  source: ReportSource;
+  createdAt: string;
+}
+
+export type ModerationQueueItemStatus = typeof ModerationQueueItemStatus[keyof typeof ModerationQueueItemStatus];
+
+
+export const ModerationQueueItemStatus = {
+  pending: 'pending',
+  reviewed: 'reviewed',
+  actioned: 'actioned',
+  dismissed: 'dismissed',
+} as const;
+
+export type ModerationQueueItemSource = typeof ModerationQueueItemSource[keyof typeof ModerationQueueItemSource];
+
+
+export const ModerationQueueItemSource = {
+  user: 'user',
+  auto_filter: 'auto_filter',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ModerationQueueItemResolution = {
+  /** @nullable */
+  action?: string | null;
+  /** @nullable */
+  note?: string | null;
+  /** @nullable */
+  resolvedAt?: string | null;
+} | null;
+
+export interface ModerationQueueItem {
+  id: string;
+  status: ModerationQueueItemStatus;
+  source: ModerationQueueItemSource;
+  targetType: string;
+  targetId: string;
+  /** @nullable */
+  targetLabel?: string | null;
+  /** @nullable */
+  contentExcerpt?: string | null;
+  reason: string;
+  /** @nullable */
+  note?: string | null;
+  createdAt: string;
+  /** @nullable */
+  resolution?: ModerationQueueItemResolution;
+  owner?: ProfileSummary | null;
+  reporter?: ProfileSummary | null;
+  /** @minimum 0 */
+  openReportsOnTarget: number;
+  /** @minimum 0 */
+  ownerPriorActions: number;
+}
+
+export type ModerationQueueSummary = {
+  open: number;
+  heldByFilter: number;
+  resolvedToday: number;
+};
+
+export interface ModerationQueue {
+  items: ModerationQueueItem[];
+  hasMore: boolean;
+  summary: ModerationQueueSummary;
+}
+
+export type ResolveReportInputAction = typeof ResolveReportInputAction[keyof typeof ResolveReportInputAction];
+
+
+export const ResolveReportInputAction = {
+  dismiss: 'dismiss',
+  remove_content: 'remove_content',
+  suspend_user: 'suspend_user',
+} as const;
+
+export interface ResolveReportInput {
+  action: ResolveReportInputAction;
+  /** @maxLength 1000 */
+  note?: string;
+}
+
+export type ResolveReportResultStatus = typeof ResolveReportResultStatus[keyof typeof ResolveReportResultStatus];
+
+
+export const ResolveReportResultStatus = {
+  dismissed: 'dismissed',
+  actioned: 'actioned',
+} as const;
+
+export type ResolveReportResultAction = typeof ResolveReportResultAction[keyof typeof ResolveReportResultAction];
+
+
+export const ResolveReportResultAction = {
+  dismiss: 'dismiss',
+  remove_content: 'remove_content',
+  suspend_user: 'suspend_user',
+} as const;
+
+export interface ResolveReportResult {
+  ok: boolean;
+  status: ResolveReportResultStatus;
+  action: ResolveReportResultAction;
+  /** @minimum 1 */
+  resolvedReports: number;
+  /** @nullable */
+  suspendedUserId?: string | null;
+  signedOut: boolean;
+}
+
+export interface MutedWord {
+  phrase: string;
+  createdAt: string;
+}
+
+export interface BlockedAccount {
+  userId: string;
+  name: string;
+  handle: string;
+  initials: string;
+  /** @nullable */
+  avatarUrl?: string | null;
+  /** @nullable */
+  accountType?: string | null;
+  color: string;
+  blockedAt: string;
+}
+
+export type DeletionBlockerCode = typeof DeletionBlockerCode[keyof typeof DeletionBlockerCode];
+
+
+export const DeletionBlockerCode = {
+  seller_open_orders: 'seller_open_orders',
+  seller_held_funds: 'seller_held_funds',
+  seller_reserved_label_funds: 'seller_reserved_label_funds',
+  seller_open_returns: 'seller_open_returns',
+  seller_open_disputes: 'seller_open_disputes',
+  seller_payout_in_flight: 'seller_payout_in_flight',
+  buyer_orders_awaiting_shipment: 'buyer_orders_awaiting_shipment',
+} as const;
+
+export interface DeletionBlocker {
+  code: DeletionBlockerCode;
+  title: string;
+  detail: string;
+  /** @minimum 0 */
+  count: number;
+  /** @nullable */
+  amountCents: number | null;
+  actionRoute: string;
+  actionLabel: string;
+}
+
+export interface AccountDeletionCheck {
+  canDelete: boolean;
+  /** @nullable */
+  accountType: string | null;
+  blockers: DeletionBlocker[];
+  willDelete: string[];
+  willRetain: string[];
+}
+
+export interface AccountSession {
+  id: string;
+  current: boolean;
+  status: string;
+  device: string;
+  /** @nullable */
+  browser?: string | null;
+  isMobile: boolean;
+  /** @nullable */
+  location?: string | null;
+  /** @nullable */
+  ipAddress?: string | null;
+  lastActiveAt: string;
+  createdAt: string;
+}
+
+export interface RevokeSessionsResult {
+  ok: boolean;
+  /** @minimum 0 */
+  revoked: number;
+}
+
+export interface LikeCommentInput {
+  liked: boolean;
+}
+
+export interface MutedWordInput {
+  /**
+     * @minLength 1
+     * @maxLength 60
+     */
+  phrase: string;
+}
+
+export interface BlockAccountInput {
+  userId: string;
+}
+
+export type DeleteAccountInputConfirmation = typeof DeleteAccountInputConfirmation[keyof typeof DeleteAccountInputConfirmation];
+
+
+export const DeleteAccountInputConfirmation = {
+  DELETE: 'DELETE',
+} as const;
+
+export interface DeleteAccountInput {
+  confirmation: DeleteAccountInputConfirmation;
+}
+
+export interface LegalAcceptanceInput {
+  /** @pattern ^[0-9]{4}-[0-9]{2}-[0-9]{2}(\.[0-9]+)?$ */
+  version: string;
+}
+
 export type RenewCallToken200 = CallCredentials & {
   renewed: true;
   duplicate: boolean;
@@ -565,3 +956,76 @@ specialty?: string;
 export type UploadManufacturerThreadAttachment201 = {
   objectPath: string;
 };
+
+export type LikePostComment200 = {
+  liked: boolean;
+  /** @minimum 0 */
+  likesCount: number;
+};
+
+export type CreateReport200Status = typeof CreateReport200Status[keyof typeof CreateReport200Status];
+
+
+export const CreateReport200Status = {
+  already_reported: 'already_reported',
+} as const;
+
+export type CreateReport200 = {
+  status: CreateReport200Status;
+  id?: string;
+};
+
+export type GetModerationAccess200 = {
+  isModerator: boolean;
+};
+
+export type ListModerationReportsParams = {
+status?: ListModerationReportsStatus;
+type?: ReportTargetType;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+/**
+ * @minimum 0
+ */
+offset?: number;
+};
+
+export type ListModerationReportsStatus = typeof ListModerationReportsStatus[keyof typeof ListModerationReportsStatus];
+
+
+export const ListModerationReportsStatus = {
+  open: 'open',
+  resolved: 'resolved',
+  all: 'all',
+} as const;
+
+export type ListMutedWords200 = {
+  words: MutedWord[];
+  limit: number;
+};
+
+export type DeleteAccount409Code = typeof DeleteAccount409Code[keyof typeof DeleteAccount409Code];
+
+
+export const DeleteAccount409Code = {
+  DELETION_BLOCKED: 'DELETION_BLOCKED',
+} as const;
+
+export type DeleteAccount409 = {
+  error: string;
+  code: DeleteAccount409Code;
+  blockers: DeletionBlocker[];
+};
+
+export type AcceptLegalTerms200 = {
+  termsVersion: string;
+  termsAcceptedAt: string;
+};
+
+export type ListAccountSessions200 = {
+  sessions: AccountSession[];
+};
+

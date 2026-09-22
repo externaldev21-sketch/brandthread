@@ -11,6 +11,9 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
+import { matchesMutedWords } from "../lib/contentModerator";
+import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
+import { isBlockedEitherWay, mutedPhrasesFor, notBlockedWith, optionalViewerId } from "../lib/safety";
 import {
   paginationMetadata,
   parsePagination,
@@ -416,6 +419,7 @@ router.get("/search", async (req, res): Promise<void> => {
 
     const lim = Math.min(parsedLimit, 50);
     const pattern = containsSearchPattern(term);
+    const viewerId = optionalViewerId(req);
 
     // Do not SQL-limit joined variants: first collapse each product to its
     // lowest price, then filter/sort products, and only then apply the limit.
@@ -428,6 +432,9 @@ router.get("/search", async (req, res): Promise<void> => {
       }).from(users).where(
         and(
           eq(users.accountType, "seller"),
+          isNull(users.suspendedAt),
+          isNull(users.deletedAt),
+          notBlockedWith(viewerId, users.clerkId),
           or(ilike(users.displayName, pattern), ilike(users.brandName, pattern)),
         ),
       ).orderBy(asc(users.displayName), asc(users.clerkId)).limit(10),
@@ -443,7 +450,9 @@ router.get("/search", async (req, res): Promise<void> => {
       }).from(products)
         .leftJoin(productVariants, eq(productVariants.productId, products.id))
         .where(and(eq(products.status, "active"), isNull(products.deletedAt), ilike(products.name, pattern),
-          category ? eq(products.category, category) : undefined))
+          category ? eq(products.category, category) : undefined,
+          notBlockedWith(viewerId, products.ownerId),
+          sql`NOT EXISTS (SELECT 1 FROM users su WHERE su.clerk_id = ${products.ownerId} AND su.suspended_at IS NOT NULL)`))
         .groupBy(products.id)
         .having(and(
           minPriceCents === undefined ? undefined : sql`min(${productVariants.priceCents}) >= ${minPriceCents}`,
@@ -570,6 +579,10 @@ router.get("/sellers/:sellerId", async (req, res) => {
     .limit(1);
 
   if (!seller) return res.status(404).json({ error: "Seller not found" });
+  const viewerId = optionalViewerId(req);
+  if (viewerId && viewerId !== canonicalClerkId && await isBlockedEitherWay(viewerId, canonicalClerkId)) {
+    return res.status(404).json({ error: "Seller not found" });
+  }
   const vacation = await getSellerVacationStatus(canonicalClerkId);
 
   const [sellerProducts, sellerPosts] = await Promise.all([
@@ -809,9 +822,10 @@ router.get("/posts", async (req, res) => {
       return res.status(400).json({ error: "Invalid posts query", code: "VALIDATION_ERROR" });
     }
     const { limit: lim, offset: off } = page.data;
+    const viewerId = optionalViewerId(req);
 
     // Fetch posts newest-first, joined with seller display info
-    const rows = await db
+    const pageRows = await db
       .select({
         id:          posts.id,
         userId:      posts.userId,
@@ -838,16 +852,18 @@ router.get("/posts", async (req, res) => {
       .where(and(
         ownerId ? eq(posts.userId, ownerId) : undefined,
         eq(users.accountType, "seller"),
-        sql<boolean>`coalesce((${posts.visibility}->>'isPublic')::boolean, true) = true`,
-        or(
-          eq(posts.postStatus, "published"),
-          and(eq(posts.postStatus, "scheduled"), lte(posts.scheduledAt, new Date())),
-        ),
+        publicPostCondition(),
+        notBlockedWith(viewerId, posts.userId),
       ))
       .orderBy(desc(posts.createdAt), asc(posts.id))
       .limit(lim)
       .offset(off);
-    setPaginationHeaders(res, page.data, rows.length);
+    setPaginationHeaders(res, page.data, pageRows.length);
+
+    // Muted words hide matching captions from this viewer only.
+    const muted = await mutedPhrasesFor(viewerId);
+    const rows = muted.length === 0 ? pageRows : pageRows.filter((row) =>
+      !matchesMutedWords([row.caption ?? "", ...(row.hashtags ?? [])].join(" "), muted));
 
     if (rows.length === 0) {
       return res.json([]);
@@ -882,11 +898,7 @@ router.get("/posts", async (req, res) => {
         .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "repost")))
         .groupBy(interactions.postId),
 
-      db
-        .select({ postId: interactions.postId, cnt: count() })
-        .from(interactions)
-        .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "comment")))
-        .groupBy(interactions.postId),
+      visibleCommentCounts(postIds),
     ]);
 
     // Index by postId for O(1) lookup
@@ -899,8 +911,7 @@ router.get("/posts", async (req, res) => {
     for (const r of likeRows) if (r.postId) likesByPost[r.postId] = Number(r.cnt);
     const repostsByPost: Record<string, number> = {};
     for (const r of repostRows) if (r.postId) repostsByPost[r.postId] = Number(r.cnt);
-    const commentsByPost: Record<string, number> = {};
-    for (const r of commentRows) if (r.postId) commentsByPost[r.postId] = Number(r.cnt);
+    const commentsByPost: Record<string, number> = Object.fromEntries(commentRows);
 
     const result = rows.map((p) => ({
       id:             p.id,
@@ -1036,6 +1047,7 @@ router.get("/profiles/:username", async (req, res) => {
     const [user] = await db
       .select({
         id:          users.id,
+        clerkId:     users.clerkId,
         username:    users.username,
         accountType: users.accountType,
         displayName: users.displayName,
@@ -1059,6 +1071,13 @@ router.get("/profiles/:username", async (req, res) => {
 
     // Tombstoned / deleted account.
     if (user.deletedAt) {
+      res.status(404).json({ error: "Profile not found" });
+      return;
+    }
+
+    // Blocked in either direction: the profile is invisible to this viewer.
+    const viewerId = optionalViewerId(req);
+    if (viewerId && viewerId !== user.clerkId && await isBlockedEitherWay(viewerId, user.clerkId)) {
       res.status(404).json({ error: "Profile not found" });
       return;
     }
