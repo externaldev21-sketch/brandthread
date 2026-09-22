@@ -32,8 +32,10 @@ If a rule blocks something good, change the rule in this file in the same PR. Do
 | 1.2 | No hex or `rgba()` literals in `app/**` or `components/**`. Allowed exceptions: pure black or white **scrims over media** (`rgba(0,0,0,x)` on top of photos or video), brand logos and third-party brand buttons (e.g. Sign in with Apple), and colour swatches that are user data. Mark each exception with `// theme-exempt: <reason>`. |
 | 1.3 | Text roles: `text` for primary, `muted` for secondary, `subtle` for tertiary. **Never lower text opacity on top of `muted` or `subtle`.** Stacked opacity is what makes text look "foggy". |
 | 1.4 | Status colours come from the theme: `success`, `warning`, `error` (`useColors().success`/`.warning`/`.destructive`). Never use the static `RED`, `ORANGE` or `SUCCESS` for text on coloured themes. |
-| 1.5 | Text on an accent fill uses `theme.onAccent`. Don't add a text shadow to dark text on a light fill. It blurs the glyphs. |
-| 1.6 | Every new or changed screen is checked on **Monochrome, Purple, Olive and Maroon** before merging. On web dev, use `?bt_theme=<id>`. A black patch on a coloured theme fails review. |
+| 1.5 | **Pair accent surfaces correctly.** On a solid `accent` or `primaryGradient` fill, text and icons use `theme.onAccent`. **Never use `'#fff'` or `ON_DARK` there:** every one of the 12 presets has a *light* accent, so white on accent is invisible. The audit found about 30 such spots, including the Buy now button, the share-store QR code and chat bubbles. On a tinted `accentDim` fill, text uses `theme.accentLight`, not `onAccent`, which comes out dark on dark (the FilterChip active state measures 1.6–2.8 : 1). Don't add a text shadow to dark text on a light fill. It blurs the glyphs. |
+| 1.5a | **`useColors().muted` is a surface colour, not a text colour.** It resolves to `surfaceGlass`. Secondary text uses `useColors().mutedForeground` (or `theme.muted`). The audit found 30 call sites that use `colors.muted` for text, at about 1.05 : 1. Rename the key to `mutedSurface` so this can't recur. |
+| 1.6 | Gradients must pass contrast at **both stops**, not just at the midpoint. Today the Leopard red, Maroon and Navy `primaryGradient` left stops fail against `onAccent` (2.3–3.4 : 1). Darken those stops, or use a flat `accent` for buttons. |
+| 1.7 | Every new or changed screen is checked on **Monochrome, Purple, Olive and Maroon** before merging. On web dev, use `?bt_theme=<id>`. A black patch on a coloured theme fails review. |
 
 **Why:** 192 of 241 screens import static colours, and there are 811 hex literals. The static `MUTED` (white at 58%) measures **3.5 : 1 on the Olive, Silver and Emerald cards**, which fails AA. The runtime `theme.muted` measures at least 5.4 : 1 on every preset.
 
@@ -169,17 +171,19 @@ If a rule blocks something good, change the rule in this file in the same PR. Do
 | Icon action | `IconButton` (44 × 44) | — |
 | Pushed-screen header | `ScreenHeader` | Bespoke header rows. `BrandthreadHeader` and `ScreenHeader` must merge into one. |
 | Tab-root header | `ScreenHeader` large-title variant (to add) | — |
-| Bottom sheet | One `Sheet` component (radius 24 top, `SheetHandle`, 72% scrim, `slow` slide, keyboard-aware, bottom inset) | Raw `<Modal>` per screen (50 files today) |
-| Success / info feedback | `Toast` via one provider (`UndoToastProvider` is the base), 2.5 s, `hapticSuccess` | `Alert.alert('Success', …)` |
+| Bottom sheet | One new `BottomSheet` in BrandthreadUI, built from `ShopProductSheet`'s motion: radius 24 top, internal handle, a 72% scrim that **fades** separately (it never slides up with the sheet), `slow` spring, swipe to dismiss, keyboard-aware, bottom inset | Raw `<Modal animationType="slide">` per screen (50 files today) |
+| Success / info feedback | Rename `UndoToastProvider` to `ToastProvider`, exposing `showToast({ message, variant, action? })`. Show it above the tab bar and safe area, for 2.5 s, with the haptic that matches the variant. | `Toast`, `FeedToastProvider` and `Alert.alert('Success', …)`. Four toast systems exist today. |
 | Inline error | `InlineFeedback` under the field or section | Red text styled locally |
 | Destructive confirm | Native action sheet, or the `Sheet` confirm variant | `Alert.alert` with three buttons |
 | Empty state | `EmptyState` (icon, title ≤ 5 words, one-sentence body, one primary action) | Centred grey "No data" text |
-| Loading (content) | `LoadingSkeleton` / `FeedSkeleton` / `ProductGridSkeleton` / `CheckoutSkeleton` | `ActivityIndicator` in the middle of the screen (124 files today) |
+| Loading (content) | `LoadingSkeleton` / `FeedSkeleton` / `ProductGridSkeleton` / `CheckoutSkeleton`. Fill is **8% white, pulsing 0.55↔1**; today's 5% fill measures 1.1 : 1 and is effectively invisible. The skeleton must match the final layout's shape. | `ActivityIndicator` in the middle of the screen (124 files today); ad-hoc `SkeletonBlock`s |
 | Loading (blocking, > 1 s) | `BrandedLoadingState` with a real message | Bare spinners, "Loading..." |
 | Text input | `FormInput` (52 h, radius 14, 1 pt border, 1.5 pt focus border, label above, helper and error below) | Placeholder-as-label |
 | List row | `NavigationCard` / a settings `Row` (≥ 52 h, 16 padding, chevron `muted`) | Bespoke rows per settings screen |
-| Chips | `FilterChip` | — |
-| Status | `StatusBadge` | Locally coloured pills |
+| Chips | `FilterChip` (active label `accentLight`) | `OptionChip` and other local chips |
+| Badges | `StatusBadge`, plus one `orderStatusBadge(status)` map shared by every order screen | `components/Badge.tsx`, `NewFeatureBadge`, `LockBadge` (merge these in as variants), locally coloured status pills |
+| Tab bar | One `FloatingTabBar` shared by buyer and seller: 11 pt labels, a pressed state and `hapticSelection`, `navigate` rather than `replace`, scroll to top on re-tap, `maxWidth: 560` on iPad | The separate seller full-width band and buyer capsule |
+| Images | `CachedImage` (expo-image) with a neutral dark placeholder | RN `Image`, and the colourful demo blurhash as the default placeholder |
 | Icons | `Feather` (outline, 1.5–2 stroke) at `ICON` sizes (16/20/24) | Mixing Ionicons, MaterialIcons or emoji as UI icons |
 
 ## 10. Layout and safe area
@@ -222,6 +226,18 @@ If a rule blocks something good, change the rule in this file in the same PR. Do
 | Buyer account type | **Shopper** in marketing, **Buyer** in settings | Customer (reserve that for the seller's view of buyers) |
 | Seller plan | **Plan** | Subscription tier, package |
 
+## 11a. Honesty rules (no fake UI)
+
+These are the most common P0 in the audit. There are more than 150 of them.
+
+- **Never claim success without a successful API response.** Nothing that shows "Saved", "Link copied", "Export complete" or "Deleted" may run before, or instead of, the real call.
+- **No dead controls.** A button with no `onPress`, or one that only fires a haptic, is not allowed to ship. Hide it or remove it. For a real roadmap item, use a disabled row with the caption "Coming soon", and never in a primary flow.
+- **No demo, seed or placeholder data outside `__DEV__`.** This covers fake names ("Jordan", "Maya Chen"), fake bank accounts, fake metrics and fake integrations shown as "Connected".
+- **Errors are never shown as empty states.** A failed fetch shows an `InlineError` with a retry, not "No orders yet" and never "$0.00 · All caught up".
+- **No fake progress.** Progress bars reflect real progress. If progress is unknown, show an indeterminate state and honest copy ("Usually under a minute").
+- **Never show raw `error.message`** or server strings to users. Map them to human copy (§11) and log the original.
+- **Screens with no route to them are deleted,** not polished.
+
 ## 12. Accessibility minimums
 
 - Every icon-only button has an `accessibilityLabel` written as a verb ("Close", "Share post").
@@ -244,6 +260,10 @@ grep -rl 'TouchableOpacity' app components --include=*.tsx | wc -l              
 grep -rn 'useNativeDriver: false' app components --include=*.tsx | wc -l         # baseline 10
 # 9 success alerts
 grep -rnE "Alert.alert\(['\"](Success|Saved|Done|Great)" app --include=*.tsx | wc -l   # baseline 26
+# 1.5a `muted` used as a text colour (it's a surface)
+grep -rnE "color: (colors|c|palette)\.muted[,} ]" app components --include=*.tsx | wc -l   # baseline 30
+# 11a dev/vendor words in UI strings
+grep -rnE "Nano Banana|GPT-[0-9]|OpenAI|backend wiring|production build|Server-side enforcement" app components --include=*.tsx | wc -l   # baseline 12 (includes code comments)
 # 8.2 RN Image
 grep -rlE "\bImage\b.*from 'react-native'" app components --include=*.tsx | wc -l                   # baseline 9 (single-line imports)
 # 4 off-scale font sizes
@@ -263,4 +283,6 @@ Recommended ESLint rules (add them once the other sessions land):
 - [ ] Every button gives press feedback and the right haptic, and every async button has a loading state and double-tap protection
 - [ ] Long lists are virtualized, images use `expo-image`, and animations use the native driver or Reanimated at ≤ 400 ms
 - [ ] Copy follows §11: sentence case, verb-first, no jargon, glossary words
+- [ ] No fake success, dead buttons, demo data or raw error text (§11a)
+- [ ] Nothing drawn in white on `accent` (§1.5)
 - [ ] Nothing is hidden under the notch, home indicator, keyboard or tab bar
