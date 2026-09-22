@@ -339,7 +339,7 @@ export default function FriendsScreen() {
             <Feather name="user-plus" size={ICON.lg} color={MUTED} />
             {pendingCount > 0 && (
                 <View style={[s.badge, { backgroundColor: theme.accent }]}>
-                <Text style={s.badgeText}>{pendingCount}</Text>
+                <Text style={[s.badgeText, { color: theme.onAccent }]}>{pendingCount}</Text>
               </View>
             )}
           </View>
@@ -369,7 +369,7 @@ export default function FriendsScreen() {
                 <View style={[s.storyCircle, { backgroundColor: MY_COLOR }]}>
                   <Text style={s.storyInitials}>{MY_INITIALS}</Text>
                   <View style={[s.plusBadge, { backgroundColor: theme.accent }]}>
-                    <Feather name="plus" size={10} color="#fff" />
+                    <Feather name="plus" size={10} color={theme.onAccent} />
                   </View>
                 </View>
                 <Text style={s.storyLabel} numberOfLines={1}>

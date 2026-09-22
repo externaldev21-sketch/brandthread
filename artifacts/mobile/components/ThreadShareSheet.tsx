@@ -24,7 +24,7 @@ import {
   sendMessage,
 } from '@/services/socialService';
 import type { Friendship } from '@/services/socialTypes';
-import { BORDER, CARD, FG, FONT, FS, MUTED, ON_DARK, RADIUS, SUCCESS, SURFACE } from '@/lib/theme';
+import { FONT, FS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
 interface ThreadShareSheetProps {
@@ -57,6 +57,7 @@ export function ThreadShareSheet({
   onFeedback,
 }: ThreadShareSheetProps) {
   const { theme } = useAppTheme();
+  const styles = React.useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [busy, setBusy] = useState<BusyAction>(null);
@@ -237,7 +238,7 @@ export function ThreadShareSheet({
             <View style={styles.headerSpacer} />
             <Text style={styles.title}>Share to</Text>
             <Pressable onPress={onClose} style={styles.close} accessibilityLabel="Close share menu" testID="thread-share-close">
-              <Feather name="x" size={20} color={FG} />
+              <Feather name="x" size={20} color={theme.text} />
             </Pressable>
           </View>
 
@@ -327,6 +328,8 @@ function ShareAction({
   muted?: boolean;
   avatar?: { initials: string; color: string };
 }) {
+  const { theme } = useAppTheme();
+  const styles = React.useMemo(() => makeStyles(theme), [theme]);
   return (
     <Pressable
       style={styles.action}
@@ -337,10 +340,10 @@ function ShareAction({
       testID={`thread-share-${label.toLowerCase().replace(/\s+/g, '-')}`}
     >
       <View style={[styles.actionCircle, muted && styles.actionCircleMuted, avatar && { backgroundColor: avatar.color }]}>
-        {busy ? <ActivityIndicator color={ON_DARK} /> : avatar ? (
+         {busy ? <ActivityIndicator color={theme.onAccent} /> : avatar ? (
           <Text style={styles.avatarText}>{avatar.initials}</Text>
         ) : (
-          <Feather name={icon ?? 'send'} size={22} color={FG} />
+           <Feather name={icon ?? 'send'} size={22} color={theme.text} />
         )}
       </View>
       <Text style={styles.actionLabel} numberOfLines={2}>{label}</Text>
@@ -348,8 +351,8 @@ function ShareAction({
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.34)' },
+const makeStyles = (theme: { background: string; card: string; border: string; text: string; muted: string; surface: string; onAccent: string }) => StyleSheet.create({
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: `${theme.background}55` },
   sheet: {
     position: 'absolute',
     left: 0,
@@ -357,26 +360,26 @@ const styles = StyleSheet.create({
     bottom: 0,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
-    backgroundColor: CARD,
+    backgroundColor: theme.card,
     borderTopWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
   },
   header: { height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14 },
   headerSpacer: { width: 34 },
-  title: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
-  close: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: SURFACE },
+  title: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.md },
+  close: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surface },
   section: { paddingHorizontal: 14, paddingVertical: 14 },
   actionRow: { flexDirection: 'row', gap: 12 },
   action: { width: 66, alignItems: 'center', gap: 7 },
-  actionCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER },
-  actionCircleMuted: { backgroundColor: 'rgba(255,255,255,0.07)' },
-  actionLabel: { minHeight: 30, color: MUTED, fontFamily: FONT.medium, fontSize: 10, lineHeight: 13, textAlign: 'center' },
-  avatarText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.sm },
-  divider: { height: StyleSheet.hairlineWidth, backgroundColor: BORDER },
-  progressWrap: { position: 'absolute', left: 0, right: 0, zIndex: 10000, backgroundColor: 'rgba(8,8,10,0.92)', paddingTop: 8 },
+  actionCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: theme.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.border },
+  actionCircleMuted: { backgroundColor: theme.background },
+  actionLabel: { minHeight: 30, color: theme.muted, fontFamily: FONT.medium, fontSize: FS.xs, lineHeight: 13, textAlign: 'center' },
+  avatarText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: FS.sm },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: theme.border },
+  progressWrap: { position: 'absolute', left: 0, right: 0, zIndex: 10000, backgroundColor: theme.background, paddingTop: 8 },
   progressLabels: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 18, paddingBottom: 7 },
-  progressText: { color: FG, fontFamily: FONT.medium, fontSize: FS.xs },
-  cancelText: { color: FG, fontFamily: FONT.semibold, fontSize: FS.xs },
-  progressTrack: { height: 3, backgroundColor: 'rgba(255,255,255,0.24)' },
+  progressText: { color: theme.text, fontFamily: FONT.medium, fontSize: FS.xs },
+  cancelText: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.xs },
+  progressTrack: { height: 3, backgroundColor: theme.border },
   progressFill: { height: 3 },
 });

@@ -122,7 +122,7 @@ const createTaskStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.cr
   labelDone:  { textDecorationLine: 'line-through', color: MUTED },
   desc:       { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   activePill: { backgroundColor: colors.primary, borderRadius: RADIUS.pill, paddingHorizontal: 6, paddingVertical: 2 },
-  activePillText: { fontSize: 9, fontFamily: FONT.bold, color: colors.primaryForeground },
+  activePillText: { fontSize: FS.xs, fontFamily: FONT.bold, color: colors.primaryForeground },
   skip:       { fontSize: FS.xs, fontFamily: FONT.medium, color: SUBTLE },
 });
 

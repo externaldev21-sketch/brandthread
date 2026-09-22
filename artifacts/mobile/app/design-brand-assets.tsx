@@ -355,7 +355,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   cardInfo:      { padding: SP.sm, gap: 2 },
   assetName:     { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   assetType:     { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, textTransform: 'capitalize' },
-  assetDate:     { fontSize: 10, fontFamily: FONT.regular, color: SUBTLE },
+  assetDate:     { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
 
   fab:           { position: 'absolute', right: SP.md, flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: PURPLE, borderRadius: RADIUS.pill, paddingHorizontal: SP.md, paddingVertical: SP.sm },
   fabText:       { fontSize: FS.sm, fontFamily: FONT.semibold, color: '#FFFFFF' },

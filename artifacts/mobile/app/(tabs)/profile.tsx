@@ -57,6 +57,7 @@ export default function ProfileScreen() {
   const api = useApi();
   const colors = useColors();
   const { theme } = useAppTheme();
+  const palette = theme as unknown as Record<string, string>;
   const { isLoaded: authLoaded, userId } = useAuth();
   const [activeTab, setActiveTab] = useState(0);
   const [sellerPosts, setSellerPosts] = useState<SellerThreadPost[]>([]);
@@ -216,7 +217,7 @@ export default function ProfileScreen() {
   return (
     <>
     <ScrollView
-      style={[s.root, { backgroundColor: 'transparent' }]}
+      style={[s.root, { backgroundColor: palette.background ?? palette.surface ?? BG }]}
       contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 120 }}
       showsVerticalScrollIndicator={false}
     >
@@ -656,7 +657,7 @@ const s = StyleSheet.create({
   },
   gridCaption: { fontSize: 11, fontFamily: FONT.semibold, color: FG, lineHeight: 14, marginTop: SP.md },
   gridStatRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  gridStat: { fontSize: 10, fontFamily: FONT.medium, color: MUTED },
+  gridStat: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   emptyState: { width: '100%', alignItems: 'center', padding: SP.lg, gap: SP.sm },
   emptyText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' },
 

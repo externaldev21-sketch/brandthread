@@ -19,7 +19,7 @@ import { useAuth } from '@clerk/expo';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED, GROWTH_STUDIO_TOOLS } from '@/lib/growthTools';
-import { BG, BORDER, CARD, CARD_ELEVATED, FG, FONT, FS, MUTED, RADIUS, SP, SUBTLE } from '@/lib/theme';
+import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   FIXED_SHORTCUTS,
@@ -114,6 +114,7 @@ export default function SellerStudioRadialMenu({
   const insets   = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
   const { theme } = useAppTheme();
+  const styles = React.useMemo(() => makeStyles(theme), [theme]);
   const { hasPlan, loading: planLoading, error: planError, retry: retryPlan } =
     useSubscriptionPlan();
 
@@ -310,13 +311,13 @@ export default function SellerStudioRadialMenu({
             pressed && styles.actionRowPressed,
           ]}
         >
-          <View style={[styles.actionIcon, { borderColor: BORDER, backgroundColor: CARD }]}>
+           <View style={styles.actionIcon}>
             <Feather name={action.icon} size={20} color={theme.accentLight} />
           </View>
           <Text style={styles.actionLabel} numberOfLines={1}>
             {action.label}
           </Text>
-          <Feather name="chevron-right" size={16} color={MUTED} />
+           <Feather name="chevron-right" size={16} color={theme.muted} />
         </Pressable>
       </Animated.View>
     );
@@ -526,7 +527,7 @@ export default function SellerStudioRadialMenu({
                       style={styles.editBadge}
                       hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
                     >
-                      <Feather name="edit-2" size={11} color={FG} />
+                       <Feather name="edit-2" size={11} color={theme.text} />
                     </Pressable>,
                   )
                 : renderShortcutTile(
@@ -619,7 +620,7 @@ export default function SellerStudioRadialMenu({
                   customShortcut?.id === dest.id && styles.pickerRowSelected,
                 ]}
               >
-                <View style={[styles.pickerIcon, { borderColor: BORDER, backgroundColor: CARD }]}>
+                <View style={styles.pickerIcon}>
                   <Feather name={dest.icon as keyof typeof Feather.glyphMap} size={18} color={theme.accentLight} />
                 </View>
                 <View style={styles.pickerTextWrap}>
@@ -647,11 +648,11 @@ export default function SellerStudioRadialMenu({
                   pressed && styles.pickerRowPressed,
                 ]}
               >
-                <View style={[styles.pickerIcon, { borderColor: BORDER, backgroundColor: CARD }]}>
-                  <Feather name="x-circle" size={18} color={MUTED} />
+                <View style={styles.pickerIcon}>
+                  <Feather name="x-circle" size={18} color={theme.muted} />
                 </View>
                 <View style={styles.pickerTextWrap}>
-                  <Text style={[styles.pickerLabel, { color: MUTED }]}>Clear shortcut</Text>
+                  <Text style={styles.pickerLabel}>Clear shortcut</Text>
                 </View>
               </Pressable>
             )}
@@ -675,7 +676,7 @@ export default function SellerStudioRadialMenu({
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: { background: string; border: string; card: string; cardElevated: string; text: string; muted: string; subtle: string }) => StyleSheet.create({
   // Lightning-bolt / close toggle
   toggle: {
     position: 'absolute',
@@ -702,7 +703,7 @@ const styles = StyleSheet.create({
 
   // Backdrop: 0.88 black
   backdrop: {
-    backgroundColor: BG,
+    backgroundColor: theme.background,
   },
 
   // Outer wrapper centers the scroll list on screen
@@ -721,7 +722,7 @@ const styles = StyleSheet.create({
   // Section heading — uppercase label above each group
   sectionHeading: {
     width: SHEET_WIDTH,
-    color: FG,
+    color: theme.text,
     fontFamily: FONT.bold,
     fontSize: FS.sm,
     letterSpacing: 0.5,
@@ -747,11 +748,11 @@ const styles = StyleSheet.create({
     gap: SP.sm,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: CARD,
+    borderColor: theme.border,
+    backgroundColor: theme.card,
   },
   actionRowPressed: {
-    backgroundColor: CARD_ELEVATED,
+    backgroundColor: theme.cardElevated,
     transform: [{ scale: 0.98 }],
   },
 
@@ -766,7 +767,7 @@ const styles = StyleSheet.create({
   },
   actionLabel: {
     flex: 1,
-    color: FG,
+    color: theme.text,
     fontFamily: FONT.semibold,
     fontSize: FS.md,
     letterSpacing: -0.1,
@@ -791,8 +792,8 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: CARD,
+    borderColor: theme.border,
+    backgroundColor: theme.card,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: SP.sm,
@@ -800,14 +801,14 @@ const styles = StyleSheet.create({
     gap: SP.xs,
   },
   tilePressed: {
-    backgroundColor: CARD_ELEVATED,
+    backgroundColor: theme.cardElevated,
     transform: [{ scale: 0.96 }],
   },
   tileIcon: {
     // margin managed by gap above
   },
   tileLabel: {
-    color: FG,
+    color: theme.text,
     fontFamily: FONT.semibold,
     fontSize: FS.sm,
     textAlign: 'center',
@@ -822,9 +823,9 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: CARD_ELEVATED,
+    backgroundColor: theme.cardElevated,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
@@ -833,7 +834,7 @@ const styles = StyleSheet.create({
   // Save failure note
   saveFailedNote: {
     width: SHEET_WIDTH,
-    color: SUBTLE,
+    color: theme.subtle,
     fontFamily: FONT.regular,
     fontSize: FS.xs,
     textAlign: 'center',
@@ -845,7 +846,7 @@ const styles = StyleSheet.create({
 
   pickerBackdrop: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: BG,
+    backgroundColor: theme.background,
     opacity: 0.72,
   },
 
@@ -854,11 +855,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: CARD,
+    backgroundColor: theme.card,
     borderTopLeftRadius: RADIUS.xl,
     borderTopRightRadius: RADIUS.xl,
     borderTopWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
     paddingTop: SP.sm,
     maxHeight: '80%',
   },
@@ -867,13 +868,13 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: BORDER,
+    backgroundColor: theme.border,
     alignSelf: 'center',
     marginBottom: SP.md,
   },
 
   pickerHeading: {
-    color: FG,
+    color: theme.text,
     fontFamily: FONT.bold,
     fontSize: FS.base,
     letterSpacing: -0.2,
@@ -896,19 +897,19 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     gap: SP.sm,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: CARD,
+    borderColor: theme.border,
+    backgroundColor: theme.card,
   },
   pickerRowPressed: {
-    backgroundColor: CARD_ELEVATED,
+    backgroundColor: theme.cardElevated,
   },
   pickerRowSelected: {
-    borderColor: BORDER,
-    backgroundColor: CARD_ELEVATED,
+    borderColor: theme.border,
+    backgroundColor: theme.cardElevated,
   },
   pickerRowClear: {
     marginTop: SP.sm,
-    borderColor: BORDER,
+    borderColor: theme.border,
   },
 
   pickerIcon: {
@@ -927,14 +928,14 @@ const styles = StyleSheet.create({
   },
 
   pickerLabel: {
-    color: FG,
+    color: theme.text,
     fontFamily: FONT.semibold,
     fontSize: FS.base,
     letterSpacing: -0.1,
   },
 
   pickerDesc: {
-    color: MUTED,
+    color: theme.muted,
     fontFamily: FONT.regular,
     fontSize: FS.xs,
   },

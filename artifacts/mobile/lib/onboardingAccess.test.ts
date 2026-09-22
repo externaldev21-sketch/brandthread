@@ -14,7 +14,7 @@ describe('onboarding account boundary', () => {
   it('keeps guest checkout available at the purchase boundary', () => {
     const checkout = read('../app/buyer-checkout.tsx');
     const storeSettings = read('../app/store-settings.tsx');
-    expect(checkout).toContain('Guest Checkout');
+    expect(checkout).toContain('Guest checkout');
     expect(storeSettings).toContain('Allow guest checkout');
   });
 });

@@ -385,7 +385,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   tabLabel:        { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
   tabLabelActive:  { color: theme.accent },
   tabBadge:        { backgroundColor: theme.accent, borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1 },
-   tabBadgeText:    { fontFamily: FONT.bold, fontSize: 10, color: theme.onAccent },
+   tabBadgeText:    { fontFamily: FONT.bold, fontSize: FS.xs, color: theme.onAccent },
   emptyState:      { alignItems: 'center', paddingVertical: SP.xl * 2, gap: SP.sm },
   emptyTitle:      { fontFamily: FONT.semibold, fontSize: FS.md, color: FG },
   emptyBody:       { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', paddingHorizontal: SP.xl },

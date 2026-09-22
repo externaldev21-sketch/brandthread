@@ -14,10 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import {
-  BG, SURFACE, CARD, CARD_ELEVATED,
-  BORDER, BORDER_ACTIVE, BORDER_SUBTLE,
-  FG, MUTED, SUBTLE,
-  FONT, FS, SP, RADIUS, ICON, OVERLAY,
+  FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
   BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
@@ -42,11 +39,9 @@ const RECENT_PROJECTS = [
   'Streetwear Lookbook',
 ];
 
-const CARD_ELEVATED_HEX = '#222226';
-
 export default function DesignPromptEditScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
   const s = createStyles(theme);
   const router = useRouter();
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -128,7 +123,7 @@ export default function DesignPromptEditScreen() {
             </LinearGradient>
           ) : (
             <View style={s.uploadZone}>
-              <Feather name="upload-cloud" size={ICON.xxl} color={MUTED} />
+              <Feather name="upload-cloud" size={ICON.xxl} color={theme.muted} />
               <Text style={s.uploadTitle}>Upload or choose image</Text>
               <Text style={s.uploadSub}>JPG, PNG, WEBP up to 20MB</Text>
             </View>
@@ -168,11 +163,11 @@ export default function DesignPromptEditScreen() {
         {/* Preserve Toggles */}
         <SectionHeader title="Preserve settings" style={s.sectionHdr} />
         <BrandthreadCard style={s.toggleCard}>
-          <ToggleRow label="Preserve product" description="Keep the garment shape & structure" value={preserveProduct} onChange={setPreserveProduct} cardElevatedHex={CARD_ELEVATED_HEX} />
+          <ToggleRow label="Preserve product" description="Keep the garment shape & structure" value={preserveProduct} onChange={setPreserveProduct} />
           <View style={s.divider} />
-          <ToggleRow label="Preserve logo" description="Keep logos and brand marks unchanged" value={preserveLogo} onChange={setPreserveLogo} cardElevatedHex={CARD_ELEVATED_HEX} />
+          <ToggleRow label="Preserve logo" description="Keep logos and brand marks unchanged" value={preserveLogo} onChange={setPreserveLogo} />
           <View style={s.divider} />
-          <ToggleRow label="Preserve garment color" description="Lock the current garment color" value={preserveGarmentColor} onChange={setPreserveGarmentColor} cardElevatedHex={CARD_ELEVATED_HEX} />
+          <ToggleRow label="Preserve garment color" description="Lock the current garment color" value={preserveGarmentColor} onChange={setPreserveGarmentColor} />
         </BrandthreadCard>
 
         {/* Generate Button */}
@@ -191,8 +186,8 @@ export default function DesignPromptEditScreen() {
             <SectionHeader title="Result" style={s.sectionHdr} />
             {showComparison ? (
               <View style={s.comparison}>
-                <ComparisonPanel label="Before" accent={MUTED} uri={imageUri ?? undefined} />
-                <ComparisonPanel label="After" accent={CYAN} uri={result.imageUris[0]} />
+                <ComparisonPanel label="Before" accent={theme.muted} uri={imageUri ?? undefined} />
+                <ComparisonPanel label="After" accent={theme.secondary} uri={result.imageUris[0]} />
               </View>
             ) : (
               <Image source={{ uri: result.imageUris[0] }} style={s.resultPlaceholder} resizeMode="cover" />
@@ -230,9 +225,9 @@ export default function DesignPromptEditScreen() {
   );
 }
 
-function ToggleRow({ label, description, value, onChange, cardElevatedHex }: {
+function ToggleRow({ label, description, value, onChange }: {
   label: string; description: string; value: boolean;
-  onChange: (v: boolean) => void; cardElevatedHex: string;
+  onChange: (v: boolean) => void;
 }) {
   const { theme } = useAppTheme();
   const { accent: PURPLE } = theme;
@@ -243,7 +238,7 @@ function ToggleRow({ label, description, value, onChange, cardElevatedHex }: {
         <Text style={s.toggleLabel}>{label}</Text>
         <Text style={s.toggleDesc}>{description}</Text>
       </View>
-      <Switch value={value} onValueChange={onChange} trackColor={{ false: cardElevatedHex, true: PURPLE }} thumbColor={value ? '#FFF' : MUTED} />
+      <Switch value={value} onValueChange={onChange} trackColor={{ false: theme.cardElevated, true: PURPLE }} thumbColor={value ? theme.onAccent : theme.muted} />
     </View>
   );
 }
@@ -270,43 +265,43 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   sectionHdr:             { marginTop: SP.lg, marginBottom: SP.sm },
   uploadCard:             { marginHorizontal: SP.md, padding: 0, overflow: 'hidden' },
   uploadZone:             { alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingVertical: SP.xl, paddingHorizontal: SP.md },
-  uploadTitle:            { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  uploadSub:              { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  uploadTitle:            { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
+  uploadSub:              { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
   uploadActions:          { flexDirection: 'row', gap: SP.sm, padding: SP.md },
   uploadBtn:              { flex: 1 },
   preview:                { width: '100%', height: 200 },
   mockPreview:            { alignItems: 'center', justifyContent: 'center', height: 200, gap: SP.sm },
   mockLabel:              { fontSize: FS.sm, fontFamily: FONT.medium, color: PURPLE_LIGHT },
   promptInput:            { marginBottom: SP.sm },
-  chipsLabel:             { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: SP.sm },
+  chipsLabel:             { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.muted, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: SP.sm },
   chipsScroll:            { gap: SP.sm, paddingRight: SP.md },
-  chip:                   { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
-  chipActive:             { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
-  chipText:               { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
+  chip:                   { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.pill, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border },
+  chipActive:             { backgroundColor: PURPLE_DIM, borderColor: theme.accent },
+  chipText:               { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
   chipTextActive:         { color: PURPLE_LIGHT },
   toggleCard:             { marginHorizontal: SP.md, gap: 0 },
   toggleRow:              { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: SP.sm },
   toggleInfo:             { flex: 1, gap: 2 },
-  toggleLabel:            { fontSize: FS.base, fontFamily: FONT.medium, color: FG },
-  toggleDesc:             { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  divider:                { height: 1, backgroundColor: BORDER_SUBTLE, marginVertical: SP.xs },
+  toggleLabel:            { fontSize: FS.base, fontFamily: FONT.medium, color: theme.text },
+  toggleDesc:             { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
+  divider:                { height: 1, backgroundColor: theme.borderSubtle, marginVertical: SP.xs },
   generateBtn:            { marginTop: SP.md },
   generateInner:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingVertical: SP.md },
-  generateText:           { fontSize: FS.md, fontFamily: FONT.bold, color: '#FFF' },
+  generateText:           { fontSize: FS.md, fontFamily: FONT.bold, color: theme.onAccent },
   resultsSection:         { marginTop: SP.lg },
   comparison:             { flexDirection: 'row', gap: SP.sm, marginHorizontal: SP.md },
-  compPanel:              { flex: 1, height: 200, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', gap: SP.sm, borderWidth: 1, borderColor: BORDER_ACTIVE },
+  compPanel:              { flex: 1, height: 200, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', gap: SP.sm, borderWidth: 1, borderColor: theme.border },
   compLabel:              { fontSize: FS.sm, fontFamily: FONT.semibold },
   compToggle:             { marginHorizontal: SP.md, marginTop: SP.sm },
-  resultPlaceholder:      { marginHorizontal: SP.md, height: 240, borderRadius: RADIUS.lg, alignItems: 'center', justifyContent: 'center', gap: SP.sm, borderWidth: 1, borderColor: BORDER_ACTIVE },
+  resultPlaceholder:      { marginHorizontal: SP.md, height: 240, borderRadius: RADIUS.lg, alignItems: 'center', justifyContent: 'center', gap: SP.sm, borderWidth: 1, borderColor: theme.border },
   resultPlaceholderLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
   resultActions:          { gap: SP.sm, marginHorizontal: SP.md, marginTop: SP.md },
   actionBtn:              { width: '100%' },
-  overlay:                { ...StyleSheet.absoluteFill, backgroundColor: OVERLAY, alignItems: 'center', justifyContent: 'center', zIndex: 99 },
+  overlay:                { ...StyleSheet.absoluteFill, backgroundColor: '#00000099', alignItems: 'center', justifyContent: 'center', zIndex: 99 },
   overlayCard:            { width: 280, padding: 0, overflow: 'hidden' },
   overlayGrad:            { alignItems: 'center', gap: SP.md, padding: SP.xl, borderRadius: RADIUS.lg },
-  overlayTitle:           { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
-  overlaySub:             { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  overlayTitle:           { fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text },
+  overlaySub:             { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
   bottomPad:              { height: 40 },
   });
 };

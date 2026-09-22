@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { FS } from '@/lib/theme';
 
 const BRAND_CHECKLIST_ITEMS = [
   'Brand name finalized',
@@ -319,7 +320,7 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
   cardTitle: { flex: 1, fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   aiBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  aiText: { fontSize: 10, fontFamily: 'Inter_700Bold' },
+  aiText: { fontSize: FS.xs, fontFamily: 'Inter_700Bold' },
   input: { borderRadius: 10, borderWidth: 1, padding: 12, fontSize: 14, fontFamily: 'Inter_400Regular', marginBottom: 10 },
   generateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, padding: 13 },
   generateText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },

@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, ON_DARK, FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BuyerSettingsState, loadBuyerSettings, patchBuyerSettings } from '@/lib/buyerSettings';
 import { reportNetworkError } from '@/lib/networkNotice';
@@ -51,7 +51,7 @@ const CONFIG: Record<string, Config> = {
 export default function BuyerSettingsDetail() {
   const { theme } = useAppTheme();
   const PURPLE = theme.accent;
-  const styles = makeStyles();
+  const styles = makeStyles(theme);
   const { section = 'content' } = useLocalSearchParams<{ section?: string }>();
   const router = useRouter(); const insets = useSafeAreaInsets();
   const api = useApi();
@@ -104,15 +104,15 @@ export default function BuyerSettingsDetail() {
   const items = useMemo(() => settings ? cfg.items(settings) : [], [cfg, settings]);
 
   return <View style={[styles.page, { paddingTop: insets.top }]}>
-    <View style={styles.header}><TouchableOpacity style={styles.back} onPress={() => router.back()}><Feather name="arrow-left" size={21} color={FG}/></TouchableOpacity><Text style={styles.title}>{cfg.title}</Text><View style={styles.back}/></View>
+     <View style={styles.header}><TouchableOpacity style={styles.back} onPress={() => router.back()}><Feather name="arrow-left" size={21} color={theme.text}/></TouchableOpacity><Text style={styles.title}>{cfg.title}</Text><View style={styles.back}/></View>
     <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}>
       {cfg.intro ? <Text style={styles.intro}>{cfg.intro}</Text> : null}
       {loading ? <Text style={styles.intro}>Loading settings…</Text> : settings ? <View style={styles.card}>{items.map((item, i) => <TouchableOpacity key={`${item.label}-${i}`} activeOpacity={item.toggle ? 1 : 0.7} style={[styles.row, i < items.length - 1 && styles.divider]} onPress={() => { if (!item.toggle) { Haptics.selectionAsync(); item.action?.(); if (!item.action && !item.value?.toLowerCase().includes('off')) Alert.alert(item.label, 'This control is ready for backend wiring.'); } }}>
-        {item.icon ? <View style={styles.itemIcon}><Feather name={item.icon} size={19} color={FG}/></View> : null}
+         {item.icon ? <View style={styles.itemIcon}><Feather name={item.icon} size={19} color={theme.text}/></View> : null}
         <View style={{ flex: 1 }}><Text style={styles.label}>{item.label}</Text>{item.sub ? <Text style={styles.sub}>{item.sub}</Text> : null}</View>
-        {item.toggle && settings ? <Switch value={Boolean(settings[item.toggle])} onValueChange={(v) => toggle(item.toggle!, v)} trackColor={{ false: CARD_ELEVATED, true: PURPLE }} thumbColor={ON_DARK} /> : <><Text style={styles.value}>{item.value}</Text><Feather name="chevron-right" size={18} color={SUBTLE}/></>}
+         {item.toggle && settings ? <Switch value={Boolean(settings[item.toggle])} onValueChange={(v) => toggle(item.toggle!, v)} trackColor={{ false: theme.cardElevated, true: PURPLE }} thumbColor={theme.onAccent} /> : <><Text style={styles.value}>{item.value}</Text><Feather name="chevron-right" size={18} color={theme.subtle}/></>}
       </TouchableOpacity>)}</View> : null}
     </ScrollView>
   </View>;
 }
-const makeStyles = () => StyleSheet.create({ page:{flex:1,backgroundColor:'transparent'}, header:{height:58,flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:SP.md,borderBottomWidth:1,borderBottomColor:BORDER},back:{width:40,height:40,alignItems:'center',justifyContent:'center'},title:{color:FG,fontFamily:FONT.bold,fontSize:FS.md},intro:{color:MUTED,fontFamily:FONT.regular,fontSize:13,lineHeight:19,marginBottom:SP.md},card:{backgroundColor:CARD,borderWidth:1,borderColor:BORDER,borderRadius:RADIUS.lg,overflow:'hidden'},row:{minHeight:60,paddingHorizontal:14,paddingVertical:12,flexDirection:'row',alignItems:'center',gap:10},divider:{borderBottomWidth:1,borderBottomColor:BORDER},itemIcon:{width:28,alignItems:'center'},label:{color:FG,fontFamily:FONT.medium,fontSize:14},sub:{color:MUTED,fontFamily:FONT.regular,fontSize:11.5,marginTop:3,lineHeight:16},value:{color:MUTED,fontFamily:FONT.regular,fontSize:12,textTransform:'capitalize',maxWidth:110},});
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({ page:{flex:1,backgroundColor:theme.background}, header:{height:58,flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:SP.md,borderBottomWidth:1,borderBottomColor:theme.border},back:{width:40,height:40,alignItems:'center',justifyContent:'center'},title:{color:theme.text,fontFamily:FONT.bold,fontSize:FS.md},intro:{color:theme.muted,fontFamily:FONT.regular,fontSize:13,lineHeight:19,marginBottom:SP.md},card:{backgroundColor:theme.card,borderWidth:1,borderColor:theme.border,borderRadius:RADIUS.lg,overflow:'hidden'},row:{minHeight:60,paddingHorizontal:14,paddingVertical:12,flexDirection:'row',alignItems:'center',gap:10},divider:{borderBottomWidth:1,borderBottomColor:theme.border},itemIcon:{width:28,alignItems:'center'},label:{color:theme.text,fontFamily:FONT.medium,fontSize:14},sub:{color:theme.muted,fontFamily:FONT.regular,fontSize:11.5,marginTop:3,lineHeight:16},value:{color:theme.muted,fontFamily:FONT.regular,fontSize:12,textTransform:'capitalize',maxWidth:110},});

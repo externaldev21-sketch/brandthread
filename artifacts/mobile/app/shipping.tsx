@@ -9,6 +9,7 @@ import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
+import { FS } from '@/lib/theme';
 
 const SHIPMENTS = [
   { id: 'SH-8821', customer: 'Jordan Lee', carrier: 'UPS', status: 'In Transit', eta: 'Jul 10', progress: 70 },
@@ -316,10 +317,10 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: 'row', gap: 6, marginBottom: 16 },
   stat: { flex: 1, borderRadius: 12, padding: 12, borderWidth: 1, alignItems: 'center', gap: 3 },
   statVal: { fontSize: 18, fontFamily: 'Inter_700Bold' },
-  statLabel: { fontSize: 10, fontFamily: 'Inter_400Regular' },
+  statLabel: { fontSize: FS.xs, fontFamily: 'Inter_400Regular' },
   actionsRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
   action: { flex: 1, borderRadius: 12, padding: 12, borderWidth: 1, alignItems: 'center', gap: 6 },
-  actionLabel: { fontSize: 10, fontFamily: 'Inter_500Medium' },
+  actionLabel: { fontSize: FS.xs, fontFamily: 'Inter_500Medium' },
   sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 0 },
   addRateBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
@@ -337,7 +338,7 @@ const styles = StyleSheet.create({
   shipSteps: { flexDirection: 'row', justifyContent: 'space-between' },
   stepItem: { alignItems: 'center', gap: 4 },
   stepDot: { width: 8, height: 8, borderRadius: 4 },
-  stepLabel: { fontSize: 9, fontFamily: 'Inter_500Medium' },
+  stepLabel: { fontSize: FS.xs, fontFamily: 'Inter_500Medium' },
   returnRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   returnInfo: { flex: 1, gap: 2 },
   returnId: { fontSize: 11, fontFamily: 'Inter_700Bold' },

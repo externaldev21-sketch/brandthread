@@ -5,6 +5,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
+import { FS } from '@/lib/theme';
 
 const PAGES = [
   { name: 'Home', status: 'Published', views: '8,240', icon: 'home' as const },
@@ -247,14 +248,14 @@ const styles = StyleSheet.create({
   layoutPreviewOuter: { borderRadius: 8, overflow: 'hidden', marginBottom: 8 },
   layoutCardFooter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   layoutName: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  layoutDesc: { fontSize: 10, fontFamily: 'Inter_400Regular', marginTop: 1 },
+  layoutDesc: { fontSize: FS.xs, fontFamily: 'Inter_400Regular', marginTop: 1 },
   layoutCheck: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   previewBar: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   previewDot: { width: 6, height: 6, borderRadius: 3 },
   previewContent: { borderRadius: 8, overflow: 'hidden' },
   previewHero: { height: 54, alignItems: 'center', justifyContent: 'center' },
-  previewHeroText: { fontSize: 10, fontFamily: 'Inter_700Bold', letterSpacing: 1.5 },
-  previewHeroSub: { fontSize: 8, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  previewHeroText: { fontSize: FS.xs, fontFamily: 'Inter_700Bold', letterSpacing: 1.5 },
+  previewHeroSub: { fontSize: FS.xs, fontFamily: 'Inter_400Regular', marginTop: 2 },
   previewGrid: { flexDirection: 'row', gap: 2, marginTop: 2 },
   previewProduct: { height: 26, borderRadius: 3, marginBottom: 2 },
   editBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, paddingVertical: 10 },

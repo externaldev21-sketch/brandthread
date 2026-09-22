@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
-import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
 import { getCounts, createCount, updateCountItem, completeCount, getInventoryItems, getLocations } from '@/services/inventoryService';
@@ -85,7 +85,7 @@ const COUNT_TYPES: { key: CountType; label: string }[] = [
 
 // ─── Progress Bar ─────────────────────────────────────────────────────────────
 
-function ProgressBar({ percent }: { percent: number }) {
+function ProgressBar({ percent, accent }: { percent: number; accent: string }) {
   const widthAnim = useRef(new Animated.Value(0)).current;
   React.useEffect(() => {
     Animated.timing(widthAnim, { toValue: percent / 100, duration: 400, useNativeDriver: false }).start();
@@ -93,7 +93,7 @@ function ProgressBar({ percent }: { percent: number }) {
   return (
     <View style={pb.track}>
       <Animated.View
-        style={[pb.fill, { width: widthAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]}
+        style={[pb.fill, { backgroundColor: accent, width: widthAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]}
       />
     </View>
   );
@@ -101,14 +101,26 @@ function ProgressBar({ percent }: { percent: number }) {
 
 const pb = StyleSheet.create({
   track: { height: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: RADIUS.pill, overflow: 'hidden', marginVertical: SP.sm },
-  fill: { height: '100%', borderRadius: RADIUS.pill, backgroundColor: PURPLE },
+  fill: { height: '100%', borderRadius: RADIUS.pill },
 });
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function InventoryCountScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const {
+    background: BG, surface: SURFACE, card: CARD, cardElevated: CARD_ELEVATED,
+    border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE,
+    accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM,
+    secondary: CYAN, secondaryDim: CYAN_DIM, success: SUCCESS, warning: ORANGE, error: RED,
+  } = theme;
+  const SUCCESS_DIM = `${SUCCESS}26`;
+  const BORDER_ACTIVE = theme.accentLight;
+  const ORANGE_DIM = `${ORANGE}26`;
+  const RED_DIM = `${RED}26`;
+  const BLUE = theme.accentLight;
+  const GOLD = theme.accent;
+  const GRAD_CARD_GLOW = theme.glowGradient;
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
@@ -418,7 +430,7 @@ export default function InventoryCountScreen() {
           <Text style={s.progressPct}>{progressPct}%</Text>
           <Text style={s.progressLabel}>{cnt.countedItems} of {cnt.totalItems} items counted · {cnt.discrepancyCount} discrepancies</Text>
         </View>
-        <ProgressBar percent={progressPct} />
+        <ProgressBar percent={progressPct} accent={PURPLE} />
         <View style={s.progressMeta}>
           <Text style={s.progressMetaText}>{countTypeLabel(cnt.type)}</Text>
           {cnt.locationName && <Text style={s.progressMetaText}>· {cnt.locationName}</Text>}
@@ -574,7 +586,19 @@ export default function InventoryCountScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const {
+    background: BG, surface: SURFACE, card: CARD, cardElevated: CARD_ELEVATED,
+    border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE,
+    accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM,
+    secondary: CYAN, secondaryDim: CYAN_DIM, success: SUCCESS, warning: ORANGE, error: RED,
+  } = theme as typeof theme & Record<string, string>;
+  const SUCCESS_DIM = `${SUCCESS}26`;
+  const BORDER_ACTIVE = (theme as any).accentLight;
+  const ORANGE_DIM = `${ORANGE}26`;
+  const RED_DIM = `${RED}26`;
+  const BLUE = PURPLE_LIGHT;
+  const GOLD = PURPLE;
+  const GRAD_CARD_GLOW = (theme as any).glowGradient;
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1 },

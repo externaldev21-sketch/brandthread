@@ -28,7 +28,7 @@ describe('app background theme', () => {
     expect(ACCENT_LIGHT).toBe('#FFFFFF');
     expect(colors.dark.primary).toBe(ACCENT);
     expect(colors.dark.primaryForeground).toBe(BG);
-    expect(colors.dark.info).toBe('#D4D4D8');
+    expect(colors.dark.info).toBe('rgba(247,247,250,0.50)');
   });
 
   it('isolates every root stack scene on an opaque background plane', () => {
@@ -39,7 +39,7 @@ describe('app background theme', () => {
     expect(rootLayout).not.toContain('AnimatedGradientBackground');
     expect(rootLayout).toContain('contentStyle: OPAQUE_SCREEN_CONTENT');
     expect(rootLayout).not.toContain("contentStyle: { backgroundColor: 'transparent' }");
-    expect(rootLayout).toContain('<NavigationThemeProvider value={TRANSPARENT_NAVIGATION_THEME}>');
+    expect(rootLayout).toContain('<NavigationThemeProvider value={navigationTheme}>');
 
     for (const route of ['sign-in.tsx', 'onboarding.tsx', 'splash.tsx', 'forgot-password.tsx', 'account-type.tsx']) {
       const source = readFileSync(appPath(route), 'utf8');
@@ -78,7 +78,7 @@ describe('app background theme', () => {
     expect(chromePalette.particlePrimary).toBe(chrome.accentLight);
 
     const backgroundSource = readFileSync(resolve(process.cwd(), 'components/branding/AnimatedGradientBackground.tsx'), 'utf8');
-    expect(backgroundSource).toContain("colors={['#0A0A0B', '#0D0D0F', '#0A0A0B']}");
+    expect(backgroundSource).toContain('heroGradient');
     expect(backgroundSource).not.toContain('<SilkRibbonField');
     expect(backgroundSource).not.toContain('<ParticleField');
   });
@@ -89,8 +89,8 @@ describe('app background theme', () => {
     const sellerHome = readFileSync(appPath('(tabs)/index.tsx'), 'utf8');
     const buyerInbox = readFileSync(appPath('(buyer)/inbox.tsx'), 'utf8');
 
-    expect(sellerLayout).toContain("sceneStyle: { backgroundColor: '#0A0A0B' }");
-    expect(buyerLayout).toContain("sceneStyle: { backgroundColor: '#0A0A0B' }");
+    expect(sellerLayout).toContain('sceneStyle: { backgroundColor: theme.background }');
+    expect(buyerLayout).toContain('sceneStyle: { backgroundColor: colors.background }');
     expect(sellerLayout).toContain('detachInactiveScreens');
     expect(buyerLayout).toContain('detachInactiveScreens');
     expect(sellerLayout).toContain('freezeOnBlur: true');
@@ -100,9 +100,9 @@ describe('app background theme', () => {
   });
 
   it('does not leave opaque colors on full-screen route roots', () => {
-    const routeRootPattern = /\b(?:root|page|container|scroll|screen|loadWrap|loadingWrap|center|safeArea|layout):\s*\{[^}\n]*\bbackgroundColor:\s*(?:BG|colors\.background|['"]#07070F['"])/gm;
-    const inlineRootPattern = /<(?:View|KeyboardAvoidingView)[^>]*style=\{?\[[^\]]*(?:\.root|\.container|\.page)[^\]]*,\s*\{\s*backgroundColor:\s*(?:BG|colors\.background|['"]#07070F['"])/g;
-    const fullFlexPattern = /<(?:View|KeyboardAvoidingView) style=\{\{\s*flex:\s*1,\s*backgroundColor:\s*(?:BG|colors\.background|['"]#07070F['"])/g;
+    const routeRootPattern = /\b(?:root|page|container|scroll|screen|loadWrap|loadingWrap|center|safeArea|layout):\s*\{[^}\n]*\bbackgroundColor:\s*['"]#07070F['"]/gm;
+    const inlineRootPattern = /<(?:View|KeyboardAvoidingView)[^>]*style=\{?\[[^\]]*(?:\.root|\.container|\.page)[^\]]*,\s*\{\s*backgroundColor:\s*['"]#07070F['"]/g;
+    const fullFlexPattern = /<(?:View|KeyboardAvoidingView) style=\{\{\s*flex:\s*1,\s*backgroundColor:\s*['"]#07070F['"]/g;
     // These routes intentionally keep a dark media/modal canvas opaque.
     const immersiveRoutes = new Set(['camera-capture.tsx', 'product-import.tsx']);
     const offenders = routeFiles(resolve(process.cwd(), 'app'))

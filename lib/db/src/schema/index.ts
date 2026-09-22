@@ -21,6 +21,9 @@ export const users = pgTable('users', {
   bio: text('bio'),
   profileImageUrl: text('profile_image_url'),
   accountType: text('account_type'), // 'buyer' | 'seller' | 'both'
+  appThemeId: text('app_theme_id').notNull().default('monochrome'),
+  // Null follows the current app theme; otherwise one of the supported icon themes.
+  appIconId: text('app_icon_id'),
   // Referral / invite system
   inviteCode:     text('invite_code').unique(),   // lazily generated on first /referrals/code call
   referredByCode: text('referred_by_code'),       // code used when this user signed up

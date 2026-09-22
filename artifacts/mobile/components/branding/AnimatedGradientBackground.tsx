@@ -478,11 +478,16 @@ export default function AnimatedGradientBackground({
 }: {
   style?: StyleProp<ViewStyle>;
 }) {
+  const { theme } = useAppTheme();
+  const gradient = theme.heroGradient;
+  const gradientLocations = gradient.map(
+    (_, index) => index / Math.max(1, gradient.length - 1),
+  ) as [number, number, ...number[]];
   return (
-    <View pointerEvents="none" style={[styles.root, { backgroundColor: '#0A0A0B' }, style]}>
+    <View pointerEvents="none" style={[styles.root, { backgroundColor: theme.background }, style]}>
       <LinearGradient
-        colors={['#0A0A0B', '#0D0D0F', '#0A0A0B']}
-        locations={[0, 0.5, 1]}
+        colors={gradient}
+        locations={gradientLocations}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.baseGradient}

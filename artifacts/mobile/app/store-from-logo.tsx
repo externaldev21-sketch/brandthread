@@ -525,7 +525,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   paletteRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   paletteItem: { alignItems: 'center', gap: 4 },
   paletteSwatch: { width: 36, height: 36, borderRadius: RADIUS.xs },
-  paletteLabel: { fontSize: 9, fontFamily: FONT.regular, color: MUTED },
+  paletteLabel: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   rowWrap: { flexDirection: 'row', alignItems: 'center', gap: SP.md, flexWrap: 'wrap' },
   previewLink: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },

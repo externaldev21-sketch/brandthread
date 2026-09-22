@@ -4,7 +4,7 @@
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/app-icons/monochrome.png",
     "scheme": "brandthread",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -188,7 +188,11 @@
       }
     },
     "android": {
-      "package": "com.brandthread.mobile"
+      "package": "com.brandthread.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/app-icons/monochrome-android-foreground.png",
+        "backgroundColor": "#0A0A0B"
+      }
     },
     "web": {
       "favicon": "./assets/images/icon.png",
@@ -196,6 +200,73 @@
     },
     "plugins": [
       "./plugins/with-verify-app-identity",
+      [
+        "expo-runtime-app-icon",
+        {
+          "icons": {
+            "monochrome": {
+              "image": "./assets/images/app-icons/monochrome.png",
+              "backgroundColor": "#0A0A0B",
+              "androidForegroundImage": "./assets/images/app-icons/monochrome-android-foreground.png"
+            },
+            "purple": {
+              "image": "./assets/images/app-icons/purple.png",
+              "backgroundColor": "#281235",
+              "androidForegroundImage": "./assets/images/app-icons/purple-android-foreground.png"
+            },
+            "olive": {
+              "image": "./assets/images/app-icons/olive.png",
+              "backgroundColor": "#2C311E",
+              "androidForegroundImage": "./assets/images/app-icons/olive-android-foreground.png"
+            },
+            "navy": {
+              "image": "./assets/images/app-icons/navy.png",
+              "backgroundColor": "#09142F",
+              "androidForegroundImage": "./assets/images/app-icons/navy-android-foreground.png"
+            },
+            "champagne": {
+              "image": "./assets/images/app-icons/champagne.png",
+              "backgroundColor": "#2A211A",
+              "androidForegroundImage": "./assets/images/app-icons/champagne-android-foreground.png"
+            },
+            "black": {
+              "image": "./assets/images/app-icons/black.png",
+              "backgroundColor": "#171717",
+              "androidForegroundImage": "./assets/images/app-icons/black-android-foreground.png"
+            },
+            "silver": {
+              "image": "./assets/images/app-icons/silver.png",
+              "backgroundColor": "#25272A",
+              "androidForegroundImage": "./assets/images/app-icons/silver-android-foreground.png"
+            },
+            "black_gold": {
+              "image": "./assets/images/app-icons/black-gold.png",
+              "backgroundColor": "#0C0C0C",
+              "androidForegroundImage": "./assets/images/app-icons/black-gold-android-foreground.png"
+            },
+            "emerald_gold": {
+              "image": "./assets/images/app-icons/emerald-gold.png",
+              "backgroundColor": "#182411",
+              "androidForegroundImage": "./assets/images/app-icons/emerald-gold-android-foreground.png"
+            },
+            "leopard_red": {
+              "image": "./assets/images/app-icons/leopard-red.png",
+              "backgroundColor": "#231305",
+              "androidForegroundImage": "./assets/images/app-icons/leopard-red-android-foreground.png"
+            },
+            "maroon": {
+              "image": "./assets/images/app-icons/maroon.png",
+              "backgroundColor": "#2B060B",
+              "androidForegroundImage": "./assets/images/app-icons/maroon-android-foreground.png"
+            },
+            "gold": {
+              "image": "./assets/images/app-icons/gold.png",
+              "backgroundColor": "#241A0D",
+              "androidForegroundImage": "./assets/images/app-icons/gold-android-foreground.png"
+            }
+          }
+        }
+      ],
       "expo-router",
       "expo-font",
       [
@@ -231,7 +302,7 @@
           "icon": "./assets/images/icon.png",
           "color": "#C7CDD5",
           "sounds": [
-            "./assets/sounds/order-received.wav"
+            "./assets/sounds/order_received.wav"
           ],
           "iosDisplayInForeground": true
         }

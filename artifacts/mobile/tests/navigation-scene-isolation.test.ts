@@ -15,7 +15,7 @@ describe('navigation scene isolation', () => {
     expect(rootLayout.slice(layoutStart, stackOptions)).toContain(
       '<IsolatedStackScene>{children}</IsolatedStackScene>',
     );
-    expect(rootLayout).toContain("style={{ flex: 1, backgroundColor: '#0A0A0B' }}");
+    expect(rootLayout).toContain('backgroundColor: palette.background');
     expect(rootLayout).toContain('contentStyle: OPAQUE_SCREEN_CONTENT');
     expect(rootLayout).not.toContain("contentStyle: { backgroundColor: 'transparent' }");
     expect(rootLayout).not.toContain('AnimatedGradientBackground');
@@ -27,7 +27,8 @@ describe('navigation scene isolation', () => {
       const source = read(layout);
       expect(source).toContain('detachInactiveScreens');
       expect(source).toContain('freezeOnBlur: true');
-      expect(source).toContain("sceneStyle: { backgroundColor: '#0A0A0B' }");
+      expect(source.includes('sceneStyle: { backgroundColor: colors.background }')
+        || source.includes('sceneStyle: { backgroundColor: theme.background }')).toBe(true);
       expect(source).not.toContain("sceneStyle: { backgroundColor: 'transparent' }");
     }
   });

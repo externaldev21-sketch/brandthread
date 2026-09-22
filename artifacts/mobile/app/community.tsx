@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6, paddingVertical: 2,
     borderRadius: RADIUS.xs,
   },
-  newBadgeText: { fontSize: 9, fontFamily: FONT.bold, letterSpacing: 0.5 },
+  newBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, letterSpacing: 0.5 },
   rate: { color: FG, fontSize: FS.sm, fontFamily: FONT.bold },
   hireBtn: {
     paddingHorizontal: SP.md, paddingVertical: 7,

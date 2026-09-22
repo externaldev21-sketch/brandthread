@@ -11,12 +11,6 @@ import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
-const BG     = '#0A0A0B';
-const CARD   = '#18181B';
-const BORDER = 'rgba(255,255,255,0.07)';
-const FG     = '#F4F4FF';
-const MUTED  = 'rgba(244,244,255,0.50)';
-
 const FAQS = [
   { q: 'How do drops work?', a: 'Drops are limited-time releases from brands you follow. When a drop goes live you get a notification. Tap the drop to view it and place your order before it sells out. Pre-orders are charged immediately and shipped when production is complete.' },
   { q: 'When does my payment get charged?', a: 'For in-stock items your card is charged at checkout. For pre-order drops your card is charged immediately, but the brand only receives funds once your order ships — we hold the money in escrow to protect you.' },
@@ -35,6 +29,7 @@ export default function HelpScreen() {
   const api = useApi();
   const { user } = useUser();
   const { theme } = useAppTheme();
+  const s = React.useMemo(() => createStyles(theme), [theme]);
 
   const [query, setQuery]     = useState('');
   const [openIdx, setOpenIdx] = useState<number | null>(null);
@@ -80,7 +75,7 @@ export default function HelpScreen() {
     <View style={[s.root, { paddingTop: Platform.OS === 'web' ? 20 : insets.top }]}>
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Feather name="arrow-left" size={22} color={FG} />
+           <Feather name="arrow-left" size={22} color={theme.text} />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Help & Support</Text>
         <View style={{ width: 22 }} />
@@ -89,17 +84,17 @@ export default function HelpScreen() {
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100, gap: 16 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Search */}
         <View style={s.searchRow}>
-          <Feather name="search" size={16} color={MUTED} />
+           <Feather name="search" size={16} color={theme.muted} />
           <TextInput
             style={s.searchInput}
             value={query}
             onChangeText={setQuery}
             placeholder="Search help articles…"
-            placeholderTextColor={MUTED}
+             placeholderTextColor={theme.muted}
           />
           {query.length > 0 && (
             <TouchableOpacity onPress={() => setQuery('')}>
-              <Feather name="x" size={16} color={MUTED} />
+               <Feather name="x" size={16} color={theme.muted} />
             </TouchableOpacity>
           )}
         </View>
@@ -136,7 +131,7 @@ export default function HelpScreen() {
             >
               <View style={s.faqTop}>
                 <Text style={s.faqQ} numberOfLines={isOpen ? undefined : 2}>{faq.q}</Text>
-                <Feather name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color={MUTED} />
+                 <Feather name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color={theme.muted} />
               </View>
               {isOpen && <Text style={s.faqA}>{faq.a}</Text>}
             </TouchableOpacity>
@@ -153,7 +148,7 @@ export default function HelpScreen() {
 
           {submitted ? (
             <View style={s.submittedBadge}>
-              <Feather name="check-circle" size={16} color="#34D399" />
+               <Feather name="check-circle" size={16} color={theme.success} />
               <Text style={s.submittedText}>Got it! We'll be in touch shortly.</Text>
               <TouchableOpacity onPress={() => setSubmitted(false)}>
                 <Text style={s.sendAnotherText}>Send another</Text>
@@ -170,7 +165,7 @@ export default function HelpScreen() {
                     onPress={() => setCategory(c)}
                     activeOpacity={0.8}
                   >
-                    <Text style={[s.catChipText, category === c && s.catChipTextActive]}>{c}</Text>
+                    <Text style={[s.catChipText, category === c && [s.catChipTextActive, { color: theme.onAccent }]]}>{c}</Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -178,7 +173,7 @@ export default function HelpScreen() {
               <TextInput
                 style={s.ticketInput}
                 placeholder="Subject"
-                placeholderTextColor={MUTED}
+                 placeholderTextColor={theme.muted}
                 value={subject}
                 onChangeText={setSubject}
                 maxLength={120}
@@ -186,7 +181,7 @@ export default function HelpScreen() {
               <TextInput
                 style={[s.ticketInput, s.ticketBody]}
                 placeholder="Describe your issue…"
-                placeholderTextColor={MUTED}
+                 placeholderTextColor={theme.muted}
                 value={ticketBody}
                 onChangeText={setTicketBody}
                 multiline
@@ -201,8 +196,8 @@ export default function HelpScreen() {
                 activeOpacity={0.85}
               >
                 {submitting
-                  ? <ActivityIndicator size="small" color="#000" />
-                  : <Text style={s.contactFullBtnText}>Send Message</Text>
+                   ? <ActivityIndicator size="small" color={theme.onAccent} />
+                   : <Text style={[s.contactFullBtnText, { color: theme.onAccent }]}>Send Message</Text>
                 }
               </TouchableOpacity>
             </>
@@ -213,35 +208,35 @@ export default function HelpScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  root:       { flex: 1, backgroundColor: 'transparent' },
-  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
-  headerTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', color: FG },
-  searchRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 14, paddingVertical: 12 },
-  searchInput: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: FG },
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
+  root:       { flex: 1, backgroundColor: theme.background },
+  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: theme.border },
+  headerTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', color: theme.text },
+  searchRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: theme.card, borderRadius: 12, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 14, paddingVertical: 12 },
+  searchInput: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: theme.text },
   contactRow: { flexDirection: 'row', gap: 10 },
-  contactBtn: { flex: 1, backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, padding: 14, alignItems: 'center', gap: 8 },
-  contactLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: FG },
-  sectionTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.5 },
-  noResults:  { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center', paddingVertical: 20 },
-  faqCard:    { backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, padding: 16, gap: 10 },
+  contactBtn: { flex: 1, backgroundColor: theme.card, borderRadius: 14, borderWidth: 1, borderColor: theme.border, padding: 14, alignItems: 'center', gap: 8 },
+  contactLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: theme.text },
+  sectionTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  noResults:  { fontSize: 13, fontFamily: 'Inter_400Regular', color: theme.muted, textAlign: 'center', paddingVertical: 20 },
+  faqCard:    { backgroundColor: theme.card, borderRadius: 14, borderWidth: 1, borderColor: theme.border, padding: 16, gap: 10 },
   faqTop:     { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
-  faqQ:       { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: FG, flex: 1 },
-  faqA:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 20 },
+  faqQ:       { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: theme.text, flex: 1 },
+  faqA:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: theme.muted, lineHeight: 20 },
   ticketSection:   { borderRadius: 18, borderWidth: 1, padding: 16, gap: 12 },
   ticketHeader:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  ticketTitle:     { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
-  ticketSub:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 19 },
+  ticketTitle:     { fontSize: 15, fontFamily: 'Inter_700Bold', color: theme.text },
+  ticketSub:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: theme.muted, lineHeight: 19 },
   catScroll:       { flexGrow: 0, marginBottom: -2 },
   catChip:         { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
-  catChipText:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED },
-  catChipTextActive: { color: '#000' },
-  ticketInput:     { backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, padding: 12, fontSize: 14, fontFamily: 'Inter_400Regular', color: FG },
+  catChipText:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: theme.muted },
+  catChipTextActive: {},
+  ticketInput:     { backgroundColor: theme.card, borderRadius: 12, borderWidth: 1, borderColor: theme.border, padding: 12, fontSize: 14, fontFamily: 'Inter_400Regular', color: theme.text },
   ticketBody:      { minHeight: 100 },
-  submittedBadge:  { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, backgroundColor: 'rgba(52,211,153,0.12)', borderRadius: 10 },
-  submittedText:   { flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium', color: FG },
-  sendAnotherText: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, textDecorationLine: 'underline' },
+  submittedBadge:  { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, backgroundColor: `${theme.success}1F`, borderRadius: 10 },
+  submittedText:   { flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium', color: theme.text },
+  sendAnotherText: { fontSize: 12, fontFamily: 'Inter_400Regular', color: theme.muted, textDecorationLine: 'underline' },
   contactFullBtn:  { borderRadius: 14, paddingHorizontal: 24, paddingVertical: 13, alignItems: 'center' },
-  contactFullBtnText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#000' },
+  contactFullBtnText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
   btnDisabled:     { opacity: 0.5 },
 });

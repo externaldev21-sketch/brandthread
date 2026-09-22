@@ -5,7 +5,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { BG, CARD, BORDER, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
 interface Props {
@@ -22,6 +22,7 @@ function roleLabel(role?: string): string {
 
 export function RoleLockedView({ screenTitle, currentRole }: Props) {
   const { theme } = useAppTheme();
+  const styles = makeStyles(theme);
   return (
     <View style={styles.root}>
       <View style={styles.card}>
@@ -35,7 +36,7 @@ export function RoleLockedView({ screenTitle, currentRole }: Props) {
         </Text>
         {currentRole ? (
           <View style={styles.rolePill}>
-            <Feather name="user" size={12} color={MUTED} />
+            <Feather name="user" size={12} color={theme.muted} />
             <Text style={styles.roleText}>Your role: {roleLabel(currentRole)}</Text>
           </View>
         ) : null}
@@ -44,19 +45,19 @@ export function RoleLockedView({ screenTitle, currentRole }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: theme.background,
     alignItems: 'center',
     justifyContent: 'center',
     padding: SP.xl,
   },
   card: {
-    backgroundColor: CARD,
+    backgroundColor: theme.card,
     borderRadius: RADIUS.xl,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
     padding: SP.xl,
     alignItems: 'center',
     width: '100%',
@@ -71,14 +72,14 @@ const styles = StyleSheet.create({
     marginBottom: SP.lg,
   },
   title: {
-    color: FG,
+    color: theme.text,
     fontSize: FS.lg,
     fontFamily: FONT.semibold,
     marginBottom: SP.sm,
     textAlign: 'center',
   },
   body: {
-    color: MUTED,
+    color: theme.muted,
     fontSize: FS.sm,
     fontFamily: FONT.regular,
     textAlign: 'center',
@@ -89,13 +90,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: `${SUBTLE}22`,
+    backgroundColor: `${theme.subtle}22`,
     borderRadius: 20,
     paddingHorizontal: SP.md,
     paddingVertical: SP.xs,
   },
   roleText: {
-    color: MUTED,
+    color: theme.muted,
     fontSize: FS.xs,
     fontFamily: FONT.medium,
   },

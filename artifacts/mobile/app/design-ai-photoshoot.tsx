@@ -616,7 +616,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   stepDotNum: {
     fontFamily: FONT.bold,
-    fontSize: 10,
+    fontSize: FS.xs,
     color: SUBTLE,
   },
   stepDotNumActive: {

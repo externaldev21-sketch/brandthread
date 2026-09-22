@@ -39,6 +39,7 @@ import {
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useColors } from '@/hooks/useColors';
 import {
   getLastViewedAt,
   setBadgeCount,
@@ -194,6 +195,7 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
   const api = useApi();
   const { userId } = useAuth();
   const { theme } = useAppTheme();
+  const colors = useColors();
 
   const activeTab = getActiveTab(segments as string[]);
 
@@ -287,6 +289,8 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
         {
           height: 76 + insets.bottom,
           paddingBottom: insets.bottom,
+          backgroundColor: colors.tabBarBackground,
+          borderColor: colors.border,
         },
       ]}
       testID="seller-global-tab-bar"
@@ -296,13 +300,20 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
         accessibilityRole="button"
         accessibilityLabel="Open Studio tools"
         onPress={onOpenStudio}
-        style={({ pressed }) => [styles.sideButton, pressed && styles.pressed]}
+        style={({ pressed }) => [
+          styles.sideButton,
+          { backgroundColor: theme.surfaceGlass, borderColor: theme.border },
+          pressed && styles.pressed,
+        ]}
       >
-        <Feather name="menu" size={20} color={FG} />
-        <Text style={styles.sideLabel}>Studio</Text>
+        <Feather name="menu" size={20} color={colors.foreground} />
+        <Text style={[styles.sideLabel, { color: colors.foreground }]}>Studio</Text>
       </Pressable>
 
-      <View style={styles.centerBar}>
+      <View style={[
+        styles.centerBar,
+        { backgroundColor: theme.surfaceGlass, borderColor: theme.border },
+      ]}>
         {TABS.map((tabDef) => {
           const isFocused = activeTab === tabDef.name;
           const color = isFocused ? theme.accent : INACTIVE_COLOR;
@@ -325,14 +336,14 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
                   : `${tabDef.label} tab`
               }
               onPress={onPress}
-              style={[styles.tab, isFocused && styles.tabActive]}
+              style={[styles.tab, isFocused && [styles.tabActive, { backgroundColor: colors.accent }]]}
               testID={`seller-tab-${tabDef.name}`}
             >
               <View style={styles.iconWrap}>
                 <Feather name={tabDef.icon} size={24} color={color} />
                 {showOrderBadge && (
-                  <View style={[styles.badge, { backgroundColor: theme.accent, borderColor: BG }]}>
-                    <Text style={styles.badgeText}>
+                  <View style={[styles.badge, { backgroundColor: theme.accent, borderColor: colors.background }]}>
+                    <Text style={[styles.badgeText, { color: theme.onAccent }]}>
                       {newOrderCount > 99 ? '99+' : String(newOrderCount)}
                     </Text>
                   </View>
@@ -354,10 +365,14 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
         accessibilityRole="button"
         accessibilityLabel="Open Brandthread AI"
         onPress={openAI}
-        style={({ pressed }) => [styles.sideButton, pressed && styles.pressed]}
+        style={({ pressed }) => [
+          styles.sideButton,
+          { backgroundColor: theme.surfaceGlass, borderColor: theme.border },
+          pressed && styles.pressed,
+        ]}
       >
         <BrandthreadLogo size={22} opacity={1} />
-        <Text style={styles.sideLabel}>AI</Text>
+        <Text style={[styles.sideLabel, { color: colors.foreground }]}>AI</Text>
       </Pressable>
     </View>
   );
@@ -437,12 +452,12 @@ const styles = StyleSheet.create({
     justifyContent:   'center',
     paddingHorizontal: 3,
     borderWidth:      1.5,
-    borderColor:      '#0A0A0B',
+    borderColor:      'transparent',
   },
   badgeText: {
-    fontSize:   9,
+    fontSize:   FS.xs,
     fontFamily: FONT.medium,
-    color:      '#FFFFFF',
+    color:      FG,
     lineHeight: 11,
   },
 });

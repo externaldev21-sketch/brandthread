@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
     backgroundColor: ORANGE_DIM, paddingHorizontal: SP.sm, paddingVertical: 3,
     borderRadius: RADIUS.pill,
   },
-  unpaidText: { color: ORANGE, fontSize: 10, fontFamily: FONT.semibold },
+  unpaidText: { color: ORANGE, fontSize: FS.xs, fontFamily: FONT.semibold },
   payoutNote: { color: SUCCESS, fontSize: FS.xs, fontFamily: FONT.medium },
   actionsRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.sm + 4,

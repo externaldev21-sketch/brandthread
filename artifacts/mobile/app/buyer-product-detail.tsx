@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { formatCents } from '@/lib/money';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import {
   addToCart, createBuyNowSession, replaceCartItemVariant,
@@ -34,6 +35,25 @@ import {
   GRAD_SUCCESS_G,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
+
+type ThemeAliases = {
+  theme: AppThemePreset;
+  BG: string; BORDER: string; CARD: string; CARD_ELEVATED: string;
+  FG: string; MUTED: string; SUBTLE: string;
+  RED: string; RED_DIM: string; SUCCESS: string; SUCCESS_DIM: string;
+  ORANGE: string; ORANGE_DIM: string; GOLD: string;
+};
+
+function useThemeAliases(): ThemeAliases {
+  const { theme } = useAppTheme();
+  return {
+    theme,
+    BG: theme.background, BORDER: theme.border, CARD: theme.card, CARD_ELEVATED: theme.cardElevated,
+    FG: theme.text, MUTED: theme.muted, SUBTLE: theme.subtle,
+    RED: theme.error, RED_DIM: `${theme.error}26`, SUCCESS: theme.success, SUCCESS_DIM: `${theme.success}26`,
+    ORANGE: theme.warning, ORANGE_DIM: `${theme.warning}26`, GOLD: theme.accent,
+  };
+}
 import {
   ClaimedRemainingLabel,
   TimeRemainingLabel,
@@ -45,12 +65,12 @@ import {
 
 function useChrome() {
   const colors = useColors();
-  const { theme } = useAppTheme();
+  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, GOLD } = useThemeAliases();
   return {
     theme, PURPLE: colors.primary, PURPLE_LIGHT: theme.accentLight, PURPLE_DIM: colors.accent,
     CYAN: theme.secondary, CYAN_DIM: theme.secondaryDim,
     BORDER_ACTIVE: `${theme.accent}73`, BORDER_FOCUS: `${theme.secondary}80`,
-    GRAD_PRIMARY: theme.primaryGradient,
+    GRAD_PRIMARY: theme.primaryGradient as readonly [string, string, ...string[]],
     SHADOW_PURPLE: { shadowColor: theme.shadowColor, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   };
 }
@@ -291,7 +311,7 @@ function OptionPicker({ product, option, selections, onSelect }: {
   selections: Record<string, string>;
   onSelect: (optionId: string, valueId: string) => void;
 }) {
-  const { theme } = useAppTheme();
+  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, GOLD } = useThemeAliases();
   const op = makeOptionStyles(theme);
   const isColor = option.name.toLowerCase() === 'color';
   return (
@@ -360,6 +380,10 @@ function OptionPicker({ product, option, selections, onSelect }: {
 
 const makeOptionStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE = theme.accent, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = theme.accentDim;
+  const FG = theme.text;
+  const BORDER = theme.border;
+  const CARD_ELEVATED = theme.cardElevated;
+  const RED = theme.error;
   return StyleSheet.create({
   root: { marginBottom: SP.md },
   labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },
@@ -1027,14 +1051,14 @@ export default function BuyerProductDetailScreen() {
             <>
               <View style={s.divider} />
               <TouchableOpacity
-                style={sz.toggle}
+                style={[sz.toggle, { borderTopColor: theme.border }]}
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSizeChartOpen(o => !o); }}
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 accessibilityLabel="Size chart"
                 accessibilityState={{ expanded: sizeChartOpen }}
               >
-                <Text style={sz.label}>Size Chart</Text>
+                <Text style={[sz.label, { color: theme.text }]}>Size Chart</Text>
                 <Feather name={sizeChartOpen ? 'chevron-up' : 'chevron-down'} size={16} color={MUTED} />
               </TouchableOpacity>
               {sizeChartOpen && <SizeChartViewer chart={(product as any).sizeChart} />}
@@ -1200,7 +1224,7 @@ export default function BuyerProductDetailScreen() {
 interface SizeChart { columns: string[]; rows: { size: string; values: string[] }[]; unit?: string; notes?: string }
 
 function SizeChartViewer({ chart }: { chart: SizeChart }) {
-  const { theme } = useAppTheme();
+  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, GOLD } = useThemeAliases();
   const sch = makeSizeChartStyles(theme);
   if (!chart?.columns?.length) return null;
   return (
@@ -1236,7 +1260,7 @@ function SizeChartViewer({ chart }: { chart: SizeChart }) {
 
 function RelatedProducts({ productId }: { productId: string }) {
   const { push } = useThreadPull();
-  const { theme } = useAppTheme();
+  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, GOLD } = useThemeAliases();
   const api = useApi();
   const router = useRouter();
   const pathname = usePathname();
@@ -1330,13 +1354,18 @@ function RelatedProducts({ productId }: { productId: string }) {
 
 const makeSizeChartStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE_DIM = theme.accentDim, PURPLE_LIGHT = theme.accentLight;
+  const BORDER = theme.border;
+  const CARD_ELEVATED = theme.cardElevated;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const SUBTLE = theme.subtle;
   return StyleSheet.create({
   row:        { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER },
   altRow:     { backgroundColor: CARD_ELEVATED },
   cell:       { width: 72, paddingVertical: 8, paddingHorizontal: 4, justifyContent: 'center' },
   sizeCell:   { width: 52 },
   headerCell: { backgroundColor: PURPLE_DIM },
-  headerText: { fontFamily: FONT.semibold, fontSize: 10, color: PURPLE_LIGHT, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.4 },
+  headerText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: PURPLE_LIGHT, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.4 },
   sizeText:   { fontFamily: FONT.semibold, fontSize: FS.xs, color: FG, textAlign: 'center' },
   valueText:  { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, textAlign: 'center' },
   notes:      { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, marginTop: SP.sm, lineHeight: 17 },
@@ -1346,12 +1375,13 @@ const makeSizeChartStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => 
 // ─────────────────────────────────────────────────────────────────────────────
 
 function PolicyRow({ icon, label, value }: { icon: keyof typeof Feather.glyphMap; label: string; value: string }) {
+  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, GOLD } = useThemeAliases();
   return (
     <View style={pr.root}>
-      <Feather name={icon} size={14} color={MUTED} />
+      <Feather name={icon} size={14} color={theme.muted} />
       <View style={{ flex: 1 }}>
-        <Text style={pr.label}>{label}</Text>
-        <Text style={pr.value}>{value}</Text>
+        <Text style={[pr.label, { color: theme.muted }]}>{label}</Text>
+        <Text style={[pr.value, { color: theme.subtle }]}>{value}</Text>
       </View>
     </View>
   );
@@ -1363,6 +1393,19 @@ const pr = StyleSheet.create({
 });
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const BG = theme.background;
+  const CARD = theme.card;
+  const CARD_ELEVATED = theme.cardElevated;
+  const BORDER = theme.border;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const SUBTLE = theme.subtle;
+  const SUCCESS = theme.success;
+  const SUCCESS_DIM = `${theme.success}26`;
+  const ORANGE = theme.warning;
+  const ORANGE_DIM = `${theme.warning}26`;
+  const RED = theme.error;
+  const RED_DIM = `${theme.error}26`;
   const { PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM, BORDER_ACTIVE, BORDER_FOCUS, SHADOW_PURPLE } = {
     PURPLE: theme.accent, PURPLE_LIGHT: theme.accentLight, PURPLE_DIM: theme.accentDim, CYAN: theme.secondary, CYAN_DIM: theme.secondaryDim,
     BORDER_ACTIVE: `${theme.accent}73`, BORDER_FOCUS: `${theme.secondary}80`,

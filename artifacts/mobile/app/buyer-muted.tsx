@@ -12,13 +12,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK, FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getMutedUsers, unmuteUser } from '@/services/socialService';
 import type { MuteRecord } from '@/services/socialTypes';
 
 export default function MutedAccountsScreen() {
   const { theme } = useAppTheme();
+  const styles = makeStyles(theme);
   const PURPLE = theme.accent;
   const CYAN = theme.accentLight;
   const router = useRouter();
@@ -55,7 +56,7 @@ export default function MutedAccountsScreen() {
     <View style={[styles.page, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={21} color={FG} />
+          <Feather name="arrow-left" size={21} color={theme.text} />
         </TouchableOpacity>
         <Text style={styles.title}>Muted accounts</Text>
         <View style={styles.iconBtn} />
@@ -69,13 +70,13 @@ export default function MutedAccountsScreen() {
 
       {muted.length > 0 && (
         <View style={styles.search}>
-          <Feather name="search" size={16} color={MUTED} />
+           <Feather name="search" size={16} color={theme.muted} />
           <TextInput
             style={styles.searchInput}
             value={query}
             onChangeText={setQuery}
             placeholder="Search muted accounts"
-            placeholderTextColor={SUBTLE}
+             placeholderTextColor={theme.subtle}
           />
         </View>
       )}
@@ -86,7 +87,7 @@ export default function MutedAccountsScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Feather name="volume-x" size={32} color={MUTED} />
+             <Feather name="volume-x" size={32} color={theme.muted} />
             <Text style={styles.emptyTitle}>No muted accounts</Text>
             <Text style={styles.emptySub}>Muted accounts will appear here.</Text>
           </View>
@@ -113,42 +114,42 @@ export default function MutedAccountsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: 'transparent' },
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
+  page: { flex: 1, backgroundColor: theme.background },
   header: {
     height: 58, flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between', paddingHorizontal: SP.md,
-    borderBottomWidth: 1, borderBottomColor: BORDER,
+    borderBottomWidth: 1, borderBottomColor: theme.border,
   },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
+  title: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.md },
   intro: { padding: SP.md },
-  introText: { color: MUTED, fontFamily: FONT.regular, fontSize: 13, lineHeight: 19 },
+  introText: { color: theme.muted, fontFamily: FONT.regular, fontSize: 13, lineHeight: 19 },
   search: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     marginHorizontal: SP.md, marginBottom: SP.sm,
-    backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1,
-    borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 10,
+    backgroundColor: theme.card, borderRadius: RADIUS.md, borderWidth: 1,
+    borderColor: theme.border, paddingHorizontal: 12, paddingVertical: 10,
   },
-  searchInput: { flex: 1, color: FG, fontFamily: FONT.regular, fontSize: FS.base },
+  searchInput: { flex: 1, color: theme.text, fontFamily: FONT.regular, fontSize: FS.base },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingHorizontal: SP.md, paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: BORDER,
+    borderBottomWidth: 1, borderBottomColor: theme.border,
   },
   avatar: {
     width: 44, height: 44, borderRadius: 22,
     alignItems: 'center', justifyContent: 'center',
   },
-  avatarText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.base },
-  name: { color: FG, fontFamily: FONT.medium, fontSize: FS.base },
-  handle: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm },
+  avatarText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: FS.base },
+  name: { color: theme.text, fontFamily: FONT.medium, fontSize: FS.base },
+  handle: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm },
   unmuteBtn: {
     paddingHorizontal: 14, paddingVertical: 7,
-    backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
+     backgroundColor: theme.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border,
   },
-  unmuteText: { color: FG, fontFamily: FONT.medium, fontSize: 13 },
+  unmuteText: { color: theme.text, fontFamily: FONT.medium, fontSize: 13 },
   empty: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: SP.lg },
-  emptyTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.md, marginTop: SP.md },
-  emptySub: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: SP.sm, textAlign: 'center' },
+  emptyTitle: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.md, marginTop: SP.md },
+  emptySub: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: SP.sm, textAlign: 'center' },
 });

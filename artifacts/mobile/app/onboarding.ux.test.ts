@@ -52,7 +52,9 @@ describe("v6 step order: AccountType first, then path-specific auth", () => {
   });
 
   it("seller flows through AccountType → SellerAuth → Name → BrandName", () => {
-    expect(source).toContain("function SellerAuthStep");
+    // Buyer and seller now share the runtime-themed auth form.
+    expect(source).toContain("function SharedAuthStep");
+    expect(source).toContain("allowSignedInAccountCreation");
     expect(source).toContain("step === SELLER_STEP_INDEX.AUTH");
     expect(source).toContain("step === SELLER_STEP_INDEX.NAME");
     expect(source).toContain("step === SELLER_STEP_INDEX.BRAND_NAME");

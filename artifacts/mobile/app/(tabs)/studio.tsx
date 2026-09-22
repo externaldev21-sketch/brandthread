@@ -3,7 +3,7 @@
  * Responsive grid using useWindowDimensions() — no percentage widths.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions, Alert, ActivityIndicator } from 'react-native';
@@ -16,7 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { markFeatureOpened, getSetupState } from '@/lib/setupStore';
 import { getProjects } from '@/services/designService';
 import { DesignProject, PROJECT_TYPE_LABELS, PROJECT_STATUS_LABELS } from '@/services/designTypes';
-import { BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, ORANGE, ORANGE_DIM, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, SectionHeader, EmptyState, NewFeatureBadge, StatusBadge, LockBadge } from '@/components/BrandthreadUI';
 import { GROWTH_PLAN_ENFORCEMENT_ENABLED, GROWTH_STUDIO_TOOLS, type GrowthTool, type GrowthToolId } from '@/lib/growthTools';
@@ -81,8 +81,8 @@ const STANDARD_STUDIO_TOOLS: StudioTool[] = [
     title: 'Create Content',
     desc: 'Film and edit Seller posts and videos.',
     icon: 'video',
-    accent: CYAN,
-    accentDim: CYAN_DIM,
+    accent: '',
+    accentDim: '',
     route: '/create-post',
     badge: true,
   },
@@ -106,7 +106,7 @@ const TEMPLATES = [
 
 export default function StudioScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const s = useMemo(() => makeStyles(theme), [theme]);
   const router   = useRouter();
   const { userId } = useAuth();
   const insets   = useSafeAreaInsets();
@@ -189,7 +189,7 @@ export default function StudioScreen() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <View style={[s.root, { paddingTop: insets.top, backgroundColor: theme.background }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
 
         {/* ── HEADER ── */}
@@ -203,7 +203,7 @@ export default function StudioScreen() {
             onPress={() => router.push('/design' as never)}
             activeOpacity={0.8}
           >
-            <Feather name="folder" size={14} color={PURPLE_LIGHT} />
+            <Feather name="folder" size={14} color={theme.accentLight} />
             <Text style={s.myProjectsBtnText}>My Projects</Text>
           </TouchableOpacity>
         </View>
@@ -225,8 +225,8 @@ export default function StudioScreen() {
               !planError &&
               GROWTH_REQUIRED_TOOLS.has(tool.id) &&
               !hasPlan('growth');
-            const toolAccent = tool.id === 'ai-design' ? theme.accentLight : tool.accent;
-            const toolAccentDim = tool.id === 'ai-design' ? theme.accentDim : tool.accentDim;
+            const toolAccent = tool.id === 'ai-design' || tool.id === 'create-content' ? theme.accentLight : tool.accent;
+            const toolAccentDim = tool.id === 'ai-design' || tool.id === 'create-content' ? theme.accentDim : tool.accentDim;
             return (
               <TouchableOpacity
                 key={tool.id}
@@ -251,7 +251,7 @@ export default function StudioScreen() {
                 {/* Labels */}
                 <Text style={s.toolTitle} numberOfLines={1}>{tool.title}</Text>
                 <Text style={s.toolDesc}>{tool.desc}</Text>
-                <Text style={[s.toolCta, { color: isLocked ? MUTED : toolAccent }]}>
+                <Text style={[s.toolCta, { color: isLocked ? theme.muted : toolAccent }]}>
                   {isLocked ? 'Growth plan →' : 'Open →'}
                 </Text>
               </TouchableOpacity>
@@ -269,7 +269,7 @@ export default function StudioScreen() {
 
         {loadingProjects ? (
           <View style={s.loadingRow}>
-            <ActivityIndicator size="small" color={PURPLE} />
+            <ActivityIndicator size="small" color={theme.accent} />
           </View>
         ) : projects.length > 0 ? (
           projects.slice(0, 4).map((proj) => {
@@ -299,7 +299,7 @@ export default function StudioScreen() {
                   </View>
                   <Text style={s.projCta}>Tap to open →</Text>
                 </View>
-                <Feather name="chevron-right" size={16} color={MUTED} />
+                <Feather name="chevron-right" size={16} color={theme.muted} />
               </TouchableOpacity>
             );
           })
@@ -309,9 +309,9 @@ export default function StudioScreen() {
             activeOpacity={0.8}
             onPress={() => router.push('/design' as never)}
           >
-            <Feather name="folder" size={20} color={MUTED} style={{ marginRight: SP.sm }} />
+            <Feather name="folder" size={20} color={theme.muted} style={{ marginRight: SP.sm }} />
             <Text style={s.projEmptyText}>No projects yet — tap to create your first</Text>
-            <Feather name="chevron-right" size={14} color={MUTED} />
+            <Feather name="chevron-right" size={14} color={theme.muted} />
           </TouchableOpacity>
         )}
 
@@ -369,10 +369,22 @@ export default function StudioScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
+const makeStyles = (theme: any) => {
+  const accent = theme.accent;
+  const accentLight = theme.accentLight;
+  const accentDim = theme.accentDim;
+  const background = theme.background;
+  const card = theme.card;
+  const border = theme.border;
+  const foreground = theme.text;
+  const muted = theme.muted;
+  const subtle = theme.subtle;
+  const warning = theme.warning;
+  const warningDim = `${warning}24`;
+  return StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: SCREEN_BG,
+    backgroundColor: background,
   },
   scroll: {
     paddingBottom: 120,
@@ -393,13 +405,13 @@ const s = StyleSheet.create({
   headerTitle: {
     fontSize: FS.xxl,
     fontFamily: FONT.bold,
-    color: PURPLE_LIGHT,
+    color: accentLight,
     letterSpacing: -0.5,
   },
   headerSubtitle: {
     fontSize: FS.xs,
     fontFamily: FONT.medium,
-    color: MUTED,
+    color: muted,
   },
   myProjectsBtn: {
     flexDirection: 'row',
@@ -408,14 +420,14 @@ const s = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: RADIUS.pill,
-    backgroundColor: PURPLE_DIM,
+    backgroundColor: accentDim,
     borderWidth: 1,
-    borderColor: PURPLE + '44',
+    borderColor: accent + '44',
   },
   myProjectsBtnText: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    color: PURPLE_LIGHT,
+    color: accentLight,
   },
   planErrorBanner: {
     flexDirection: 'row',
@@ -426,15 +438,15 @@ const s = StyleSheet.create({
     paddingHorizontal: SP.md,
     paddingVertical: SP.sm,
     borderRadius: RADIUS.md,
-    backgroundColor: '#2B1E0F',
+    backgroundColor: warningDim,
     borderWidth: 1,
-    borderColor: ORANGE,
+    borderColor: warning,
   },
   planErrorText: {
     flex: 1,
     fontSize: FS.sm,
     fontFamily: FONT.medium,
-    color: ORANGE,
+    color: warning,
   },
 
   // Section header
@@ -451,13 +463,13 @@ const s = StyleSheet.create({
   sectionTitle: {
     fontSize: FS.base,
     fontFamily: FONT.bold,
-    color: FG,
+    color: foreground,
     letterSpacing: -0.1,
   },
   sectionAction: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    color: PURPLE_LIGHT,
+    color: accentLight,
   },
 
   // Tool grid — flex wrap with calculated pixel widths
@@ -468,7 +480,7 @@ const s = StyleSheet.create({
     rowGap: ROW_GAP,
   },
   toolCard: {
-    backgroundColor: CARD,
+    backgroundColor: card,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     padding: SP.md,
@@ -490,13 +502,13 @@ const s = StyleSheet.create({
   toolTitle: {
     fontSize: FS.sm,
     fontFamily: FONT.bold,
-    color: FG,
+    color: foreground,
     letterSpacing: -0.1,
   },
   toolDesc: {
     fontSize: FS.xs,
     fontFamily: FONT.regular,
-    color: MUTED,
+    color: muted,
     lineHeight: 16,
     flexShrink: 1,
   },
@@ -519,17 +531,17 @@ const s = StyleSheet.create({
     gap: SP.sm,
     marginHorizontal: H_PAD,
     marginBottom: 8,
-    backgroundColor: ORANGE_DIM,
+    backgroundColor: warningDim,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: ORANGE + '44',
+    borderColor: warning + '44',
     padding: SP.md,
   },
   projErrorText: {
     flex: 1,
     fontSize: FS.sm,
     fontFamily: FONT.medium,
-    color: ORANGE,
+    color: warning,
   },
 
   // Project empty row
@@ -538,17 +550,17 @@ const s = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: H_PAD,
     marginBottom: 8,
-    backgroundColor: CARD,
+    backgroundColor: card,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: border,
     padding: SP.md,
   },
   projEmptyText: {
     flex: 1,
     fontSize: FS.sm,
     fontFamily: FONT.regular,
-    color: MUTED,
+    color: muted,
   },
 
   // Project cards (full-width rows)
@@ -558,10 +570,10 @@ const s = StyleSheet.create({
     gap: SP.md,
     marginHorizontal: H_PAD,
     marginBottom: 8,
-    backgroundColor: CARD,
+    backgroundColor: card,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: border,
     padding: SP.md,
   },
   projThumb: {
@@ -577,7 +589,7 @@ const s = StyleSheet.create({
   projName: {
     fontSize: FS.sm,
     fontFamily: FONT.bold,
-    color: FG,
+    color: foreground,
     letterSpacing: -0.1,
   },
   projMeta: {
@@ -588,12 +600,12 @@ const s = StyleSheet.create({
   projType: {
     fontSize: FS.xs,
     fontFamily: FONT.regular,
-    color: MUTED,
+    color: muted,
   },
   projCta: {
     fontSize: FS.xs,
     fontFamily: FONT.medium,
-    color: SUBTLE,
+    color: subtle,
   },
 
   // Templates horizontal scroll
@@ -611,14 +623,15 @@ const s = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   templateLabelWrap: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: `${background}CC`,
     paddingHorizontal: 6,
     paddingVertical: 5,
   },
   templateLabel: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    color: FG,
+    color: foreground,
     textAlign: 'center',
   },
-});
+  });
+};

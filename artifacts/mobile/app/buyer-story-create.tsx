@@ -580,7 +580,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   thumbNumText: {
     color: '#FFF',
-    fontSize: 9,
+    fontSize: FS.xs,
     fontFamily: FONT.bold,
   },
   advancedBtn: {

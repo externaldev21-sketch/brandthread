@@ -10,7 +10,8 @@ import {
   Inter_700Bold,
   useFonts,
 } from '@expo-google-fonts/inter';
-import { Keyboard, Platform, Pressable, Text, View } from 'react-native';
+import { Keyboard, Platform, Pressable, Text, View, StatusBar } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useGlobalSearchParams, useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import { DarkTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import * as SplashScreen from 'expo-splash-screen';
@@ -20,7 +21,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { flushPendingBuyerOnboardingSync } from '@/lib/buyerOnboardingSync';
 import { RoleProvider } from '@/contexts/RoleContext';
 import { ThreadPullProvider } from '@/contexts/ThreadPullTransitionContext';
-import { AppThemeProvider } from '@/contexts/AppThemeContext';
+import { AppThemeProvider, useAppTheme } from '@/contexts/AppThemeContext';
+import { AppIconProvider } from '@/contexts/AppIconContext';
 import BootScreen from '@/components/BootScreen';
 import * as Notifications from 'expo-notifications';
 import { configureServices } from '@/lib/serviceConfig';
@@ -53,21 +55,60 @@ import { SellerGlobalTabBar } from '@/components/SellerGlobalTabBar';
 import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 import { SellerShellProvider, useSellerShell } from '@/contexts/SellerShellContext';
 
-const TRANSPARENT_NAVIGATION_THEME = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    background: 'transparent',
-  },
-};
-
-const OPAQUE_SCREEN_CONTENT = { backgroundColor: '#0A0A0B' } as const;
+// Presentation routes must remain transparent so the active runtime shell is
+// visible behind cards, sheets, and full-screen modal content.
+const OPAQUE_SCREEN_CONTENT = { backgroundColor: 'transparent' } as const;
 
 function IsolatedStackScene({ children }: { children: React.ReactNode }) {
+  const { theme } = useAppTheme();
+  const palette = theme as typeof theme & Record<string, any>;
   return (
-    <View style={{ flex: 1, backgroundColor: '#0A0A0B' }}>
+    <View style={{ flex: 1, backgroundColor: palette.background ?? '#0A0A0B' }}>
       {children}
     </View>
+  );
+}
+
+/**
+ * Runtime theme boundary. Keeping this immediately inside AppThemeProvider
+ * means navigation chrome, system bars, and the shared shell all consume the
+ * same palette in one render when a user picks a cover.
+ */
+function RuntimeThemeShell({ children }: { children: React.ReactNode }) {
+  const { theme, isHydrated } = useAppTheme();
+  const palette = theme as typeof theme & Record<string, any>;
+  const background = palette.background ?? '#0A0A0B';
+  const heroGradient = (palette.heroGradient ?? [background, palette.surface ?? background]) as [string, string, ...string[]];
+  const navigationTheme = {
+    ...DarkTheme,
+    dark: true,
+    colors: {
+      ...DarkTheme.colors,
+      primary: theme.accent,
+      background: 'transparent',
+      card: palette.surface ?? background,
+      text: palette.text ?? '#F7F7FA',
+      border: palette.border ?? 'rgba(255,255,255,0.12)',
+      notification: theme.accent,
+    },
+  };
+
+  if (!isHydrated) return <BootScreen />;
+  return (
+    <NavigationThemeProvider value={navigationTheme}>
+      <View style={{ flex: 1, backgroundColor: background }}>
+        <LinearGradient
+          colors={heroGradient}
+          style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+          pointerEvents="none"
+        />
+        <StatusBar
+          barStyle={palette.statusBarStyle ?? 'light-content'}
+          backgroundColor={background}
+        />
+        {children}
+      </View>
+    </NavigationThemeProvider>
   );
 }
 
@@ -168,7 +209,7 @@ if (Platform.OS !== 'web') {
       description: 'New order alerts for your Brandthread store.',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
-      sound: 'order-received.wav',
+      sound: 'order_received.wav',
       lightColor: '#F7F7FA',
     });
   }
@@ -978,21 +1019,23 @@ export default function RootLayout() {
           <GestureHandlerRootView style={{ flex: 1 }}>
             <CookieConsentProvider>
             <AppThemeProvider>
-              <RoleProvider>
-                <SellerShellProvider>
-                  <RevenueCatProvider>
-                    <FeatureFlagProvider>
-                      <UndoToastProvider>
-                        <NavigationThemeProvider value={TRANSPARENT_NAVIGATION_THEME}>
-                          <ThreadPullProvider>
-                            <RootLayoutNav />
-                          </ThreadPullProvider>
-                        </NavigationThemeProvider>
-                      </UndoToastProvider>
-                    </FeatureFlagProvider>
-                  </RevenueCatProvider>
-                </SellerShellProvider>
-              </RoleProvider>
+              <AppIconProvider>
+                <RoleProvider>
+                  <SellerShellProvider>
+                    <RevenueCatProvider>
+                      <FeatureFlagProvider>
+                        <UndoToastProvider>
+                          <RuntimeThemeShell>
+                            <ThreadPullProvider>
+                              <RootLayoutNav />
+                            </ThreadPullProvider>
+                          </RuntimeThemeShell>
+                        </UndoToastProvider>
+                      </FeatureFlagProvider>
+                    </RevenueCatProvider>
+                  </SellerShellProvider>
+                </RoleProvider>
+              </AppIconProvider>
             </AppThemeProvider>
             </CookieConsentProvider>
           </GestureHandlerRootView>

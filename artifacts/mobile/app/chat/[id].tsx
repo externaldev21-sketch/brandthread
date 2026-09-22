@@ -12,6 +12,7 @@ import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
 import type { Conversation, Message } from '@/services/socialTypes';
+import { FS } from '@/lib/theme';
 
 type ChatMessage = Omit<Message, 'status'> & { status: 'sent' | 'delivered' | 'read' | 'failed' };
 
@@ -103,7 +104,7 @@ const bub = StyleSheet.create({
   bubbleThem:  { borderRadius: 20, borderBottomLeftRadius: 5 },
   textMe:      { fontSize: 15, fontFamily: 'Inter_400Regular', color: '#FFFFFF', lineHeight: 21 },
   textThem:    { fontSize: 15, fontFamily: 'Inter_400Regular', lineHeight: 21 },
-  timestamp:   { fontSize: 10, fontFamily: 'Inter_400Regular', marginBottom: 6, paddingHorizontal: 4 },
+  timestamp:   { fontSize: FS.xs, fontFamily: 'Inter_400Regular', marginBottom: 6, paddingHorizontal: 4 },
   dividerRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 16, paddingHorizontal: 20 },
   dividerLine: { flex: 1, height: 1 },
   dividerText: { fontSize: 11, fontFamily: 'Inter_500Medium' },

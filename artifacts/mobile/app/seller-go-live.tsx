@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
-import { BG, CARD, BORDER, FG, MUTED, SUBTLE, RED, FONT, FS, SP, RADIUS, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 
@@ -19,7 +19,6 @@ const LIVE_DIM = '#FF3B3020';
 export default function SellerGoLiveScreen() {
   const { theme } = useAppTheme();
   const s = makeStyles(theme);
-  const { accent: PURPLE } = theme;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
@@ -92,9 +91,9 @@ export default function SellerGoLiveScreen() {
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
       {/* Header */}
-      <View style={[s.header, { borderBottomColor: BORDER }]}>
+      <View style={[s.header, { borderBottomColor: theme.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={s.closeBtn}>
-          <Feather name="x" size={22} color={FG} />
+          <Feather name="x" size={22} color={theme.text} />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Go Live</Text>
         <View style={{ width: 40 }} />
@@ -107,47 +106,47 @@ export default function SellerGoLiveScreen() {
             <View style={s.liveDot} />
             <Text style={s.liveBadgeText}>LIVE</Text>
           </View>
-          <Text style={[s.liveHint, { color: MUTED }]}>
+          <Text style={[s.liveHint, { color: theme.muted }]}>
             Your followers will see your stream in the Thread feed and get notified.
           </Text>
         </View>
 
         {/* Title */}
         <View style={s.field}>
-          <Text style={[s.label, { color: MUTED }]}>Stream title *</Text>
+          <Text style={[s.label, { color: theme.muted }]}>Stream title *</Text>
           <TextInput
             value={title}
             onChangeText={setTitle}
             placeholder="e.g. New drop preview, styling tips…"
-            placeholderTextColor={SUBTLE}
+            placeholderTextColor={theme.subtle}
             maxLength={80}
-            style={[s.input, { backgroundColor: CARD, borderColor: BORDER, color: FG }]}
+            style={[s.input, { backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
           />
-          <Text style={[s.charCount, { color: SUBTLE }]}>{title.length}/80</Text>
+          <Text style={[s.charCount, { color: theme.subtle }]}>{title.length}/80</Text>
         </View>
 
         {/* Description */}
         <View style={s.field}>
-          <Text style={[s.label, { color: MUTED }]}>Description (optional)</Text>
+          <Text style={[s.label, { color: theme.muted }]}>Description (optional)</Text>
           <TextInput
             value={description}
             onChangeText={setDescription}
             placeholder="Tell viewers what the stream is about…"
-            placeholderTextColor={SUBTLE}
+            placeholderTextColor={theme.subtle}
             multiline
             maxLength={200}
-            style={[s.inputMulti, { backgroundColor: CARD, borderColor: BORDER, color: FG }]}
+            style={[s.inputMulti, { backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
           />
         </View>
 
         {/* Product tags */}
         {products.length > 0 && (
           <View style={s.field}>
-            <Text style={[s.label, { color: MUTED }]}>Tag products (optional)</Text>
-            <Text style={[s.sublabel, { color: SUBTLE }]}>
+            <Text style={[s.label, { color: theme.muted }]}>Tag products (optional)</Text>
+            <Text style={[s.sublabel, { color: theme.subtle }]}>
               Viewers can tap to shop these during your stream. You can also add/remove them while live.
             </Text>
-            <View style={[s.productList, { backgroundColor: CARD, borderColor: BORDER }]}>
+            <View style={[s.productList, { backgroundColor: theme.card, borderColor: theme.border }]}>
               {products.slice(0, 20).map((p, i) => {
                 const selected = selectedProductIds.has(p.id);
                 return (
@@ -157,24 +156,24 @@ export default function SellerGoLiveScreen() {
                     activeOpacity={0.7}
                     style={[
                       s.productRow,
-                      i > 0 && { borderTopWidth: 1, borderTopColor: BORDER },
-                      selected && { backgroundColor: `${PURPLE}10` },
+                      i > 0 && { borderTopWidth: 1, borderTopColor: theme.border },
+                      selected && { backgroundColor: theme.accentDim },
                     ]}
                   >
                     {p.imageUrl ? (
                       <Image source={{ uri: p.imageUrl }} style={s.productThumb} />
                     ) : (
-                      <View style={[s.productThumb, { backgroundColor: BORDER }]}>
-                        <Feather name="package" size={14} color={MUTED} />
+                      <View style={[s.productThumb, { backgroundColor: theme.border }]}>
+                        <Feather name="package" size={14} color={theme.muted} />
                       </View>
                     )}
                     <View style={{ flex: 1 }}>
-                      <Text style={[s.productName, { color: FG }]} numberOfLines={1}>{p.name}</Text>
-                      <Text style={[s.productPrice, { color: MUTED }]}>
+                      <Text style={[s.productName, { color: theme.text }]} numberOfLines={1}>{p.name}</Text>
+                      <Text style={[s.productPrice, { color: theme.muted }]}>
                         {typeof p.priceCents === 'number' ? formatCents(p.priceCents) : '—'}
                       </Text>
                     </View>
-                    <View style={[s.checkbox, selected && { backgroundColor: PURPLE, borderColor: PURPLE }]}>
+                    <View style={[s.checkbox, selected && { backgroundColor: theme.accent, borderColor: theme.accent }]}>
                       {selected && <Feather name="check" size={13} color={theme.onAccent} />}
                     </View>
                   </TouchableOpacity>
@@ -182,7 +181,7 @@ export default function SellerGoLiveScreen() {
               })}
             </View>
             {selectedProductIds.size > 0 && (
-              <Text style={[s.selCount, { color: PURPLE }]}>
+              <Text style={[s.selCount, { color: theme.accent }]}>
                 {selectedProductIds.size} product{selectedProductIds.size !== 1 ? 's' : ''} tagged
               </Text>
             )}
@@ -192,7 +191,7 @@ export default function SellerGoLiveScreen() {
       </ScrollView>
 
       {/* Go Live CTA */}
-      <View style={[s.footer, { paddingBottom: insets.bottom + 12, borderTopColor: BORDER }]}>
+      <View style={[s.footer, { paddingBottom: insets.bottom + 12, borderTopColor: theme.border }]}>
         <TouchableOpacity
           onPress={handleGoLive}
           disabled={starting || !title.trim()}
@@ -214,12 +213,11 @@ export default function SellerGoLiveScreen() {
 }
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const PURPLE = theme.accent;
   return StyleSheet.create({
   root:           { flex: 1, backgroundColor: 'transparent' },
   header:         { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1 },
   closeBtn:       { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:    { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
+  headerTitle:    { fontSize: FS.base, fontFamily: FONT.bold, color: theme.text },
   body:           { padding: SP.md, gap: SP.lg, paddingBottom: 100 },
   liveHero:       { alignItems: 'center', paddingVertical: SP.md },
   liveBadge:      { flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: RADIUS.pill, paddingHorizontal: 14, paddingVertical: 7, marginBottom: 10 },
@@ -237,7 +235,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   productThumb:   { width: 38, height: 38, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   productName:    { fontSize: FS.sm, fontFamily: FONT.semibold },
   productPrice:   { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-  checkbox:       { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  checkbox:       { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   selCount:       { fontSize: FS.xs, fontFamily: FONT.semibold, textAlign: 'right' },
   footer:         { borderTopWidth: 1, padding: SP.md },
   goLiveBtn:      { borderRadius: RADIUS.pill, height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },

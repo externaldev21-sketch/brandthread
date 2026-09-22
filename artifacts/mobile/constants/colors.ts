@@ -1,74 +1,64 @@
 /**
- * Brandthread design tokens — true black with a strict grayscale hierarchy.
+ * Legacy color shape for the `useColors()` hook.
  *
- * These values are consumed by the legacy `useColors()` hook used in
- * secondary/settings screens. They must match the canonical tokens in
- * `lib/theme.ts` so the whole app is visually consistent.
- *
- * Key mappings to lib/theme constants:
- *   background      → BG           #0A0A0B
- *   foreground      → FG           #F7F7FA
- *   card            → CARD         neutral graphite
- *   primary/tint    → ACCENT       #F7F7FA
- *   mutedForeground → MUTED        rgba(248,250,252,0.50)
- *   border          → BORDER       rgba(255,255,255,0.07)
- *   success         → SUCCESS      #10B981
- *   destructive     → RED          #F87171
+ * Values are aliases of the canonical dark-only tokens in `lib/theme.ts`.
+ * Keep this compatibility object while older screens migrate; never add
+ * independent palette values here.
  */
+import {
+  BG, CARD, CARD_GLASS, FG, ACCENT, MUTED, SUBTLE, BORDER,
+  RED, SUCCESS, ORANGE, GOLD, RADIUS,
+} from '@/lib/theme';
 
 const colors = {
-  /** Light palette — not used in the app (forced dark), kept for completeness. */
+  /** The app is dark-only; the light shape remains for legacy callers. */
   light: {
-    text:                '#17191D',
-    tint:                '#17191D',
-    background:          '#F8FAFC',
-    foreground:          '#17191D',
-    card:                '#FFFFFF',
-    cardForeground:      '#17191D',
-    primary:             '#17191D',
-    primaryForeground:   '#FFFFFF',
-    secondary:           '#E5E7EB',
-    secondaryForeground: '#34383E',
-    muted:               '#F1F5F9',
-    mutedForeground:     '#6B7280',
-    accent:              '#E5E7EB',
-    accentForeground:    '#17191D',
-    destructive:         '#EF4444',
-    destructiveForeground: '#FFFFFF',
-    border:              'rgba(0,0,0,0.08)',
-    input:               '#F1F5F9',
-    success:             '#10B981',
-    warning:             '#F59E0B',
-    info:                '#34383E',
+    text: FG,
+    tint: ACCENT,
+    background: BG,
+    foreground: FG,
+    card: CARD,
+    cardForeground: FG,
+    primary: ACCENT,
+    primaryForeground: BG,
+    secondary: CARD,
+    secondaryForeground: FG,
+    muted: CARD_GLASS,
+    mutedForeground: MUTED,
+    accent: CARD_GLASS,
+    accentForeground: FG,
+    destructive: RED,
+    destructiveForeground: FG,
+    border: BORDER,
+    input: CARD_GLASS,
+    success: SUCCESS,
+    warning: ORANGE,
+    info: MUTED,
   },
-
-  /** Dark palette — the active Brandthread theme. */
   dark: {
-    text:                '#F7F7FA',
-    tint:                '#F7F7FA',
-    background:          '#0A0A0B',
-    foreground:          '#F7F7FA',
-    card:                'rgba(24,24,27,0.58)',
-    cardForeground:      '#F7F7FA',
-    primary:             '#F7F7FA',
-    primaryForeground:   '#0A0A0B',
-    secondary:           'rgba(24,24,27,0.72)',
-    secondaryForeground: '#F7F7FA',
-    muted:               'rgba(24,24,27,0.72)',
-    mutedForeground:     'rgba(247,247,250,0.58)',
-    accent:              '#27272A',
-    accentForeground:    '#F7F7FA',
-    destructive:         '#F87171',
-    destructiveForeground: '#FFFFFF',
-    border:              'rgba(255,255,255,0.07)',
-    input:               'rgba(24,24,27,0.58)',
-    success:             '#10B981',
-    warning:             '#F59E0B',
-    info:                '#D4D4D8',
+    text: FG,
+    tint: ACCENT,
+    background: BG,
+    foreground: FG,
+    card: CARD_GLASS,
+    cardForeground: FG,
+    primary: ACCENT,
+    primaryForeground: BG,
+    secondary: CARD_GLASS,
+    secondaryForeground: FG,
+    muted: CARD_GLASS,
+    mutedForeground: MUTED,
+    accent: CARD,
+    accentForeground: FG,
+    destructive: RED,
+    destructiveForeground: FG,
+    border: BORDER,
+    input: CARD_GLASS,
+    success: SUCCESS,
+    warning: ORANGE,
+    info: SUBTLE,
   },
-
-  /** Shared shape token — matches RADIUS.lg in lib/theme. */
-  radius: 12,
+  radius: RADIUS.lg,
 };
 
 export default colors;

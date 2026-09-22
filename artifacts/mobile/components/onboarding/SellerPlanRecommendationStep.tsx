@@ -5,6 +5,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useRevenueCat } from '@/lib/revenueCat';
 import { SELLER_PACKAGE_IDS, type SellerPlanId } from '@/lib/sellerBilling';
 import { recommendSellerPlan, SELLER_PLANS } from '@/lib/sellerPlans';
+import { FS } from '@/lib/theme';
 
 export function SellerPlanRecommendationStep({
   brandStage,
@@ -96,7 +97,7 @@ const styles = StyleSheet.create({
   card: { width: '100%', minHeight: 340, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.11)', backgroundColor: 'rgba(255,255,255,0.045)', padding: 16 },
   badgeRow: { minHeight: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   badge: { flexDirection: 'row', gap: 5, alignItems: 'center', borderRadius: 20, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
-  badgeText: { fontSize: 9, fontFamily: 'Inter_700Bold', letterSpacing: 0.5 },
+  badgeText: { fontSize: FS.xs, fontFamily: 'Inter_700Bold', letterSpacing: 0.5 },
   planName: { color: '#FFF', fontSize: 22, fontFamily: 'Inter_700Bold', marginTop: 8 },
   tagline: { color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 17, fontFamily: 'Inter_400Regular', marginTop: 3 },
   price: { color: '#FFF', fontSize: 28, fontFamily: 'Inter_700Bold', marginTop: 12 },

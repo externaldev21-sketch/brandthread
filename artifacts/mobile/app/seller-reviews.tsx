@@ -7,7 +7,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BG, CARD, SURFACE, BORDER, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
@@ -30,6 +30,7 @@ type Review = {
 };
 
 function Stars({ rating }: { rating: number }) {
+  const { theme } = useAppTheme();
   return (
     <View style={{ flexDirection: 'row', gap: 2 }}>
       {[1, 2, 3, 4, 5].map((i) => (
@@ -37,7 +38,7 @@ function Stars({ rating }: { rating: number }) {
           key={i}
           name="star"
           size={13}
-          color={i <= rating ? '#F59E0B' : SUBTLE}
+          color={i <= rating ? theme.warning : theme.subtle}
           style={i <= rating ? { opacity: 1 } : { opacity: 0.3 }}
         />
       ))}
@@ -46,6 +47,8 @@ function Stars({ rating }: { rating: number }) {
 }
 
 function ReviewCard({ review, onReplySubmitted }: { review: Review; onReplySubmitted: () => void }) {
+  const { theme } = useAppTheme();
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
   const api = useApi();
   const [replying, setReplying] = useState(false);
   const [replyText, setReplyText] = useState('');
@@ -95,7 +98,7 @@ function ReviewCard({ review, onReplySubmitted }: { review: Review; onReplySubmi
       {review.seller_reply ? (
         <View style={s.replyBox}>
           <View style={s.replyHeader}>
-            <Feather name="corner-down-right" size={13} color={PURPLE_LIGHT} />
+            <Feather name="corner-down-right" size={13} color={theme.accentLight} />
             <Text style={s.replyLabel}>Your reply</Text>
           </View>
           <Text style={s.replyText}>{review.seller_reply}</Text>
@@ -109,7 +112,7 @@ function ReviewCard({ review, onReplySubmitted }: { review: Review; onReplySubmi
           onPress={() => setReplying(true)}
           activeOpacity={0.8}
         >
-          <Feather name="message-square" size={13} color={PURPLE_LIGHT} />
+          <Feather name="message-square" size={13} color={theme.accentLight} />
           <Text style={s.replyBtnText}>Reply publicly</Text>
         </TouchableOpacity>
       )}
@@ -121,7 +124,7 @@ function ReviewCard({ review, onReplySubmitted }: { review: Review; onReplySubmi
             value={replyText}
             onChangeText={setReplyText}
             placeholder="Write a public reply visible to all buyers..."
-            placeholderTextColor={SUBTLE}
+            placeholderTextColor={theme.subtle}
             multiline
             numberOfLines={3}
             maxLength={500}
@@ -142,7 +145,7 @@ function ReviewCard({ review, onReplySubmitted }: { review: Review; onReplySubmi
               activeOpacity={0.85}
             >
               {submitting ? (
-                <ActivityIndicator size="small" color="#000" />
+                <ActivityIndicator size="small" color={theme.onAccent} />
               ) : (
                 <Text style={s.submitText}>Post Reply</Text>
               )}
@@ -157,6 +160,9 @@ function ReviewCard({ review, onReplySubmitted }: { review: Review; onReplySubmi
 export default function SellerReviewsScreen() {
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM } = theme;
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
+  const FG = theme.text;
+  const MUTED = theme.muted;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
@@ -264,7 +270,17 @@ export default function SellerReviewsScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const CARD = theme.card;
+  const SURFACE = theme.surface;
+  const BORDER = theme.border;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const PURPLE = theme.accent;
+  const PURPLE_LIGHT = theme.accentLight;
+  const PURPLE_DIM = theme.accentDim;
+  const ON_ACCENT = theme.onAccent;
+  return StyleSheet.create({
   root:       { flex: 1, backgroundColor: 'transparent' },
   header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
   headerTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', color: FG },
@@ -272,7 +288,7 @@ const s = StyleSheet.create({
   statsRow:   { flexDirection: 'row', padding: 16, gap: 0, borderBottomWidth: 1, borderBottomColor: BORDER },
   stat:       { flex: 1, alignItems: 'center', gap: 2 },
   statVal:    { fontSize: 18, fontFamily: 'Inter_700Bold', color: FG },
-  statLabel:  { fontSize: 10, fontFamily: 'Inter_400Regular', color: MUTED },
+  statLabel:  { fontSize: FS.xs, fontFamily: 'Inter_400Regular', color: MUTED },
   statDivider: { width: 1, backgroundColor: BORDER, marginVertical: 4 },
 
   scroll:     { padding: 16, paddingBottom: 100, gap: 12 },
@@ -283,7 +299,7 @@ const s = StyleSheet.create({
   avatarText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: PURPLE_LIGHT },
   buyerName:  { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
   productName: { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
-  dateText:   { fontSize: 10, fontFamily: 'Inter_400Regular', color: MUTED },
+  dateText:   { fontSize: FS.xs, fontFamily: 'Inter_400Regular', color: MUTED },
   reviewBody: { fontSize: 13, fontFamily: 'Inter_400Regular', color: FG, lineHeight: 20 },
 
   replyBox:   { backgroundColor: PURPLE_DIM, borderRadius: 10, padding: 12, gap: 6 },
@@ -301,7 +317,7 @@ const s = StyleSheet.create({
   cancelText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: MUTED },
   submitBtn:  { paddingVertical: 8, paddingHorizontal: 18, borderRadius: 8, backgroundColor: PURPLE, minWidth: 90, alignItems: 'center' },
   submitBtnDisabled: { opacity: 0.5 },
-  submitText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#000' },
+  submitText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: ON_ACCENT },
 
   center:     { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60, gap: 12 },
   errorText:  { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center' },
@@ -309,4 +325,5 @@ const s = StyleSheet.create({
   retryText:  { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
   emptyTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
   emptyBody:  { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center', lineHeight: 20, maxWidth: 280 },
-});
+  });
+};

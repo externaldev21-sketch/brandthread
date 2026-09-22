@@ -10,7 +10,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { BG, SCREEN_BG, SURFACE, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, ORANGE, RED, RED_DIM, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { AnimatedEntrance, BrandthreadCard, PrimaryButton, IconButton, SearchBar, FilterChip, StatusBadge, EmptyState, ProductGridSkeleton, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
@@ -62,12 +62,15 @@ interface ProductRowProps {
 
 function ProductRow({ product, onPress, onMore, isLast }: ProductRowProps) {
   const { theme } = useAppTheme();
+  const s = React.useMemo(() => createStyles(theme), [theme]);
+  const { error: RED, warning: ORANGE, success: SUCCESS, card: CARD, border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE } = theme;
+  const palette = theme as typeof theme & Record<string, string>;
   const coverUri = product.media.find(m => m.isCover)?.uri ?? product.media[0]?.uri;
   const gradColors = getCategoryColors(product.category, theme);
 
   const stock = product.inventory.totalStock;
   const threshold = product.inventory.lowStockThreshold;
-  const stockColor = stock === 0 ? RED : stock <= threshold ? ORANGE : SUCCESS;
+  const stockColor = stock === 0 ? theme.error : stock <= threshold ? theme.warning : theme.success;
   const stockLabel = stock === 0 ? 'Out of stock' : `${stock} in stock`;
 
   const price = product.pricing.priceCents;
@@ -81,7 +84,7 @@ function ProductRow({ product, onPress, onMore, isLast }: ProductRowProps) {
       <TouchableOpacity
         activeOpacity={0.82}
         onPress={onPress}
-        style={s.productRow}
+        style={[s.productRow, { backgroundColor: palette.card ?? CARD, borderColor: palette.border ?? BORDER }]}
         accessibilityLabel={`${product.name}, ${statusLabel(product.status)}, ${formatCents(price)}`}
       >
         {/* Square thumbnail */}
@@ -96,19 +99,19 @@ function ProductRow({ product, onPress, onMore, isLast }: ProductRowProps) {
         {/* Content */}
         <View style={s.rowContent}>
           <View style={s.rowTopLine}>
-            <Text style={s.rowName} numberOfLines={1}>{product.name}</Text>
+            <Text style={[s.rowName, { color: palette.foreground ?? FG }]} numberOfLines={1}>{product.name}</Text>
             <StatusBadge label={statusLabel(product.status)} variant={statusVariant(product.status)} small />
           </View>
 
           <View style={s.rowMeta}>
-            <Text style={s.rowMetaText} numberOfLines={1}>
+            <Text style={[s.rowMetaText, { color: palette.muted ?? MUTED }]} numberOfLines={1}>
               {product.category}
               {product.variants.length > 0 ? ` · ${product.variants.length} variant${product.variants.length !== 1 ? 's' : ''}` : ''}
             </Text>
           </View>
 
           <View style={s.rowPriceLine}>
-            <Text style={s.rowPrice}>{formatCents(price)}</Text>
+            <Text style={[s.rowPrice, { color: palette.foreground ?? FG }]}>{formatCents(price)}</Text>
             {compare && compare > price && (
               <Text style={s.rowCompare}>{formatCents(compare)}</Text>
             )}
@@ -126,7 +129,7 @@ function ProductRow({ product, onPress, onMore, isLast }: ProductRowProps) {
           hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
           accessibilityLabel={`More actions for ${product.name}`}
         >
-          <Feather name="more-horizontal" size={ICON.sm} color={MUTED} />
+          <Feather name="more-horizontal" size={ICON.sm} color={palette.subtle ?? SUBTLE} />
         </TouchableOpacity>
       </TouchableOpacity>
       {!isLast && <View style={s.rowDivider} />}
@@ -147,6 +150,8 @@ interface ActionSheetProps {
 function ActionSheet({ product, visible, onClose, onRefresh, onDelete }: ActionSheetProps) {
   const router = useRouter();
   const { theme } = useAppTheme();
+  const sh = React.useMemo(() => createSheetStyles(theme), [theme]);
+  const { muted: MUTED, subtle: SUBTLE } = theme;
   if (!product) return null;
 
   const p = product as Product;
@@ -198,14 +203,14 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete }: ActionS
     { label: 'Duplicate', icon: 'copy', onPress: handleDuplicate },
     { label: 'Share', icon: 'share', onPress: handleShare },
     {
-      label: 'Send to manufacturer', icon: 'tool', accent: ORANGE,
+      label: 'Send to manufacturer', icon: 'tool', accent: theme.warning,
       onPress: () => { closeSheet(); router.push(('/manufacturer-hub?productId=' + p.id) as never); },
     },
     { label: 'View analytics', icon: 'bar-chart-2', onPress: () => { closeSheet(); router.push(('/product-detail?id=' + p.id + '&tab=analytics') as never); } },
     isArchived
       ? { label: 'Unarchive', icon: 'rotate-ccw', onPress: handleUnarchive }
       : { label: 'Archive', icon: 'archive', onPress: handleArchive },
-    { label: 'Delete', icon: 'trash-2', accent: RED, onPress: handleDelete },
+    { label: 'Delete', icon: 'trash-2', accent: theme.error, onPress: handleDelete },
   ];
 
   return (
@@ -246,6 +251,9 @@ interface FilterModalProps {
 }
 
 function FilterModal({ visible, current, onApply, onClose }: FilterModalProps) {
+  const { theme } = useAppTheme();
+  const sh = React.useMemo(() => createSheetStyles(theme), [theme]);
+  const PURPLE_LIGHT = theme.accentLight;
   const [selected, setSelected] = useState<ProductFilter>(current);
 
   useEffect(() => { setSelected(current); }, [current, visible]);
@@ -315,6 +323,9 @@ function SortModal({
   onSelect: (k: SortKey) => void;
   onClose: () => void;
 }) {
+  const { theme } = useAppTheme();
+  const sh = React.useMemo(() => createSheetStyles(theme), [theme]);
+  const PURPLE_LIGHT = theme.accentLight;
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={sh.overlay} onPress={onClose} />
@@ -343,6 +354,10 @@ function SortModal({
 
 export default function ProductsScreen() {
   const { theme } = useAppTheme();
+  const palette = theme as typeof theme & Record<string, string>;
+  const s = React.useMemo(() => createStyles(theme), [theme]);
+  const { background: SCREEN_BG, surface: SURFACE, card: CARD, border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE, accent: PURPLE, accentLight: PURPLE_LIGHT } = theme;
+  const BG = theme.surface;
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { showUndo } = useUndoToast();
@@ -514,9 +529,9 @@ export default function ProductsScreen() {
   ), [router]);
 
   return (
-    <View style={s.root}>
+    <View style={[s.root, { backgroundColor: palette.background ?? palette.surface ?? SCREEN_BG }]}>
       {/* ── Fixed header ── */}
-      <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
+      <View style={[s.header, { paddingTop: insets.top + SP.sm, backgroundColor: palette.surface ?? BG, borderBottomColor: palette.border ?? BORDER }]}>
         {/* Title row */}
         <View style={s.titleRow}>
           <TouchableOpacity
@@ -528,7 +543,7 @@ export default function ProductsScreen() {
             ])}
             activeOpacity={0.7}
           >
-            <Text style={s.titleText}>Products</Text>
+            <Text style={[s.titleText, { color: palette.foreground ?? FG }]}>Products</Text>
             <Feather name="chevron-down" size={18} color={MUTED} />
           </TouchableOpacity>
           <View style={s.titleActions}>
@@ -651,7 +666,11 @@ export default function ProductsScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
+const createStyles = (theme: any) => {
+  const SCREEN_BG = theme.background, BG = theme.surface, CARD = theme.card, BORDER = theme.border;
+  const BORDER_ACTIVE = theme.accent, FG = theme.text, MUTED = theme.muted, SUBTLE = theme.subtle;
+  const PURPLE_DIM = theme.accentDim, PURPLE_LIGHT = theme.accentLight, RED = theme.error;
+  return StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: SCREEN_BG,
@@ -863,9 +882,13 @@ const s = StyleSheet.create({
     backgroundColor: SCREEN_BG,
     zIndex: 10,
   },
-});
+  });
+};
 
-const sh = StyleSheet.create({
+const createSheetStyles = (theme: any) => {
+  const SURFACE = theme.surface, BORDER = theme.border, FG = theme.text, MUTED = theme.muted;
+  const PURPLE_LIGHT = theme.accentLight;
+  return StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.72)',
@@ -936,7 +959,8 @@ const sh = StyleSheet.create({
     color: PURPLE_LIGHT,
     fontFamily: FONT.semibold,
   },
-});
+  });
+};
 
 const fm = StyleSheet.create({
   chips: {

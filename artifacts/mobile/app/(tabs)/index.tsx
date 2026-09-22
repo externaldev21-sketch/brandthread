@@ -14,7 +14,7 @@ import { deriveHubStats, deriveInventoryStats, deriveOrderStats } from '@/lib/se
 import { AnimatedEntrance, BrandthreadScreen, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SearchBar, StatCard, SectionHeader, ProgressCard, NavigationCard, NewFeatureBadge, LoadingSkeleton, EmptyState, StatusBadge, PressableScale } from '@/components/BrandthreadUI';
 import { SellerDashboardKPIGrid } from '@/components/SellerDashboardKPIGrid';
 import { SellerQuickActionsGrid } from '@/components/SellerQuickActionsGrid';
-import { BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED, SELLER_DASHBOARD_GLASS, SELLER_DASHBOARD_GLASS_ELEVATED, BORDER, BORDER_SUBTLE, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, GREEN_BRIGHT, BLUE, ORANGE, RED, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP, ICON, ANIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { useRevenueCat } from '@/lib/revenueCat';
@@ -108,6 +108,7 @@ function normalizeRevenueTrend(rows: unknown[]): RevenueTrendPoint[] {
 
 function UnifiedCard({ children, style, onPress, glow = false }: { children: React.ReactNode, style?: StyleProp<ViewStyle>, onPress?: () => void, glow?: boolean }) {
   const { theme } = useAppTheme();
+  const s = React.useMemo(() => createStyles(theme), [theme]);
   const cardStyle = [
     s.unifiedCard,
     glow && { shadowColor: theme.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 16, elevation: 8 },
@@ -130,6 +131,7 @@ function DashboardUnavailableState({
   compact?: boolean;
 }) {
   const { theme } = useAppTheme();
+  const s = React.useMemo(() => createStyles(theme), [theme]);
   return (
     <View
       style={[s.unavailableCard, compact && s.unavailableCardCompact]}
@@ -165,6 +167,9 @@ function RevenueTrendChart({
   error: boolean;
   accent: string;
 }) {
+  const { theme } = useAppTheme();
+  const s = React.useMemo(() => createStyles(theme), [theme]);
+  const { subtle: SUBTLE, text: FG } = theme;
   const animation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -258,6 +263,9 @@ const DEFAULT_SETUP: SetupState = {
 
 export default function SellerHomeScreen() {
   const { theme } = useAppTheme();
+  const s = React.useMemo(() => createStyles(theme), [theme]);
+  const { background: BG, surface: SCREEN_BG, text: FG, muted: MUTED, subtle: SUBTLE, border: BORDER, success: SUCCESS, accentLight: GREEN_BRIGHT, accent: BLUE, warning: ORANGE, error: RED } = theme;
+  const palette = theme as typeof theme & Record<string, string>;
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { userId } = useAuth();
@@ -559,7 +567,7 @@ export default function SellerHomeScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: SCREEN_BG }}>
+      <View style={{ flex: 1, backgroundColor: palette.background ?? palette.surface ?? SCREEN_BG }}>
         <View style={[s.header, { paddingTop: insets.top + 8 }]}>
           <View style={{ gap: 4 }}>
             <LoadingSkeleton height={12} style={{ width: 100 }} />
@@ -596,15 +604,15 @@ export default function SellerHomeScreen() {
       onSetupStateChange={setSetupState}
     />
   ) : (
-    <View style={{ flex: 1, backgroundColor: SCREEN_BG }}>
+    <View style={{ flex: 1, backgroundColor: palette.background ?? palette.surface ?? SCREEN_BG }}>
       <View style={[s.header, { paddingTop: insets.top + 8 }]}>
         <View>
           <Text style={s.greetSmall}>{greeting()}</Text>
           <Text style={s.brandName}>Brandthread</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          <IconButton name="search" onPress={() => { setSearchQuery(''); setSearchModal(true); }} />
-          <IconButton name="bell" badge={unseenOrderCount > 0} badgeCount={unseenOrderCount} onPress={() => Alert.alert('Notifications', 'No new notifications.')} />
+            <IconButton name="search" accessibilityLabel="Search store" onPress={() => { setSearchQuery(''); setSearchModal(true); }} />
+            <IconButton name="bell" accessibilityLabel="Open notifications" badge={unseenOrderCount > 0} badgeCount={unseenOrderCount} onPress={() => Alert.alert('Notifications', 'No new notifications.')} />
         </View>
       </View>
 
@@ -641,7 +649,7 @@ export default function SellerHomeScreen() {
                   <Feather name="arrow-right" size={14} color={theme.onAccent} />
                 </PressableScale>
               </View>
-              <Pressable onPress={dismissTrialBanner} hitSlop={10} accessibilityLabel="Dismiss trial reminder">
+              <Pressable onPress={dismissTrialBanner} hitSlop={10} accessibilityRole="button" accessibilityLabel="Dismiss trial reminder">
                 <Feather name="x" size={16} color={MUTED} />
               </Pressable>
             </View>
@@ -757,7 +765,7 @@ export default function SellerHomeScreen() {
                     onPress={task.completed ? undefined : () => openSetupTask(task)}
                    rightElement={task.optional && !task.completed ? (
                      <View style={{ backgroundColor: 'rgba(255,255,255,0.06)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                        <Text style={{ fontSize: 10, fontFamily: FONT.medium, color: MUTED }}>Optional</Text>
+                        <Text style={{ fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED }}>Optional</Text>
                      </View>
                    ) : null}
                     isLast={i === setupState.tasks.length - 1}
@@ -872,7 +880,7 @@ export default function SellerHomeScreen() {
 
       <Modal visible={commandModal} animationType="slide" transparent>
         <View style={s.modalOverlay}>
-          <Pressable style={s.modalOverlay} onPress={() => setCommandModal(false)} />
+          <Pressable style={s.modalOverlay} onPress={() => setCommandModal(false)} accessibilityRole="button" accessibilityLabel="Close create and manage menu" />
           <View style={[s.bottomSheet, { paddingBottom: Math.max(insets.bottom, SP.lg) }]}>
             <View style={s.sheetHandle} />
             <Text style={s.commandTitle}>Create & manage</Text>
@@ -882,6 +890,8 @@ export default function SellerHomeScreen() {
                   key={item.label}
                   style={s.commandItem}
                   onPress={() => { setCommandModal(false); setTimeout(() => nav(item.route), 150); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.label}
                 >
                   <View style={s.commandIconWrap}>
                     <Feather name={item.icon} size={18} color={theme.accentLight} />
@@ -898,7 +908,7 @@ export default function SellerHomeScreen() {
         <View style={[s.searchScreen, { paddingTop: insets.top, backgroundColor: BG }]}>
           <View style={s.searchHeader}>
             <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Search orders or products…" style={{ flex: 1 }} />
-            <PressableScale onPress={() => setSearchModal(false)} style={s.searchClose}>
+            <PressableScale onPress={() => setSearchModal(false)} style={s.searchClose} accessibilityRole="button" accessibilityLabel="Close store search">
               <Text style={{ fontSize: FS.base, fontFamily: FONT.medium, color: MUTED }}>Cancel</Text>
             </PressableScale>
           </View>
@@ -909,7 +919,7 @@ export default function SellerHomeScreen() {
                   <View style={{ marginBottom: SP.lg }}>
                     <Text style={s.searchSectionTitle}>Orders</Text>
                     {orderResults.map(o => (
-                      <PressableScale key={o.id} onPress={() => { setSearchModal(false); nav(`/order-detail?id=${o.id}`); }} style={{ paddingVertical: SP.sm, borderBottomWidth: 1, borderColor: BORDER }}>
+                      <PressableScale key={o.id} onPress={() => { setSearchModal(false); nav(`/order-detail?id=${o.id}`); }} style={{ paddingVertical: SP.sm, borderBottomWidth: 1, borderColor: BORDER }} accessibilityRole="button" accessibilityLabel={`Open order ${o.orderNumber}`}>
                         <Text style={{ fontSize: FS.base, fontFamily: FONT.medium, color: FG }}>{o.orderNumber} — {o.customer?.name ?? o.customerName}</Text>
                         <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 2 }}>{formatCents(o.total_cents ?? o.totalCents ?? 0)} • {orderStatusLabel(o.status)}</Text>
                       </PressableScale>
@@ -920,7 +930,7 @@ export default function SellerHomeScreen() {
                   <View style={{ marginBottom: SP.lg }}>
                     <Text style={s.searchSectionTitle}>Products</Text>
                     {productResults.map(p => (
-                      <PressableScale key={p.id} onPress={() => { setSearchModal(false); nav(`/(tabs)/products`); }} style={{ paddingVertical: SP.sm, borderBottomWidth: 1, borderColor: BORDER }}>
+                      <PressableScale key={p.id} onPress={() => { setSearchModal(false); nav(`/(tabs)/products`); }} style={{ paddingVertical: SP.sm, borderBottomWidth: 1, borderColor: BORDER }} accessibilityRole="button" accessibilityLabel={`Open product ${p.name}`}>
                         <Text style={{ fontSize: FS.base, fontFamily: FONT.medium, color: FG }}>{p.name}</Text>
                         <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 2 }}>{formatCents(p.price_cents ?? p.priceCents ?? 0)}</Text>
                       </PressableScale>
@@ -945,7 +955,14 @@ export default function SellerHomeScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (theme: any) => {
+  const SCREEN_BG = theme.background, BG = theme.surface, CARD = theme.card, CARD_ELEVATED = theme.cardElevated;
+  const SELLER_DASHBOARD_GLASS = theme.cardGlass, SELLER_DASHBOARD_GLASS_ELEVATED = theme.cardElevatedGlass;
+  const BORDER = theme.border, BORDER_SUBTLE = theme.borderSubtle, BORDER_ACTIVE = theme.accent;
+  const FG = theme.text, MUTED = theme.muted, SUBTLE = theme.subtle;
+  const SUCCESS = theme.success, GREEN_BRIGHT = theme.success, BLUE = theme.accentLight, ORANGE = theme.warning, RED = theme.error;
+  const PURPLE = theme.accent, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = theme.accentDim;
+  return StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1175,7 +1192,7 @@ const s = StyleSheet.create({
     borderRadius: RADIUS.pill,
   },
   chartDay: {
-    fontSize: 9,
+     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: SUBTLE,
     textTransform: 'uppercase' as const,
@@ -1368,6 +1385,7 @@ const s = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 4,
   },
-});
+  });
+};
 
 const ListItem = SellerDashboardListItem;

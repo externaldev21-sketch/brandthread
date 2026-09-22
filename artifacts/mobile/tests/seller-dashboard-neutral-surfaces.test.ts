@@ -23,6 +23,7 @@ describe('seller dashboard neutral glass surfaces', () => {
 
     expect(dashboard).not.toMatch(/\bCARD_GLASS\b|\bCARD_ELEVATED_GLASS\b/);
     expect(kpiGrid).not.toMatch(/\bCARD_GLASS\b|\bCARD_ELEVATED_GLASS\b/);
-    expect(quickActions).toContain('backgroundColor: SELLER_DASHBOARD_GLASS');
+    expect(quickActions).toContain('backgroundColor: theme.card');
+    expect(quickActions).toContain('borderColor: theme.border');
   });
 });

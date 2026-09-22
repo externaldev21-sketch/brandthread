@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import { FS } from '@/lib/theme';
 
 type CanvasTile = {
   id: string;
@@ -310,14 +311,14 @@ const styles = StyleSheet.create({
   canvasTile: { width: '100%', height: 110, borderRadius: 10, borderWidth: 1, marginBottom: 8, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: '#111' },
   canvasShape: { borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
   canvasLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-  canvasDims: { fontSize: 10, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  canvasDims: { fontSize: FS.xs, fontFamily: 'Inter_400Regular', marginTop: 2 },
   toolRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 14, borderWidth: 1, marginBottom: 8, gap: 12 },
   toolIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   toolInfo: { flex: 1 },
   toolLabel: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   toolDesc: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
   toolBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  toolBadgeText: { fontSize: 10, fontFamily: 'Inter_700Bold' },
+  toolBadgeText: { fontSize: FS.xs, fontFamily: 'Inter_700Bold' },
   generateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, padding: 16, marginBottom: 28, marginTop: 8 },
   generateText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
 

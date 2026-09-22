@@ -61,3 +61,45 @@ mtime_ms = 1789432584846
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/25bbec15-f4a2-42a8-953f-62abda26bf74/043829e2-1706-4aa6-9340-8882b9fd9920"
 storage_version_token = "1789432589115725"
 content_type = "image/png"
+
+[[outputs]]
+id = "KxeHLlKLAFDAPt0zY26K0"
+uri = "file://artifacts/mobile/assets/images/app-icons/contact-sheet.png"
+type = "image"
+title = "Brandthread Theme Launcher Icons"
+description = "Contact sheet for the 12 bundled iOS and Android launcher icon variants."
+logical_id = "886e54ba-97d4-4edc-840c-abebe09ffe8c"
+content_hash = "sha256:ac69dc79fb6ebd991f9ed500617138b51e3f10d57f601880574ea21dd4fb476b"
+size = 1059024
+mtime_ms = 1790113852512
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/886e54ba-97d4-4edc-840c-abebe09ffe8c/6276082f-5a3b-4d79-8acc-320aaa71a57a"
+storage_version_token = "1790114221550522"
+content_type = "image/png"
+
+[[outputs]]
+id = "QmFh6xLVlPpoeLenW2_qU"
+uri = "file://screenshots/buyer-tab-bar-reference-comparison.png"
+type = "image"
+title = "Buyer tab bar reference comparison"
+description = "Side-by-side comparison of the finished Brandthread buyer navigation in normal and search states against IMG_8922 and IMG_8923."
+logical_id = "5ae4beb1-1d42-4e79-b03c-1df1862fa357"
+content_hash = "sha256:5d2a85cfd4aea92296c2d77bc99a8ab7efd469931606ea0d45de137a1087813e"
+size = 148267
+mtime_ms = 1790115294399
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/5ae4beb1-1d42-4e79-b03c-1df1862fa357/5ec835d8-77df-40cd-96b1-d4405ddcb987"
+storage_version_token = "1790115312195315"
+content_type = "image/png"
+
+[[outputs]]
+id = "MoZn6MSJCBBonB3eG3dBx"
+uri = "file://screenshots/theme-leopard-red-settings.png"
+type = "image"
+title = "Leopard Red theme verification"
+description = "402×874 verification showing deep red app background and cards, gold accents, and readable hierarchical text on the App Theme screen."
+logical_id = "eb036a0a-5a5c-4fb9-8cb1-e81564f27b8a"
+content_hash = "sha256:f09748e50876c136741f91f3e020b7c5b88123b9e8b9b51ab875b37cb3578fec"
+size = 202892
+mtime_ms = 1790115720999
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c8017a58-af99-4654-be4f-b3160d5d3e36/eb036a0a-5a5c-4fb9-8cb1-e81564f27b8a/7abcfaab-9045-4d14-a0a9-e34c45d1057a"
+storage_version_token = "1790115746129644"
+content_type = "image/png"

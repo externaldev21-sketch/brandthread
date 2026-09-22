@@ -127,6 +127,8 @@ vi.mock('@/contexts/AppThemeContext', () => ({
       primaryGradient: ['#727A84', '#F8FAFC'],
       secondary: '#22D3EE',
       secondaryDim: '#164E63',
+      warning: '#F97316',
+      error: '#F87171',
       shadowColor: '#C7CDD5',
     },
   }),
@@ -282,9 +284,9 @@ describe('buyer product detail when seller payments are unavailable', () => {
     });
 
     const warning = renderer.root.findByProps({ accessibilityRole: 'alert' });
-    expect(warning.props.style).toMatchObject({
-      backgroundColor: '#3F2A00',
-      borderColor: '#F9731644',
+     expect(warning.props.style).toMatchObject({
+       backgroundColor: '#F9731626',
+       borderColor: '#F9731644',
     });
     expect(textContent(warning)).toContain('Payments unavailable');
     expect(textContent(warning)).toContain('You can still add this item to your cart.');

@@ -664,7 +664,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   threadPreviewKicker: {
     color: THREAD_THEME_LIGHT_PALETTE.secondary,
-    fontSize: 9,
+    fontSize: FS.xs,
     fontFamily: FONT.medium,
     letterSpacing: 1.7,
   },
@@ -715,7 +715,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   brandthreadBadgeText: {
     color: MUTED,
-    fontSize: 9,
+    fontSize: FS.xs,
     fontFamily: FONT.bold,
     letterSpacing: 0.9,
   },
@@ -768,7 +768,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   shopifyLogoText: { color: '#142000', fontSize: 21, fontFamily: FONT.bold },
   shopifyCopy: { flex: 1, gap: 3 },
-  shopifyEyebrow: { color: '#95BF47', fontSize: 9, letterSpacing: 1.2, fontFamily: FONT.bold },
+  shopifyEyebrow: { color: '#95BF47', fontSize: FS.xs, letterSpacing: 1.2, fontFamily: FONT.bold },
   shopifyTitle: { color: FG, fontSize: FS.base, lineHeight: 21, fontFamily: FONT.bold },
   shopifyDesc: { color: MUTED, fontSize: FS.xs, lineHeight: 17, fontFamily: FONT.regular },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
@@ -844,7 +844,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingVertical: 2,
     alignSelf: 'flex-start',
   },
-  demoBadgeText: { fontSize: 9, fontFamily: FONT.semibold, color: CYAN },
+  demoBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: CYAN },
   // Management grid
   mgmtRow: { flexDirection: 'row', gap: SP.sm },
   mgmtCard: {
@@ -867,7 +867,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   mgmtLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, textAlign: 'center' },
   mgmtSubLabel: {
-    fontSize: 10,
+    fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: SUBTLE,
     textTransform: 'uppercase',
@@ -889,7 +889,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  suggestionBadgeText: { fontSize: 9, fontFamily: FONT.bold, color: theme.onAccent },
+  suggestionBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: theme.onAccent },
   aiImproveText: { flex: 1, gap: SP.xs },
   aiImproveTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
   aiImproveDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },

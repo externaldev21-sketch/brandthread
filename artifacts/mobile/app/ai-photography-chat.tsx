@@ -20,6 +20,7 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useApi } from '@/hooks/useApi';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+import { FS } from '@/lib/theme';
 
 interface UploadedPhoto {
   id: string;
@@ -578,7 +579,7 @@ const styles = StyleSheet.create({
   attachedRow: { flexDirection: 'row', gap: 6, marginBottom: 8, flexWrap: 'wrap' },
   attachedItem: { alignItems: 'center', gap: 3 },
   attachedThumb: { width: 48, height: 48, borderRadius: 8 },
-  attachedLabel: { fontSize: 9, fontFamily: 'Inter_500Medium' },
+  attachedLabel: { fontSize: FS.xs, fontFamily: 'Inter_500Medium' },
   resultImage: { width: 240, height: 240, borderRadius: 10, marginTop: 10 },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   loadingDots: { flexDirection: 'row', gap: 6 },

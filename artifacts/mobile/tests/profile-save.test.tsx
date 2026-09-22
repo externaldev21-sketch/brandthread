@@ -2,7 +2,7 @@ import React from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
 const {
   alertMock,
@@ -31,7 +31,7 @@ const {
 }));
 
 vi.mock("react-native", () => {
-  const React = require("react") as typeof import("react");
+  const React = require("react") as any;
   const nativeComponent = (name: string) => {
     function MockNativeComponent(props: Record<string, unknown>) {
       return React.createElement(name, props, props.children as React.ReactNode);
@@ -55,6 +55,10 @@ vi.mock("react-native", () => {
     View: nativeComponent("View"),
   };
 });
+
+vi.mock("@clerk/expo", () => ({
+  useAuth: () => ({ isLoaded: true, userId: "seller-1" }),
+}));
 
 vi.mock("@expo/vector-icons", () => ({
   Feather: ({ name }: { name: string }) => React.createElement("Feather", { name }),
@@ -111,6 +115,24 @@ vi.mock("@/contexts/AppThemeContext", () => ({
       onAccent: "#FFFFFF",
     },
   }),
+}));
+
+vi.mock("@/lib/theme", () => ({
+  BG: "#09090B",
+  SCREEN_BG: "transparent",
+  CARD: "#18181B",
+  BORDER: "#FFFFFF22",
+  FG: "#FAFAFA",
+  MUTED: "#D7D7DB",
+  SUBTLE: "#C5C5CA",
+  FONT: { regular: "System", medium: "System", semibold: "System", bold: "System" },
+  FS: { xs: 11, sm: 13, base: 15, md: 17, lg: 19, xl: 22, xxl: 26 },
+  SP: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 },
+  RADIUS: { xs: 6, sm: 10, md: 14, lg: 18, pill: 999 },
+  ICON: { xs: 12, sm: 16, md: 20, lg: 24, xxl: 40 },
+  SURFACE: "#111113",
+  ACCENT: "#F7F7FA",
+  ACCENT_LIGHT: "#FFFFFF",
 }));
 
 vi.mock("@/lib/money", () => ({

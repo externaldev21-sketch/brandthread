@@ -14,13 +14,8 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
+import { FS } from '@/lib/theme';
 
-const BG     = '#0A0A0B';
-const CARD   = '#18181B';
-const BORDER = 'rgba(255,255,255,0.07)';
-const FG     = '#F4F4FF';
-const MUTED  = 'rgba(244,244,255,0.50)';
-const ERR    = '#EF4444';
 
 const STEPS = ['Account', 'Company', 'Specialties', 'Photos & Pricing', 'Review'];
 
@@ -185,7 +180,7 @@ export default function ManufacturerOnboardScreen() {
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => step === 0 ? router.back() : setStep((v) => v - 1)} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="arrow-left" size={20} color={FG} />
+          <Feather name="arrow-left" size={20} color={colors.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={s.headerTitle}>Join as Manufacturer</Text>
@@ -288,7 +283,7 @@ export default function ManufacturerOnboardScreen() {
                     style={s.photoRemove}
                     onPress={() => set('photos', form.photos.filter((_, idx) => idx !== i))}
                   >
-                    <Feather name="x" size={12} color="#FFF" />
+                    <Feather name="x" size={12} color={colors.primaryForeground} />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -349,7 +344,7 @@ export default function ManufacturerOnboardScreen() {
               activeOpacity={0.8}
             >
               <View style={[s.checkbox, form.agreeTerms && [s.checkboxActive, { backgroundColor: colors.primary, borderColor: colors.primary }]]}>
-                {form.agreeTerms && <Feather name="check" size={12} color={BG} />}
+                {form.agreeTerms && <Feather name="check" size={12} color={colors.primaryForeground} />}
               </View>
               <Text style={s.termsText}>
                 I agree to the{' '}
@@ -374,7 +369,7 @@ export default function ManufacturerOnboardScreen() {
           ) : (
             <>
               <Text style={s.nextBtnText}>{step < STEPS.length - 1 ? 'Continue' : 'Submit Application'}</Text>
-              <Feather name={step < STEPS.length - 1 ? 'arrow-right' : 'check'} size={16} color={BG} />
+              <Feather name={step < STEPS.length - 1 ? 'arrow-right' : 'check'} size={16} color={colors.primaryForeground} />
             </>
           )}
         </TouchableOpacity>
@@ -398,7 +393,7 @@ function Field({ label, value, onChange, placeholder, keyboardType, secure }: {
         value={value}
         onChangeText={onChange}
         placeholder={placeholder}
-        placeholderTextColor={MUTED}
+        placeholderTextColor={colors.muted}
         keyboardType={keyboardType}
         secureTextEntry={secure}
         autoCapitalize={secure || keyboardType === 'email-address' ? 'none' : 'words'}
@@ -411,7 +406,7 @@ function Row({ label, value, last }: { label: string; value: string; last?: bool
   const colors = useColors();
   const s = React.useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={[s.reviewRow, !last && { borderBottomWidth: 1, borderBottomColor: BORDER }]}>
+    <View style={[s.reviewRow, !last && { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
       <Text style={s.reviewLabel}>{label}</Text>
       <Text style={s.reviewValue} numberOfLines={2}>{value}</Text>
     </View>
@@ -420,63 +415,63 @@ function Row({ label, value, last }: { label: string; value: string; last?: bool
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
-  root:        { flex: 1, backgroundColor: 'transparent' },
-  header:      { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
-  backBtn:     { width: 36, height: 36, borderRadius: 10, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
-  headerSub:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 1 },
-  progressTrack: { height: 3, backgroundColor: BORDER },
+  root:        { flex: 1, backgroundColor: colors.background },
+  header:      { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
+  backBtn:     { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.text },
+  headerSub:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.muted, marginTop: 1 },
+  progressTrack: { height: 3, backgroundColor: colors.border },
   progressFill:  { height: 3, backgroundColor: colors.primary, borderRadius: 2 },
 
   stepWrap:  { gap: 0 },
-  stepTitle: { fontSize: 20, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 6 },
-  stepSub:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 19, marginBottom: 24 },
+  stepTitle: { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.text, marginBottom: 6 },
+  stepSub:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.muted, lineHeight: 19, marginBottom: 24 },
 
-  groupLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+  groupLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
   chipGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip:       { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+  chip:       { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
   chipActive: { backgroundColor: colors.accent, borderColor: colors.primary },
-  chipText:   { fontSize: 12, fontFamily: 'Inter_500Medium', color: MUTED },
+  chipText:   { fontSize: 12, fontFamily: 'Inter_500Medium', color: colors.muted },
   chipTextActive: { color: colors.primary },
 
   row: { flexDirection: 'row', gap: 12 },
 
   // Field
   fieldWrap:  { marginBottom: 16 },
-  fieldLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', color: MUTED, marginBottom: 6 },
+  fieldLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', color: colors.muted, marginBottom: 6 },
   fieldInput: {
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
     borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 14, fontFamily: 'Inter_400Regular', color: FG,
+    fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.text,
   },
 
   // Photos
   photoGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
-  photoThumb:  { width: 88, height: 88, borderRadius: 12, backgroundColor: CARD, overflow: 'hidden' },
-  photoRemove: { position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
-  photoAdd:    { width: 88, height: 88, borderRadius: 12, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  photoAddText: { fontSize: 10, fontFamily: 'Inter_500Medium', color: colors.primary },
+  photoThumb:  { width: 88, height: 88, borderRadius: 12, backgroundColor: colors.card, overflow: 'hidden' },
+  photoRemove: { position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: `${colors.shadowColor}99`, alignItems: 'center', justifyContent: 'center' },
+  photoAdd:    { width: 88, height: 88, borderRadius: 12, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  photoAddText: { fontSize: FS.xs, fontFamily: 'Inter_500Medium', color: colors.primary },
 
   // Escrow notice
   escrowNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, backgroundColor: colors.accent, borderRadius: 14, borderWidth: 1, borderColor: colors.primary, padding: 14, marginTop: 8 },
   escrowTitle:  { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary, marginBottom: 4 },
-  escrowDesc:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: FG, lineHeight: 18 },
+  escrowDesc:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.text, lineHeight: 18 },
 
   // Review
-  reviewCard:  { backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
+  reviewCard:  { backgroundColor: colors.card, borderRadius: 14, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   reviewRow:   { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, gap: 20 },
-  reviewLabel: { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED },
-  reviewValue: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG, flex: 1, textAlign: 'right' },
-  photoCount:  { fontSize: 13, fontFamily: 'Inter_500Medium', color: MUTED, textAlign: 'center', paddingVertical: 14 },
+  reviewLabel: { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.muted },
+  reviewValue: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: colors.text, flex: 1, textAlign: 'right' },
+  photoCount:  { fontSize: 13, fontFamily: 'Inter_500Medium', color: colors.muted, textAlign: 'center', paddingVertical: 14 },
 
   // Terms
   termsRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginTop: 20 },
-  checkbox:     { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  checkbox:     { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
   checkboxActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  termsText:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, flex: 1, lineHeight: 19 },
+  termsText:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.muted, flex: 1, lineHeight: 19 },
 
   // Bottom
-  bottomBar: { paddingHorizontal: 20, paddingTop: 12, borderTopWidth: 1, borderTopColor: BORDER, backgroundColor: BG },
+  bottomBar: { paddingHorizontal: 20, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.background },
   nextBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primary, borderRadius: 16, paddingVertical: 16 },
-  nextBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: BG },
+  nextBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primaryForeground },
 });

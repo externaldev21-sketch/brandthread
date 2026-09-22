@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity } from 'rea
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, BrandthreadHeader, GradientCard, PrimaryButton, SecondaryButton, StatusBadge, FormInput } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
@@ -70,6 +70,10 @@ function mapStatus(s: string): string {
 export default function DisputeDetailScreen() {
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentDim: PURPLE_DIM, secondary: CYAN } = theme;
+  const { text: FG, muted: MUTED, subtle: SUBTLE, border: BORDER, card: CARD, cardElevated: CARD_ELEVATED, success: SUCCESS, warning: ORANGE, error: RED } = theme;
+  const BORDER_ACTIVE = theme.accent;
+  const SUCCESS_DIM = `${SUCCESS}26`;
+  const RED_DIM = `${RED}26`;
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   const { orderId, disputeId } = useLocalSearchParams<{ orderId: string; disputeId: string }>();
   const router = useRouter();
@@ -471,8 +475,12 @@ export default function DisputeDetailScreen() {
   );
 }
 
-const createStyles = (theme: { accent: string; accentDim: string; secondary: string }) => {
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const { accent: PURPLE, accentDim: PURPLE_DIM, secondary: CYAN } = theme;
+  const { text: FG, muted: MUTED, subtle: SUBTLE, border: BORDER, card: CARD, cardElevated: CARD_ELEVATED, success: SUCCESS, warning: ORANGE, error: RED } = theme;
+  const BORDER_ACTIVE = theme.accent;
+  const SUCCESS_DIM = `${SUCCESS}26`;
+  const RED_DIM = `${RED}26`;
   return StyleSheet.create({
   centered:           { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   loadingText:        { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED },

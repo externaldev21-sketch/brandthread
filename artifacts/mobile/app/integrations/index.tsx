@@ -10,7 +10,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
-import { PURPLE, SUCCESS, SUCCESS_DIM, RED, FONT, FS, RADIUS } from '@/lib/theme';
+import { FONT, FS, RADIUS } from '@/lib/theme';
 
 interface IntegrationDef {
   key: string;
@@ -99,7 +99,7 @@ export default function IntegrationsScreen() {
   }
 
   return (
-    <View style={[s.container, { backgroundColor: 'transparent' }]}>
+    <View style={[s.container, { backgroundColor: colors.background }]}>
       <ScreenHeader title="Integrations" />
       <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
         <View style={s.section}>
@@ -131,9 +131,9 @@ export default function IntegrationsScreen() {
                     {isToggling ? (
                       <ActivityIndicator size="small" color={colors.primary} />
                     ) : connected ? (
-                      <View style={[s.connectedPill, { backgroundColor: SUCCESS_DIM }]}>
-                        <View style={[s.dot, { backgroundColor: SUCCESS }]} />
-                        <Text style={[s.connectedText, { color: SUCCESS }]}>Connected</Text>
+                       <View style={[s.connectedPill, { backgroundColor: `${colors.success}26` }]}>
+                         <View style={[s.dot, { backgroundColor: colors.success }]} />
+                         <Text style={[s.connectedText, { color: colors.success }]}>Connected</Text>
                       </View>
                     ) : (
                       <View style={[s.connectBtn, { borderColor: colors.border }]}>

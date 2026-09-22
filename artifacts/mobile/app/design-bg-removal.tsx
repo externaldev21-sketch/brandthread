@@ -828,7 +828,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   compareSection:   { gap: SP.md },
   compareRow:       { flexDirection: 'row', gap: SP.sm },
   compareCol:       { flex: 1, gap: SP.xs },
-  compareLabel:     { fontSize: 10, fontFamily: FONT.bold, color: MUTED, letterSpacing: 0.8 },
+  compareLabel:     { fontSize: FS.xs, fontFamily: FONT.bold, color: MUTED, letterSpacing: 0.8 },
   compareFrame:     { aspectRatio: 1, borderRadius: RADIUS.md, borderWidth: 1, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   compareImg:       { width: '100%', height: '100%' },
   checkerboard:     {
@@ -857,11 +857,11 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   errorText:        { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: '#EF4444', lineHeight: 18 },
 
   // Integration grid
-  sectionLabel:     { fontSize: 10, fontFamily: FONT.bold, color: MUTED, letterSpacing: 0.8, marginTop: SP.xs },
+  sectionLabel:     { fontSize: FS.xs, fontFamily: FONT.bold, color: MUTED, letterSpacing: 0.8, marginTop: SP.xs },
   integrationGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   integrationCard:  { width: (SW - SP.md * 2 - SP.sm * 2) / 3, alignItems: 'center', gap: SP.xs, paddingVertical: SP.md, backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER },
   integrationIcon:  { width: 40, height: 40, borderRadius: 20, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
-  integrationLabel: { fontSize: 10, fontFamily: FONT.medium, color: MUTED, textAlign: 'center' },
+  integrationLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, textAlign: 'center' },
 
   // Recent results
   recentSection:    { gap: SP.sm },

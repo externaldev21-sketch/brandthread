@@ -60,6 +60,7 @@ export default function InboxScreen() {
   const router = useRouter();
   const api = useApi();
   const { theme } = useAppTheme();
+  const palette = theme as typeof theme & { background?: string; };
   const { userId } = useAuth();
   const accountRef = useRef(userId);
   accountRef.current = userId;
@@ -373,7 +374,7 @@ export default function InboxScreen() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <View style={s.root}>
+    <View style={[s.root, { backgroundColor: palette.background ?? BG }]}>
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
         <TouchableOpacity

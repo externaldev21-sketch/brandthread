@@ -8,7 +8,7 @@ import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
 import { isManagerRole } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
-import { SUCCESS, ORANGE } from '@/lib/theme';
+import { SUCCESS, ORANGE, FS } from '@/lib/theme';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { formatCents } from '@/lib/money';
 
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
   overviewRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
   overviewCard: { flex: 1, borderRadius: 12, padding: 12, borderWidth: 1, alignItems: 'center', gap: 4 },
   overviewVal: { fontSize: 16, fontFamily: 'Inter_700Bold' },
-  overviewLabel: { fontSize: 10, fontFamily: 'Inter_400Regular' },
+  overviewLabel: { fontSize: FS.xs, fontFamily: 'Inter_400Regular' },
   sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
   plRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },

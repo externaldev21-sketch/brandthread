@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
-import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
 import { getIncoming, createIncoming, updateIncomingStatus, receiveIncoming, getInventoryItems, getLocations } from '@/services/inventoryService';
@@ -49,13 +49,13 @@ function incomingStatusLabel(status: IncomingStatus): string {
   }
 }
 
-function sourceColor(source: IncomingInventory['source']): string {
+function sourceColor(source: IncomingInventory['source'], colors: { accent: string; secondary: string; accentLight: string; warning: string; muted: string }): string {
   switch (source) {
-    case 'manufacturer': return PURPLE;
-    case 'purchase_order': return CYAN;
-    case 'manual': return BLUE;
-    case 'transfer': return ORANGE;
-    default: return MUTED;
+    case 'manufacturer': return colors.accent;
+    case 'purchase_order': return colors.secondary;
+    case 'manual': return colors.accentLight;
+    case 'transfer': return colors.warning;
+    default: return colors.muted;
   }
 }
 
@@ -100,7 +100,19 @@ const SOURCE_OPTIONS: { key: IncomingInventory['source']; label: string }[] = [
 
 export default function IncomingInventoryScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const {
+    background: BG, surface: SURFACE, card: CARD, cardElevated: CARD_ELEVATED,
+    border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE,
+    accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM,
+    secondary: CYAN, secondaryDim: CYAN_DIM, success: SUCCESS, warning: ORANGE, error: RED,
+  } = theme;
+  const SUCCESS_DIM = `${SUCCESS}26`;
+  const BORDER_ACTIVE = theme.accentLight;
+  const ORANGE_DIM = `${ORANGE}26`;
+  const RED_DIM = `${RED}26`;
+  const BLUE = theme.accentLight;
+  const GOLD = theme.accent;
+  const GRAD_CARD_GLOW = theme.glowGradient;
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
@@ -311,8 +323,8 @@ export default function IncomingInventoryScreen() {
                 <StatusBadge label={incomingStatusLabel(rec.status)} variant={incomingStatusVariant(rec.status)} small />
               </View>
               <View style={s.listCardBadgeRow}>
-                <View style={[s.sourceBadge, { borderColor: sourceColor(rec.source) + '55' }]}>
-                  <Text style={[s.sourceBadgeText, { color: sourceColor(rec.source) }]}>{sourceLabel(rec.source)}</Text>
+                <View style={[s.sourceBadge, { borderColor: sourceColor(rec.source, theme) + '55' }]}>
+                  <Text style={[s.sourceBadgeText, { color: sourceColor(rec.source, theme) }]}>{sourceLabel(rec.source)}</Text>
                 </View>
               </View>
               <View style={s.listCardMeta}>
@@ -667,8 +679,8 @@ export default function IncomingInventoryScreen() {
             </View>
           </View>
           <View style={s.summaryMeta}>
-            <View style={[s.sourceBadge, { borderColor: sourceColor(rec.source) + '55', marginBottom: SP.xs }]}>
-              <Text style={[s.sourceBadgeText, { color: sourceColor(rec.source) }]}>{sourceLabel(rec.source)}</Text>
+            <View style={[s.sourceBadge, { borderColor: sourceColor(rec.source, theme) + '55', marginBottom: SP.xs }]}>
+              <Text style={[s.sourceBadgeText, { color: sourceColor(rec.source, theme) }]}>{sourceLabel(rec.source)}</Text>
             </View>
             {rec.manufacturerName && <Text style={s.metaLine}>Manufacturer: {rec.manufacturerName}</Text>}
             {rec.productionOrderId && <Text style={s.metaLine}>Production Order: {rec.productionOrderId}</Text>}
@@ -774,7 +786,19 @@ export default function IncomingInventoryScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const {
+    background: BG, surface: SURFACE, card: CARD, cardElevated: CARD_ELEVATED,
+    border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE,
+    accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM,
+    secondary: CYAN, secondaryDim: CYAN_DIM, success: SUCCESS, warning: ORANGE, error: RED,
+  } = theme as typeof theme & Record<string, string>;
+  const SUCCESS_DIM = `${SUCCESS}26`;
+  const BORDER_ACTIVE = (theme as any).accentLight;
+  const ORANGE_DIM = `${ORANGE}26`;
+  const RED_DIM = `${RED}26`;
+  const BLUE = PURPLE_LIGHT;
+  const GOLD = PURPLE;
+  const GRAD_CARD_GLOW = (theme as any).glowGradient;
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1 },

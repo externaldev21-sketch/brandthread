@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import { ACCENT } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 type Mode = 'buyer' | 'seller';
 
@@ -13,6 +13,8 @@ interface ModeSwitcherProps {
 
 export default function ModeSwitcher({ currentMode }: ModeSwitcherProps) {
   const router = useRouter();
+  const { theme } = useAppTheme();
+  const styles = makeStyles(theme);
   const [isBoth, setIsBoth] = useState(false);
   const slideAnim = React.useRef(new Animated.Value(currentMode === 'seller' ? 1 : 0)).current;
 
@@ -69,17 +71,17 @@ export default function ModeSwitcher({ currentMode }: ModeSwitcherProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   wrap: {
     alignItems: 'center',
     paddingVertical: 8,
-    backgroundColor: '#0E0E0E',
+    backgroundColor: theme.background,
     borderBottomWidth: 1,
-    borderBottomColor: '#1E1E1E',
+    borderBottomColor: theme.border,
   },
   track: {
     flexDirection: 'row',
-    backgroundColor: '#1A1A1A',
+    backgroundColor: theme.surface,
     borderRadius: 100,
     padding: 3,
     position: 'relative',
@@ -92,7 +94,7 @@ const styles = StyleSheet.create({
     width: 88,
     height: 30,
     borderRadius: 100,
-    backgroundColor: ACCENT,
+    backgroundColor: theme.accent,
   },
   option: {
     width: 88,
@@ -104,9 +106,9 @@ const styles = StyleSheet.create({
   optionText: {
     fontSize: 12,
     fontFamily: 'Inter_600SemiBold',
-    color: '#666',
+    color: theme.muted,
   },
   optionTextActive: {
-    color: '#000',
+    color: theme.onAccent,
   },
 });

@@ -5365,7 +5365,7 @@ const styles = StyleSheet.create({
   actionCellDisabled: { opacity: 0.45 },
   actionCellActive: { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED },
   actionCellLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: FG, textAlign: 'center' },
-  actionCellSub: { fontSize: 10, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', paddingHorizontal: 4 },
+  actionCellSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', paddingHorizontal: 4 },
 
   // Guide controls
   guideRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: BORDER },

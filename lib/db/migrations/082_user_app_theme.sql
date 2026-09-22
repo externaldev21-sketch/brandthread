@@ -1,0 +1,2 @@
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS app_theme_id TEXT NOT NULL DEFAULT 'monochrome';

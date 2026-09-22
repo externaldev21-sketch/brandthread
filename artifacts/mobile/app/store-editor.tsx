@@ -1226,7 +1226,7 @@ const makeBrandStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   personalizeActionText: {
     color: FG,
-    fontSize: 10,
+    fontSize: FS.xs,
     fontFamily: FONT.semibold,
     textAlign: 'center',
   },

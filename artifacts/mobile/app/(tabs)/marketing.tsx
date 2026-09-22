@@ -7,6 +7,7 @@ import { Badge } from '@/components/Badge';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { FS } from '@/lib/theme';
 import { useApi } from '@/hooks/useApi';
 
 const CAMPAIGNS = [
@@ -246,7 +247,7 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
   statChip: { flex: 1, borderRadius: 12, padding: 12, borderWidth: 1, alignItems: 'center', gap: 4 },
   statVal: { fontSize: 16, fontFamily: 'Inter_700Bold' },
-  statLabel: { fontSize: 10, fontFamily: 'Inter_400Regular' },
+  statLabel: { fontSize: FS.xs, fontFamily: 'Inter_400Regular' },
   klaviyoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, paddingVertical: 14, marginBottom: 24 },
   klaviyoText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },

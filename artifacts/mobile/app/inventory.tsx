@@ -978,7 +978,7 @@ const s = StyleSheet.create({
   tabBadge:         { position: 'absolute', top: 4, right: -10, backgroundColor: RED,
                       borderRadius: RADIUS.pill, minWidth: 16, height: 16,
                       alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
-  tabBadgeText:     { fontSize: 9, fontFamily: FONT.bold, color: '#fff' },
+  tabBadgeText:     { fontSize: FS.xs, fontFamily: FONT.bold, color: '#fff' },
 
   content:          { flex: 1 },
   tabContent:       { paddingHorizontal: SP.md, paddingTop: SP.md },
@@ -1039,7 +1039,7 @@ const s = StyleSheet.create({
   itemCardDivider:  { height: 1, backgroundColor: BORDER, marginVertical: SP.sm },
   itemCardStats:    { flexDirection: 'row', gap: SP.md },
   itemStat:         { flex: 1, alignItems: 'center' },
-  itemStatLabel:    { fontSize: 10, fontFamily: FONT.medium, color: SUBTLE, marginBottom: 2 },
+  itemStatLabel:    { fontSize: FS.xs, fontFamily: FONT.medium, color: SUBTLE, marginBottom: 2 },
   itemStatValue:    { fontSize: FS.sm, fontFamily: FONT.bold, color: FG },
   itemCardMeta:     { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginTop: SP.xs },
   itemCardActions:  { flexDirection: 'row', gap: SP.sm },

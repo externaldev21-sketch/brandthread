@@ -7,6 +7,7 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { FS } from '@/lib/theme';
 
 interface CommunityMessage {
   id: string;
@@ -129,7 +130,7 @@ const styles = StyleSheet.create({
   author: { fontSize: 11, fontFamily: 'Inter_500Medium', marginBottom: 3 },
   bubble: { borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, maxWidth: '85%' },
   bubbleText: { fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 19 },
-  time: { fontSize: 10, fontFamily: 'Inter_400Regular', marginTop: 4 },
+  time: { fontSize: FS.xs, fontFamily: 'Inter_400Regular', marginTop: 4 },
   inputBar: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1 },
   input: { flex: 1, borderWidth: 1, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, fontFamily: 'Inter_400Regular', maxHeight: 100 },
   sendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },

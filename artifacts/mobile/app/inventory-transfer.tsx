@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
 import { getLocations, getInventoryItems, getTransfer, getTransfers, createTransfer, shipTransfer, receiveTransfer } from '@/services/inventoryService';
@@ -64,7 +64,19 @@ function timelineIndex(status: TransferStatus): number {
 
 export default function InventoryTransferScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const {
+    background: BG, surface: SURFACE, card: CARD, cardElevated: CARD_ELEVATED,
+    border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE,
+    accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM,
+    secondary: CYAN, secondaryDim: CYAN_DIM, success: SUCCESS, warning: ORANGE, error: RED,
+  } = theme;
+  const SUCCESS_DIM = `${SUCCESS}26`;
+  const BORDER_ACTIVE = theme.accentLight;
+  const ORANGE_DIM = `${ORANGE}26`;
+  const RED_DIM = `${RED}26`;
+  const BLUE = theme.accentLight;
+  const GOLD = theme.accent;
+  const GRAD_CARD_GLOW = theme.glowGradient;
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
@@ -812,7 +824,19 @@ export default function InventoryTransferScreen() {
 }
 
 const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const {
+    background: BG, surface: SURFACE, card: CARD, cardElevated: CARD_ELEVATED,
+    border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE,
+    accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM,
+    secondary: CYAN, secondaryDim: CYAN_DIM, success: SUCCESS, warning: ORANGE, error: RED,
+  } = theme as typeof theme & Record<string, string>;
+  const SUCCESS_DIM = `${SUCCESS}26`;
+  const BORDER_ACTIVE = (theme as any).accentLight;
+  const ORANGE_DIM = `${ORANGE}26`;
+  const RED_DIM = `${RED}26`;
+  const BLUE = PURPLE_LIGHT;
+  const GOLD = PURPLE;
+  const GRAD_CARD_GLOW = (theme as any).glowGradient;
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   header: {

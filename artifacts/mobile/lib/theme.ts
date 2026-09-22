@@ -35,7 +35,9 @@ export const BORDER_FOCUS    = '#F7F7FA';
 // ─── Text ─────────────────────────────────────────────────────────────────────
 export const FG      = '#F7F7FA';
 export const MUTED   = 'rgba(247,247,250,0.58)';
-export const SUBTLE  = 'rgba(247,247,250,0.34)';
+// 50% white on the black background clears the 4.5:1 readable-text target
+// while remaining visibly dimmer than MUTED.
+export const SUBTLE  = 'rgba(247,247,250,0.50)';
 export const ON_DARK = '#FFFFFF';                        // on gradient/colored bg
 export const ON_DARK_MUTED = 'rgba(255,255,255,0.72)';   // secondary text on gradient/colored bg
 
@@ -44,18 +46,26 @@ export const ACCENT        = '#F7F7FA';
 export const ACCENT_LIGHT  = '#FFFFFF';
 // No colored panel wash: compatibility dim tokens resolve to neutral graphite.
 export const ACCENT_DIM    = 'rgba(255,255,255,0.055)';
+/** @deprecated Use ACCENT. Kept for compatibility with legacy screens. */
 export const PURPLE        = ACCENT;
+/** @deprecated Use ACCENT_LIGHT. Kept for compatibility with legacy screens. */
 export const PURPLE_LIGHT  = ACCENT_LIGHT;
+/** @deprecated Use ACCENT_DIM. Kept for compatibility with legacy screens. */
 export const PURPLE_DIM    = ACCENT_DIM;
+/** @deprecated Use ACCENT. Kept for compatibility with legacy screens. */
 export const CYAN          = ACCENT;
+/** @deprecated Use ACCENT_LIGHT. Kept for compatibility with legacy screens. */
 export const CYAN_LIGHT    = ACCENT_LIGHT;
+/** @deprecated Use ACCENT_DIM. Kept for compatibility with legacy screens. */
 export const CYAN_DIM      = ACCENT_DIM;
 
 // ─── Semantic Colors ──────────────────────────────────────────────────────────
 export const SUCCESS        = '#10B981';   // completion, available, shipped
 export const SUCCESS_DIM    = 'rgba(16,185,129,0.15)';
 export const GREEN_BRIGHT   = '#39FF88';   // revenue highlight ONLY (not UI chrome)
-export const BLUE           = ACCENT;      // compatibility alias; info chrome is grayscale
+/** @deprecated Use ACCENT. Kept for compatibility; info chrome is grayscale. */
+export const BLUE           = ACCENT;
+/** @deprecated Use ACCENT_DIM. Kept for compatibility; info chrome is grayscale. */
 export const BLUE_DIM       = ACCENT_DIM;
 export const ORANGE         = '#F97316';   // warning, draft
 export const ORANGE_DIM     = 'rgba(249,115,22,0.15)';
@@ -117,13 +127,16 @@ export const RADIUS = {
 } as const;
 
 // ─── Shadows ──────────────────────────────────────────────────────────────────
-export const SHADOW_PURPLE = {
+export const SHADOW = {
   shadowColor: '#000000',
   shadowOffset: { width: 0, height: 4 },
   shadowOpacity: 0.4,
   shadowRadius: 16,
   elevation: 8,
 } as const;
+
+/** @deprecated Use SHADOW. Kept for compatibility with legacy imports. */
+export const SHADOW_PURPLE = SHADOW;
 
 export const SHADOW_SM = {
   shadowColor: '#000',

@@ -22,7 +22,7 @@ describe('seller home dashboard data contract', () => {
   });
 
   it('uses the Dashboard title and full-width stacked metrics that scale large values', () => {
-    expect(source).toContain('<Text style={styles.screenTitle}>Dashboard</Text>');
+    expect(source).toMatch(/<Text style=\{\[styles\.screenTitle,[\s\S]*?\}>Dashboard<\/Text>/);
     expect(source).toContain("flexDirection: 'column'");
     expect(source).toContain("width: '100%'");
     expect(source.match(/adjustsFontSizeToFit/g)).toHaveLength(3);

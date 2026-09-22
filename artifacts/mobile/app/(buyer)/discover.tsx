@@ -390,7 +390,7 @@ const showcase = StyleSheet.create({
   visualFallback: { alignItems: 'center', justifyContent: 'center' },
   initials:       { fontSize: 56, fontFamily: FONT.bold, color: ON_DARK },
   tag:            { position: 'absolute', top: 12, left: 12, paddingHorizontal: 9, paddingVertical: 5, borderRadius: RADIUS.xs, backgroundColor: 'rgba(0,0,0,0.72)' },
-  tagText:        { fontSize: 10, fontFamily: FONT.bold, color: ON_DARK, letterSpacing: 0.7, textTransform: 'uppercase' },
+  tagText:        { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK, letterSpacing: 0.7, textTransform: 'uppercase' },
   pricePill:      { position: 'absolute', bottom: 12, alignSelf: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: FG, borderWidth: 3, borderColor: CARD },
   priceText:      { fontSize: FS.sm, fontFamily: FONT.bold, color: BG },
   signalRow:      { minHeight: 34, paddingTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
@@ -607,6 +607,7 @@ export default function DiscoverScreen() {
   const router    = useRouter();
   const api       = useApi();
   const { theme } = useAppTheme();
+  const palette = theme as typeof theme & { background?: string; card?: string; border?: string; text?: string; muted?: string; };
   const { isSignedIn } = useAuth();
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -806,7 +807,7 @@ export default function DiscoverScreen() {
 
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: BG }}
+      style={{ flex: 1, backgroundColor: palette.background ?? BG }}
       contentContainerStyle={{ paddingBottom: 110 }}
       showsVerticalScrollIndicator={false}
       refreshControl={
@@ -821,12 +822,12 @@ export default function DiscoverScreen() {
       {/* ─ Header ─ */}
       <View style={[s.header, { paddingTop: topPad + 16, paddingHorizontal: 20 }]}>
         <View>
-          <Text style={[s.greeting, { color: MUTED }]}>What's dropping</Text>
-          <Text style={[s.pageTitle, { color: FG }]}>Discover</Text>
+          <Text style={[s.greeting, { color: palette.muted ?? MUTED }]}>What's dropping</Text>
+          <Text style={[s.pageTitle, { color: palette.text ?? FG }]}>Discover</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <TouchableOpacity
-            style={[s.headerBtn, { backgroundColor: CARD, borderColor: BORDER }]}
+            style={[s.headerBtn, { backgroundColor: palette.card ?? CARD, borderColor: palette.border ?? BORDER }]}
             activeOpacity={0.75}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/search' as never); }}
             accessibilityRole="button"
@@ -836,7 +837,7 @@ export default function DiscoverScreen() {
           </TouchableOpacity>
           {isSignedIn && (
             <TouchableOpacity
-              style={[s.headerBtn, { backgroundColor: CARD, borderColor: BORDER }]}
+              style={[s.headerBtn, { backgroundColor: palette.card ?? CARD, borderColor: palette.border ?? BORDER }]}
               activeOpacity={0.75}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/inbox' as never); }}
               accessibilityRole="button"

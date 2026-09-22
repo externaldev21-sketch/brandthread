@@ -343,7 +343,7 @@ const s = StyleSheet.create({
     gap: 3,
   },
   verifiedText: {
-    fontSize: 10,
+    fontSize: FS.xs,
     fontFamily: FONT.semibold,
     color: SUCCESS,
   },

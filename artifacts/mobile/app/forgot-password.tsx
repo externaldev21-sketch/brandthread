@@ -19,23 +19,12 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 
 type Step = 'email' | 'code' | 'done';
 
-// ─── Design tokens (exact match to onboarding / splash / welcome) ────────────
-const BG       = '#0A0A0B';
-const FG       = '#FFFFFF';
-const MUTED    = 'rgba(255,255,255,0.5)';
-const MUTED2   = 'rgba(255,255,255,0.28)';
-const CARD     = 'rgba(255,255,255,0.04)';
-const BORDER   = 'rgba(255,255,255,0.09)';
-const INPUT_BG = 'rgba(255,255,255,0.07)';
-const INPUT_BD = 'rgba(255,255,255,0.12)';
-const ERR      = '#F87171';
-const SUCCESS  = '#34D399';
-
 export default function ForgotPasswordScreen() {
   const { signIn, fetchStatus } = useSignIn();
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
   const { theme } = useAppTheme();
+  const s = React.useMemo(() => createStyles(theme), [theme]);
 
   const [step, setStep]         = useState<Step>('email');
   const [email, setEmail]       = useState('');
@@ -109,7 +98,7 @@ export default function ForgotPasswordScreen() {
               }}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-              <Feather name="arrow-left" size={20} color={MUTED} />
+               <Feather name="arrow-left" size={20} color={theme.muted} />
             </TouchableOpacity>
           )}
 
@@ -132,7 +121,7 @@ export default function ForgotPasswordScreen() {
                 <TextInput
                   style={s.input}
                   placeholder="you@yourbrand.com"
-                  placeholderTextColor={MUTED2}
+                   placeholderTextColor={theme.subtle}
                   value={email}
                   onChangeText={t => { setEmail(t); setError(''); }}
                   autoCapitalize="none"
@@ -144,7 +133,7 @@ export default function ForgotPasswordScreen() {
 
               {error ? (
                 <View style={s.errorBox}>
-                  <Feather name="alert-circle" size={14} color={ERR} />
+                   <Feather name="alert-circle" size={14} color={theme.error} />
                   <Text style={s.errorText}>{error}</Text>
                 </View>
               ) : null}
@@ -190,7 +179,7 @@ export default function ForgotPasswordScreen() {
                 <TextInput
                   style={[s.input, s.codeInput]}
                   placeholder="000000"
-                  placeholderTextColor={MUTED2}
+                   placeholderTextColor={theme.subtle}
                   value={code}
                   onChangeText={t => { setCode(t); setError(''); }}
                   keyboardType="number-pad"
@@ -205,14 +194,14 @@ export default function ForgotPasswordScreen() {
                   <TextInput
                     style={[s.input, s.pwInput]}
                     placeholder="Minimum 8 characters"
-                    placeholderTextColor={MUTED2}
+                     placeholderTextColor={theme.subtle}
                     value={password}
                     onChangeText={t => { setPassword(t); setError(''); }}
                     secureTextEntry={!showPw}
                     autoComplete="new-password"
                   />
                   <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPw(v => !v)}>
-                    <Feather name={showPw ? 'eye-off' : 'eye'} size={18} color={MUTED} />
+                     <Feather name={showPw ? 'eye-off' : 'eye'} size={18} color={theme.muted} />
                   </TouchableOpacity>
                 </View>
                 {password.length > 0 && password.length < 8 && (
@@ -222,7 +211,7 @@ export default function ForgotPasswordScreen() {
 
               {error ? (
                 <View style={s.errorBox}>
-                  <Feather name="alert-circle" size={14} color={ERR} />
+                   <Feather name="alert-circle" size={14} color={theme.error} />
                   <Text style={s.errorText}>{error}</Text>
                 </View>
               ) : null}
@@ -265,17 +254,17 @@ export default function ForgotPasswordScreen() {
               {/* Success card */}
               <View style={s.successCard}>
                 <LinearGradient
-                  colors={['rgba(52,211,153,0.12)', 'rgba(52,211,153,0.04)']}
+                   colors={[`${theme.success}1F`, `${theme.success}0A`]}
                   style={s.successGrad}
                 >
                   <View style={s.successIconWrap}>
                     <LinearGradient
-                      colors={[SUCCESS, '#059669']}
+                       colors={[theme.success, theme.success]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={s.successIconGrad}
                     >
-                      <Feather name="check" size={28} color={FG} />
+                       <Feather name="check" size={28} color={theme.onAccent} />
                     </LinearGradient>
                   </View>
                   <Text style={s.successTitle}>Password updated.</Text>
@@ -342,31 +331,31 @@ function mapError(err: any): string {
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const s = StyleSheet.create({
-  root:    { flex: 1, backgroundColor: 'transparent' },
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
+  root:    { flex: 1, backgroundColor: theme.background },
 
   scroll: { paddingHorizontal: 24, paddingTop: 16 },
 
   backBtn: { width: 40, height: 40, justifyContent: 'center', marginBottom: 20 },
 
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 36 },
-  logoText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: 2.5 },
+  logoText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: theme.text, letterSpacing: 2.5 },
 
   headline: {
     fontSize: 32, fontFamily: 'Inter_700Bold',
-    color: FG, letterSpacing: -0.8, marginBottom: 8,
+    color: theme.text, letterSpacing: -0.8, marginBottom: 8,
   },
   subtitle: {
     fontSize: 15, fontFamily: 'Inter_400Regular',
-    color: MUTED, lineHeight: 22, marginBottom: 32,
+    color: theme.muted, lineHeight: 22, marginBottom: 32,
   },
 
   fieldWrap: { marginBottom: 16 },
-  label:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, marginBottom: 6 },
+  label:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: theme.muted, marginBottom: 6 },
   input: {
-    backgroundColor: INPUT_BG, borderWidth: 1, borderColor: INPUT_BD,
+    backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border,
     borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13,
-    fontSize: 15, fontFamily: 'Inter_400Regular', color: FG,
+    fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.text,
   },
   codeInput: {
     letterSpacing: 8, fontSize: 22, textAlign: 'center',
@@ -374,56 +363,56 @@ const s = StyleSheet.create({
   },
   pwRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: INPUT_BG, borderWidth: 1, borderColor: INPUT_BD, borderRadius: 12,
+    backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, borderRadius: 12,
   },
   pwInput: { flex: 1, borderWidth: 0, backgroundColor: 'transparent' },
   eyeBtn:  { paddingHorizontal: 14 },
-  hint:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 4 },
+  hint:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: theme.muted, marginTop: 4 },
 
   errorBox: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(248,113,113,0.08)', borderRadius: 10,
-    borderWidth: 1, borderColor: 'rgba(248,113,113,0.25)',
+    backgroundColor: `${theme.error}14`, borderRadius: 10,
+    borderWidth: 1, borderColor: `${theme.error}40`,
     paddingHorizontal: 12, paddingVertical: 10, marginBottom: 16,
   },
-  errorText: { fontSize: 13, fontFamily: 'Inter_400Regular', color: ERR, flex: 1 },
+  errorText: { fontSize: 13, fontFamily: 'Inter_400Regular', color: theme.error, flex: 1 },
 
   primaryWrap: { marginBottom: 10 },
   primaryBtn:  { borderRadius: 14, paddingVertical: 17, alignItems: 'center' },
-  primaryBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+  primaryBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: theme.onAccent },
 
   secondaryBtn: {
     borderRadius: 14, paddingVertical: 16, alignItems: 'center',
-    borderWidth: 1, borderColor: BORDER,
+    borderWidth: 1, borderColor: theme.border,
   },
-  secondaryBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+  secondaryBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: theme.text },
 
   resendBtn:  { paddingVertical: 14, alignItems: 'center' },
-  resendText: { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED },
+  resendText: { fontSize: 14, fontFamily: 'Inter_400Regular', color: theme.muted },
 
   // Success card
   successCard: {
     borderRadius: 20, borderWidth: 1,
-    borderColor: 'rgba(52,211,153,0.25)', overflow: 'hidden', marginBottom: 28,
+    borderColor: `${theme.success}40`, overflow: 'hidden', marginBottom: 28,
   },
   successGrad: { padding: 28, alignItems: 'center' },
   successIconWrap: { marginBottom: 20 },
   successIconGrad: {
     width: 64, height: 64, borderRadius: 20,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: SUCCESS, shadowOpacity: 0.5,
+     shadowColor: theme.success, shadowOpacity: 0.5,
     shadowRadius: 16, shadowOffset: { width: 0, height: 0 },
     elevation: 12,
   },
   successTitle: {
-    fontSize: 26, fontFamily: 'Inter_700Bold', color: FG,
+     fontSize: 26, fontFamily: 'Inter_700Bold', color: theme.text,
     letterSpacing: -0.5, marginBottom: 8, textAlign: 'center',
   },
   successSub: {
     fontSize: 14, fontFamily: 'Inter_400Regular',
-    color: MUTED, lineHeight: 21, textAlign: 'center',
+     color: theme.muted, lineHeight: 21, textAlign: 'center',
   },
 
   // Generic card (CARD token)
-  _card: { backgroundColor: CARD },
+  _card: { backgroundColor: theme.card },
 });

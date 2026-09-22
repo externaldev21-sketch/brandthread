@@ -15,17 +15,9 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { PostAnalyticsResponse, useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
+import { FS } from '@/lib/theme';
 
 // ─── Design Tokens ─────────────────────────────────────────────────────────────
-const BG        = '#0A0A0B';
-const CARD      = '#18181B';
-const BORDER    = 'rgba(255,255,255,0.07)';
-const FG        = '#F4F4FF';
-const MUTED     = 'rgba(244,244,255,0.50)';
-const GREEN     = '#10B981';
-const BLUE      = '#D4D4D8';
-const ORANGE    = '#F97316';
-const ERR       = '#F87171';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -50,17 +42,17 @@ function formatPeakHour(hour: number): string {
   return `${h}:00 ${period}`;
 }
 
-function postTypeGradient(type: string, primary: string): [string, string] {
-  if (type === 'video' || type === 'behind_scenes') return [primary, '#0A1828'];
-  if (type === 'slideshow') return [BLUE, '#0A1828'];
-  if (type === 'announcement') return [GREEN, 'rgba(16,185,129,0.18)'];
-  return ['#3D1F0F', '#1A0A05'];
+function postTypeGradient(type: string, primary: string, colors: ReturnType<typeof useColors>): [string, string] {
+  if (type === 'video' || type === 'behind_scenes') return [primary, colors.background];
+  if (type === 'slideshow') return [colors.info, colors.background];
+  if (type === 'announcement') return [colors.success, `${colors.success}2E`];
+  return [colors.warning, colors.background];
 }
 
-function retentionBarColor(pct: number): string {
-  if (pct > 0.7) return GREEN;
-  if (pct > 0.4) return ORANGE;
-  return ERR;
+function retentionBarColor(pct: number, colors: ReturnType<typeof useColors>): string {
+  if (pct > 0.7) return colors.success;
+  if (pct > 0.4) return colors.warning;
+  return colors.destructive;
 }
 
 function countryInitials(country: string): string {
@@ -72,6 +64,8 @@ function countryInitials(country: string): string {
 // ─── Section Title ─────────────────────────────────────────────────────────────
 
 function SectionTitle({ title }: { title: string }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return <Text style={styles.sectionTitle}>{title}</Text>;
 }
 
@@ -85,6 +79,7 @@ interface EngagementBarProps {
 
 function EngagementBar({ label, value, maxValue }: EngagementBarProps) {
   const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const pct = maxValue > 0 ? value / maxValue : 0;
   return (
     <View style={styles.engRow}>
@@ -111,6 +106,7 @@ interface CountryBarProps {
 
 function CountryBar({ country, pct }: CountryBarProps) {
   const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.countryRow}>
       <View style={styles.countryInitialsCircle}>
@@ -134,6 +130,7 @@ function CountryBar({ country, pct }: CountryBarProps) {
 
 export default function PostAnalyticsScreen() {
   const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
@@ -183,13 +180,13 @@ export default function PostAnalyticsScreen() {
   }
 
   const { post, metrics } = analytics;
-  const gradColors = postTypeGradient(post.mediaType ?? 'image', colors.primary);
+  const gradColors = postTypeGradient(post.mediaType ?? 'image', colors.primary, colors);
 
   return (
     <View style={styles.root}>
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={20} color={FG} />
+          <Feather name="arrow-left" size={20} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Post Analytics</Text>
         <View style={styles.rangePill}>
@@ -213,10 +210,10 @@ export default function PostAnalyticsScreen() {
         </View>
 
         <View style={styles.heroGrid}>
-          <HeroCard icon="eye" iconColor={GREEN} label="Views" value={metrics.views.tracked ? formatNumber(metrics.views.count ?? 0) : 'Not tracked'} />
+           <HeroCard icon="eye" iconColor={colors.success} label="Views" value={metrics.views.tracked ? formatNumber(metrics.views.count ?? 0) : 'Not tracked'} />
           <HeroCard icon="heart" iconColor={colors.primary} label="Likes" value={formatNumber(metrics.likes)} />
-          <HeroCard icon="bookmark" iconColor={BLUE} label="Saves" value={formatNumber(metrics.saves.count)} />
-          <HeroCard icon="repeat" iconColor={ORANGE} label="Reposts" value={formatNumber(metrics.reposts)} />
+           <HeroCard icon="bookmark" iconColor={colors.info} label="Saves" value={formatNumber(metrics.saves.count)} />
+           <HeroCard icon="repeat" iconColor={colors.warning} label="Reposts" value={formatNumber(metrics.reposts)} />
         </View>
 
         <SectionTitle title="Performance data" />
@@ -265,12 +262,12 @@ export default function PostAnalyticsScreen() {
             onPress={() => router.push(('/boost?targetType=post&targetId=' + encodeURIComponent(post.id)) as never)}
           >
             <LinearGradient colors={colors.gradient as any} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.quickActionGradient}>
-              <Feather name="zap" size={18} color={FG} />
+              <Feather name="zap" size={18} color={colors.primaryForeground} />
               <Text style={styles.quickActionText}>Boost Post</Text>
             </LinearGradient>
           </TouchableOpacity>
           <TouchableOpacity style={styles.quickActionShare} activeOpacity={0.85} onPress={() => router.back()}>
-            <Feather name="arrow-left" size={18} color={FG} />
+             <Feather name="arrow-left" size={18} color={colors.primaryForeground} />
             <Text style={styles.quickActionText}>Back</Text>
           </TouchableOpacity>
         </View>
@@ -287,12 +284,12 @@ export default function PostAnalyticsScreen() {
       {/* ─── Fixed Header ──────────────────────────────────────────────────── * /}
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={20} color={FG} />
+          <Feather name="arrow-left" size={20} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Post Analytics</Text>
         <TouchableOpacity style={styles.rangePill} onPress={cycleRange}>
           <Text style={styles.rangePillText}>{activeRange}</Text>
-          <Feather name="chevron-down" size={12} color={MUTED} style={{ marginLeft: 2 }} />
+          <Feather name="chevron-down" size={12} color={colors.muted} style={{ marginLeft: 2 }} />
         </TouchableOpacity>
       </View>
 
@@ -320,8 +317,8 @@ export default function PostAnalyticsScreen() {
                 styles.statusBadge,
                 {
                   backgroundColor:
-                    post.status === 'published' ? GREEN :
-                    post.status === 'draft' ? ORANGE : BLUE,
+                    post.status === 'published' ? colors.success :
+                    post.status === 'draft' ? colors.warning : colors.info,
                 },
               ]}>
                 <Text style={styles.statusBadgeText}>{post.status}</Text>
@@ -337,7 +334,7 @@ export default function PostAnalyticsScreen() {
         <View style={styles.heroGrid}>
           <HeroCard
             icon="eye"
-            iconColor={GREEN}
+            iconColor={colors.success}
             label="Views"
             value={formatNumber(analytics.views)}
           />
@@ -349,13 +346,13 @@ export default function PostAnalyticsScreen() {
           />
           <HeroCard
             icon="bookmark"
-            iconColor={BLUE}
+            iconColor={colors.info}
             label="Saves"
             value={formatNumber(analytics.saves)}
           />
           <HeroCard
             icon="share-2"
-            iconColor={ORANGE}
+            iconColor={colors.warning}
             label="Shares"
             value={formatNumber(analytics.shares)}
           />
@@ -398,15 +395,15 @@ export default function PostAnalyticsScreen() {
         <SectionTitle title="Revenue" />
         <View style={styles.revenueRow}>
           <View style={[styles.revenueCard, { flex: 1 }]}>
-            <Text style={[styles.revenueLabel, { color: GREEN }]}>Revenue</Text>
+            <Text style={[styles.revenueLabel, { color: colors.success }]}>Revenue</Text>
             <Text style={styles.revenueValue}>{formatRevenue(analytics.revenue)}</Text>
           </View>
           <View style={[styles.revenueCard, { flex: 1 }]}>
-            <Text style={[styles.revenueLabel, { color: MUTED }]}>Purchases</Text>
+            <Text style={[styles.revenueLabel, { color: colors.muted }]}>Purchases</Text>
             <Text style={styles.revenueValue}>{analytics.purchases}</Text>
           </View>
           <View style={[styles.revenueCard, { flex: 1 }]}>
-            <Text style={[styles.revenueLabel, { color: MUTED }]}>Conversion</Text>
+            <Text style={[styles.revenueLabel, { color: colors.muted }]}>Conversion</Text>
             <Text style={styles.revenueValue}>{conversionPct}%</Text>
           </View>
         </View>
@@ -423,7 +420,7 @@ export default function PostAnalyticsScreen() {
         <SectionTitle title="Peak Engagement Hour" />
         <View style={[styles.card, styles.peakHourCard]}>
           <View style={styles.peakHourLeft}>
-            <Feather name="clock" size={20} color={GREEN} />
+            <Feather name="clock" size={20} color={colors.success} />
             <Text style={styles.peakHourTime}>{formatPeakHour(analytics.peakHour)}</Text>
           </View>
           <Text style={styles.peakHourSub}>Most viewers are active at this hour</Text>
@@ -438,12 +435,12 @@ export default function PostAnalyticsScreen() {
               end={{ x: 1, y: 0 }}
               style={styles.quickActionGradient}
             >
-              <Feather name="zap" size={18} color={FG} />
+              <Feather name="zap" size={18} color={colors.primaryForeground} />
               <Text style={styles.quickActionText}>Boost Post</Text>
             </LinearGradient>
           </TouchableOpacity>
           <TouchableOpacity style={styles.quickActionShare} activeOpacity={0.85}>
-            <Feather name="share-2" size={18} color={FG} />
+              <Feather name="share-2" size={18} color={colors.primaryForeground} />
             <Text style={styles.quickActionText}>Share Results</Text>
           </TouchableOpacity>
         </View>
@@ -463,6 +460,8 @@ interface HeroCardProps {
 }
 
 function HeroCard({ icon, iconColor, label, value }: HeroCardProps) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.heroCard}>
       <Feather name={icon} size={16} color={iconColor} />
@@ -473,6 +472,8 @@ function HeroCard({ icon, iconColor, label, value }: HeroCardProps) {
 }
 
 function AnalyticsRow({ label, value, detail }: { label: string; value: string; detail: string }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.analyticsRow}>
       <View style={styles.analyticsRowCopy}>
@@ -491,6 +492,8 @@ interface RetentionChartProps {
 }
 
 function RetentionChart({ data }: RetentionChartProps) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const chartWidth = SCREEN_WIDTH - 32 - 28 - 16; // account for padding + card padding
   const barWidth = 2;
   const gap = 1;
@@ -507,7 +510,7 @@ function RetentionChart({ data }: RetentionChartProps) {
             styles.retentionBar,
             {
               height: `${Math.max(point.viewerPct * 100, 2)}%`,
-              backgroundColor: retentionBarColor(point.viewerPct),
+               backgroundColor: retentionBarColor(point.viewerPct, colors),
               marginRight: gap,
             },
           ]}
@@ -519,32 +522,32 @@ function RetentionChart({ data }: RetentionChartProps) {
 
 // ─── Styles ────────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: colors.background,
   },
 
   // ── Not Found ──
   notFound: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 28,
     gap: 12,
   },
   notFoundText: {
-    color: FG,
+    color: colors.text,
     fontSize: 16,
     textAlign: 'center',
   },
 
   // ── Header ──
   header: {
-    backgroundColor: CARD,
+    backgroundColor: colors.card,
     borderBottomWidth: 1,
-    borderBottomColor: BORDER,
+    borderBottomColor: colors.border,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
@@ -558,7 +561,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     flex: 1,
-    color: FG,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
@@ -567,13 +570,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: colors.border,
     borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
   rangePillText: {
-    color: MUTED,
+    color: colors.muted,
     fontSize: 13,
     fontWeight: '500',
   },
@@ -591,9 +594,9 @@ const styles = StyleSheet.create({
   previewCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: CARD,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: colors.border,
     borderRadius: 16,
     padding: 14,
     marginTop: 16,
@@ -609,7 +612,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   previewCaption: {
-    color: FG,
+    color: colors.text,
     fontSize: 14,
     lineHeight: 19,
   },
@@ -619,13 +622,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   typeBadge: {
-    backgroundColor: BORDER,
+    backgroundColor: colors.border,
     borderRadius: 20,
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
   typeBadgeText: {
-    color: MUTED,
+    color: colors.muted,
     fontSize: 11,
     textTransform: 'capitalize',
   },
@@ -635,20 +638,20 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   statusBadgeText: {
-    color: BG,
+    color: colors.primaryForeground,
     fontSize: 11,
     fontWeight: '600',
     textTransform: 'capitalize',
   },
   openBtn: {
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: colors.border,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   openBtnText: {
-    color: FG,
+    color: colors.text,
     fontSize: 13,
     fontWeight: '500',
   },
@@ -662,32 +665,32 @@ const styles = StyleSheet.create({
   },
   heroCard: {
     width: (SCREEN_WIDTH - 32 - 10) / 2,
-    backgroundColor: CARD,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: colors.border,
     borderRadius: 14,
     padding: 14,
     gap: 4,
   },
   heroValue: {
-    color: FG,
+    color: colors.text,
     fontSize: 22,
     fontWeight: '700',
     marginTop: 6,
   },
   heroLabel: {
-    color: MUTED,
+    color: colors.muted,
     fontSize: 12,
   },
   heroChange: {
-    color: GREEN,
+    color: colors.success,
     fontSize: 11,
     marginTop: 2,
   },
 
   // ── Section Title ──
   sectionTitle: {
-    color: FG,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
     marginTop: 24,
@@ -696,29 +699,29 @@ const styles = StyleSheet.create({
 
   // ── Card ──
   card: {
-    backgroundColor: CARD,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: colors.border,
     borderRadius: 14,
     padding: 14,
     gap: 12,
   },
   unavailableTitle: {
-    color: FG,
+    color: colors.text,
     fontSize: 15,
     fontWeight: '700',
   },
   unavailableText: {
-    color: MUTED,
+    color: colors.muted,
     fontSize: 13,
     lineHeight: 19,
   },
   availabilityNote: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: CARD,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: colors.border,
     borderRadius: 14,
     padding: 14,
     gap: 10,
@@ -736,17 +739,17 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   analyticsLabel: {
-    color: FG,
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
   },
   analyticsDetail: {
-    color: MUTED,
+    color: colors.muted,
     fontSize: 11,
     lineHeight: 16,
   },
   analyticsValue: {
-    color: FG,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '700',
     textAlign: 'right',
@@ -759,14 +762,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   engLabel: {
-    color: MUTED,
+    color: colors.muted,
     fontSize: 13,
     width: 110,
   },
   engBarBg: {
     flex: 1,
     height: 6,
-    backgroundColor: BG,
+    backgroundColor: colors.background,
     borderRadius: 3,
     overflow: 'hidden',
   },
@@ -775,7 +778,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   engValue: {
-    color: FG,
+    color: colors.text,
     fontSize: 12,
     width: 50,
     textAlign: 'right',
@@ -798,8 +801,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   retentionXLabel: {
-    color: MUTED,
-    fontSize: 10,
+    color: colors.muted,
+    fontSize: FS.xs,
   },
   retentionStats: {
     flexDirection: 'row',
@@ -807,7 +810,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   retentionStat: {
-    color: MUTED,
+    color: colors.muted,
     fontSize: 12,
   },
 
@@ -817,9 +820,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   revenueCard: {
-    backgroundColor: CARD,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: colors.border,
     borderRadius: 14,
     padding: 12,
     alignItems: 'center',
@@ -830,7 +833,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   revenueValue: {
-    color: FG,
+    color: colors.text,
     fontSize: 15,
     fontWeight: '700',
     textAlign: 'center',
@@ -847,22 +850,22 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   countryInitialsText: {
-    color: MUTED,
-    fontSize: 10,
+    color: colors.muted,
+    fontSize: FS.xs,
     fontWeight: '700',
   },
   countryName: {
-    color: FG,
+    color: colors.text,
     fontSize: 13,
     width: 110,
   },
   countryPct: {
-    color: FG,
+    color: colors.text,
     fontSize: 12,
     width: 36,
     textAlign: 'right',
@@ -879,12 +882,12 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   peakHourTime: {
-    color: GREEN,
+    color: colors.success,
     fontSize: 28,
     fontWeight: '700',
   },
   peakHourSub: {
-    color: MUTED,
+    color: colors.muted,
     fontSize: 12,
   },
 
@@ -911,15 +914,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: CARD,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: colors.border,
     borderRadius: 14,
     padding: 14,
     gap: 8,
   },
   quickActionText: {
-    color: FG,
+    color: colors.text,
     fontSize: 15,
     fontWeight: '600',
   },

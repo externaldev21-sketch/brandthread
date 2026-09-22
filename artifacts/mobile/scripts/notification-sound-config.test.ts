@@ -13,7 +13,7 @@ describe("order notification sound configuration", () => {
       (entry: unknown) => Array.isArray(entry) && entry[0] === "expo-notifications",
     );
 
-    expect(plugin?.[1]?.sounds).toContain("./assets/sounds/order-received.wav");
+    expect(plugin?.[1]?.sounds).toContain("./assets/sounds/order_received.wav");
   });
 
   it("documents the exact drop-in asset path", () => {
@@ -23,7 +23,7 @@ describe("order notification sound configuration", () => {
     );
 
     expect(guide).toContain(
-      "artifacts/mobile/assets/sounds/order-received.wav",
+      "artifacts/mobile/assets/sounds/order_received.wav",
     );
   });
 });

@@ -13,7 +13,7 @@ import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
-import { BG, BORDER, CARD, FG, FONT, FS, MUTED, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
 
@@ -29,6 +29,7 @@ export default function SellerCreateFAB() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
+  const styles = React.useMemo(() => makeStyles(theme), [theme]);
   const { role, isLoaded: isRoleLoaded } = useRole();
   const [open, setOpen] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
@@ -95,7 +96,7 @@ export default function SellerCreateFAB() {
               <Text style={styles.subtitle}>What do you want to make?</Text>
             </View>
             <Pressable style={styles.close} onPress={() => setOpen(false)} accessibilityLabel="Close create menu">
-              <Feather name="x" size={20} color={MUTED} />
+              <Feather name="x" size={20} color={theme.muted} />
             </Pressable>
           </View>
           {ACTIONS.map(action => (
@@ -112,7 +113,7 @@ export default function SellerCreateFAB() {
                 <Text style={styles.actionLabel}>{action.label}</Text>
                 <Text style={styles.actionDescription}>{action.description}</Text>
               </View>
-              <Feather name="chevron-right" size={18} color={MUTED} />
+               <Feather name="chevron-right" size={18} color={theme.muted} />
             </Pressable>
           ))}
         </View>
@@ -121,7 +122,7 @@ export default function SellerCreateFAB() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: { background: string; border: string; card: string; text: string; muted: string }) => StyleSheet.create({
   fab: {
     position: 'absolute',
     right: SP.md,
@@ -137,17 +138,17 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 7 },
   },
   pressed: { transform: [{ scale: 0.92 }], opacity: 0.9 },
-  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.68)' },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: `${theme.background}CC` },
   sheet: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: BG,
+    backgroundColor: theme.background,
     borderTopLeftRadius: RADIUS.xl,
     borderTopRightRadius: RADIUS.xl,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
     paddingHorizontal: SP.md,
     paddingTop: SP.sm,
     gap: SP.xs,
@@ -157,16 +158,16 @@ const styles = StyleSheet.create({
     width: 38,
     height: 4,
     borderRadius: 2,
-    backgroundColor: BORDER,
+    backgroundColor: theme.border,
     marginBottom: SP.md,
   },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },
-  title: { color: FG, fontFamily: FONT.bold, fontSize: FS.xl },
-  subtitle: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 3 },
-  close: { width: 40, height: 40, borderRadius: 20, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
+  title: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.xl },
+  subtitle: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 3 },
+  close: { width: 40, height: 40, borderRadius: 20, backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center' },
   action: { minHeight: 72, borderRadius: RADIUS.md, flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.sm, gap: SP.sm },
   actionIcon: { width: 42, height: 42, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   actionCopy: { flex: 1 },
-  actionLabel: { color: FG, fontFamily: FONT.semibold, fontSize: FS.md },
-  actionDescription: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
+  actionLabel: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.md },
+  actionDescription: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
 });

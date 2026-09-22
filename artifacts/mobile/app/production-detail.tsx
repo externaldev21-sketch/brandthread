@@ -11,14 +11,19 @@ import { BrandthreadCard, BrandthreadHeader, GradientCard, SecondaryButton, Stat
 import { getProductionOrder, getOrCreateConversation } from '@/services/manufacturerService';
 import { getBulkWalletOptions, payBulkOrderFromWallet, BulkWalletOption } from '@/services/manufacturerService';
 import { ProductionOrder, PRODUCTION_STAGES } from '@/services/manufacturerTypes';
-import { BG, BORDER, FG, FONT, FS, MUTED, ON_DARK, PURPLE, PURPLE_LIGHT, RADIUS, SP, SUBTLE, SUCCESS } from '@/lib/theme';
+import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 function fmtDate(value?: string) {
   return value ? new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 }
 
 export default function ProductionDetailScreen() {
+  const { theme } = useAppTheme();
+  const { text: FG, border: BORDER, muted: MUTED, subtle: SUBTLE, accent: PURPLE,
+    accentLight: PURPLE_LIGHT, success: SUCCESS, onAccent: ON_DARK } = theme;
+  const styles = React.useMemo(() => makeStyles(theme), [theme]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -197,7 +202,10 @@ export default function ProductionDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE, accent: PURPLE,
+    accentLight: PURPLE_LIGHT, success: SUCCESS } = theme;
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   center: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: SP.lg },
   scroll: { padding: SP.md, gap: SP.md },
@@ -224,4 +232,5 @@ const styles = StyleSheet.create({
   walletError: { color: '#F97316', fontFamily: FONT.medium, fontSize: FS.sm, marginBottom: SP.sm },
   processing: { color: PURPLE_LIGHT, fontFamily: FONT.medium, fontSize: FS.sm, marginBottom: SP.sm },
   retryLink: { color: PURPLE_LIGHT, fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: SP.sm, textAlign: 'center' },
-});
+  });
+};

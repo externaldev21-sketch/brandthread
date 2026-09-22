@@ -1,10 +1,10 @@
 ---
 name: Runtime app themes
-description: Legacy persisted theme IDs remain valid while every preset resolves to the canonical visual system
+description: Monochrome is the default; complete dark palettes and matching launcher icons persist per account
 ---
 
-**Rule:** Keep existing persisted theme IDs readable, but every preset resolves to white primary emphasis, neutral graphite dim fills, and the same near-black shell. Runtime selection never changes buyer/seller chrome hue.
+**Rule:** Keep Monochrome as the default and support 11 additional dark cover-based palettes that recolor buyer and seller chrome immediately. Hydrate the account-scoped local theme before any server profile request; reconcile the server value afterward without letting a late response override a newer user selection. Every preset must define complete surfaces, borders, hierarchical text, accent, navigation, gradients, semantic colors, and a matching launcher icon. A null launcher-icon preference means follow the active theme; a theme ID is an explicit override.
 
-**Why:** Removing IDs would break saved settings, while retaining colored output would violate the strict monochrome app-wide direction.
+**Why:** The product intentionally offers App Theme in buyer and seller settings. A selected cover is expected to change the full app at once, remain readable, survive relaunches, and follow the signed-in account to another device. Alternate launcher icons require native code and are unavailable in Expo Go and web.
 
-**How to apply:** Continue using the shared provider so existing screens and stored values work, but do not introduce new preset hues or recolor the shared shell. Explicit semantic colors and deliberate content/color-picker/storefront colors remain untouched.
+**How to apply:** Read colors from the runtime theme context or its compatibility hooks; never bake active palette values into module-level StyleSheets. Release the theme boot gate after local storage resolves, then reconcile the profile in the background and switch only when its valid value differs. Persist theme and icon preferences optimistically to account-scoped local storage and the server profile. Keep icon switching behind runtime platform/build guards and a dynamic native-module import so Expo Go and web startup remain safe. Keep primary, muted, subtle, and status text at least 4.5:1 across backgrounds and cards, with visibly descending luminance. Preserve authored media, color-picker values, external brand colors, and deliberate media-legibility overlays.

@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 
-import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, BLUE, ORANGE, RED, GOLD, ON_DARK, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP, ICON, ANIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, FilterChip, StatusBadge, SectionHeader, FormInput, ProgressCard, EmptyState } from '@/components/BrandthreadUI';
@@ -65,6 +65,8 @@ interface CollapsibleSectionProps {
 
 function CollapsibleSection({ title, icon, expanded, onToggle, children, hint }: CollapsibleSectionProps) {
   const { theme } = useAppTheme();
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
+  const MUTED = theme.muted;
   return (
     <View style={s.collapsibleBlock}>
       <TouchableOpacity style={s.collapsibleHeader} onPress={onToggle} activeOpacity={0.75}>
@@ -117,7 +119,18 @@ function centsToInput(cents: number | undefined): string {
 
 export default function AddProductScreen() {
   const { theme } = useAppTheme();
-  const { accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM } = theme;
+  const {
+    background: BG, surface: SURFACE, card: CARD, cardElevated: CARD_ELEVATED,
+    border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE,
+    accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM,
+    secondary: CYAN, secondaryDim: CYAN_DIM, success: SUCCESS, warning: ORANGE, error: RED,
+    onAccent: ON_DARK,
+  } = theme;
+  const BORDER_ACTIVE = theme.accentLight;
+  const BLUE = theme.accentLight;
+  const GOLD = theme.accent;
+  const GRAD_CARD_GLOW = theme.glowGradient;
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
   const router = useRouter();
   const navigation = useNavigation();
   const params = useLocalSearchParams();
@@ -1402,7 +1415,19 @@ export default function AddProductScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const {
+    background: BG, surface: SURFACE, card: CARD, cardElevated: CARD_ELEVATED,
+    border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE,
+    accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM,
+    secondary: CYAN, secondaryDim: CYAN_DIM, success: SUCCESS, warning: ORANGE, error: RED,
+    onAccent: ON_DARK,
+  } = theme;
+  const BORDER_ACTIVE = theme.accentLight;
+  const BLUE = theme.accentLight;
+  const GOLD = theme.accent;
+  const GRAD_CARD_GLOW = theme.glowGradient;
+  return StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: 'transparent',
@@ -1610,4 +1635,5 @@ const s = StyleSheet.create({
   modelCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   modelTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   modelDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 18 },
-});
+  });
+};

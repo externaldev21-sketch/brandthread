@@ -3,7 +3,8 @@ import { Animated, PanResponder, Pressable, StyleSheet, Text, View } from 'react
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
-import { FONT, FS, FG, SP } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 const ACTION_WIDTH = 92;
 const TRIGGER_DISTANCE = 64;
@@ -27,6 +28,7 @@ export default function SwipeActionRow({
   disabled = false,
   accessibilityLabel,
 }: SwipeActionRowProps) {
+  const { theme } = useAppTheme();
   const translateX = useRef(new Animated.Value(0)).current;
   const actionTriggered = useRef(false);
 
@@ -81,8 +83,8 @@ export default function SwipeActionRow({
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? label}
       >
-        <Feather name={icon} size={18} color={FG} />
-        <Text style={styles.actionText}>{label}</Text>
+        <Feather name={icon} size={18} color={theme.onAccent} />
+        <Text style={[styles.actionText, { color: theme.onAccent }]}>{label}</Text>
       </Pressable>
       <Animated.View
         style={{ transform: [{ translateX }] }}
@@ -110,7 +112,6 @@ const styles = StyleSheet.create({
     gap: SP.xs,
   },
   actionText: {
-    color: FG,
     fontFamily: FONT.semibold,
     fontSize: FS.xs,
   },

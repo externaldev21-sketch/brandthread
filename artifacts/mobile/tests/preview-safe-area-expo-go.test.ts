@@ -11,8 +11,8 @@ describe('browser preview safe areas and Expo Go startup', () => {
     const sellerTabs = read('app/(tabs)/_layout.tsx');
     const cookieConsent = read('contexts/CookieConsentContext.tsx');
 
-    expect(buyerTabs).toContain('height: 64 + insets.bottom');
-    expect(buyerTabs).toContain('minHeight: 48');
+    expect(buyerTabs).toContain('const barHeight = 54 + bottomInset + 8');
+    expect(buyerTabs).toContain('minWidth: 44');
     expect(sellerTabs).not.toContain("if (Platform.OS === 'web') return null");
     expect(cookieConsent).toContain('bottom:72+SP.md');
   });
@@ -23,6 +23,7 @@ describe('browser preview safe areas and Expo Go startup', () => {
       'components/KeyboardAwareScrollViewCompat.tsx',
       'app/buyer-checkout.tsx',
       'app/(buyer)/search.tsx',
+      'app/(buyer)/_layout.tsx',
       'app/(tabs)/feed.tsx',
     ];
 

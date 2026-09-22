@@ -634,6 +634,7 @@ function LiveStreamPage({
   pageHeight: number;
 }) {
   const { theme } = useAppTheme();
+  const palette = theme as typeof theme & { background?: string; surface?: string; card?: string; border?: string; text?: string; muted?: string; subtle?: string; };
   const pulseAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     const loop = Animated.loop(
@@ -671,7 +672,7 @@ function LiveStreamPage({
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
         {/* Avatar circle */}
         <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center', marginBottom: 20, borderWidth: 3, borderColor: '#fff' }}>
-          <Text style={{ color: '#fff', fontFamily: FONT.bold, fontSize: 32 }}>
+          <Text style={{ color: theme.onAccent, fontFamily: FONT.bold, fontSize: 32 }}>
             {(stream.brandName ?? stream.sellerName).slice(0, 1).toUpperCase()}
           </Text>
         </View>
@@ -1261,6 +1262,7 @@ export default function FeedScreen({
   showFashionPreview?: boolean;
 }) {
   const { theme } = useAppTheme();
+  const palette = theme as typeof theme & { background?: string; surface?: string; card?: string; border?: string; text?: string; muted?: string; subtle?: string; };
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
   const insets = useSafeAreaInsets();
@@ -1727,7 +1729,7 @@ export default function FeedScreen({
   return (
     <FeedToastProvider>
     <View
-      style={styles.container}
+      style={[styles.container, { backgroundColor: palette.background ?? BG }]}
       onLayout={({ nativeEvent }) => {
         const measuredWidth = Math.round(nativeEvent.layout.width);
         const measuredHeight = Math.round(nativeEvent.layout.height);
@@ -1886,7 +1888,7 @@ export default function FeedScreen({
                 <Feather name="search" size={19} color={ON_DARK} />
             </TouchableOpacity>
 
-            <Text style={styles.topTitle}>Thread</Text>
+            <Text style={styles.topTitle}>Home</Text>
 
             <Animated.View ref={cartTargetRef} style={{ transform: [{ scale: cartPulse }] }}>
             <TouchableOpacity
@@ -1917,7 +1919,7 @@ export default function FeedScreen({
           <View style={styles.feedTabs}>
             {([
               ['following', 'Following'],
-              ['for-you', 'Thread'],
+              ['for-you', 'For You'],
             ] as const).map(([key, label]) => (
               <TouchableOpacity
                 key={key}
@@ -2090,7 +2092,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: '#FFFFFF',
   },
   repostAvatarFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#35353A' },
-  repostAvatarInitials: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 7 },
+  repostAvatarInitials: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.xs },
   repostIdentityText: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: 12, flexShrink: 1 },
   caption: {
     height: 38, fontSize: 14, fontFamily: FONT.regular, color: '#FFFFFF',
@@ -2114,7 +2116,7 @@ const styles = StyleSheet.create({
     borderRadius: 9, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: BG,
   },
-  cartCountText: { fontSize: 9, lineHeight: 12, fontFamily: FONT.bold },
+  cartCountText: { fontSize: FS.xs, lineHeight: 12, fontFamily: FONT.bold },
   topTitle: { flex: 1, textAlign: 'center', fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
   feedTabs: { alignSelf: 'center', flexDirection: 'row', gap: 22, marginTop: 0, paddingBottom: 1 },
   feedTab: { paddingHorizontal: 4, paddingVertical: 3, alignItems: 'center' },

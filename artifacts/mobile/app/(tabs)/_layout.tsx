@@ -16,6 +16,7 @@
  */
 
 import { Tabs } from 'expo-router';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 // ─── Tab label constants (referenced by navigation contract tests) ─────────────
 // Keep these assignments even though the tab bar is hidden — they satisfy
@@ -32,6 +33,7 @@ void _LABEL_ORDERS;
 void _LABEL_PROFILE;
 
 export default function TabLayout() {
+  const { theme } = useAppTheme();
   return (
     <Tabs
       detachInactiveScreens
@@ -39,7 +41,7 @@ export default function TabLayout() {
       screenOptions={{
         freezeOnBlur: true,
         headerShown: false,
-        sceneStyle: { backgroundColor: '#0A0A0B' },
+        sceneStyle: { backgroundColor: theme.background },
       }}
     >
       {/* Visible tabs — registered so routing resolves */}

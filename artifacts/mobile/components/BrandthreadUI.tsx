@@ -25,9 +25,10 @@ import {
   SUCCESS, SUCCESS_DIM, GREEN_BRIGHT,
   BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM,
-  SHADOW_PURPLE, SHADOW_SM,
+  SHADOW, SHADOW_SM,
 } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { useColors } from '@/hooks/useColors';
 import { hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { undoExpiresAt } from '@/lib/undoRecovery';
@@ -44,6 +45,7 @@ type UndoToastContextValue = { showUndo: (action: UndoAction) => void; dismissUn
 const UndoToastContext = createContext<UndoToastContextValue | null>(null);
 
 export function UndoToastProvider({ children }: { children: React.ReactNode }) {
+  const colors = useColors();
   const [action, setAction] = useState<UndoAction | null>(null);
   const [undoing, setUndoing] = useState(false);
   useEffect(() => {
@@ -63,10 +65,10 @@ export function UndoToastProvider({ children }: { children: React.ReactNode }) {
     <UndoToastContext.Provider value={{ showUndo, dismissUndo }}>
       {children}
       {action && (
-        <View accessibilityLiveRegion="polite" style={undoS.root}>
-          <Text style={undoS.message}>{action.message}</Text>
+        <View accessibilityLiveRegion="polite" style={[undoS.root, { backgroundColor: colors.elevated, borderColor: colors.border }]}>
+          <Text style={[undoS.message, { color: colors.foreground }]}>{action.message}</Text>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Undo: ${action.message}`} onPress={undo} disabled={undoing} style={undoS.button}>
-            <Text style={undoS.buttonText}>{undoing ? 'Restoring…' : 'Undo'}</Text>
+            <Text style={[undoS.buttonText, { color: colors.success }]}>{undoing ? 'Restoring…' : 'Undo'}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -74,7 +76,7 @@ export function UndoToastProvider({ children }: { children: React.ReactNode }) {
   );
 }
 const undoS = StyleSheet.create({
-  root: { position: 'absolute', left: SP.md, right: SP.md, bottom: SP.xl, minHeight: 52, borderRadius: RADIUS.md, backgroundColor: '#272738', borderWidth: 1, borderColor: BORDER_ACTIVE, paddingHorizontal: SP.md, flexDirection: 'row', alignItems: 'center', gap: SP.sm, zIndex: 1000, elevation: 1000 },
+  root: { position: 'absolute', left: SP.md, right: SP.md, bottom: SP.xl, minHeight: 52, borderRadius: RADIUS.md, backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER_ACTIVE, paddingHorizontal: SP.md, flexDirection: 'row', alignItems: 'center', gap: SP.sm, zIndex: 1000, elevation: 1000 },
   message: { flex: 1, color: FG, fontFamily: FONT.medium, fontSize: FS.sm },
   button: { minHeight: 44, justifyContent: 'center', paddingHorizontal: SP.sm },
   buttonText: { color: SUCCESS, fontFamily: FONT.bold, fontSize: FS.sm },
@@ -194,9 +196,10 @@ export function BrandthreadScreen({
   children, style, scrollable = false, noSafeTop = false, noSafeBottom = false,
 }: BrandthreadScreenProps) {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
   const containerStyle: ViewStyle = {
     flex: 1,
-    backgroundColor: SCREEN_BG,
+    backgroundColor: colors.background,
     paddingTop: noSafeTop ? 0 : insets.top,
     paddingBottom: noSafeBottom ? 0 : 0,
   };
@@ -232,8 +235,9 @@ export function BrandthreadHeader({
   title, subtitle, onBack, rightElement, gradient = false,
 }: BrandthreadHeaderProps) {
   const { theme } = useAppTheme();
+  const colors = useColors();
   return (
-    <View style={hdrS.root}>
+    <View style={[hdrS.root, { borderBottomColor: colors.border }]}>
       <View style={hdrS.left}>
         {onBack && (
           <PressableScale
@@ -241,7 +245,7 @@ export function BrandthreadHeader({
             style={hdrS.back}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Feather name="arrow-left" size={ICON.md} color={FG} />
+            <Feather name="arrow-left" size={ICON.md} color={colors.foreground} />
           </PressableScale>
         )}
         <View>
@@ -250,9 +254,9 @@ export function BrandthreadHeader({
               <Text style={[hdrS.gradTitle, { color: theme.accent }]}>{title}</Text>
             </LinearGradient>
           ) : (
-            <Text style={hdrS.title}>{title}</Text>
+            <Text style={[hdrS.title, { color: colors.foreground }]}>{title}</Text>
           )}
-          {subtitle && <Text style={hdrS.subtitle}>{subtitle}</Text>}
+          {subtitle && <Text style={[hdrS.subtitle, { color: colors.mutedForeground }]}>{subtitle}</Text>}
         </View>
       </View>
       {rightElement && <View style={hdrS.right}>{rightElement}</View>}
@@ -285,13 +289,14 @@ interface BrandthreadCardProps {
 
 export function BrandthreadCard({ children, style, onPress, glow = false, elevated = false }: BrandthreadCardProps) {
   const { theme } = useAppTheme();
+  const colors = useColors();
   const s: ViewStyle = {
-    backgroundColor: elevated ? CARD_ELEVATED_GLASS : CARD_GLASS,
+    backgroundColor: elevated ? colors.elevated : colors.card,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: colors.border,
     padding: SP.md,
-    ...(glow ? { ...SHADOW_PURPLE, shadowColor: theme.accent } : {}),
+    ...(glow ? { ...SHADOW, shadowColor: theme.accent } : {}),
   };
   if (onPress) {
     return (
@@ -315,13 +320,14 @@ interface GradientCardProps {
 
 export function GradientCard({ children, style, onPress, colors, glow = false }: GradientCardProps) {
   const { theme } = useAppTheme();
+  const palette = useColors();
   const cardColors = colors ?? [theme.accentDim, theme.secondaryDim] as const;
   const inner = (
     <LinearGradient
       colors={cardColors}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={[gcS.card, { borderColor: theme.accent + '66' }, glow && { ...SHADOW_PURPLE, shadowColor: theme.accent } as ViewStyle, style]}
+      style={[gcS.card, { borderColor: palette.border }, glow && { ...SHADOW, shadowColor: theme.accent } as ViewStyle, style]}
     >
       {children}
     </LinearGradient>
@@ -357,6 +363,7 @@ export function PrimaryButton({
   label, onPress, icon, loading, disabled, small, style, colors,
 }: PrimaryButtonProps) {
   const { theme } = useAppTheme();
+  const palette = useColors();
   const buttonColors = colors ?? theme.primaryGradient;
   const foreground = theme.onAccent;
   const onAccentTextStyle = getOnAccentTextStyle(theme);
@@ -373,17 +380,17 @@ export function PrimaryButton({
       style={[{ borderRadius: RADIUS.md, overflow: 'hidden' }, style]}
     >
       <LinearGradient
-        colors={disabled ? ['#3A3A4E', '#3A3A4E'] : buttonColors}
+        colors={disabled ? [palette.elevated, palette.elevated] : buttonColors}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={[pbS.inner, { height: h }]}
       >
         {loading ? (
-          <ActivityIndicator color={disabled ? MUTED : foreground} size="small" />
+          <ActivityIndicator color={disabled ? palette.mutedForeground : foreground} size="small" />
         ) : (
           <>
-            {icon && <Feather name={icon} size={ICON.sm} color={disabled ? MUTED : foreground} />}
-            <Text style={[pbS.label, disabled ? { color: MUTED, fontSize: small ? FS.sm : FS.base, opacity: 0.5 } : [onAccentTextStyle, { fontSize: small ? FS.sm : FS.base }]]}>{label}</Text>
+            {icon && <Feather name={icon} size={ICON.sm} color={disabled ? palette.mutedForeground : foreground} />}
+            <Text style={[pbS.label, disabled ? { color: palette.mutedForeground, fontSize: small ? FS.sm : FS.base, opacity: 0.5 } : [onAccentTextStyle, { fontSize: small ? FS.sm : FS.base }]]}>{label}</Text>
           </>
         )}
       </LinearGradient>
@@ -484,13 +491,14 @@ interface IconButtonProps {
 
 export function IconButton({ name, onPress, color = FG, size = ICON.md, badge, badgeCount, accessibilityLabel, accessibilityHint, style }: IconButtonProps) {
   const { theme } = useAppTheme();
+  const palette = useColors();
   const label = accessibilityLabel ?? `${name.replace(/-/g, ' ')}${badgeCount ? `, ${badgeCount} notifications` : ''}`;
   return (
     <PressableScale
       onPress={() => { hapticLight(); onPress(); }}
       accessibilityLabel={label}
       accessibilityHint={accessibilityHint}
-      style={[ibS.root, style]}
+      style={[ibS.root, { backgroundColor: palette.card, borderColor: palette.border }, style]}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
     >
       <Feather name={name} size={size} color={color} />
@@ -509,7 +517,7 @@ const ibS = StyleSheet.create({
   root:      { width: COMP.iconBtn, height: COMP.iconBtn, borderRadius: RADIUS.sm, backgroundColor: CARD,
                borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   badge:     { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4 },
-  badgeText: { fontSize: 8, fontFamily: FONT.bold, textAlign: 'center' },
+  badgeText: { fontSize: FS.xs, fontFamily: FONT.bold, textAlign: 'center' },
 });
 
 // ─── SearchBar ────────────────────────────────────────────────────────────────
@@ -526,15 +534,16 @@ interface SearchBarProps {
 export function SearchBar({ value, onChange, placeholder = 'Search…', style, onFocus, onBlur }: SearchBarProps) {
   const [focused, setFocused] = useState(false);
   const { theme } = useAppTheme();
+  const palette = useColors();
   return (
-    <View style={[srS.root, focused && [srS.focused, { borderColor: theme.accent }], style]}>
-      <Feather name="search" size={ICON.sm} color={focused ? theme.accentLight : MUTED} />
+    <View style={[srS.root, { backgroundColor: palette.card, borderColor: palette.border }, focused && [srS.focused, { borderColor: theme.accent }], style]}>
+      <Feather name="search" size={ICON.sm} color={focused ? theme.accentLight : palette.mutedForeground} />
       <TextInput
-        style={srS.input}
+        style={[srS.input, { color: palette.foreground }]}
         value={value}
         onChangeText={onChange}
         placeholder={placeholder}
-        placeholderTextColor={SUBTLE}
+        placeholderTextColor={palette.subtle}
         accessibilityLabel={placeholder}
         accessibilityRole="search"
         onFocus={() => { setFocused(true); onFocus?.(); }}
@@ -548,7 +557,7 @@ export function SearchBar({ value, onChange, placeholder = 'Search…', style, o
           accessibilityHint="Removes the current search text"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Feather name="x" size={ICON.sm} color={MUTED} />
+          <Feather name="x" size={ICON.sm} color={palette.mutedForeground} />
         </PressableScale>
       )}
     </View>
@@ -574,17 +583,18 @@ interface FilterChipProps {
 
 export function FilterChip({ label, active, onPress, count }: FilterChipProps) {
   const { theme } = useAppTheme();
+  const palette = useColors();
   return (
     <PressableScale
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
       accessibilityLabel={count !== undefined ? `${label}, ${count}` : label}
       accessibilityState={{ selected: active }}
-      style={[fcS.chip, active && [fcS.active, { backgroundColor: theme.accentDim, borderColor: theme.accent + '88' }]]}
+      style={[fcS.chip, { backgroundColor: palette.card, borderColor: palette.border }, active && [fcS.active, { backgroundColor: theme.accentDim, borderColor: theme.accent + '88' }]]}
     >
-      <Text style={[fcS.label, active && [fcS.activeLabel, { color: theme.accentLight }]]}>{label}</Text>
+      <Text style={[fcS.label, { color: palette.mutedForeground }, active && [fcS.activeLabel, { color: theme.onAccent }]]}>{label}</Text>
       {count !== undefined && (
         <View style={[fcS.count, active && [fcS.activeCount, { backgroundColor: theme.accentDim }]]}>
-          <Text style={[fcS.countText, active && [fcS.activeCountText, { color: theme.accentLight }]]}>{count}</Text>
+          <Text style={[fcS.countText, { color: palette.mutedForeground }, active && [fcS.activeCountText, { color: theme.onAccent }]]}>{count}</Text>
         </View>
       )}
     </PressableScale>
@@ -599,7 +609,7 @@ const fcS = StyleSheet.create({
   activeLabel:  { fontFamily: FONT.semibold },
   count:        { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: RADIUS.pill, paddingHorizontal: 5, paddingVertical: 1 },
   activeCount:  {},
-  countText:    { fontSize: 10, fontFamily: FONT.bold, color: MUTED },
+  countText:    { fontSize: FS.xs, fontFamily: FONT.bold, color: MUTED },
   activeCountText: {},
 });
 
@@ -624,10 +634,11 @@ const STATUS_COLORS: Record<StatusVariant, { bg: string; fg: string }> = {
 
 export function StatusBadge({ label, variant = 'neutral', small = false }: StatusBadgeProps) {
   const { theme } = useAppTheme();
-  const c = variant === 'purple' ? { bg: theme.accentDim, fg: theme.accentLight } : STATUS_COLORS[variant];
+  const palette = useColors();
+  const c = variant === 'purple' ? { bg: theme.accentDim, fg: theme.accentLight } : variant === 'neutral' ? { bg: palette.accent, fg: palette.mutedForeground } : STATUS_COLORS[variant];
   return (
     <View style={[stS.root, { backgroundColor: c.bg, paddingHorizontal: small ? 6 : 9, paddingVertical: small ? 2 : 4 }]}>
-      <Text style={[stS.label, { color: c.fg, fontSize: small ? 9 : FS.xs }]}>{label}</Text>
+      <Text style={[stS.label, { color: c.fg, fontSize: FS.xs }]}>{label}</Text>
     </View>
   );
 }
@@ -650,6 +661,7 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon, title, description, action, secondaryAction, style }: EmptyStateProps) {
   const { theme } = useAppTheme();
+  const colors = useColors();
   return (
     <View style={[esS.root, style]}>
       <View style={esS.illustration} accessibilityElementsHidden>
@@ -672,8 +684,8 @@ export function EmptyState({ icon, title, description, action, secondaryAction, 
           </View>
         </LinearGradient>
       </View>
-      <Text style={esS.title}>{title}</Text>
-      <Text style={esS.desc}>{description}</Text>
+      <Text style={[esS.title, { color: colors.foreground }]}>{title}</Text>
+      <Text style={[esS.desc, { color: colors.mutedForeground }]}>{description}</Text>
       {action && (
         <View style={esS.actions}>
           <PrimaryButton label={action.label} onPress={action.onPress} icon={action.icon} style={esS.btn} />
@@ -807,7 +819,7 @@ const scS = StyleSheet.create({
   value:    { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, letterSpacing: -0.5 },
   label:    { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   changeRow:{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
-  change:   { fontSize: 10, fontFamily: FONT.semibold },
+  change:   { fontSize: FS.xs, fontFamily: FONT.semibold },
 });
 
 // ─── QuickActionCard ──────────────────────────────────────────────────────────
@@ -875,7 +887,7 @@ export function NewFeatureBadge({ featureId, openedIds, style }: NewFeatureBadge
 
 const nfS = StyleSheet.create({
   root: { borderRadius: RADIUS.pill, paddingHorizontal: 5, paddingVertical: 2 },
-  text: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 0.5 },
+  text: { fontSize: FS.xs, fontFamily: FONT.bold, letterSpacing: 0.5 },
 });
 
 // ─── LockBadge ────────────────────────────────────────────────────────────────
@@ -907,7 +919,7 @@ const lbS = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 3,
   },
-  text: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 0.5 },
+  text: { fontSize: FS.xs, fontFamily: FONT.bold, letterSpacing: 0.5 },
 });
 
 // ─── FormInput ────────────────────────────────────────────────────────────────
@@ -1067,7 +1079,7 @@ const ncS = StyleSheet.create({
   desc:       { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
   dot:        { width: 6, height: 6, borderRadius: 3 },
   badgeCount: { borderRadius: RADIUS.pill, paddingHorizontal: 6, paddingVertical: 1 },
-  badgeText:  { fontSize: 9, fontFamily: FONT.bold },
+  badgeText:  { fontSize: FS.xs, fontFamily: FONT.bold },
 });
 
 // ─── LoadingSkeleton ──────────────────────────────────────────────────────────
@@ -1205,6 +1217,7 @@ const skS = StyleSheet.create({
 export function BrandedLoadingState({ message, style }: { message?: string; style?: StyleProp<ViewStyle> }) {
   const pulse = useRef(new Animated.Value(0.45)).current;
   const { theme } = useAppTheme();
+  const colors = useColors();
   useEffect(() => {
     const anim = Animated.loop(
       Animated.sequence([
@@ -1216,7 +1229,7 @@ export function BrandedLoadingState({ message, style }: { message?: string; styl
     return () => anim.stop();
   }, []);
   return (
-    <View style={[blS.root, style]}>
+    <View style={[blS.root, { backgroundColor: colors.background }, style]}>
       <Animated.View style={{ opacity: pulse }}>
         <LinearGradient
           colors={theme.primaryGradient}
@@ -1227,7 +1240,7 @@ export function BrandedLoadingState({ message, style }: { message?: string; styl
           <Feather name="loader" size={ICON.md} color={theme.onAccent} />
         </LinearGradient>
       </Animated.View>
-      {message && <Text style={blS.msg}>{message}</Text>}
+      {message && <Text style={[blS.msg, { color: colors.mutedForeground }]}>{message}</Text>}
     </View>
   );
 }
@@ -1251,10 +1264,11 @@ export function Toast({ message, visible, variant = 'success' }: ToastProps) {
   useEffect(() => {
     Animated.timing(opacity, { toValue: visible ? 1 : 0, duration: ANIM.fast, useNativeDriver: true }).start();
   }, [visible]);
-  const colors = { success: SUCCESS, error: RED, info: BLUE };
-  const color = colors[variant];
+  const palette = useColors();
+  const statusColors = { success: palette.success, error: palette.destructive, info: palette.info };
+  const color = statusColors[variant];
   return (
-    <Animated.View style={[toS.root, { opacity, borderColor: color + '44' }]}>
+    <Animated.View style={[toS.root, { opacity, backgroundColor: palette.card, borderColor: color + '44' }]}>
       <Feather name={variant === 'success' ? 'check-circle' : variant === 'error' ? 'alert-circle' : 'info'} size={ICON.sm} color={color} />
       <Text style={[toS.text, { color }]}>{message}</Text>
     </Animated.View>

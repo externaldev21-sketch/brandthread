@@ -442,6 +442,8 @@ export interface LocalUserProfile {
   website: string | null;
   username: string | null;
   accountType: 'buyer' | 'seller' | null;
+  appThemeId: string;
+  appIconId: string | null;
   brandName: string | null;
   onboardingComplete: boolean;
 }
@@ -547,6 +549,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         name?:        string;
         username?:    string;
         accountType?: 'buyer' | 'seller';
+        appThemeId?: string;
+        appIconId?: string | null;
         expectedClerkId?: string;
       }) => patch<any>('/api/auth/profile', body),
       /** Permanently erase this account after the explicit DELETE confirmation. */
@@ -1215,6 +1219,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         website?: string;
         name?: string;
         username?: string;
+        appThemeId?: string;
+        appIconId?: string | null;
       }) =>
         patch<any>('/api/auth/profile', body),
       /** Platform subscription — billed to the seller's own payment method (sellers only).

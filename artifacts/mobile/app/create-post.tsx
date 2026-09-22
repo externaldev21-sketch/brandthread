@@ -43,15 +43,10 @@ import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
-const BG       = '#000000';
-const BG_SOFT  = '#0A0A0B';
-const CARD     = '#18181B';
-const BORDER   = 'rgba(255,255,255,0.08)';
-const FG       = '#F4F4FF';
-const MUTED    = 'rgba(244,244,255,0.50)';
-const ORANGE   = '#F97316';
-
 const { width: SW } = Dimensions.get('window');
+let ts: any = {};
+let ms: any = {};
+let dps: any = {};
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Step = 'media-pick' | 'video-edit' | 'slide-edit' | 'post-details' | 'publishing' | 'done';
@@ -112,6 +107,7 @@ function ToolBtn({ icon, label, onPress, accessibilityLabel, testID }: {
   icon: keyof typeof Feather.glyphMap; label?: string; onPress?: () => void;
   accessibilityLabel?: string; testID?: string;
 }) {
+  const { theme } = useAppTheme();
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -121,7 +117,7 @@ function ToolBtn({ icon, label, onPress, accessibilityLabel, testID }: {
       accessibilityRole="button"
       testID={testID}
     >
-      <Feather name={icon} size={26} color={FG} />
+      <Feather name={icon} size={26} color={theme.text} />
       {label ? <Text style={ts.toolBtnLabel}>{label}</Text> : null}
     </TouchableOpacity>
   );
@@ -131,6 +127,7 @@ function ToolBtn({ icon, label, onPress, accessibilityLabel, testID }: {
 function SettingsRow({ label, value, onPress, children }: {
   label: string; value?: string; onPress?: () => void; children?: React.ReactNode;
 }) {
+  const { theme } = useAppTheme();
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -141,7 +138,7 @@ function SettingsRow({ label, value, onPress, children }: {
       <View style={ts.settingsRowRight}>
         {value ? <Text style={ts.settingsRowValue}>{value}</Text> : null}
         {children}
-        {onPress ? <Feather name="chevron-right" size={16} color={MUTED} /> : null}
+        {onPress ? <Feather name="chevron-right" size={16} color={theme.muted} /> : null}
       </View>
     </TouchableOpacity>
   );
@@ -202,8 +199,10 @@ interface DatePickerModalProps {
 }
 
 function DatePickerModal({ visible, initial, onConfirm, onClose, insets }: DatePickerModalProps) {
-  const colors = useColors();
-  const PURPLE = colors.primary;
+  const { theme } = useAppTheme();
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const PURPLE = theme.accent;
   const [ps, setPs] = useState<PickerState>(initial);
 
   // sync when re-opened with a different initial value
@@ -412,6 +411,16 @@ function DatePickerModal({ visible, initial, onConfirm, onClose, insets }: DateP
 export default function CreatePostScreen() {
   const colors   = useColors();
   const { theme } = useAppTheme();
+  const BG = theme.background;
+  const BG_SOFT = theme.surface;
+  const CARD = theme.card;
+  const BORDER = theme.border;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const ORANGE = theme.warning;
+  Object.assign(ts, createTs(theme));
+  Object.assign(ms, createMs(theme));
+  Object.assign(dps, createDps(theme));
   const PURPLE   = colors.primary;
   const insets   = useSafeAreaInsets();
   const router   = useRouter();
@@ -2073,6 +2082,10 @@ interface SoundModalProps {
 }
 function SoundModal({ visible, onClose, soundTab, setSoundTab, soundSearch, setSoundSearch, onUse, insets }: SoundModalProps) {
   const colors = useColors();
+  const { theme } = useAppTheme();
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const ORANGE = theme.warning;
   const PURPLE = colors.primary;
   const tabs = [
     { id: 'trending'    as const, label: 'Trending' },
@@ -2139,6 +2152,10 @@ interface ProductModalProps {
 }
 function ProductModal({ visible, onClose, productSearch, setProductSearch, productTags, onTag, taggableProducts, insets }: ProductModalProps) {
   const colors = useColors();
+  const { theme } = useAppTheme();
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const ORANGE = theme.warning;
   const PURPLE = colors.primary;
   const filtered = taggableProducts.filter(p => productSearch === '' || p.name.toLowerCase().includes(productSearch.toLowerCase()));
   const statusColor = (st: string) => st === 'active' ? PURPLE : st === 'scheduled' ? ORANGE : MUTED;
@@ -2211,7 +2228,15 @@ function ProductModal({ visible, onClose, productSearch, setProductSearch, produ
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const ts = StyleSheet.create({
+const createTs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const BG = theme.background;
+  const BG_SOFT = theme.surface;
+  const CARD = theme.card;
+  const BORDER = theme.border;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const ORANGE = theme.warning;
+  return StyleSheet.create({
   root:   { flex: 1 },
   center: { alignItems: 'center', justifyContent: 'center' },
 
@@ -2278,7 +2303,7 @@ const ts = StyleSheet.create({
   mpPhotoThumbImg: { width: 70, height: 70 },
   mpRemoveChip:    { position: 'absolute', top: 4, right: 4, width: 16, height: 16, borderRadius: 8, backgroundColor: '#000000AA', alignItems: 'center', justifyContent: 'center' },
   mpCoverBadge:    { position: 'absolute', bottom: 4, left: 4, backgroundColor: '#000000AA', borderRadius: 3, paddingHorizontal: 4, paddingVertical: 1 },
-  mpCoverBadgeText:{ fontSize: 8, fontFamily: FONT.bold, color: FG },
+  mpCoverBadgeText:{ fontSize: FS.xs, fontFamily: FONT.bold, color: FG },
   mpAddMoreThumb:  { width: 70, height: 70, borderRadius: 6, borderWidth: 1, borderColor: BORDER, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
 
   // Bottom composer zone
@@ -2361,7 +2386,7 @@ const ts = StyleSheet.create({
     alignItems: 'center', gap: 6,
   },
   toolBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  toolBtnLabel:{ fontSize: 10, fontFamily: FONT.regular, color: FG, marginTop: 2 },
+  toolBtnLabel:{ fontSize: FS.xs, fontFamily: FONT.regular, color: FG, marginTop: 2 },
   toolDivider: { width: 30, height: StyleSheet.hairlineWidth, backgroundColor: BORDER, marginVertical: 4 },
 
   timelinePanel: {
@@ -2373,7 +2398,7 @@ const ts = StyleSheet.create({
   timelineMetaText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   timeline:         { height: 48, flexDirection: 'row', borderRadius: 8, overflow: 'hidden', backgroundColor: CARD, position: 'relative', marginBottom: 10 },
   timelineClip:     { minWidth: 16, alignItems: 'center', justifyContent: 'center', borderRightWidth: 2, borderRightColor: BG },
-  timelineClipText: { color: FG, fontSize: 10, fontFamily: FONT.bold },
+  timelineClipText: { color: FG, fontSize: FS.xs, fontFamily: FONT.bold },
   scrubber:         { position: 'absolute', top: 0, bottom: 0, width: 3, marginLeft: -1, backgroundColor: FG },
   trimRow:          { flexDirection: 'row', gap: 6, marginBottom: 14 },
   trimBtn:          { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
@@ -2407,7 +2432,7 @@ const ts = StyleSheet.create({
   thumbImg:       { width: '100%', height: '100%' },
   thumbPlaceholder:{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
   thumbEditOverlay:{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', paddingVertical: 5 },
-  thumbEditText:  { fontSize: 10, fontFamily: FONT.medium, color: FG },
+  thumbEditText:  { fontSize: FS.xs, fontFamily: FONT.medium, color: FG },
 
   pillRow: {
     flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 12,
@@ -2478,7 +2503,7 @@ const ts = StyleSheet.create({
   slideThumb:    { width: 60, height: 80, borderRadius: 6, overflow: 'hidden', borderWidth: 2, borderColor: 'transparent', position: 'relative' },
   slideThumbImg: { width: 60, height: 80 },
   slideOverlayBadge: { position: 'absolute', top: 3, right: 3, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
-  slideOverlayBadgeText: { fontSize: 9, fontFamily: FONT.bold, color: '#fff' },
+  slideOverlayBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: '#fff' },
   slideNextBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20,
     paddingHorizontal: 20, paddingTop: 12,
@@ -2488,10 +2513,17 @@ const ts = StyleSheet.create({
   slideNextBusyText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
   errorRetryBtn: { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
   errorRetryText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: FG },
-});
+  });
+};
 
 // ─── Modal styles ─────────────────────────────────────────────────────────────
-const ms = StyleSheet.create({
+const createMs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const BG_SOFT = theme.surface;
+  const CARD = theme.card;
+  const BORDER = theme.border;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  return StyleSheet.create({
   root:    { flex: 1, backgroundColor: BG_SOFT },
   header:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER },
   title:   { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
@@ -2519,10 +2551,17 @@ const ms = StyleSheet.create({
   tagBtnText:{ fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED },
   doneBtn:   { borderRadius: 12, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, paddingVertical: 14, alignItems: 'center' },
   doneBtnText:{ fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-});
+  });
+};
 
 // ─── Date picker modal styles ─────────────────────────────────────────────────
-const dps = StyleSheet.create({
+const createDps = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const BG_SOFT = theme.surface;
+  const CARD = theme.card;
+  const BORDER = theme.border;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  return StyleSheet.create({
   overlay:   { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
   sheet:     { backgroundColor: BG_SOFT, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16, paddingTop: 12, maxHeight: '92%' },
   handle:    { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: 14 },
@@ -2551,4 +2590,5 @@ const dps = StyleSheet.create({
   ampmText:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
   confirmBtn:{ borderRadius: 12, paddingVertical: 15, alignItems: 'center', marginTop: 8 },
   confirmText:{ fontSize: FS.base, fontFamily: FONT.bold, color: '#fff' },
-});
+  });
+};

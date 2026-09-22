@@ -17,7 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUser, useAuth } from '@clerk/expo';
 import { getSetupState, completionPercent, SetupState } from '@/lib/setupStore';
 import { useApi } from '@/lib/api';
-import { BG, SCREEN_BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE, SUCCESS, BLUE, ORANGE, RED, GOLD, FONT, FS, SP, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, SecondaryButton, NavigationCard, StatusBadge } from '@/components/BrandthreadUI';
 
@@ -43,52 +43,52 @@ interface NavItem {
 //      Taxes and Duties → /taxes-duties (all previously had no route).
 
 const STORE_ITEMS: NavItem[] = [
-  { icon: 'layout', label: 'Store Builder', desc: 'Customize your storefront',  accent: PURPLE, route: '/store-builder' },
-  { icon: 'grid',   label: 'Collections',   desc: 'Group products',              accent: CYAN,   route: '/store-collections' },
-  { icon: 'globe',  label: 'Domains',       desc: 'Custom domain settings',      accent: BLUE,   route: '/store-domain' },
-  { icon: 'tag',    label: 'Discounts',     desc: 'Coupon codes and offers',      accent: GOLD, route: '/discounts' },
+  { icon: 'layout', label: 'Store Builder', desc: 'Customize your storefront',  accent: 'accent', route: '/store-builder' },
+  { icon: 'grid',   label: 'Collections',   desc: 'Group products',              accent: 'secondary', route: '/store-collections' },
+  { icon: 'globe',  label: 'Domains',       desc: 'Custom domain settings',      accent: 'accentLight', route: '/store-domain' },
+  { icon: 'tag',    label: 'Discounts',     desc: 'Coupon codes and offers',      accent: 'warning', route: '/discounts' },
 ];
 
 const STUDIO_ITEMS: NavItem[] = [
-  { icon: 'edit-3',      label: 'Design Studio',      desc: 'Create designs and mockups',  accent: PURPLE, route: '/design' },
-  { icon: 'camera',      label: 'AI Photoshoot',      desc: 'Generate product photos',     accent: BLUE,   route: '/design-ai-photoshoot' },
-  { icon: 'scissors',    label: 'Background Removal', desc: 'Clean image backgrounds',     accent: CYAN,   route: '/design-bg-removal' },
-  { icon: 'trending-up', label: 'Campaign Generator', desc: 'Create campaign assets',      accent: ORANGE, route: '/design-campaign' },
-  { icon: 'layers',      label: 'Brand Assets',       desc: 'Logos, colors and graphics',  accent: GOLD,   route: '/design-brand-assets' },
+  { icon: 'edit-3', label: 'Design Studio', desc: 'Create designs and mockups', accent: 'accent', route: '/design' },
+  { icon: 'camera', label: 'AI Photoshoot', desc: 'Generate product photos', accent: 'accentLight', route: '/design-ai-photoshoot' },
+  { icon: 'scissors', label: 'Background Removal', desc: 'Clean image backgrounds', accent: 'secondary', route: '/design-bg-removal' },
+  { icon: 'trending-up', label: 'Campaign Generator', desc: 'Create campaign assets', accent: 'warning', route: '/design-campaign' },
+  { icon: 'layers', label: 'Brand Assets', desc: 'Logos, colors and graphics', accent: 'secondary', route: '/design-brand-assets' },
 ];
 
 const OPERATIONS_ITEMS: NavItem[] = [
-  { icon: 'archive', label: 'Inventory',        desc: 'Track stock levels',             accent: BLUE,         route: '/inventory' },
-  { icon: 'truck',   label: 'Shipping',         desc: 'Rates, zones and carriers',      accent: ORANGE,       route: '/shipping' },
+  { icon: 'archive', label: 'Inventory', desc: 'Track stock levels', accent: 'accentLight', route: '/inventory' },
+  { icon: 'truck', label: 'Shipping', desc: 'Rates, zones and carriers', accent: 'warning', route: '/shipping' },
   // FIX ↑ previously had no route — now wired to shipping.tsx
-  { icon: 'tool',    label: 'Manufacturer Hub', desc: 'Find and manage manufacturers',  accent: PURPLE, badge: true, route: '/manufacturer-hub' },
-  { icon: 'users',   label: 'Customers',        desc: 'Browse your customer list',      accent: PURPLE_LIGHT, route: '/customer-accounts' },
+  { icon: 'tool', label: 'Manufacturer Hub', desc: 'Find and manage manufacturers', accent: 'accent', badge: true, route: '/manufacturer-hub' },
+  { icon: 'users',   label: 'Customers',        desc: 'Browse your customer list',      accent: 'accentLight', route: '/customer-accounts' },
   // FIX ↑ previously had no route — now wired to customer-accounts.tsx
 ];
 
 const GROWTH_ITEMS: NavItem[] = [
-  { icon: 'message-circle', label: 'Messages',  desc: 'Read and reply to buyer DMs',  accent: PURPLE, route: '/seller-inbox' },
-  { icon: 'trending-up',    label: 'Marketing', desc: 'Campaigns and promotions',      accent: ORANGE, route: '/(tabs)/marketing' },
-  { icon: 'bar-chart-2',    label: 'Analytics', desc: 'Sales, traffic and insights',   accent: BLUE,   route: '/(tabs)/analytics' },
-  { icon: 'video',          label: 'Content',   desc: 'Posts, drafts and scheduled',   accent: CYAN,   route: '/content' },
-  { icon: 'briefcase',      label: 'Community', desc: 'Hire freelance creatives',      accent: CYAN,   route: '/community' },
+  { icon: 'message-circle', label: 'Messages', desc: 'Read and reply to buyer DMs', accent: 'accent', route: '/seller-inbox' },
+  { icon: 'trending-up', label: 'Marketing', desc: 'Campaigns and promotions', accent: 'warning', route: '/(tabs)/marketing' },
+  { icon: 'bar-chart-2', label: 'Analytics', desc: 'Sales, traffic and insights', accent: 'accentLight', route: '/(tabs)/analytics' },
+  { icon: 'video', label: 'Content', desc: 'Posts, drafts and scheduled', accent: 'secondary', route: '/content' },
+  { icon: 'briefcase', label: 'Community', desc: 'Hire freelance creatives', accent: 'secondary', route: '/community' },
 ];
 
 const MONEY_ITEMS: NavItem[] = [
-  { icon: 'dollar-sign', label: 'Payouts',          desc: 'Bank account and payout history', accent: SUCCESS, route: '/payouts' },
+  { icon: 'dollar-sign', label: 'Payouts', desc: 'Bank account and payout history', accent: 'success', route: '/payouts' },
   // ↑ De-duplicated: was also in OPERATIONS without a route — removed from there.
-  { icon: 'star',        label: 'Subscription',     desc: 'Manage your Brandthread plan',    accent: GOLD, badge: true, route: '/subscription' },
-  { icon: 'percent',     label: 'Taxes and Duties', desc: 'Tax rules and collection',        accent: MUTED, route: '/taxes-duties' },
+  { icon: 'star', label: 'Subscription', desc: 'Manage your Brandthread plan', accent: 'warning', badge: true, route: '/subscription' },
+  { icon: 'percent', label: 'Taxes and Duties', desc: 'Tax rules and collection', accent: 'muted', route: '/taxes-duties' },
   // FIX ↑ previously had no route — now wired to taxes-duties.tsx
 ];
 
 const ACCOUNT_ITEMS: NavItem[] = [
-  { icon: 'users',       label: 'Team',           desc: 'Invite collaborators',          accent: BLUE,   route: '/team' },
+  { icon: 'users', label: 'Team', desc: 'Invite collaborators', accent: 'accentLight', route: '/team' },
   // FIX ↑ previously had no route — now wired to team.tsx
-  { icon: 'link',        label: 'Integrations',   desc: 'Connect third-party services',  accent: PURPLE, route: '/integrations/klaviyo' },
-  { icon: 'bell',        label: 'Notifications',  desc: 'Push and email preferences',    accent: ORANGE, route: '/notifications-settings' },
-  { icon: 'settings',    label: 'Settings',       desc: 'App and account settings',      accent: MUTED,  route: '/settings' },
-  { icon: 'help-circle', label: 'Help & Support', desc: 'Guides, FAQs and contact us',  accent: CYAN,   route: '/help' },
+  { icon: 'link', label: 'Integrations', desc: 'Connect third-party services', accent: 'accent', route: '/integrations/klaviyo' },
+  { icon: 'bell', label: 'Notifications', desc: 'Push and email preferences', accent: 'warning', route: '/notifications-settings' },
+  { icon: 'settings', label: 'Settings', desc: 'App and account settings', accent: 'muted', route: '/settings' },
+  { icon: 'help-circle', label: 'Help & Support', desc: 'Guides, FAQs and contact us', accent: 'secondary', route: '/help' },
 ];
 
 // ─── Section metadata ─────────────────────────────────────────────────────────
@@ -207,7 +207,7 @@ export default function MoreScreen() {
           <SecondaryButton
             label="Edit profile"
             small
-            accent={PURPLE}
+            accent={theme.accent}
             onPress={() => router.push('/edit-profile' as any)}
             style={styles.editProfileBtn}
           />
@@ -216,8 +216,8 @@ export default function MoreScreen() {
         {/* STORE SETUP PROGRESS */}
         <BrandthreadCard style={styles.setupCard}>
           <View style={styles.setupRow}>
-            <Text style={[styles.setupLabel, { color: MUTED, fontSize: FS.sm }]}>Store setup</Text>
-            <Text style={[styles.setupLabel, { color: PURPLE_LIGHT, fontSize: FS.sm, fontFamily: FONT.bold }]}>
+            <Text style={[styles.setupLabel, { color: theme.muted, fontSize: FS.sm }]}>Store setup</Text>
+            <Text style={[styles.setupLabel, { color: theme.accentLight, fontSize: FS.sm, fontFamily: FONT.bold }]}>
               {percent}%
             </Text>
           </View>
@@ -244,13 +244,13 @@ export default function MoreScreen() {
                 activeOpacity={0.7}
               >
                 <View style={styles.sectionHeaderLeft}>
-                  <Feather name={icon} size={13} color={SUBTLE} style={styles.sectionIcon} />
+                  <Feather name={icon} size={13} color={theme.subtle} style={styles.sectionIcon} />
                   <Text style={styles.sectionTitle}>{title.toUpperCase()}</Text>
                 </View>
                 <Feather
                   name={isOpen ? 'chevron-up' : 'chevron-down'}
                   size={15}
-                  color={SUBTLE}
+                  color={theme.subtle}
                 />
               </TouchableOpacity>
 
@@ -269,7 +269,7 @@ export default function MoreScreen() {
                         icon={item.icon}
                         label={item.label}
                         description={item.desc}
-                        accent={item.accent}
+                        accent={item.accent === 'accent' ? theme.accent : item.accent === 'accentLight' ? theme.accentLight : item.accent === 'secondary' ? theme.secondary : item.accent === 'warning' ? theme.warning : item.accent === 'success' ? theme.success : theme.muted}
                         badge={badgeProp}
                         onPress={() => handleNavPress(item)}
                       />
@@ -285,7 +285,7 @@ export default function MoreScreen() {
         <View style={styles.signOutWrap}>
           <SecondaryButton
             label="Sign out"
-            accent={RED}
+            accent={theme.error}
             onPress={handleSignOut}
           />
         </View>
@@ -296,12 +296,17 @@ export default function MoreScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
+const createStyles = (theme: any) => {
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const BG_THEME = theme.background;
+  const FG_THEME = theme.text;
+  const MUTED_THEME = theme.muted;
+  const SUBTLE_THEME = theme.subtle;
+  const BORDER_THEME = theme.border;
   return StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: SCREEN_BG,
+    backgroundColor: BG_THEME,
   },
   scrollContent: {
     paddingBottom: 160,
@@ -339,12 +344,12 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
   userName: {
     fontSize: FS.md,
     fontFamily: FONT.bold,
-    color: FG,
+    color: FG_THEME,
   },
   userEmail: {
     fontSize: FS.sm,
     fontFamily: FONT.regular,
-    color: MUTED,
+    color: MUTED_THEME,
   },
   badgeRow: {
     flexDirection: 'row',
@@ -360,9 +365,9 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
     marginBottom: SP.md,
   },
   switcherTitle: {
-    fontSize: 9,
+    fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: SUBTLE,
+    color: SUBTLE_THEME,
     letterSpacing: 1.5,
     marginBottom: SP.sm,
   },
@@ -379,9 +384,9 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
     paddingVertical: 9,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: theme.glass ?? theme.accentDim,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: BORDER_THEME,
   },
   switcherOptionActive: {
     backgroundColor: PURPLE_DIM,
@@ -391,15 +396,15 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
     flex: 1,
     fontSize: FS.sm,
     fontFamily: FONT.medium,
-    color: MUTED,
+    color: MUTED_THEME,
   },
   switcherLabelActive: {
-    color: PURPLE_LIGHT,
+    color: theme.accentLight,
   },
   switcherHint: {
     fontSize: FS.xs,
     fontFamily: FONT.regular,
-    color: SUBTLE,
+    color: SUBTLE_THEME,
   },
 
   // Setup progress
@@ -418,7 +423,7 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
   },
   progressTrack: {
     height: 3,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.glass ?? theme.accentDim,
     borderRadius: 99,
     overflow: 'hidden',
   },
@@ -430,7 +435,7 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
   continueSetup: {
     fontSize: FS.xs,
     fontFamily: FONT.medium,
-    color: PURPLE_LIGHT,
+    color: theme.accentLight,
     marginTop: SP.sm,
   },
 
@@ -454,9 +459,9 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
     opacity: 0.7,
   },
   sectionTitle: {
-    fontSize: 10,
+    fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: SUBTLE,
+    color: SUBTLE_THEME,
     letterSpacing: 1.5,
   },
   sectionItems: {

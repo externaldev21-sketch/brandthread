@@ -18,8 +18,9 @@ import { Modal, View, Text, TouchableOpacity, StyleSheet, Pressable, ScrollView 
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { CARD, BORDER, FG, MUTED, SUBTLE, SUCCESS, FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { GROWTH_EXTRAS, GROWTH_STUDIO_TOOLS, getGrowthStudioTools } from '@/lib/growthTools';
 import { getSellerPlan } from '@/lib/sellerPlans';
 
@@ -49,6 +50,7 @@ export default function PlanUpsellModal({
 }: Props) {
   const { theme } = useAppTheme();
   const growthStudioTools = React.useMemo(() => getGrowthStudioTools(theme), [theme]);
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
   const plan = getSellerPlan(requiredPlan)!;
   const planLabel = plan.name;
   const planPrice = plan.priceLabel;
@@ -156,7 +158,7 @@ export default function PlanUpsellModal({
                 {GROWTH_EXTRAS.map((perk) => (
                   <View key={perk.label} style={s.perkRow}>
                     <View style={s.checkCircle}>
-                      <Feather name="check" size={12} color={SUCCESS} />
+                      <Feather name="check" size={12} color={theme.success} />
                     </View>
                     <Text style={s.perkText}>{perk.label}</Text>
                   </View>
@@ -168,7 +170,7 @@ export default function PlanUpsellModal({
                 {PRO_FEATURES.map((f) => (
                   <View key={f} style={s.perkRow}>
                     <View style={s.checkCircle}>
-                      <Feather name="check" size={12} color={SUCCESS} />
+                      <Feather name="check" size={12} color={theme.success} />
                     </View>
                     <Text style={s.perkText}>{f}</Text>
                   </View>
@@ -194,14 +196,14 @@ export default function PlanUpsellModal({
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
+const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: CARD,
+    backgroundColor: theme.card,
     borderTopLeftRadius: RADIUS.xl,
     borderTopRightRadius: RADIUS.xl,
     overflow: 'hidden',
@@ -233,14 +235,14 @@ const s = StyleSheet.create({
     marginBottom: SP.md,
   },
   headerTitle: {
-    color: '#FFFFFF',
+    color: theme.onAccent,
     fontSize: FS.xl,
     fontFamily: FONT.semibold,
     marginBottom: SP.xs,
     textAlign: 'center',
   },
   headerSubtitle: {
-    color: 'rgba(255,255,255,0.7)',
+    color: theme.muted,
     fontSize: FS.sm,
     fontFamily: FONT.regular,
     textAlign: 'center',
@@ -248,7 +250,7 @@ const s = StyleSheet.create({
   },
   featureNameText: {
     fontFamily: FONT.semibold,
-    color: 'rgba(255,255,255,0.9)',
+    color: theme.text,
   },
 
   // ── Scrollable body ──
@@ -261,7 +263,7 @@ const s = StyleSheet.create({
   },
 
   sectionLabel: {
-    color: MUTED,
+    color: theme.muted,
     fontSize: FS.xs,
     fontFamily: FONT.medium,
     textTransform: 'uppercase',
@@ -298,7 +300,7 @@ const s = StyleSheet.create({
     flexWrap: 'wrap',
   },
   toolTitle: {
-    color: FG,
+    color: theme.text,
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
   },
@@ -308,11 +310,11 @@ const s = StyleSheet.create({
     paddingVertical: 2,
   },
   tappedBadgeText: {
-    fontSize: 10,
+    fontSize: FS.xs,
     fontFamily: FONT.medium,
   },
   toolDesc: {
-    color: MUTED,
+    color: theme.muted,
     fontSize: FS.xs,
     fontFamily: FONT.regular,
     marginTop: 2,
@@ -322,7 +324,7 @@ const s = StyleSheet.create({
   // ── Divider ──
   divider: {
     height: 1,
-    backgroundColor: BORDER,
+    backgroundColor: theme.border,
     marginVertical: SP.md,
   },
 
@@ -337,13 +339,13 @@ const s = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: `${SUCCESS}18`,
+    backgroundColor: `${theme.success}18`,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
   perkText: {
-    color: FG,
+    color: theme.text,
     fontSize: FS.sm,
     fontFamily: FONT.regular,
     flex: 1,
@@ -368,7 +370,7 @@ const s = StyleSheet.create({
     paddingVertical: SP.md,
   },
   laterText: {
-    color: SUBTLE,
+    color: theme.subtle,
     fontSize: FS.sm,
     fontFamily: FONT.regular,
   },

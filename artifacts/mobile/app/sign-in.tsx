@@ -18,7 +18,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
-import { SCREEN_BG } from '@/lib/theme';
 import {
   APPLE_OAUTH_STRATEGY,
   isOAuthCancellationError,
@@ -27,16 +26,6 @@ import {
 } from '@/lib/oauthFlow';
 
 WebBrowser.maybeCompleteAuthSession();
-
-// ─── Design tokens (exact match to onboarding / splash / welcome) ────────────
-const FG       = '#FFFFFF';
-const MUTED    = 'rgba(255,255,255,0.5)';
-const MUTED2   = 'rgba(255,255,255,0.28)';
-const CARD     = 'rgba(255,255,255,0.04)';
-const BORDER   = 'rgba(255,255,255,0.09)';
-const INPUT_BG = 'rgba(255,255,255,0.07)';
-const INPUT_BD = 'rgba(255,255,255,0.12)';
-const ERR      = '#F87171';
 
 export default function SignInScreen() {
   const { signIn, fetchStatus } = useSignIn();
@@ -48,6 +37,7 @@ export default function SignInScreen() {
   const { addAccount } = useLocalSearchParams<{ addAccount?: string }>();
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
+  const s = makeStyles(theme);
   const isAddAccount = addAccount === '1';
 
   // Warm up the browser on Android for faster OAuth sheet presentation
@@ -155,10 +145,12 @@ export default function SignInScreen() {
           {/* Back */}
           <TouchableOpacity
             style={s.backBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
             onPress={() => { Haptics.selectionAsync(); router.back(); }}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <Feather name="arrow-left" size={20} color={MUTED} />
+            <Feather name="arrow-left" size={20} color={theme.muted} />
           </TouchableOpacity>
 
           {/* Logo */}
@@ -194,6 +186,8 @@ export default function SignInScreen() {
           {/* Continue */}
           <TouchableOpacity
             style={s.primaryWrap}
+            accessibilityRole="button"
+            accessibilityLabel="Continue with this account"
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.replace('/' as never); }}
             activeOpacity={0.88}
           >
@@ -205,12 +199,14 @@ export default function SignInScreen() {
           {/* Sign out */}
           <TouchableOpacity
             style={[s.secondaryBtn, signingOut && { opacity: 0.5 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Sign out"
             onPress={handleSignOut}
             disabled={signingOut}
             activeOpacity={0.85}
           >
             {signingOut
-              ? <ActivityIndicator color={FG} size="small" />
+              ? <ActivityIndicator color={theme.text} size="small" />
               : <Text style={s.secondaryBtnText}>Sign out</Text>}
           </TouchableOpacity>
         </ScrollView>
@@ -234,10 +230,12 @@ export default function SignInScreen() {
           {/* Back */}
           <TouchableOpacity
             style={s.backBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
             onPress={() => { Haptics.selectionAsync(); router.back(); }}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <Feather name="arrow-left" size={20} color={MUTED} />
+            <Feather name="arrow-left" size={20} color={theme.muted} />
           </TouchableOpacity>
 
           {/* Logo */}
@@ -263,7 +261,7 @@ export default function SignInScreen() {
             disabled={!!oauthLoading || isFetching}
           >
             {oauthLoading === 'Google' ? (
-              <ActivityIndicator color={FG} size="small" />
+              <ActivityIndicator color={theme.text} size="small" />
             ) : (
               <>
                 <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: 'Inter_700Bold', fontSize: 11, color: '#FFFFFF', lineHeight: 13 }}>G</Text></View>
@@ -304,7 +302,7 @@ export default function SignInScreen() {
             <TextInput
               style={s.input}
               placeholder="you@yourbrand.com"
-              placeholderTextColor={MUTED2}
+              placeholderTextColor={theme.subtle}
               value={email}
               onChangeText={t => { setEmail(t); setError(''); }}
               autoCapitalize="none"
@@ -325,14 +323,14 @@ export default function SignInScreen() {
               <TextInput
                 style={[s.input, s.pwInput]}
                 placeholder="••••••••"
-                placeholderTextColor={MUTED2}
+                placeholderTextColor={theme.subtle}
                 value={password}
                 onChangeText={t => { setPassword(t); setError(''); }}
                 secureTextEntry={!showPw}
                 autoComplete="current-password"
               />
               <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPw(v => !v)}>
-                <Feather name={showPw ? 'eye-off' : 'eye'} size={18} color={MUTED} />
+                <Feather name={showPw ? 'eye-off' : 'eye'} size={18} color={theme.muted} />
               </TouchableOpacity>
             </View>
           </View>
@@ -340,7 +338,7 @@ export default function SignInScreen() {
           {/* ── Error ──────────────────────────────────────────────────────────── */}
           {error ? (
             <View style={s.errorBox}>
-              <Feather name="alert-circle" size={14} color={ERR} />
+              <Feather name="alert-circle" size={14} color={theme.error} />
               <Text style={s.errorText}>{error}</Text>
             </View>
           ) : null}
@@ -348,6 +346,8 @@ export default function SignInScreen() {
           {/* ── Sign in ────────────────────────────────────────────────────────── */}
           <TouchableOpacity
             style={[s.primaryWrap, (!canSubmit || isFetching) && { opacity: 0.5 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Sign in"
             onPress={handleSignIn}
             disabled={!canSubmit || isFetching}
             activeOpacity={0.88}
@@ -367,6 +367,8 @@ export default function SignInScreen() {
           {/* ── Create account ─────────────────────────────────────────────────── */}
           <TouchableOpacity
             style={s.secondaryBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Create an account"
             onPress={() => { Haptics.selectionAsync(); router.replace('/onboarding' as never); }}
             activeOpacity={0.85}
           >
@@ -409,44 +411,44 @@ function mapError(err: any): string {
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const s = StyleSheet.create({
-  root:    { flex: 1, backgroundColor: SCREEN_BG },
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
+  root:    { flex: 1, backgroundColor: theme.background },
 
   scroll: { paddingHorizontal: 24, paddingTop: 16 },
 
-  backBtn: { width: 40, height: 40, justifyContent: 'center', marginBottom: 20 },
+  backBtn: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
 
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 36 },
-  logoText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: 2.5 },
+  logoText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: theme.text, letterSpacing: 2.5 },
 
   headline: {
     fontSize: 32, fontFamily: 'Inter_700Bold',
-    color: FG, letterSpacing: -0.8, marginBottom: 8,
+    color: theme.text, letterSpacing: -0.8, marginBottom: 8,
   },
   subtitle: {
     fontSize: 15, fontFamily: 'Inter_400Regular',
-    color: MUTED, lineHeight: 22, marginBottom: 32,
+    color: theme.muted, lineHeight: 22, marginBottom: 32,
   },
 
   oauthBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER,
+    backgroundColor: theme.cardGlass, borderRadius: 14, borderWidth: 1, borderColor: theme.border,
     paddingVertical: 15, marginBottom: 10,
   },
   // Apple button: solid black per Apple Human Interface Guidelines
   appleBtn: { backgroundColor: '#000000', borderColor: 'rgba(255,255,255,0.15)' },
-  oauthText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
+  oauthText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: theme.text },
 
   divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 20 },
-  divLine: { flex: 1, height: 1, backgroundColor: BORDER },
-  divText: { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED },
+  divLine: { flex: 1, height: 1, backgroundColor: theme.border },
+  divText: { fontSize: 13, fontFamily: 'Inter_400Regular', color: theme.muted },
 
   fieldWrap: { marginBottom: 16 },
-  label:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, marginBottom: 6 },
+  label:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: theme.muted, marginBottom: 6 },
   input: {
-    backgroundColor: INPUT_BG, borderWidth: 1, borderColor: INPUT_BD,
+    backgroundColor: theme.cardGlass, borderWidth: 1, borderColor: theme.border,
     borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13,
-    fontSize: 15, fontFamily: 'Inter_400Regular', color: FG,
+    fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.text,
   },
 
   pwLabelRow: {
@@ -456,34 +458,34 @@ const s = StyleSheet.create({
   forgotLink: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   pwRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: INPUT_BG, borderWidth: 1, borderColor: INPUT_BD, borderRadius: 12,
+    backgroundColor: theme.cardGlass, borderWidth: 1, borderColor: theme.border, borderRadius: 12,
   },
   pwInput: { flex: 1, borderWidth: 0, backgroundColor: 'transparent' },
   eyeBtn:  { paddingHorizontal: 14 },
 
   errorBox: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(248,113,113,0.08)', borderRadius: 10,
-    borderWidth: 1, borderColor: 'rgba(248,113,113,0.25)',
+     backgroundColor: `${theme.error}22`, borderRadius: 10,
+     borderWidth: 1, borderColor: theme.error,
     paddingHorizontal: 12, paddingVertical: 10, marginBottom: 16,
   },
-  errorText: { fontSize: 13, fontFamily: 'Inter_400Regular', color: ERR, flex: 1 },
+  errorText: { fontSize: 13, fontFamily: 'Inter_400Regular', color: theme.error, flex: 1 },
 
   primaryWrap: { marginBottom: 10 },
   primaryBtn:  { borderRadius: 14, paddingVertical: 17, alignItems: 'center' },
-  primaryBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+  primaryBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: theme.onAccent },
 
   secondaryBtn: {
     borderRadius: 14, paddingVertical: 16, alignItems: 'center',
-    borderWidth: 1, borderColor: BORDER,
+    borderWidth: 1, borderColor: theme.border,
   },
-  secondaryBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+  secondaryBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: theme.text },
 
   // Active session screen
   sessionScroll: { justifyContent: 'flex-start' },
   sessionCard: {
-    backgroundColor: CARD, borderRadius: 18,
-    borderWidth: 1, borderColor: BORDER,
+    backgroundColor: theme.cardGlass, borderRadius: 18,
+    borderWidth: 1, borderColor: theme.border,
     padding: 18, marginBottom: 24,
   },
   sessionAvatarRow: {
@@ -493,11 +495,11 @@ const s = StyleSheet.create({
     width: 48, height: 48, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  sessionAvatarText: { fontSize: 20, fontFamily: 'Inter_700Bold', color: FG },
+  sessionAvatarText: { fontSize: 20, fontFamily: 'Inter_700Bold', color: theme.text },
   sessionName: {
-    fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG, marginBottom: 2,
+    fontSize: 15, fontFamily: 'Inter_600SemiBold', color: theme.text, marginBottom: 2,
   },
   sessionEmail: {
-    fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED,
+    fontSize: 13, fontFamily: 'Inter_400Regular', color: theme.muted,
   },
 });

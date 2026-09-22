@@ -15,11 +15,11 @@ describe('buyer Thread chrome', () => {
   });
 
   it('gives the Profile circle enough room for its icon and full label', () => {
-    expect(layout).toContain('width: 68');
-    expect(layout).toContain('height: 68');
-    expect(layout).toContain('borderRadius: 34');
-    expect(layout).toContain('fontSize: 11');
-    expect(layout).toContain('lineHeight: 14');
+    expect(layout).toContain('width: 54');
+    expect(layout).toContain('height: 54');
+    expect(layout).toContain('borderRadius: 27');
+    expect(layout).toContain('fontSize: 10');
+    expect(layout).toContain('lineHeight: 12');
   });
 
   it('fits every Thread page to the measured tab scene without cropping media', () => {

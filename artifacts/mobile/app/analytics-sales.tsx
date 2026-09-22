@@ -203,6 +203,6 @@ const createStyles = (colors: ReturnType<typeof useColors>) => {
   chartTabText:{ fontSize: 11, fontFamily: FONT.medium, color: MUTED },
   chartTabTextActive:{},
   xRow:     { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  xLabel:   { fontSize: 10, fontFamily: FONT.regular, color: SUBTLE },
+  xLabel:   { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
   });
 };

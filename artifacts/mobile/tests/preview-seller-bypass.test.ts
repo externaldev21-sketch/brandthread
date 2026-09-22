@@ -8,14 +8,14 @@ const indexSource = readFileSync(path.resolve(__dirname, '../app/index.tsx'), 'u
 describe('development app preview routing', () => {
   it('defaults web previews to seller while preserving the buyer override', () => {
     expect(layoutSource).toContain(
-      "if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined') return null;",
+      "if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web' || typeof window === 'undefined') return null;",
     );
-    expect(layoutSource).toContain("return v === 'buyer' ? 'buyer' : 'seller';");
+    expect(layoutSource).toContain("return v === 'seller' ? 'seller' : 'buyer';");
     expect(indexSource).toContain(
-      "const effectivePreviewRole = previewRole === 'buyer' ? 'buyer' : 'seller';",
+      "const effectivePreviewRole = Platform.OS === 'web'",
     );
     expect(indexSource).toContain(
-      "effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/'",
+      "previewRole === 'seller' ? '/(tabs)' : '/(buyer)'",
     );
   });
 });

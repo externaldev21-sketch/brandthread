@@ -16,7 +16,7 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@clerk/expo';
 import { getSetupState, completionPercent } from '@/lib/setupStore';
-import { BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE, SUCCESS, BLUE, ORANGE, RED, GOLD, FONT, FS, SP, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { NavigationCard } from '@/components/BrandthreadUI';
 import { SecondaryButton } from '@/components/BrandthreadUI';
@@ -37,6 +37,20 @@ interface NavItem {
   badge?: boolean;
   route?: string;
 }
+
+// Semantic accent tokens keep section definitions module-safe while resolving
+// to the active runtime palette at render time.
+const PURPLE = 'accent';
+const PURPLE_LIGHT = 'accentLight';
+const PURPLE_DIM = 'accentDim';
+const CYAN = 'secondary';
+const CYAN_DIM = 'secondaryDim';
+const BLUE = 'secondary';
+const ORANGE = 'warning';
+const RED = 'error';
+const GOLD = 'warning';
+const SUCCESS = 'success';
+const MUTED = 'muted';
 
 // ─── Section definitions (same as old More screen) ───────────────────────────
 
@@ -83,9 +97,9 @@ const ACCOUNT_ITEMS: NavItem[] = [
   { icon: 'users',       label: 'Team',           desc: 'Invite collaborators',          accent: BLUE,   route: '/team' },
   { icon: 'link',        label: 'Integrations',   desc: 'Connect third-party services',  accent: PURPLE, route: '/integrations/klaviyo' },
   { icon: 'bell',        label: 'Notifications',  desc: 'Push and email preferences',    accent: ORANGE, route: '/notifications-settings' },
-  { icon: 'droplet',     label: 'App Theme',      desc: 'Choose your Brandthread finish', accent: PURPLE, route: '/app-theme' },
   { icon: 'gift',        label: 'Invite Friends', desc: 'Share your referral code and see rewards', accent: GOLD, route: '/buyer-invite' },
   { icon: 'download',    label: 'Download My Data', desc: 'Export your products, orders and customers', accent: BLUE, route: '/seller-data-export' },
+  { icon: 'droplet',     label: 'App theme',       desc: 'Change the colors of the whole app',       accent: PURPLE, route: '/app-theme' },
   { icon: 'settings',    label: 'Settings',       desc: 'App and account settings',      accent: MUTED,  route: '/settings' },
   { icon: 'trash-2',     label: 'Delete Account', desc: 'Permanently erase your account', accent: RED, route: '/buyer-account-control' },
   { icon: 'help-circle', label: 'Help & Support', desc: 'Guides, FAQs and contact us',  accent: CYAN,   route: '/help' },
@@ -163,7 +177,7 @@ export default function SellerSettingsScreen() {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           activeOpacity={0.75}
         >
-          <Feather name="arrow-left" size={20} color={FG} />
+          <Feather name="arrow-left" size={20} color={theme.text} />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Settings & Tools</Text>
         <View style={{ width: 36 }} />
@@ -184,13 +198,13 @@ export default function SellerSettingsScreen() {
             <View style={{ flex: 1, gap: 4 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <Text style={s.progressLabel}>Store setup</Text>
-                <Text style={[s.progressLabel, { color: PURPLE_LIGHT }]}>{setupPct}%</Text>
+                <Text style={[s.progressLabel, { color: theme.accentLight }]}>{setupPct}%</Text>
               </View>
               <View style={s.track}>
                 <View style={[s.fill, { width: `${setupPct}%` }]} />
               </View>
             </View>
-            <Feather name="chevron-right" size={15} color={MUTED} />
+            <Feather name="chevron-right" size={15} color={theme.muted} />
           </TouchableOpacity>
         )}
 
@@ -205,10 +219,10 @@ export default function SellerSettingsScreen() {
                 activeOpacity={0.7}
               >
                 <View style={s.sectionHeaderLeft}>
-                  <Feather name={icon} size={13} color={SUBTLE} />
+                   <Feather name={icon} size={13} color={theme.subtle} />
                   <Text style={s.sectionTitle}>{title.toUpperCase()}</Text>
                 </View>
-                <Feather name={isOpen ? 'chevron-up' : 'chevron-down'} size={15} color={SUBTLE} />
+                  <Feather name={isOpen ? 'chevron-up' : 'chevron-down'} size={15} color={theme.subtle} />
               </TouchableOpacity>
 
               {isOpen && (
@@ -221,7 +235,7 @@ export default function SellerSettingsScreen() {
                         icon={item.icon}
                         label={item.label}
                         description={item.desc}
-                        accent={item.accent}
+                        accent={resolveNavAccent(item.accent, theme)}
                         badge={item.badge}
                         onPress={() => handleNavPress(item)}
                       />
@@ -235,7 +249,7 @@ export default function SellerSettingsScreen() {
 
         {/* ── Sign out ──────────────────────────────────────────────────── */}
         <View style={s.signOutWrap}>
-          <SecondaryButton label="Sign out" accent={RED} onPress={handleSignOut} />
+          <SecondaryButton label="Sign out" accent={theme.error} onPress={handleSignOut} />
         </View>
 
       </ScrollView>
@@ -243,12 +257,22 @@ export default function SellerSettingsScreen() {
   );
 }
 
+function resolveNavAccent(value: string, theme: ReturnType<typeof useAppTheme>['theme']): string {
+  if ([PURPLE, PURPLE_LIGHT, PURPLE_DIM].includes(value)) return value === PURPLE_LIGHT ? theme.accentLight : value === PURPLE_DIM ? theme.accentDim : theme.accent;
+  if ([CYAN, CYAN_DIM, BLUE].includes(value)) return value === CYAN_DIM ? theme.secondaryDim : theme.secondary;
+  if (value === SUCCESS) return theme.success;
+  if (value === ORANGE || value === GOLD) return theme.warning;
+  if (value === RED) return theme.error;
+  if (value === MUTED) return theme.muted;
+  return theme.accent;
+}
+
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   return StyleSheet.create({
-  root:        { flex: 1, backgroundColor: 'transparent' },
+  root:        { flex: 1, backgroundColor: theme.background },
   scrollContent: { paddingBottom: 120, paddingTop: SP.sm },
 
   // Header
@@ -259,17 +283,17 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
     paddingHorizontal: SP.md,
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: BORDER,
+    borderBottomColor: theme.border,
   },
   backBtn: {
     width: 36, height: 36, borderRadius: 10,
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border,
     alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: {
     fontSize: FS.md,
     fontFamily: FONT.bold,
-    color: FG,
+    color: theme.text,
     letterSpacing: -0.3,
   },
 
@@ -280,20 +304,20 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
     gap: SP.md,
     marginHorizontal: SP.md,
     marginBottom: SP.md,
-    backgroundColor: SURFACE,
+    backgroundColor: theme.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
     padding: SP.md,
   },
   progressLabel: {
     fontSize: FS.xs,
     fontFamily: FONT.medium,
-    color: MUTED,
+    color: theme.muted,
   },
   track: {
     height: 3,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.secondaryDim,
     borderRadius: 99,
     overflow: 'hidden',
   },
@@ -314,9 +338,9 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
   },
   sectionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   sectionTitle: {
-    fontSize: 10,
+    fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: SUBTLE,
+    color: theme.subtle,
     letterSpacing: 1.5,
   },
   sectionItems: {

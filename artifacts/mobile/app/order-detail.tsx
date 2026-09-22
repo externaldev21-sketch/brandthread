@@ -10,12 +10,25 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, ReturnStatus, RETURN_REASONS, OrderStatus, TrackingStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent, PaymentSummary } from '@/services/orderTypes';
+
+function useThemeAliases() {
+  const { theme } = useAppTheme();
+  return {
+    theme,
+    BG: theme.background, SURFACE: theme.surface, CARD: theme.card, CARD_ELEVATED: theme.cardElevated,
+    BORDER: theme.border, BORDER_ACTIVE: theme.accentLight, FG: theme.text, MUTED: theme.muted, SUBTLE: theme.subtle,
+    SUCCESS: theme.success, SUCCESS_DIM: `${theme.success}26`, BLUE: theme.accentLight, BLUE_DIM: `${theme.accentLight}26`,
+    ORANGE: theme.warning, ORANGE_DIM: `${theme.warning}26`, RED: theme.error, RED_DIM: `${theme.error}26`,
+    GOLD: theme.accent, PURPLE: theme.accent, PURPLE_LIGHT: theme.accentLight, PURPLE_DIM: theme.accentDim,
+    CYAN: theme.secondary, CYAN_DIM: theme.secondaryDim,
+  };
+}
 
 // ─── API → Order adapter ──────────────────────────────────────────────────────
 
@@ -350,17 +363,17 @@ function paymentVariant(status: string): 'success' | 'info' | 'warning' | 'error
   }
 }
 
-function timelineColor(type: string): string {
+function timelineColor(type: string, theme: ReturnType<typeof useAppTheme>['theme']): string {
   switch (type) {
-    case 'order_created': return CYAN;
-    case 'payment_confirmed': return SUCCESS;
-    case 'shipped': case 'label_purchased': case 'tracking_added': return BLUE;
-    case 'delivered': return SUCCESS;
-    case 'return_requested': case 'refund_issued': return ORANGE;
-    case 'dispute_opened': case 'cancelled': return RED;
-    case 'risk_review': return RED;
-    case 'note_added': return PURPLE;
-    default: return MUTED;
+    case 'order_created': return theme.secondary;
+    case 'payment_confirmed': return theme.success;
+    case 'shipped': case 'label_purchased': case 'tracking_added': return theme.accentLight;
+    case 'delivered': return theme.success;
+    case 'return_requested': case 'refund_issued': return theme.warning;
+    case 'dispute_opened': case 'cancelled': return theme.error;
+    case 'risk_review': return theme.error;
+    case 'note_added': return theme.accent;
+    default: return theme.muted;
   }
 }
 
@@ -389,6 +402,8 @@ function trackingStatusLabel(status: TrackingStatus): string {
 // ─── InfoRow ─────────────────────────────────────────────────────────────────
 
 function InfoRow({ label, value, valueColor, bold }: { label: string; value: string; valueColor?: string; bold?: boolean }) {
+  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
   return (
     <View style={s.infoRow}>
       <Text style={s.infoLabel}>{label}</Text>
@@ -400,6 +415,8 @@ function InfoRow({ label, value, valueColor, bold }: { label: string; value: str
 // ─── AddressCard ─────────────────────────────────────────────────────────────
 
 function AddressCard({ title, addr }: { title: string; addr: { name: string; line1: string; line2?: string; city: string; state: string; zip: string; country: string } }) {
+  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
   return (
     <BrandthreadCard style={s.addressCard}>
       <Text style={s.addressTitle}>{title}</Text>
@@ -414,8 +431,8 @@ function AddressCard({ title, addr }: { title: string; addr: { name: string; lin
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function OrderDetailScreen() {
-  const { theme } = useAppTheme();
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
   const { id, tab } = useLocalSearchParams<{ id: string; tab?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -825,7 +842,7 @@ export default function OrderDetailScreen() {
                 <Text style={s.modalSubtitle}>{trackingModal.carrier} · {trackingModal.trackingNumber}</Text>
                 {trackingModal.trackingEvents.map(ev => (
                   <View key={ev.id} style={s.trackingEventRow}>
-                    <View style={[s.trackingDot, { backgroundColor: timelineColor(ev.status) }]} />
+                    <View style={[s.trackingDot, { backgroundColor: timelineColor(ev.status, theme) }]} />
                     <View style={{ flex: 1 }}>
                       <Text style={s.trackingEvDesc}>{ev.description}</Text>
                       {ev.location && <Text style={s.trackingEvLoc}>{ev.location}</Text>}
@@ -858,6 +875,8 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
   reload: () => void;
   onAddTrackingQuick: (carrier: string, trackingNumber: string) => Promise<void>;
 }) {
+  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
   const [addingTracking, setAddingTracking] = useState(false);
   const [trackingCarrier, setTrackingCarrier] = useState('');
   const [trackingNum, setTrackingNum] = useState('');
@@ -1026,6 +1045,8 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
 // ═══════════════════════════════════════════════════════
 
 function CustomerTab({ order }: { order: Order }) {
+  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
   const c = order.customer;
   return (
     <View style={s.tabContent}>
@@ -1074,6 +1095,8 @@ function CustomerTab({ order }: { order: Order }) {
 // ═══════════════════════════════════════════════════════
 
 function PaymentTab({ order }: { order: Order }) {
+  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
   const p = order.payment;
   return (
     <View style={s.tabContent}>
@@ -1164,6 +1187,8 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
   onShowTracking: (shipmentId: string) => void;
   router: ReturnType<typeof useRouter>;
 }) {
+  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
   const { fulfillment, shipments } = order;
   const [trackingStatus, setTrackingStatus] = useState<TrackingStatus>(
     order.trackingStatus ?? shipments[0]?.trackingStatus ?? 'label_created',
@@ -1362,13 +1387,15 @@ function TimelineTab({ order, noteText, setNoteText, onAddNote, addingNote }: {
   onAddNote: () => void;
   addingNote: boolean;
 }) {
+  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
   const events = [...order.timeline].reverse();
   return (
     <View style={s.tabContent}>
       <SectionHeader title="Timeline" />
       {events.map(ev => (
         <View key={ev.id} style={s.timelineRow}>
-          <View style={[s.timelineDot, { backgroundColor: timelineColor(ev.type) }]} />
+          <View style={[s.timelineDot, { backgroundColor: timelineColor(ev.type, theme) }]} />
           <View style={s.timelineBody}>
             <Text style={s.timelineMessage}>{ev.message}</Text>
             <View style={s.timelineMeta}>
@@ -1416,6 +1443,8 @@ function ReturnsTab({ order, onAction, router }: {
   onAction: (returnId: string, status: ReturnStatus, reason?: string) => void;
   router: ReturnType<typeof useRouter>;
 }) {
+  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
   if (order.returns.length === 0) {
     return (
       <View style={s.tabContent}>
@@ -1476,6 +1505,8 @@ function ReturnsTab({ order, onAction, router }: {
 // ═══════════════════════════════════════════════════════
 
 function DisputesTab({ order, router }: { order: Order; router: ReturnType<typeof useRouter> }) {
+  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
   if (order.disputes.length === 0) {
     return (
       <View style={s.tabContent}>
@@ -1541,6 +1572,8 @@ function NotesTab({ order, noteText, setNoteText, noteType, setNoteType, onAddNo
   addingNote: boolean;
   onPinNote: (noteId: string, current: boolean) => void;
 }) {
+  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
   const sorted = [...order.notes].sort((a, b) => {
     if (a.isPinned && !b.isPinned) return -1;
     if (!a.isPinned && b.isPinned) return 1;
@@ -1618,7 +1651,21 @@ function NotesTab({ order, noteText, setNoteText, noteType, setNoteType, onAddNo
 // STYLES
 // ═══════════════════════════════════════════════════════
 
-const s = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { background: BG, surface: SURFACE, card: CARD, cardElevated: CARD_ELEVATED,
+    border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE, accent: PURPLE,
+    accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN,
+    secondaryDim: CYAN_DIM, success: SUCCESS, warning: ORANGE, error: RED,
+    onAccent: ON_DARK } = theme;
+  const SUCCESS_DIM = `${SUCCESS}26`;
+  const ORANGE_DIM = `${ORANGE}26`;
+  const RED_DIM = `${RED}26`;
+  const BLUE = theme.accentLight;
+  const BLUE_DIM = `${BLUE}26`;
+  const BORDER_ACTIVE = theme.accentLight;
+  const GOLD = theme.accent;
+  const GRAD_CARD_GLOW = theme.glowGradient;
+  return StyleSheet.create({
   root:             { flex: 1, backgroundColor: 'transparent' },
   centered:         { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
 
@@ -1762,7 +1809,7 @@ const s = StyleSheet.create({
   timelineMeta:     { flexDirection: 'row', gap: SP.sm, alignItems: 'center', marginTop: 2 },
   timelineTime:     { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
   timelineTag:      { flexDirection: 'row', gap: 3, alignItems: 'center' },
-  timelineTagText:  { fontSize: 10, fontFamily: FONT.medium },
+  timelineTagText:  { fontSize: FS.xs, fontFamily: FONT.medium },
 
   // Notes
   noteFormCard:     { gap: SP.sm, backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: SP.md },
@@ -1824,4 +1871,5 @@ const s = StyleSheet.create({
   trackingEvDesc:   { fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
   trackingEvLoc:    { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   trackingEvTime:   { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
-});
+  });
+};

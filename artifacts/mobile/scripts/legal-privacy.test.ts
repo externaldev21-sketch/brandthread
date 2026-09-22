@@ -32,7 +32,7 @@ describe('public legal documents', () => {
 
   it('keeps legal routes public through the global auth gate', () => {
     const layout = fs.readFileSync(path.join(projectRoot, 'app', '_layout.tsx'), 'utf8');
-    expect(layout).toContain("const PUBLIC_SCREENS = ['privacy', 'terms']");
+    expect(layout).toContain("const PUBLIC_SCREENS = ['privacy', 'terms',");
     expect(layout).toContain('if (inPublicScreen) return');
   });
 });

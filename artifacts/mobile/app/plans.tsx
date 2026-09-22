@@ -34,10 +34,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ONBOARDING_KEY } from './_layout';
 import { useApi } from '@/lib/api';
 import { parseRoleError } from '@/lib/roleError';
-import {
-  BG, CARD, BORDER, FG, MUTED, PURPLE, CYAN, SUCCESS, ORANGE,
-  FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useRevenueCat } from '@/lib/revenueCat';
 import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
@@ -47,8 +44,6 @@ import { recommendSellerPlan, SELLER_PLANS, type SellerPlanDefinition } from '@/
 // ─── Local palette constants ──────────────────────────────────────────────────
 // (plans.tsx predates the theme migration; keep these local so the screen is
 //  self-contained and doesn't depend on the retired useColors hook)
-const CARD_ELEVATED = '#18181B';
-const BORDER_ACTIVE = PURPLE;
 
 // ─── Plan catalogue ───────────────────────────────────────────────────────────
 
@@ -56,7 +51,6 @@ const BORDER_ACTIVE = PURPLE;
 
 export default function PlansScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   const insets    = useSafeAreaInsets();
   const router    = useRouter();
@@ -231,7 +225,7 @@ export default function PlansScreen() {
     return (
       <View style={styles.awaitRoot}>
         <LinearGradient colors={theme.heroGradient as any} style={StyleSheet.absoluteFill} />
-        <ActivityIndicator color={PURPLE} size="large" />
+        <ActivityIndicator color={theme.accent} size="large" />
         <Text style={styles.awaitTitle}>Confirming your trial…</Text>
         <Text style={styles.awaitSub}>Syncing with Stripe — this takes a moment.</Text>
       </View>
@@ -256,7 +250,7 @@ export default function PlansScreen() {
             onPress={() => { haptic(); router.back(); }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Feather name="x" size={18} color={FG} />
+            <Feather name="x" size={18} color={theme.text} />
           </TouchableOpacity>
         )}
         <View style={styles.headerCenter}>
@@ -278,10 +272,10 @@ export default function PlansScreen() {
         {/* Recommendation banner */}
         {recommendedId && (
           <View style={styles.recBanner}>
-            <Feather name="star" size={13} color={CYAN} />
+            <Feather name="star" size={13} color={theme.secondary} />
             <Text style={styles.recBannerText}>
               Based on your brand stage, we recommend{' '}
-              <Text style={{ color: CYAN, fontFamily: FONT.semibold }}>
+              <Text style={{ color: theme.secondary, fontFamily: FONT.semibold }}>
                  {SELLER_PLANS.find(p => p.id === recommendedId)?.name}
               </Text>
             </Text>
@@ -290,10 +284,10 @@ export default function PlansScreen() {
 
         {/* Commission note */}
         <View style={styles.commissionNote}>
-          <Feather name="info" size={13} color={MUTED} />
+            <Feather name="info" size={13} color={theme.muted} />
           <Text style={styles.commissionText}>
             All plans are subject to a{' '}
-            <Text style={{ color: FG, fontFamily: FONT.medium }}>5% platform commission</Text>
+             <Text style={{ color: theme.text, fontFamily: FONT.medium }}>5% platform commission</Text>
             {' '}on each sale.
           </Text>
         </View>
@@ -305,7 +299,7 @@ export default function PlansScreen() {
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={styles.trialCalloutInner}
           >
-            <Feather name="shield" size={16} color={PURPLE} />
+                 <Feather name="shield" size={16} color={theme.accent} />
             <View style={{ flex: 1 }}>
               <Text style={styles.trialCalloutTitle}>5-day free trial on every plan</Text>
               <Text style={styles.trialCalloutSub}>
@@ -339,7 +333,7 @@ export default function PlansScreen() {
               <View style={styles.badgeRow}>
                 {isRecommended && (
                   <View style={styles.recBadge}>
-                    <Feather name="star" size={10} color={CYAN} />
+                    <Feather name="star" size={10} color={theme.secondary} />
                     <Text style={styles.recBadgeText}>RECOMMENDED FOR YOU</Text>
                   </View>
                 )}
@@ -358,13 +352,13 @@ export default function PlansScreen() {
               {/* Name + price */}
               <View style={styles.cardTopRow}>
                 <View style={{ flex: 1 }}>
-                 <Text style={[styles.planName, plan.id === 'growth' && { color: PURPLE }]}>
+                    <Text style={[styles.planName, plan.id === 'growth' && { color: theme.accent }]}>
                     {plan.name}
                   </Text>
                   <Text style={styles.planTagline}>{plan.tagline}</Text>
                 </View>
                 <View style={styles.priceCol}>
-                 <Text style={[styles.priceLabel, plan.id === 'growth' && { color: PURPLE }]}>
+                  <Text style={[styles.priceLabel, plan.id === 'growth' && { color: theme.accent }]}>
                      {priceLabel}
                   </Text>
                    <Text style={styles.pricePeriod}>{Platform.OS === 'web' ? '/mo' : 'per month'}</Text>
@@ -380,14 +374,14 @@ export default function PlansScreen() {
               <View style={styles.featureList}>
                 {plan.features.map((f) => (
                   <View key={f} style={styles.featureRow}>
-                    <Feather name="check" size={13} color={plan.id === 'growth' ? PURPLE : SUCCESS} style={{ marginTop: 2 }} />
+                     <Feather name="check" size={13} color={plan.id === 'growth' ? theme.accent : theme.success} style={{ marginTop: 2 }} />
                     <Text style={styles.featureText}>{f}</Text>
                   </View>
                 ))}
                 {plan.notIncluded.map((f) => (
                   <View key={f} style={styles.featureRow}>
-                    <Feather name="minus" size={13} color={MUTED} style={{ marginTop: 2 }} />
-                    <Text style={[styles.featureText, { color: MUTED }]}>{f}</Text>
+                     <Feather name="minus" size={13} color={theme.muted} style={{ marginTop: 2 }} />
+                     <Text style={[styles.featureText, { color: theme.muted }]}>{f}</Text>
                   </View>
                 ))}
               </View>
@@ -405,9 +399,9 @@ export default function PlansScreen() {
                 ]}
               >
                 {isLoading ? (
-                  <ActivityIndicator color="#fff" size="small" />
+                   <ActivityIndicator color={theme.onAccent} size="small" />
                 ) : (
-                  <Text style={[styles.ctaText, isCurrent && { color: PURPLE }]}>
+                  <Text style={[styles.ctaText, isCurrent && { color: theme.accent }]}>
                     {isCurrent
                       ? 'Current plan'
                       : isOnboarding
@@ -429,7 +423,7 @@ export default function PlansScreen() {
             activeOpacity={0.7}
           >
             <Text style={styles.skipText}>Skip for now — start with Starter</Text>
-            <Feather name="arrow-right" size={14} color={MUTED} />
+             <Feather name="arrow-right" size={14} color={theme.muted} />
           </TouchableOpacity>
         )}
         {Platform.OS !== 'web' && (
@@ -439,7 +433,7 @@ export default function PlansScreen() {
             disabled={loadingId !== null}
             testID="seller-revenuecat-restore"
           >
-            {loadingId === 'restore' ? <ActivityIndicator color={MUTED} size="small" /> : <Text style={styles.skipText}>Restore purchases</Text>}
+             {loadingId === 'restore' ? <ActivityIndicator color={theme.muted} size="small" /> : <Text style={styles.skipText}>Restore purchases</Text>}
           </TouchableOpacity>
         )}
 
@@ -455,8 +449,7 @@ function capitalize(s: string) { return s ? s.charAt(0).toUpperCase() + s.slice(
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
 
@@ -468,79 +461,79 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
     paddingHorizontal: SP.md,
     paddingBottom: SP.md,
     borderBottomWidth: 1,
-    borderBottomColor: BORDER,
+    borderBottomColor: theme.border,
   },
-  closeBtn:    { width: 40, height: 40, borderRadius: 20, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
+  closeBtn:    { width: 40, height: 40, borderRadius: 20, backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center' },
   headerCenter:{ flex: 1, alignItems: 'center' },
-  headerTitle: { fontSize: FS.lg, fontFamily: FONT.semibold, color: FG },
-  headerSub:   { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  headerTitle: { fontSize: FS.lg, fontFamily: FONT.semibold, color: theme.text },
+  headerSub:   { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
 
   // Recommendation banner
   recBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: `${CYAN}14`, borderRadius: RADIUS.md,
+    backgroundColor: `${theme.secondary}14`, borderRadius: RADIUS.md,
     paddingHorizontal: SP.md, paddingVertical: 10,
-    borderWidth: 1, borderColor: `${CYAN}30`,
+    borderWidth: 1, borderColor: `${theme.secondary}30`,
   },
-  recBannerText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, lineHeight: 18 },
+  recBannerText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },
 
   // Commission + trial callouts
   commissionNote: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingHorizontal: SP.md, paddingVertical: 10,
-    backgroundColor: CARD, borderRadius: RADIUS.md,
-    borderWidth: 1, borderColor: BORDER,
+    backgroundColor: theme.card, borderRadius: RADIUS.md,
+    borderWidth: 1, borderColor: theme.border,
   },
-  commissionText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, lineHeight: 18 },
-  trialCallout:   { borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1, borderColor: `${PURPLE}44` },
+  commissionText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },
+  trialCallout:   { borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1, borderColor: `${theme.accent}44` },
   trialCalloutInner: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: SP.md },
-  trialCalloutTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginBottom: 4 },
-  trialCalloutSub:   { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, lineHeight: 18 },
+  trialCalloutTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginBottom: 4 },
+  trialCalloutSub:   { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18 },
 
   // Cards
   card: {
-    backgroundColor: CARD,
+    backgroundColor: theme.card,
     borderRadius: RADIUS.xl,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
     padding: SP.lg,
     gap: SP.md,
   },
   cardHighlight: {
-    backgroundColor: CARD_ELEVATED,
-    borderColor: PURPLE,
+    backgroundColor: theme.cardElevated,
+    borderColor: theme.accent,
     borderWidth: 2,
-    shadowColor: PURPLE,
+    shadowColor: theme.shadowColor,
     shadowOpacity: 0.32,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 5 },
     elevation: 7,
     transform: [{ scale: 1.015 }],
   },
-  cardCurrent:   { borderColor: SUCCESS },
+  cardCurrent:   { borderColor: theme.success },
 
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   recBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: `${CYAN}22`, borderRadius: 20,
+    backgroundColor: `${theme.secondary}22`, borderRadius: 20,
     paddingHorizontal: 8, paddingVertical: 3,
   },
-  recBadgeText:     { fontSize: 9, fontFamily: FONT.semibold, color: CYAN, letterSpacing: 0.5 },
-  popularBadge:     { backgroundColor: `${PURPLE}33`, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
-  popularBadgeText: { fontSize: 9, fontFamily: FONT.semibold, color: PURPLE, letterSpacing: 0.5 },
-  currentBadge:     { backgroundColor: `${SUCCESS}22`, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
-  currentBadgeText: { fontSize: 9, fontFamily: FONT.semibold, color: SUCCESS, letterSpacing: 0.5 },
+   recBadgeText:     { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.secondary, letterSpacing: 0.5 },
+  popularBadge:     { backgroundColor: `${theme.accent}33`, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
+   popularBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.accent, letterSpacing: 0.5 },
+  currentBadge:     { backgroundColor: `${theme.success}22`, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
+   currentBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.success, letterSpacing: 0.5 },
 
   cardTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
-  planName:    { fontSize: FS.xl, fontFamily: FONT.semibold, color: FG },
-  planTagline: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  planName:    { fontSize: FS.xl, fontFamily: FONT.semibold, color: theme.text },
+  planTagline: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
   priceCol:    { alignItems: 'flex-end' },
-  priceLabel:  { fontSize: 28, fontFamily: FONT.semibold, color: FG, letterSpacing: -0.5 },
-  pricePeriod: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  priceLabel:  { fontSize: 28, fontFamily: FONT.semibold, color: theme.text, letterSpacing: -0.5 },
+  pricePeriod: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
 
   featureList: { gap: 8 },
   featureRow:  { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  featureText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 18 },
+  featureText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text, lineHeight: 18 },
 
   // CTAs
   ctaBtn: {
@@ -549,23 +542,23 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ctaBtnDefault:   { backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
-  ctaBtnHighlight: { backgroundColor: PURPLE },
-  ctaBtnCurrent:   { backgroundColor: 'transparent', borderWidth: 1, borderColor: SUCCESS },
-  ctaText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
+  ctaBtnDefault:   { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border },
+  ctaBtnHighlight: { backgroundColor: theme.accent },
+  ctaBtnCurrent:   { backgroundColor: 'transparent', borderWidth: 1, borderColor: theme.success },
+  ctaText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.onAccent },
 
   // Skip
   skipRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 6, paddingVertical: SP.lg, marginTop: 4,
   },
-  skipText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  skipText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
    restoreRow: { alignItems: 'center', paddingVertical: SP.sm },
-   nativeTrial: { fontSize: FS.xs, fontFamily: FONT.regular, color: CYAN, marginTop: -SP.xs },
+   nativeTrial: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.secondary, marginTop: -SP.xs },
 
   // Awaiting Stripe overlay
-  awaitRoot: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: 20, padding: 40 },
-  awaitTitle: { fontSize: FS.xl, fontFamily: FONT.semibold, color: FG, textAlign: 'center' },
-  awaitSub:   { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' },
+  awaitRoot: { flex: 1, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center', gap: 20, padding: 40 },
+  awaitTitle: { fontSize: FS.xl, fontFamily: FONT.semibold, color: theme.text, textAlign: 'center' },
+  awaitSub:   { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center' },
   });
 };

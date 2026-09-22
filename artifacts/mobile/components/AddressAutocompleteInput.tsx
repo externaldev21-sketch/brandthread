@@ -11,7 +11,8 @@ import {
 import { Feather } from '@expo/vector-icons';
 
 import { useApi } from '@/hooks/useApi';
-import { BORDER, CARD_ELEVATED, FG, FONT, FS, MUTED, SP, SUBTLE } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 export interface AddressSelection {
   line1: string;
@@ -38,6 +39,8 @@ export function AddressAutocompleteInput({
   onSelect: (address: AddressSelection) => void;
 }) {
   const api = useApi();
+  const { theme } = useAppTheme();
+  const styles = makeStyles(theme);
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [resolving, setResolving] = useState<string | null>(null);
@@ -88,19 +91,19 @@ export function AddressAutocompleteInput({
     <View style={styles.wrap}>
       <Text style={styles.label}>Shipping address</Text>
       <View style={styles.inputWrap}>
-        <Feather name="search" size={17} color={MUTED} />
+        <Feather name="search" size={17} color={theme.muted} />
         <TextInput
           value={value}
           onChangeText={onChangeText}
           placeholder="Start typing your street address"
-          placeholderTextColor={SUBTLE}
+          placeholderTextColor={theme.subtle}
           autoCapitalize="words"
           autoComplete="street-address"
           textContentType="fullStreetAddress"
           accessibilityLabel="Shipping address search"
           style={styles.input}
         />
-        {loading ? <ActivityIndicator size="small" color={FG} /> : null}
+        {loading ? <ActivityIndicator size="small" color={theme.text} /> : null}
       </View>
 
       {suggestions.length > 0 && (
@@ -114,11 +117,11 @@ export function AddressAutocompleteInput({
               accessibilityRole="button"
               accessibilityLabel={`Use address ${suggestion.label}`}
             >
-              <Feather name="map-pin" size={16} color={MUTED} />
+              <Feather name="map-pin" size={16} color={theme.muted} />
               <Text style={styles.suggestionText} numberOfLines={2}>{suggestion.label}</Text>
               {resolving === suggestion.placeId
-                ? <ActivityIndicator size="small" color={FG} />
-                : <Feather name="chevron-right" size={16} color={SUBTLE} />}
+                ? <ActivityIndicator size="small" color={theme.text} />
+                : <Feather name="chevron-right" size={16} color={theme.subtle} />}
             </Pressable>
           ))}
         </View>
@@ -128,10 +131,10 @@ export function AddressAutocompleteInput({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   wrap: { marginBottom: SP.sm },
   label: {
-    color: MUTED,
+    color: theme.muted,
     fontFamily: FONT.medium,
     fontSize: FS.xs,
     marginBottom: 6,
@@ -142,13 +145,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 9,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: CARD_ELEVATED,
+    borderColor: theme.border,
+    backgroundColor: theme.cardElevated,
     paddingHorizontal: 12,
   },
   input: {
     flex: 1,
-    color: FG,
+    color: theme.text,
     fontFamily: FONT.regular,
     fontSize: FS.base,
     paddingVertical: 12,
@@ -156,8 +159,8 @@ const styles = StyleSheet.create({
   suggestions: {
     borderWidth: 1,
     borderTopWidth: 0,
-    borderColor: BORDER,
-    backgroundColor: CARD_ELEVATED,
+    borderColor: theme.border,
+    backgroundColor: theme.cardElevated,
   },
   suggestion: {
     minHeight: 52,
@@ -167,16 +170,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  suggestionBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: BORDER },
+  suggestionBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
   suggestionText: {
     flex: 1,
-    color: FG,
+    color: theme.text,
     fontFamily: FONT.regular,
     fontSize: FS.sm,
     lineHeight: 19,
   },
   hint: {
-    color: SUBTLE,
+    color: theme.subtle,
     fontFamily: FONT.regular,
     fontSize: FS.xs,
     lineHeight: 17,

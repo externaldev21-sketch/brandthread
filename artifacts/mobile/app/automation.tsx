@@ -7,6 +7,7 @@ import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { FS } from '@/lib/theme';
 
 interface Automation {
   id: string;
@@ -163,7 +164,7 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
   stat: { flex: 1, borderRadius: 12, padding: 12, borderWidth: 1, alignItems: 'center', gap: 3 },
   statVal: { fontSize: 20, fontFamily: 'Inter_700Bold' },
-  statLabel: { fontSize: 10, fontFamily: 'Inter_400Regular', textAlign: 'center' },
+  statLabel: { fontSize: FS.xs, fontFamily: 'Inter_400Regular', textAlign: 'center' },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
   addBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },

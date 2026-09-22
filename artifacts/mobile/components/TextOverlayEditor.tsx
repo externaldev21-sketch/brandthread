@@ -23,17 +23,12 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import type {
   TextOverlay, TextOverlayAlign, TextOverlayBgStyle, TextOverlayFontStyle,
 } from '@/lib/videoEditing';
 
 // ─── Design tokens (monochrome Brandthread identity) ─────────────────────────
-const BG       = '#000000';
-const FG       = '#F4F4FF';
-const MUTED    = 'rgba(244,244,255,0.55)';
-const BORDER   = 'rgba(255,255,255,0.12)';
-const SELECTED = 'rgba(255,255,255,0.25)';
-
 const { width: SW, height: SH } = Dimensions.get('window');
 
 // ─── Palette — monochrome-first, TikTok-inspired colours ─────────────────────
@@ -77,6 +72,8 @@ function genId(): string {
 function ColorSwatch({ color, selected, onPress }: {
   color: string; selected: boolean; onPress: () => void;
 }) {
+  const { theme } = useAppTheme();
+  const es = createEditorStyles(theme);
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -107,6 +104,8 @@ export function TextOverlayEditor({
   visible, editingOverlay, onDone, onCancel,
 }: TextOverlayEditorProps) {
   const insets = useSafeAreaInsets();
+  const { theme } = useAppTheme();
+  const es = createEditorStyles(theme);
 
   // Editor state
   const [text, setText]           = useState('');
@@ -282,7 +281,7 @@ export function TextOverlayEditor({
               accessibilityRole="button"
               testID="text-overlay-align"
             >
-              <Feather name={alignIcon[align]} size={22} color={FG} />
+              <Feather name={alignIcon[align]} size={22} color={theme.text} />
             </TouchableOpacity>
 
             {/* Background style toggle */}
@@ -294,7 +293,7 @@ export function TextOverlayEditor({
               accessibilityRole="button"
               testID="text-overlay-bgstyle"
             >
-              <Feather name={bgIcon[bgStyle]} size={22} color={FG} />
+              <Feather name={bgIcon[bgStyle]} size={22} color={theme.text} />
             </TouchableOpacity>
 
             {/* Font style horizontal scroll */}
@@ -483,7 +482,7 @@ export function OverlayChip({
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
-const es = StyleSheet.create({
+const createEditorStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -497,7 +496,7 @@ const es = StyleSheet.create({
     paddingVertical: 8,
   },
   doneBtnText: {
-    color: FG,
+    color: theme.text,
     fontSize: FS.base,
     fontFamily: FONT.semibold,
   },
@@ -520,10 +519,10 @@ const es = StyleSheet.create({
     textAlignVertical: 'center',
   },
   bottomStrip: {
-    backgroundColor: 'rgba(0,0,0,0.85)',
+    backgroundColor: theme.card,
     paddingTop: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: BORDER,
+    borderTopColor: theme.border,
   },
   controlRow: {
     flexDirection: 'row',
@@ -538,10 +537,10 @@ const es = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.cardElevated,
   },
   iconBtnActive: {
-    backgroundColor: SELECTED,
+    backgroundColor: theme.accentDim,
   },
   fontRow: {
     flexDirection: 'row',
@@ -556,19 +555,19 @@ const es = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: 'transparent',
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: theme.surface,
   },
   fontChipActive: {
-    borderColor: FG,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderColor: theme.accent,
+    backgroundColor: theme.accentDim,
   },
   fontChipText: {
-    color: MUTED,
+    color: theme.muted,
     fontSize: FS.xs,
     fontFamily: FONT.regular,
   },
   fontChipTextActive: {
-    color: FG,
+    color: theme.text,
   },
   paletteRow: {
     flexDirection: 'row',
@@ -586,11 +585,11 @@ const es = StyleSheet.create({
   },
   swatchSelected: {
     borderWidth: 2.5,
-    borderColor: FG,
+    borderColor: theme.accent,
   },
   swatchLight: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderColor: theme.border,
   },
 });
 

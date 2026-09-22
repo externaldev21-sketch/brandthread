@@ -44,7 +44,6 @@ const STATIC_GROUPS: SettingsGroup[] = [
     title: 'App settings',
     items: [
       { label: 'Push notifications', icon: 'bell',       route: '/push-notifications' },
-      { label: 'App Theme',          icon: 'droplet',    route: '/app-theme' },
       { label: 'App icon',           icon: 'smartphone', route: '/app-icon' },
       { label: 'Biometric unlock',   icon: 'unlock',     route: '/biometric-unlock' },
     ],
@@ -195,43 +194,45 @@ export default function SettingsScreen() {
     })).filter((g) => g.items.length > 0);
   }, [query, role, isRoleLoaded]);
 
+  const themedStyles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
-    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <View style={[styles.header, { backgroundColor: '#0D0B08', paddingTop: topPad + 12 }]}>
-        <View style={styles.headerTopRow}>
-          <Text style={styles.headerTitle}>Settings</Text>
+    <View style={themedStyles.container}>
+      <View style={[themedStyles.header, { backgroundColor: colors.background, paddingTop: topPad + 12 }]}>
+        <View style={themedStyles.headerTopRow}>
+          <Text style={[themedStyles.headerTitle, { color: colors.foreground }]}>Settings</Text>
           <TouchableOpacity
-            style={styles.closeBtn}
+            style={[themedStyles.closeBtn, { backgroundColor: colors.secondary }]}
             activeOpacity={0.7}
             onPress={handleClose}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Feather name="x" size={20} color="#FFFFFF" />
+            <Feather name="x" size={20} color={colors.foreground} />
           </TouchableOpacity>
         </View>
       </View>
 
       <ScrollView
-        style={[styles.sheet, { backgroundColor: colors.background }]}
+        style={[themedStyles.sheet, { backgroundColor: colors.background }]}
         contentContainerStyle={{ paddingBottom: 60 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={[styles.profileHeader, { borderBottomColor: colors.border }]}>
-          <View style={[styles.profileAvatar, { backgroundColor: colors.primary }]}>
-            <Text style={[styles.profileAvatarText, { color: colors.primaryForeground }]}>{profileInitials}</Text>
+        <View style={[themedStyles.profileHeader, { borderBottomColor: colors.border }]}>
+          <View style={[themedStyles.profileAvatar, { backgroundColor: colors.primary }]}>
+            <Text style={[themedStyles.profileAvatarText, { color: colors.primaryForeground }]}>{profileInitials}</Text>
           </View>
-          <View style={styles.profileCopy}>
-            <Text style={[styles.profileEyebrow, { color: colors.mutedForeground }]}>
+          <View style={themedStyles.profileCopy}>
+            <Text style={[themedStyles.profileEyebrow, { color: colors.mutedForeground }]}>
               {role === 'seller' ? 'Seller account' : 'Buyer account'}
             </Text>
-            <Text style={[styles.profileName, { color: colors.foreground }]} numberOfLines={1}>{profileName}</Text>
-            <Text style={[styles.profileSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+            <Text style={[themedStyles.profileName, { color: colors.foreground }]} numberOfLines={1}>{profileName}</Text>
+            <Text style={[themedStyles.profileSub, { color: colors.mutedForeground }]} numberOfLines={1}>
               {user?.primaryEmailAddress?.emailAddress || 'Manage your account and preferences'}
             </Text>
           </View>
           <TouchableOpacity
-            style={[styles.profileEdit, { borderColor: colors.border }]}
+            style={[themedStyles.profileEdit, { borderColor: colors.border }]}
             onPress={() => router.push(profileRoute as never)}
             activeOpacity={0.75}
             accessibilityRole="button"
@@ -241,46 +242,46 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.searchWrap, { backgroundColor: colors.secondary }]}>
+        <View style={[themedStyles.searchWrap, { backgroundColor: colors.secondary }]}>
           <Feather name="search" size={16} color={colors.mutedForeground} />
           <TextInput
             value={query}
             onChangeText={setQuery}
             placeholder="Search settings"
             placeholderTextColor={colors.mutedForeground}
-            style={[styles.searchInput, { color: colors.foreground }]}
+            style={[themedStyles.searchInput, { color: colors.foreground }]}
           />
         </View>
 
         {filteredGroups.map((group) => (
-          <View key={group.title} style={styles.group}>
-            <Text style={[styles.groupTitle, { color: colors.mutedForeground }]}>{group.title}</Text>
-            <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View key={group.title} style={themedStyles.group}>
+            <Text style={[themedStyles.groupTitle, { color: colors.mutedForeground }]}>{group.title}</Text>
+            <View style={[themedStyles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {group.items.map((item, i) => (
                 <TouchableOpacity
                   key={item.label}
                   onPress={() => handleItem(item)}
                   activeOpacity={0.7}
                   style={[
-                    styles.row,
+                    themedStyles.row,
                     i !== group.items.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
                   ]}
                 >
-                  <Feather
+                    <Feather
                     name={item.icon}
                     size={17}
-                    color={item.destructive ? '#EF4444' : colors.foreground}
+                    color={item.destructive ? colors.destructive : colors.foreground}
                     style={{ width: 22 }}
                   />
-                  <View style={styles.rowCopy}>
+                  <View style={themedStyles.rowCopy}>
                     <Text
-                      style={[styles.rowLabel, { color: item.destructive ? '#EF4444' : colors.foreground }]}
+                      style={[themedStyles.rowLabel, { color: item.destructive ? colors.destructive : colors.foreground }]}
                       numberOfLines={1}
                     >
                       {item.label}
                     </Text>
                     {'description' in item && (
-                      <Text style={[styles.rowDescription, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      <Text style={[themedStyles.rowDescription, { color: colors.mutedForeground }]} numberOfLines={1}>
                         {item.description}
                       </Text>
                     )}
@@ -292,7 +293,7 @@ export default function SettingsScreen() {
           </View>
         ))}
 
-        <Text style={[styles.versionText, { color: colors.mutedForeground }]}>Brandthread v1.0.0</Text>
+        <Text style={[themedStyles.versionText, { color: colors.mutedForeground }]}>Brandthread v1.0.0</Text>
       </ScrollView>
       <PlanUpsellModal
         visible={upsellFeature !== null}
@@ -312,7 +313,7 @@ export default function SettingsScreen() {
           if (!scopeSaving) setScopeVisible(false);
         }}
       >
-        <View style={styles.scopeBackdrop}>
+          <View style={themedStyles.scopeBackdrop}>
           <TouchableOpacity
             style={StyleSheet.absoluteFill}
             activeOpacity={1}
@@ -322,16 +323,16 @@ export default function SettingsScreen() {
               if (!scopeSaving) setScopeVisible(false);
             }}
           />
-          <View style={[styles.scopeCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.scopeHeader}>
-              <View style={styles.scopeHeaderCopy}>
-                <Text style={[styles.scopeTitle, { color: colors.foreground }]}>Account reach</Text>
-                <Text style={[styles.scopeSubtitle, { color: colors.mutedForeground }]}>
+          <View style={[themedStyles.scopeCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={themedStyles.scopeHeader}>
+              <View style={themedStyles.scopeHeaderCopy}>
+                <Text style={[themedStyles.scopeTitle, { color: colors.foreground }]}>Account reach</Text>
+                <Text style={[themedStyles.scopeSubtitle, { color: colors.mutedForeground }]}>
                   Choose where your seller account is available.
                 </Text>
               </View>
               <TouchableOpacity
-                style={[styles.scopeClose, { borderColor: colors.border }]}
+                style={[themedStyles.scopeClose, { borderColor: colors.border }]}
                 onPress={() => setScopeVisible(false)}
                 disabled={!!scopeSaving}
                 accessibilityRole="button"
@@ -342,11 +343,11 @@ export default function SettingsScreen() {
             </View>
 
             {scopeLoading ? (
-              <View style={styles.scopeLoading}>
+              <View style={themedStyles.scopeLoading}>
                 <ActivityIndicator color={colors.primary} />
               </View>
             ) : (
-              <View style={styles.scopeOptions} accessibilityRole="radiogroup">
+              <View style={themedStyles.scopeOptions} accessibilityRole="radiogroup">
                 {([
                   {
                     value: 'global',
@@ -372,17 +373,17 @@ export default function SettingsScreen() {
                       accessibilityState={{ selected, disabled: !!scopeSaving }}
                       onPress={() => chooseAccountScope(option.value)}
                       style={[
-                        styles.scopeOption,
+                        themedStyles.scopeOption,
                         { borderColor: selected ? colors.primary : colors.border },
                         selected && { backgroundColor: colors.secondary },
                       ]}
                     >
-                      <View style={[styles.scopeOptionIcon, { backgroundColor: colors.secondary }]}>
+                      <View style={[themedStyles.scopeOptionIcon, { backgroundColor: colors.secondary }]}>
                         <Feather name={option.icon} size={18} color={colors.foreground} />
                       </View>
-                      <View style={styles.scopeOptionCopy}>
-                        <Text style={[styles.scopeOptionTitle, { color: colors.foreground }]}>{option.label}</Text>
-                        <Text style={[styles.scopeOptionDescription, { color: colors.mutedForeground }]}>
+                      <View style={themedStyles.scopeOptionCopy}>
+                        <Text style={[themedStyles.scopeOptionTitle, { color: colors.foreground }]}>{option.label}</Text>
+                        <Text style={[themedStyles.scopeOptionDescription, { color: colors.mutedForeground }]}>
                           {option.description}
                         </Text>
                       </View>
@@ -407,18 +408,19 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
+function makeStyles(colors: ReturnType<typeof useColors>) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: { paddingHorizontal: 20, paddingBottom: 28 },
   headerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerTitle: { fontSize: 30, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  headerTitle: { fontSize: 30, fontFamily: 'Inter_700Bold' },
   closeBtn: {
     width: 34,
     height: 34,
     borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: colors.secondary,
   },
   sheet: { flex: 1, marginTop: -16, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 16, paddingHorizontal: 20 },
   profileHeader: { flexDirection: 'row', alignItems: 'center', paddingTop: 2, paddingBottom: 20, marginBottom: 18, borderBottomWidth: 1 },
@@ -442,7 +444,7 @@ const styles = StyleSheet.create({
   scopeBackdrop: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.68)',
+    backgroundColor: (colors as any).overlay ?? 'rgba(0,0,0,0.68)',
   },
   scopeCard: {
     borderTopLeftRadius: 24,
@@ -492,4 +494,5 @@ const styles = StyleSheet.create({
   scopeOptionCopy: { flex: 1 },
   scopeOptionTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   scopeOptionDescription: { fontSize: 12, lineHeight: 17, fontFamily: 'Inter_400Regular', marginTop: 2 },
-});
+  });
+}

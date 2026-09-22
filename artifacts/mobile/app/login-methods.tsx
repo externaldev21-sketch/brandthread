@@ -560,7 +560,7 @@ export default function LoginMethods() {
 
             <Text style={s.modalNote}>
               Or scan the QR code using your authenticator's camera feature. The URI is:{'\n'}
-              <Text style={{ fontFamily: FONT.regular, fontSize: 10, color: MUTED }}>{totpModal?.uri}</Text>
+              <Text style={{ fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED }}>{totpModal?.uri}</Text>
             </Text>
 
             <Text style={s.modalStep}>3. Enter the 6-digit code shown in your app:</Text>

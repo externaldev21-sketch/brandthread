@@ -5,7 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { sellerCompactGridStyles } from '@/components/sellerCompactGridLayout';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { BORDER, SELLER_DASHBOARD_GLASS, FG, FONT, FS, MUTED, RADIUS } from '@/lib/theme';
+import { FONT, FS, RADIUS } from '@/lib/theme';
 
 export interface SellerDashboardKPI {
   label: string;
@@ -24,22 +24,25 @@ export function SellerDashboardKPICard({
   value,
   onPress,
   trend,
-  trendColor = MUTED,
+  trendColor,
   style,
 }: KPICardProps) {
   const { theme } = useAppTheme();
+  const palette = theme as typeof theme & Record<string, string>;
+  trendColor ??= palette.muted;
   const cardStyle = [
     styles.card,
     {
-      borderColor: BORDER,
+      backgroundColor: palette.card ?? palette.surface,
+      borderColor: palette.border,
       shadowColor: theme.accent,
     },
   ];
   const content = (
     <>
-      <Text style={styles.label} numberOfLines={2} maxFontSizeMultiplier={2}>{label}</Text>
+        <Text style={[styles.label, { color: palette.muted }]} numberOfLines={2} maxFontSizeMultiplier={2}>{label}</Text>
       <Text
-        style={styles.value}
+         style={[styles.value, { color: palette.text }]}
         numberOfLines={1}
         adjustsFontSizeToFit
         minimumFontScale={0.65}
@@ -87,7 +90,7 @@ export function SellerDashboardKPIGrid({ cards }: { cards: SellerDashboardKPI[] 
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   grid: {
     marginBottom: 10,
   },
@@ -101,21 +104,18 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderRadius: RADIUS.lg,
-    backgroundColor: SELLER_DASHBOARD_GLASS,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 2,
   },
   label: {
-    color: MUTED,
     fontFamily: FONT.medium,
     fontSize: FS.xs,
     lineHeight: 16,
     minHeight: 32,
   },
   value: {
-    color: FG,
     fontFamily: FONT.bold,
     fontSize: FS.xl,
     letterSpacing: -0.5,
@@ -131,7 +131,9 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   trendText: {
-    fontSize: 9,
+    fontSize: FS.xs,
     fontFamily: FONT.semibold,
   },
 });
+
+const styles = makeStyles();

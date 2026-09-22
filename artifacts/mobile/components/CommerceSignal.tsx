@@ -462,7 +462,7 @@ const uc = StyleSheet.create({
   colon: { fontSize: FS.md, fontFamily: FONT.semibold, color: MUTED, marginBottom: 8, paddingHorizontal: 1 },
   block: { alignItems: 'center', minWidth: 36 },
   num:   { fontSize: FS.md, fontFamily: FONT.bold, color: FG, letterSpacing: -0.5 },
-  lbl:   { fontSize: 9, fontFamily: FONT.semibold, color: SUBTLE, letterSpacing: 1, marginTop: 1 },
+  lbl:   { fontSize: FS.xs, fontFamily: FONT.semibold, color: SUBTLE, letterSpacing: 1, marginTop: 1 },
 });
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
@@ -478,7 +478,7 @@ const sig = StyleSheet.create({
     paddingHorizontal: 7, paddingVertical: 3,
     borderRadius: RADIUS.pill,
   },
-  demandBadgeText: { fontSize: 9, fontFamily: FONT.bold, letterSpacing: 0.3 },
+  demandBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, letterSpacing: 0.3 },
   price: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
   signalRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: SP.xs },
 });

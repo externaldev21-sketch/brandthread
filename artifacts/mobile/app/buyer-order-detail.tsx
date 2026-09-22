@@ -396,7 +396,7 @@ const rvs = StyleSheet.create({
   },
   handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: SP.md },
   header: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: SP.lg },
-  eyebrow: { color: MUTED, fontFamily: FONT.bold, fontSize: 9, letterSpacing: 1.6, marginBottom: 4 },
+  eyebrow: { color: MUTED, fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1.6, marginBottom: 4 },
   title: { color: FG, fontFamily: FONT.bold, fontSize: FS.lg, letterSpacing: -0.3 },
   starsRow: { alignItems: 'center', marginBottom: SP.lg, gap: SP.sm },
   ratingLabel: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.sm, textAlign: 'center' },

@@ -290,7 +290,7 @@ const s = StyleSheet.create({
   locationRow: { flexDirection: 'row', alignItems: 'flex-start', padding: 14, gap: 10 },
   rowLabel: { fontSize: 14, fontFamily: FONT.semibold },
   primaryBadge: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
-  primaryBadgeText: { fontSize: 10, fontFamily: FONT.semibold },
+  primaryBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   rowDescription: { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
   rowAddress: { fontSize: 11, fontFamily: FONT.regular, marginTop: 1 },
   locActions: { flexDirection: 'column', alignItems: 'flex-end', gap: 6 },

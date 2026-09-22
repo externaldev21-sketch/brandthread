@@ -26,7 +26,7 @@ A comprehensive clothing brand management mobile app covering 18 modules: brand 
 - `artifacts/api-server/` is the Express API. Route modules are in `src/routes/`; authentication middleware, object storage, payments, AI, and logging helpers are in `src/lib/` and `src/middlewares/`.
 - `lib/db/src/schema/index.ts` is the live Drizzle schema imported by the API. SQL changes belong in ordered, idempotent files under `lib/db/migrations/`, run by `lib/db/scripts/migrate.mjs`.
 - `lib/api-spec/openapi.yaml` is the contract source for generated API clients and Zod schemas. Regenerate them with the codegen command after changing that contract.
-- Mobile theme tokens and shared visual constants are in `artifacts/mobile/lib/theme.ts`; the app is dark-only and should stay on the Brandthread purple-on-near-black palette.
+- Mobile theme tokens and shared visual constants are in `artifacts/mobile/lib/theme.ts`; the app is dark-only and uses a strict monochrome palette of true black/graphite surfaces with white and gray text.
 - `lib/integrations-openai-ai-server/` and `lib/integrations/openai_ai_integrations/` contain the Replit-managed OpenAI clients used by API AI features.
 
 ## Architecture decisions
@@ -48,7 +48,7 @@ Brandthread is a fashion-commerce platform with role-specific buyer and seller e
 
 ## User preferences
 
-- Keep the Brandthread mobile experience dark-only, with the existing purple/cyan accent system.
+- Keep the Brandthread mobile experience dark-only and monochrome: true black/graphite surfaces with white and gray text. Do not introduce purple or cyan accents.
 - Buyer and seller are separate account paths; do not reintroduce a combined “both” account type.
 - Prefer real API-backed data and explicit unsupported states over fabricated dashboard, profile, order, or social metrics.
 
@@ -60,6 +60,7 @@ Brandthread is a fashion-commerce platform with role-specific buyer and seller e
 - Expo web previews need the API base URL at the development domain root. Routing to `/api-server/*` can return SPA HTML with a successful status instead of an API response.
 - Clerk Expo v3 uses the Signals API (`password()` / `finalize()`), and the onboarding flow must retain Clerk error handling plus user-scoped AsyncStorage draft state.
 - Use `useFocusEffect` plus the existing polling patterns for order refresh, and keep database order enums distinct from mobile display labels.
+- Alternate home-screen app icons are bundled by a native config plugin and only take effect in a native/EAS build. Expo Go and web previews apply the selected app theme but intentionally skip launcher-icon changes.
 
 ## Pointers
 

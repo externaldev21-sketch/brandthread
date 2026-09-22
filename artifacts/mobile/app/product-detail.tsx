@@ -14,7 +14,7 @@ import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
-import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, COMP, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
 import { AnimatedEntrance, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SectionHeader, StatusBadge, StatCard, NavigationCard, LoadingSkeleton, EmptyState, FilterChip, PressableScale } from '@/components/BrandthreadUI';
@@ -25,6 +25,18 @@ import { getItemsByProduct, adjustStock } from '@/services/inventoryService';
 import { InventoryItem } from '@/services/inventoryTypes';
 import { calcPricing, formatCurrency, isLowStock, isOutOfStock } from '@/lib/productUtils';
 import { reportNetworkError } from '@/lib/networkNotice';
+
+function useThemeAliases() {
+  const { theme } = useAppTheme();
+  return {
+    theme,
+    BG: theme.background, SURFACE: theme.surface, CARD: theme.card, CARD_ELEVATED: theme.cardElevated,
+    BORDER: theme.border, BORDER_ACTIVE: theme.accentLight, FG: theme.text, MUTED: theme.muted, SUBTLE: theme.subtle,
+    SUCCESS: theme.success, SUCCESS_DIM: `${theme.success}26`, BLUE: theme.accentLight,
+    ORANGE: theme.warning, RED: theme.error, RED_DIM: `${theme.error}26`, GOLD: theme.accent,
+    PURPLE: theme.accent, PURPLE_LIGHT: theme.accentLight, PURPLE_DIM: theme.accentDim, CYAN: theme.secondary,
+  };
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,7 +56,7 @@ const TABS: { key: Tab; label: string }[] = [
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function ProductDetailScreen() {
-  const { theme } = useAppTheme();
+  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN } = useThemeAliases();
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const { userId } = useAuth();
@@ -259,7 +271,8 @@ function OverviewTab({ product, pricing, coverImage }: {
   pricing: ReturnType<typeof calcPricing>;
   coverImage: Product['media'][0] | undefined;
 }) {
-  const { theme } = useAppTheme();
+  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN } = useThemeAliases();
+  const ov = React.useMemo(() => makeOvStyles(theme), [theme]);
   const statusVariant = product.status === 'active' ? 'success' : product.status === 'draft' ? 'warning' : product.status === 'archived' ? 'neutral' : 'info';
 
   // Fix 8: show '—' if price is 0 or undefined; show '—' for margin if cost is undefined
@@ -375,6 +388,8 @@ function OverviewTab({ product, pricing, coverImage }: {
 }
 
 function InfoRow({ label, value, icon, right }: { label: string; value: string; icon: keyof typeof Feather.glyphMap; right?: React.ReactNode }) {
+  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN } = useThemeAliases();
+  const ov = React.useMemo(() => makeOvStyles(theme), [theme]);
   return (
     <View style={ov.infoRow}>
       <Feather name={icon} size={ICON.sm} color={MUTED} />
@@ -386,7 +401,10 @@ function InfoRow({ label, value, icon, right }: { label: string; value: string; 
   );
 }
 
-const ov = StyleSheet.create({
+const makeOvStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { card: CARD, border: BORDER, text: FG, muted: MUTED, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM } = theme;
+  const BORDER_ACTIVE = theme.accentLight;
+  return StyleSheet.create({
   heroImage:       { width: '100%', height: 180 },
   heroPlaceholder: { width: '100%', height: 180, alignItems: 'center', justifyContent: 'center' },
   heroBadgeRow:    { flexDirection: 'row', gap: SP.sm, padding: SP.md, paddingBottom: 0 },
@@ -406,12 +424,14 @@ const ov = StyleSheet.create({
   tagRow:          { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm },
   tag:             { backgroundColor: PURPLE_DIM, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm + SP.xs, paddingVertical: SP.xs, borderWidth: 1, borderColor: BORDER_ACTIVE },
   tagText:         { fontSize: FS.xs, fontFamily: FONT.medium, color: PURPLE_LIGHT },
-});
+  });
+};
 
 // ─── Variants Tab ─────────────────────────────────────────────────────────────
 
 function VariantsTab({ product, setProduct, id }: { product: Product; setProduct: (p: Product) => void; id: string }) {
-  const { theme } = useAppTheme();
+  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN } = useThemeAliases();
+  const vt = React.useMemo(() => makeVtStyles(theme), [theme]);
   // Fix 2: bulk edit price handler
   const handleBulkPrice = () => {
     const currentPrice = product.pricing.priceCents;
@@ -572,7 +592,11 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
   );
 }
 
-const vt = StyleSheet.create({
+const makeVtStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { cardElevated: CARD_ELEVATED, border: BORDER, text: FG, muted: MUTED, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM } = theme;
+  const BLUE = theme.accentLight;
+  const BORDER_ACTIVE = theme.accentLight;
+  return StyleSheet.create({
   bulkTitle:       { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, marginBottom: SP.sm },
   bulkRow:         { flexDirection: 'row', gap: SP.sm },
   bulkBtn:         { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
@@ -591,12 +615,14 @@ const vt = StyleSheet.create({
   actionBtn:       { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6,
                      backgroundColor: PURPLE_DIM, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER_ACTIVE },
   actionBtnText:   { fontSize: FS.xs, fontFamily: FONT.medium, color: PURPLE_LIGHT },
-});
+  });
+};
 
 // ─── Inventory Tab ────────────────────────────────────────────────────────────
 
 function InventoryTab({ product, setProduct, id }: { product: Product; setProduct: (p: Product) => void; id: string }) {
-  const { theme } = useAppTheme();
+  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN } = useThemeAliases();
+  const invS = React.useMemo(() => makeInvStyles(theme), [theme]);
   const router = useRouter();
   const inv = product.inventory;
   const [invItems, setInvItems] = useState<InventoryItem[]>([]);
@@ -779,7 +805,9 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
   );
 }
 
-const invS = StyleSheet.create({
+const makeInvStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { cardElevated: CARD_ELEVATED, border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE } = theme;
+  return StyleSheet.create({
   variantRow:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm },
   variantName:   { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
   variantSku:    { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
@@ -794,7 +822,8 @@ const invS = StyleSheet.create({
   itemStatsRow:  { flexDirection: 'row', alignItems: 'center', gap: 4, paddingBottom: SP.sm, flexWrap: 'wrap' },
   itemStat:      { fontSize: FS.xs, fontFamily: FONT.medium, color: SUBTLE },
   itemStatDot:   { fontSize: FS.xs, color: SUBTLE },
-});
+  });
+};
 
 // ─── Orders Tab ───────────────────────────────────────────────────────────────
 
@@ -802,7 +831,9 @@ function OrdersTab({ product, router }: { product: Product; router: ReturnType<t
   return null;
 }
 
-const ord = StyleSheet.create({
+const makeOrdStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { text: FG, muted: MUTED, accentLight: PURPLE_LIGHT } = theme;
+  return StyleSheet.create({
   orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SP.sm },
   orderId:     { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
   customer:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
@@ -812,7 +843,8 @@ const ord = StyleSheet.create({
   viewBtn:     { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start',
                  paddingVertical: 4 },
   viewBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
-});
+  });
+};
 
 // ─── Production Tab ───────────────────────────────────────────────────────────
 
@@ -823,7 +855,8 @@ const STAGE_MAP: Record<string, number> = {
 };
 
 function ProductionTab({ product, router }: { product: Product; router: ReturnType<typeof useRouter> }) {
-  const { theme } = useAppTheme();
+  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN } = useThemeAliases();
+  const pt = React.useMemo(() => makePtStyles(theme), [theme]);
   const mfg = product.manufacturing;
   const stageIdx = STAGE_MAP[mfg.stage] ?? -1;
 
@@ -851,7 +884,7 @@ function ProductionTab({ product, router }: { product: Product; router: ReturnTy
             return (
               <View key={stage} style={pt.stageItem}>
                 <View style={[pt.stageDot, done && { backgroundColor: theme.accent, borderColor: theme.accent }, current && { backgroundColor: theme.secondary, borderColor: theme.secondary, shadowColor: theme.shadowColor }]}>
-                  {done && <Feather name="check" size={8} color="#fff" />}
+                  {done && <Feather name="check" size={8} color={theme.onAccent} />}
                 </View>
                 {idx < PRODUCTION_STAGES.length - 1 && (
                   <View style={[pt.stageLine, done && pt.stageLineDone]} />
@@ -907,7 +940,9 @@ function ProductionTab({ product, router }: { product: Product; router: ReturnTy
   );
 }
 
-const pt = StyleSheet.create({
+const makePtStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { text: FG, muted: MUTED, subtle: SUBTLE, accent: PURPLE, accentLight: PURPLE_LIGHT, border: BORDER, card: CARD, secondary: CYAN } = theme;
+  return StyleSheet.create({
   mfgHeader:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SP.md },
   mfgName:         { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
   mfgSub:          { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
@@ -918,11 +953,12 @@ const pt = StyleSheet.create({
   stageDotDone:    { backgroundColor: PURPLE, borderColor: PURPLE },
   stageLine:       { position: 'absolute', top: 8, left: '50%', right: '-50%', height: 1, backgroundColor: BORDER },
   stageLineDone:   { backgroundColor: PURPLE },
-  stageLabel:      { fontSize: 8, fontFamily: FONT.medium, color: MUTED, marginTop: 4, textAlign: 'center' },
+  stageLabel:      { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginTop: 4, textAlign: 'center' },
   stageLabelDone:  { color: PURPLE_LIGHT },
   deadline:        { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   unitsText:       { fontSize: FS.xs, fontFamily: FONT.medium, color: CYAN },
-});
+  });
+};
 
 // ─── Content Tab ──────────────────────────────────────────────────────────────
 
@@ -944,7 +980,9 @@ function ContentTab({ product, router, id }: { product: Product; router: ReturnT
   );
 }
 
-const ct = StyleSheet.create({
+const makeCtStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { text: FG, muted: MUTED, subtle: SUBTLE, accentLight: PURPLE_LIGHT, border: BORDER } = theme;
+  return StyleSheet.create({
   contentRow:    { flexDirection: 'row', gap: SP.md, alignItems: 'center' },
   thumbnail:     { width: 56, height: 56, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   contentHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
@@ -952,7 +990,8 @@ const ct = StyleSheet.create({
   statsRow:      { flexDirection: 'row', gap: SP.md },
   stat:          { flexDirection: 'row', alignItems: 'center', gap: 3 },
   statText:      { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
-});
+  });
+};
 
 // ─── Analytics Tab ────────────────────────────────────────────────────────────
 
@@ -965,7 +1004,8 @@ function AnalyticsTab({
   onRetry: () => void;
   product: Product;
 }) {
-  const { theme } = useAppTheme();
+  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN } = useThemeAliases();
+  const an = React.useMemo(() => makeAnStyles(theme), [theme]);
   if (error) return null;
   if (loading || !analytics) {
     return (
@@ -1064,17 +1104,21 @@ function AnalyticsTab({
   );
 }
 
-const an = StyleSheet.create({
+const makeAnStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { text: FG, muted: MUTED, subtle: SUBTLE, accent: PURPLE, accentLight: PURPLE_LIGHT, border: BORDER } = theme;
+  const SUCCESS = theme.success;
+  return StyleSheet.create({
   chartRow:    { flexDirection: 'row', alignItems: 'flex-end', gap: 4, height: 70 },
   barWrap:     { flex: 1, alignItems: 'center' },
   barContainer:{ flex: 1, justifyContent: 'flex-end', width: '100%' },
   bar:         { width: '100%', borderRadius: 2 },
-  barLabel:    { fontSize: 8, fontFamily: FONT.regular, color: MUTED, marginTop: 3 },
+  barLabel:    { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 3 },
   perfRow:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm },
   perfLabel:   { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   perfValue:   { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   perfDivider: { height: 1, backgroundColor: BORDER },
-});
+  });
+};
 
 // ─── Store Page Tab ───────────────────────────────────────────────────────────
 
@@ -1087,7 +1131,8 @@ function StoreTab({
   router: ReturnType<typeof useRouter>;
   id: string;
 }) {
-  const { theme } = useAppTheme();
+  const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN } = useThemeAliases();
+  const st = React.useMemo(() => makeStStyles(theme), [theme]);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [descOpen, setDescOpen] = useState(false);
@@ -1249,7 +1294,10 @@ function StoreTab({
   );
 }
 
-const st = StyleSheet.create({
+const makeStStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { text: FG, muted: MUTED, subtle: SUBTLE, accent: PURPLE, accentLight: PURPLE_LIGHT, border: BORDER, surface: SURFACE } = theme;
+  const BLUE = theme.accentLight;
+  return StyleSheet.create({
   coverImg:        { width: '100%', height: 200 },
   coverPlaceholder:{ width: '100%', height: 200, alignItems: 'center', justifyContent: 'center' },
   productName:     { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, marginBottom: SP.sm },
@@ -1268,30 +1316,36 @@ const st = StyleSheet.create({
                      paddingVertical: SP.sm, borderTopWidth: 1, borderTopColor: BORDER },
   descTitle:       { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   descText:        { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 20 },
-});
+  });
+};
 
 // ─── Root Styles ──────────────────────────────────────────────────────────────
 
-const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string; shadowColor: string }) => {
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const surface = theme.surface;
+  const card = theme.card;
+  const border = theme.border;
+  const foreground = theme.text;
+  const muted = theme.muted;
   return StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md,
                   paddingVertical: SP.sm, minHeight: COMP.headerH, gap: SP.sm,
-                  borderBottomWidth: 1, borderBottomColor: BORDER },
-  backBtn:      { width: COMP.minTouchTarget, height: COMP.minTouchTarget, borderRadius: RADIUS.sm, backgroundColor: CARD,
-                  borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:  { flex: 1, fontSize: FS.base, fontFamily: FONT.bold, color: FG, letterSpacing: -0.2 },
+                  borderBottomWidth: 1, borderBottomColor: border },
+  backBtn:      { width: COMP.minTouchTarget, height: COMP.minTouchTarget, borderRadius: RADIUS.sm, backgroundColor: card,
+                  borderWidth: 1, borderColor: border, alignItems: 'center', justifyContent: 'center' },
+  headerTitle:  { flex: 1, fontSize: FS.base, fontFamily: FONT.bold, color: foreground, letterSpacing: -0.2 },
   headerRight:  { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   headerBtn:    { minHeight: COMP.minTouchTarget, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: theme.accentDim,
-                  borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER_ACTIVE },
+                  borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.accent },
   editBtnText:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.accentLight },
-  iconBtnSmall: { width: COMP.minTouchTarget, height: COMP.minTouchTarget, borderRadius: RADIUS.sm, backgroundColor: CARD,
-                  borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  tabBarWrap:   { borderBottomWidth: 1, borderBottomColor: BORDER, backgroundColor: SURFACE },
+  iconBtnSmall: { width: COMP.minTouchTarget, height: COMP.minTouchTarget, borderRadius: RADIUS.sm, backgroundColor: card,
+                  borderWidth: 1, borderColor: border, alignItems: 'center', justifyContent: 'center' },
+  tabBarWrap:   { borderBottomWidth: 1, borderBottomColor: border, backgroundColor: surface },
   tabBarContent:{ paddingHorizontal: SP.sm },
   tabItem:      { minHeight: COMP.minTouchTarget, paddingHorizontal: SP.md, paddingVertical: 12, alignItems: 'center', position: 'relative' },
-  tabLabel:     { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-  tabLabelActive:{ color: FG, fontFamily: FONT.semibold },
+  tabLabel:     { fontSize: FS.sm, fontFamily: FONT.medium, color: muted },
+  tabLabelActive:{ color: foreground, fontFamily: FONT.semibold },
   tabUnderline: { position: 'absolute', bottom: 0, left: SP.md, right: SP.md, height: 2,
                   backgroundColor: theme.accent, borderRadius: RADIUS.pill },
   tabContent:   { flex: 1 },

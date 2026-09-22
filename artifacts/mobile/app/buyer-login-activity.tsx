@@ -145,7 +145,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   deviceOs: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
   deviceMeta: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, marginTop: 1 },
   currentBadge: { backgroundColor: SUCCESS_DIM, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-  currentBadgeText: { fontFamily: FONT.medium, fontSize: 10, color: SUCCESS },
+  currentBadgeText: { fontFamily: FONT.medium, fontSize: FS.xs, color: SUCCESS },
   removeBtn: { padding: 8 },
   signOutAll: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: SP.md, padding: SP.md, backgroundColor: RED_DIM, borderRadius: RADIUS.md, borderWidth: 1, borderColor: RED + '40' },
   signOutAllText: { fontFamily: FONT.medium, fontSize: FS.sm, color: RED },

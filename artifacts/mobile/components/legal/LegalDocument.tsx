@@ -11,7 +11,6 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { BG, BORDER, CARD, FG, MUTED, ORANGE, SUBTLE } from '@/lib/theme';
 
 export interface LegalSection {
   title: string;
@@ -148,7 +147,7 @@ export default function LegalDocument({
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: theme.background,
   },
   content: {
     width: '100%',
@@ -184,7 +183,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     fontSize: 17,
   },
   brandName: {
-    color: FG,
+    color: theme.text,
     fontFamily: 'Inter_700Bold',
     fontSize: 17,
     letterSpacing: -0.3,
@@ -195,11 +194,11 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     flexShrink: 1,
     gap: 6,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 9,
-    backgroundColor: CARD,
+    backgroundColor: theme.card,
   },
   companionText: {
     color: theme.accentLight,
@@ -212,7 +211,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   hero: {
     paddingBottom: 34,
     borderBottomWidth: 1,
-    borderBottomColor: BORDER,
+    borderBottomColor: theme.border,
   },
   eyebrow: {
     color: theme.accentLight,
@@ -223,7 +222,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     marginBottom: 14,
   },
   title: {
-    color: FG,
+    color: theme.text,
     fontFamily: 'Inter_700Bold',
     fontSize: 42,
     lineHeight: 48,
@@ -231,14 +230,14 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     marginBottom: 18,
   },
   summary: {
-    color: MUTED,
+    color: theme.muted,
     fontFamily: 'Inter_400Regular',
     fontSize: 17,
     lineHeight: 27,
     maxWidth: 700,
   },
   date: {
-    color: SUBTLE,
+    color: theme.subtle,
     fontFamily: 'Inter_500Medium',
     fontSize: 13,
     marginTop: 18,
@@ -260,19 +259,19 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: CARD,
+    backgroundColor: theme.card,
   },
   noticeCopy: {
     flex: 1,
   },
   noticeTitle: {
-    color: FG,
+    color: theme.text,
     fontFamily: 'Inter_700Bold',
     fontSize: 15,
     marginBottom: 5,
   },
   noticeText: {
-    color: MUTED,
+    color: theme.muted,
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
     lineHeight: 21,
@@ -296,14 +295,14 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   },
   sectionTitle: {
     flex: 1,
-    color: FG,
+    color: theme.text,
     fontFamily: 'Inter_700Bold',
     fontSize: 22,
     lineHeight: 29,
     letterSpacing: -0.4,
   },
   paragraph: {
-    color: MUTED,
+    color: theme.muted,
     fontFamily: 'Inter_400Regular',
     fontSize: 15,
     lineHeight: 25,
@@ -323,7 +322,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   },
   bulletText: {
     flex: 1,
-    color: MUTED,
+    color: theme.muted,
     fontFamily: 'Inter_400Regular',
     fontSize: 15,
     lineHeight: 24,
@@ -331,32 +330,32 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
   placeholderCard: {
     marginTop: 48,
     borderWidth: 1,
-    borderColor: ORANGE,
+    borderColor: theme.warning,
     borderRadius: 16,
     padding: 20,
-    backgroundColor: CARD,
+    backgroundColor: theme.card,
   },
   placeholderLabel: {
-    color: ORANGE,
+    color: theme.warning,
     fontFamily: 'Inter_700Bold',
     fontSize: 11,
     letterSpacing: 1.2,
     marginBottom: 8,
   },
   placeholderTitle: {
-    color: FG,
+    color: theme.text,
     fontFamily: 'Inter_700Bold',
     fontSize: 17,
     marginBottom: 8,
   },
   placeholderText: {
-    color: MUTED,
+    color: theme.muted,
     fontFamily: 'Inter_500Medium',
     fontSize: 13,
     lineHeight: 21,
   },
   footer: {
-    color: SUBTLE,
+    color: theme.subtle,
     fontFamily: 'Inter_400Regular',
     fontSize: 12,
     textAlign: 'center',

@@ -5,12 +5,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@clerk/expo';
 import { type SearchResult } from '@/lib/searchData';
-import { BG, CARD, BORDER, FG, MUTED } from '@/lib/theme';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
@@ -31,6 +30,8 @@ function MasonryCard({ item, accent, onPress }: {
   accent: string;
   onPress: () => void;
 }) {
+  const { theme } = useAppTheme();
+  const styles = makeStyles(theme);
   const [aspectRatio, setAspectRatio] = useState(0.82);
 
   useEffect(() => {
@@ -68,13 +69,15 @@ function MasonryCard({ item, accent, onPress }: {
 export default function SearchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { q: tabQuery, filters: filterRequest } = useLocalSearchParams<{ q?: string; filters?: string }>();
   const { push } = useThreadPull();
-  const bg      = BG;
-  const card    = CARD;
-  const border  = BORDER;
-  const fg      = FG;
-  const muted   = MUTED;
   const { theme } = useAppTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const bg      = theme.background;
+  const card    = theme.card;
+  const border  = theme.border;
+  const fg      = theme.text;
+  const muted   = theme.muted;
   const primary = theme.accent;
   const primaryDim = theme.accentDim;
 
@@ -100,6 +103,18 @@ export default function SearchScreen() {
   const recentKey = `bt:buyer-search-recent:${userId ?? 'anon'}`;
 
   const hasActiveFilters = sort !== '' || minPrice !== '' || maxPrice !== '' || category !== '';
+
+  useEffect(() => {
+    if (typeof tabQuery === 'string') setQuery(tabQuery);
+  }, [tabQuery]);
+
+  useEffect(() => {
+    if (filterRequest !== '1') return;
+    openFilters();
+    router.setParams({ filters: undefined });
+  // Open only when the transformed tab bar explicitly requests it.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterRequest]);
   const productResults = useMemo(() => results.filter((result): result is ProductResult => result.kind === 'product'), [results]);
   const brandResults = useMemo(() => results.filter(result => result.kind === 'brand'), [results]);
   const productColumns = useMemo(() => [
@@ -240,54 +255,6 @@ export default function SearchScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
-      <View style={[styles.header, { paddingTop: topPad + 8, borderBottomColor: border }]}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <Feather name="chevron-left" size={26} color={fg} />
-        </TouchableOpacity>
-        <View style={[styles.searchBar, { backgroundColor: card, borderColor: border }]}>
-          <Feather name="search" size={16} color={muted} />
-          <TextInput
-            style={[styles.searchInput, { color: fg }]}
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search brands and drops"
-            placeholderTextColor={muted}
-            autoFocus
-            autoCorrect={false}
-            returnKeyType="search"
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
-            onSubmitEditing={() => rememberSearch(query)}
-          />
-          {query.length > 0 && (
-            <TouchableOpacity
-              onPress={() => setQuery('')}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Clear search"
-            >
-              <Feather name="x-circle" size={16} color={muted} />
-            </TouchableOpacity>
-          )}
-        </View>
-        <TouchableOpacity
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            openFilters();
-          }}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="Open search filters"
-        >
-          <Feather name="sliders" size={20} color={hasActiveFilters ? primary : fg} />
-        </TouchableOpacity>
-      </View>
-
       <Modal
         visible={showFilters}
         transparent
@@ -338,7 +305,10 @@ export default function SearchScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingTop: topPad + 16, paddingBottom: 40 }}
+      >
         {query.trim().length === 0 ? (
           <>
             {searchFocused && recentSearches.length > 0 ? (
@@ -504,7 +474,7 @@ export default function SearchScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1,
@@ -529,28 +499,28 @@ const styles = StyleSheet.create({
     width: 38, height: 38, borderRadius: 19,
     alignItems: 'center', justifyContent: 'center',
   },
-  avatarText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  avatarText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: theme.onAccent },
   editorialHeader: { marginTop: 18, paddingHorizontal: 16, paddingBottom: 14, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
   editorialTitle: { fontSize: 21, fontFamily: 'Inter_700Bold', letterSpacing: -0.45 },
   masonryGrid: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingHorizontal: 12 },
   masonryColumn: { flex: 1, gap: 18 },
   masonryCard: { flex: 1 },
   masonryMedia: { width: '100%', minHeight: 145, maxHeight: 280, borderRadius: 18, overflow: 'hidden', justifyContent: 'flex-end' },
-  masonryFallback: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.14)' },
-  masonryInitials: { color: '#FFFFFF', fontSize: 36, fontFamily: 'Inter_700Bold', opacity: 0.9 },
-  masonryFallbackLine: { width: 42, height: 2, borderRadius: 1, backgroundColor: 'rgba(255,255,255,0.54)', marginTop: 10 },
-  masonryPrice: { alignSelf: 'flex-start', backgroundColor: 'rgba(4,4,7,0.78)', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 6, margin: 9 },
-  masonryPriceText: { color: '#FFFFFF', fontSize: 12, fontFamily: 'Inter_700Bold' },
-  masonryName: { color: FG, fontSize: 14, lineHeight: 18, fontFamily: 'Inter_700Bold', marginTop: 8 },
+  masonryFallback: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: `${theme.background}24` },
+  masonryInitials: { color: theme.onAccent, fontSize: 36, fontFamily: 'Inter_700Bold', opacity: 0.9 },
+  masonryFallbackLine: { width: 42, height: 2, borderRadius: 1, backgroundColor: `${theme.onAccent}8A`, marginTop: 10 },
+  masonryPrice: { alignSelf: 'flex-start', backgroundColor: `${theme.background}C7`, borderRadius: 12, paddingHorizontal: 9, paddingVertical: 6, margin: 9 },
+  masonryPriceText: { color: theme.onAccent, fontSize: 12, fontFamily: 'Inter_700Bold' },
+  masonryName: { color: theme.text, fontSize: 14, lineHeight: 18, fontFamily: 'Inter_700Bold', marginTop: 8 },
   masonryBrandRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5 },
   masonryBrandDot: { width: 15, height: 15, borderRadius: 8 },
-  masonryBrand: { color: MUTED, fontSize: 11, fontFamily: 'Inter_500Medium', flex: 1 },
+  masonryBrand: { color: theme.muted, fontSize: 11, fontFamily: 'Inter_500Medium', flex: 1 },
   followingBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1 },
   followingBadgeText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
-  sheetBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.62)' },
+  sheetBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: `${theme.background}9E` },
   filterSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, paddingHorizontal: 18, paddingTop: 10 },
-  sheetHandle: { width: 42, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: 18 },
+  sheetHandle: { width: 42, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: 'center', marginBottom: 18 },
   sheetTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
   sheetTitle: { fontSize: 21, fontFamily: 'Inter_700Bold' },
   sheetSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 3 },

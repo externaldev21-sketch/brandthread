@@ -14,6 +14,7 @@ import {
   getInitialDropBroadcastStates,
   type DropBroadcastState,
 } from '@/lib/dropBroadcastState';
+import { FS } from '@/lib/theme';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -646,10 +647,10 @@ const styles = StyleSheet.create({
   listRowLabel: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   chipRow: { flexDirection: 'row', gap: 4 },
   chip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
-  chipText: { fontSize: 9, fontFamily: 'Inter_700Bold', letterSpacing: 0.3 },
+  chipText: { fontSize: FS.xs, fontFamily: 'Inter_700Bold', letterSpacing: 0.3 },
 
   payoutInfo: { flex: 1 },
-  payoutLabel: { fontSize: 10, fontFamily: 'Inter_500Medium', marginBottom: 3, letterSpacing: 0.3 },
+  payoutLabel: { fontSize: FS.xs, fontFamily: 'Inter_500Medium', marginBottom: 3, letterSpacing: 0.3 },
   payoutAccount: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   viewPayoutsLink: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
 
@@ -682,7 +683,7 @@ const styles = StyleSheet.create({
   dropStats: { flexDirection: 'row', alignItems: 'center' },
   dropStat: { flex: 1, alignItems: 'center' },
   dropStatVal: { fontSize: 14, fontFamily: 'Inter_700Bold', marginBottom: 2 },
-  dropStatLabel: { fontSize: 10, fontFamily: 'Inter_400Regular' },
+  dropStatLabel: { fontSize: FS.xs, fontFamily: 'Inter_400Regular' },
   dropDivider: { width: 1, height: 28 },
 
   // Pre Order progress

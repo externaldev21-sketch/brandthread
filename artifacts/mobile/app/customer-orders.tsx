@@ -252,7 +252,7 @@ const s = StyleSheet.create({
   statsRow:     { flexDirection: 'row', backgroundColor: SURFACE, borderRadius: 10, padding: 12 },
   stat:         { flex: 1, alignItems: 'center', gap: 2 },
   statVal:      { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
-  statLabel:    { fontSize: 10, fontFamily: 'Inter_400Regular', color: MUTED },
+  statLabel:    { fontSize: FS.xs, fontFamily: 'Inter_400Regular', color: MUTED },
   statDiv:      { width: 1, backgroundColor: BORDER, marginVertical: 4 },
   tagsRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   tag:          { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
@@ -267,7 +267,7 @@ const s = StyleSheet.create({
   orderLeft:    { flex: 1, gap: 3 },
   orderNum:     { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
   orderDate:    { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
-  trackingText: { fontSize: 10, fontFamily: 'Inter_400Regular', color: MUTED, fontStyle: 'italic' },
+  trackingText: { fontSize: FS.xs, fontFamily: 'Inter_400Regular', color: MUTED, fontStyle: 'italic' },
   orderRight:   { alignItems: 'flex-end', gap: 6 },
   orderTotal:   { fontSize: 14, fontFamily: 'Inter_700Bold', color: FG },
 });

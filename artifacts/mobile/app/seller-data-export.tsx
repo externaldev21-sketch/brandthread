@@ -8,7 +8,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { BG, CARD, SURFACE, BORDER, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { PrimaryButton, SecondaryButton } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
@@ -24,7 +24,7 @@ const INCLUDE_OPTIONS: { key: IncludeKey; label: string; icon: keyof typeof Feat
 
 export default function SellerDataExportScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM } = theme;
+  const styles = React.useMemo(() => makeStyles(theme), [theme]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
@@ -85,38 +85,38 @@ export default function SellerDataExportScreen() {
   }
 
   return (
-    <View style={[s.root, { paddingTop: Platform.OS === 'web' ? 20 : insets.top }]}>
+      <View style={[styles.root, { paddingTop: Platform.OS === 'web' ? 20 : insets.top }]}>
       {/* Header */}
-      <View style={s.header}>
+      <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Feather name="arrow-left" size={22} color={FG} />
+          <Feather name="arrow-left" size={22} color={theme.text} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Export My Data</Text>
+        <Text style={styles.headerTitle}>Export My Data</Text>
         <View style={{ width: 22 }} />
       </View>
 
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* What to include */}
-        <Text style={s.sectionLabel}>What to include</Text>
-        <View style={s.card}>
+        <Text style={styles.sectionLabel}>What to include</Text>
+        <View style={styles.card}>
           {INCLUDE_OPTIONS.map((opt, i) => {
             const checked = include.includes(opt.key);
             return (
               <TouchableOpacity
                 key={opt.key}
-                style={[s.optRow, i > 0 && { borderTopWidth: 1, borderTopColor: BORDER }]}
+                style={[styles.optRow, i > 0 && { borderTopWidth: 1, borderTopColor: theme.border }]}
                 onPress={() => toggleInclude(opt.key)}
                 activeOpacity={0.8}
               >
-                <View style={[s.optIcon, { backgroundColor: checked ? PURPLE_DIM : SURFACE }]}>
-                  <Feather name={opt.icon} size={16} color={checked ? PURPLE_LIGHT : MUTED} />
+                <View style={[styles.optIcon, { backgroundColor: checked ? theme.accentDim : theme.surface }]}>
+                  <Feather name={opt.icon} size={16} color={checked ? theme.accentLight : theme.muted} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.optLabel}>{opt.label}</Text>
-                  <Text style={s.optDesc}>{opt.desc}</Text>
+                  <Text style={styles.optLabel}>{opt.label}</Text>
+                  <Text style={styles.optDesc}>{opt.desc}</Text>
                 </View>
-                <View style={[s.checkbox, checked && s.checkboxChecked]}>
-                  {checked && <Feather name="check" size={13} color="#000" />}
+                <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
+                  {checked && <Feather name="check" size={13} color={theme.onAccent} />}
                 </View>
               </TouchableOpacity>
             );
@@ -124,24 +124,24 @@ export default function SellerDataExportScreen() {
         </View>
 
         {/* Format */}
-        <Text style={s.sectionLabel}>Format</Text>
-        <View style={s.formatRow}>
+        <Text style={styles.sectionLabel}>Format</Text>
+        <View style={styles.formatRow}>
           {(['json', 'csv'] as Format[]).map((f) => (
             <TouchableOpacity
               key={f}
-              style={[s.formatBtn, format === f && s.formatBtnActive]}
+              style={[styles.formatBtn, format === f && styles.formatBtnActive]}
               onPress={() => setFormat(f)}
               activeOpacity={0.8}
             >
               <Feather
                 name={f === 'json' ? 'code' : 'file-text'}
                 size={16}
-                color={format === f ? PURPLE_LIGHT : MUTED}
+                color={format === f ? theme.accentLight : theme.muted}
               />
-              <Text style={[s.formatLabel, format === f && s.formatLabelActive]}>
+              <Text style={[styles.formatLabel, format === f && styles.formatLabelActive]}>
                 {f.toUpperCase()}
               </Text>
-              <Text style={s.formatDesc}>
+              <Text style={styles.formatDesc}>
                 {f === 'json' ? 'Structured data' : 'Spreadsheet-ready'}
               </Text>
             </TouchableOpacity>
@@ -149,9 +149,9 @@ export default function SellerDataExportScreen() {
         </View>
 
         {/* Privacy note */}
-        <View style={s.noteCard}>
-          <Feather name="shield" size={14} color={MUTED} />
-          <Text style={s.noteText}>
+        <View style={styles.noteCard}>
+          <Feather name="shield" size={14} color={theme.muted} />
+          <Text style={styles.noteText}>
             Exports contain only your own seller data. Customer PII is included — store securely and handle per your privacy policy.
           </Text>
         </View>
@@ -167,20 +167,20 @@ export default function SellerDataExportScreen() {
 
         {/* Result */}
         {result && (
-          <View style={s.resultCard}>
-            <View style={s.resultHeader}>
-              <Feather name="check-circle" size={18} color="#34D399" />
-              <Text style={s.resultTitle}>Export ready!</Text>
+          <View style={styles.resultCard}>
+            <View style={styles.resultHeader}>
+              <Feather name="check-circle" size={18} color={theme.success} />
+              <Text style={styles.resultTitle}>Export ready!</Text>
             </View>
-            <Text style={s.resultDate}>
+            <Text style={styles.resultDate}>
               Generated {new Date(result.exportedAt).toLocaleString()}
             </Text>
             {Object.keys(result.counts).length > 0 && (
-              <View style={s.countsRow}>
+              <View style={styles.countsRow}>
                 {Object.entries(result.counts).map(([k, v]) => (
-                  <View key={k} style={s.countChip}>
-                    <Text style={s.countVal}>{v}</Text>
-                    <Text style={s.countLabel}>{k}</Text>
+                  <View key={k} style={styles.countChip}>
+                    <Text style={styles.countVal}>{v}</Text>
+                    <Text style={styles.countLabel}>{k}</Text>
                   </View>
                 ))}
               </View>
@@ -192,33 +192,33 @@ export default function SellerDataExportScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
-  headerTitle:  { fontSize: 17, fontFamily: 'Inter_700Bold', color: FG },
+  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: theme.border },
+  headerTitle:  { fontSize: 17, fontFamily: 'Inter_700Bold', color: theme.text },
   scroll:       { padding: 16, paddingBottom: 100, gap: 16 },
-  sectionLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: -8 },
-  card:         { backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER },
+  sectionLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: -8 },
+  card:         { backgroundColor: theme.card, borderRadius: 14, borderWidth: 1, borderColor: theme.border },
   optRow:       { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   optIcon:      { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  optLabel:     { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: FG },
-  optDesc:      { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 2 },
-  checkbox:     { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  checkboxChecked: { backgroundColor: PURPLE, borderColor: PURPLE },
+  optLabel:     { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: theme.text },
+  optDesc:      { fontSize: 11, fontFamily: 'Inter_400Regular', color: theme.muted, marginTop: 2 },
+  checkbox:     { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
+  checkboxChecked: { backgroundColor: theme.accent, borderColor: theme.accent },
   formatRow:    { flexDirection: 'row', gap: 10 },
-  formatBtn:    { flex: 1, backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, padding: 14, alignItems: 'center', gap: 6 },
-  formatBtnActive: { borderColor: PURPLE, backgroundColor: PURPLE_DIM },
-  formatLabel:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: MUTED },
-  formatLabelActive: { color: PURPLE_LIGHT },
-  formatDesc:   { fontSize: 10, fontFamily: 'Inter_400Regular', color: MUTED },
-  noteCard:     { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: SURFACE, borderRadius: 10, padding: 12 },
-  noteText:     { flex: 1, fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 18 },
-  resultCard:   { backgroundColor: 'rgba(52,211,153,0.10)', borderRadius: 14, borderWidth: 1, borderColor: 'rgba(52,211,153,0.30)', padding: 16, gap: 8 },
+  formatBtn:    { flex: 1, backgroundColor: theme.card, borderRadius: 12, borderWidth: 1, borderColor: theme.border, padding: 14, alignItems: 'center', gap: 6 },
+  formatBtnActive: { borderColor: theme.accent, backgroundColor: theme.accentDim },
+  formatLabel:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: theme.muted },
+  formatLabelActive: { color: theme.accentLight },
+  formatDesc:   { fontSize: FS.xs, fontFamily: 'Inter_400Regular', color: theme.muted },
+  noteCard:     { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: theme.surface, borderRadius: 10, padding: 12 },
+  noteText:     { flex: 1, fontSize: 12, fontFamily: 'Inter_400Regular', color: theme.muted, lineHeight: 18 },
+  resultCard:   { backgroundColor: theme.success + '1A', borderRadius: 14, borderWidth: 1, borderColor: theme.success + '4D', padding: 16, gap: 8 },
   resultHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  resultTitle:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
-  resultDate:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
+  resultTitle:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: theme.text },
+  resultDate:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: theme.muted },
   countsRow:    { flexDirection: 'row', gap: 10, marginTop: 4 },
-  countChip:    { flex: 1, backgroundColor: SURFACE, borderRadius: 8, padding: 10, alignItems: 'center', gap: 2 },
-  countVal:     { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
-  countLabel:   { fontSize: 10, fontFamily: 'Inter_400Regular', color: MUTED },
+  countChip:    { flex: 1, backgroundColor: theme.surface, borderRadius: 8, padding: 10, alignItems: 'center', gap: 2 },
+  countVal:     { fontSize: 16, fontFamily: 'Inter_700Bold', color: theme.text },
+  countLabel:   { fontSize: FS.xs, fontFamily: 'Inter_400Regular', color: theme.muted },
 });

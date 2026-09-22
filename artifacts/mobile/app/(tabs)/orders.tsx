@@ -10,7 +10,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BG, SCREEN_BG, SURFACE, CARD, CARD_GLASS, CARD_ELEVATED_GLASS, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, CYAN, CYAN_DIM, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP, ICON, ANIM } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { IconButton, FilterChip, StatusBadge, SearchBar, EmptyState } from '@/components/BrandthreadUI';
 import { filterOrders, sortOrders } from '@/services/orderService';
@@ -57,23 +57,23 @@ function fmtMoney(cents: number): string {
   return formatCents(cents);
 }
 
-function getPaymentColor(status: string): string {
+function getPaymentColor(status: string, theme: any): string {
   switch (status) {
-    case 'paid': return SUCCESS;
-    case 'pending': case 'authorized': return ORANGE;
-    case 'refunded': case 'partially_refunded': return CYAN;
-    case 'failed': case 'voided': return RED;
-    default: return MUTED;
+    case 'paid': return theme.success;
+    case 'pending': case 'authorized': return theme.warning;
+    case 'refunded': case 'partially_refunded': return theme.secondary;
+    case 'failed': case 'voided': return theme.error;
+    default: return theme.muted;
   }
 }
 
-function getFulfillmentColor(status: string): string {
+function getFulfillmentColor(status: string, theme: any): string {
   switch (status) {
-    case 'unfulfilled': return ORANGE;
-    case 'partially_fulfilled': return CYAN;
-    case 'fulfilled': return SUCCESS;
-    case 'manufacturer_pending': return BLUE;
-    default: return MUTED;
+    case 'unfulfilled': return theme.warning;
+    case 'partially_fulfilled': return theme.secondary;
+    case 'fulfilled': return theme.success;
+    case 'manufacturer_pending': return theme.accentLight;
+    default: return theme.muted;
   }
 }
 
@@ -306,6 +306,9 @@ export function OrderRow({
   onMarkProcessing, onMarkReady, onShip, isLast = false,
 }: OrderRowProps) {
   const { theme } = useAppTheme();
+  const s = React.useMemo(() => createStyles(theme), [theme]);
+  const { text: FG, error: RED, accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, success: SUCCESS, warning: ORANGE, muted: MUTED, border: BORDER, borderSubtle: BORDER_ACTIVE } = theme;
+  const BLUE = theme.accentLight, BLUE_DIM = theme.accentDim, RED_DIM = `${theme.error}22`, CYAN_DIM = `${theme.secondary}22`;
   const isHighRisk = order.riskLevel === 'high';
   const hasReturn = order.returns.length > 0;
   const hasDispute = order.disputes.length > 0;
@@ -320,8 +323,8 @@ export function OrderRow({
       : firstItem.productName
     : order.listItemLabel ?? (itemCount > 0 ? `${itemCount} ${itemCount === 1 ? 'item' : 'items'}` : 'No items');
 
-  const payColor = getPaymentColor(order.paymentStatus);
-  const fulColor = getFulfillmentColor(order.fulfillmentStatus);
+  const payColor = getPaymentColor(order.paymentStatus, theme);
+  const fulColor = getFulfillmentColor(order.fulfillmentStatus, theme);
 
   return (
     <>
@@ -330,6 +333,7 @@ export function OrderRow({
         onPress={onPress}
         onLongPress={onLongPress}
         style={[s.orderRow, selected && s.orderRowSelected, isHighRisk && s.orderRowRisk, isArchived && s.orderRowArchived]}
+        accessibilityRole="button"
         accessibilityLabel={`Order ${order.orderNumber}, ${order.customer.name}, ${fmtMoney(order.payment.totalCents)}`}
       >
         {/* Selection checkbox */}
@@ -425,6 +429,8 @@ export function OrderRow({
               style={s.quickAction}
               onPress={e => { e.stopPropagation(); onMarkProcessing(); }}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`Accept order ${order.orderNumber}`}
             >
               <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.quickActionGrad}>
                 <Feather name="check-circle" size={11} color={theme.onAccent} />
@@ -437,10 +443,12 @@ export function OrderRow({
               style={s.quickAction}
               onPress={e => { e.stopPropagation(); onMarkReady(); }}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`Mark order ${order.orderNumber} ready`}
             >
               <LinearGradient colors={[BLUE, CYAN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.quickActionGrad}>
-                <Feather name="package" size={11} color="#fff" />
-                <Text style={s.quickActionText}>Ready</Text>
+                <Feather name="package" size={11} color={theme.onAccent} />
+                <Text style={[s.quickActionText, { color: theme.onAccent }]}>Ready</Text>
               </LinearGradient>
             </TouchableOpacity>
           )}
@@ -449,10 +457,12 @@ export function OrderRow({
               style={s.quickAction}
               onPress={e => { e.stopPropagation(); onShip(); }}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`Ship order ${order.orderNumber}`}
             >
               <LinearGradient colors={[SUCCESS, CYAN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.quickActionGrad}>
-                <Feather name="send" size={11} color="#fff" />
-                <Text style={s.quickActionText}>Ship</Text>
+                <Feather name="send" size={11} color={theme.onAccent} />
+                <Text style={[s.quickActionText, { color: theme.onAccent }]}>Ship</Text>
               </LinearGradient>
             </TouchableOpacity>
           )}
@@ -484,9 +494,12 @@ function SortModal({
   onSelect: (k: OrderSortKey) => void;
   onClose: () => void;
 }) {
+  const { theme } = useAppTheme();
+  const s = React.useMemo(() => createStyles(theme), [theme]);
+  const PURPLE_LIGHT = theme.accentLight;
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={onClose} />
+      <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close sort menu" />
       <View style={s.modalSheet}>
         <View style={s.modalHandle} />
         <Text style={s.modalTitle}>Sort Orders</Text>
@@ -496,6 +509,8 @@ function SortModal({
             style={[s.sortOption, current === key && s.sortOptionActive]}
             onPress={() => { Haptics.selectionAsync(); onSelect(key); onClose(); }}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={`Sort by ${label}`}
           >
             <Text style={[s.sortOptionText, current === key && s.sortOptionTextActive]}>
               {label}
@@ -503,7 +518,7 @@ function SortModal({
             {current === key && <Feather name="check" size={ICON.sm} color={PURPLE_LIGHT} />}
           </TouchableOpacity>
         ))}
-        <TouchableOpacity style={s.modalCloseBtn} onPress={onClose}>
+        <TouchableOpacity style={s.modalCloseBtn} onPress={onClose} accessibilityRole="button" accessibilityLabel="Cancel sorting">
           <Text style={s.modalCloseBtnText}>Cancel</Text>
         </TouchableOpacity>
       </View>
@@ -521,9 +536,12 @@ function FilterSheet({
   onSelect: (k: OrderFilterKey) => void;
   onClose: () => void;
 }) {
+  const { theme } = useAppTheme();
+  const s = React.useMemo(() => createStyles(theme), [theme]);
+  const PURPLE_LIGHT = theme.accentLight;
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={onClose} />
+      <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close filter menu" />
       <View style={s.modalSheet}>
         <View style={s.modalHandle} />
         <Text style={s.modalTitle}>Filter Orders</Text>
@@ -534,6 +552,8 @@ function FilterSheet({
               style={[s.sortOption, current === key && s.sortOptionActive]}
               onPress={() => { Haptics.selectionAsync(); onSelect(key); onClose(); }}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`Filter orders by ${label}`}
             >
               <Text style={[s.sortOptionText, current === key && s.sortOptionTextActive]}>
                 {label}
@@ -542,7 +562,7 @@ function FilterSheet({
             </TouchableOpacity>
           ))}
         </ScrollView>
-        <TouchableOpacity style={s.modalCloseBtn} onPress={onClose}>
+        <TouchableOpacity style={s.modalCloseBtn} onPress={onClose} accessibilityRole="button" accessibilityLabel="Cancel filtering">
           <Text style={s.modalCloseBtnText}>Cancel</Text>
         </TouchableOpacity>
       </View>
@@ -554,7 +574,10 @@ function FilterSheet({
 
 export default function OrdersScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const s = React.useMemo(() => createStyles(theme), [theme]);
+  const { background: BG, surface: SCREEN_BG, text: FG, muted: MUTED, subtle: SUBTLE, error: RED, success: SUCCESS, warning: ORANGE, accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM, border: BORDER, borderSubtle: BORDER_ACTIVE, card: CARD, cardElevatedGlass: CARD_ELEVATED_GLASS } = theme;
+  const BLUE = theme.accentLight, BLUE_DIM = theme.accentDim, SUCCESS_DIM = `${theme.success}22`, ORANGE_DIM = `${theme.warning}22`, RED_DIM = `${theme.error}22`, CARD_GLASS = theme.cardGlass, SURFACE = theme.surface;
+  const palette = theme as typeof theme & Record<string, string>;
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -847,7 +870,7 @@ export default function OrdersScreen() {
             : ''}
         </Text>
         {sort !== 'newest' && (
-          <TouchableOpacity onPress={() => setSortModalVisible(true)}>
+          <TouchableOpacity onPress={() => setSortModalVisible(true)} accessibilityRole="button" accessibilityLabel={`Current sort: ${currentSortLabel}. Change sort`}>
             <Text style={s.sortIndicator}>{currentSortLabel} ↕</Text>
           </TouchableOpacity>
         )}
@@ -868,7 +891,7 @@ export default function OrdersScreen() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <View style={[s.root, { paddingTop: insets.top, backgroundColor: palette.background ?? palette.surface ?? BG }]}>
       {/* ── Fixed header ── */}
       <View style={s.header}>
         {/* Title row */}
@@ -882,6 +905,8 @@ export default function OrdersScreen() {
               { text: 'Cancel', style: 'cancel' },
             ])}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Choose order view"
           >
             <Text style={s.titleText}>Orders</Text>
             <Feather name="chevron-down" size={18} color={MUTED} />
@@ -890,6 +915,7 @@ export default function OrdersScreen() {
             <TouchableOpacity
               style={s.headerIconBtn}
               onPress={handleMoreMenu}
+              accessibilityRole="button"
               accessibilityLabel="More order actions"
             >
               <Feather name="more-horizontal" size={ICON.md} color={FG} />
@@ -911,6 +937,7 @@ export default function OrdersScreen() {
           <TouchableOpacity
             style={[s.controlBtn, hasActiveFilter && s.controlBtnActive]}
             onPress={() => setFilterSheetVisible(true)}
+            accessibilityRole="button"
             accessibilityLabel={hasActiveFilter ? `Filter: ${activeFilter}` : 'Filter orders'}
           >
             <Feather name="sliders" size={14} color={hasActiveFilter ? PURPLE_LIGHT : MUTED} />
@@ -918,6 +945,7 @@ export default function OrdersScreen() {
           <TouchableOpacity
             style={s.controlBtn}
             onPress={() => setSortModalVisible(true)}
+            accessibilityRole="button"
             accessibilityLabel={`Sort: ${currentSortLabel}`}
           >
             <Feather name="chevrons-down" size={14} color={MUTED} />
@@ -972,22 +1000,22 @@ export default function OrdersScreen() {
       {/* Bulk action bar */}
       {selectedIds.length > 0 && (
         <View style={[s.bulkBar, { paddingBottom: insets.bottom + SP.sm }]}>
-          <LinearGradient colors={['#18181B', '#0A0A0B']} style={s.bulkBarInner}>
+          <LinearGradient colors={theme.heroGradient} style={s.bulkBarInner}>
             <Text style={s.bulkCount}>{selectedIds.length} selected</Text>
             <View style={s.bulkActions}>
-              <TouchableOpacity style={s.bulkBtn} onPress={handleBulkMarkProcessing}>
+              <TouchableOpacity style={s.bulkBtn} onPress={handleBulkMarkProcessing} accessibilityRole="button" accessibilityLabel="Mark selected orders processing">
                 <Feather name="play" size={ICON.xs} color={BLUE} />
                 <Text style={[s.bulkBtnText, { color: BLUE }]}>Processing</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.bulkBtn} onPress={handleBulkMarkReady}>
+              <TouchableOpacity style={s.bulkBtn} onPress={handleBulkMarkReady} accessibilityRole="button" accessibilityLabel="Mark selected orders ready">
                 <Feather name="package" size={ICON.xs} color={SUCCESS} />
                 <Text style={[s.bulkBtnText, { color: SUCCESS }]}>Ready</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.bulkBtn} onPress={handleExportCsv}>
+              <TouchableOpacity style={s.bulkBtn} onPress={handleExportCsv} accessibilityRole="button" accessibilityLabel="Export selected orders">
                 <Feather name="download" size={ICON.xs} color={MUTED} />
                 <Text style={[s.bulkBtnText, { color: MUTED }]}>Export</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.bulkBtn} onPress={() => setSelectedIds([])}>
+              <TouchableOpacity style={s.bulkBtn} onPress={() => setSelectedIds([])} accessibilityRole="button" accessibilityLabel="Clear selected orders">
                 <Feather name="x" size={ICON.xs} color={RED} />
                 <Text style={[s.bulkBtnText, { color: RED }]}>Clear</Text>
               </TouchableOpacity>
@@ -1018,7 +1046,14 @@ export default function OrdersScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
+const createStyles = (theme: any) => {
+  const BG = theme.background, SCREEN_BG = theme.surface, SURFACE = theme.surface, CARD = theme.card;
+  const CARD_GLASS = theme.cardGlass, CARD_ELEVATED_GLASS = theme.cardElevatedGlass;
+  const BORDER = theme.border, BORDER_ACTIVE = theme.accent, FG = theme.text, MUTED = theme.muted, SUBTLE = theme.subtle;
+  const SUCCESS = theme.success, SUCCESS_DIM = `${theme.success}22`, BLUE = theme.accentLight, BLUE_DIM = theme.accentDim;
+  const ORANGE = theme.warning, ORANGE_DIM = `${theme.warning}22`, RED = theme.error, RED_DIM = `${theme.error}22`;
+  const CYAN = theme.secondary, CYAN_DIM = `${theme.secondary}22`, PURPLE = theme.accent, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = theme.accentDim;
+  return StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: SCREEN_BG,
@@ -1231,7 +1266,7 @@ const s = StyleSheet.create({
     borderColor: ORANGE + '44',
   },
   newDotText: {
-    fontSize: 9,
+     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: ORANGE,
     letterSpacing: 0.4,
@@ -1254,7 +1289,7 @@ const s = StyleSheet.create({
     borderColor: RED + '44',
   },
   riskText: {
-    fontSize: 9,
+     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: RED,
     letterSpacing: 0.3,
@@ -1266,7 +1301,7 @@ const s = StyleSheet.create({
     paddingVertical: 1,
   },
   returnBadgeText: {
-    fontSize: 9,
+     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: CYAN,
     letterSpacing: 0.3,
@@ -1278,7 +1313,7 @@ const s = StyleSheet.create({
     paddingVertical: 1,
   },
   disputeBadgeText: {
-    fontSize: 9,
+     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: RED,
     letterSpacing: 0.3,
@@ -1346,7 +1381,7 @@ const s = StyleSheet.create({
     borderColor: BORDER_ACTIVE + '55',
   },
   tagText: {
-    fontSize: 9,
+     fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: PURPLE_LIGHT,
     letterSpacing: 0.3,
@@ -1496,7 +1531,7 @@ const s = StyleSheet.create({
     borderColor: BORDER,
   },
   bulkBtnText: {
-    fontSize: 10,
+     fontSize: FS.xs,
     fontFamily: FONT.semibold,
   },
 
@@ -1562,4 +1597,5 @@ const s = StyleSheet.create({
     fontFamily: FONT.semibold,
     color: MUTED,
   },
-});
+  });
+};

@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
-import { BG, CARD, BORDER, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, RED, RED_DIM, ORANGE, ORANGE_DIM, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadHeader, PrimaryButton, SecondaryButton, GradientCard, BrandedLoadingState } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
@@ -29,42 +29,42 @@ interface VerificationState {
 
 // ─── Status display config ────────────────────────────────────────────────────
 
-const STATUS_CONFIG: Record<VerificationStatus, {
+const statusConfig = (theme: ReturnType<typeof useAppTheme>['theme']): Record<VerificationStatus, {
   icon: keyof typeof Feather.glyphMap;
   color: string;
   bg: string;
   title: string;
   body: string;
-}> = {
+}> => ({
   unverified: {
     icon: 'shield',
-    color: MUTED,
-    bg: CARD,
+    color: theme.muted,
+    bg: theme.card,
     title: 'Not yet verified',
     body: 'Verify your identity to earn the verified seller badge and build buyer trust.',
   },
   pending: {
     icon: 'clock',
-    color: ORANGE,
-    bg: ORANGE_DIM,
+    color: theme.warning,
+    bg: theme.warning + '26',
     title: 'Verification in progress',
     body: "Stripe is reviewing your documents. This usually takes a few minutes. We'll notify you when it's done.",
   },
   verified: {
     icon: 'check-circle',
-    color: SUCCESS,
-    bg: SUCCESS_DIM,
+    color: theme.success,
+    bg: theme.success + '26',
     title: "You're verified!",
     body: 'Your identity has been confirmed. Your verified badge is now live on your storefront and profile.',
   },
   failed: {
     icon: 'alert-circle',
-    color: RED,
-    bg: RED_DIM,
+    color: theme.error,
+    bg: theme.error + '26',
     title: 'Verification failed',
     body: "We couldn't confirm your identity with the documents provided. You can start the process again with different documents.",
   },
-};
+});
 
 // ─── Benefits list ────────────────────────────────────────────────────────────
 
@@ -80,6 +80,7 @@ const BENEFITS = [
 export default function SellerVerificationScreen() {
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM } = theme;
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
   const router = useRouter();
   const params = useLocalSearchParams();
   const launchedFromSellerSetup = isSellerSetupOrigin(params.from);
@@ -197,7 +198,7 @@ export default function SellerVerificationScreen() {
   }
 
   const status = state?.verificationStatus ?? 'unverified';
-  const cfg = STATUS_CONFIG[status];
+  const cfg = statusConfig(theme)[status];
 
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
@@ -222,7 +223,7 @@ export default function SellerVerificationScreen() {
         {status === 'verified' && (
           <GradientCard style={s.verifiedCard}>
             <View style={s.verifiedRow}>
-              <Feather name="check-circle" size={ICON.md} color={SUCCESS} />
+              <Feather name="check-circle" size={ICON.md} color={theme.success} />
               <Text style={s.verifiedLabel}>Verified Seller Badge</Text>
             </View>
             <Text style={s.verifiedSub}>
@@ -269,7 +270,7 @@ export default function SellerVerificationScreen() {
         {/* ── Privacy note ── */}
         {(status === 'unverified' || status === 'failed') && (
           <View style={s.privacyNote}>
-            <Feather name="lock" size={14} color={MUTED} style={{ marginTop: 1 }} />
+            <Feather name="lock" size={14} color={theme.muted} style={{ marginTop: 1 }} />
             <Text style={s.privacyText}>
               Verification is processed securely by Stripe. Brandthread does not store your ID documents. Stripe's{' '}
               <Text
@@ -329,7 +330,7 @@ export default function SellerVerificationScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: 'transparent',
@@ -363,7 +364,7 @@ const s = StyleSheet.create({
   statusBody: {
     fontFamily: FONT.regular,
     fontSize: FS.sm,
-    color: MUTED,
+     color: theme.muted,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -380,12 +381,12 @@ const s = StyleSheet.create({
   verifiedLabel: {
     fontFamily: FONT.semibold,
     fontSize: FS.md,
-    color: FG,
+     color: theme.text,
   },
   verifiedSub: {
     fontFamily: FONT.regular,
     fontSize: FS.sm,
-    color: MUTED,
+     color: theme.muted,
     lineHeight: 20,
   },
 
@@ -394,7 +395,7 @@ const s = StyleSheet.create({
   sectionTitle: {
     fontFamily: FONT.semibold,
     fontSize: FS.sm,
-    color: MUTED,
+     color: theme.muted,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: SP.xs,
@@ -409,7 +410,7 @@ const s = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: RADIUS.sm,
-    backgroundColor: PURPLE_DIM,
+     backgroundColor: theme.accentDim,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -417,7 +418,7 @@ const s = StyleSheet.create({
     flex: 1,
     fontFamily: FONT.regular,
     fontSize: FS.sm,
-    color: FG,
+     color: theme.text,
     lineHeight: 20,
   },
 
@@ -433,20 +434,20 @@ const s = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: PURPLE_DIM,
+     backgroundColor: theme.accentDim,
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepNumText: {
     fontFamily: FONT.bold,
     fontSize: FS.xs,
-    color: PURPLE_LIGHT,
+     color: theme.accentLight,
   },
   stepText: {
     flex: 1,
     fontFamily: FONT.regular,
     fontSize: FS.sm,
-    color: FG,
+     color: theme.text,
     lineHeight: 20,
   },
 
@@ -461,11 +462,11 @@ const s = StyleSheet.create({
     flex: 1,
     fontFamily: FONT.regular,
     fontSize: FS.xs,
-    color: MUTED,
+     color: theme.muted,
     lineHeight: 18,
   },
   privacyLink: {
-    color: PURPLE_LIGHT,
+     color: theme.accentLight,
     textDecorationLine: 'underline',
   },
 
@@ -474,7 +475,7 @@ const s = StyleSheet.create({
   pendingHint: {
     fontFamily: FONT.regular,
     fontSize: FS.xs,
-    color: MUTED,
+     color: theme.muted,
     textAlign: 'center',
     lineHeight: 18,
   },

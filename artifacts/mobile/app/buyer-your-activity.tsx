@@ -36,7 +36,7 @@ function BarChart({ data, maxVal }: { data: number[]; maxVal: number }) {
                 width: '100%',
               }}
             />
-            <Text style={{ fontFamily: FONT.regular, fontSize: 10, color: isToday ? theme.accent : MUTED }}>
+            <Text style={{ fontFamily: FONT.regular, fontSize: FS.xs, color: isToday ? theme.accent : MUTED }}>
               {days[i]}
             </Text>
           </View>

@@ -523,7 +523,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   purchaseHandle: { width: 42, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: SP.md },
   purchaseHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
-  purchaseEyebrow: { color: LIVE_RED, fontFamily: FONT.bold, fontSize: 9, letterSpacing: 1.1, marginBottom: 4 },
+  purchaseEyebrow: { color: LIVE_RED, fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1.1, marginBottom: 4 },
   purchaseTitle: { color: FG, fontFamily: FONT.bold, fontSize: FS.lg },
   purchaseClose: { width: 38, height: 38, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: BORDER },
   purchaseScroll: { marginTop: SP.sm },
@@ -542,7 +542,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   buyNowButton: { minHeight: 48, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', marginTop: SP.xs },
   buyNowDisabled: { opacity: 0.45 },
   buyNowText: { color: BG, fontFamily: FONT.bold, fontSize: FS.sm },
-  purchaseFootnote: { color: MUTED, fontFamily: FONT.regular, fontSize: 10, textAlign: 'center', lineHeight: 15 },
+  purchaseFootnote: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'center', lineHeight: 15 },
   // Ended
   endedIcon:        { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   endedTitle:       { fontSize: FS.lg, fontFamily: FONT.bold },

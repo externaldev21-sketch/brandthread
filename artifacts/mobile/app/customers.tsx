@@ -7,6 +7,7 @@ import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
 import { serviceRequest } from '@/lib/serviceConfig';
+import { FS } from '@/lib/theme';
 
 const SEGMENTS = ['All', 'VIP', 'Returning', 'At-Risk'] as const;
 type Segment = typeof SEGMENTS[number];
@@ -233,7 +234,7 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: 'row', gap: 6, marginBottom: 16 },
   stat: { flex: 1, borderRadius: 12, padding: 10, borderWidth: 1, alignItems: 'center', gap: 3 },
   statVal: { fontSize: 14, fontFamily: 'Inter_700Bold' },
-  statLabel: { fontSize: 10, fontFamily: 'Inter_400Regular' },
+  statLabel: { fontSize: FS.xs, fontFamily: 'Inter_400Regular' },
   analyticsBtnHdr: { width: 36, height: 36, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   loyaltyCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 14, padding: 14, borderWidth: 1, marginBottom: 16 },
   loyaltyLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
@@ -257,7 +258,7 @@ const styles = StyleSheet.create({
   custRight: { alignItems: 'flex-end', justifyContent: 'center' },
   tagsRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
   tagChip:   { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, borderWidth: 1 },
-  tagText:   { fontSize: 9, fontFamily: 'Inter_600SemiBold' },
+  tagText:   { fontSize: FS.xs, fontFamily: 'Inter_600SemiBold' },
   sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
   rewardRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   rewardIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },

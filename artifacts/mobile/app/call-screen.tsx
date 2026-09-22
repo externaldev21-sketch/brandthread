@@ -723,7 +723,7 @@ const s = StyleSheet.create({
     borderColor: 'rgba(255,59,48,0.30)',
   },
   ctrlLabel: {
-    fontSize: 9,
+    fontSize: FS.xs,
     fontFamily: FONT.medium,
     color: FG,
     textAlign: 'center',

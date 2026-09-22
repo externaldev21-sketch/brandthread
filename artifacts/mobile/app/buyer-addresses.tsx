@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, RED, FONT, FS, SP, RADIUS, COMP, SUCCESS } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { useAuth } from '@clerk/expo';
@@ -163,7 +163,7 @@ export default function BuyerAddressesScreen() {
           if (showForm) handleCancel();
           else router.back();
         }}>
-          <Feather name={showForm ? 'x' : 'arrow-left'} size={21} color={FG} />
+          <Feather name={showForm ? 'x' : 'arrow-left'} size={21} color={theme.text} />
         </TouchableOpacity>
         <Text style={styles.title}>{showForm ? (isCreating ? 'Add address' : 'Edit address') : 'Shipping addresses'}</Text>
         <View style={styles.iconBtn} />
@@ -176,43 +176,43 @@ export default function BuyerAddressesScreen() {
             <View style={styles.form}>
               <View style={styles.field}>
                 <Text style={styles.label}>Label (e.g. Home, Office)</Text>
-                <TextInput value={label} onChangeText={setLabel} style={styles.input} placeholder="Label" placeholderTextColor={SUBTLE} />
+                    <TextInput value={label} onChangeText={setLabel} style={styles.input} placeholder="Label" placeholderTextColor={theme.subtle} />
               </View>
               <View style={styles.field}>
                 <Text style={styles.label}>Recipient name</Text>
-                <TextInput value={recipientName} onChangeText={setRecipientName} style={styles.input} placeholder="Full name" placeholderTextColor={SUBTLE} />
+                <TextInput value={recipientName} onChangeText={setRecipientName} style={styles.input} placeholder="Full name" placeholderTextColor={theme.subtle} />
               </View>
               <View style={styles.field}>
                 <Text style={styles.label}>Street address</Text>
-                <TextInput value={street} onChangeText={setStreet} style={styles.input} placeholder="123 Main St" placeholderTextColor={SUBTLE} />
+                <TextInput value={street} onChangeText={setStreet} style={styles.input} placeholder="123 Main St" placeholderTextColor={theme.subtle} />
               </View>
               <View style={styles.field}>
                 <Text style={styles.label}>Apt, Suite, etc. (optional)</Text>
-                <TextInput value={line2} onChangeText={setLine2} style={styles.input} placeholder="Apt 4B" placeholderTextColor={SUBTLE} />
+                <TextInput value={line2} onChangeText={setLine2} style={styles.input} placeholder="Apt 4B" placeholderTextColor={theme.subtle} />
               </View>
               <View style={styles.row}>
                 <View style={[styles.field, { flex: 1 }]}>
                   <Text style={styles.label}>City</Text>
-                  <TextInput value={city} onChangeText={setCity} style={styles.input} placeholder="City" placeholderTextColor={SUBTLE} />
+                  <TextInput value={city} onChangeText={setCity} style={styles.input} placeholder="City" placeholderTextColor={theme.subtle} />
                 </View>
                 <View style={[styles.field, { flex: 1, marginLeft: SP.sm }]}>
                   <Text style={styles.label}>State / Province</Text>
-                  <TextInput value={state} onChangeText={setState} style={styles.input} placeholder="State" placeholderTextColor={SUBTLE} />
+                  <TextInput value={state} onChangeText={setState} style={styles.input} placeholder="State" placeholderTextColor={theme.subtle} />
                 </View>
               </View>
               <View style={styles.row}>
                 <View style={[styles.field, { flex: 1 }]}>
                   <Text style={styles.label}>ZIP / Postal Code</Text>
-                  <TextInput value={postalCode} onChangeText={setPostalCode} style={styles.input} placeholder="ZIP" placeholderTextColor={SUBTLE} />
+                  <TextInput value={postalCode} onChangeText={setPostalCode} style={styles.input} placeholder="ZIP" placeholderTextColor={theme.subtle} />
                 </View>
                 <View style={[styles.field, { flex: 1, marginLeft: SP.sm }]}>
                   <Text style={styles.label}>Country</Text>
-                  <TextInput value={country} onChangeText={setCountry} style={styles.input} placeholder="US" placeholderTextColor={SUBTLE} />
+                  <TextInput value={country} onChangeText={setCountry} style={styles.input} placeholder="US" placeholderTextColor={theme.subtle} />
                 </View>
               </View>
               <View style={styles.field}>
                 <Text style={styles.label}>Phone (optional)</Text>
-                <TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" style={styles.input} placeholder="Phone number" placeholderTextColor={SUBTLE} />
+                <TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" style={styles.input} placeholder="Phone number" placeholderTextColor={theme.subtle} />
               </View>
 
               {!isDefault && (
@@ -232,7 +232,7 @@ export default function BuyerAddressesScreen() {
             <>
               {addresses.length === 0 ? (
                 <View style={styles.empty}>
-                  <Feather name="map-pin" size={48} color={MUTED} style={{ marginBottom: SP.md }} />
+                   <Feather name="map-pin" size={48} color={theme.muted} style={{ marginBottom: SP.md }} />
                   <Text style={styles.emptyText}>You haven't saved any addresses yet.</Text>
                 </View>
               ) : (
@@ -246,10 +246,10 @@ export default function BuyerAddressesScreen() {
                         </View>
                         <View style={styles.actions}>
                           <TouchableOpacity onPress={() => handleEdit(addr)} style={styles.actionBtn}>
-                            <Feather name="edit-2" size={16} color={MUTED} />
+                           <Feather name="edit-2" size={16} color={theme.muted} />
                           </TouchableOpacity>
                           <TouchableOpacity onPress={() => handleDelete(addr.id)} style={styles.actionBtn}>
-                            <Feather name="trash-2" size={16} color={RED} />
+                           <Feather name="trash-2" size={16} color={theme.error} />
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -286,26 +286,26 @@ export default function BuyerAddressesScreen() {
 }
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  root: { flex: 1, backgroundColor: 'transparent' },
-  header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
+  root: { flex: 1, backgroundColor: theme.background },
+  header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: theme.border },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
+  title: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.md },
   
   empty: { padding: SP.xl, alignItems: 'center', marginTop: SP.xl },
-  emptyText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.base, textAlign: 'center' },
+  emptyText: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.base, textAlign: 'center' },
   
   list: { gap: SP.md, marginBottom: SP.lg },
-  card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
+  card: { backgroundColor: theme.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, overflow: 'hidden' },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: SP.md, borderBottomWidth: 1, borderBottomColor: theme.border },
   row: { flexDirection: 'row', alignItems: 'center' },
-  cardLabel: { color: FG, fontFamily: FONT.semibold, fontSize: FS.base },
-  defaultBadge: { backgroundColor: 'rgba(16, 185, 129, 0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.sm, marginLeft: SP.sm },
-  defaultBadgeText: { color: SUCCESS, fontFamily: FONT.semibold, fontSize: FS.xs },
+  cardLabel: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.base },
+  defaultBadge: { backgroundColor: `${theme.success}26`, paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.sm, marginLeft: SP.sm },
+  defaultBadgeText: { color: theme.success, fontFamily: FONT.semibold, fontSize: FS.xs },
   actions: { flexDirection: 'row', gap: SP.sm },
   actionBtn: { padding: 4 },
   cardBody: { padding: SP.md },
-  addressText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
-  makeDefaultBtn: { borderTopWidth: 1, borderTopColor: BORDER, padding: SP.md, alignItems: 'center' },
+  addressText: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
+  makeDefaultBtn: { borderTopWidth: 1, borderTopColor: theme.border, padding: SP.md, alignItems: 'center' },
   makeDefaultText: { color: theme.accentLight, fontFamily: FONT.medium, fontSize: FS.sm },
 
   addBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: SP.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.accent, borderStyle: 'dashed' },
@@ -313,13 +313,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
 
   form: { gap: SP.md },
   field: { gap: 6 },
-  label: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.sm },
-  input: { backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, paddingHorizontal: SP.md, height: COMP.inputH, color: FG, fontFamily: FONT.regular, fontSize: FS.base },
+  label: { color: theme.muted, fontFamily: FONT.medium, fontSize: FS.sm },
+  input: { backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.md, paddingHorizontal: SP.md, height: COMP.inputH, color: theme.text, fontFamily: FONT.regular, fontSize: FS.base },
   
   defaultToggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: SP.xs },
-  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1, borderColor: MUTED, alignItems: 'center', justifyContent: 'center' },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1, borderColor: theme.muted, alignItems: 'center', justifyContent: 'center' },
   checkboxActive: { backgroundColor: theme.accent, borderColor: theme.accent },
-  defaultToggleText: { color: FG, fontFamily: FONT.medium, fontSize: FS.base },
+  defaultToggleText: { color: theme.text, fontFamily: FONT.medium, fontSize: FS.base },
   
   saveBtn: { backgroundColor: theme.accent, height: COMP.buttonH, borderRadius: RADIUS.lg, alignItems: 'center', justifyContent: 'center', marginTop: SP.lg },
   saveBtnText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: FS.base },

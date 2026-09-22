@@ -374,7 +374,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingVertical: 3,
   },
   currentBadgeText: {
-    fontSize: 9,
+    fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: '#fff',
     letterSpacing: 0.5,
@@ -389,7 +389,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingVertical: 3,
   },
   previewingBadgeText: {
-    fontSize: 9,
+    fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: '#000',
     letterSpacing: 0.5,

@@ -125,7 +125,7 @@ describe('tab freeze/detach behavior', () => {
   });
 
   it('(tabs) layout retains opaque scene background', () => {
-    expect(tabsLayout).toContain("sceneStyle: { backgroundColor: '#0A0A0B' }");
+    expect(tabsLayout).toContain('sceneStyle: { backgroundColor: theme.background }');
   });
 });
 

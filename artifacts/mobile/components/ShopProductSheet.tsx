@@ -567,7 +567,12 @@ export function ShopProductSheet({
       </TouchableWithoutFeedback>
 
       <Animated.View
-        style={[ss.sheet, { paddingBottom: insets.bottom + 8, transform: [{ translateY: slideY }] }]}
+        style={[ss.sheet, {
+          backgroundColor: theme.surface,
+          borderColor: theme.border,
+          paddingBottom: insets.bottom + 8,
+          transform: [{ translateY: slideY }],
+        }]}
         {...panResponder.panHandlers}
       >
         {/* ─ Handle ─ */}
@@ -1016,7 +1021,7 @@ const ss = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#111113',
+    backgroundColor: 'transparent',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     borderTopWidth: 1,
@@ -1140,7 +1145,7 @@ const ss = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 2,
   },
-  preOrderText: { fontSize: 9, fontFamily: FONT.bold, color: ON_DARK },
+  preOrderText: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
   productName: {
     fontSize: FS.md,
     fontFamily: FONT.bold,

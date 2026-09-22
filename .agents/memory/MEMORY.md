@@ -1,13 +1,13 @@
 - [Brandthread theme](brandthread-theme.md) — buyer/seller chrome is strictly black, white, and gray; color is reserved for semantic status and authored content.
 - [Brandthread design system](brandthread-woven-system.md) — Inter hierarchy and clean primitives replace the retired Woven/thread/stitch presentation.
-- [Runtime app themes](runtime-app-themes.md) — legacy theme IDs remain compatible but all resolve to the canonical monochrome emphasis and neutral shell.
+- [Runtime app themes](runtime-app-themes.md) — 12 account-scoped palettes have matching native launcher icons; null icon preference follows the active theme.
 - [Onboarding value-first contract](onboarding-value-first.md) — defaults stay editable; seller personalization and one optional, durable AI success precede plan commitment.
 - [Seller trial reminder delivery](seller-trial-reminder-delivery.md) — create on day four of an exact five-day trial; leases, retries, preferences, and per-token dedupe protect delivery.
 - [Transparent navigation isolation](transparent-navigation-isolation.md) — every root scene needs an opaque plane; only the focused scene animates, and inactive tab scenes detach.
 - [Clerk Expo v3 Signals API](clerk-expo-v3-signals-api.md) — @clerk/expo v3 hooks return SignInFutureResource; use password()+finalize() not create()+setActive(); Metro needs _tmp_ blockList fix.
 - [Brandthread backend architecture](brandthread-backend-architecture.md) — ownerId scoping, transactional orders, lib/db build requirement, clerkClient usage, healthz double-path gotcha.
 - [Inbox structural flattening](inbox-flattening-pattern.md) — Brandthread screens (profile, inbox) use flat Instagram-style rows, no card chrome; keep new screens consistent.
-- [Buyer/Seller only — no Both](buyer-seller-nav.md) — "Both" account type fully removed; buyer home is Thread (video feed at index); buyer tabs are Thread·Discover·Friends·Inbox·Profile.
+- [Buyer/Seller navigation](buyer-seller-nav.md) — buyer bar is Home·Discover·Inbox·Search plus separate Profile; Search transforms the capsule into an inline field.
 - [User-scoped onboarding state](user-scoped-onboarding-state.md) — auth-gated local completion and identity writes must be owned by a Clerk user, never a shared device-global key.
 - [Onboarding architecture](onboarding-architecture.md) — Clerk account creation is the literal first step for buyer and seller; user-scoped draft migration preserves equivalent screens across reorderings.
 - [Manufacturer payout and call integrity](manufacturer-payout-call-integrity.md) — payout truth, reversal accounting, exact callbacks, and participant-scoped call events must stay idempotent across provider races.

@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 
 import { QuickActionCard } from '@/components/BrandthreadUI';
 import { sellerCompactGridStyles } from '@/components/sellerCompactGridLayout';
-import { BORDER, SELLER_DASHBOARD_GLASS } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 export interface SellerQuickAction {
   label: string;
@@ -15,6 +15,7 @@ export interface SellerQuickAction {
 }
 
 export function SellerQuickActionsGrid({ actions }: { actions: SellerQuickAction[] }) {
+  const { theme } = useAppTheme();
   return (
     <View style={sellerCompactGridStyles.grid} testID="seller-quick-actions-grid">
       {actions.map(action => (
@@ -23,7 +24,7 @@ export function SellerQuickActionsGrid({ actions }: { actions: SellerQuickAction
           style={sellerCompactGridStyles.column}
           testID={`seller-quick-action-${action.label.toLowerCase().replace(/\s+/g, '-')}`}
         >
-          <QuickActionCard {...action} style={styles.card} />
+          <QuickActionCard {...action} style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]} />
         </View>
       ))}
     </View>
@@ -35,7 +36,5 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     minWidth: 0,
-    backgroundColor: SELLER_DASHBOARD_GLASS,
-    borderColor: BORDER,
   },
 });

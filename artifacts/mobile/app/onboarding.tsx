@@ -42,6 +42,7 @@ WebBrowser.maybeCompleteAuthSession();
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import {
   APP_THEME_PRESETS,
+  DEFAULT_THEME,
   getOnAccentTextStyle,
   useAppTheme,
   type AppThemeId,
@@ -59,7 +60,6 @@ import {
   syncBuyerOnboarding,
 } from '@/lib/buyerOnboardingSync';
 import { ApiError } from '@/lib/networkNotice';
-import { SCREEN_BG } from '@/lib/theme';
 import {
   APPLE_OAUTH_STRATEGY,
   isOAuthCancellationError,
@@ -69,17 +69,18 @@ import {
 } from '@/lib/oauthFlow';
 
 // ─── Palette ────────────────────────────────────────────────────────────────
-const CARD    = 'rgba(255,255,255,0.045)';
-const BORDER  = 'rgba(255,255,255,0.09)';
-const GREEN   = '#34D399';
-const FG      = '#FFFFFF';
-const MUTED   = 'rgba(255,255,255,0.45)';
-const MUTED2  = 'rgba(255,255,255,0.25)';
-const INPUT_BG = 'rgba(255,255,255,0.07)';
-const INPUT_BD = 'rgba(255,255,255,0.12)';
-const ERR     = '#F87171';
-
 const { width: SW } = Dimensions.get('window');
+let sm: any = {};
+// Runtime aliases are used only by legacy inline controls; all StyleSheets below
+// are factories and receive theme values directly.
+let CARD = DEFAULT_THEME.card;
+let FG = DEFAULT_THEME.text;
+let MUTED = DEFAULT_THEME.muted;
+let MUTED2 = DEFAULT_THEME.subtle;
+let INPUT_BG = DEFAULT_THEME.surface;
+let INPUT_BD = DEFAULT_THEME.border;
+let ERR = DEFAULT_THEME.error;
+let GREEN = DEFAULT_THEME.success;
 
 // ─── Data ───────────────────────────────────────────────────────────────────
 const STYLE_INTERESTS_WITH_EMOJI: { label: string; emoji: string }[] = [
@@ -316,8 +317,9 @@ function mapClerkError(err: any): string {
  */
 function StepDots({ current, total }: { current: number; total: number }) {
   const { theme } = useAppTheme();
+  const styles = createSdots(theme);
   return (
-    <View style={sdots.row} accessibilityLabel={`Step ${current + 1} of ${total}`}>
+    <View style={styles.row} accessibilityLabel={`Step ${current + 1} of ${total}`}>
       {Array.from({ length: total }).map((_, i) => {
         const filled = i <= current;
         const active = i === current;
@@ -325,7 +327,7 @@ function StepDots({ current, total }: { current: number; total: number }) {
           <View
             key={i}
             style={[
-              sdots.dot,
+              styles.dot,
               active && { width: 18 },
             ]}
           >
@@ -343,9 +345,9 @@ function StepDots({ current, total }: { current: number; total: number }) {
     </View>
   );
 }
-const sdots = StyleSheet.create({
+const createSdots = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: theme.borderSubtle, overflow: 'hidden' },
 });
 
 /**
@@ -357,7 +359,7 @@ function StyleChip({ label, emoji, selected, onPress }: { label: string; emoji: 
   return (
     <TouchableOpacity
       style={[
-        ssc.chip,
+        createSsc(theme).chip,
         selected && { backgroundColor: theme.accentDim, borderColor: theme.accent, borderWidth: 1.5 },
       ]}
       accessibilityRole="checkbox"
@@ -365,39 +367,40 @@ function StyleChip({ label, emoji, selected, onPress }: { label: string; emoji: 
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
       activeOpacity={0.75}
     >
-      <Text style={ssc.emoji}>{emoji}</Text>
+      <Text style={createSsc(theme).emoji}>{emoji}</Text>
       {selected && <Feather name="check" size={11} color={theme.accentLight} style={{ marginRight: 1 }} />}
-      <Text style={[ssc.chipText, selected && { color: theme.accentLight }]}>{label}</Text>
+      <Text style={[createSsc(theme).chipText, selected && { color: theme.accentLight }]}>{label}</Text>
     </TouchableOpacity>
   );
 }
-const ssc = StyleSheet.create({
-  chip:     { backgroundColor: CARD, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, borderRadius: 100, paddingHorizontal: 12, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 5 },
+const createSsc = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
+  chip:     { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: 100, paddingHorizontal: 12, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 5 },
   emoji:    { fontSize: 14 },
-  chipText: { fontSize: 14, fontFamily: 'Inter_500Medium', color: MUTED },
+  chipText: { fontSize: 14, fontFamily: 'Inter_500Medium', color: theme.muted },
 });
 
 function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
   const { theme } = useAppTheme();
   return (
     <TouchableOpacity
-      style={[sc.chip, selected && { backgroundColor: theme.accentDim, borderColor: theme.accent, borderWidth: 1.5 }]}
+      style={[createSc(theme).chip, selected && { backgroundColor: theme.accentDim, borderColor: theme.accent, borderWidth: 1.5 }]}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
       activeOpacity={0.75}
     >
-      <Text style={[sc.chipText, selected && { color: theme.accentLight }]}>{label}</Text>
+      <Text style={[createSc(theme).chipText, selected && { color: theme.accentLight }]}>{label}</Text>
     </TouchableOpacity>
   );
 }
-const sc = StyleSheet.create({
-  chip:       { backgroundColor: CARD, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, borderRadius: 100, paddingHorizontal: 14, paddingVertical: 9 },
-  chipText:   { fontSize: 14, fontFamily: 'Inter_500Medium', color: MUTED },
+const createSc = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
+  chip:       { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: 100, paddingHorizontal: 14, paddingVertical: 9 },
+  chipText:   { fontSize: 14, fontFamily: 'Inter_500Medium', color: theme.muted },
 });
 
 function RadioRow({ label, sub, selected, onPress }: { label: string; sub: string; selected: boolean; onPress: () => void }) {
   const { theme } = useAppTheme();
+  const sr = createSr(theme);
   return (
     <TouchableOpacity
       style={[sr.row, selected && { borderColor: theme.accent, borderWidth: 1.5, backgroundColor: theme.secondaryDim }]}
@@ -416,23 +419,24 @@ function RadioRow({ label, sub, selected, onPress }: { label: string; sub: strin
     </TouchableOpacity>
   );
 }
-const sr = StyleSheet.create({
-  row:     { backgroundColor: CARD, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  label:   { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG, marginBottom: 2 },
-  labelOn: { color: FG },
-  sub:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 18 },
-  circle:  { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+const createSr = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
+  row:     { backgroundColor: theme.card, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  label:   { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: theme.text, marginBottom: 2 },
+  labelOn: { color: theme.text },
+  sub:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: theme.muted, lineHeight: 18 },
+  circle:  { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   dot:     { width: 9, height: 9, borderRadius: 5 },
 });
 
 function PrimaryButton({ label, onPress, disabled, loading }: { label: string; onPress: () => void; disabled?: boolean; loading?: boolean }) {
   const { theme } = useAppTheme();
+  const spb = createSpb(theme);
   const onAccentTextStyle = getOnAccentTextStyle(theme);
   return (
     <TouchableOpacity activeOpacity={0.88} onPress={onPress} disabled={disabled || loading}>
       {disabled ? (
         <View style={[spb.btn, spb.btnDisabled]}>
-          {loading ? <ActivityIndicator color={MUTED} size="small" /> : <Text style={[spb.text, spb.textDisabled]}>{label}</Text>}
+          {loading ? <ActivityIndicator color={theme.muted} size="small" /> : <Text style={[spb.text, spb.textDisabled]}>{label}</Text>}
         </View>
       ) : (
         <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={spb.btn}>
@@ -442,16 +446,17 @@ function PrimaryButton({ label, onPress, disabled, loading }: { label: string; o
     </TouchableOpacity>
   );
 }
-const spb = StyleSheet.create({
+const createSpb = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   btn:         { borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
   btnDisabled: { backgroundColor: 'rgba(255,255,255,0.06)' },
-  text:        { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
-  textDisabled:{ color: MUTED2 },
+  text:        { fontSize: 16, fontFamily: 'Inter_700Bold', color: theme.text },
+  textDisabled:{ color: theme.subtle },
 });
 
 // ─── Loading animation ────────────────────────────────────────────────────────
 function LoadingAnimation({ steps, onDone }: { steps: string[]; onDone: () => void }) {
   const { theme } = useAppTheme();
+  const sl = createSl(theme);
   const insets  = useSafeAreaInsets();
   const [done, setDone]   = useState<boolean[]>(steps.map(() => false));
   const [active, setActive] = useState(0);
@@ -504,7 +509,7 @@ function LoadingAnimation({ steps, onDone }: { steps: string[]; onDone: () => vo
             <View key={label} style={sl.stepRow}>
               <View style={[sl.stepIcon, isDone && sl.stepIconDone, isActive && { borderColor: theme.accent }]}>
                 {isDone ? (
-                  <Feather name="check" size={14} color={FG} />
+                  <Feather name="check" size={14} color={theme.text} />
                 ) : isActive ? (
                   <ActivityIndicator size="small" color={theme.accent} />
                 ) : (
@@ -532,8 +537,10 @@ function LoadingAnimation({ steps, onDone }: { steps: string[]; onDone: () => vo
     </View>
   );
 }
-const sl = StyleSheet.create({
-  root: { flex: 1, backgroundColor: SCREEN_BG, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
+const createSl = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const CARD = theme.card, BORDER = theme.border, FG = theme.text, MUTED = theme.muted, MUTED2 = theme.subtle, GREEN = theme.success;
+  return StyleSheet.create({
+  root: { flex: 1, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
   stepsList: { width: '100%', gap: 18, marginBottom: 48 },
   stepRow:   { flexDirection: 'row', alignItems: 'center', gap: 14 },
   stepIcon:  {
@@ -547,12 +554,14 @@ const sl = StyleSheet.create({
   stepLabelActive:{ color: FG, fontFamily: 'Inter_500Medium' },
   barTrack: { width: '100%', height: 3, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' },
   barFill:  { height: 3, borderRadius: 2, overflow: 'hidden' },
-});
+  });
+};
 
 
 // ─── Notifications step ────────────────────────────────────────────────────────
 function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: () => void; onSkip: () => void }) {
   const { theme } = useAppTheme();
+  const sn = createSn(theme);
   const insets  = useSafeAreaInsets();
   const opacity = useRef(new Animated.Value(0)).current;
   const slideY  = useRef(new Animated.Value(30)).current;
@@ -626,8 +635,10 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
     </View>
   );
 }
-const sn = StyleSheet.create({
-  root: { flex: 1, backgroundColor: SCREEN_BG, paddingHorizontal: 24 },
+const createSn = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const CARD = theme.card, BORDER = theme.border, FG = theme.text, MUTED = theme.muted, GREEN = theme.success;
+  return StyleSheet.create({
+  root: { flex: 1, backgroundColor: CARD, paddingHorizontal: 24 },
   body: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 32 },
   bellWrap: { marginBottom: 28 },
   bellBg:   { width: 72, height: 72, borderRadius: 20, alignItems: 'center', justifyContent: 'center', shadowOpacity: 0.5, shadowRadius: 20, shadowOffset: { width: 0, height: 0 }, elevation: 12 },
@@ -642,11 +653,13 @@ const sn = StyleSheet.create({
   enableBtnText: { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
   skipBtn: { paddingVertical: 13, alignItems: 'center' },
   skipText: { fontSize: 15, fontFamily: 'Inter_500Medium', color: MUTED },
-});
+  });
+};
 
 // ─── Success screen ────────────────────────────────────────────────────────────
 function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { flow: Flow; firstName: string; brandName: string; onFinish: () => void; finishing?: boolean }) {
   const { theme } = useAppTheme();
+  const ss = createSs(theme);
   const insets  = useSafeAreaInsets();
   const opacity = useRef(new Animated.Value(0)).current;
   const scale   = useRef(new Animated.Value(0.85)).current;
@@ -694,7 +707,7 @@ function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { fl
             : ['Design Studio & AI tools ready', 'Manufacturer network unlocked', 'Your store is ready to launch', 'Analytics dashboard activated']
           ).map((f) => (
             <View key={f} style={ss.featureRow}>
-              <Feather name="check-circle" size={16} color={GREEN} />
+              <Feather name="check-circle" size={16} color={theme.success} />
               <Text style={ss.featureText}>{f}</Text>
             </View>
           ))}
@@ -707,8 +720,10 @@ function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { fl
     </View>
   );
 }
-const ss = StyleSheet.create({
-  root:       { flex: 1, backgroundColor: SCREEN_BG, paddingHorizontal: 24 },
+const createSs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const CARD = theme.card, FG = theme.text, MUTED = theme.muted;
+  return StyleSheet.create({
+  root:       { flex: 1, backgroundColor: CARD, paddingHorizontal: 24 },
   body:       { flex: 1, justifyContent: 'center' },
   checkCircle:{ width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 24, shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 0 }, elevation: 12 },
   headline:   { fontSize: 34, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -1, lineHeight: 40, marginBottom: 10 },
@@ -718,7 +733,8 @@ const ss = StyleSheet.create({
   features:   { gap: 10 },
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   featureText:{ fontSize: 14, fontFamily: 'Inter_400Regular', color: FG },
-});
+  });
+};
 
 // ─── Buyer Auth Step — bold "Sign up" screen with stacked OAuth rows ──────────
 type BuyerAuthPhase = 'choose' | 'email-form' | 'verify' | 'existing-account';
@@ -740,6 +756,7 @@ function BuyerAuthStep({
   username, onUsernameChange, referralCode, onReferralCodeChange,
 }: BuyerAuthStepProps) {
   const { theme } = useAppTheme();
+  const sba = createSba(theme);
   const router = useRouter();
   const { isSignedIn, signOut } = useAuth();
   const { user } = useUser();
@@ -1162,6 +1179,7 @@ function SharedAuthStep({
   allowSignedInAccountCreation = false,
 }: SharedAuthStepProps) {
   const { theme } = useAppTheme();
+  const ssa = createSsa(theme);
   const router = useRouter();
   const { isSignedIn, signOut } = useAuth();
   const { user } = useUser();
@@ -1579,7 +1597,9 @@ function SharedAuthStep({
 }
 
 // Shared styles for buyer auth step
-const sba = StyleSheet.create({
+const createSba = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const CARD = theme.card, BORDER = theme.border, FG = theme.text, MUTED = theme.muted;
+  return StyleSheet.create({
   scroll:    { flexGrow: 1, paddingVertical: 8, gap: 0 },
   chooseScroll: { flexGrow: 1, paddingVertical: 24, gap: 0 },
   chooseHeadline: { fontSize: 36, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -1.2, marginBottom: 8 },
@@ -1639,10 +1659,13 @@ const sba = StyleSheet.create({
   sessionBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
   continueBtn:    { paddingVertical: 14, alignItems: 'center' },
   continueBtnText:{ fontSize: 14, fontFamily: 'Inter_500Medium', color: MUTED },
-});
+  });
+};
 
 // Shared styles for seller auth step
-const ssa = StyleSheet.create({
+const createSsa = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const CARD = theme.card, BORDER = theme.border, FG = theme.text, MUTED = theme.muted, MUTED2 = theme.subtle, INPUT_BG = theme.surface, INPUT_BD = theme.border, ERR = theme.error;
+  return StyleSheet.create({
   scroll:    { flexGrow: 1, paddingVertical: 8, gap: 0 },
   headline:  { fontSize: 28, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.5, marginBottom: 4 },
   sub:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 20 },
@@ -1661,7 +1684,7 @@ const ssa = StyleSheet.create({
   divLine:   { flex: 1, height: 1, backgroundColor: BORDER },
   divText:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED },
   oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, paddingVertical: 16, backgroundColor: CARD, marginBottom: 9 },
-  appleBtn:  { backgroundColor: SCREEN_BG, borderColor: BORDER },
+  appleBtn:  { backgroundColor: CARD, borderColor: BORDER },
   oauthText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
   legal:     { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED2, textAlign: 'center', lineHeight: 18, marginTop: 12 },
   existingEmailChip: {
@@ -1693,7 +1716,8 @@ const ssa = StyleSheet.create({
   sessionBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
   continueBtn:    { paddingVertical: 14, alignItems: 'center' },
   continueBtnText:{ fontSize: 14, fontFamily: 'Inter_500Medium', color: MUTED },
-});
+  });
+};
 
 // ─── Seller preview / theme selection step ────────────────────────────────────
 function SellerPreviewStep({
@@ -1710,6 +1734,7 @@ function SellerPreviewStep({
   generateSample: (style: string) => Promise<{ b64_json: string }>;
 }) {
   const { theme } = useAppTheme();
+  const spreview = createSpreview(theme);
   const [sampleStyle, setSampleStyle] = useState('Minimalist');
   const [sampleUri, setSampleUri] = useState<string | null>(null);
   const [sampleError, setSampleError] = useState('');
@@ -1820,7 +1845,9 @@ function SellerPreviewStep({
     </ScrollView>
   );
 }
-const spreview = StyleSheet.create({
+const createSpreview = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const CARD = theme.card, BORDER = theme.border, FG = theme.text, MUTED = theme.muted, MUTED2 = theme.subtle, ERR = theme.error, GREEN = theme.success;
+  return StyleSheet.create({
   scroll: { flexGrow: 1, paddingBottom: 24 },
   headline: { fontSize: 26, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.5, marginBottom: 6 },
   sub: { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 21, marginBottom: 18 },
@@ -1848,11 +1875,21 @@ const spreview = StyleSheet.create({
   continueDisabled: { backgroundColor: 'rgba(255,255,255,0.07)' },
   continueText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#06110B' },
   continueTextDisabled: { color: MUTED2 },
-});
+  });
+};
 
 // ─── Main onboarding component ────────────────────────────────────────────────
 export default function OnboardingScreen() {
   const { theme, selectTheme } = useAppTheme();
+  CARD = theme.card;
+  FG = theme.text;
+  MUTED = theme.muted;
+  MUTED2 = theme.subtle;
+  INPUT_BG = theme.surface;
+  INPUT_BD = theme.border;
+  ERR = theme.error;
+  GREEN = theme.success;
+  Object.assign(sm, createSm(theme));
   const { isSignedIn, signOut, isLoaded: authLoaded } = useAuth();
   const { user, isLoaded: userLoaded }                = useUser();
   const { signUp }              = useSignUp();
@@ -1913,7 +1950,7 @@ export default function OnboardingScreen() {
   const [brandStage, setBrandStage]       = useState('idea');
   const [goals, setGoals]                 = useState<string[]>(DEFAULT_SELLER_GOALS);
   const [selectedPlanId, setSelectedPlanId] = useState<SellerPlanId>('starter');
-  const [selectedThemeId, setSelectedThemeId] = useState<AppThemeId>('purple');
+  const [selectedThemeId, setSelectedThemeId] = useState<AppThemeId>('monochrome');
   const [planPrepDone, setPlanPrepDone] = useState(false);
 
   const [finishing, setFinishing]         = useState(false);
@@ -2001,7 +2038,7 @@ export default function OnboardingScreen() {
               setBrandStage(draft.brandStage ?? 'idea');
               setGoals(draft.goals ?? DEFAULT_SELLER_GOALS);
               setSelectedPlanId(draft.selectedPlanId ?? recommendSellerPlan(draft.brandStage ?? '', draft.goals ?? []).planId);
-              setSelectedThemeId(isAppThemeId(draft.selectedThemeId) ? draft.selectedThemeId : 'purple');
+              setSelectedThemeId(isAppThemeId(draft.selectedThemeId) ? draft.selectedThemeId : 'monochrome');
             }
           } catch { /* bad json, ignore */ }
         } else if (pendingFlow === 'buyer' || pendingFlow === 'seller') {
@@ -2691,7 +2728,7 @@ export default function OnboardingScreen() {
 
   if (!ready) {
     return (
-      <View style={{ flex: 1, backgroundColor: SCREEN_BG, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ flex: 1, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center' }}>
         <View pointerEvents="none" style={sm.backgroundDim} />
         <StatusBar barStyle="light-content" />
         <ActivityIndicator color={theme.accent} />
@@ -2700,7 +2737,7 @@ export default function OnboardingScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: SCREEN_BG }}>
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
       <StatusBar barStyle="light-content" />
 
       {/* Standard header for form steps */}
@@ -2780,7 +2817,9 @@ export default function OnboardingScreen() {
   );
 }
 
-const sm = StyleSheet.create({
+const createSm = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const CARD = theme.card, BORDER = theme.border, FG = theme.text, MUTED = theme.muted, MUTED2 = theme.subtle, INPUT_BG = theme.surface, INPUT_BD = theme.border;
+  return StyleSheet.create({
   deviceProbeControl: { position: 'absolute', right: 0, bottom: 0, width: 2, height: 2, opacity: 0.01 },
   deviceProbeMetric: { position: 'absolute', width: 1, height: 1, opacity: 0.01 },
   header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 8, gap: 10, zIndex: 3 },
@@ -2820,4 +2859,5 @@ const sm = StyleSheet.create({
   buildBtnInner: { borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
   buildBtnText: { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
   buildBtnTextDisabled: { color: MUTED2 },
-});
+  });
+};

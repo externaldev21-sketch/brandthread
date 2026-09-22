@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
-import { BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE, SUCCESS, RED, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SectionHeader, StatusBadge, EmptyState, FormInput } from '@/components/BrandthreadUI';
 
@@ -86,6 +86,12 @@ function methodIcon(method: string): keyof typeof Feather.glyphMap {
 export default function ProductImportScreen() {
   const { theme } = useAppTheme();
   const s = makeStyles(theme);
+  const {
+    background: BG, surface: SURFACE, card: CARD, border: BORDER,
+    text: FG, muted: MUTED, subtle: SUBTLE, success: SUCCESS, error: RED,
+    accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM,
+    secondary: CYAN, secondaryDim: CYAN_DIM, warning: GOLD,
+  } = theme;
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -376,7 +382,11 @@ export default function ProductImportScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { background: BG, surface: SURFACE, card: CARD, border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE,
+    accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM,
+    success: SUCCESS, error: RED } = theme;
+  return StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: 'transparent',
@@ -501,4 +511,5 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     fontFamily: FONT.regular,
     color: MUTED,
   },
-});
+  });
+};

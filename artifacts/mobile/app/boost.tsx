@@ -338,7 +338,7 @@ const tc = StyleSheet.create({
   },
   badgeText: {
     color: '#fff',
-    fontSize: 9,
+    fontSize: FS.xs,
     fontFamily: FONT.semibold,
   },
 });

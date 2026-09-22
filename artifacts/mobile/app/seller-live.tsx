@@ -11,7 +11,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
-import { BG, BORDER, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
@@ -43,6 +43,13 @@ export default function SellerLiveScreen() {
 function SellerLiveNativeScreen() {
   const { theme } = useAppTheme();
   const { accent: PURPLE } = theme;
+  const BG = theme.background;
+  const BORDER = theme.border;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const SUBTLE = theme.subtle;
+  const PURPLE_DIM = theme.accentDim;
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
   const params = useLocalSearchParams<{
     streamId: string; channelName: string; agoraUid: string;
     agoraAppId: string; token: string; title: string;
@@ -397,7 +404,15 @@ function SellerLiveNativeScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const BG = theme.background;
+  const BORDER = theme.border;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const PURPLE = theme.accent;
+  const PURPLE_DIM = theme.accentDim;
+  const RED = LIVE_RED;
+  return StyleSheet.create({
   root:             { flex: 1, backgroundColor: 'transparent' },
   overlay:          { backgroundColor: 'rgba(0,0,0,0.25)' },
   cameraPlaceholder:{ alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a', gap: 12 },
@@ -416,13 +431,13 @@ const s = StyleSheet.create({
   rightRail:        { position: 'absolute', right: 12, top: 0, zIndex: 10, gap: 16 },
   railBtn:          { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   railBadge:        { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  railBadgeText:    { color: '#fff', fontFamily: FONT.bold, fontSize: 10 },
+  railBadgeText:    { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs },
   productStrip:     { position: 'absolute', bottom: 160, left: 0, right: 0, zIndex: 8 },
   productStripContent: { paddingHorizontal: 12, gap: 8 },
   productChip:      { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 7 },
   productChipText:  { color: '#fff', fontFamily: FONT.semibold, fontSize: 12, maxWidth: 100 },
   productChipPrice: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: 11 },
-  featuredLabel: { color: '#fff', fontFamily: FONT.bold, fontSize: 8, letterSpacing: 0.8 },
+  featuredLabel: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 0.8 },
   bottomSection:    { position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10 },
   commentScroll:    { maxHeight: 200, marginHorizontal: 12 },
   commentContent:   { gap: 4, paddingBottom: 8 },
@@ -442,4 +457,5 @@ const s = StyleSheet.create({
   pickerRowPrice:   { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
   checkbox:         { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   emptyText:        { textAlign: 'center', padding: 24, fontFamily: FONT.regular, fontSize: FS.sm },
-});
+  });
+};

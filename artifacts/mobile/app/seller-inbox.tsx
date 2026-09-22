@@ -9,8 +9,8 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
-import { BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { subscribeConversationReadFailure } from '@/lib/conversationReadEvents';
@@ -45,7 +45,6 @@ function previewText(lastMessage?: string): string {
 
 export default function SellerInboxScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -195,7 +194,7 @@ export default function SellerInboxScreen() {
         activeOpacity={0.7}
         onPress={() => openConversation(item.id)}
       >
-        <View style={[s.avatar, { backgroundColor: other.color || PURPLE }]}>
+        <View style={[s.avatar, { backgroundColor: other.color || theme.accent }]}>
           <Text style={s.avatarInitials}>{other.initials || (other.name?.[0] ?? '?').toUpperCase()}</Text>
         </View>
         <View style={s.rowCenter}>
@@ -212,7 +211,7 @@ export default function SellerInboxScreen() {
           ) : null}
           <View style={s.rowBottom}>
             <Text
-              style={[s.preview, hasUnread && { color: FG, fontFamily: FONT.medium }]}
+              style={[s.preview, hasUnread && { color: theme.text, fontFamily: FONT.medium }]}
               numberOfLines={1}
             >
               {previewText(item.lastMessage)}
@@ -237,7 +236,7 @@ export default function SellerInboxScreen() {
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           style={s.headerBack}
         >
-          <Feather name="arrow-left" size={ICON.lg} color={FG} />
+          <Feather name="arrow-left" size={ICON.lg} color={theme.text} />
         </TouchableOpacity>
         <View style={s.headerCenter}>
           <Text style={s.headerTitle}>Messages</Text>
@@ -253,11 +252,11 @@ export default function SellerInboxScreen() {
 
       {isLoading ? (
         <View style={s.centerFill}>
-          <ActivityIndicator color={PURPLE} />
+          <ActivityIndicator color={theme.accent} />
         </View>
       ) : convs.length === 0 ? (
         <View style={s.centerFill}>
-          <Feather name="message-circle" size={40} color={SUBTLE} />
+          <Feather name="message-circle" size={40} color={theme.subtle} />
           <Text style={s.emptyTitle}>No messages yet</Text>
           <Text style={s.emptyBody}>
             When buyers message you about products or orders, their conversations will appear here.
@@ -269,7 +268,7 @@ export default function SellerInboxScreen() {
           keyExtractor={(c) => c.id}
           renderItem={renderItem}
           refreshControl={
-            <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={PURPLE} />
+            <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.accent} />
           }
           contentContainerStyle={{ paddingBottom: insets.bottom + SP.lg }}
           showsVerticalScrollIndicator={false}
@@ -279,32 +278,31 @@ export default function SellerInboxScreen() {
   );
 }
 
-const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+const createStyles = (theme: AppThemePreset) => {
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   header: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: SP.md, paddingBottom: SP.sm,
-    borderBottomWidth: 1, borderBottomColor: BORDER,
+    borderBottomWidth: 1, borderBottomColor: theme.border,
   },
   headerBack: { marginRight: SP.sm },
   headerCenter: { flex: 1, alignItems: 'center' },
   headerTitle: {
     textAlign: 'center',
-    fontSize: FS.md, fontFamily: FONT.semibold, color: FG,
+    fontSize: FS.md, fontFamily: FONT.semibold, color: theme.text,
   },
   headerSubtitle: {
-    fontSize: FS.xs, fontFamily: FONT.medium, color: PURPLE, marginTop: 1,
+    fontSize: FS.xs, fontFamily: FONT.medium, color: theme.accent, marginTop: 1,
   },
   centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
-  emptyTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, marginTop: SP.md },
+  emptyTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text, marginTop: SP.md },
   emptyBody: {
-    fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED,
+    fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted,
     textAlign: 'center', marginTop: SP.xs,
   },
-   retryButton: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: SP.md, paddingHorizontal: SP.md, paddingVertical: SP.sm, borderWidth: 1, borderColor: PURPLE, borderRadius: RADIUS.sm },
-   retryText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE },
+   retryButton: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: SP.md, paddingHorizontal: SP.md, paddingVertical: SP.sm, borderWidth: 1, borderColor: theme.accent, borderRadius: RADIUS.sm },
+   retryText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.accent },
 
   // Row — flat Instagram-style, no card chrome
   row: {
@@ -315,18 +313,18 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
     width: 48, height: 48, borderRadius: 24,
     alignItems: 'center', justifyContent: 'center', marginRight: SP.sm,
   },
-  avatarInitials: { fontSize: FS.sm, fontFamily: FONT.bold, color: ON_DARK },
+  avatarInitials: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.onAccent },
   rowCenter: { flex: 1 },
   rowTop: { flexDirection: 'row', alignItems: 'center' },
-  name: { flex: 1, fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  time: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginLeft: SP.sm },
-  context: { fontSize: FS.xs, fontFamily: FONT.medium, color: PURPLE, marginTop: 1 },
+  name: { flex: 1, fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
+  time: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginLeft: SP.sm },
+  context: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.accent, marginTop: 1 },
   rowBottom: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
-  preview: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  preview: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
   unreadBadge: {
     minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5,
-    backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center', marginLeft: SP.sm,
+    backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center', marginLeft: SP.sm,
   },
-  unreadText: { fontSize: 11, fontFamily: FONT.bold, color: ON_DARK },
+  unreadText: { fontSize: 11, fontFamily: FONT.bold, color: theme.onAccent },
   });
 };

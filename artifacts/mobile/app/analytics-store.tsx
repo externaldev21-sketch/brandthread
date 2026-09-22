@@ -210,8 +210,8 @@ const createStyles = (colors: ReturnType<typeof useColors>) => {
   kpiCard:  { width: 110, backgroundColor: CARD, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: BORDER, gap: 4 },
   kpiIconWrap:{ width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   kpiValue: { fontSize: 18, fontFamily: FONT.bold, color: FG },
-  kpiLabel: { fontSize: 10, fontFamily: FONT.regular, color: MUTED },
-  kpiChange:{ fontSize: 10, fontFamily: FONT.medium },
+  kpiLabel: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  kpiChange:{ fontSize: FS.xs, fontFamily: FONT.medium },
   funnelStep:{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
   funnelLeft:{ flex: 1, gap: 6 },
   funnelLabel:{ fontSize: 13, fontFamily: FONT.medium, color: FG },
@@ -226,6 +226,6 @@ const createStyles = (colors: ReturnType<typeof useColors>) => {
   secStat:  { fontSize: 11, fontFamily: FONT.regular, color: MUTED },
   dotSep:   { fontSize: 11, color: SUBTLE },
   secPurchases:{ fontSize: 15, fontFamily: FONT.bold, color: SUCCESS },
-  secPurchasesLabel:{ fontSize: 10, fontFamily: FONT.regular, color: MUTED },
+  secPurchasesLabel:{ fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   });
 };

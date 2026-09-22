@@ -153,7 +153,7 @@ function RevenueBarChart({
               <SvgText
                 x={yLabelW - 4} y={y + 4}
                 textAnchor="end"
-                fontSize={9}
+                fontSize={FS.xs}
                 fontFamily={FONT.regular}
                 fill={SUBTLE}
               >
@@ -192,7 +192,7 @@ function RevenueBarChart({
               x={barX(i) + barW / 2}
               y={chartHeight - 2}
               textAnchor="middle"
-              fontSize={9}
+              fontSize={FS.xs}
               fontFamily={FONT.regular}
               fill={SUBTLE}
             >
@@ -620,7 +620,7 @@ const styles = StyleSheet.create({
   // Date boxes
   dateRow:      { flexDirection: 'row', alignItems: 'center', marginBottom: 14, gap: 10 },
   dateBox:      { flex: 1, backgroundColor: CARD_GLASS, borderRadius: 10, borderWidth: 1, borderColor: BORDER, paddingVertical: 10, paddingHorizontal: 12 },
-  dateBoxLabel: { fontSize: 10, fontFamily: FONT.medium, color: SUBTLE, marginBottom: 2 },
+  dateBoxLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: SUBTLE, marginBottom: 2 },
   dateBoxValue: { fontSize: 14, fontFamily: FONT.semibold, color: FG },
   dateSep:      { color: MUTED, fontFamily: FONT.medium, fontSize: FS.md },
   rangeNotice:  { color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: -4, marginBottom: 14 },
@@ -630,9 +630,9 @@ const styles = StyleSheet.create({
   statCard:     { flex: 1, paddingVertical: 12, paddingHorizontal: 8, alignItems: 'center' },
   statCardFeatured: { backgroundColor: CARD_GLASS, borderRadius: 12, borderWidth: 1, borderColor: BORDER },
   statLabelRow: { minHeight: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 },
-  statLabel:    { fontSize: 10, fontFamily: FONT.medium, color: MUTED },
+  statLabel:    { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   trendRow:     { flexDirection: 'row', alignItems: 'center', gap: 1 },
-  trendText:    { fontSize: 9, fontFamily: FONT.semibold },
+  trendText:    { fontSize: FS.xs, fontFamily: FONT.semibold },
   statValue:    { fontSize: 18, fontFamily: FONT.bold, color: FG },
 
   // Card

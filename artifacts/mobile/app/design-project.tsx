@@ -676,7 +676,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   badgeText: {
     fontFamily: FONT.medium,
-    fontSize: 10,
+    fontSize: FS.xs,
   },
   nextRow: {
     paddingHorizontal: SP.lg,

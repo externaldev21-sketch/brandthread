@@ -905,7 +905,7 @@ export default function StoreGenerateScreen() {
             activeOpacity={continueEnabled ? 0.8 : 1}
           >
             <LinearGradient
-              colors={continueEnabled ? [...theme.primaryGradient] : ['#3A3A4E', '#3A3A4E']}
+              colors={continueEnabled ? [...theme.primaryGradient] : [CARD_ELEVATED, CARD_ELEVATED]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={st.navContinueGrad}
@@ -1065,7 +1065,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   colorSwatch: { width: 40, height: 40, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER },
   colorTileLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED },
-  colorTileHex: { fontSize: 9, fontFamily: FONT.regular, color: SUBTLE },
+  colorTileHex: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
   // Contrast
   contrastRow: {
     flexDirection: 'row',

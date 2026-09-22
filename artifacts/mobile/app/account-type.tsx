@@ -5,9 +5,9 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { FS } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 
-const BG     = '#0A0A0B';
 const getCards = (theme: AppThemePreset): {
   type: AccountType;
   icon: 'shopping-bag' | 'star';
@@ -145,8 +145,8 @@ export function AccountTypeStep({
                 <View style={styles.bullets}>
                   {c.bullets.map((b) => (
                     <View key={b} style={styles.bulletRow}>
-                      <View style={[styles.bulletIcon, { borderColor: isSelected ? `${c.accent}B0` : 'rgba(255,255,255,0.2)' }]}>
-                        <Feather name="check" size={10} color={isSelected ? c.accent : 'rgba(255,255,255,0.42)'} />
+                   <View style={[styles.bulletIcon, { borderColor: isSelected ? `${c.accent}B0` : theme.border }]}>
+                         <Feather name="check" size={10} color={isSelected ? c.accent : theme.muted} />
                       </View>
                       <Text style={styles.bulletText}>{b}</Text>
                     </View>
@@ -160,7 +160,7 @@ export function AccountTypeStep({
 
       {/* Footer CTA */}
       <LinearGradient
-        colors={['rgba(7,7,15,0)', 'rgba(7,7,15,1)']}
+        colors={[`${theme.background}00`, theme.background]}
         style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}
       >
         <TouchableOpacity
@@ -183,7 +183,7 @@ export function AccountTypeStep({
             </LinearGradient>
           ) : (
             <View style={[styles.continueBtn, styles.continueBtnDisabled]}>
-              <Text style={[styles.continueBtnText, { color: 'rgba(255,255,255,0.3)' }]}>
+               <Text style={[styles.continueBtnText, { color: theme.muted }]}>
                 Continue
               </Text>
             </View>
@@ -204,29 +204,29 @@ export default function AccountTypeScreen() {
 }
 
 const createStyles = (theme: AppThemePreset) => StyleSheet.create({
-  root:  { flex: 1, backgroundColor: 'transparent' },
+   root:  { flex: 1, backgroundColor: theme.background },
   header: { paddingHorizontal: 20, paddingBottom: 12 },
   headerText: { gap: 6 },
   headline: {
     fontSize: 32,
     fontFamily: 'Inter_700Bold',
-    color: '#FFFFFF',
+     color: theme.text,
     letterSpacing: -0.8,
     lineHeight: 38,
   },
   subtext: {
     fontSize: 14,
     fontFamily: 'Inter_400Regular',
-    color: 'rgba(255,255,255,0.5)',
+     color: theme.muted,
     lineHeight: 21,
   },
 
   cards: { paddingHorizontal: 20, paddingTop: 6, gap: 12 },
   card: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
+     backgroundColor: theme.card,
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.09)',
+     borderColor: theme.border,
     padding: 18,
     overflow: 'hidden',
   },
@@ -253,9 +253,9 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   cardTitleWrap: { flex: 1, paddingTop: 1 },
-  cardKicker: { fontSize: 10, fontFamily: 'Inter_700Bold', letterSpacing: 1.8, marginBottom: 3 },
-  cardTitle: { fontSize: 19, fontFamily: 'Inter_700Bold', color: '#FFFFFF', marginBottom: 4, letterSpacing: -0.3 },
-  cardDesc:  { fontSize: 13, fontFamily: 'Inter_400Regular', color: 'rgba(255,255,255,0.55)', lineHeight: 18 },
+  cardKicker: { fontSize: FS.xs, fontFamily: 'Inter_700Bold', letterSpacing: 1.8, marginBottom: 3 },
+   cardTitle: { fontSize: 19, fontFamily: 'Inter_700Bold', color: theme.text, marginBottom: 4, letterSpacing: -0.3 },
+   cardDesc:  { fontSize: 13, fontFamily: 'Inter_400Regular', color: theme.muted, lineHeight: 18 },
 
   bullets:   { gap: 9, paddingTop: 2 },
   bulletRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
@@ -263,7 +263,7 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     width: 18, height: 18, borderRadius: 9, borderWidth: 1,
     alignItems: 'center', justifyContent: 'center',
   },
-  bulletText:{ flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium', color: 'rgba(255,255,255,0.68)' },
+   bulletText:{ flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium', color: theme.subtle },
 
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
@@ -275,11 +275,11 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center',
   },
   continueBtnDisabled: {
-    backgroundColor: 'rgba(255,255,255,0.07)',
+     backgroundColor: theme.surface,
   },
   continueBtnText: {
     fontSize: 16,
     fontFamily: 'Inter_700Bold',
-    color: '#FFFFFF',
+     color: theme.onAccent,
   },
 });

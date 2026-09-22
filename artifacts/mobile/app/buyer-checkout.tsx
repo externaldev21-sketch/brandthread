@@ -23,6 +23,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '@/hooks/useColors';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import {
   applyDiscount, clearCart, clearCheckoutSession, createCheckoutSession,
@@ -38,6 +39,25 @@ import {
   MUTED, ON_DARK, RADIUS, RED, RED_DIM,
   SP, SUCCESS, SUCCESS_DIM, SUBTLE, COMP, ICON, ORANGE, ORANGE_DIM,
 } from '@/lib/theme';
+
+type ThemeAliases = {
+  theme: AppThemePreset;
+  BG: string; BORDER: string; CARD: string; CARD_ELEVATED: string;
+  FG: string; MUTED: string; SUBTLE: string;
+  RED: string; RED_DIM: string; SUCCESS: string; SUCCESS_DIM: string;
+  ORANGE: string; ORANGE_DIM: string;
+};
+
+function useThemeAliases(): ThemeAliases {
+  const { theme } = useAppTheme();
+  return {
+    theme,
+    BG: theme.background, BORDER: theme.border, CARD: theme.card, CARD_ELEVATED: theme.cardElevated,
+    FG: theme.text, MUTED: theme.muted, SUBTLE: theme.subtle,
+    RED: theme.error, RED_DIM: `${theme.error}26`, SUCCESS: theme.success, SUCCESS_DIM: `${theme.success}26`,
+    ORANGE: theme.warning, ORANGE_DIM: `${theme.warning}26`,
+  };
+}
 import { formatCents } from '@/lib/money';
 import {
   getCheckoutBlockingSection,
@@ -66,7 +86,7 @@ export interface VerifiedOrder {
 // ─── Shared primitives ────────────────────────────────────────────────────────
 
 function Card({ children, style }: { children: React.ReactNode; style?: any }) {
-  const { theme } = useAppTheme();
+  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
   const s = makeStyles(theme);
   return <View style={[s.card, style]}>{children}</View>;
 }
@@ -79,7 +99,7 @@ function Input({
   keyboardType?: any; autoCapitalize?: any; placeholder?: string;
   multiline?: boolean; numberOfLines?: number;
 }) {
-  const { theme } = useAppTheme();
+  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
   const s = makeStyles(theme);
   return (
     <View style={s.field}>
@@ -103,7 +123,7 @@ function Input({
 // ─── Progress bar ─────────────────────────────────────────────────────────────
 
 function Progress({ step }: { step: CheckoutStep }) {
-  const { theme } = useAppTheme();
+  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
   const s = makeStyles(theme);
   const index = Math.max(0, STEPS.indexOf(step));
   return (
@@ -125,7 +145,7 @@ function GuidedSection({
   title: string; summary: string; expanded: boolean; complete: boolean;
   onPress: () => void; children: React.ReactNode;
 }) {
-  const { theme } = useAppTheme();
+  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
   const s = makeStyles(theme);
   return (
     <View style={s.guidedSection}>
@@ -157,7 +177,7 @@ function ReceiptSheet({
 }: {
   session: CheckoutSession; visible: boolean; onClose: () => void;
 }) {
-  const { theme } = useAppTheme();
+  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
   const s = makeStyles(theme);
   const insets = useSafeAreaInsets();
   if (!visible) return null;
@@ -239,7 +259,7 @@ function CheckoutSummaryView({
   onTapShipping: () => void;
   onTapAddress: () => void;
 }) {
-  const { theme } = useAppTheme();
+  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
   const s = makeStyles(theme);
   const addr = session.shippingAddress;
   const addressLine = addr
@@ -352,7 +372,7 @@ function AddressEditor({
   onSelectAddress: (addr: any) => void;
   onDone: () => void;
 }) {
-  const { theme } = useAppTheme();
+  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
   const s = makeStyles(theme);
   const { isSignedIn } = useAuth();
   const insets = useSafeAreaInsets();
@@ -608,7 +628,7 @@ function Information({
   savedAddresses: any[];
   onSelectAddress: (addr: any) => void;
 }) {
-  const { theme } = useAppTheme();
+  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
   const s = makeStyles(theme);
   const { isSignedIn } = useAuth();
   const PURPLE = theme.accent;
@@ -622,7 +642,7 @@ function Information({
         <Card>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <Feather name="info" size={16} color={PURPLE} />
-            <Text style={[s.sectionTitle, { marginBottom: 0 }]}>Guest Checkout</Text>
+        <Text style={[s.sectionTitle, { marginBottom: 0 }]}>Guest checkout</Text>
           </View>
           <Text style={s.muted}>Your email is used for receipts. Your address is used for this order only.</Text>
         </Card>
@@ -735,7 +755,7 @@ function Delivery({
   onApply: (code: string) => Promise<void>;
   onRemove: (code: string) => void;
 }) {
-  const { theme } = useAppTheme();
+  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
   const s = makeStyles(theme);
   const PURPLE = theme.accent;
   const PURPLE_LIGHT = theme.accentLight;
@@ -842,7 +862,7 @@ function Review({
   session: CheckoutSession;
   onAck: (key: string, checked: boolean) => void;
 }) {
-  const { theme } = useAppTheme();
+  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
   const s = makeStyles(theme);
   const { isSignedIn } = useAuth();
   const PURPLE = theme.accent;
@@ -970,7 +990,7 @@ function Confirmation({
   onRefresh: () => void;
   refreshing: boolean;
 }) {
-  const { theme } = useAppTheme();
+  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
   const s = makeStyles(theme);
   const { isSignedIn } = useAuth();
   const router = useRouter();
@@ -1080,7 +1100,7 @@ function Confirmation({
           <View style={[s.deliveryIcon, { backgroundColor: theme.accentDim }]}>
             <Feather name="truck" size={22} color={theme.accentLight} />
           </View>
-          <Text style={s.deliveryLabel}>ESTIMATED DELIVERY</Text>
+        <Text style={s.deliveryLabel}>Estimated delivery</Text>
           <Text style={s.deliveryDate}>{primaryEstimate}</Text>
           {estimateLabels.length > 1 && (
             <Text style={s.deliverySub}>Your items will arrive in {estimateLabels.length} shipments</Text>
@@ -1204,7 +1224,7 @@ function Confirmation({
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function BuyerCheckoutScreen() {
-  const { theme } = useAppTheme();
+  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
   const s = makeStyles(theme);
   const PURPLE = theme.accent;
   const PURPLE_LIGHT = theme.accentLight;
@@ -1832,6 +1852,19 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE_LIGHT = theme.accentLight;
   const PURPLE_DIM = theme.accentDim;
   const CYAN = theme.secondary;
+  const BG = theme.background;
+  const BORDER = theme.border;
+  const CARD = theme.card;
+  const CARD_ELEVATED = theme.cardElevated;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const SUBTLE = theme.subtle;
+  const RED = theme.error;
+  const RED_DIM = `${theme.error}26`;
+  const SUCCESS = theme.success;
+  const SUCCESS_DIM = `${theme.success}26`;
+  const ORANGE = theme.warning;
+  const ORANGE_DIM = `${theme.warning}26`;
   const SHADOW_PURPLE = {
     shadowColor: theme.shadowColor,
     shadowOpacity: 0.28,
@@ -1977,24 +2010,24 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     confetti: { position: 'absolute', top: 0, width: 8, height: 14, borderRadius: 2 },
     successHalo: { width: 112, height: 112, borderRadius: 56, backgroundColor: SUCCESS_DIM, alignItems: 'center', justifyContent: 'center', marginBottom: SP.md },
     confirmIcon: { width: 78, height: 78, borderRadius: 39, alignItems: 'center', justifyContent: 'center', backgroundColor: SUCCESS },
-    confirmEyebrow: { color: SUCCESS, fontFamily: FONT.bold, fontSize: 10, letterSpacing: 1.8, marginBottom: 7 },
+    confirmEyebrow: { color: SUCCESS, fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1.8, marginBottom: 7 },
     headline: { color: FG, fontFamily: FONT.extrabold ?? FONT.bold, fontSize: FS.h1, letterSpacing: -1.2, marginBottom: SP.sm },
     confirmText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 22, textAlign: 'center', maxWidth: 330 },
     deliveryHero: { width: '100%', alignItems: 'center', backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.xl, padding: SP.lg, marginTop: SP.xl },
     deliveryIcon: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm },
-    deliveryLabel: { color: SUBTLE, fontFamily: FONT.bold, fontSize: 9, letterSpacing: 1.5, marginBottom: 5 },
+    deliveryLabel: { color: SUBTLE, fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1.5, marginBottom: 5 },
     deliveryDate: { color: FG, fontFamily: FONT.extrabold ?? FONT.bold, fontSize: FS.xl, textAlign: 'center', letterSpacing: -0.35 },
     deliverySub: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 6, textAlign: 'center' },
     confirmItems: { width: '100%', marginTop: SP.xl },
-    confirmItemsLabel: { color: SUBTLE, fontFamily: FONT.bold, fontSize: 9, letterSpacing: 1.35, marginBottom: SP.sm },
+    confirmItemsLabel: { color: SUBTLE, fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1.35, marginBottom: SP.sm },
     confirmItemsRow: { gap: 10, paddingRight: SP.md },
     confirmProduct: { width: 112 },
     confirmProductImage: { width: 112, height: 126, borderRadius: RADIUS.md, backgroundColor: CARD },
     confirmProductFallback: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER },
     confirmQty: { position: 'absolute', top: 7, right: 7, minWidth: 23, height: 23, paddingHorizontal: 5, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.72)', alignItems: 'center', justifyContent: 'center' },
-    confirmQtyText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 10 },
+    confirmQtyText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs },
     confirmProductName: { color: FG, fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 16, marginTop: 7 },
-    confirmProductVariant: { color: MUTED, fontFamily: FONT.regular, fontSize: 10, marginTop: 2 },
+    confirmProductVariant: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
     orderNumbers: { width: '100%', marginTop: SP.lg, backgroundColor: CARD, borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: SP.sm },
     orderNumber: { color: FG, fontFamily: FONT.bold, fontSize: FS.sm, textAlign: 'center', paddingVertical: 3 },
     refreshButton: { borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: SP.lg, paddingVertical: SP.sm, marginTop: SP.lg },
@@ -2019,8 +2052,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     useSavedBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: SP.sm },
     useSavedText: { fontFamily: FONT.semibold, fontSize: FS.sm },
     defaultBadge: { backgroundColor: SUCCESS_DIM, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-    defaultBadgeText: { color: SUCCESS, fontFamily: FONT.bold, fontSize: 10, textTransform: 'uppercase' },
+    defaultBadgeText: { color: SUCCESS, fontFamily: FONT.bold, fontSize: FS.xs, textTransform: 'uppercase' },
     selectedBadge: { backgroundColor: PURPLE_DIM, borderWidth: 1, borderColor: PURPLE, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-    selectedBadgeText: { color: PURPLE_LIGHT, fontFamily: FONT.bold, fontSize: 10, textTransform: 'uppercase' },
+    selectedBadgeText: { color: PURPLE_LIGHT, fontFamily: FONT.bold, fontSize: FS.xs, textTransform: 'uppercase' },
   });
 };

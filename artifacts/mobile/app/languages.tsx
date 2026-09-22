@@ -166,7 +166,7 @@ const s = StyleSheet.create({
   langNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
   langName: { fontSize: 14, fontFamily: FONT.semibold },
   defaultBadge: { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
-  defaultBadgeText: { fontSize: 10, fontFamily: FONT.semibold },
+  defaultBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   langNative: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 2 },
   langMarket: { fontSize: 11, fontFamily: FONT.regular },
   footerNote: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 18 },

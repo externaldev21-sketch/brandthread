@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleProp, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View, ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { PressableScale, PrimaryButton, SecondaryButton } from '@/components/BrandthreadUI';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BORDER_SUBTLE,
   FG,
@@ -24,23 +25,27 @@ export function SellerDashboardSectionHeader({
   action?: string;
   onAction?: () => void;
 }) {
+  const { theme } = useAppTheme();
+  const palette = theme as typeof theme & Record<string, string>;
   return (
     <View style={styles.sectionHeaderRow} testID={`seller-dashboard-section-${title.toLowerCase().replace(/\s+/g, '-')}`}>
-      <Text style={styles.sectionHeaderTitle} maxFontSizeMultiplier={2}>{title}</Text>
+      <Text style={[styles.sectionHeaderTitle, { color: palette.muted ?? MUTED }]} maxFontSizeMultiplier={2}>{title}</Text>
       {action && onAction ? (
         <TouchableOpacity onPress={onAction} style={styles.sectionHeaderActionButton}>
-          <Text style={styles.sectionHeaderAction} maxFontSizeMultiplier={2}>{action}</Text>
-        </TouchableOpacity>
-      ) : action ? <Text style={styles.sectionHeaderAction} maxFontSizeMultiplier={2}>{action}</Text> : null}
+           <Text style={[styles.sectionHeaderAction, { color: palette.subtle ?? SUBTLE }]} maxFontSizeMultiplier={2}>{action}</Text>
+       </TouchableOpacity>
+       ) : action ? <Text style={[styles.sectionHeaderAction, { color: palette.subtle ?? SUBTLE }]} maxFontSizeMultiplier={2}>{action}</Text> : null}
     </View>
   );
 }
 
 export function SellerDashboardTrendHeader() {
+  const { theme } = useAppTheme();
+  const palette = theme as typeof theme & Record<string, string>;
   return (
     <View style={styles.trendHeader} testID="seller-dashboard-trend-header">
-      <Text style={styles.trendTitle} maxFontSizeMultiplier={2}>Revenue Trend</Text>
-      <Text style={styles.trendPeriod} maxFontSizeMultiplier={2}>Last 7 days</Text>
+       <Text style={[styles.trendTitle, { color: palette.muted ?? MUTED }]} maxFontSizeMultiplier={2}>Revenue Trend</Text>
+       <Text style={[styles.trendPeriod, { color: palette.muted ?? MUTED }]} maxFontSizeMultiplier={2}>Last 7 days</Text>
     </View>
   );
 }
@@ -79,7 +84,9 @@ export function SellerDashboardListGroup({
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
-  return <View style={[styles.listGroup, style]}>{children}</View>;
+  const { theme } = useAppTheme();
+  const palette = theme as typeof theme & Record<string, string>;
+  return <View style={[styles.listGroup, { backgroundColor: palette.card ?? palette.surface, borderColor: palette.borderSubtle ?? BORDER_SUBTLE }, style]}>{children}</View>;
 }
 
 export function SellerDashboardListItem({
@@ -103,29 +110,31 @@ export function SellerDashboardListItem({
   rightElement?: React.ReactNode;
   badge?: number;
 }) {
+  const { theme } = useAppTheme();
+  const palette = theme as typeof theme & Record<string, string>;
   const content = (
-    <View style={styles.listItem} testID={`seller-dashboard-row-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+    <View style={[styles.listItem, { backgroundColor: palette.card ?? palette.surface }]} testID={`seller-dashboard-row-${title.toLowerCase().replace(/\s+/g, '-')}`}>
       <View style={[styles.listIconWrap, { backgroundColor: `${iconColor}1A` }]}>
         <Feather name={icon as React.ComponentProps<typeof Feather>['name']} size={16} color={iconColor} />
       </View>
       <View style={styles.listBody}>
         <View style={styles.listTitleRow}>
-          <Text style={[styles.listTitle, subtitle && styles.listTitleWithSubtitle]} numberOfLines={2} maxFontSizeMultiplier={2}>
+           <Text style={[styles.listTitle, { color: palette.foreground }, subtitle && styles.listTitleWithSubtitle]} numberOfLines={2} maxFontSizeMultiplier={2}>
             {title}
           </Text>
           {badge !== undefined && badge > 0 ? (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText} maxFontSizeMultiplier={2}>{badge > 9 ? '9+' : badge}</Text>
+             <View style={[styles.badge, { backgroundColor: palette.statusError ?? RED }]}>
+               <Text style={[styles.badgeText, { color: palette.onStatus ?? '#FFF' }]} maxFontSizeMultiplier={2}>{badge > 9 ? '9+' : badge}</Text>
             </View>
           ) : null}
         </View>
         {subtitle ? (
-          <Text style={styles.listSubtitle} numberOfLines={2} maxFontSizeMultiplier={2}>{subtitle}</Text>
+           <Text style={[styles.listSubtitle, { color: palette.muted }]} numberOfLines={2} maxFontSizeMultiplier={2}>{subtitle}</Text>
         ) : null}
       </View>
       <View style={styles.listRight}>
         {value ? (
-          <Text style={styles.listValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} maxFontSizeMultiplier={2}>
+             <Text style={[styles.listValue, { color: palette.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} maxFontSizeMultiplier={2}>
             {value}
           </Text>
         ) : null}
@@ -270,7 +279,7 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
   },
   badgeText: {
-    fontSize: 10,
+    fontSize: FS.xs,
     lineHeight: 14,
     fontFamily: FONT.bold,
     color: '#FFF',

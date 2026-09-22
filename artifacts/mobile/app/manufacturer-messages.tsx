@@ -180,7 +180,7 @@ const bubS = StyleSheet.create({
     textAlign: 'center',
   },
   timestamp: {
-    fontSize: 10,
+    fontSize: FS.xs,
     fontFamily: FONT.regular,
     color: SUBTLE,
     marginTop: 3,

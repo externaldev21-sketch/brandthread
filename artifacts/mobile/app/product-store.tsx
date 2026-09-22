@@ -13,7 +13,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
-import { BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, ON_DARK, FONT, FS, SP, RADIUS, COMP, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, StatusBadge, FilterChip, SectionHeader } from '@/components/BrandthreadUI';
 import { getProduct } from '@/services/productService';
@@ -37,51 +37,60 @@ const CATEGORY_GRADS: Record<string, readonly [string, string]> = {
 
 // ─── Helper Components ────────────────────────────────────────────────────────
 
-function StarRow({ rating, count }: { rating: number; count?: number }) {
+function StarRow({ rating, count, styles, theme }: { rating: number; count?: number; styles: ReturnType<typeof makeStyles>; theme: ReturnType<typeof useAppTheme>['theme'] }) {
   return (
-    <View style={s.starRow}>
+    <View style={styles.starRow}>
       {[1, 2, 3, 4, 5].map(i => (
         <Feather
           key={i}
           name="star"
           size={ICON.xs}
-          color={i <= Math.round(rating) ? '#F59E0B' : SUBTLE}
+          color={i <= Math.round(rating) ? theme.warning : theme.subtle}
         />
       ))}
       {count !== undefined && (
-        <Text style={s.starCount}>{rating.toFixed(1)} ({count} reviews)</Text>
+        <Text style={styles.starCount}>{rating.toFixed(1)} ({count} reviews)</Text>
       )}
     </View>
   );
 }
 
-function AccordionSection({ title, children }: { title: string; children: React.ReactNode }) {
+function AccordionSection({ title, children, styles, theme }: { title: string; children: React.ReactNode; styles: ReturnType<typeof makeStyles>; theme: ReturnType<typeof useAppTheme>['theme'] }) {
   const [open, setOpen] = useState(false);
   return (
-    <View style={s.accordionWrap}>
+    <View style={styles.accordionWrap}>
       <TouchableOpacity
-        style={s.accordionHeader}
+        style={styles.accordionHeader}
         onPress={() => { Haptics.selectionAsync(); setOpen(v => !v); }}
         activeOpacity={0.7}
       >
-        <Text style={s.accordionTitle}>{title}</Text>
-        <Feather name={open ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={MUTED} />
+        <Text style={styles.accordionTitle}>{title}</Text>
+        <Feather name={open ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={theme.muted} />
       </TouchableOpacity>
-      {open && <View style={s.accordionBody}>{children}</View>}
-      <View style={s.accordionDivider} />
+      {open && <View style={styles.accordionBody}>{children}</View>}
+      <View style={styles.accordionDivider} />
     </View>
   );
 }
 
-function AccordionText({ text }: { text: string }) {
-  return <Text style={s.accordionText}>{text}</Text>;
+function AccordionText({ text, styles }: { text: string; styles: ReturnType<typeof makeStyles> }) {
+  return <Text style={styles.accordionText}>{text}</Text>;
 }
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function ProductStoreScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const {
+    background: BG, surface: SURFACE, card: CARD, border: BORDER,
+    text: FG, muted: MUTED, subtle: SUBTLE, success: SUCCESS,
+    accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM,
+    secondary: CYAN, secondaryDim: CYAN_DIM, warning: ORANGE, error: RED,
+    onAccent: ON_DARK,
+  } = theme;
+  const SUCCESS_DIM = `${SUCCESS}26`;
+  const BLUE = theme.accentLight;
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
   const router = useRouter();
   const { id, variantId } = useLocalSearchParams<{ id: string; variantId?: string }>();
   const insets = useSafeAreaInsets();
@@ -390,7 +399,7 @@ export default function ProductStoreScreen() {
           </View>
 
           {/* Stars */}
-          <StarRow rating={4.8} count={23} />
+          <StarRow rating={4.8} count={23} styles={s} theme={theme} />
         </View>
 
         {/* 5. Variant selector */}
@@ -491,25 +500,25 @@ export default function ProductStoreScreen() {
 
         {/* 8. Details accordions */}
         <View style={s.accordionsWrap}>
-          <AccordionSection title="Description">
+          <AccordionSection title="Description" styles={s} theme={theme}>
             {product.description.split('\n').map((line, i) => (
               <Text key={i} style={s.accordionText}>{line || ' '}</Text>
             ))}
           </AccordionSection>
 
-          <AccordionSection title="Materials & Care">
-            <AccordionText text="Refer to the product description for fabric and care instructions." />
+          <AccordionSection title="Materials & Care" styles={s} theme={theme}>
+            <AccordionText text="Refer to the product description for fabric and care instructions." styles={s} />
           </AccordionSection>
 
-          <AccordionSection title="Shipping">
-          <AccordionText text="Estimated 3–7 business days. Free shipping on orders over $120." />
+          <AccordionSection title="Shipping" styles={s} theme={theme}>
+          <AccordionText text="Estimated 3–7 business days. Free shipping on orders over $120." styles={s} />
           </AccordionSection>
 
-          <AccordionSection title="Returns">
-          <AccordionText text="30-day returns on unworn, unwashed items with original tags attached." />
+          <AccordionSection title="Returns" styles={s} theme={theme}>
+          <AccordionText text="30-day returns on unworn, unwashed items with original tags attached." styles={s} />
           </AccordionSection>
 
-          <AccordionSection title="Reviews">
+          <AccordionSection title="Reviews" styles={s} theme={theme}>
           <Text style={s.accordionText}>No reviews yet — be the first to rate this piece.</Text>
           </AccordionSection>
         </View>
@@ -589,7 +598,16 @@ export default function ProductStoreScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const {
+    background: BG, surface: SURFACE, card: CARD, border: BORDER,
+    text: FG, muted: MUTED, subtle: SUBTLE, success: SUCCESS,
+    accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM,
+    secondary: CYAN, secondaryDim: CYAN_DIM, error: RED, onAccent: ON_DARK,
+  } = theme;
+  const SUCCESS_DIM = `${SUCCESS}26`;
+  const BLUE = theme.accentLight;
+  return StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: 'transparent',
@@ -1041,4 +1059,5 @@ const s = StyleSheet.create({
     fontFamily: FONT.bold,
     letterSpacing: 0.2,
   },
-});
+  });
+};

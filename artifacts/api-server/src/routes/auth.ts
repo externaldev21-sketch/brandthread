@@ -45,6 +45,8 @@ const profileBodySchema = z.object({
   name: optionalProfileText,
   username: usernameSchema.optional(),
   accountType: z.enum(["buyer", "seller"]).optional(),
+  appThemeId: z.enum(["monochrome", "purple", "olive", "navy", "champagne", "black", "silver", "black-gold", "emerald-gold", "leopard-red", "maroon", "gold"]).optional(),
+  appIconId: z.enum(["monochrome", "purple", "olive", "navy", "champagne", "black", "silver", "black-gold", "emerald-gold", "leopard-red", "maroon", "gold"]).nullable().optional(),
   expectedClerkId: z.string().min(1).optional(),
 }).passthrough();
 const privacyBodySchema = z.object({
@@ -579,7 +581,7 @@ router.patch(
 // Update editable profile fields. Validates and enforces uniqueness on username.
 router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema }), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
-  const { displayName, brandName, bio, website, name, username, accountType, expectedClerkId } = req.body as {
+  const { displayName, brandName, bio, website, name, username, accountType, appThemeId, appIconId, expectedClerkId } = req.body as {
     displayName?: string;
     brandName?:   string;
     bio?:         string;
@@ -587,6 +589,8 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
     name?:        string;
     username?:    string;
     accountType?: "buyer" | "seller";
+    appThemeId?: string;
+    appIconId?: string | null;
     expectedClerkId?: string;
   };
   if (expectedClerkId && expectedClerkId !== clerkId) {
@@ -618,6 +622,8 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
     }
     updates.accountType = accountType;
   }
+  if (appThemeId !== undefined) updates.appThemeId = appThemeId;
+  if (appIconId !== undefined) updates.appIconId = appIconId;
 
   // Username: format + uniqueness check
   if (username !== undefined) {

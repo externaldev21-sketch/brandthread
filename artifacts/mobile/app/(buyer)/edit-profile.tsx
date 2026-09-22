@@ -476,7 +476,7 @@ const styles = StyleSheet.create({
   rowInput: { flex: 1, fontSize: 15, fontFamily: FONT.regular, color: FG, padding: 0, textAlign: 'right' },
   chevronLabel: { fontSize: 13.5, fontFamily: FONT.regular, color: MUTED },
   newPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
-  newPillText: { fontSize: 10.5, fontFamily: FONT.bold, color: '#FFFFFF' },
+  newPillText: { fontSize: FS.xs, fontFamily: FONT.bold, color: '#FFFFFF' },
   avatarSection: { alignItems: 'center', paddingVertical: 20, gap: 10 },
   avatar: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 28, color: '#FFF', fontFamily: FONT.bold },

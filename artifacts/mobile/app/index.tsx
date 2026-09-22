@@ -7,13 +7,14 @@
 
 import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
-import { useLocalSearchParams, useRootNavigationState, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRootNavigationState, useRouter } from 'expo-router';
 import BootScreen from '@/components/BootScreen';
 import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
 
 export default function Index() {
   const router = useRouter();
-  const { bt_preview: previewRole } = useLocalSearchParams<{ bt_preview?: string }>();
+  const params = useLocalSearchParams<{ bt_preview?: string; bt_theme?: string; bt_capture?: string }>();
+  const previewRole = params.bt_preview;
   const rootNavigationState = useRootNavigationState();
 
   useEffect(() => {
@@ -28,6 +29,17 @@ export default function Index() {
     }, 50);
     return () => clearTimeout(redirect);
   }, [previewRole, rootNavigationState?.key, router]);
+
+  if (__DEV__ && Platform.OS === 'web' && params.bt_capture === '1') {
+    return (
+      <Redirect
+        href={{
+          pathname: previewRole === 'seller' ? '/(tabs)' : '/(buyer)',
+          params,
+        }}
+      />
+    );
+  }
 
   return <BootScreen />;
 }

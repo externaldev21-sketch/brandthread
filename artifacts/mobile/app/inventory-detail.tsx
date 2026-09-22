@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { formatCents } from '@/lib/money';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
 import { getInventoryItem, getAdjustments, getEvents, getRestockRecommendations, updateThreshold, updateOversellPolicy } from '@/services/inventoryService';
@@ -38,13 +38,13 @@ function statusVariant(status: string): 'success' | 'warning' | 'error' | 'info'
   }
 }
 
-function statusGlowColors(status: string): readonly [string, string] {
+function statusGlowColors(status: string, theme: ReturnType<typeof useAppTheme>['theme']): readonly [string, string] {
   switch (status) {
-    case 'available':    return [SUCCESS_DIM, 'rgba(16,185,129,0.02)'] as const;
-    case 'low_stock':    return [ORANGE_DIM,  'rgba(249,115,22,0.02)'] as const;
-    case 'out_of_stock': return [RED_DIM,     'rgba(248,113,113,0.02)'] as const;
-    case 'pre_order':    return [BLUE_DIM,    'rgba(59,130,246,0.02)'] as const;
-    default:             return GRAD_CARD_GLOW;
+    case 'available':    return [`${theme.success}26`, `${theme.success}05`] as const;
+    case 'low_stock':    return [`${theme.warning}26`, `${theme.warning}05`] as const;
+    case 'out_of_stock': return [`${theme.error}26`, `${theme.error}05`] as const;
+    case 'pre_order':    return [`${theme.accentLight}26`, `${theme.accentLight}05`] as const;
+    default:             return [theme.glowGradient[0], theme.glowGradient[1]] as const;
   }
 }
 
@@ -70,18 +70,18 @@ function eventTypeLabel(type: string): string {
   }
 }
 
-function eventTypeColor(type: string): string {
+function eventTypeColor(type: string, theme: ReturnType<typeof useAppTheme>['theme']): string {
   switch (type) {
-    case 'adjustment':           return PURPLE;
-    case 'reservation':          return ORANGE;
-    case 'reservation_released': return SUCCESS;
-    case 'fulfillment':          return CYAN;
-    case 'return_restock':       return SUCCESS;
-    case 'transfer_in':          return BLUE;
-    case 'transfer_out':         return ORANGE;
-    case 'production_received':  return SUCCESS;
-    case 'count_adjustment':     return CYAN;
-    default:                     return MUTED;
+    case 'adjustment':           return theme.accent;
+    case 'reservation':          return theme.warning;
+    case 'reservation_released': return theme.success;
+    case 'fulfillment':          return theme.secondary;
+    case 'return_restock':       return theme.success;
+    case 'transfer_in':          return theme.accentLight;
+    case 'transfer_out':         return theme.warning;
+    case 'production_received':  return theme.success;
+    case 'count_adjustment':     return theme.secondary;
+    default:                     return theme.muted;
   }
 }
 
@@ -89,7 +89,20 @@ function eventTypeColor(type: string): string {
 
 export default function InventoryDetailScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const {
+    background: BG, surface: SURFACE, card: CARD, cardElevated: CARD_ELEVATED,
+    border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE,
+    accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM,
+    secondary: CYAN, secondaryDim: CYAN_DIM, success: SUCCESS, warning: ORANGE, error: RED,
+  } = theme;
+  const SUCCESS_DIM = `${SUCCESS}26`;
+  const BORDER_ACTIVE = theme.accentLight;
+  const ORANGE_DIM = `${ORANGE}26`;
+  const RED_DIM = `${RED}26`;
+  const BLUE = theme.accentLight;
+  const BLUE_DIM = `${theme.accentLight}26`;
+  const GOLD = theme.accent;
+  const GRAD_CARD_GLOW = theme.glowGradient;
   const d = React.useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -187,7 +200,7 @@ export default function InventoryDetailScreen() {
   // ─── Status Card ────────────────────────────────────────────────────────────
 
   const renderStatusCard = () => (
-    <GradientCard colors={statusGlowColors(item.status)} glow style={d.statusCard}>
+        <GradientCard colors={statusGlowColors(item.status, theme)} glow style={d.statusCard}>
       <View style={d.statusCardRow}>
         <View style={{ flex: 1 }}>
           <Text style={d.statusProductName}>{item.productName}</Text>
@@ -420,7 +433,7 @@ export default function InventoryDetailScreen() {
         <Text style={d.emptyMeta}>No events recorded.</Text>
       ) : (
         events.map(evt => {
-          const dotColor = eventTypeColor(evt.type);
+          const dotColor = eventTypeColor(evt.type, theme);
           const qChange = evt.quantityChanged;
           const changeColor = qChange >= 0 ? SUCCESS : RED;
           const changeStr = (qChange >= 0 ? '+' : '') + qChange;
@@ -521,7 +534,20 @@ export default function InventoryDetailScreen() {
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const {
+    background: BG, surface: SURFACE, card: CARD, cardElevated: CARD_ELEVATED,
+    border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE,
+    accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM,
+    secondary: CYAN, secondaryDim: CYAN_DIM, success: SUCCESS, warning: ORANGE, error: RED,
+  } = theme as typeof theme & Record<string, string>;
+  const SUCCESS_DIM = `${SUCCESS}26`;
+  const BORDER_ACTIVE = (theme as any).accentLight;
+  const ORANGE_DIM = `${ORANGE}26`;
+  const RED_DIM = `${RED}26`;
+  const BLUE = PURPLE_LIGHT;
+  const BLUE_DIM = `${PURPLE_LIGHT}26`;
+  const GOLD = PURPLE;
+  const GRAD_CARD_GLOW = (theme as any).glowGradient;
   return StyleSheet.create({
   root:             { flex: 1 },
   loadingWrap:      { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: SP.md },
@@ -556,7 +582,7 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
   summaryCell:      { width: '30%', alignItems: 'center', paddingVertical: SP.sm,
                       backgroundColor: SURFACE, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER },
   summaryValue:     { fontSize: FS.xl, fontFamily: FONT.bold, letterSpacing: -0.5 },
-  summaryLabel:     { fontSize: 10, fontFamily: FONT.medium, color: SUBTLE, marginTop: 2 },
+  summaryLabel:     { fontSize: FS.xs, fontFamily: FONT.medium, color: SUBTLE, marginTop: 2 },
   summaryDivider:   { height: 1, backgroundColor: BORDER, marginVertical: SP.xs },
   inventoryValueRow:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   inventoryValueLabel: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },

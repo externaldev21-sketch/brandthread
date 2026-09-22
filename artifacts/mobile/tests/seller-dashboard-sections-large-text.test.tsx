@@ -31,6 +31,30 @@ vi.mock('@/components/BrandthreadUI', () => ({
   PrimaryButton: nativeComponent('PrimaryButton'),
   SecondaryButton: nativeComponent('SecondaryButton'),
 }));
+vi.mock('@/contexts/AppThemeContext', () => ({
+  useAppTheme: () => ({
+    theme: {
+      background: '#0A0A0B',
+      surface: '#111113',
+      card: '#18181B',
+      cardElevated: '#222226',
+      border: '#FFFFFF2B',
+      borderSubtle: '#FFFFFF1A',
+      text: '#FAFAFA',
+      muted: '#D7D7DB',
+      subtle: '#C5C5CA',
+      accent: '#F7F7FA',
+      accentLight: '#FFFFFF',
+      accentDim: '#FFFFFF2E',
+      onAccent: '#0A0A0B',
+      secondary: '#F7F7FA',
+      secondaryDim: '#FFFFFF24',
+      success: '#7FF0B0',
+      warning: '#FFD580',
+      error: '#FFB4B4',
+    },
+  }),
+}));
 
 import {
   SellerDashboardActionRow,

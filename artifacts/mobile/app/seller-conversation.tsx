@@ -10,7 +10,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { useUser } from '@clerk/expo';
-import { BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, RED, ON_DARK, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import * as ImagePicker from 'expo-image-picker';
@@ -103,12 +103,22 @@ function groupByDate(msgs: Msg[]): ListRow[] {
 export default function SellerConversationScreen() {
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const BG = theme.background;
+  const CARD = theme.card;
+  const BORDER = theme.border;
+  const BORDER_ACTIVE = theme.accent;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const SUBTLE = theme.subtle;
+  const RED = theme.error;
+  const ON_DARK = theme.onAccent;
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
   const { user } = useUser();
   const myId = user?.id ?? '';
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
 
   const flatListRef = useRef<FlatList<ListRow>>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -848,7 +858,19 @@ export default function SellerConversationScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const BG = theme.background;
+  const CARD = theme.card;
+  const BORDER = theme.border;
+  const BORDER_ACTIVE = theme.accent;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const SUBTLE = theme.subtle;
+  const RED = theme.error;
+  const ON_DARK = theme.onAccent;
+  const PURPLE = theme.accent;
+  const PURPLE_DIM = theme.accentDim;
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
@@ -1024,4 +1046,5 @@ const s = StyleSheet.create({
   voiceWave:         { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 3 },
   voiceBar:          { width: 3, backgroundColor: PURPLE_DIM, borderRadius: 2 },
   voiceDur:          { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
-});
+  });
+};

@@ -279,10 +279,12 @@ export default function BuyerDropDetail() {
                   disabled={notifyLoading}
                   testID="drop-notify-button"
                 >
-                  {notifyLoading ? <ActivityIndicator color={ON_DARK} /> : (
+                  {notifyLoading ? <ActivityIndicator color={subscribed ? ON_DARK : theme.onAccent} /> : (
                     <>
-                      <Feather name={subscribed ? 'check' : 'bell'} size={18} color={ON_DARK} />
-                      <Text style={styles.primaryButtonText}>{subscribed ? 'You’ll be notified' : 'Notify me'}</Text>
+                      <Feather name={subscribed ? 'check' : 'bell'} size={18} color={subscribed ? ON_DARK : theme.onAccent} />
+                      <Text style={[styles.primaryButtonText, !subscribed && { color: theme.onAccent }]}>
+                        {subscribed ? 'You’ll be notified' : 'Notify me'}
+                      </Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -292,8 +294,8 @@ export default function BuyerDropDetail() {
                   onPress={() => scrollRef.current?.scrollTo({ y: HERO_H - 24, animated: true })}
                   testID="shop-live-drop-button"
                 >
-                  <Feather name="shopping-bag" size={18} color={ON_DARK} />
-                  <Text style={styles.primaryButtonText}>Shop the drop</Text>
+                  <Feather name="shopping-bag" size={18} color={theme.onAccent} />
+                  <Text style={[styles.primaryButtonText, { color: theme.onAccent }]}>Shop the drop</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -369,20 +371,20 @@ const styles = StyleSheet.create({
   heroHeader: { position: 'absolute', top: 0, left: SP.md, right: SP.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 2 },
   roundButton: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(0,0,0,0.48)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
   heroBadge: { backgroundColor: 'rgba(0,0,0,0.58)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', borderRadius: RADIUS.pill, paddingHorizontal: 13, paddingVertical: 7 },
-  heroBadgeText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 10, letterSpacing: 1.5 },
+  heroBadgeText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1.5 },
   heroCopy: { padding: 20, paddingBottom: 28 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: SP.md },
   brandMark: { width: 38, height: 38, borderRadius: 19, borderWidth: 1.5, backgroundColor: 'rgba(0,0,0,0.62)', alignItems: 'center', justifyContent: 'center' },
   brandInitials: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 11 },
   brandNameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   brandName: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.sm },
-  dropType: { color: ON_DARK_MUTED, fontFamily: FONT.medium, fontSize: 9, letterSpacing: 1.2, marginTop: 2 },
+  dropType: { color: ON_DARK_MUTED, fontFamily: FONT.medium, fontSize: FS.xs, letterSpacing: 1.2, marginTop: 2 },
   dropName: { color: ON_DARK, fontFamily: FONT.extrabold, fontSize: 39, lineHeight: 41, letterSpacing: -1.5, marginBottom: SP.lg, maxWidth: W - 40 },
-  eyebrow: { color: ON_DARK_MUTED, fontFamily: FONT.semibold, fontSize: 10, letterSpacing: 1.7, marginBottom: 9 },
+  eyebrow: { color: ON_DARK_MUTED, fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1.7, marginBottom: 9 },
   timerRow: { flexDirection: 'row', justifyContent: 'space-between' },
   timerUnit: { minWidth: 58 },
   timerNumber: { color: ON_DARK, fontFamily: FONT.light, fontSize: 42, lineHeight: 48, letterSpacing: -1.8, fontVariant: ['tabular-nums'] },
-  timerLabel: { color: ON_DARK_MUTED, fontFamily: FONT.semibold, fontSize: 8, letterSpacing: 1.25 },
+  timerLabel: { color: ON_DARK_MUTED, fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1.25 },
   timerRule: { height: 2, marginTop: 13, width: 58 },
   livePanel: { backgroundColor: 'rgba(255,59,48,0.12)', borderWidth: 1, borderColor: 'rgba(255,59,48,0.4)', borderRadius: RADIUS.md, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 13 },
   livePulse: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FF3B30' },
@@ -393,22 +395,22 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.base },
   content: { paddingTop: SP.lg },
   releaseMeta: { marginHorizontal: SP.md, paddingBottom: SP.lg, flexDirection: 'row', alignItems: 'center', gap: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
-  metaLabel: { color: SUBTLE, fontFamily: FONT.semibold, fontSize: 9, letterSpacing: 1.2, marginBottom: 4 },
+  metaLabel: { color: SUBTLE, fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1.2, marginBottom: 4 },
   metaValue: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
   metaDivider: { width: 1, height: 30, backgroundColor: BORDER },
   collectionHeader: { paddingHorizontal: SP.md, paddingTop: SP.xl, paddingBottom: SP.md, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
-  collectionEyebrow: { color: SUBTLE, fontFamily: FONT.semibold, fontSize: 9, letterSpacing: 1.4 },
+  collectionEyebrow: { color: SUBTLE, fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1.4 },
   collectionTitle: { color: FG, fontFamily: FONT.bold, fontSize: FS.xxl, marginTop: 4, letterSpacing: -0.5 },
   stockPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, paddingVertical: 6, borderRadius: RADIUS.pill, borderWidth: 1 },
   stockDot: { width: 6, height: 6, borderRadius: 3 },
-  stockText: { fontFamily: FONT.bold, fontSize: 9, letterSpacing: 1 },
+  stockText: { fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: SP.md },
   productTile: { width: (W - SP.md * 2 - 10) / 2, borderRadius: RADIUS.sm, overflow: 'hidden', backgroundColor: CARD },
   productMedia: { height: (W - SP.md * 2 - 10) * 0.68, justifyContent: 'flex-end' },
   productFallback: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: CARD },
   productCaption: { padding: 11 },
   productName: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.sm, lineHeight: 17 },
-  productCategory: { color: ON_DARK_MUTED, fontFamily: FONT.semibold, fontSize: 8, letterSpacing: 1.1, marginTop: 5 },
+  productCategory: { color: ON_DARK_MUTED, fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1.1, marginTop: 5 },
   emptyProducts: { margin: SP.md, padding: SP.xl, borderRadius: RADIUS.lg, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', gap: SP.sm },
   emptyTitle: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
   emptyText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 20 },

@@ -5,6 +5,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { FS } from '@/lib/theme';
 
 const CHECKOUT_MODES = ['Checkout only', 'Accounts optional', 'Accounts required'];
 
@@ -115,7 +116,7 @@ export default function CheckoutScreen() {
             <View style={[styles.appIcon, { backgroundColor: theme.accent }]}>
               <Feather name="shopping-bag" size={12} color={theme.onAccent} />
             </View>
-            <Text style={[styles.radioLabel, { color: colors.foreground }]}>SMART Checkout Rules</Text>
+            <Text style={[styles.radioLabel, { color: colors.foreground }]}>SMART checkout rules</Text>
           </TouchableOpacity>
           {postPurchaseApp === 'smart' && (
             <Text style={[styles.hintText, { color: colors.mutedForeground, marginLeft: 30, marginBottom: 14 }]}>
@@ -270,7 +271,7 @@ const styles = StyleSheet.create({
   listRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14 },
   listIcon: { width: 20, marginTop: 2 },
   recommendedPill: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginLeft: 8 },
-  recommendedText: { fontSize: 10, fontFamily: 'Inter_500Medium' },
+  recommendedText: { fontSize: FS.xs, fontFamily: 'Inter_500Medium' },
   onPill: { alignSelf: 'flex-start', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, marginTop: 8 },
   onPillText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   addRuleBtn: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9 },

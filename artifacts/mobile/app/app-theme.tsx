@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { APP_THEME_PRESETS, AppThemeId, AppThemePreset, useAppTheme } from '@/contexts/AppThemeContext';
-import { BG, CARD, BORDER, FG, MUTED, FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 type ThemeImageContext = {
   (key: string): ImageSourcePropType;
@@ -16,7 +16,8 @@ const themeImageContext = (require as unknown as {
   context: (directory: string, useSubdirectories: boolean, pattern: RegExp) => ThemeImageContext;
 }).context('../assets/images/themes', false, /\.png$/);
 
-const THEME_IMAGE_PATHS: Record<AppThemeId, string> = {
+const THEME_IMAGE_PATHS: Partial<Record<AppThemeId, string>> = {
+  monochrome: '../assets/images/themes/theme-black.png',
   purple: '../assets/images/themes/theme-purple.png',
   olive: '../assets/images/themes/theme-olive.png',
   navy: '../assets/images/themes/theme-navy.png',
@@ -31,7 +32,9 @@ const THEME_IMAGE_PATHS: Record<AppThemeId, string> = {
 };
 
 function getOptionalThemeImage(id: AppThemeId): ImageSourcePropType | null {
-  const contextKey = `./${THEME_IMAGE_PATHS[id].split('/').pop()}`;
+  const imagePath = THEME_IMAGE_PATHS[id];
+  if (!imagePath) return null;
+  const contextKey = `./${imagePath.split('/').pop()}`;
   return themeImageContext.keys().includes(contextKey) ? themeImageContext(contextKey) : null;
 }
 
@@ -73,24 +76,24 @@ export default function AppThemeScreen() {
   }
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.back} accessibilityLabel="Back to settings">
-          <Feather name="arrow-left" size={20} color={FG} />
+    <View style={[styles.root, { paddingTop: insets.top, backgroundColor: theme.background }]}>
+      <View style={[styles.header, { borderBottomColor: theme.border }]}>
+        <TouchableOpacity onPress={() => router.back()} style={[styles.back, { borderColor: theme.border, backgroundColor: theme.card }]} accessibilityRole="button" accessibilityLabel="Back to settings">
+          <Feather name="arrow-left" size={20} color={theme.text} />
         </TouchableOpacity>
         <View style={styles.headerCopy}>
-          <Text style={styles.title}>App Theme</Text>
-          <Text style={styles.subtitle}>Choose your Brandthread finish</Text>
+          <Text style={[styles.title, { color: theme.text }]}>App theme</Text>
+          <Text style={[styles.subtitle, { color: theme.muted }]}>Choose your Brandthread finish</Text>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]} showsVerticalScrollIndicator={false}>
         <View style={[styles.current, { borderColor: theme.accent + '66', backgroundColor: theme.accentDim }]}>
           <View style={[styles.currentDot, { backgroundColor: theme.accent }]} />
-          <Text style={styles.currentText}>Using {theme.name}</Text>
+          <Text style={[styles.currentText, { color: theme.text }]}>Using {theme.name}</Text>
           <Feather name="check" size={16} color={theme.accentLight} />
         </View>
-        <Text style={styles.helper}>Your theme updates primary buttons, selected tabs, focus states, gradients, and highlights across buyer and seller views.</Text>
+        <Text style={[styles.helper, { color: theme.muted }]}>Changes the colors of the whole app across buyer and seller views.</Text>
 
         <View style={styles.grid}>
           {APP_THEME_PRESETS.map((option) => {
@@ -98,7 +101,11 @@ export default function AppThemeScreen() {
             return (
               <TouchableOpacity
                 key={option.id}
-                style={[styles.tile, selected && { borderColor: option.accent, shadowColor: option.accent, shadowOpacity: 0.32, elevation: 5 }]}
+                style={[
+                  styles.tile,
+                  { borderColor: theme.border, backgroundColor: theme.card },
+                  selected && { borderColor: option.accent, shadowColor: option.accent, shadowOpacity: 0.32, elevation: 5 },
+                ]}
                 onPress={() => chooseTheme(option.id)}
                 activeOpacity={0.84}
                 accessibilityRole="button"
@@ -106,7 +113,7 @@ export default function AppThemeScreen() {
                 accessibilityLabel={`${option.name} theme${selected ? ', selected' : ''}`}
               >
                 <ThemePreview option={option} selected={selected} />
-                <Text style={[styles.name, selected && { color: option.accentLight }]} numberOfLines={1}>{option.name}</Text>
+                <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{option.name}</Text>
               </TouchableOpacity>
             );
           })}
@@ -117,20 +124,20 @@ export default function AppThemeScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: 'transparent' },
-  header: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: BORDER },
-  back: { width: 38, height: 38, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
+  root: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.md, borderBottomWidth: StyleSheet.hairlineWidth },
+  back: { width: 44, height: 44, borderRadius: RADIUS.sm, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   headerCopy: { flex: 1 },
-  title: { color: FG, fontFamily: FONT.bold, fontSize: FS.lg, letterSpacing: -0.2 },
-  subtitle: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
+  title: { fontFamily: FONT.bold, fontSize: FS.lg, letterSpacing: -0.2 },
+  subtitle: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
   content: { padding: SP.md },
   current: { minHeight: 46, borderRadius: RADIUS.md, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 13 },
   currentDot: { width: 10, height: 10, borderRadius: 5 },
-  currentText: { flex: 1, color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
-  helper: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, marginTop: SP.md, marginBottom: SP.lg },
+  currentText: { flex: 1, fontFamily: FONT.semibold, fontSize: FS.sm },
+  helper: { fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, marginTop: SP.md, marginBottom: SP.lg },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12 },
-  tile: { width: '47.8%', borderRadius: RADIUS.lg, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
+  tile: { width: '47.8%', borderRadius: RADIUS.lg, borderWidth: 1, overflow: 'hidden' },
   preview: { height: 138, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   selected: { position: 'absolute', top: 9, right: 9, width: 25, height: 25, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  name: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, paddingHorizontal: 11, paddingTop: 10, paddingBottom: 12 },
+  name: { fontFamily: FONT.semibold, fontSize: FS.sm, paddingHorizontal: 11, paddingTop: 10, paddingBottom: 12 },
 });

@@ -197,9 +197,9 @@ const tileStyles = StyleSheet.create({
   tilePinned: { position: 'absolute', top: 5, left: 5 },
   tileTypeIcon: { position: 'absolute', top: 5, right: 5 },
   tileViews: { position: 'absolute', bottom: 5, left: 5, flexDirection: 'row', alignItems: 'center', gap: 2 },
-  tileViewsText: { color: MUTED, fontSize: 10, fontFamily: FONT.semibold },
+  tileViewsText: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.semibold },
   tileStatusBadge: { position: 'absolute', bottom: 5, right: 5, borderWidth: 1, borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 },
-  tileStatusText: { fontSize: 9, fontFamily: FONT.semibold, textTransform: 'capitalize' },
+  tileStatusText: { fontSize: FS.xs, fontFamily: FONT.semibold, textTransform: 'capitalize' },
 });
 
 // ─── Create Post Tile ──────────────────────────────────────────────────────────
@@ -301,7 +301,7 @@ const productStyles = StyleSheet.create({
   productImageContainer: { position: 'relative', height: 176, width: '100%', borderRadius: RADIUS.sm, overflow: 'hidden', backgroundColor: CARD },
   productImage: { height: 176, width: '100%' },
   productStatusBadge: { position: 'absolute', top: 6, left: 6, backgroundColor: 'rgba(0,0,0,0.65)', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: ORANGE },
-  productStatusBadgeText: { color: ORANGE, fontSize: 9, fontFamily: FONT.semibold, textTransform: 'capitalize' },
+  productStatusBadgeText: { color: ORANGE, fontSize: FS.xs, fontFamily: FONT.semibold, textTransform: 'capitalize' },
   productInfo: { paddingHorizontal: 2, paddingTop: 10, paddingBottom: SP.md },
   productName: { color: FG, fontSize: FS.sm, lineHeight: 18, fontFamily: FONT.semibold, marginBottom: 4 },
   productPriceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
@@ -1020,7 +1020,7 @@ const styles = StyleSheet.create({
   },
   statItem: { flex: 1, alignItems: 'center' },
   statNumber: { color: FG, fontSize: FS.md, fontFamily: FONT.bold },
-  statLabel: { color: MUTED, fontSize: 10, fontFamily: FONT.medium, marginTop: 2 },
+  statLabel: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium, marginTop: 2 },
   statDivider: { width: 1, backgroundColor: BORDER, marginVertical: 4 },
 
   // Shop button (buyer view only) — outline only, no gradient fill

@@ -7,11 +7,13 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 export default function BootScreen() {
+  const { theme } = useAppTheme();
   return (
-    <View style={styles.root}>
-      <BrandthreadLogo size={150} tintColor="#FFFFFF" />
+    <View style={[styles.root, { backgroundColor: theme.background }]}>
+      <BrandthreadLogo size={150} tintColor={theme.accentLight} />
     </View>
   );
 }
@@ -19,7 +21,7 @@ export default function BootScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#0A0A0B',
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   },

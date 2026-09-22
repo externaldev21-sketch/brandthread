@@ -13,7 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi, type Freelancer } from '@/lib/api';
 import { serviceLabel, serviceIcon, formatHourlyRate, formatPrice, ratingLabel, apiErrorMessage, apiErrorCode } from '@/lib/freelancer';
-import { BG, CARD, BORDER, FG, MUTED, SUBTLE, GOLD, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, RED, OVERLAY, FONT, FS, SP, RADIUS, ON_DARK, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { centsAtBasisPoints, parseDecimalToCents } from '@/lib/money';
@@ -23,6 +23,7 @@ const PLATFORM_FEE_BASIS_POINTS = 500; // display only — server computes the r
 export default function FreelancerProfileScreen() {
   const colors = useColors();
   const { theme } = useAppTheme();
+  const styles = React.useMemo(() => makeStyles(theme), [theme]);
   const api = useApi();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -165,7 +166,7 @@ export default function FreelancerProfileScreen() {
       <View style={styles.container}>
         <ScreenHeader title="Freelancer" />
         <View style={styles.center}>
-          <Feather name="alert-circle" size={24} color={SUBTLE} />
+          <Feather name="alert-circle" size={24} color={theme.subtle} />
           <Text style={styles.errorText}>{error ?? 'Freelancer not found'}</Text>
         </View>
       </View>
@@ -208,7 +209,7 @@ export default function FreelancerProfileScreen() {
             <View style={styles.statDivider} />
             <View style={styles.statBox}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                {rating && <Feather name="star" size={13} color={GOLD} />}
+                {rating && <Feather name="star" size={13} color={theme.warning} />}
                 <Text style={styles.statValue}>{rating ?? 'New'}</Text>
               </View>
               <Text style={styles.statLabel}>Rating</Text>
@@ -221,14 +222,14 @@ export default function FreelancerProfileScreen() {
           </View>
 
           {freelancer.payoutsReady ? (
-            <View style={[styles.payBadge, { backgroundColor: SUCCESS_DIM }]}>
-              <Feather name="check-circle" size={12} color={SUCCESS} />
-              <Text style={[styles.payBadgeText, { color: SUCCESS }]}>Payouts ready</Text>
+            <View style={[styles.payBadge, { backgroundColor: theme.success + '26' }]}>
+              <Feather name="check-circle" size={12} color={theme.success} />
+              <Text style={[styles.payBadgeText, { color: theme.success }]}>Payouts ready</Text>
             </View>
           ) : !freelancer.hasConnectedAccount ? (
-            <View style={[styles.payBadge, { backgroundColor: ORANGE_DIM }]}>
-              <Feather name="clock" size={12} color={ORANGE} />
-              <Text style={[styles.payBadgeText, { color: ORANGE }]}>
+            <View style={[styles.payBadge, { backgroundColor: theme.warning + '26' }]}>
+              <Feather name="clock" size={12} color={theme.warning} />
+              <Text style={[styles.payBadgeText, { color: theme.warning }]}>
                 {isOwn ? 'Payout setup incomplete' : 'Hasn\'t set up payouts yet'}
               </Text>
             </View>
@@ -288,7 +289,7 @@ export default function FreelancerProfileScreen() {
                   end={{ x: 1, y: 1 }}
                   style={styles.connectBtn}
                 >
-                  <Feather name="credit-card" size={16} color={ON_DARK} />
+                  <Feather name="credit-card" size={16} color={theme.onAccent} />
                   <Text style={styles.connectBtnText}>
                     {freelancer.hasConnectedAccount ? 'Finish Payout Setup' : 'Connect Bank Account'}
                   </Text>
@@ -303,7 +304,7 @@ export default function FreelancerProfileScreen() {
             >
               <Feather name="edit-3" size={16} color={colors.primary} />
               <Text style={styles.manageText}>Edit Profile</Text>
-              <Feather name="chevron-right" size={16} color={SUBTLE} />
+              <Feather name="chevron-right" size={16} color={theme.subtle} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -313,14 +314,14 @@ export default function FreelancerProfileScreen() {
             >
               <Feather name="briefcase" size={16} color={theme.secondary} />
               <Text style={styles.manageText}>My Gigs</Text>
-              <Feather name="chevron-right" size={16} color={SUBTLE} />
+              <Feather name="chevron-right" size={16} color={theme.subtle} />
             </TouchableOpacity>
 
             {freelancer.isActive && (
               <TouchableOpacity style={styles.manageRow} activeOpacity={0.7} onPress={deactivate}>
-                <Feather name="eye-off" size={16} color={RED} />
-                <Text style={[styles.manageText, { color: RED }]}>Deactivate Listing</Text>
-                <Feather name="chevron-right" size={16} color={SUBTLE} />
+                <Feather name="eye-off" size={16} color={theme.error} />
+                <Text style={[styles.manageText, { color: theme.error }]}>Deactivate Listing</Text>
+                <Feather name="chevron-right" size={16} color={theme.subtle} />
               </TouchableOpacity>
             )}
           </View>
@@ -344,13 +345,13 @@ export default function FreelancerProfileScreen() {
                 end={{ x: 1, y: 1 }}
                 style={styles.hireBtn}
               >
-                <Feather name="zap" size={16} color={ON_DARK} />
+                <Feather name="zap" size={16} color={theme.onAccent} />
                 <Text style={styles.hireBtnText}>Hire {freelancer.name.split(' ')[0]}</Text>
               </LinearGradient>
             </TouchableOpacity>
           ) : (
             <View style={styles.notPayableCard}>
-              <Feather name="info" size={14} color={ORANGE} />
+              <Feather name="info" size={14} color={theme.warning} />
               <Text style={styles.notPayableText}>
                 This freelancer hasn't set up payouts yet and can't accept paid jobs.
               </Text>
@@ -377,7 +378,7 @@ export default function FreelancerProfileScreen() {
               value={title}
               onChangeText={setTitle}
               placeholder="Job title — e.g. Logo refresh for my drop"
-              placeholderTextColor={SUBTLE}
+              placeholderTextColor={theme.subtle}
               maxLength={200}
             />
             <TextInput
@@ -385,7 +386,7 @@ export default function FreelancerProfileScreen() {
               value={description}
               onChangeText={setDescription}
               placeholder="Describe the work, deliverables, and timeline…"
-              placeholderTextColor={SUBTLE}
+              placeholderTextColor={theme.subtle}
               multiline
               maxLength={5000}
             />
@@ -396,7 +397,7 @@ export default function FreelancerProfileScreen() {
                 value={priceText}
                 onChangeText={(v) => setPriceText(v.replace(/[^0-9.]/g, ''))}
                 placeholder="Agreed price"
-                placeholderTextColor={SUBTLE}
+                placeholderTextColor={theme.subtle}
                 keyboardType="decimal-pad"
               />
             </View>
@@ -412,8 +413,8 @@ export default function FreelancerProfileScreen() {
                   <Text style={styles.feeValue}>-{formatPrice(feeCents)}</Text>
                 </View>
                 <View style={[styles.feeRow, { marginTop: 2 }]}>
-                  <Text style={[styles.feeLabel, { color: FG }]}>Freelancer receives</Text>
-                  <Text style={[styles.feeValue, { color: SUCCESS }]}>{formatPrice(netCents)}</Text>
+                  <Text style={[styles.feeLabel, { color: theme.text }]}>Freelancer receives</Text>
+                  <Text style={[styles.feeValue, { color: theme.success }]}>{formatPrice(netCents)}</Text>
                 </View>
               </View>
             )}
@@ -430,10 +431,10 @@ export default function FreelancerProfileScreen() {
                 style={[styles.hireBtn, (!hireValid || hiring) && { opacity: 0.4 }]}
               >
                 {hiring ? (
-                  <ActivityIndicator color={ON_DARK} size="small" />
+                  <ActivityIndicator color={theme.onAccent} size="small" />
                 ) : (
                   <>
-                    <Feather name="lock" size={15} color={ON_DARK} />
+                    <Feather name="lock" size={15} color={theme.onAccent} />
                     <Text style={styles.hireBtnText}>
                       {priceCents >= 100 ? `Pay ${formatPrice(priceCents)}` : 'Pay with Stripe'}
                     </Text>
@@ -456,30 +457,30 @@ export default function FreelancerProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.sm },
-  errorText: { color: MUTED, fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', paddingHorizontal: SP.xl },
+  errorText: { color: theme.muted, fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', paddingHorizontal: SP.xl },
   heroCard: {
-    alignItems: 'center', backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    alignItems: 'center', backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border,
     borderRadius: RADIUS.lg, padding: SP.lg,
   },
   avatar: { width: 72, height: 72, borderRadius: 36 },
   // Preserved identity accent: only the generated profile avatar remains brand purple.
-  avatarFallback: { backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { color: PURPLE, fontSize: FS.xl, fontFamily: FONT.bold },
-  name: { color: FG, fontSize: FS.lg, fontFamily: FONT.bold, marginTop: SP.sm + 2 },
-  username: { color: SUBTLE, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
+  avatarFallback: { backgroundColor: theme.accentDim, alignItems: 'center', justifyContent: 'center' },
+  avatarInitial: { color: theme.accent, fontSize: FS.xl, fontFamily: FONT.bold },
+  name: { color: theme.text, fontSize: FS.lg, fontFamily: FONT.bold, marginTop: SP.sm + 2 },
+  username: { color: theme.subtle, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
   serviceRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: SP.xs + 2 },
   serviceText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   statsRow: {
     flexDirection: 'row', alignItems: 'center', marginTop: SP.md,
-    borderTopWidth: 1, borderTopColor: BORDER, paddingTop: SP.md, alignSelf: 'stretch',
+    borderTopWidth: 1, borderTopColor: theme.border, paddingTop: SP.md, alignSelf: 'stretch',
   },
   statBox: { flex: 1, alignItems: 'center', gap: 2 },
-  statDivider: { width: 1, height: 28, backgroundColor: BORDER },
-  statValue: { color: FG, fontSize: FS.sm, fontFamily: FONT.bold },
-  statLabel: { color: SUBTLE, fontSize: FS.xs, fontFamily: FONT.regular },
+  statDivider: { width: 1, height: 28, backgroundColor: theme.border },
+  statValue: { color: theme.text, fontSize: FS.sm, fontFamily: FONT.bold },
+  statLabel: { color: theme.subtle, fontSize: FS.xs, fontFamily: FONT.regular },
   payBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: SP.sm + 2, paddingVertical: 5, borderRadius: RADIUS.pill, marginTop: SP.md,
@@ -487,10 +488,10 @@ const styles = StyleSheet.create({
   payBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   section: { marginTop: SP.lg },
   sectionTitle: {
-    color: SUBTLE, fontSize: FS.xs, fontFamily: FONT.semibold,
+    color: theme.subtle, fontSize: FS.xs, fontFamily: FONT.semibold,
     letterSpacing: 1, textTransform: 'uppercase', marginBottom: SP.sm,
   },
-  bio: { color: MUTED, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 21 },
+  bio: { color: theme.muted, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 21 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   tag: {
     paddingHorizontal: SP.sm + 2, paddingVertical: 5,
@@ -499,62 +500,62 @@ const styles = StyleSheet.create({
   tagText: { fontSize: FS.xs, fontFamily: FONT.medium },
   linkRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm,
+    backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.sm,
     paddingHorizontal: SP.md - 2, paddingVertical: SP.sm + 4, marginBottom: SP.sm,
   },
-  linkText: { color: FG, fontSize: FS.xs, fontFamily: FONT.medium, flex: 1 },
+  linkText: { color: theme.text, fontSize: FS.xs, fontFamily: FONT.medium, flex: 1 },
   manageRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm + 2,
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm,
+    backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.sm,
     paddingHorizontal: SP.md - 2, paddingVertical: SP.md - 4, marginBottom: SP.sm,
   },
-  manageText: { color: FG, fontSize: FS.sm, fontFamily: FONT.medium, flex: 1 },
+  manageText: { color: theme.text, fontSize: FS.sm, fontFamily: FONT.medium, flex: 1 },
   connectBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm,
     borderRadius: RADIUS.sm, paddingVertical: SP.md - 2, marginBottom: SP.sm,
   },
-  connectBtnText: { color: ON_DARK, fontSize: FS.sm, fontFamily: FONT.bold },
+  connectBtnText: { color: theme.onAccent, fontSize: FS.sm, fontFamily: FONT.bold },
   footer: {
-    padding: SP.md + 4, paddingBottom: SP.lg + 8, backgroundColor: BG,
-    borderTopWidth: 1, borderTopColor: BORDER,
+    padding: SP.md + 4, paddingBottom: SP.lg + 8, backgroundColor: theme.background,
+    borderTopWidth: 1, borderTopColor: theme.border,
   },
   hireBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm,
     borderRadius: RADIUS.sm, paddingVertical: SP.md - 2,
   },
-  hireBtnText: { color: ON_DARK, fontSize: FS.sm, fontFamily: FONT.bold },
+  hireBtnText: { color: theme.onAccent, fontSize: FS.sm, fontFamily: FONT.bold },
   notPayableCard: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    backgroundColor: ORANGE_DIM, borderRadius: RADIUS.sm, padding: SP.md - 2,
+    backgroundColor: theme.warning + '26', borderRadius: RADIUS.sm, padding: SP.md - 2,
   },
-  notPayableText: { color: ORANGE, fontSize: FS.xs, fontFamily: FONT.medium, flex: 1 },
-  modalOverlay: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },
+  notPayableText: { color: theme.warning, fontSize: FS.xs, fontFamily: FONT.medium, flex: 1 },
+  modalOverlay: { flex: 1, backgroundColor: theme.background + 'CC', justifyContent: 'flex-end' },
   modalSheet: {
-    backgroundColor: '#111113', borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
+    backgroundColor: theme.card, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
     padding: SP.md + 4, paddingBottom: SP.xl,
-    borderWidth: 1, borderColor: BORDER,
+    borderWidth: 1, borderColor: theme.border,
   },
   modalHandle: {
-    width: 40, height: 4, borderRadius: 2, backgroundColor: BORDER,
+    width: 40, height: 4, borderRadius: 2, backgroundColor: theme.border,
     alignSelf: 'center', marginBottom: SP.md,
   },
-  modalTitle: { color: FG, fontSize: FS.md, fontFamily: FONT.bold },
-  modalSub: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 4, marginBottom: SP.md },
+  modalTitle: { color: theme.text, fontSize: FS.md, fontFamily: FONT.bold },
+  modalSub: { color: theme.muted, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 4, marginBottom: SP.md },
   input: {
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm,
-    color: FG, fontSize: FS.sm, fontFamily: FONT.regular,
+    backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.sm,
+    color: theme.text, fontSize: FS.sm, fontFamily: FONT.regular,
     paddingHorizontal: SP.md - 2, paddingVertical: SP.sm + 4, marginBottom: SP.sm + 2,
   },
   multiline: { minHeight: 80, textAlignVertical: 'top' },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-  pricePrefix: { color: FG, fontSize: FS.lg, fontFamily: FONT.bold },
+  pricePrefix: { color: theme.text, fontSize: FS.lg, fontFamily: FONT.bold },
   feeCard: {
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm,
+    backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.sm,
     padding: SP.md - 2, marginTop: SP.sm + 2, marginBottom: SP.md, gap: 6,
   },
   feeRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  feeLabel: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular },
-  feeValue: { color: FG, fontSize: FS.xs, fontFamily: FONT.semibold },
+  feeLabel: { color: theme.muted, fontSize: FS.xs, fontFamily: FONT.regular },
+  feeValue: { color: theme.text, fontSize: FS.xs, fontFamily: FONT.semibold },
   modalCancel: { alignItems: 'center', paddingVertical: SP.md },
-  modalCancelText: { color: MUTED, fontSize: FS.sm, fontFamily: FONT.medium },
+  modalCancelText: { color: theme.muted, fontSize: FS.sm, fontFamily: FONT.medium },
 });

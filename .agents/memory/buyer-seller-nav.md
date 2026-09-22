@@ -9,14 +9,20 @@ Only two account types exist: `buyer` and `seller`. "Both" is removed from `User
 **Why:** Product spec requires exactly two roles; "Both" created dead code paths and complexity.
 
 ## Buyer tab structure
-- **index** → Thread (re-exports `(tabs)/feed.tsx` — seller video feed, product tagging, likes, comments, purchase)
+- **index** → Home/Thread (re-exports `(tabs)/feed.tsx` — seller video feed, product tagging, likes, comments, purchase)
 - **discover** → Discover (`(buyer)/discover.tsx` — hero drops, For You, Dropping Soon, Trending)
-- **friends** → Friends
 - **inbox** → Inbox
+- **search** → Search
 - **profile** → Profile
-- Hidden (href: null): following, wishlist, edit-profile, search, feed
+- Hidden (href: null): friends, following, wishlist, edit-profile, feed
 
-**How to apply:** When a buyer signs in, `/(buyer)/` resolves to Thread. Do not put non-seller content in Thread; buyer posts only appear on buyer profile.
+The buyer bar is a compact four-item capsule (Home, Discover, Inbox, Search) plus a separate circular Profile button. Selecting Search swaps the capsule contents without animation: Home stays fixed, a capped-width inline search field appears, and Profile stays anchored.
+
+Its sizing follows the selected reference rather than generic edge-to-edge mobile spacing: about 8% side margins, 68% main capsule width, a 1–2% gap, and a 14–15% Profile circle. The capsule and Profile circle are the same height.
+
+**Why:** Search must remain part of the navigation, but sliding/scaling two overlapping tab layers caused bounce, imbalance, and temporarily hid Home. The user explicitly rejected that behavior and oversized proportions.
+
+**How to apply:** When a buyer signs in, `/(buyer)/` resolves to Home/Thread. Search mode must never animate the bar’s width or replace Home; switch contents in place, cap the field width, preserve the separate Profile control, and keep equal control heights. Do not put non-seller content in Thread; buyer posts only appear on buyer profile.
 
 ## Seller tab structure (unchanged)
 Dashboard · Products · Feed (center pill) · More · Profile

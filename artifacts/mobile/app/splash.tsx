@@ -3,11 +3,11 @@ import { View, StyleSheet, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
-
-const SPLASH_BACKGROUND = '#0A0A0B';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 export default function SplashScreen() {
   const router = useRouter();
+  const { theme } = useAppTheme();
 
   const logoScale   = useRef(new Animated.Value(0.86)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
@@ -35,9 +35,9 @@ export default function SplashScreen() {
   }, []);
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: theme.background }]}>
       <Animated.View style={[styles.logoWrap, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
-        <BrandthreadLogo size={150} tintColor="#FFFFFF" />
+        <BrandthreadLogo size={150} tintColor={theme.accentLight} />
       </Animated.View>
     </View>
   );
@@ -46,7 +46,6 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: SPLASH_BACKGROUND,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -161,9 +161,9 @@ export default function LoyaltyScreen() {
             disabled={redeeming || balance < 100}
             activeOpacity={0.85}
           >
-            {redeeming
-              ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={s.redeemBtnText}>Use points in Cart</Text>
+             {redeeming
+               ? <ActivityIndicator color={theme.onAccent} size="small" />
+               : <Text style={[s.redeemBtnText, { color: theme.onAccent }]}>Use points in Cart</Text>
             }
           </TouchableOpacity>
           <Text style={s.redeemDisabledNote}>Choose your points in Cart when you’re ready to check out.</Text>
@@ -240,7 +240,7 @@ const s = StyleSheet.create({
   discountPreview:    { backgroundColor: SUCCESS_DIM, borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 8 },
   discountPreviewText:{ fontSize: FS.sm, fontFamily: FONT.bold, color: SUCCESS },
   redeemBtn:          { borderRadius: RADIUS.sm, alignItems: 'center', paddingVertical: 14 },
-  redeemBtnText:      { fontSize: FS.base, fontFamily: FONT.bold, color: '#fff' },
+   redeemBtnText:      { fontSize: FS.base, fontFamily: FONT.bold },
   redeemDisabledNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', marginTop: SP.xs },
 
   historyRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginHorizontal: SP.md, marginBottom: SP.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, padding: SP.md },

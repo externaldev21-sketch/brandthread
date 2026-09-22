@@ -196,6 +196,7 @@ export default function SellerHomeCommerceDashboard({
   const router = useRouter();
   const api = useApi();
   const { theme } = useAppTheme();
+  const palette = theme as typeof theme & Record<string, string>;
   const { currentRole, isLoadingRole } = useTeamRole();
   const [range, setRange] = useState<TimeRange>('today');
   const [snapshot, setSnapshot] = useState<SellerHomeAnalyticsSnapshot | null>(null);
@@ -423,7 +424,7 @@ export default function SellerHomeCommerceDashboard({
   const visitorCount = data?.visitorCount ?? 0;
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: palette.background ?? palette.surface ?? BG }]}>
       <ScrollView
         testID="seller-dashboard-scroll"
         accessibilityLabel="Seller dashboard scroll"
@@ -445,7 +446,7 @@ export default function SellerHomeCommerceDashboard({
           accessible
           style={styles.topBar}
         >
-          <Text style={styles.screenTitle}>Dashboard</Text>
+          <Text style={[styles.screenTitle, { color: palette.foreground ?? FG }]}>Dashboard</Text>
         </View>
 
         {/* ── Time range pills ─────────────────────────────────────────── */}
@@ -463,16 +464,18 @@ export default function SellerHomeCommerceDashboard({
                 key={item.id}
                 style={[
                   styles.rangePill,
+                  { backgroundColor: palette.glass ?? palette.surface ?? SELLER_DASHBOARD_GLASS, borderColor: palette.border ?? BORDER },
                   selected && { backgroundColor: theme.accentDim, borderColor: theme.accent },
                 ]}
                 onPress={() => {
                   Haptics.selectionAsync().catch(() => {});
                   setRange(item.id);
                 }}
-                accessibilityRole="tab"
+                accessibilityRole="button"
+                accessibilityLabel={`Show ${item.label} sales`}
                 accessibilityState={{ selected }}
               >
-                <Text style={[styles.rangeText, selected && { color: theme.accentLight }]}>
+                <Text style={[styles.rangeText, { color: selected ? theme.accentLight : (palette.muted ?? MUTED) }]}>
                   {item.label}
                 </Text>
               </TouchableOpacity>
@@ -481,12 +484,12 @@ export default function SellerHomeCommerceDashboard({
         </ScrollView>
 
         {/* ── Summary stats ─────────────────────────────────────────────── */}
-        <View style={styles.statsCard}>
+        <View style={[styles.statsCard, { backgroundColor: palette.glass ?? palette.surface ?? SELLER_DASHBOARD_GLASS, borderColor: palette.border ?? BORDER }]}>
           {!data ? (
             <SummarySkeleton />
           ) : (
             <View style={styles.statGrid}>
-              <View style={styles.statTile}>
+              <View style={[styles.statTile, { backgroundColor: palette.cardElevated ?? palette.card ?? CARD_ELEVATED_GLASS, borderColor: palette.borderSubtle ?? BORDER_SUBTLE }]}>
                 <Text style={styles.statLabel}>Total sales</Text>
                 <Text
                   style={styles.statValue}
@@ -566,7 +569,7 @@ export default function SellerHomeCommerceDashboard({
         </View>
 
         {/* ── Sales activity chart ──────────────────────────────────────── */}
-        <View style={styles.chartCard}>
+        <View style={[styles.chartCard, { backgroundColor: palette.glass ?? palette.surface ?? SELLER_DASHBOARD_GLASS, borderColor: palette.border ?? BORDER }]}>
           <View style={styles.chartHeader}>
             <Text style={styles.sectionTitle}>Sales activity</Text>
             <View style={styles.chartBadge}>
@@ -618,6 +621,8 @@ export default function SellerHomeCommerceDashboard({
                   style={[styles.actionRow, toCapture > 0 && styles.actionRowBordered]}
                   onPress={() => nav('/(tabs)/orders')}
                   activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={`View ${toFulfill} ${toFulfill === 1 ? 'order' : 'orders'} to fulfill`}
                 >
                   <View style={styles.actionIconWrap}>
                     <Feather name="package" size={16} color={FG} />
@@ -640,6 +645,8 @@ export default function SellerHomeCommerceDashboard({
                   style={styles.actionRow}
                   onPress={() => nav('/payments')}
                   activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={`View ${toCapture} ${toCapture === 1 ? 'payment' : 'payments'} to capture`}
                 >
                   <View style={styles.actionIconWrap}>
                     <Feather name="credit-card" size={16} color={FG} />
@@ -684,11 +691,13 @@ export default function SellerHomeCommerceDashboard({
                 <TouchableOpacity
                   key={task.id}
                   style={[
-                    styles.setupCard,
+                    [styles.setupCard, { backgroundColor: palette.card ?? palette.surface ?? CARD_ELEVATED_GLASS, borderColor: palette.borderSubtle ?? BORDER_SUBTLE }],
                     index < unfinishedTasks.length - 1 && styles.setupCardBordered,
                   ]}
                   activeOpacity={0.75}
                   onPress={() => openTask(task)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open setup task: ${task.label}`}
                 >
                   <View style={[styles.setupIcon, { backgroundColor: theme.accentDim }]}>
                     <Feather
@@ -710,6 +719,7 @@ export default function SellerHomeCommerceDashboard({
                       event.stopPropagation();
                       showTaskOptions(task);
                     }}
+                    accessibilityRole="button"
                     accessibilityLabel={`Options for ${task.label}`}
                   >
                     <Feather name="more-horizontal" size={18} color={MUTED} />
@@ -759,7 +769,7 @@ const styles = StyleSheet.create({
     paddingVertical: SP.sm,
   },
   rangePill: {
-    minHeight: 36,
+     minHeight: 44,
     paddingHorizontal: 14,
     alignItems: 'center',
     justifyContent: 'center',
@@ -904,7 +914,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 3,
     borderTopRightRadius: 3,
   },
-  barLabel: { color: SUBTLE, fontFamily: FONT.regular, fontSize: 9 },
+  barLabel: { color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.xs },
 
   // ── Chart empty state
   chartEmptyWrap: {
@@ -1092,8 +1102,8 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   optionsButton: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,

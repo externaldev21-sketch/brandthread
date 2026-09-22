@@ -357,7 +357,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   commentsLabel: { fontFamily: FONT.semibold, fontSize: FS.sm, color: MUTED, marginBottom: SP.sm },
   commentRow: { flexDirection: 'row', gap: 8, marginBottom: SP.sm },
   commentAvatar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  commentAvatarText: { fontFamily: FONT.bold, fontSize: 10, color: ON_DARK },
+  commentAvatarText: { fontFamily: FONT.bold, fontSize: FS.xs, color: ON_DARK },
   commentName: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED },
   commentText: { fontFamily: FONT.regular, fontSize: FS.sm, color: FG },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.md, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: RED + '44', justifyContent: 'center' },

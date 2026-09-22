@@ -53,6 +53,8 @@ function BottomSheet({
   children: React.ReactNode;
 }) {
   const insets = useSafeAreaInsets();
+  const { theme } = useAppTheme();
+  const palette = theme as typeof theme & { card?: string; border?: string; overlay?: string };
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -67,10 +69,11 @@ function BottomSheet({
 
   return (
     <Modal transparent animationType="none" onRequestClose={onClose} visible={visible}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose}>
+      <TouchableOpacity style={[styles.backdrop, { backgroundColor: palette.overlay ?? OVERLAY }]} activeOpacity={1} onPress={onClose}>
         <Animated.View
           style={[
             styles.sheet,
+            { backgroundColor: palette.card ?? CARD, borderColor: palette.border ?? BORDER },
             { paddingBottom: insets.bottom + SP.md },
             { opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [120, 0] }) }] },
           ]}
@@ -93,10 +96,12 @@ function SheetRow({
   destructive?: boolean;
   onPress: () => void;
 }) {
+  const { theme } = useAppTheme();
+  const palette = theme as typeof theme & { text?: string; border?: string };
   return (
     <TouchableOpacity style={styles.sheetRow} onPress={onPress} activeOpacity={0.7}>
-      <Feather name={icon} size={ICON.md} color={destructive ? RED : FG} />
-      <Text style={[styles.sheetRowText, destructive && { color: RED }]}>{label}</Text>
+      <Feather name={icon} size={ICON.md} color={destructive ? RED : (palette.text ?? FG)} />
+      <Text style={[styles.sheetRowText, { color: palette.text ?? FG }, destructive && { color: RED }]}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -109,6 +114,17 @@ export default function ProfileScreen() {
   const { user } = useUser();
   const api     = useApi();
   const { theme } = useAppTheme();
+  const palette = theme as typeof theme & {
+    background?: string;
+    surface?: string;
+    card?: string;
+    cardElevated?: string;
+    border?: string;
+    text?: string;
+    muted?: string;
+    subtle?: string;
+    overlay?: string;
+  };
   const accountRef = useRef(user?.id);
   accountRef.current = user?.id;
 
@@ -276,7 +292,7 @@ export default function ProfileScreen() {
     || '•';
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: palette.background ?? BG }]}>
       {/* Top Bar */}
       <View style={styles.topBar}>
         <TouchableOpacity
@@ -546,6 +562,7 @@ export default function ProfileScreen() {
         <Text style={styles.sheetTitle}>Profile</Text>
         <SheetRow icon="edit-3" label="Edit Profile" onPress={() => { setMenuOpen(false); router.push('/(buyer)/edit-profile'); }} />
         <SheetRow icon="share-2" label="Share Profile" onPress={handleShareProfile} />
+        <SheetRow icon="users" label="Friends" onPress={() => { setMenuOpen(false); router.push('/(buyer)/friends' as any); }} />
         <SheetRow icon="star" label="Close Friends" onPress={() => { setMenuOpen(false); router.push('/buyer-close-friends' as any); }} />
         <SheetRow icon="archive" label="Archive" onPress={() => { setMenuOpen(false); router.push('/buyer-archive' as any); }} />
         <SheetRow icon="activity" label="Your Activity" onPress={() => { setMenuOpen(false); router.push('/buyer-your-activity' as any); }} />
