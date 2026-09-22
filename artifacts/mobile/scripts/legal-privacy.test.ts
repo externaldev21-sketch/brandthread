@@ -3,6 +3,11 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const projectRoot = path.resolve(__dirname, '..');
+const privacyLabelsDoc = path.resolve(projectRoot, '..', '..', 'docs', 'app-store', 'privacy-labels.md');
+const { REQUIRED_COLLECTED_TYPES, FORBIDDEN_COLLECTED_TYPES } = require('./verify-ios-privacy-manifest.js') as {
+  REQUIRED_COLLECTED_TYPES: string[];
+  FORBIDDEN_COLLECTED_TYPES: string[];
+};
 
 describe('public legal documents', () => {
   it.each([
@@ -77,5 +82,25 @@ describe('Apple privacy manifest configuration', () => {
     );
     expect(types).not.toContain('NSPrivacyCollectedDataTypePreciseLocation');
     expect(types).not.toContain('NSPrivacyCollectedDataTypeCoarseLocation');
+  });
+
+  it('declares exactly the data types the verifier and App Store labels doc list', () => {
+    const types = manifest.NSPrivacyCollectedDataTypes.map(
+      (entry: { NSPrivacyCollectedDataType: string }) => entry.NSPrivacyCollectedDataType,
+    );
+    expect([...types].sort()).toEqual([...REQUIRED_COLLECTED_TYPES].sort());
+    for (const forbidden of FORBIDDEN_COLLECTED_TYPES) expect(types).not.toContain(forbidden);
+
+    const doc = fs.readFileSync(privacyLabelsDoc, 'utf8');
+    const documented = new Set(doc.match(/`NSPrivacyCollectedDataType(?!Purpose|Linked|Tracking)\w+`/g)?.map((m) => m.slice(1, -1)));
+    const collectedTableTypes = [...documented].filter((t) => !FORBIDDEN_COLLECTED_TYPES.includes(t));
+    expect(collectedTableTypes.sort()).toEqual([...types].sort());
+  });
+
+  it('never marks collected data as used for tracking', () => {
+    for (const entry of manifest.NSPrivacyCollectedDataTypes) {
+      expect(entry.NSPrivacyCollectedDataTypeTracking).toBe(false);
+      expect(entry.NSPrivacyCollectedDataTypePurposes).toContain('NSPrivacyCollectedDataTypePurposeAppFunctionality');
+    }
   });
 });

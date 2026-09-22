@@ -29,7 +29,8 @@
     "verify:apple-auth": "node scripts/verify-apple-auth.js",
     "verify:ios-build": "node scripts/verify-ios-build.js",
     "verify:privacy-manifest": "node scripts/verify-ios-privacy-manifest.js",
-    "verify:privacy-manifest:config": "node scripts/verify-ios-privacy-manifest.js --config-only"
+    "verify:privacy-manifest:config": "node scripts/verify-ios-privacy-manifest.js --config-only",
+    "verify:submit-config": "node scripts/verify-submit-config.js"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
@@ -48,7 +49,6 @@
     "@workspace/api-client-react": "workspace:*",
     "babel-plugin-react-compiler": "^19.0.0-beta-e993439-20250117",
     "create-launch": "0.3.6",
-    "expo": "~57.0.24",
     "expo-auth-session": "~57.0.12",
     "expo-blur": "~57.0.3",
     "expo-constants": "~57.0.19",
@@ -60,7 +60,6 @@
     "expo-image-picker": "~57.0.19",
     "expo-linear-gradient": "~57.0.2",
     "expo-linking": "~57.0.10",
-    "expo-location": "~57.0.19",
     "expo-router": "~57.0.22",
     "expo-secure-store": "~57.0.4",
     "expo-splash-screen": "~57.0.9",
@@ -68,9 +67,7 @@
     "expo-symbols": "~57.0.3",
     "expo-system-ui": "~57.0.4",
     "expo-web-browser": "~57.0.3",
-    "react": "19.2.3",
     "react-dom": "19.2.3",
-    "react-native": "0.86.3",
     "react-native-gesture-handler": "~2.32.0",
     "react-native-keyboard-controller": "1.21.9",
     "react-native-reanimated": "~4.5.1",

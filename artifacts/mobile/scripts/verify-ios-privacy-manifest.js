@@ -15,19 +15,34 @@ const REQUIRED_API_DECLARATIONS = {
   NSPrivacyAccessedAPICategoryUserDefaults: 'CA92.1',
 };
 
+// Must match docs/app-store/privacy-labels.md exactly, so the App Store
+// privacy questionnaire, the privacy manifest and the code never drift apart.
 const REQUIRED_COLLECTED_TYPES = [
   'NSPrivacyCollectedDataTypeName',
   'NSPrivacyCollectedDataTypeEmailAddress',
+  'NSPrivacyCollectedDataTypePhoneNumber',
+  'NSPrivacyCollectedDataTypePhysicalAddress',
   'NSPrivacyCollectedDataTypeUserID',
   'NSPrivacyCollectedDataTypeDeviceID',
   'NSPrivacyCollectedDataTypePaymentInfo',
+  'NSPrivacyCollectedDataTypeOtherFinancialInfo',
   'NSPrivacyCollectedDataTypePurchaseHistory',
-  'NSPrivacyCollectedDataTypeSensitiveInfo',
   'NSPrivacyCollectedDataTypePhotosorVideos',
   'NSPrivacyCollectedDataTypeAudioData',
   'NSPrivacyCollectedDataTypeEmailsOrTextMessages',
   'NSPrivacyCollectedDataTypeOtherUserContent',
   'NSPrivacyCollectedDataTypeCustomerSupport',
+  'NSPrivacyCollectedDataTypeProductInteraction',
+  'NSPrivacyCollectedDataTypeOtherDiagnosticData',
+];
+
+// No feature collects these. Sensitive Info covers Apple's special categories
+// (e.g. biometric data); Face ID stays on device and Stripe Identity runs in
+// the external browser, so Brandthread never receives that data.
+const FORBIDDEN_COLLECTED_TYPES = [
+  'NSPrivacyCollectedDataTypeSensitiveInfo',
+  'NSPrivacyCollectedDataTypePreciseLocation',
+  'NSPrivacyCollectedDataTypeCoarseLocation',
 ];
 
 function fail(message) {
@@ -48,6 +63,19 @@ function assertConfiguredManifest() {
     if (!declaration?.NSPrivacyAccessedAPITypeReasons?.includes(reason)) {
       fail(`${category} is missing required reason ${reason}`);
     }
+  }
+
+  const declaredTypes = (configuredManifest.NSPrivacyCollectedDataTypes ?? []).map(
+    (entry) => entry.NSPrivacyCollectedDataType,
+  );
+  for (const dataType of FORBIDDEN_COLLECTED_TYPES) {
+    if (declaredTypes.includes(dataType)) {
+      fail(`${dataType} is declared, but no Brandthread feature collects it`);
+    }
+  }
+  const unexpected = declaredTypes.filter((dataType) => !REQUIRED_COLLECTED_TYPES.includes(dataType));
+  if (unexpected.length > 0) {
+    fail(`${unexpected.join(', ')} must also be added to this verifier and docs/app-store/privacy-labels.md`);
   }
 
   for (const dataType of REQUIRED_COLLECTED_TYPES) {
@@ -97,6 +125,12 @@ function assertGeneratedManifest() {
     }
   }
 
+  for (const dataType of FORBIDDEN_COLLECTED_TYPES) {
+    if (generated.includes(`<string>${dataType}</string>`)) {
+      fail(`generated app manifest declares ${dataType}, but no Brandthread feature collects it`);
+    }
+  }
+
   for (const dataType of REQUIRED_COLLECTED_TYPES) {
     const entry = dictionaries.find((dictionary) =>
       dictionary.includes(`<string>${dataType}</string>`),
@@ -115,10 +149,14 @@ function assertGeneratedManifest() {
   console.log(`Verified generated app privacy manifest: ${path.relative(projectRoot, appManifestPath)}`);
 }
 
-assertConfiguredManifest();
+module.exports = { REQUIRED_COLLECTED_TYPES, FORBIDDEN_COLLECTED_TYPES };
 
-if (process.argv.includes('--config-only')) {
-  console.log('Verified Expo privacy-manifest configuration.');
-} else {
-  assertGeneratedManifest();
+if (require.main === module) {
+  assertConfiguredManifest();
+
+  if (process.argv.includes('--config-only')) {
+    console.log('Verified Expo privacy-manifest configuration.');
+  } else {
+    assertGeneratedManifest();
+  }
 }

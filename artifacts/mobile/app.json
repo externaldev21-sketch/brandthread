@@ -1,12 +1,12 @@
 {
   "expo": {
     "name": "Brandthread",
-    "slug": "mobile",
+    "slug": "brandthread",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/app-icons/monochrome.png",
     "scheme": "brandthread",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "ios": {
       "bundleIdentifier": "com.brandthread.mobile",
       "usesAppleSignIn": true,
@@ -15,7 +15,10 @@
           "Default"
         ]
       },
-      "supportsTablet": false,
+      "supportsTablet": true,
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "privacyManifests": {
         "NSPrivacyTracking": false,
         "NSPrivacyTrackingDomains": [],
@@ -119,14 +122,6 @@
             ]
           },
           {
-            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeSensitiveInfo",
-            "NSPrivacyCollectedDataTypeLinked": true,
-            "NSPrivacyCollectedDataTypeTracking": false,
-            "NSPrivacyCollectedDataTypePurposes": [
-              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
-            ]
-          },
-          {
             "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypePhotosorVideos",
             "NSPrivacyCollectedDataTypeLinked": true,
             "NSPrivacyCollectedDataTypeTracking": false,
@@ -192,7 +187,10 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/app-icons/monochrome-android-foreground.png",
         "backgroundColor": "#0A0A0B"
-      }
+      },
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
     },
     "web": {
       "favicon": "./assets/images/icon.png",
@@ -280,19 +278,53 @@
       "expo-web-browser",
       "expo-apple-authentication",
       [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Brandthread uses Face ID to confirm it's you when you turn on or use biometric unlock for your account."
+        }
+      ],
+      [
         "expo-media-library",
         {
-          "photosPermission": "Brandthread needs access to your photos so you can post them to your story.",
-          "savePhotosPermission": "Brandthread needs access to save videos you choose from Thread.",
-          "isAccessMediaLocationEnabled": false
+          "photosPermission": "Brandthread uses your photo library so you can choose photos and videos to share in posts, stories, messages, products and designs.",
+          "savePhotosPermission": "Brandthread saves photos and videos to your library only when you tap Save or Download, for example when exporting a design or saving a video from Thread.",
+          "isAccessMediaLocationEnabled": false,
+          "granularPermissions": [
+            "photo",
+            "video"
+          ]
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Brandthread uses your photo library so you can choose photos and videos to share in posts, stories, messages, products and designs.",
+          "cameraPermission": "Brandthread uses your camera so you can take photos and record videos for posts, stories, products and designs, and so others can see you when you go live or join a video call.",
+          "microphonePermission": "Brandthread uses your microphone to record sound for your videos and voice messages, and so others can hear you when you go live or join a call.",
+          "colors": {
+            "cropToolbarColor": "#0A0A0B",
+            "cropToolbarIconColor": "#F7F7FA",
+            "cropToolbarActionTextColor": "#F7F7FA",
+            "cropBackButtonIconColor": "#F7F7FA",
+            "cropBackgroundColor": "#0A0A0B"
+          },
+          "dark": {
+            "colors": {
+              "cropToolbarColor": "#0A0A0B",
+              "cropToolbarIconColor": "#F7F7FA",
+              "cropToolbarActionTextColor": "#F7F7FA",
+              "cropBackButtonIconColor": "#F7F7FA",
+              "cropBackgroundColor": "#0A0A0B"
+            }
+          }
         }
       ],
       "expo-video",
       [
         "expo-camera",
         {
-          "cameraPermission": "Brandthread needs camera access to record videos and take photos for posts.",
-          "microphonePermission": "Brandthread needs microphone access to record video with audio.",
+          "cameraPermission": "Brandthread uses your camera so you can take photos and record videos for posts, stories, products and designs, and so others can see you when you go live or join a video call.",
+          "microphonePermission": "Brandthread uses your microphone to record sound for your videos and voice messages, and so others can hear you when you go live or join a call.",
           "recordAudioAndroid": true
         }
       ],
@@ -307,7 +339,12 @@
           "iosDisplayInForeground": true
         }
       ],
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Brandthread uses your microphone to record sound for your videos and voice messages, and so others can hear you when you go live or join a call."
+        }
+      ],
       "expo-asset"
     ],
     "experiments": {

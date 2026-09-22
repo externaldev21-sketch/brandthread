@@ -32,8 +32,10 @@ function taskState(id: SetupTaskId) {
 }
 
 describe('seller setup completion behavior', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     storage.clear();
+    // Setup progress is stored per seller; bind one like the app does at sign-in.
+    await getSetupState('seller_setup_test');
   });
 
   const successfulActions: Array<[SetupTaskId, string]> = [
