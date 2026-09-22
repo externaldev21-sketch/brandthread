@@ -413,6 +413,7 @@ function BuyerBottomTabBar({
                   onPress={() => updateSearch('')}
                   hitSlop={14}
                   style={({ pressed }) => pressed && { opacity: 0.6 }}
+                  testID="buyer-tab-search-clear"
                 >
                   <Feather name="x-circle" size={16} color={inactiveColor} />
                 </Pressable>

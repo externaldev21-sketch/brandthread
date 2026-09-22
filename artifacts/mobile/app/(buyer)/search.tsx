@@ -310,7 +310,7 @@ export default function SearchScreen() {
         contentContainerStyle={{ paddingTop: topPad + 16, paddingBottom: 40 }}
       >
         {query.trim().length === 0 ? (
-          <>
+          <View testID="buyer-search-empty-state" accessibilityLabel="Search is empty">
             {searchFocused && recentSearches.length > 0 ? (
               <Text style={[styles.sectionLabel, { color: muted }]}>RECENT</Text>
             ) : null}
@@ -339,9 +339,9 @@ export default function SearchScreen() {
               <Text style={[styles.rowText, { color: fg }]}>Browse trending brands and drops</Text>
               <Feather name="chevron-right" size={17} color={muted} />
             </TouchableOpacity>
-          </>
+          </View>
         ) : (
-          <>
+          <View testID="buyer-search-results-state" accessibilityLabel={`Search results for ${query}`}>
             {suggestions.length > 0 ? (
               <>
                 <Text style={[styles.sectionLabel, { color: muted }]}>SUGGESTIONS</Text>
@@ -467,7 +467,7 @@ export default function SearchScreen() {
                 )}
               </>
             )}
-          </>
+          </View>
         )}
       </ScrollView>
     </View>

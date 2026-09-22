@@ -740,6 +740,13 @@ function RootLayoutNav() {
 
   return (
     <View style={{ flex: 1, flexDirection: 'column' }}>
+      <View
+        testID="expo-go-startup-ready"
+        accessibilityLabel="Brandthread startup ready"
+        accessible
+        pointerEvents="none"
+        style={{ position: 'absolute', width: 1, height: 1, opacity: 0.01 }}
+      />
       <StoreContextBanner />
       <NetworkNoticeBanner />
       <Pressable onPress={Keyboard.dismiss} accessible={false} style={{ flex: 1 }}>
