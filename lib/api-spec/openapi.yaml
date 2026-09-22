@@ -1329,12 +1329,19 @@ components:
         id: { type: string }
         manufacturerId: { type: string }
         sellerId: { type: string }
+        sellerName: { type: string, description: "Seller brand name (manufacturer-facing endpoints)" }
         threadId: { type: ["string", "null"] }
         orderType: { type: string, enum: [sample, bulk] }
+        issuedBy: { type: string, enum: [seller, manufacturer] }
         title: { type: string }
+        description: { type: ["string", "null"] }
         quantity: { type: integer }
         priceCents: { type: integer }
         status: { type: string }
+        carrier: { type: ["string", "null"] }
+        trackingNumber: { type: ["string", "null"] }
+        shippedAt: { type: ["string", "null"] }
+        deliveredAt: { type: ["string", "null"] }
         imageUrls:
           type: array
           description: Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.

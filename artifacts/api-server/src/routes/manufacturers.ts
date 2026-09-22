@@ -148,6 +148,16 @@ function serializeSampleOrder(order: typeof sampleOrders.$inferSelect) {
   };
 }
 
+/** Adds the seller's brand name so manufacturers never see raw account ids. */
+async function withSellerNames<T extends { sellerId: string }>(orders: T[]): Promise<Array<T & { sellerName: string }>> {
+  const sellerIds = [...new Set(orders.map((order) => order.sellerId))];
+  const rows = sellerIds.length === 0 ? [] : await db.select({
+    clerkId: users.clerkId, brandName: users.brandName, displayName: users.displayName, name: users.name,
+  }).from(users).where(inArray(users.clerkId, sellerIds));
+  const names = new Map(rows.map((row) => [row.clerkId, row.brandName?.trim() || row.displayName?.trim() || row.name?.trim() || "Seller"]));
+  return orders.map((order) => ({ ...order, sellerName: names.get(order.sellerId) ?? "Seller" }));
+}
+
 async function serializeManufacturerOrderDetail(order: typeof sampleOrders.$inferSelect) {
   const serialized = serializeSampleOrder(order);
   const imageUrls = await Promise.all((order.imageUrls ?? []).map((path) =>
@@ -1055,7 +1065,7 @@ router.get("/me/dashboard", async (req, res) => {
   const pendingMessages = threads.reduce((sum, t) => sum + t.manufacturerUnreadCount, 0);
   const totalRevenue    = completed.reduce((s, o) => s + o.priceCents, 0);
 
-  const recentOrders = sharedOrders.slice(0, 5).map(serializeSampleOrder);
+  const recentOrders = await withSellerNames(sharedOrders.slice(0, 5).map(serializeSampleOrder));
 
   return res.json({
     activeOrders, pendingMessages, completedOrders,
@@ -1474,7 +1484,7 @@ router.get("/me/sample-orders", async (req, res) => {
   const rows = await db.select().from(sampleOrders)
     .where(eq(sampleOrders.manufacturerId, mfr.id))
     .orderBy(desc(sampleOrders.updatedAt));
-  return res.json(rows.map(serializeSampleOrder));
+  return res.json(await withSellerNames(rows.map(serializeSampleOrder)));
 });
 
 router.get("/me/sample-orders/:orderId", async (req, res) => {
@@ -1487,7 +1497,7 @@ router.get("/me/sample-orders/:orderId", async (req, res) => {
     eq(sampleOrders.manufacturerId, mfr.id),
   )).limit(1);
   if (!order) return res.status(404).json({ error: "Order not found" });
-  return res.json(await serializeManufacturerOrderDetail(order));
+  return res.json((await withSellerNames([await serializeManufacturerOrderDetail(order)]))[0]);
 });
 
 router.patch("/me/sample-orders/:orderId/status", async (req, res) => {

@@ -270,17 +270,38 @@ export const SampleOrderOrderType = {
   bulk: 'bulk',
 } as const;
 
+export type SampleOrderIssuedBy = typeof SampleOrderIssuedBy[keyof typeof SampleOrderIssuedBy];
+
+
+export const SampleOrderIssuedBy = {
+  seller: 'seller',
+  manufacturer: 'manufacturer',
+} as const;
+
 export interface SampleOrder {
   id: string;
   manufacturerId: string;
   sellerId: string;
+  /** Seller brand name (manufacturer-facing endpoints) */
+  sellerName?: string;
   /** @nullable */
   threadId?: string | null;
   orderType: SampleOrderOrderType;
+  issuedBy?: SampleOrderIssuedBy;
   title: string;
+  /** @nullable */
+  description?: string | null;
   quantity: number;
   priceCents: number;
   status: string;
+  /** @nullable */
+  carrier?: string | null;
+  /** @nullable */
+  trackingNumber?: string | null;
+  /** @nullable */
+  shippedAt?: string | null;
+  /** @nullable */
+  deliveredAt?: string | null;
   /** Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints. */
   imageUrls?: string[];
   createdAt: string;

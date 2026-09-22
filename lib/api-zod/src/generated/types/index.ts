@@ -89,5 +89,6 @@ export * from './sampleDetailDecisionInputRevision';
 export * from './sampleDetailDecisionInputStatus';
 export * from './sampleOrder';
 export * from './sampleOrderImageUploadReceipt';
+export * from './sampleOrderIssuedBy';
 export * from './sampleOrderOrderType';
 export * from './uploadManufacturerThreadAttachment201';

@@ -1,82 +1,147 @@
-import { useState, useRef, useEffect } from "react";
-import { useGetThreadMessages, useListManufacturerThreads, useSendThreadMessage, useUploadManufacturerThreadAttachment, getGetThreadMessagesQueryKey, getListManufacturerThreadsQueryKey } from "@workspace/api-client-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useGetThreadMessages, useListManufacturerThreads, useSendThreadMessage, useUploadManufacturerThreadAttachment,
+  getGetThreadMessagesQueryKey, getListManufacturerThreadsQueryKey, type Message,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ArrowLeft, Send, Package, MessageSquare, Paperclip, FileText } from "lucide-react";
+import { ArrowLeft, FileText, ImagePlus, Info, Loader2, MessageSquare, Plus, Send, X } from "lucide-react";
+import { orderStatusLabel } from "@workspace/manufacturer-flow";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { Message } from "@workspace/api-client-react";
 import { EmptyState, QueryError } from "@/components/query-state";
 import { ThreadCall } from "@/components/thread-call";
+import { OrderCard } from "@/components/orders/order-card";
+import { SendCardDialog } from "@/components/orders/send-card-dialog";
+import type { OrderCardSnapshot } from "@/lib/order-types";
+
+type RichMessage = Message & { order?: OrderCardSnapshot | null };
+
+const MAX_ATTACHMENTS = 6;
+const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
+const ACCEPTED = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+
+function dayLabel(date: Date) {
+  const today = new Date();
+  const yesterday = new Date(); yesterday.setDate(today.getDate() - 1);
+  if (date.toDateString() === today.toDateString()) return "Today";
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: date.getFullYear() === today.getFullYear() ? undefined : "numeric" });
+}
+
+type PendingFile = { file: File; preview: string | null };
 
 export default function MessageThread({ threadId }: { threadId: string }) {
   const messagesQuery = useGetThreadMessages(threadId, { query: { enabled: !!threadId, queryKey: getGetThreadMessagesQueryKey(threadId), refetchInterval: 10_000 } });
   const threadsQuery = useListManufacturerThreads({ query: { queryKey: getListManufacturerThreadsQueryKey(), refetchInterval: 10_000 } });
-  const { data: messages, isLoading: messagesLoading } = messagesQuery;
-  const { data: threads } = threadsQuery;
+  const messages = messagesQuery.data as RichMessage[] | undefined;
   const sendMutation = useSendThreadMessage();
   const uploadMutation = useUploadManufacturerThreadAttachment();
   const queryClient = useQueryClient();
-  
+
   const [draft, setDraft] = useState("");
-  const [attachment, setAttachment] = useState<File | null>(null);
+  const [attachments, setAttachments] = useState<PendingFile[]>([]);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [cardOpen, setCardOpen] = useState(false);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
   const requestIdRef = useRef<string | null>(null);
+  const lastCount = useRef(0);
 
-  const thread = threads?.find(t => t.id === threadId);
+  const thread = threadsQuery.data?.find((t) => t.id === threadId);
 
   useEffect(() => {
-    // Scroll to bottom when messages load
-    if (messages) {
-      endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Follow new messages without yanking the view on every poll.
+    if (messages && messages.length !== lastCount.current) {
+      endOfMessagesRef.current?.scrollIntoView({ behavior: lastCount.current === 0 ? "auto" : "smooth" });
+      lastCount.current = messages.length;
     }
   }, [messages]);
 
-  const handleSend = async () => {
-    const clientRequestId = requestIdRef.current ?? crypto.randomUUID();
-    requestIdRef.current = clientRequestId;
-    if ((!draft.trim() && !attachment) || !threadId) return;
-    let mediaUrls: string[] | undefined;
-    const file = attachment;
-    if (file) {
-      try {
-        // Pass the selected File itself so the generated client receives its
-        // original bytes and exact MIME type (image/jpeg, image/png, or application/pdf).
-        const uploaded = await uploadMutation.mutateAsync({ threadId, data: file });
-        mediaUrls = [uploaded.objectPath];
-      } catch {
-        return;
-      }
+  useEffect(() => () => attachments.forEach((item) => item.preview && URL.revokeObjectURL(item.preview)), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const grouped = useMemo(() => {
+    const groups: Array<{ day: string; items: RichMessage[] }> = [];
+    for (const message of messages ?? []) {
+      const day = dayLabel(new Date(message.sentAt));
+      const current = groups.at(-1);
+      if (current?.day === day) current.items.push(message);
+      else groups.push({ day, items: [message] });
     }
-    sendMutation.mutate(
-      { threadId, data: { clientRequestId, content: draft.trim() || undefined, messageType: mediaUrls ? (file?.type.startsWith("image/") ? "image" : "text") : "text", mediaUrls } },
-      {
-        onSuccess: (newMessage) => {
-          setDraft("");
-          setAttachment(null);
-          requestIdRef.current = null;
-          // Optimistically update cache
-          queryClient.setQueryData(getGetThreadMessagesQueryKey(threadId), (old: Message[] | undefined) => 
-            old ? [...old, newMessage] : [newMessage]
-          );
-          void queryClient.invalidateQueries({ queryKey: getListManufacturerThreadsQueryKey() });
-        },
-        onError: () => {
-          void queryClient.invalidateQueries({ queryKey: getGetThreadMessagesQueryKey(threadId) });
-          void queryClient.invalidateQueries({ queryKey: getListManufacturerThreadsQueryKey() });
-        },
-      }
-    );
+    return groups;
+  }, [messages]);
+
+  const addFiles = (files: FileList | null) => {
+    setAttachError(null);
+    if (!files) return;
+    const next = [...attachments];
+    for (const file of Array.from(files)) {
+      if (!ACCEPTED.includes(file.type)) { setAttachError("Attach JPEG, PNG, WebP photos or PDF files."); continue; }
+      if (file.size > MAX_ATTACHMENT_BYTES) { setAttachError(`${file.name} is larger than 20 MB.`); continue; }
+      if (next.length >= MAX_ATTACHMENTS) { setAttachError(`You can attach up to ${MAX_ATTACHMENTS} files at once.`); break; }
+      next.push({ file, preview: file.type.startsWith("image/") ? URL.createObjectURL(file) : null });
+    }
+    setAttachments(next);
   };
 
-  if (messagesLoading || threadsQuery.isLoading) {
+  const removeAttachment = (index: number) => {
+    setAttachments((items) => {
+      const removed = items[index];
+      if (removed?.preview) URL.revokeObjectURL(removed.preview);
+      return items.filter((_, i) => i !== index);
+    });
+  };
+
+  const handleSend = async () => {
+    if ((!draft.trim() && attachments.length === 0) || !threadId || sending) return;
+    setSending(true);
+    setSendError(null);
+    const clientRequestId = requestIdRef.current ?? crypto.randomUUID();
+    requestIdRef.current = clientRequestId;
+    try {
+      const mediaUrls: string[] = [];
+      for (const item of attachments) {
+        const uploaded = await uploadMutation.mutateAsync({ threadId, data: item.file });
+        mediaUrls.push(uploaded.objectPath);
+      }
+      const onlyImages = attachments.length > 0 && attachments.every((item) => item.file.type.startsWith("image/"));
+      const message = await sendMutation.mutateAsync({
+        threadId,
+        data: {
+          clientRequestId,
+          content: draft.trim() || (attachments.length ? (onlyImages ? `Sent ${attachments.length === 1 ? "a photo" : `${attachments.length} photos`}` : "Sent an attachment") : undefined),
+          messageType: onlyImages ? "image" : "text",
+          mediaUrls: mediaUrls.length ? mediaUrls : undefined,
+        },
+      });
+      setDraft("");
+      attachments.forEach((item) => item.preview && URL.revokeObjectURL(item.preview));
+      setAttachments([]);
+      requestIdRef.current = null;
+      queryClient.setQueryData(getGetThreadMessagesQueryKey(threadId), (old: Message[] | undefined) =>
+        old ? (old.some((item) => item.id === message.id) ? old : [...old, message]) : [message]);
+      void queryClient.invalidateQueries({ queryKey: getListManufacturerThreadsQueryKey() });
+    } catch {
+      setSendError("Message not sent. Check your connection and try again.");
+      void queryClient.invalidateQueries({ queryKey: getGetThreadMessagesQueryKey(threadId) });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (messagesQuery.isLoading || threadsQuery.isLoading) {
     return (
-      <div className="h-full flex flex-col border border-border bg-card rounded-lg animate-pulse">
-        <div className="h-16 border-b border-border bg-secondary/20"></div>
-        <div className="flex-1 p-6 space-y-6">
-          <div className="h-16 w-2/3 bg-secondary/50 rounded-lg"></div>
-          <div className="h-16 w-2/3 bg-secondary/50 rounded-lg ml-auto"></div>
+      <div className="flex h-[calc(100vh-8rem)] flex-col rounded-lg border border-border bg-card" data-testid="status-thread-loading">
+        <div className="flex h-16 items-center gap-3 border-b border-border px-6">
+          <div className="h-10 w-10 animate-pulse rounded-full bg-secondary" />
+          <div className="space-y-2"><div className="h-3 w-32 animate-pulse rounded bg-secondary" /><div className="h-3 w-20 animate-pulse rounded bg-secondary" /></div>
+        </div>
+        <div className="flex-1 space-y-6 p-6">
+          <div className="h-16 w-2/3 animate-pulse rounded-lg bg-secondary/50" />
+          <div className="ml-auto h-16 w-1/2 animate-pulse rounded-lg bg-secondary/50" />
+          <div className="h-40 w-72 animate-pulse rounded-xl bg-secondary/50" />
         </div>
       </div>
     );
@@ -87,10 +152,7 @@ export default function MessageThread({ threadId }: { threadId: string }) {
       <QueryError
         title="Unable to load conversation"
         description="The latest messages could not be retrieved."
-        onRetry={() => {
-          void messagesQuery.refetch();
-          void threadsQuery.refetch();
-        }}
+        onRetry={() => { void messagesQuery.refetch(); void threadsQuery.refetch(); }}
       />
     );
   }
@@ -100,119 +162,147 @@ export default function MessageThread({ threadId }: { threadId: string }) {
   }
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex flex-col border border-border bg-card rounded-lg overflow-hidden animate-in fade-in duration-300 relative">
-      {/* Header */}
-      <div className="h-16 border-b border-border bg-card/80 backdrop-blur-sm flex items-center px-4 md:px-6 shrink-0 z-10 sticky top-0">
-        <Link href="/messages" className="mr-4 text-muted-foreground hover:text-foreground transition-colors p-2 -ml-2 rounded-full hover:bg-secondary">
-          <ArrowLeft className="w-5 h-5" />
+    <div className="relative flex h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-lg border border-border bg-card animate-in fade-in duration-300">
+      <div className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-3 border-b border-border bg-card/80 px-4 backdrop-blur-sm md:px-6">
+        <Link href="/messages" className="-ml-2 rounded-full p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" aria-label="Back to inbox">
+          <ArrowLeft className="h-5 w-5" />
         </Link>
-        <div className="flex-1 min-w-0 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-secondary border border-border flex items-center justify-center font-bold text-muted-foreground shrink-0">
-            {thread.buyerAvatar ? (
-              <img src={thread.buyerAvatar} alt={thread.buyerName} className="w-full h-full rounded-full object-cover" />
-            ) : (
-              thread.buyerName.substring(0, 2).toUpperCase()
-            )}
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-secondary font-bold text-muted-foreground">
+            {thread.buyerAvatar ? <img src={thread.buyerAvatar} alt="" className="h-full w-full object-cover" /> : thread.buyerName.substring(0, 2).toUpperCase()}
           </div>
-          <div className="truncate">
-            <h2 className="font-semibold text-sm md:text-base truncate">{thread.buyerName}</h2>
-            <p className="text-xs text-muted-foreground truncate">{thread.subject}</p>
+          <div className="min-w-0">
+            <h2 className="truncate text-sm font-semibold md:text-base" data-testid="text-thread-seller">{thread.buyerName}</h2>
+            <p className="truncate text-xs text-muted-foreground">
+              {thread.subject}{thread.orderStatus ? ` · ${orderStatusLabel(thread.orderStatus)}` : ""}
+            </p>
           </div>
         </div>
-        
-        {thread.orderStatus && (
-          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-secondary/50 border border-border rounded text-xs font-mono uppercase tracking-wider text-muted-foreground">
-            <Package className="w-3 h-3" />
-            {thread.orderStatus.replace('_', ' ')}
-          </div>
-        )}
+        <Button size="sm" onClick={() => setCardOpen(true)} className="hidden gap-1.5 sm:inline-flex" data-testid="button-open-send-card">
+          <Plus className="h-4 w-4" /> Order card
+        </Button>
         <ThreadCall threadId={threadId} />
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+      <div className="flex-1 space-y-6 overflow-y-auto p-4 md:p-6" data-testid="thread-messages">
         {messages?.length === 0 && (
-          <div className="py-16 text-center text-sm text-muted-foreground" data-testid="status-empty-thread">
-            No messages yet. Send the first reply below.
+          <div className="mx-auto max-w-sm py-16 text-center" data-testid="status-empty-thread">
+            <MessageSquare className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+            <p className="font-medium">Start the conversation</p>
+            <p className="mt-1 text-sm text-muted-foreground">Introduce your factory, ask for the tech pack, or send a priced sample card when you're ready.</p>
           </div>
         )}
-        {messages?.map((msg, i) => {
-          const isMe = msg.senderRole === "manufacturer";
-          const richMessage = msg as typeof msg & { messageType?: string; mediaUrls?: string[]; cardData?: Record<string, unknown> | null };
-          const showTime = i === 0 || new Date(msg.sentAt).getTime() - new Date(messages[i-1].sentAt).getTime() > 1000 * 60 * 30; // 30 mins
-          
-          return (
-            <div key={msg.id} className="flex flex-col">
-              {showTime && (
-                <div className="text-center text-xs text-muted-foreground font-mono mb-4 mt-2">
-                  {new Date(msg.sentAt).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                </div>
-              )}
-              <div className={cn(
-                "max-w-[85%] md:max-w-[70%] rounded-lg px-4 py-3 text-sm",
-                isMe 
-                  ? "bg-primary text-primary-foreground self-end" 
-                  : "bg-secondary border border-border text-foreground self-start"
-              )}>
-                <p className="whitespace-pre-wrap">{msg.content}</p>
-                {richMessage.mediaUrls?.map((url) => url.match(/\.(pdf)(\?|$)/i) ? (
-                  <a key={url} href={url} target="_blank" rel="noreferrer" className="mt-3 flex items-center gap-2 underline"><FileText className="h-4 w-4" />Open PDF attachment</a>
-                ) : <a key={url} href={url} target="_blank" rel="noreferrer"><img src={url} alt="Message attachment" className="mt-3 max-h-64 rounded object-cover" /></a>)}
-                {(richMessage.messageType === "sample_card" || richMessage.messageType === "bulk_card") && richMessage.cardData && typeof richMessage.cardData.orderId === "string" && (
-                  <Link href={`/orders/${richMessage.cardData.orderId}`} className="mt-3 block rounded border border-current/30 p-3 font-medium underline" data-testid={`link-message-order-${msg.id}`}>
-                    Open {richMessage.messageType === "bulk_card" ? "bulk" : "sample"} order tracker
-                  </Link>
-                )}
-              </div>
-              <span className={cn(
-                "text-[10px] text-muted-foreground mt-1 px-1",
-                isMe ? "self-end" : "self-start"
-              )}>
-                {new Date(msg.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
+        {grouped.map((group) => (
+          <section key={group.day} className="space-y-4">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span className="h-px flex-1 bg-border" /><span className="font-mono">{group.day}</span><span className="h-px flex-1 bg-border" />
             </div>
-          );
-        })}
+            {group.items.map((msg) => {
+              if (msg.messageType === "system" || msg.senderRole === "system") {
+                return (
+                  <div key={msg.id} className="flex justify-center" data-testid={`system-message-${msg.id}`}>
+                    <p className="flex max-w-lg items-start gap-2 rounded-full border border-border bg-secondary/40 px-4 py-1.5 text-center text-xs text-muted-foreground">
+                      <Info className="mt-0.5 h-3 w-3 shrink-0" />
+                      <span>{msg.content}</span>
+                      <span className="shrink-0 font-mono opacity-70">{new Date(msg.sentAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
+                    </p>
+                  </div>
+                );
+              }
+              const isMe = msg.senderRole === "manufacturer";
+              const time = new Date(msg.sentAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+              const isCard = msg.messageType === "sample_card" || msg.messageType === "bulk_card";
+              if (isCard) {
+                return (
+                  <div key={msg.id} className={cn("flex flex-col gap-1", isMe ? "items-end" : "items-start")}>
+                    {msg.order ? <OrderCard order={msg.order} threadId={threadId} /> : (
+                      <div className="rounded-lg border border-border bg-secondary/40 px-4 py-3 text-sm text-muted-foreground">
+                        {msg.content || "Order card"} · no longer available
+                      </div>
+                    )}
+                    <span className="px-1 text-[10px] text-muted-foreground">{isMe ? "You" : thread.buyerName} · {time}</span>
+                  </div>
+                );
+              }
+              // Signed URLs carry no extension: image messages hold only photos,
+              // anything else attached (PDFs, mixed sets) is shown as a file link.
+              const images = msg.messageType === "image" ? msg.mediaUrls ?? [] : [];
+              const files = msg.messageType === "image" ? [] : msg.mediaUrls ?? [];
+              const autoCaption = /^Sent (a photo|\d+ photos|an attachment)$/.test(msg.content);
+              return (
+                <div key={msg.id} className={cn("flex flex-col gap-1", isMe ? "items-end" : "items-start")} data-testid={`message-${msg.id}`}>
+                  <div className={cn(
+                    "max-w-[85%] overflow-hidden rounded-2xl text-sm md:max-w-[70%]",
+                    isMe ? "rounded-br-sm bg-primary text-primary-foreground" : "rounded-bl-sm border border-border bg-secondary text-foreground",
+                  )}>
+                    {images.length > 0 && (
+                      <div className={cn("grid gap-0.5", images.length > 1 && "grid-cols-2")}>
+                        {images.map((url) => (
+                          <a key={url} href={url} target="_blank" rel="noreferrer" className="block">
+                            <img src={url} alt="Shared in conversation" className={cn("w-full object-cover", images.length > 1 ? "aspect-square" : "max-h-80")} loading="lazy" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                    {files.map((url) => (
+                      <a key={url} href={url} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-4 pt-3 underline">
+                        <FileText className="h-4 w-4" /> Open attachment
+                      </a>
+                    ))}
+                    {msg.content && !(autoCaption && (images.length || files.length)) && (
+                      <p className="whitespace-pre-wrap px-4 py-2.5">{msg.content}</p>
+                    )}
+                  </div>
+                  <span className="px-1 text-[10px] text-muted-foreground">{time}</span>
+                </div>
+              );
+            })}
+          </section>
+        ))}
         <div ref={endOfMessagesRef} className="h-1" />
       </div>
 
-      {/* Input */}
-      <div className="p-4 bg-card border-t border-border shrink-0">
-        <div className="flex gap-3">
-          <Textarea 
+      <div className="shrink-0 border-t border-border bg-card p-3 md:p-4">
+        {attachments.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-2" data-testid="attachment-previews">
+            {attachments.map((item, index) => (
+              <div key={`${item.file.name}-${index}`} className="relative h-16 w-16 overflow-hidden rounded-md border border-border bg-secondary">
+                {item.preview ? <img src={item.preview} alt={item.file.name} className="h-full w-full object-cover" /> : (
+                  <div className="flex h-full w-full flex-col items-center justify-center p-1 text-[9px] text-muted-foreground"><FileText className="mb-1 h-4 w-4" /><span className="w-full truncate text-center">{item.file.name}</span></div>
+                )}
+                <button type="button" onClick={() => removeAttachment(index)} className="absolute right-0.5 top-0.5 rounded-full bg-background/90 p-0.5" aria-label={`Remove ${item.file.name}`}>
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex items-end gap-2">
+          <Button type="button" variant="outline" size="icon" onClick={() => setCardOpen(true)} className="shrink-0 sm:hidden" aria-label="Send order card">
+            <Plus className="h-4 w-4" />
+          </Button>
+          <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-md border border-border hover:bg-secondary" data-testid="button-attach-message" title="Attach photos or a PDF">
+            <ImagePlus className="h-4 w-4" />
+            <span className="sr-only">Attach photos or a PDF</span>
+            <input type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf" className="sr-only" onChange={(event) => { addFiles(event.target.files); event.currentTarget.value = ""; }} />
+          </label>
+          <Textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-            placeholder="Type your reply... (Press Enter to send)" 
-            className="min-h-[60px] max-h-[150px] bg-secondary/30 resize-none border-border"
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleSend(); } }}
+            placeholder={`Message ${thread.buyerName}… (Enter to send, Shift+Enter for a new line)`}
+            className="max-h-[150px] min-h-[44px] resize-none border-border bg-secondary/30"
             data-testid="input-message-draft"
           />
-          <label className="flex cursor-pointer items-center justify-center rounded border border-border px-3 hover:bg-secondary" data-testid="button-attach-message">
-            <Paperclip className="h-4 w-4" />
-            <input type="file" accept="image/*,.pdf,application/pdf" className="sr-only" onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} />
-          </label>
-          <Button 
-            onClick={handleSend}
-            disabled={(!draft.trim() && !attachment) || sendMutation.isPending || uploadMutation.isPending}
-            className="h-auto px-6"
-            data-testid="button-send-message"
-          >
-            <Send className="w-4 h-4" />
+          <Button onClick={() => void handleSend()} disabled={(!draft.trim() && attachments.length === 0) || sending} className="h-10 shrink-0 px-4" data-testid="button-send-message" aria-label="Send message">
+            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
-        {attachment && <p className="mt-2 text-xs text-muted-foreground" data-testid="text-attachment-name">Attached: {attachment.name}</p>}
-        {uploadMutation.isError && <p className="mt-2 text-sm text-destructive" role="alert">Attachment upload failed. Please try again.</p>}
-        {sendMutation.isError && (
-          <p className="mt-2 text-sm text-destructive" role="alert" data-testid="status-send-error">
-            Message not sent. Check your connection and try again.
-          </p>
-        )}
+        {attachError && <p className="mt-2 text-sm text-destructive" role="alert">{attachError}</p>}
+        {sendError && <p className="mt-2 text-sm text-destructive" role="alert" data-testid="status-send-error">{sendError}</p>}
       </div>
+
+      <SendCardDialog open={cardOpen} onOpenChange={setCardOpen} threadId={threadId} sellerName={thread.buyerName} />
     </div>
   );
 }

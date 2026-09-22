@@ -4,7 +4,11 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useRef, useState } from "react";
-import { Save, Factory, CheckCircle2, Upload, X, MessageSquare, ArrowLeft, ArrowRight, Trash2, Loader2 } from "lucide-react";
+import { Save, Factory, CheckCircle2, Upload, MessageSquare, ArrowLeft, ArrowRight, Trash2, Loader2, Eye, EyeOff, Globe2 } from "lucide-react";
+import { COUNTRIES, findCountry, localTimeLabel } from "@workspace/manufacturer-flow";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { TimeZoneSelect, browserTimeZone } from "@/components/time-zone-select";
 import { useAuth } from "@clerk/react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -27,6 +31,7 @@ const formSchema = z.object({
   website: z.string().url().optional().or(z.literal('')),
   contactEmail: z.string().email().optional().or(z.literal('')),
   contactPhone: z.string().min(5).optional().or(z.literal('')),
+  timeZone: z.string().min(1, "Choose your time zone"),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -57,6 +62,7 @@ export default function Profile() {
       website: "",
       contactEmail: "",
       contactPhone: "",
+      timeZone: browserTimeZone(),
     }
   });
 
@@ -76,6 +82,7 @@ export default function Profile() {
         website: profile.website || "",
         contactEmail: profile.contactEmail || "",
         contactPhone: profile.contactPhone || "",
+        timeZone: profile.timeZone || findCountry(profile.country)?.timeZone || browserTimeZone(),
       });
       initialized.current = true;
     }
@@ -99,6 +106,26 @@ export default function Profile() {
           await queryClient.invalidateQueries({ queryKey: getGetMyManufacturerProfileQueryKey() });
         }
       }
+    );
+  };
+
+  const [visibilityPending, setVisibilityPending] = useState(false);
+  const setDirectoryVisibility = (isPublicDirectory: boolean) => {
+    if (!profile?.revision) return;
+    setVisibilityPending(true);
+    updateMutation.mutate(
+      { data: { isPublicDirectory, expectedRevision: profile.revision } },
+      {
+        onSuccess: (updatedProfile) => {
+          queryClient.setQueryData(getGetMyManufacturerProfileQueryKey(), updatedProfile);
+          toast.success(isPublicDirectory ? "You're now listed in the public directory" : "Your listing is now private");
+        },
+        onError: async () => {
+          toast.error("Visibility couldn't be changed. Refresh and try again.");
+          await queryClient.invalidateQueries({ queryKey: getGetMyManufacturerProfileQueryKey() });
+        },
+        onSettled: () => setVisibilityPending(false),
+      },
     );
   };
 
@@ -213,6 +240,27 @@ export default function Profile() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10">
           
+          <section className="flex flex-col gap-4 rounded-lg border border-border bg-card p-5 sm:flex-row sm:items-center sm:justify-between" data-testid="panel-directory-visibility">
+            <div className="flex gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary">
+                {profile?.isPublicDirectory ? <Globe2 className="h-5 w-5 text-primary" /> : <EyeOff className="h-5 w-5 text-muted-foreground" />}
+              </div>
+              <div>
+                <p className="font-medium">{profile?.isPublicDirectory ? "Listed in the public directory" : "Private listing"}</p>
+                <p className="text-sm text-muted-foreground">
+                  {profile?.isPublicDirectory
+                    ? "Any Brandthread seller can find you, view your photos and message you."
+                    : "Only sellers who invited you or already work with you can see your profile."}
+                </p>
+              </div>
+            </div>
+            <label className="flex items-center gap-3 text-sm">
+              {visibilityPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+              <span>Public</span>
+              <Switch checked={!!profile?.isPublicDirectory} disabled={visibilityPending} onCheckedChange={setDirectoryVisibility} data-testid="switch-directory-visibility" />
+            </label>
+          </section>
+
           {/* Basic Info */}
           <div className="space-y-6">
             <div className="flex items-center gap-2 border-b border-border/50 pb-2 text-primary font-mono text-sm tracking-wider uppercase">
@@ -239,10 +287,16 @@ export default function Profile() {
                 name="country"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Location / Country</FormLabel>
-                    <FormControl>
-                      <Input {...field} className="h-11 bg-card border-border" />
-                    </FormControl>
+                    <FormLabel>Country</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="h-11 bg-card border-border" data-testid="select-profile-country"><SelectValue placeholder="Choose a country" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="max-h-72">
+                        {field.value && !findCountry(field.value) && <SelectItem value={field.value}>{field.value}</SelectItem>}
+                        {[...COUNTRIES].sort((a, b) => a.name.localeCompare(b.name)).map((item) => <SelectItem key={item.code} value={item.name}>{item.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -327,6 +381,18 @@ export default function Profile() {
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="timeZone"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel>Time zone</FormLabel>
+                    <TimeZoneSelect value={field.value} onChange={field.onChange} />
+                    <p className="text-xs text-muted-foreground">Sellers see your local time — {localTimeLabel(field.value) ?? "choose a zone"} — so they know when to expect replies.</p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
           </div>
 
@@ -344,7 +410,7 @@ export default function Profile() {
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {profile!.photos!.map((photo, index) => (
                   <div key={`${photo}-${index}`} className="group relative overflow-hidden rounded-md border border-border bg-card">
-                    <img src={photo.startsWith("/objects/") ? `/api/storage${photo}` : photo} alt={`Factory production ${index + 1}`} className="aspect-[4/3] w-full object-cover" />
+                    <img src={photo} alt={`Factory production ${index + 1}`} className="aspect-[4/3] w-full object-cover" />
                     <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-background/85 p-1.5">
                       <span className="truncate px-1 text-xs font-medium text-foreground">
                         {index === 0 ? "Lead image" : `Photo ${index + 1}`}
