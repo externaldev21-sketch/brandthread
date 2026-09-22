@@ -19,7 +19,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE, RED, ON_DARK,
@@ -187,6 +187,7 @@ export default function BuyerPostCommentsScreen() {
     postAuthorColor?: string;
     postCaption?: string;
     postMediaUri?: string;
+    postPosterUri?: string;
     postMediaColor1?: string;
     postMediaColor2?: string;
     postType?: string;
@@ -195,7 +196,9 @@ export default function BuyerPostCommentsScreen() {
   const postId = params.postId ?? '';
   const postAuthorId = params.postAuthorId ?? '';
   const mediaUri = params.postMediaUri ?? '';
+  const posterUri = params.postPosterUri ?? '';
   const postType = params.postType ?? 'photo';
+  const [videoPlaying, setVideoPlaying] = useState(false);
   const mediaPlayer = useVideoPlayer(
     mediaUri && postType === 'video' ? { uri: mediaUri } : null,
     player => {
@@ -204,6 +207,18 @@ export default function BuyerPostCommentsScreen() {
       player.play();
     },
   );
+
+  useEffect(() => {
+    const subscription = mediaPlayer.addListener('playingChange', ({ isPlaying }) => {
+      setVideoPlaying(isPlaying);
+    });
+    return () => subscription.remove();
+  }, [mediaPlayer]);
+
+  useFocusEffect(useCallback(() => {
+    if (mediaUri && postType === 'video') mediaPlayer.play();
+    return () => mediaPlayer.pause();
+  }, [mediaPlayer, mediaUri, postType]));
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [inputText, setInputText] = useState('');
@@ -323,13 +338,23 @@ export default function BuyerPostCommentsScreen() {
     <View style={s.overlay}>
       {mediaUri ? (
         postType === 'video' ? (
-          <VideoView
-            player={mediaPlayer}
-            style={s.mediaBackdrop}
-            contentFit="cover"
-            nativeControls={false}
-            testID="comments-video-preview"
-          />
+          <>
+            {posterUri && !videoPlaying ? (
+              <CachedImage
+                source={{ uri: posterUri }}
+                style={s.mediaBackdrop}
+                contentFit="cover"
+                testID="comments-video-poster"
+              />
+            ) : null}
+            <VideoView
+              player={mediaPlayer}
+              style={[s.mediaBackdrop, posterUri && !videoPlaying && { opacity: 0 }]}
+              contentFit="cover"
+              nativeControls={false}
+              testID="comments-video-preview"
+            />
+          </>
         ) : (
           <CachedImage source={{ uri: mediaUri }} style={s.mediaBackdrop} contentFit="cover" />
         )

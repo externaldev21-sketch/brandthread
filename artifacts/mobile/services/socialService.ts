@@ -727,7 +727,7 @@ function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
     hashtags:          p.hashtags ?? [],
     styleTags:         p.styleTags ?? [],
     mediaUris:         Array.isArray(p.mediaUrls) && p.mediaUrls.length > 0 ? p.mediaUrls : (p.mediaUrl ? [p.mediaUrl] : []),
-    thumbnailUri:      undefined,
+    thumbnailUri:      p.thumbnailUrl ?? p.thumbnailUri ?? undefined,
     aspectRatio:       (p.aspectRatio ?? '9:16') as SellerThreadPost['aspectRatio'],
     contentType:       (p.mediaType ?? 'video') as SellerThreadPost['contentType'],
     postStatus:        'published' as const,

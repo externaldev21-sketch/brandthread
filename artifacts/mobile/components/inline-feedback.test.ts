@@ -227,6 +227,23 @@ describe('buyer-post-comments — count sync after successful post', () => {
   });
 });
 
+describe('buyer-post-comments — continuous video preview', () => {
+  it('keeps the video source separate from its poster and resumes playback on focus', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const comments = readFileSync(resolve(__dirname, '../app/buyer-post-comments.tsx'), 'utf8');
+    const feed = readFileSync(resolve(__dirname, '../app/(tabs)/feed.tsx'), 'utf8');
+
+    expect(feed).toContain("'postMediaUri=' + encodeURIComponent(videoUri)");
+    expect(feed).toContain("'postPosterUri=' + encodeURIComponent(item.videoPosterUri ?? '')");
+    expect(comments).toContain('postPosterUri?: string');
+    expect(comments).toContain('useFocusEffect(useCallback(() =>');
+    expect(comments).toContain("if (mediaUri && postType === 'video') mediaPlayer.play()");
+    expect(comments).toContain('return () => mediaPlayer.pause()');
+    expect(comments).toContain('testID="comments-video-preview"');
+  });
+});
+
 // ─── discover: per-section error states ──────────────────────────────────────
 
 describe('discover.tsx — per-section error states', () => {

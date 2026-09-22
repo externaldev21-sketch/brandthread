@@ -1182,6 +1182,8 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     initials: post.authorInitials,
     verified: false,
     mediaUris: post.mediaUris,
+    videoSource: post.contentType === 'video' ? post.mediaUris[0] : undefined,
+    videoPosterUri: post.thumbnailUri,
     contentType: post.contentType === 'video' || post.contentType === 'slideshow' ? post.contentType : 'photo',
     caption: post.caption,
     sound: post.sound
@@ -1668,6 +1670,16 @@ export default function FeedScreen({
   function handleOpenComments(id: string) {
     const item = allItems.find(i => i.id === id);
     if (!item || isLiveStreamItem(item)) return;
+    const videoSource = item.videoSource;
+    const videoUri = item.contentType === 'video'
+      ? (
+        typeof videoSource === 'number'
+          ? Asset.fromModule(videoSource).uri
+          : typeof videoSource === 'string'
+            ? videoSource
+            : videoSource?.uri ?? item.mediaUris[0] ?? ''
+      )
+      : item.mediaUris[0] ?? '';
     const qs = [
       'postId=' + encodeURIComponent(item.id),
       'postAuthorId=' + encodeURIComponent(item.sellerId ?? ''),
@@ -1675,7 +1687,8 @@ export default function FeedScreen({
       'postAuthorInitials=' + encodeURIComponent(item.initials),
       'postAuthorColor=' + encodeURIComponent(item.avatarColor),
       'postCaption=' + encodeURIComponent(item.caption),
-      'postMediaUri=' + encodeURIComponent(item.mediaUris[0] ?? ''),
+      'postMediaUri=' + encodeURIComponent(videoUri),
+      'postPosterUri=' + encodeURIComponent(item.videoPosterUri ?? ''),
       'postMediaColor1=' + encodeURIComponent('#0a0a0a'),
       'postMediaColor2=' + encodeURIComponent('#1a1a1a'),
       'postType=' + encodeURIComponent(item.contentType),
