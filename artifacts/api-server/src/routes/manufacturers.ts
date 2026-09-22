@@ -12,6 +12,8 @@ import {
   manufacturerThreadAttachments,
   manufacturerRelationships,
   sellerQuoteRequests,
+  manufacturerReviews,
+  users,
 } from "@workspace/db";
 import { eq, desc, and, sql, inArray, isNull } from "drizzle-orm";
 import crypto from "crypto";
@@ -31,6 +33,8 @@ import { ObjectStorageService } from "../lib/objectStorage";
 import { sendManufacturerSignupEmail } from "../lib/brandthreadEmail";
 import { logger } from "../lib/logger";
 import { publishNotification } from "./notifications-feed";
+import { findCountry, isValidTimeZone, validateTransition } from "@workspace/manufacturer-flow";
+import { afterStageChange, attachOrderSnapshots, postThreadSystemMessage } from "../lib/manufacturerOrders";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -105,6 +109,12 @@ function serializeQuoteRequest(row: typeof sellerQuoteRequests.$inferSelect) {
 
 // ── Helper ─────────────────────────────────────────────────────────────────────
 
+/** A valid IANA zone from the client, else the country's main zone, else null. */
+export function resolveTimeZone(supplied: unknown, country: string | null | undefined): string | null {
+  if (isValidTimeZone(supplied)) return supplied;
+  return findCountry(country)?.timeZone ?? null;
+}
+
 async function resolveManufacturer(clerkId: string) {
   const [mfr] = await db
     .select()
@@ -152,7 +162,7 @@ function sellerOrderNotificationContext(order: Pick<typeof sampleOrders.$inferSe
     cta: order.orderType === "bulk" ? `/bulk-orders/${order.id}` : `/sample-orders/${order.id}`,
   };
 }
-async function serializeMessage(message: typeof manufacturerMessages.$inferSelect) {
+export async function serializeMessage(message: typeof manufacturerMessages.$inferSelect) {
   const objectPaths = (message.mediaUrls ?? []).filter((value) => value.startsWith("/objects/"));
   const boundPaths = new Set(objectPaths.length === 0 ? [] : (await db
     .select({ objectPath: manufacturerThreadAttachments.objectPath })
@@ -351,10 +361,100 @@ router.delete("/favorites/:manufacturerId", ...requireGrowthSeller, async (req, 
 
 router.get("/relationships", ...requireGrowthSeller, async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
-  const rows = await db.select().from(manufacturerRelationships)
+  const rows = await db.select({ relationship: manufacturerRelationships, manufacturer: manufacturers })
+    .from(manufacturerRelationships)
+    .innerJoin(manufacturers, eq(manufacturerRelationships.manufacturerId, manufacturers.id))
     .where(eq(manufacturerRelationships.sellerId, sellerId))
     .orderBy(desc(manufacturerRelationships.updatedAt));
-  res.json(rows.map(serializeRelationship));
+  const manufacturerIds = rows.map((row) => row.manufacturer.id);
+  const [orderStats, threads] = manufacturerIds.length === 0 ? [[], []] : await Promise.all([
+    db.select({
+      manufacturerId: sampleOrders.manufacturerId,
+      total: sql<number>`count(*)::integer`,
+      active: sql<number>`count(*) FILTER (WHERE ${sampleOrders.status} NOT IN ('delivered','cancelled','approved','rejected','complete','completed'))::integer`,
+      awaitingPayment: sql<number>`count(*) FILTER (WHERE ${sampleOrders.status} = 'pending_payment')::integer`,
+    }).from(sampleOrders)
+      .where(and(eq(sampleOrders.sellerId, sellerId), inArray(sampleOrders.manufacturerId, manufacturerIds)))
+      .groupBy(sampleOrders.manufacturerId),
+    db.select({ id: manufacturerThreads.id, manufacturerId: manufacturerThreads.manufacturerId, unread: manufacturerThreads.sellerUnreadCount })
+      .from(manufacturerThreads)
+      .where(and(eq(manufacturerThreads.buyerClerkId, sellerId), inArray(manufacturerThreads.manufacturerId, manufacturerIds))),
+  ]);
+  const statsById = new Map(orderStats.map((row) => [row.manufacturerId, row]));
+  const threadById = new Map(threads.map((row) => [row.manufacturerId, row]));
+  res.json(await Promise.all(rows.map(async ({ relationship, manufacturer }) => ({
+    ...serializeRelationship(relationship),
+    manufacturer: {
+      id: manufacturer.id,
+      businessName: manufacturer.businessName,
+      country: manufacturer.country,
+      city: manufacturer.city,
+      specialty: manufacturer.specialty,
+      yearsInBusiness: manufacturer.yearsInBusiness,
+      moq: manufacturer.moq,
+      timeZone: manufacturer.timeZone,
+      isPublicDirectory: manufacturer.isPublicDirectory,
+      isVerified: !!manufacturer.verifiedAt,
+      payoutReady: manufacturer.paymentSetup,
+      photo: (await signedProfilePhotos((manufacturer.photos ?? []).slice(0, 1)))[0] ?? null,
+    },
+    totalOrders: statsById.get(manufacturer.id)?.total ?? 0,
+    activeOrders: statsById.get(manufacturer.id)?.active ?? 0,
+    awaitingPayment: statsById.get(manufacturer.id)?.awaitingPayment ?? 0,
+    threadId: threadById.get(manufacturer.id)?.id ?? null,
+    unreadCount: threadById.get(manufacturer.id)?.unread ?? 0,
+  }))));
+});
+
+// Seller-scoped profile: public directory listings, plus private manufacturers
+// the seller is connected to (for example ones they invited).
+router.get("/partners/:manufacturerId", ...requireGrowthSeller, async (req, res) => {
+  const sellerId = (req as any).clerkUserId as string;
+  const manufacturerId = String(req.params.manufacturerId);
+  if (!isUuid(manufacturerId)) { res.status(404).json({ error: "Manufacturer not found" }); return; }
+  const [row] = await db.select({ manufacturer: manufacturers, relationshipId: manufacturerRelationships.id })
+    .from(manufacturers)
+    .leftJoin(manufacturerRelationships, and(
+      eq(manufacturerRelationships.manufacturerId, manufacturers.id),
+      eq(manufacturerRelationships.sellerId, sellerId),
+    ))
+    .where(and(eq(manufacturers.id, manufacturerId), eq(manufacturers.status, "active")))
+    .limit(1);
+  if (!row || (!row.manufacturer.isPublicDirectory && !row.relationshipId)) {
+    res.status(404).json({ error: "Manufacturer not found" }); return;
+  }
+  const m = row.manufacturer;
+  const [summary] = await db.select({
+    reviewCount: sql<number>`count(*)::integer`,
+    rating: sql<number | null>`round(avg(${manufacturerReviews.rating})::numeric, 2)::float`,
+  }).from(manufacturerReviews).where(eq(manufacturerReviews.manufacturerId, m.id));
+  res.json({
+    id: m.id,
+    businessName: m.businessName,
+    country: m.country,
+    city: m.city,
+    specialty: m.specialty,
+    description: m.description,
+    yearsInBusiness: m.yearsInBusiness,
+    moq: m.moq,
+    priceRange: m.priceRange,
+    bulkTurnaround: m.bulkTurnaround,
+    sampleTurnaround: m.sampleTurnaround,
+    photos: await signedProfilePhotos(m.photos),
+    website: m.website,
+    timeZone: m.timeZone,
+    responseTime: m.responseTime || null,
+    isVerified: !!m.verifiedAt,
+    isPublicDirectory: m.isPublicDirectory,
+    isConnected: !!row.relationshipId,
+    rating: summary?.reviewCount ? Number(summary.rating) : null,
+    reviewCount: summary?.reviewCount ?? 0,
+    reviews: [],
+    verifiedAt: m.verifiedAt?.toISOString() ?? null,
+    createdAt: m.createdAt.toISOString(),
+    updatedAt: m.updatedAt.toISOString(),
+    revision: m.revision,
+  });
 });
 
 router.post("/relationships", ...requireGrowthSeller, async (req, res) => {
@@ -462,10 +562,42 @@ router.patch("/me/quote-requests/:id", async (req, res) => {
 // INVITE TOKENS — seller creates private invite links for manufacturers
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// Private invites land on the manufacturer portal's join page, which signs the
+// manufacturer up (or in) and binds them to the inviting seller only.
+export function manufacturerInviteUrl(token: string) {
+  return `${getWebOrigin()}/manufacturers/join?invite=${encodeURIComponent(token)}`;
+}
+
+async function sellerDisplayName(sellerId: string) {
+  const [seller] = await db.select({ brandName: users.brandName, displayName: users.displayName, name: users.name })
+    .from(users).where(eq(users.clerkId, sellerId)).limit(1);
+  return seller?.brandName?.trim() || seller?.displayName?.trim() || seller?.name?.trim() || "A Brandthread seller";
+}
+
+function serializeInvite(inv: typeof manufacturerInviteTokens.$inferSelect) {
+  return {
+    ...inv,
+    inviteUrl: manufacturerInviteUrl(inv.token),
+    status: inv.usedAt ? "accepted" : "pending",
+    usedAt: inv.usedAt?.toISOString() ?? null,
+    createdAt: inv.createdAt.toISOString(),
+  };
+}
+
+function cleanOptional(value: unknown, max: number) {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null;
+}
+
 // POST /api/manufacturers/invite-tokens — seller creates a private invite token
 router.post("/invite-tokens", ...requireGrowthSeller, async (req, res) => {
   const sellerId   = (req as any).clerkUserId as string;
-  const { companyName, contactName, contactEmail, notes } = req.body;
+  const companyName = cleanOptional(req.body?.companyName, 200);
+  const contactName = cleanOptional(req.body?.contactName, 200);
+  const contactEmail = cleanOptional(req.body?.contactEmail, 320);
+  const notes = cleanOptional(req.body?.notes, 2000);
+  if (contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
+    res.status(400).json({ error: "Enter a valid email address or leave it blank." }); return;
+  }
 
   const token = crypto.randomBytes(24).toString("hex");
 
@@ -474,28 +606,20 @@ router.post("/invite-tokens", ...requireGrowthSeller, async (req, res) => {
     .values({ sellerId, token, companyName, contactName, contactEmail, notes })
     .returning();
 
-  const inviteUrl = `${getWebOrigin()}/manufacturer-onboard?token=${inv.token}`;
-
-  res.status(201).json({ ...inv, inviteUrl, createdAt: inv.createdAt.toISOString() });
+  res.status(201).json(serializeInvite(inv));
 });
 
 // GET /api/manufacturers/invite-tokens — seller lists their tokens
 router.get("/invite-tokens", ...requireGrowthSeller, async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   const rows = await db
-    .select()
+    .select({ invite: manufacturerInviteTokens, manufacturerName: manufacturers.businessName })
     .from(manufacturerInviteTokens)
+    .leftJoin(manufacturers, eq(manufacturerInviteTokens.manufacturerId, manufacturers.id))
     .where(eq(manufacturerInviteTokens.sellerId, sellerId))
     .orderBy(desc(manufacturerInviteTokens.createdAt));
 
-  const domain = getWebOrigin();
-
-  res.json(rows.map(inv => ({
-    ...inv,
-    inviteUrl: `${domain}/manufacturer-onboard?token=${inv.token}`,
-    usedAt:    inv.usedAt?.toISOString() ?? null,
-    createdAt: inv.createdAt.toISOString(),
-  })));
+  res.json(rows.map(({ invite, manufacturerName }) => ({ ...serializeInvite(invite), manufacturerName })));
 });
 
 // GET /api/manufacturers/invite-tokens/resolve/:token — look up an invite token (no auth — for onboard form)
@@ -506,19 +630,42 @@ router.get("/invite-tokens/resolve/:token", async (req, res) => {
     .where(eq(manufacturerInviteTokens.token, req.params.token))
     .limit(1);
 
-  if (!inv) { res.status(404).json({ error: "Invalid or expired invite token" }); return; }
-  if (inv.usedAt) { res.status(410).json({ error: "This invite has already been used" }); return; }
+  if (!inv) { res.status(404).json({ error: "This invite link isn't valid. Ask the seller to send a new one." }); return; }
+  if (inv.usedAt) { res.status(410).json({ error: "This invite has already been used. Sign in to continue." }); return; }
 
   res.json({
     valid:        true,
+    sellerName:   await sellerDisplayName(inv.sellerId),
     companyName:  inv.companyName,
     contactName:  inv.contactName,
     contactEmail: inv.contactEmail,
-    sellerId:     inv.sellerId,
   });
 });
 
-// POST /api/manufacturers/register-via-invite/:token — manufacturer registers through a private invite
+async function openInviteThread(sellerId: string, manufacturerId: string, businessName: string) {
+  const sellerName = await sellerDisplayName(sellerId);
+  const [created] = await db.insert(manufacturerThreads)
+    .values({ manufacturerId, buyerClerkId: sellerId, buyerName: sellerName, subject: "Production partnership" })
+    .onConflictDoNothing({ target: [manufacturerThreads.manufacturerId, manufacturerThreads.buyerClerkId] })
+    .returning();
+  const thread = created ?? (await db.select().from(manufacturerThreads).where(and(
+    eq(manufacturerThreads.manufacturerId, manufacturerId),
+    eq(manufacturerThreads.buyerClerkId, sellerId),
+  )).limit(1))[0];
+  if (created) {
+    await postThreadSystemMessage(db, {
+      threadId: created.id,
+      content: `${businessName} accepted your invite. This private conversation is where you'll share designs, samples and orders.`,
+      notify: "seller",
+      dedupeKey: `invite-accepted:${created.id}`,
+    });
+  }
+  return thread;
+}
+
+// POST /api/manufacturers/register-via-invite/:token — manufacturer registers through a private invite.
+// Invited manufacturers are private by default: they work with the inviting
+// seller and stay out of the public directory unless they opt in later.
 router.post("/register-via-invite/:token", async (req, res) => {
   const { userId } = getAuth(req);
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
@@ -532,34 +679,57 @@ router.post("/register-via-invite/:token", async (req, res) => {
   if (!inv) { res.status(404).json({ error: "Invalid invite token" }); return; }
   if (inv.usedAt) { res.status(410).json({ error: "This invite has already been used" }); return; }
 
-  // Check if manufacturer already registered
+  // An existing manufacturer accepting another seller's invite keeps their
+  // profile (and directory visibility) and is simply connected to that seller.
   const existing = await resolveManufacturer(userId);
   if (existing) {
-    res.status(409).json({ error: "Already registered as a manufacturer" }); return;
+    const [claimed] = await db.update(manufacturerInviteTokens)
+      .set({ usedAt: new Date(), manufacturerId: existing.id })
+      .where(and(eq(manufacturerInviteTokens.id, inv.id), isNull(manufacturerInviteTokens.usedAt)))
+      .returning({ id: manufacturerInviteTokens.id });
+    if (!claimed) { res.status(410).json({ error: "This invite has already been used" }); return; }
+    await db.insert(manufacturerRelationships)
+      .values({ sellerId: inv.sellerId, manufacturerId: existing.id })
+      .onConflictDoNothing();
+    const thread = await openInviteThread(inv.sellerId, existing.id, existing.businessName);
+    res.status(200).json({
+      ...(await serializeMyManufacturer(existing)),
+      invitedBySellerId: inv.sellerId,
+      threadId: thread?.id,
+    });
+    return;
   }
 
   const parsed = RegisterManufacturerBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
 
-  const [mfr] = await db
-    .insert(manufacturers)
-    .values({
-      clerkId:           userId,
-      isPublicDirectory: true,
-      status:            "active",
-      ...parsed.data,
-      photos:            [],
-    })
-    .returning();
-
-  // Mark invite as used
-  await db
-    .update(manufacturerInviteTokens)
-    .set({ usedAt: new Date(), manufacturerId: mfr.id })
-    .where(eq(manufacturerInviteTokens.id, inv.id));
-  await db.insert(manufacturerRelationships)
-    .values({ sellerId: inv.sellerId, manufacturerId: mfr.id })
-    .onConflictDoNothing();
+  const mfr = await db.transaction(async (tx) => {
+    const [claimed] = await tx.update(manufacturerInviteTokens)
+      .set({ usedAt: new Date() })
+      .where(and(eq(manufacturerInviteTokens.id, inv.id), isNull(manufacturerInviteTokens.usedAt)))
+      .returning({ id: manufacturerInviteTokens.id });
+    if (!claimed) return null;
+    const [created] = await tx
+      .insert(manufacturers)
+      .values({
+        clerkId:           userId,
+        ...parsed.data,
+        timeZone:          resolveTimeZone(parsed.data.timeZone, parsed.data.country),
+        isPublicDirectory: false,
+        status:            "active",
+        photos:            [],
+      })
+      .returning();
+    await tx.update(manufacturerInviteTokens)
+      .set({ manufacturerId: created.id })
+      .where(eq(manufacturerInviteTokens.id, inv.id));
+    await tx.insert(manufacturerRelationships)
+      .values({ sellerId: inv.sellerId, manufacturerId: created.id })
+      .onConflictDoNothing();
+    return created;
+  });
+  if (!mfr) { res.status(410).json({ error: "This invite has already been used" }); return; }
+  const thread = await openInviteThread(inv.sellerId, mfr.id, mfr.businessName);
 
   const signupEmail = await resolveManufacturerEmail(
     userId,
@@ -575,13 +745,18 @@ router.post("/register-via-invite/:token", async (req, res) => {
       req.log.error({ err, manufacturerId: mfr.id }, "Manufacturer signup email delivery failed");
     });
   }
+  await notify(req, {
+    userId: inv.sellerId, category: "message", type: "manufacturer_invite_accepted",
+    title: `${mfr.businessName} joined from your invite`,
+    body: "Start the conversation and send your first design.",
+    actorName: mfr.businessName, targetId: thread?.id ?? mfr.id, targetType: "manufacturer_thread",
+    cta: thread ? `/manufacturer-messages?threadId=${thread.id}` : "/manufacturer-hub",
+  });
 
   res.status(201).json({
-    ...mfr,
+    ...(await serializeMyManufacturer(mfr)),
     invitedBySellerId: inv.sellerId,
-    verifiedAt: null,
-    createdAt:  mfr.createdAt.toISOString(),
-    updatedAt:  mfr.updatedAt.toISOString(),
+    threadId: thread?.id,
   });
 });
 
@@ -777,9 +952,20 @@ router.patch("/me", async (req, res) => {
   if (!mfr) return res.status(404).json({ error: "Not registered" });
 
   const { expectedRevision, ...changes } = parsed.data;
+  if (changes.timeZone !== undefined && changes.timeZone !== "" && !isValidTimeZone(changes.timeZone)) {
+    return res.status(400).json({ error: "Choose a valid time zone" });
+  }
+  if (changes.yearsInBusiness != null && (changes.yearsInBusiness < 0 || changes.yearsInBusiness > 200)) {
+    return res.status(400).json({ error: "Years in business must be between 0 and 200" });
+  }
   const [updated] = await db
     .update(manufacturers)
-    .set({ ...changes, updatedAt: new Date(), revision: sql`${manufacturers.revision} + 1` })
+    .set({
+      ...changes,
+      ...(changes.timeZone === "" ? { timeZone: null } : {}),
+      updatedAt: new Date(),
+      revision: sql`${manufacturers.revision} + 1`,
+    })
     .where(and(eq(manufacturers.id, mfr.id), eq(manufacturers.revision, expectedRevision)))
     .returning();
   if (!updated) {
@@ -807,10 +993,19 @@ router.post("/register", async (req, res) => {
 
   const existing = await resolveManufacturer(userId);
   if (existing) return res.status(409).json({ error: "Already registered" });
+  if (parsed.data.yearsInBusiness != null && (parsed.data.yearsInBusiness < 0 || parsed.data.yearsInBusiness > 200)) {
+    return res.status(400).json({ error: "Years in business must be between 0 and 200" });
+  }
 
+  // Self-serve signups go live in the public directory immediately; there is
+  // no manual approval step.
   const [mfr] = await db
     .insert(manufacturers)
-    .values({ clerkId: userId, isPublicDirectory: true, status: "active", ...parsed.data, photos: [] })
+    .values({
+      clerkId: userId, isPublicDirectory: true, status: "active", ...parsed.data,
+      timeZone: resolveTimeZone(parsed.data.timeZone, parsed.data.country),
+      photos: [],
+    })
     .returning();
 
   const signupEmail = await resolveManufacturerEmail(userId, parsed.data.contactEmail);
@@ -824,12 +1019,7 @@ router.post("/register", async (req, res) => {
     });
   }
 
-  return res.status(201).json({
-    ...mfr,
-    verifiedAt: null,
-    createdAt:  mfr.createdAt.toISOString(),
-    updatedAt:  mfr.updatedAt.toISOString(),
-  });
+  return res.status(201).json(await serializeMyManufacturer(mfr));
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -895,15 +1085,22 @@ router.post("/threads", ...requireGrowthSeller, async (req, res) => {
   const { manufacturerId, subject = "General" } = req.body;
 
   if (!isUuid(manufacturerId)) { res.status(400).json({ error: "A canonical manufacturer UUID is required" }); return; }
-  const [manufacturer] = await db.select({ id: manufacturers.id }).from(manufacturers)
+  const [manufacturer] = await db.select({ id: manufacturers.id, isPublicDirectory: manufacturers.isPublicDirectory })
+    .from(manufacturers)
     .where(and(eq(manufacturers.id, manufacturerId), eq(manufacturers.status, "active")))
     .limit(1);
   if (!manufacturer) { res.status(404).json({ error: "Manufacturer not found" }); return; }
+  if (!manufacturer.isPublicDirectory) {
+    // Private manufacturers only talk to sellers they are already connected to.
+    const [relationship] = await db.select({ id: manufacturerRelationships.id }).from(manufacturerRelationships)
+      .where(and(eq(manufacturerRelationships.sellerId, sellerId), eq(manufacturerRelationships.manufacturerId, manufacturerId)))
+      .limit(1);
+    if (!relationship) { res.status(404).json({ error: "Manufacturer not found" }); return; }
+  }
   await db.insert(manufacturerRelationships).values({ sellerId, manufacturerId })
     .onConflictDoNothing();
 
-  // Get seller name from auth
-  const sellerName = (req as any).clerkUserName ?? "Seller";
+  const sellerName = await sellerDisplayName(sellerId);
 
   // Check for existing thread
   const [existing] = await db
@@ -946,22 +1143,24 @@ router.get("/threads", ...requireGrowthSeller, async (req, res) => {
       mfrName:     manufacturers.businessName,
       mfrCountry:  manufacturers.country,
       mfrPhotos:   manufacturers.photos,
+      mfrTimeZone: manufacturers.timeZone,
     })
     .from(manufacturerThreads)
     .leftJoin(manufacturers, eq(manufacturerThreads.manufacturerId, manufacturers.id))
     .where(eq(manufacturerThreads.buyerClerkId, sellerId))
     .orderBy(desc(manufacturerThreads.lastMessageAt));
 
-  res.json(rows.map(r => ({
+  res.json(await Promise.all(rows.map(async (r) => ({
     ...r.thread,
     sellerId,
     manufacturerName:    r.mfrName,
     manufacturerCountry: r.mfrCountry,
-    manufacturerPhoto:   r.mfrPhotos?.[0] ?? null,
+    manufacturerTimeZone: r.mfrTimeZone,
+    manufacturerPhoto:   (await signedProfilePhotos((r.mfrPhotos ?? []).slice(0, 1)))[0] ?? null,
     unreadCount: r.thread.sellerUnreadCount,
     lastMessageAt: r.thread.lastMessageAt.toISOString(),
     createdAt:     r.thread.createdAt.toISOString(),
-  })));
+  }))));
 });
 
 // Seller-side GET/POST messages. Manufacturer accounts use the /me routes.
@@ -987,7 +1186,7 @@ router.get("/threads/:threadId/messages", ...requireGrowthSeller, async (req, re
     .where(eq(manufacturerMessages.threadId, threadId))
     .orderBy(manufacturerMessages.sentAt);
 
-  res.json(await Promise.all(messages.map(serializeMessage)));
+  res.json(await attachOrderSnapshots(await Promise.all(messages.map(serializeMessage))));
 });
 
 router.post("/threads/:threadId/messages", ...requireGrowthSeller, async (req, res) => {
@@ -1129,7 +1328,7 @@ router.get("/me/threads/:threadId/messages", async (req, res) => {
     .where(eq(manufacturerMessages.threadId, req.params.threadId))
     .orderBy(manufacturerMessages.sentAt);
 
-  return res.json(await Promise.all(messages.map(serializeMessage)));
+  return res.json(await attachOrderSnapshots(await Promise.all(messages.map(serializeMessage))));
 });
 
 router.post("/me/threads/:threadId/messages", async (req, res) => {
@@ -1314,8 +1513,12 @@ router.patch("/me/sample-orders/:orderId/status", async (req, res) => {
     eq(sampleOrders.manufacturerId, mfr.id),
   )).limit(1);
   if (!current) return res.status(404).json({ error: "Order not found" });
-  if (stages.indexOf(status) !== stages.indexOf(current.status as typeof stages[number]) + 1) {
-    return res.status(409).json({ error: "Order status must advance exactly one stage" });
+  const transition = validateTransition({
+    from: current.status, to: status, actor: "manufacturer",
+    carrier: req.body?.carrier, trackingNumber: req.body?.trackingNumber,
+  });
+  if (!transition.ok) {
+    return res.status(409).json({ error: transition.message, code: transition.code });
   }
   const now = new Date();
   const [updated] = await db.update(sampleOrders).set({
@@ -1332,6 +1535,11 @@ router.patch("/me/sample-orders/:orderId/status", async (req, res) => {
     eq(sampleOrders.revision, expectedRevision),
   )).returning();
   if (!updated) return res.status(409).json({ error: "Order changed; refresh and retry", code: "STALE_WRITE" });
+  await afterStageChange({
+    order: updated, actorRole: "manufacturer", actorClerkId: userId,
+    fromStatus: current.status, toStatus: status,
+    carrier: updated.carrier, trackingNumber: updated.trackingNumber,
+  }).catch((err) => req.log.error({ err, orderId: updated.id }, "Failed to record order stage event"));
   const notificationContext = sellerOrderNotificationContext(current);
   await notify(req, {
     userId: current.sellerId, category: "production", type: "manufacturer_order_status",

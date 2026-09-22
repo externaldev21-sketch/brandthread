@@ -51,6 +51,19 @@ paths:
         "503":
           description: Secure calling is unavailable
 
+  /call/availability:
+    get:
+      operationId: getCallAvailability
+      tags: [calls]
+      summary: Whether voice and video calling is configured on this server
+      responses:
+        "200":
+          description: Call availability
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallAvailability"
+
   /call/token/renew:
     post:
       operationId: renewCallToken
@@ -211,6 +224,11 @@ paths:
         - { name: q, in: query, schema: { type: string } }
         - { name: country, in: query, schema: { type: string } }
         - { name: specialty, in: query, schema: { type: string } }
+        - { name: minYears, in: query, schema: { type: integer, minimum: 0 } }
+        - { name: maxMoq, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: verified, in: query, schema: { type: boolean } }
+        - { name: hasPhotos, in: query, schema: { type: boolean } }
+        - { name: sort, in: query, schema: { type: string, enum: [recommended, newest, experience, rating, moq] } }
       responses:
         "200":
           description: Approved directory profiles
@@ -219,6 +237,18 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/PublicManufacturer" }
+
+  /manufacturers/public/facets:
+    get:
+      operationId: getManufacturerDirectoryFacets
+      tags: [manufacturers]
+      summary: Countries and specialties present in the live public directory, with counts
+      responses:
+        "200":
+          description: Directory facets
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ManufacturerDirectoryFacets" }
 
   /manufacturers/public/{manufacturerId}:
     get:
@@ -249,6 +279,146 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ManufacturerApplicationReceipt" }
+
+  /manufacturers/invite-tokens/resolve/{token}:
+    get:
+      operationId: resolveManufacturerInvite
+      tags: [manufacturers]
+      summary: Look up a private seller invite before signing up
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Valid invite
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ManufacturerInviteResolution" }
+        "404":
+          description: Unknown invite
+        "410":
+          description: Invite already used
+
+  /manufacturers/register-via-invite/{token}:
+    post:
+      operationId: registerManufacturerViaInvite
+      tags: [manufacturers]
+      summary: Register (or link an existing profile) through a seller's private invite
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ManufacturerInput" }
+      responses:
+        "201":
+          description: Registered privately and connected to the inviting seller
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ManufacturerInviteRegistration" }
+        "200":
+          description: Existing profile connected to the inviting seller
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ManufacturerInviteRegistration" }
+
+  /manufacturers/me/threads/{threadId}/order-cards:
+    post:
+      operationId: sendManufacturerOrderCard
+      tags: [manufacturers]
+      summary: Price a sample or bulk order and send it to the seller as a payable card in chat
+      parameters:
+        - { name: threadId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OrderCardInput" }
+      responses:
+        "201":
+          description: Card created and posted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderCardResult" }
+        "200":
+          description: Idempotent replay of the same card
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderCardResult" }
+        "422":
+          description: Invalid card fields
+
+  /manufacturers/orders/{orderId}/timeline:
+    get:
+      operationId: getManufacturerOrderTimeline
+      tags: [manufacturers]
+      summary: Six-stage tracker with stage timestamps and shipment tracking, for either participant
+      parameters:
+        - { name: orderId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Order timeline
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderTimeline" }
+
+  /manufacturers/orders/{orderId}/cancel:
+    post:
+      operationId: cancelManufacturerOrderCard
+      tags: [manufacturers]
+      summary: Withdraw (manufacturer) or decline (seller) an unpaid order card
+      parameters:
+        - { name: orderId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OrderCardCancelInput" }
+      responses:
+        "200":
+          description: Cancelled order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SampleOrder" }
+        "409":
+          description: Order is paid, paying, or already closed
+
+  /manufacturers/orders/{orderId}/confirm-delivery:
+    post:
+      operationId: confirmManufacturerOrderDelivery
+      tags: [manufacturers]
+      summary: Seller confirms a shipped order arrived
+      parameters:
+        - { name: orderId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Delivered order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SampleOrder" }
+
+  /manufacturers/partners/{manufacturerId}:
+    get:
+      operationId: getPartnerManufacturer
+      tags: [manufacturers]
+      summary: Seller-scoped profile for a public manufacturer or a private one the seller is connected to
+      parameters:
+        - { name: manufacturerId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Manufacturer profile
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PublicManufacturer"
+                  - type: object
+                    required: [isConnected, isPublicDirectory]
+                    properties:
+                      isConnected: { type: boolean }
+                      isPublicDirectory: { type: boolean }
+        "404":
+          description: Not found or not connected
 
   /manufacturers/relationships:
     get:
@@ -764,6 +934,13 @@ components:
         mode: { type: string, enum: [voice, video] }
         expiresAt: { type: string, format: date-time }
 
+    CallAvailability:
+      type: object
+      required: [configured, provider]
+      properties:
+        configured: { type: boolean }
+        provider: { type: string, enum: [agora] }
+
     DropBroadcastPreview:
       type: object
       required: [followers]
@@ -794,6 +971,8 @@ components:
         website:          { type: ["string", "null"] }
         contactEmail:     { type: ["string", "null"] }
         contactPhone:     { type: ["string", "null"] }
+        timeZone:         { type: ["string", "null"] }
+        isPublicDirectory: { type: boolean }
         status:           { type: string }
         verifiedAt:       { type: ["string", "null"] }
         paymentSetup:     { type: boolean }
@@ -818,6 +997,7 @@ components:
         website:          { type: string }
         contactEmail:     { type: string }
         contactPhone:     { type: string }
+        timeZone:         { type: string, maxLength: 64 }
 
     ManufacturerUpdate:
       type: object
@@ -837,6 +1017,8 @@ components:
         website:          { type: string }
         contactEmail:     { type: string }
         contactPhone:     { type: string }
+        timeZone:         { type: string, maxLength: 64 }
+        isPublicDirectory: { type: boolean }
 
     ManufacturerPhotoReorder:
       type: object
@@ -873,12 +1055,150 @@ components:
         sampleTurnaround: { type: string }
         photos: { type: array, items: { type: string, format: uri } }
         website: { type: ["string", "null"] }
+        timeZone: { type: ["string", "null"] }
         isVerified: { type: boolean }
         rating: { type: ["number", "null"] }
+        reviewCount: { type: integer }
         responseTime: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         revision: { type: integer, minimum: 1 }
+
+    ManufacturerDirectoryFacets:
+      type: object
+      required: [total, countries, specialties]
+      properties:
+        total: { type: integer }
+        countries:
+          type: array
+          items:
+            type: object
+            required: [name, count]
+            properties:
+              name: { type: string }
+              count: { type: integer }
+        specialties:
+          type: array
+          items:
+            type: object
+            required: [name, count]
+            properties:
+              name: { type: string }
+              count: { type: integer }
+
+    ManufacturerInviteResolution:
+      type: object
+      required: [valid, sellerName]
+      properties:
+        valid: { type: boolean }
+        sellerName: { type: string }
+        companyName: { type: ["string", "null"] }
+        contactName: { type: ["string", "null"] }
+        contactEmail: { type: ["string", "null"] }
+
+    ManufacturerInviteRegistration:
+      allOf:
+        - $ref: "#/components/schemas/Manufacturer"
+        - type: object
+          required: [invitedBySellerId, threadId]
+          properties:
+            invitedBySellerId: { type: string }
+            threadId: { type: string, format: uuid }
+
+    OrderCardInput:
+      type: object
+      required: [clientRequestId, orderType, title, quantity, priceCents]
+      properties:
+        clientRequestId: { type: string, minLength: 1, maxLength: 100 }
+        orderType: { type: string, enum: [sample, bulk] }
+        title: { type: string, minLength: 1, maxLength: 120 }
+        description: { type: ["string", "null"], maxLength: 2000 }
+        quantity: { type: integer, minimum: 1 }
+        priceCents: { type: integer, minimum: 100 }
+
+    OrderCardCancelInput:
+      type: object
+      properties:
+        reason: { type: string, maxLength: 500 }
+
+    OrderCardResult:
+      type: object
+      required: [order, message]
+      properties:
+        order: { $ref: "#/components/schemas/SampleOrder" }
+        message: { $ref: "#/components/schemas/Message" }
+
+    OrderCardSnapshot:
+      type: object
+      required: [id, orderType, title, quantity, priceCents, status, revision, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        orderType: { type: string, enum: [sample, bulk] }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        quantity: { type: integer }
+        priceCents: { type: integer }
+        currency: { type: string }
+        status: { type: string }
+        issuedBy: { type: string }
+        carrier: { type: ["string", "null"] }
+        trackingNumber: { type: ["string", "null"] }
+        paymentReviewState: { type: string }
+        manufacturerPayoutReady: { type: boolean }
+        revision: { type: integer }
+        updatedAt: { type: string, format: date-time }
+
+    OrderTimelineStep:
+      type: object
+      required: [stage, label, description, state, at]
+      properties:
+        stage: { type: string, enum: [payment_received, processing, cut_and_sew, packing, shipped, delivered] }
+        label: { type: string }
+        description: { type: string }
+        state: { type: string, enum: [done, current, upcoming] }
+        at: { type: ["string", "null"], format: date-time }
+
+    OrderTimelineEvent:
+      type: object
+      required: [id, actorRole, toStatus, createdAt]
+      properties:
+        id: { type: string }
+        actorRole: { type: string }
+        fromStatus: { type: ["string", "null"] }
+        toStatus: { type: string }
+        note: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+
+    OrderTimeline:
+      type: object
+      required: [order, steps, events, tracking, viewerRole]
+      properties:
+        viewerRole: { type: string, enum: [seller, manufacturer] }
+        order: { $ref: "#/components/schemas/OrderCardSnapshot" }
+        manufacturer:
+          type: object
+          required: [id, businessName, country]
+          properties:
+            id: { type: string, format: uuid }
+            businessName: { type: string }
+            country: { type: string }
+            timeZone: { type: ["string", "null"] }
+        steps:
+          type: array
+          items: { $ref: "#/components/schemas/OrderTimelineStep" }
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/OrderTimelineEvent" }
+        createdAt: { type: string, format: date-time }
+        paidAt: { type: ["string", "null"], format: date-time }
+        tracking:
+          type: object
+          required: [carrier, carrierName, trackingNumber, url]
+          properties:
+            carrier: { type: ["string", "null"] }
+            carrierName: { type: ["string", "null"] }
+            trackingNumber: { type: ["string", "null"] }
+            url: { type: ["string", "null"] }
 
     ManufacturerApplicationInput:
       allOf:
@@ -974,6 +1294,11 @@ components:
         messageType: { type: string, enum: [text, image, sample_card, bulk_card, system] }
         mediaUrls: { type: array, items: { type: string } }
         cardData: { type: ["object", "null"], additionalProperties: true }
+        order:
+          description: Live state of the order a sample/bulk card refers to.
+          oneOf:
+            - $ref: "#/components/schemas/OrderCardSnapshot"
+            - type: "null"
         sentAt:      { type: string }
 
     MessageInput:
@@ -1144,6 +1469,9 @@ components:
         requirementsDue: { type: array, items: { type: string } }
         disabledReason: { type: ["string", "null"] }
         recovery: { type: ["string", "null"] }
+        country: { type: ["string", "null"] }
+        payoutCurrency: { type: ["string", "null"] }
+        accountType: { type: ["string", "null"], enum: [full, recipient, null] }
 
     ManufacturerConnectOnboardingInput:
       type: object

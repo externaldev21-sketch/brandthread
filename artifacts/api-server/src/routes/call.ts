@@ -105,6 +105,18 @@ export function isValidCallClientEventId(value: unknown): value is string {
   return typeof value === "string" && /^[A-Za-z0-9_-]{8,128}$/.test(value);
 }
 
+export function isCallingConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+  return Boolean(env.AGORA_APP_ID?.trim() && env.AGORA_APP_CERTIFICATE?.trim());
+}
+
+// ─── GET /api/call/availability ───────────────────────────────────────────────
+// Lets clients show a "calls coming soon" state instead of buttons that fail.
+// Setting AGORA_APP_ID and AGORA_APP_CERTIFICATE switches calling on with no
+// client release.
+router.get("/availability", (_req, res) => {
+  res.json({ configured: isCallingConfigured(), provider: "agora" });
+});
+
 // ─── POST /api/call/token ─────────────────────────────────────────────────────
 
 router.post("/token", async (req, res) => {
