@@ -5,6 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { Tabs, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 import { BORDER, SUBTLE } from '@/lib/theme';
 import { getDeactivationStatus, reactivate } from '@/lib/accountService';
@@ -196,12 +197,12 @@ function BuyerTabLayout() {
 const BUYER_NAV_ITEMS: {
   name: 'index' | 'search' | 'inbox' | 'profile';
   label: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: 'home' | 'search' | 'bell' | 'profile';
 }[] = [
   { name: 'index', label: 'Thread', icon: 'home' },
   { name: 'search', label: 'Search', icon: 'search' },
   { name: 'inbox', label: 'Inbox', icon: 'bell' },
-  { name: 'profile', label: 'Profile', icon: 'user' },
+  { name: 'profile', label: 'Profile', icon: 'profile' },
 ];
 
 function BuyerBottomTabBar({
@@ -255,7 +256,10 @@ function BuyerBottomTabBar({
                   style={({ pressed }) => [buyerBarStyles.createButton, pressed && buyerBarStyles.pressed]}
                   testID="buyer-tab-create"
                 >
-                  <Feather name="plus" size={29} color="#050505" />
+                  <View style={buyerBarStyles.plusIcon}>
+                    <View style={buyerBarStyles.plusHorizontal} />
+                    <View style={buyerBarStyles.plusVertical} />
+                  </View>
                 </Pressable>
               )}
               <Pressable
@@ -271,11 +275,8 @@ function BuyerBottomTabBar({
                 testID={`buyer-tab-${item.name}`}
               >
                 <TabBadge count={showInboxBadge ? inboxBadgeCount : 0} accent={accent} onAccent={onAccent}>
-                  <View style={[buyerBarStyles.iconShell, item.name === 'profile' && buyerBarStyles.profileIcon]}>
-                    <Feather name={item.icon} size={item.name === 'profile' ? 18 : 25} color={color} />
-                  </View>
+                  <NavIcon name={item.icon} color={color} focused={focused} />
                 </TabBadge>
-                {focused && <View style={buyerBarStyles.activeDot} />}
               </Pressable>
             </React.Fragment>
           );
@@ -298,34 +299,83 @@ const buyerBarStyles = StyleSheet.create({
     borderTopColor: 'rgba(255,255,255,0.12)',
   },
   createButton: {
-    width: 48,
+    width: 52,
     height: 38,
-    borderRadius: 12,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
   },
   tab: {
-    width: 48,
-    height: 48,
+    width: 52,
+    height: 52,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
   },
-  iconShell: { alignItems: 'center', justifyContent: 'center' },
-  profileIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.5)',
-  },
-  activeDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#FFFFFF' },
+  plusIcon: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
+  plusHorizontal: { position: 'absolute', width: 23, height: 2.5, borderRadius: 2, backgroundColor: '#050505' },
+  plusVertical: { position: 'absolute', width: 2.5, height: 23, borderRadius: 2, backgroundColor: '#050505' },
   pressed: {
     opacity: 0.72,
     transform: [{ scale: 0.95 }],
   },
 });
+
+function NavIcon({
+  name,
+  color,
+  focused,
+}: {
+  name: 'home' | 'search' | 'bell' | 'profile';
+  color: string;
+  focused: boolean;
+}) {
+  if (name === 'home') {
+    return (
+      <Svg width={27} height={27} viewBox="0 0 24 24">
+        <Path
+          d="M3.5 10.6 12 3.5l8.5 7.1v9.1a.8.8 0 0 1-.8.8h-5.1v-6.2H9.4v6.2H4.3a.8.8 0 0 1-.8-.8v-9.1Z"
+          fill={focused ? color : 'none'}
+          stroke={color}
+          strokeWidth={1.8}
+          strokeLinejoin="round"
+        />
+      </Svg>
+    );
+  }
+
+  if (name === 'search') {
+    return (
+      <Svg width={27} height={27} viewBox="0 0 24 24">
+        <Circle cx={10.5} cy={10.5} r={6.3} fill="none" stroke={color} strokeWidth={1.9} />
+        <Path d="m15.2 15.2 4.6 4.6" fill="none" stroke={color} strokeWidth={1.9} strokeLinecap="round" />
+      </Svg>
+    );
+  }
+
+  if (name === 'bell') {
+    return (
+      <Svg width={27} height={27} viewBox="0 0 24 24">
+        <Path
+          d="M6.4 9.8a5.6 5.6 0 0 1 11.2 0c0 5.2 2.1 5.8 2.1 5.8H4.3s2.1-.6 2.1-5.8Z"
+          fill={focused ? color : 'none'}
+          stroke={color}
+          strokeWidth={1.8}
+          strokeLinejoin="round"
+        />
+        <Path d="M9.7 18.5a2.5 2.5 0 0 0 4.6 0" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      </Svg>
+    );
+  }
+
+  return (
+    <Svg width={29} height={29} viewBox="0 0 24 24">
+      <Circle cx={12} cy={12} r={10} fill={focused ? 'rgba(255,255,255,0.16)' : 'none'} stroke={color} strokeWidth={1.4} />
+      <Circle cx={12} cy={9} r={3.1} fill={focused ? color : 'none'} stroke={color} strokeWidth={1.5} />
+      <Path d="M6.9 19c.7-3 2.5-4.7 5.1-4.7s4.4 1.7 5.1 4.7" fill={focused ? color : 'none'} stroke={color} strokeWidth={1.5} strokeLinecap="round" />
+    </Svg>
+  );
+}
 
 function TabBadge({
   count,

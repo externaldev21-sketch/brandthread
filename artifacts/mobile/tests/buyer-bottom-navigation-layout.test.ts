@@ -9,7 +9,7 @@ describe('buyer bottom navigation layout', () => {
     expect(layout).toContain("{ name: 'index', label: 'Thread', icon: 'home' }");
     expect(layout).toContain("{ name: 'search', label: 'Search', icon: 'search' }");
     expect(layout).toContain("{ name: 'inbox', label: 'Inbox', icon: 'bell' }");
-    expect(layout).toContain("{ name: 'profile', label: 'Profile', icon: 'user' }");
+    expect(layout).toContain("{ name: 'profile', label: 'Profile', icon: 'profile' }");
     expect(layout).toContain('testID="buyer-tab-create"');
     expect(layout).toContain("router.push('/create-post?accountType=buyer' as never)");
   });
@@ -19,5 +19,7 @@ describe('buyer bottom navigation layout', () => {
     expect(layout).toContain("backgroundColor: '#FFFFFF'");
     expect(layout).not.toContain('buyerBarStyles.centerBar');
     expect(layout).not.toContain('buyerBarStyles.tabLabel');
+    expect(layout).toContain('<NavIcon name={item.icon} color={color} focused={focused} />');
+    expect(layout).toContain("from 'react-native-svg'");
   });
 });
