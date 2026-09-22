@@ -343,14 +343,14 @@ export default function BuyerPostCommentsScreen() {
               <CachedImage
                 source={{ uri: posterUri }}
                 style={s.mediaBackdrop}
-                contentFit="cover"
+                contentFit="contain"
                 testID="comments-video-poster"
               />
             ) : null}
             <VideoView
               player={mediaPlayer}
               style={[s.mediaBackdrop, posterUri && !videoPlaying && { opacity: 0 }]}
-              contentFit="cover"
+              contentFit="contain"
               nativeControls={false}
               testID="comments-video-preview"
             />

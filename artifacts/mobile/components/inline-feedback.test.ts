@@ -241,6 +241,7 @@ describe('buyer-post-comments — continuous video preview', () => {
     expect(comments).toContain("if (mediaUri && postType === 'video') mediaPlayer.play()");
     expect(comments).toContain('return () => mediaPlayer.pause()');
     expect(comments).toContain('testID="comments-video-preview"');
+    expect(comments).toMatch(/<VideoView[\s\S]*?contentFit="contain"[\s\S]*?testID="comments-video-preview"/);
   });
 });
 
