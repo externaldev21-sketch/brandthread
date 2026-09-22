@@ -697,6 +697,9 @@ importers:
       '@react-navigation/native':
         specifier: 7.3.7
         version: 7.3.7(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
+      expo:
+        specifier: ~57.0.24
+        version: 57.0.24(@babel/core@7.29.7)(@expo/metro-runtime@57.0.16)(expo-router@57.0.22)(react-dom@19.2.3(react@19.2.3))(react-native-web@0.21.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-native-webview@13.16.1(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native-worklets@0.10.1(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
       expo-apple-authentication:
         specifier: ~57.0.2
         version: 57.0.2(expo@57.0.24)(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
@@ -739,6 +742,12 @@ importers:
       expo-video:
         specifier: ~57.0.4
         version: 57.0.4(expo@57.0.24)(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
+      react:
+        specifier: 19.2.3
+        version: 19.2.3
+      react-native:
+        specifier: 0.86.3
+        version: 0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3)
       react-native-agora:
         specifier: ^4.6.2
         version: 4.6.2(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
@@ -800,9 +809,6 @@ importers:
       create-launch:
         specifier: 0.3.6
         version: 0.3.6
-      expo:
-        specifier: ~57.0.24
-        version: 57.0.24(@babel/core@7.29.7)(@expo/metro-runtime@57.0.16)(expo-router@57.0.22)(react-dom@19.2.3(react@19.2.3))(react-native-web@0.21.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-native-webview@13.16.1(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native-worklets@0.10.1(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
       expo-auth-session:
         specifier: ~57.0.12
         version: 57.0.12(expo@57.0.24)(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
@@ -836,9 +842,6 @@ importers:
       expo-linking:
         specifier: ~57.0.10
         version: 57.0.10(expo@57.0.24)(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
-      expo-location:
-        specifier: ~57.0.19
-        version: 57.0.19(expo@57.0.24)(typescript@6.0.3)
       expo-router:
         specifier: ~57.0.22
         version: 57.0.22(97890931b579d8a23e604328ba0d0887)
@@ -860,15 +863,9 @@ importers:
       expo-web-browser:
         specifier: ~57.0.3
         version: 57.0.3(expo@57.0.24)(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))
-      react:
-        specifier: 19.2.3
-        version: 19.2.3
       react-dom:
         specifier: 19.2.3
         version: 19.2.3(react@19.2.3)
-      react-native:
-        specifier: 0.86.3
-        version: 0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3)
       react-native-gesture-handler:
         specifier: ~2.32.0
         version: 2.32.0(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
@@ -1102,7 +1099,7 @@ importers:
     devDependencies:
       orval:
         specifier: ^8.18.0
-        version: 8.18.0(prettier@3.8.4)(typescript@5.9.3)
+        version: 8.18.0(prettier@3.8.4)(typescript@6.0.3)
 
   lib/api-zod:
     dependencies:
@@ -4771,11 +4768,6 @@ packages:
 
   expo-local-authentication@57.0.3:
     resolution: {integrity: sha512-1oQCBKz8JOpai+Zp+Z2RkBFIi2CHHWLSJk/pjvT9VEyf8nPFslo4kt1ZlQvtJ4rupbKNCmxqKfYr8Mlo8nJEug==}
-    peerDependencies:
-      expo: '*'
-
-  expo-location@57.0.19:
-    resolution: {integrity: sha512-eNX8D74Aav4Go0jmNQIuIP3ioV6QLNDsKuEXE24rtqoG80UgqgD0gjnwwWqkC5fs7yGUToXcy4BLqlwCqrX5pQ==}
     peerDependencies:
       expo: '*'
 
@@ -8626,23 +8618,23 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
 
-  '@orval/angular@8.18.0(typescript@5.9.3)':
+  '@orval/angular@8.18.0(typescript@6.0.3)':
     dependencies:
-      '@orval/core': 8.18.0(typescript@5.9.3)
+      '@orval/core': 8.18.0(typescript@6.0.3)
     transitivePeerDependencies:
       - '@faker-js/faker'
       - supports-color
       - typescript
 
-  '@orval/axios@8.18.0(typescript@5.9.3)':
+  '@orval/axios@8.18.0(typescript@6.0.3)':
     dependencies:
-      '@orval/core': 8.18.0(typescript@5.9.3)
+      '@orval/core': 8.18.0(typescript@6.0.3)
     transitivePeerDependencies:
       - '@faker-js/faker'
       - supports-color
       - typescript
 
-  '@orval/core@8.18.0(typescript@5.9.3)':
+  '@orval/core@8.18.0(typescript@6.0.3)':
     dependencies:
       '@scalar/openapi-types': 0.8.0
       acorn: 8.17.0
@@ -8654,91 +8646,91 @@ snapshots:
       jiti: 2.7.0
       remeda: 2.39.0
       tinyglobby: 0.2.17
-      typedoc: 0.28.19(typescript@5.9.3)
+      typedoc: 0.28.19(typescript@6.0.3)
     transitivePeerDependencies:
       - supports-color
       - typescript
 
-  '@orval/effect@8.18.0(typescript@5.9.3)':
+  '@orval/effect@8.18.0(typescript@6.0.3)':
     dependencies:
-      '@orval/core': 8.18.0(typescript@5.9.3)
+      '@orval/core': 8.18.0(typescript@6.0.3)
       remeda: 2.39.0
     transitivePeerDependencies:
       - '@faker-js/faker'
       - supports-color
       - typescript
 
-  '@orval/fetch@8.18.0(typescript@5.9.3)':
+  '@orval/fetch@8.18.0(typescript@6.0.3)':
     dependencies:
-      '@orval/core': 8.18.0(typescript@5.9.3)
+      '@orval/core': 8.18.0(typescript@6.0.3)
       '@scalar/openapi-types': 0.8.0
     transitivePeerDependencies:
       - '@faker-js/faker'
       - supports-color
       - typescript
 
-  '@orval/hono@8.18.0(typescript@5.9.3)':
+  '@orval/hono@8.18.0(typescript@6.0.3)':
     dependencies:
-      '@orval/core': 8.18.0(typescript@5.9.3)
-      '@orval/zod': 8.18.0(typescript@5.9.3)
+      '@orval/core': 8.18.0(typescript@6.0.3)
+      '@orval/zod': 8.18.0(typescript@6.0.3)
       fs-extra: 11.3.5
       remeda: 2.39.0
     optionalDependencies:
-      typescript: 5.9.3
+      typescript: 6.0.3
     transitivePeerDependencies:
       - '@faker-js/faker'
       - supports-color
 
-  '@orval/mcp@8.18.0(typescript@5.9.3)':
+  '@orval/mcp@8.18.0(typescript@6.0.3)':
     dependencies:
-      '@orval/core': 8.18.0(typescript@5.9.3)
-      '@orval/fetch': 8.18.0(typescript@5.9.3)
-      '@orval/zod': 8.18.0(typescript@5.9.3)
+      '@orval/core': 8.18.0(typescript@6.0.3)
+      '@orval/fetch': 8.18.0(typescript@6.0.3)
+      '@orval/zod': 8.18.0(typescript@6.0.3)
     transitivePeerDependencies:
       - '@faker-js/faker'
       - supports-color
       - typescript
 
-  '@orval/mock@8.18.0(typescript@5.9.3)':
+  '@orval/mock@8.18.0(typescript@6.0.3)':
     dependencies:
-      '@orval/core': 8.18.0(typescript@5.9.3)
+      '@orval/core': 8.18.0(typescript@6.0.3)
       remeda: 2.39.0
     transitivePeerDependencies:
       - '@faker-js/faker'
       - supports-color
       - typescript
 
-  '@orval/query@8.18.0(typescript@5.9.3)':
+  '@orval/query@8.18.0(typescript@6.0.3)':
     dependencies:
-      '@orval/core': 8.18.0(typescript@5.9.3)
-      '@orval/fetch': 8.18.0(typescript@5.9.3)
+      '@orval/core': 8.18.0(typescript@6.0.3)
+      '@orval/fetch': 8.18.0(typescript@6.0.3)
       remeda: 2.39.0
     transitivePeerDependencies:
       - '@faker-js/faker'
       - supports-color
       - typescript
 
-  '@orval/solid-start@8.18.0(typescript@5.9.3)':
+  '@orval/solid-start@8.18.0(typescript@6.0.3)':
     dependencies:
-      '@orval/core': 8.18.0(typescript@5.9.3)
+      '@orval/core': 8.18.0(typescript@6.0.3)
       '@scalar/openapi-types': 0.8.0
     transitivePeerDependencies:
       - '@faker-js/faker'
       - supports-color
       - typescript
 
-  '@orval/swr@8.18.0(typescript@5.9.3)':
+  '@orval/swr@8.18.0(typescript@6.0.3)':
     dependencies:
-      '@orval/core': 8.18.0(typescript@5.9.3)
-      '@orval/fetch': 8.18.0(typescript@5.9.3)
+      '@orval/core': 8.18.0(typescript@6.0.3)
+      '@orval/fetch': 8.18.0(typescript@6.0.3)
     transitivePeerDependencies:
       - '@faker-js/faker'
       - supports-color
       - typescript
 
-  '@orval/zod@8.18.0(typescript@5.9.3)':
+  '@orval/zod@8.18.0(typescript@6.0.3)':
     dependencies:
-      '@orval/core': 8.18.0(typescript@5.9.3)
+      '@orval/core': 8.18.0(typescript@6.0.3)
       remeda: 2.39.0
     transitivePeerDependencies:
       - '@faker-js/faker'
@@ -11860,14 +11852,6 @@ snapshots:
       expo: 57.0.24(@babel/core@7.29.7)(@expo/metro-runtime@57.0.16)(expo-router@57.0.22)(react-dom@19.2.3(react@19.2.3))(react-native-web@0.21.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-native-webview@13.16.1(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native-worklets@0.10.1(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
       invariant: 2.2.4
 
-  expo-location@57.0.19(expo@57.0.24)(typescript@6.0.3):
-    dependencies:
-      '@expo/image-utils': 0.11.5(typescript@6.0.3)
-      expo: 57.0.24(@babel/core@7.29.7)(@expo/metro-runtime@57.0.16)(expo-router@57.0.22)(react-dom@19.2.3(react@19.2.3))(react-native-web@0.21.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-native-webview@13.16.1(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native-worklets@0.10.1(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
-    transitivePeerDependencies:
-      - supports-color
-      - typescript
-
   expo-media-library@57.0.5(expo@57.0.24)(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3)):
     dependencies:
       expo: 57.0.24(@babel/core@7.29.7)(@expo/metro-runtime@57.0.16)(expo-router@57.0.22)(react-dom@19.2.3(react@19.2.3))(react-native-web@0.21.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-native-webview@13.16.1(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native-worklets@0.10.1(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
@@ -13128,21 +13112,21 @@ snapshots:
       strip-ansi: 5.2.0
       wcwidth: 1.0.1
 
-  orval@8.18.0(prettier@3.8.4)(typescript@5.9.3):
+  orval@8.18.0(prettier@3.8.4)(typescript@6.0.3):
     dependencies:
       '@commander-js/extra-typings': 15.0.0(commander@15.0.0)
-      '@orval/angular': 8.18.0(typescript@5.9.3)
-      '@orval/axios': 8.18.0(typescript@5.9.3)
-      '@orval/core': 8.18.0(typescript@5.9.3)
-      '@orval/effect': 8.18.0(typescript@5.9.3)
-      '@orval/fetch': 8.18.0(typescript@5.9.3)
-      '@orval/hono': 8.18.0(typescript@5.9.3)
-      '@orval/mcp': 8.18.0(typescript@5.9.3)
-      '@orval/mock': 8.18.0(typescript@5.9.3)
-      '@orval/query': 8.18.0(typescript@5.9.3)
-      '@orval/solid-start': 8.18.0(typescript@5.9.3)
-      '@orval/swr': 8.18.0(typescript@5.9.3)
-      '@orval/zod': 8.18.0(typescript@5.9.3)
+      '@orval/angular': 8.18.0(typescript@6.0.3)
+      '@orval/axios': 8.18.0(typescript@6.0.3)
+      '@orval/core': 8.18.0(typescript@6.0.3)
+      '@orval/effect': 8.18.0(typescript@6.0.3)
+      '@orval/fetch': 8.18.0(typescript@6.0.3)
+      '@orval/hono': 8.18.0(typescript@6.0.3)
+      '@orval/mcp': 8.18.0(typescript@6.0.3)
+      '@orval/mock': 8.18.0(typescript@6.0.3)
+      '@orval/query': 8.18.0(typescript@6.0.3)
+      '@orval/solid-start': 8.18.0(typescript@6.0.3)
+      '@orval/swr': 8.18.0(typescript@6.0.3)
+      '@orval/zod': 8.18.0(typescript@6.0.3)
       '@scalar/json-magic': 0.12.16
       '@scalar/openapi-parser': 0.28.7
       '@scalar/openapi-types': 0.8.0
@@ -13157,9 +13141,9 @@ snapshots:
       js-yaml: 4.2.0
       remeda: 2.39.0
       string-argv: 0.3.2
-      typedoc: 0.28.19(typescript@5.9.3)
-      typedoc-plugin-coverage: 4.0.3(typedoc@0.28.19(typescript@5.9.3))
-      typedoc-plugin-markdown: 4.12.0(typedoc@0.28.19(typescript@5.9.3))
+      typedoc: 0.28.19(typescript@6.0.3)
+      typedoc-plugin-coverage: 4.0.3(typedoc@0.28.19(typescript@6.0.3))
+      typedoc-plugin-markdown: 4.12.0(typedoc@0.28.19(typescript@6.0.3))
     optionalDependencies:
       prettier: 3.8.4
     transitivePeerDependencies:
@@ -14281,21 +14265,21 @@ snapshots:
       media-typer: 1.1.0
       mime-types: 3.0.2
 
-  typedoc-plugin-coverage@4.0.3(typedoc@0.28.19(typescript@5.9.3)):
+  typedoc-plugin-coverage@4.0.3(typedoc@0.28.19(typescript@6.0.3)):
     dependencies:
-      typedoc: 0.28.19(typescript@5.9.3)
+      typedoc: 0.28.19(typescript@6.0.3)
 
-  typedoc-plugin-markdown@4.12.0(typedoc@0.28.19(typescript@5.9.3)):
+  typedoc-plugin-markdown@4.12.0(typedoc@0.28.19(typescript@6.0.3)):
     dependencies:
-      typedoc: 0.28.19(typescript@5.9.3)
+      typedoc: 0.28.19(typescript@6.0.3)
 
-  typedoc@0.28.19(typescript@5.9.3):
+  typedoc@0.28.19(typescript@6.0.3):
     dependencies:
       '@gerrit0/mini-shiki': 3.23.0
       lunr: 2.3.9
       markdown-it: 14.2.0
       minimatch: 10.2.5
-      typescript: 5.9.3
+      typescript: 6.0.3
       yaml: 2.9.0
 
   typescript@5.9.3: {}
