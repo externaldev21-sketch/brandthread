@@ -1,0 +1,76 @@
+name: Brandthread CI/CD
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: brandthread-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify mobile app identity
+        run: pnpm --filter @workspace/mobile run verify:app-identity
+
+      - name: Build shared database declarations
+        run: pnpm --filter @workspace/db exec tsc --build
+
+      - name: Type-check API and mobile
+        run: |
+          pnpm --filter @workspace/api-server run typecheck
+          pnpm --filter @workspace/mobile run typecheck
+
+      - name: Run API and mobile tests
+        run: |
+          pnpm --filter @workspace/api-server run test
+          pnpm --filter @workspace/mobile run test
+
+      - name: Build deployable services
+        run: |
+          pnpm --filter @workspace/api-server run build
+          pnpm --filter @workspace/manufacturer-portal run build
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Trigger Replit production deployment
+        env:
+          REPLIT_DEPLOY_HOOK_URL: ${{ secrets.REPLIT_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$REPLIT_DEPLOY_HOOK_URL" ]; then
+            echo "REPLIT_DEPLOY_HOOK_URL is not configured in the GitHub production environment." >&2
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error \
+            --retry 3 --retry-all-errors \
+            -X POST "$REPLIT_DEPLOY_HOOK_URL"

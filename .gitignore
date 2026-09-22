@@ -47,3 +47,6 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# CI workflows are stored disabled under docs/ci because the Replit GitHub credential lacks workflow scope.
+.github/workflows/
