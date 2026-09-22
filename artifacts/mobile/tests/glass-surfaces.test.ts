@@ -36,7 +36,7 @@ describe('glass surfaces and translucency', () => {
     const buyerLayout = readFileSync(appPath('(buyer)/_layout.tsx'), 'utf8');
     
     expect(sellerTabBar).toContain('SURFACE_GLASS');
-    expect(buyerLayout).toContain('const pillBg       = colors.tabBarBackground');
+    expect(buyerLayout).toMatch(/const pillBg\s+= colors\.tabBarBackground;/);
   });
 
   it('uses transparent overlays for product loading', () => {
