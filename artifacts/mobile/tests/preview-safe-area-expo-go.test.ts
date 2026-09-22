@@ -7,11 +7,13 @@ const read = (relativePath: string) =>
 
 describe('browser preview safe areas and Expo Go startup', () => {
   it('keeps both buyer and seller tab bars visible and reachable on web', () => {
-    const buyerTabs = read('app/(buyer)/_layout.tsx');
+    const buyerTabs = read('components/buyer-nav/BuyerTabBar.tsx');
+    const buyerMetrics = read('components/buyer-nav/buyerTabBarMetrics.ts');
     const sellerTabs = read('app/(tabs)/_layout.tsx');
     const cookieConsent = read('contexts/CookieConsentContext.tsx');
 
-    expect(buyerTabs).toContain('const barHeight = 54 + bottomInset + 8');
+    expect(buyerMetrics).toContain('Math.max(bottomInset - 10, 12)');
+    expect(buyerTabs).toContain('bottom: metrics.bottomOffset');
     expect(buyerTabs).toContain('minWidth: 44');
     expect(sellerTabs).not.toContain("if (Platform.OS === 'web') return null");
     expect(cookieConsent).toContain('bottom:72+SP.md');
@@ -24,6 +26,7 @@ describe('browser preview safe areas and Expo Go startup', () => {
       'app/buyer-checkout.tsx',
       'app/(buyer)/search.tsx',
       'app/(buyer)/_layout.tsx',
+      'components/buyer-nav/BuyerTabBar.tsx',
       'app/(tabs)/feed.tsx',
     ];
 

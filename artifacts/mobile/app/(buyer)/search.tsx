@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Platform, TextInput, Image as RNImage, Modal, Pressable, KeyboardAvoidingView,
@@ -16,6 +16,10 @@ import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { EmptyState, SearchResultsSkeleton } from '@/components/BrandthreadUI';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { CachedImage } from '@/components/CachedImage';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
+import { useBuyerSearch } from '@/contexts/BuyerSearchContext';
+import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { FONT, FS } from '@/lib/theme';
 
 type PersonResult = {
   userId: string; name: string; username: string | null;
@@ -69,7 +73,8 @@ function MasonryCard({ item, accent, onPress }: {
 export default function SearchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { q: tabQuery, filters: filterRequest } = useLocalSearchParams<{ q?: string; filters?: string }>();
+  // Deep links may still pass ?q=; the tab bar's inline field owns the text.
+  const { q: linkQuery } = useLocalSearchParams<{ q?: string }>();
   const { push } = useThreadPull();
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -83,7 +88,10 @@ export default function SearchScreen() {
 
   const api    = useApi();
   const { userId } = useAuth();
-  const [query,   setQuery]   = useState('');
+  const {
+    query, setQuery, filtersRequest, submitRequest, setActiveFilterCount, keyboardHeight,
+  } = useBuyerSearch();
+  const barInset = useBuyerTabBarInset();
   const [sort, setSort] = useState<string>(''); // '', 'relevance', 'price_asc', 'price_desc', 'newest'
   const [minPrice, setMinPrice] = useState<string>('');
   const [maxPrice, setMaxPrice] = useState<string>('');
@@ -98,23 +106,42 @@ export default function SearchScreen() {
   const [people,  setPeople]  = useState<PersonResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  const [searchFocused, setSearchFocused] = useState(true);
   const topPad = Platform.OS === 'web' ? 24 : insets.top;
   const recentKey = `bt:buyer-search-recent:${userId ?? 'anon'}`;
 
   const hasActiveFilters = sort !== '' || minPrice !== '' || maxPrice !== '' || category !== '';
 
   useEffect(() => {
-    if (typeof tabQuery === 'string') setQuery(tabQuery);
-  }, [tabQuery]);
+    if (typeof linkQuery === 'string' && linkQuery.length > 0) setQuery(linkQuery);
+  }, [linkQuery, setQuery]);
 
+  // Open only when the tab bar's filter button asks, never on first mount.
+  const handledFiltersRequest = useRef(filtersRequest);
   useEffect(() => {
-    if (filterRequest !== '1') return;
+    if (filtersRequest === handledFiltersRequest.current) return;
+    handledFiltersRequest.current = filtersRequest;
     openFilters();
-    router.setParams({ filters: undefined });
-  // Open only when the transformed tab bar explicitly requests it.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterRequest]);
+  }, [filtersRequest]);
+
+  const handledSubmitRequest = useRef(submitRequest);
+  useEffect(() => {
+    if (submitRequest === handledSubmitRequest.current) return;
+    handledSubmitRequest.current = submitRequest;
+    rememberSearch(query);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submitRequest]);
+
+  const activeFilterCount = [sort, minPrice || maxPrice, category].filter(Boolean).length;
+  useEffect(() => {
+    setActiveFilterCount(activeFilterCount);
+  }, [activeFilterCount, setActiveFilterCount]);
+
+  // Results scroll clear of the floating bar, and of the keyboard while the
+  // bar rides above it.
+  const bottomSpacerStyle = useAnimatedStyle(() => ({
+    height: barInset + keyboardHeight.value + 16,
+  }));
   const productResults = useMemo(() => results.filter((result): result is ProductResult => result.kind === 'product'), [results]);
   const brandResults = useMemo(() => results.filter(result => result.kind === 'brand'), [results]);
   const productColumns = useMemo(() => [
@@ -228,8 +255,14 @@ export default function SearchScreen() {
   }, [people, results]);
 
   function goToBrand() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/(buyer)/feed' as never);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    router.navigate('/(buyer)/discover' as never);
+  }
+
+  function clearRecentSearches() {
+    Haptics.selectionAsync().catch(() => {});
+    setRecentSearches([]);
+    AsyncStorage.removeItem(recentKey).catch(() => {});
   }
 
   function handleResultPress(r: SearchResult) {
@@ -307,27 +340,65 @@ export default function SearchScreen() {
 
       <ScrollView
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingTop: topPad + 16, paddingBottom: 40 }}
+        keyboardDismissMode="on-drag"
+        contentContainerStyle={{ paddingTop: topPad + 12 }}
       >
+        <View style={styles.titleBlock}>
+          <Text style={[styles.title, { color: fg }]} accessibilityRole="header">Search</Text>
+          <Text style={[styles.subtitle, { color: muted }]}>
+            {query.trim().length === 0
+              ? 'Brands, pieces and people on Brandthread'
+              : `Showing matches for “${query.trim()}”`}
+          </Text>
+        </View>
         {query.trim().length === 0 ? (
           <View testID="buyer-search-empty-state" accessibilityLabel="Search is empty">
-            {searchFocused && recentSearches.length > 0 ? (
-              <Text style={[styles.sectionLabel, { color: muted }]}>RECENT</Text>
+            {recentSearches.length > 0 ? (
+              <View style={styles.sectionHeaderRow}>
+                <Text style={[styles.sectionLabel, { color: muted, paddingHorizontal: 0 }]}>RECENT</Text>
+                <TouchableOpacity
+                  onPress={clearRecentSearches}
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear recent searches"
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                  <Text style={[styles.sectionAction, { color: fg }]}>Clear</Text>
+                </TouchableOpacity>
+              </View>
             ) : null}
-            {searchFocused && recentSearches.map((term) => (
+            {recentSearches.map((term) => (
               <TouchableOpacity
                 key={term}
                 style={styles.row}
                 activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`Search for ${term}`}
                 onPress={() => {
                   rememberSearch(term);
                   setQuery(term);
                 }}
               >
                 <Feather name="clock" size={16} color={muted} />
-                <Text style={[styles.rowText, { color: fg }]}>{term}</Text>
+                <Text style={[styles.rowText, { color: fg, flex: 1 }]} numberOfLines={1}>{term}</Text>
+                <Feather name="arrow-up-left" size={15} color={muted} />
               </TouchableOpacity>
             ))}
+
+            <Text style={[styles.sectionLabel, { color: muted, marginTop: 8 }]}>TRY</Text>
+            <View style={styles.tryChips}>
+              {SEARCH_STARTERS.map((term) => (
+                <TouchableOpacity
+                  key={term}
+                  style={[styles.tryChip, { borderColor: border, backgroundColor: card }]}
+                  activeOpacity={0.75}
+                  onPress={() => { Haptics.selectionAsync().catch(() => {}); setQuery(term); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Search for ${term}`}
+                >
+                  <Text style={[styles.tryChipText, { color: fg }]}>{term}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             <Text style={[styles.sectionLabel, { color: muted, marginTop: 8 }]}>DISCOVER</Text>
             <TouchableOpacity
@@ -366,6 +437,7 @@ export default function SearchScreen() {
               <SearchResultsSkeleton />
             ) : !searching && results.length === 0 && people.length === 0 ? (
               <EmptyState
+                compact
                 icon="search"
                 title="No exact match — yet."
                 description={`We couldn’t find “${query}”. Try a broader phrase or clear a filter to uncover more.`}
@@ -469,12 +541,27 @@ export default function SearchScreen() {
             )}
           </View>
         )}
+        <Animated.View style={bottomSpacerStyle} />
       </ScrollView>
     </View>
   );
 }
 
+// Starter queries, not results: they only prefill the field.
+const SEARCH_STARTERS = ['Outerwear', 'Denim', 'Knitwear', 'Sneakers', 'Accessories', 'Vintage'] as const;
+
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
+  titleBlock: { paddingHorizontal: 16, paddingBottom: 6 },
+  title: { fontSize: FS.h2, fontFamily: FONT.bold, letterSpacing: -0.6 },
+  subtitle: { fontSize: FS.sm, fontFamily: FONT.regular, marginTop: 4 },
+  sectionHeaderRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16,
+  },
+  sectionAction: { fontSize: FS.sm, fontFamily: FONT.semibold, paddingTop: 16, paddingBottom: 6 },
+  tryChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
+  tryChip: { minHeight: 36, paddingHorizontal: 14, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, justifyContent: 'center' },
+  tryChipText: { fontSize: FS.sm, fontFamily: FONT.medium },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1,
