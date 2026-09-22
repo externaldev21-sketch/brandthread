@@ -200,7 +200,7 @@ Key theme facts used below: static `ACCENT`/`PURPLE` = `#F7F7FA` and `ON_DARK` =
 |---|---|---|---|---|
 | P0 | Copy | Tech jargon: "JSON archive", "authenticated Brandthread account", "The server uses your signed-in identity…"; the fallback Alert prints a `file://` path. | 92, 101, 129, 56 | "Your data is ready. Save it or send it anywhere." / "We'll bundle the selected info into one file." Remove the path. |
 | P0 | Copy | Raw `err.message` in "Export failed". | 63 | "Couldn't prepare your data. Try again." |
-| P1 | Motion | The Download button is never `disabled`, so it can be tapped repeatedly while "Generating…" (duplicate exports). With 0 categories it silently does nothing. | 139-150, 44 | `disabled={loading || selectedCount===0}` + spinner. |
+| P1 | Motion | The Download button is never `disabled`, so it can be tapped repeatedly while "Generating…" (duplicate exports). With 0 categories it silently does nothing. | 139-150, 44 | `disabled={loading \|\| selectedCount===0}` + spinner. |
 | P1 | Theme | Switch thumb `ON_DARK` on a `PURPLE` (accent) track: a white thumb on a white track on Monochrome. | 114-119 | `thumbColor={theme.onAccent}` or `HapticSwitch`. |
 | P2 | Copy | Title Case "Download Your Data", "Download My Data". | 81, 147 | "Download your data", "Download". |
 

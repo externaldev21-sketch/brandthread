@@ -10,12 +10,21 @@
 
 | Priority | Meaning | Count |
 |---|---|---|
-| **P0** | Visibly broken, or would embarrass at launch: invisible text, fake success, placeholder or dev text, broken flows | **293** |
-| **P1** | Noticeable: inconsistent components, faint text, missing feedback, layout jumps, robotic copy | **818** |
-| **P2** | Nice to have: radius or spacing drift, micro-interactions, copy polish | **331** |
+| **P0** | Visibly broken, or would embarrass at launch: invisible text, fake success, placeholder or dev text, broken flows | **303** |
+| **P1** | Noticeable: inconsistent components, faint text, missing feedback, layout jumps, robotic copy | **836** |
+| **P2** | Nice to have: radius or spacing drift, micro-interactions, copy polish | **351** |
 
 
-**How this was produced:** eleven parallel reviewers each read one slice of the code line by line against the same brief. One more reviewer ran the web build in dev preview mode and captured iPhone (390×844) and iPad (1024×1366) screenshots, which are in [`screenshots/`](./screenshots/). I re-checked the headline claims against the source before including them. Contrast figures are computed with the WCAG formula against the real theme surfaces.
+**How this was produced:** ten parallel reviewers each read one slice of the code line by line against the same brief. One more reviewer ran the web build in dev preview mode and captured iPhone (390×844) and iPad (1024×1366) screenshots, which are in [`screenshots/`](./screenshots/). I re-checked the headline claims against the source before including them. Contrast figures are computed with the WCAG formula against the real theme surfaces.
+
+No backend was reachable during the screenshot pass, so API-driven screens show their loading state. That is a finding in itself: none of them time out into an error.
+
+**See it:**
+
+| iPad · Purple theme · seller dashboard | iPhone · Plans (paywall) |
+|---|---|
+| <img src="screenshots/ipad-seller-home-purple.jpg" width="360" alt="iPad dashboard on the Purple theme: the date pills are stretched to about 390 pt tall, the stat cards stay near-black instead of taking the theme, and $0.00 shows next to All caught up"> | <img src="screenshots/iphone-seller-plans.jpg" width="260" alt="iPhone Plans screen: the Switch to Starter label is invisible, the seller tab bar covers the paywall, and the Dashboard tab label is truncated"> |
+| The pills are stretched about 390 pt tall; the cards ignore the theme; "$0.00" sits next to "All caught up" | "Switch to Starter" is invisible; the tab bar covers the paywall; the tab label is cut to "Dashbo…" |
 
 **How to use it:**
 1. Fix the **systemic root causes** first. About 12 changes wipe out several hundred line items.
@@ -70,7 +79,7 @@ Ranked by how bad they'd look to a real user on launch day, weighed against how 
    - Turning on 2-step verification locks you out.
    - The Apple sign-in button breaks Apple's design rules: its logo is missing, it's coloured by the theme, and it sits below Google.
    - The username says "optional" but is required, so "Create account" stays greyed out with no reason.
-10. **Themes only half work.** 192 of 241 screens use fixed colours instead of the chosen theme, so a Purple, Olive or Maroon user sees black cards and grey borders pasted on top of their colour. Outlines are 7% white, which is the "foggy" look. Thirty labels use a background colour as a text colour and are invisible. *Fix:* start with the ~6 shared files (BrandthreadUI, ShopProductSheet, the seller dashboard, InlineFeedback, StoreContextBanner, `useColors`), which fixes most screens at once. Then sweep screen by screen.
+10. **Themes only half work.** 192 of 241 screens use fixed colours instead of the chosen theme, so a Purple, Olive or Maroon user sees black cards and grey borders pasted on top of their colour. Outlines are 7% white, which is the "foggy" look. Thirty labels use a background colour as a text colour and are invisible. The screenshots show it: dashboard cards stay near-black on Purple and Maroon. *Fix:* start with the ~6 shared files (BrandthreadUI, ShopProductSheet, the seller dashboard, InlineFeedback, StoreContextBanner, `useColors`), which fixes most screens at once. Then sweep screen by screen.
 11. **Wording that feels machine-made.** "Add to Cart" in one place and "Add to bag" in another. The code is split 80/80 between "cart" and "bag". There are 300+ Title Case labels, "Please…" 60+ times, "Error" as an alert title, "successfully", "...", "Stitching things together…" as the default loader text, and ALL-CAPS eyebrows. *Fix:* one voice (sentence case, verb-first, bag), set out in `design-rules.md` §11. The area files have the exact replacement copy.
 12. **Selling basics break on real orders.**
     - "Buy label" always says **"Order not found"**, because label, refund and return screens read a demo order store that's always empty.
@@ -82,7 +91,7 @@ Ranked by how bad they'd look to a real user on launch day, weighed against how 
     - Camera: the shutter doesn't animate, and the record ring re-renders the whole camera 10 times a second.
     - No feedback: posting has no success haptic or toast, and saving a draft gives no feedback.
 15. **Design Studio is unusable on iPhone and laggy.** The canvas tool row is about 600 pt wide on a 393 pt screen, so Adjust and Layers are unreachable. The resize and rotate handles are drawn but dead. Every brush stroke re-renders a 5,400-line screen that holds 75 separate pieces of state. Every template opens a blank canvas. AI jobs show fake progress ("~3 seconds") and can't be cancelled. *Fix:* a scrolling toolbar, attach the handles, move gestures to Reanimated and Gesture Handler, and split the file.
-16. **Taps don't feel premium.** 242 files use the default "flash" button (TouchableOpacity at 0.2 opacity), and only 9 use the app's own scale-press. The seller tab bar has no pressed state and resets history on every tab switch (`router.replace`). Haptics are patchy (only 1 of 8 switch screens uses `HapticSwitch`). *Fix:* one `PressableScale`-based button family with haptics built in (`design-rules.md` §6).
+16. **Taps don't feel premium.** 242 files use the default "flash" button (TouchableOpacity at 0.2 opacity), and only 9 use the app's own scale-press. The seller tab bar has no pressed state and resets history on every tab switch (`router.replace`). Haptics are patchy: in buyer settings, only 1 of 8 screens with switches uses `HapticSwitch`. *Fix:* one `PressableScale`-based button family with haptics built in (`design-rules.md` §6). The seller tab bar also floats over full-screen flows (the Create Post camera, Add product, Plans, Settings), highlights "Dashboard" on unrelated screens, and truncates to "Dashbo…" on iPhone. The web URLs `/feed` and `/orders` open the wrong app shell (buyer vs seller). *Fix:* show the tab bar only on an allow-list of shell routes, and rename the colliding routes.
 17. **System pop-ups used as UI (791 `Alert.alert` calls).** Success messages, pickers and menus all use alert boxes. Nine flows use the iPhone-only `Alert.prompt`, which does nothing on Android. A 6-option alert silently drops options on Android. *Fix:* toasts for success, one bottom sheet for pickers and menus, and alerts only for "Delete? This can't be undone."
 18. **Launch flicker and loading jumps.**
     - Up to **four boot screens** flash in a row, black first, then the user's theme colour.
@@ -90,6 +99,8 @@ Ranked by how bad they'd look to a real user on launch day, weighed against how 
     - 124 screens show a bare spinner, and the few skeletons are 5% white, so they're effectively invisible.
     - Sample detail flashes the whole screen to loading every 15 seconds, which drops the keyboard mid-review.
     - Content pops in and shifts the layout.
+    - Loaders never time out. When the API is down, Store Builder, Cart, Checkout, Billing and others spin forever.
+    - **iPad is a stretched phone:** the dashboard date pills grow to about 390 pt tall, and full-width buttons and cards span 1,000 pt.
 19. **Scrolling and video performance.**
     - The main thread feed doesn't memoize rows and keeps about 20 video players mounted.
     - 194 screens render lists with a plain ScrollView.
@@ -154,7 +165,8 @@ Each wave is small, low-conflict PRs. Rebase often.
 | [Seller: create post, AI, analytics & finance](screens/08-content-ai-analytics.md) | 31 | 82 | 24 |
 | [Seller: manufacturers, billing, team & settings](screens/09-business-settings.md) | 59 | 109 | 24 |
 | [Manufacturer portal (web)](screens/10-manufacturer-portal.md) | 24 | 70 | 38 |
-| **Total** | **293** | **818** | **331** |
+| [Visual pass: web screenshots (iPhone & iPad)](screens/11-screenshots.md) | 10 | 18 | 20 |
+| **Total** | **303** | **836** | **351** |
 
 ---
 
@@ -1264,6 +1276,53 @@ These are the P0 rows only, copied from the area files. Each area file also has 
 |---|---|---|---|---|
 | P0 | Copy | Dev text is shown to users: "Did you forget to add the page to the router?" | not-found.tsx:17 | "This page doesn't exist or has moved." + `<Button asChild><Link href="/">Go home</Link></Button>` |
 | P0 | Theme | A white light-mode page (`bg-gray-50`, `text-gray-900`, `text-gray-600`, `text-red-500`) in a dark app. It's a full white flash | not-found.tsx:6, 10, 11, 16 | `bg-background`, `text-foreground`, `text-muted-foreground`, and a neutral icon |
+
+### Visual pass: web screenshots (iPhone & iPad) — 10 P0 · [full detail](screens/11-screenshots.md)
+
+**Cross-cutting issues (fix once, many screens)**
+
+| Pri | Issue | Screenshot | Fix |
+|---|---|---|---|
+| P0 | Global seller floating tab bar renders over full-screen or modal flows. It covers the Create Post camera controls (Camera/Story mode row hidden, shutter clipped on iPad), the Add Product form, the Plans modal (has an X close), Settings (has an X close) and Billing. | [iphone-seller-create-post.jpg](screenshots/iphone-seller-create-post.jpg), [ipad-seller-create-post.jpg](screenshots/ipad-seller-create-post.jpg), [iphone-seller-add-product.jpg](screenshots/iphone-seller-add-product.jpg), [iphone-seller-plans.jpg](screenshots/iphone-seller-plans.jpg), [iphone-seller-settings.jpg](screenshots/iphone-seller-settings.jpg) | Add `create-post`, `add-product`, `plans`, `settings`, `billing`, camera, editor and modal routes to the exclusion list that decides when the seller bar shows (`_layout.tsx`, the `showBar` logic around lines 120-175). Use an allow-list of "shell" routes instead of a deny-list. |
+| P0 | Hardcoded mock business data ships in production code. Customers shows "1,240 Total / 84 VIP / $480 CLV / 42% Retention", "840 customers enrolled · $3.2k rewards", "18,400 pts" etc. directly above "No customers found." Marketing shows "8.1k Push Subs", a campaign named "Summer Drop 2025" (stale year) with "$2,840", "SUMMER20 142 uses". None of it is gated by `isSellerDevPreview`. | [iphone-seller-customers.jpg](screenshots/iphone-seller-customers.jpg), [iphone-seller-marketing.jpg](screenshots/iphone-seller-marketing.jpg) | Remove the literals (`app/customers.tsx:101-210`, `app/(tabs)/marketing.tsx:14,114`). Drive them from the API, show "—" or empty states, or gate them behind `isSellerDevPreview()`. |
+| P0 | Route-name collisions between `(buyer)` and `(tabs)` groups. The web URLs `/profile`, `/feed`, `/following` and `/orders` resolve to one group only. A seller on `/feed` gets the buyer shell (Home/Discover/Inbox tab bar). A buyer on `/orders` hits root `app/orders.tsx`, which redirects to the seller `(tabs)/orders` screen ("When a customer places an order, you can manage payment…") with no tab bar. Deep links and refreshes land in the wrong app. | [iphone-buyer-orders.jpg](screenshots/iphone-buyer-orders.jpg), [ipad-buyer-orders.jpg](screenshots/ipad-buyer-orders.jpg) (seller /feed gives the same image as [iphone-buyer-feed.jpg](screenshots/iphone-buyer-feed.jpg)) | Rename the colliding files (e.g. `(buyer)/buyer-orders`, `(tabs)/seller-feed`), or make `app/orders.tsx` role-aware. Add a test that each role-specific URL renders the right shell. |
+
+**iPad-specific (stretched phone layout)**
+
+| Pri | Issue | Screenshot | Fix |
+|---|---|---|---|
+| P0 | Dashboard time-range pills (Live/Today/Yesterday/This week) stretch to about 390 px tall. The horizontal `ScrollView` grows vertically on wide web. Also visible on the maroon theme. | [ipad-seller-home.jpg](screenshots/ipad-seller-home.jpg), [ipad-seller-home-maroon.jpg](screenshots/ipad-seller-home-maroon.jpg) | `components/SellerHomeCommerceDashboard.tsx` about line 453: add `style={{ flexGrow: 0 }}` to the range `ScrollView`, and/or `alignItems:'center'` in `rangeRow`. |
+
+**Seller — Analytics, Marketing, Customers, Finance, Billing**
+
+| Pri | Issue | Screenshot | Fix |
+|---|---|---|---|
+| P0 | Mock data (see cross-cutting). | [iphone-seller-customers.jpg](screenshots/iphone-seller-customers.jpg), [iphone-seller-marketing.jpg](screenshots/iphone-seller-marketing.jpg) | as above |
+
+**Seller — Plans (`/plans`)**
+
+| Pri | Issue | Screenshot | Fix |
+|---|---|---|---|
+| P0 | The "Switch to Starter" button label is almost invisible: dark text on a dark card. | [iphone-seller-plans.jpg](screenshots/iphone-seller-plans.jpg), [ipad-seller-plans.jpg](screenshots/ipad-seller-plans.jpg) | Use an outline style with `colors.text`, or show a "Current plan" label if that's the intent. |
+
+**Legal (`/privacy`, `/terms`)**
+
+| Pri | Issue | Screenshot | Fix |
+|---|---|---|---|
+| P0 | A visible "Legal review required before launch — This is a functionality-based first draft, not legal advice…" banner appears on both pages. | [iphone-seller-privacy.jpg](screenshots/iphone-seller-privacy.jpg), [iphone-seller-terms.jpg](screenshots/iphone-seller-terms.jpg) | Must be resolved (legal sign-off) and the banner removed before release. |
+
+**Buyer — Home feed (`/`) and `/feed`**
+
+| Pri | Issue | Screenshot | Fix |
+|---|---|---|---|
+| P0 | On `/feed` the "High Demand" section header renders *behind* the floating Home/Following/For You header. The two overlap and the header sits on top of the skeleton cards. | [iphone-buyer-feed.jpg](screenshots/iphone-buyer-feed.jpg), [ipad-buyer-feed.jpg](screenshots/ipad-buyer-feed.jpg) | Give the feed content a `paddingTop` equal to the header height, or don't render the Discover "High Demand" block inside the feed route. |
+| P0 | On iPhone the right action rail's last item (share, "392") collides with the profile tab button, and the caption "…cut for movement." and the music line run under the tab bar. | [iphone-buyer-home.jpg](screenshots/iphone-buyer-home.jpg) | Offset the rail and caption by tab-bar height plus inset. |
+
+**Buyer — Notifications (`/buyer-notifications`)**
+
+| Pri | Issue | Screenshot | Fix |
+|---|---|---|---|
+| P0 | The category filter pills are clipped vertically. Only the top half of "All / Social / Orders / Messages" is visible, on both iPhone and iPad. | [iphone-buyer-buyer-notifications.jpg](screenshots/iphone-buyer-buyer-notifications.jpg), [ipad-buyer-buyer-notifications.jpg](screenshots/ipad-buyer-buyer-notifications.jpg) | `app/buyer-notifications.tsx` `pillsScroll`: add `flexShrink: 0` (and/or a `minHeight`). The flex:1 loading body is shrinking the ScrollView. |
 
 ---
 
