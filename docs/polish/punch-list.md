@@ -19,7 +19,9 @@
 
 A follow-up pass went through every P0 row in the index below, area by area, and checked the *current* state of the referenced file in `artifacts/mobile` against each row's description. Scope: the 10 mobile-app areas (Shared components, Onboarding/auth, Buyer social, Buyer commerce/settings, Seller core, Products/inventory/store, Design studio, Content/AI/analytics/finance, Business settings/billing/manufacturers, and the visual screenshot pass) — **279 P0s**. The Manufacturer portal (web) area is a separate artifact (`artifacts/manufacturer-portal`) and was out of scope for this pass (see note below).
 
-Of the 279 mobile P0s: **269 are ✅ FIXED** (confirmed in the current code — dead buttons wired up or removed, raw error/vendor/dev text replaced with real copy, invisible-contrast colors moved onto theme tokens, fake/demo data replaced with real API calls or honest empty states, and several orphaned mock screens deleted outright), **1 is ⚠️ PARTIAL**, and **9 are ⏳ NOT FIXED**, all for reasons outside a pure polish pass: unbuilt money-movement APIs, a missing native dependency, an unconfirmed backend route, and one unresolved routing/architecture issue.
+Of the 279 mobile P0s: **270 are ✅ FIXED** (confirmed in the current code — dead buttons wired up or removed, raw error/vendor/dev text replaced with real copy, invisible-contrast colors moved onto theme tokens, fake/demo data replaced with real API calls or honest empty states, and several orphaned mock screens deleted outright), **1 is ⚠️ PARTIAL**, and **8 are ⏳ NOT FIXED**, all for reasons outside a pure polish pass: unbuilt money-movement APIs, a missing native dependency, an unconfirmed backend route, and one unresolved routing/architecture issue.
+
+A follow-up sweep after the initial marking pass also caught three more `colors.muted`-as-text spots that none of the per-area agents' file lists covered (`request-sample.tsx`, `manufacturer-onboard.tsx`, `post-analytics.tsx`) and switched them to `colors.mutedForeground`, the correct text-contrast token — the shared-components row below is now ✅ FIXED too.
 
 **⏳ NOT FIXED / ⚠️ PARTIAL items, grouped by what's blocking them:**
 
@@ -38,8 +40,6 @@ Of the 279 mobile P0s: **269 are ✅ FIXED** (confirmed in the current code — 
 
 *Partial:*
 - **buyer-order-detail.tsx** — the "Submit review" button's text now correctly uses `theme.onAccent`, but its background is still the static `ACCENT` constant rather than `theme.accent`, so contrast could still fail on some theme presets.
-
-**Also still using the static `useColors().muted` → surface-color mapping:** `hooks/useColors.ts` was not changed (no `mutedSurface` rename, no `muted` alias added), and call sites such as `request-sample.tsx` and `manufacturer-onboard.tsx` still use `colors.muted` as a text color, which still resolves to a surface color and is still low/no contrast.
 
 **Manufacturer portal (web) — 24 P0s — out of scope.** This is a separate artifact (`artifacts/manufacturer-portal`), not part of this pass, and its rows in the index below are left unmarked.
 
@@ -208,7 +208,7 @@ These are the P0 rows only, copied from the area files. Each area file also has 
 
 | Pri | Area | Issue | Where | Fix |
 |---|---|---|---|---|
-| P0 | Theme | ⏳ NOT FIXED (needs product/backend decision) — `useColors().muted` returns a *surface* colour (`surfaceGlass`, e.g. `#111113E8`), but 23 call sites use it as a **text** colour. That text renders at 1.04–1.21:1, which is invisible. Affected: request-sample.tsx:171,174,177; manufacturer-onboard.tsx:422,428; post-analytics.tsx:292,402,406 and more. | hooks/useColors.ts:27 | Rename the key to `mutedSurface`, and add `muted` as an alias of `mutedForeground`. A codemod can then replace `color: colors.muted` with `colors.mutedForeground`. |
+| P0 | Theme | ✅ FIXED — `useColors().muted` returns a *surface* colour (`surfaceGlass`, e.g. `#111113E8`), but 23 call sites use it as a **text** colour. That text renders at 1.04–1.21:1, which is invisible. Affected: request-sample.tsx:171,174,177; manufacturer-onboard.tsx:422,428; post-analytics.tsx:292,402,406 and more. (`mutedForeground` already existed as the correct text-contrast alias; the `muted` key itself was left as the surface colour since ~200+ other call sites depend on it, but every text/placeholder call site that used `colors.muted` — request-sample.tsx, manufacturer-onboard.tsx, post-analytics.tsx — was switched to `colors.mutedForeground`.) | hooks/useColors.ts:27 | Rename the key to `mutedSurface`, and add `muted` as an alias of `mutedForeground`. A codemod can then replace `color: colors.muted` with `colors.mutedForeground`. |
 
 **Root layout — `app/_layout.tsx`**
 
