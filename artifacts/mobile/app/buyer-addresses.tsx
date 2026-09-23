@@ -165,6 +165,7 @@ export default function BuyerAddressesScreen() {
       <Header
         title={showForm ? (isCreating ? 'Add address' : 'Edit address') : 'Shipping addresses'}
         onBack={() => { if (showForm) handleCancel(); else router.back(); }}
+        backAccessibilityLabel={showForm ? 'Close address form' : 'Go back'}
       />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -214,7 +215,14 @@ export default function BuyerAddressesScreen() {
               </View>
 
               {!isDefault && (
-                <TouchableOpacity style={styles.defaultToggle} onPress={() => setIsDefault(!isDefault)} activeOpacity={0.7}>
+                <TouchableOpacity
+                  style={styles.defaultToggle}
+                  onPress={() => setIsDefault(!isDefault)}
+                  activeOpacity={0.7}
+                  accessibilityRole="checkbox"
+                  accessibilityLabel="Set as default address"
+                  accessibilityState={{ checked: isDefault }}
+                >
                   <View style={[styles.checkbox, isDefault && styles.checkboxActive]}>
                      {isDefault && <Feather name="check" size={14} color={theme.onAccent} />}
                   </View>
@@ -262,10 +270,20 @@ export default function BuyerAddressesScreen() {
                           {addr.isDefault && <View style={styles.defaultBadge}><Text style={styles.defaultBadgeText}>Default</Text></View>}
                         </View>
                         <View style={styles.actions}>
-                          <TouchableOpacity onPress={() => handleEdit(addr)} style={styles.actionBtn}>
+                          <TouchableOpacity
+                            onPress={() => handleEdit(addr)}
+                            style={styles.actionBtn}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Edit ${addr.label} address`}
+                          >
                            <Feather name="edit-2" size={16} color={theme.muted} />
                           </TouchableOpacity>
-                          <TouchableOpacity onPress={() => handleDelete(addr.id)} style={styles.actionBtn}>
+                          <TouchableOpacity
+                            onPress={() => handleDelete(addr.id)}
+                            style={styles.actionBtn}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Delete ${addr.label} address`}
+                          >
                            <Feather name="trash-2" size={16} color={theme.error} />
                           </TouchableOpacity>
                         </View>
@@ -281,7 +299,12 @@ export default function BuyerAddressesScreen() {
                       </View>
 
                       {!addr.isDefault && (
-                        <TouchableOpacity style={styles.makeDefaultBtn} onPress={() => handleSetDefault(addr.id)}>
+                        <TouchableOpacity
+                          style={styles.makeDefaultBtn}
+                          onPress={() => handleSetDefault(addr.id)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Set ${addr.label} as default address`}
+                        >
                           <Text style={styles.makeDefaultText}>Set as default</Text>
                         </TouchableOpacity>
                       )}
@@ -304,7 +327,6 @@ export default function BuyerAddressesScreen() {
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.background },
-
   empty: { padding: SP.xl, alignItems: 'center', marginTop: SP.xl },
   emptyTitle: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.md, textAlign: 'center', marginBottom: SP.xs },
   emptyText: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.base, textAlign: 'center' },
@@ -319,10 +341,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   defaultBadge: { backgroundColor: `${theme.success}26`, paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.sm, marginLeft: SP.sm },
   defaultBadgeText: { color: theme.success, fontFamily: FONT.semibold, fontSize: FS.xs },
   actions: { flexDirection: 'row', gap: SP.sm },
-  actionBtn: { padding: 4 },
+  actionBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   cardBody: { padding: SP.md },
   addressText: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
-  makeDefaultBtn: { borderTopWidth: 1, borderTopColor: theme.border, padding: SP.md, alignItems: 'center' },
+  makeDefaultBtn: { minHeight: 44, borderTopWidth: 1, borderTopColor: theme.border, paddingHorizontal: SP.md, alignItems: 'center', justifyContent: 'center' },
   makeDefaultText: { color: theme.accentLight, fontFamily: FONT.medium, fontSize: FS.sm },
 
   addBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: SP.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.accent, borderStyle: 'dashed' },
@@ -333,7 +355,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   label: { color: theme.muted, fontFamily: FONT.medium, fontSize: FS.sm },
   input: { backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.md, paddingHorizontal: SP.md, height: COMP.inputH, color: theme.text, fontFamily: FONT.regular, fontSize: FS.base },
   
-  defaultToggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: SP.xs },
+  defaultToggle: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: SP.xs },
   checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1, borderColor: theme.muted, alignItems: 'center', justifyContent: 'center' },
   checkboxActive: { backgroundColor: theme.accent, borderColor: theme.accent },
   defaultToggleText: { color: theme.text, fontFamily: FONT.medium, fontSize: FS.base },

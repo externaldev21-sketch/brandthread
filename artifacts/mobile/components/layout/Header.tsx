@@ -29,6 +29,7 @@ export function Header({
   title,
   largeTitle,
   onBack,
+  backAccessibilityLabel = 'Go back',
   showBack = true,
   actions = [],
   scrollY,
@@ -37,6 +38,7 @@ export function Header({
   title: string;
   largeTitle?: boolean;
   onBack?: () => void;
+  backAccessibilityLabel?: string;
   showBack?: boolean;
   actions?: HeaderAction[];
   scrollY?: Animated.Value;
@@ -71,7 +73,7 @@ export function Header({
         {showBack ? (
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Go back"
+            accessibilityLabel={backAccessibilityLabel}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             onPress={handleBack}
             style={styles.iconBtn}
