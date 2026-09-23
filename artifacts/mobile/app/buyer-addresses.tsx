@@ -20,6 +20,7 @@ export default function BuyerAddressesScreen() {
 
   const [addresses, setAddresses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   
   // Edit state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -41,14 +42,16 @@ export default function BuyerAddressesScreen() {
   const load = async () => {
     if (!userId) {
       setAddresses([]);
+      setLoadError('');
       setLoading(false);
       return;
     }
     try {
       const data = await api.buyer.addresses.list();
-      setAddresses(data);
-    } catch {
-      setAddresses([]);
+      setAddresses(Array.isArray(data) ? data : []);
+      setLoadError('');
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Could not load your saved addresses.');
     } finally {
       setLoading(false);
     }
@@ -225,7 +228,26 @@ export default function BuyerAddressesScreen() {
             </View>
           ) : (
             <>
-              {addresses.length === 0 ? (
+              {loadError ? (
+                <View style={styles.empty} accessibilityRole="alert">
+                  <Feather name="alert-circle" size={48} color={theme.error} style={{ marginBottom: SP.md }} />
+                  <Text style={styles.emptyTitle}>Addresses unavailable</Text>
+                  <Text style={styles.emptyText}>We couldn't load your saved addresses. Check your connection and try again.</Text>
+                  <TouchableOpacity
+                    style={styles.retryBtn}
+                    onPress={() => {
+                      setLoading(true);
+                      void load();
+                    }}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Retry loading saved addresses"
+                  >
+                    <Feather name="refresh-cw" size={16} color={theme.onAccent} />
+                    <Text style={styles.retryBtnText}>Try again</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : addresses.length === 0 ? (
                 <View style={styles.empty}>
                    <Feather name="map-pin" size={48} color={theme.muted} style={{ marginBottom: SP.md }} />
                   <Text style={styles.emptyText}>You haven't saved any addresses yet.</Text>
@@ -284,7 +306,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   root: { flex: 1, backgroundColor: theme.background },
 
   empty: { padding: SP.xl, alignItems: 'center', marginTop: SP.xl },
+  emptyTitle: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.md, textAlign: 'center', marginBottom: SP.xs },
   emptyText: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.base, textAlign: 'center' },
+  retryBtn: { minHeight: COMP.buttonH, marginTop: SP.lg, paddingHorizontal: SP.lg, borderRadius: RADIUS.md, backgroundColor: theme.accent, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm },
+  retryBtnText: { color: theme.onAccent, fontFamily: FONT.semibold, fontSize: FS.sm },
   
   list: { gap: SP.md, marginBottom: SP.lg },
   card: { backgroundColor: theme.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, overflow: 'hidden' },
