@@ -99,6 +99,7 @@ import type {
   DesignTextLayer, DesignImageLayer, DesignShapeLayer, DesignDrawingLayer,
   DrawPath, BlendModeKind,
 } from '@/services/designTypes';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -3560,9 +3561,9 @@ export default function DesignCanvasScreen() {
       />
 
       {/* ── BRUSH LIBRARY ── */}
-      <Modal visible={activeSheet === 'brushLib'} transparent animationType="slide" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'brushLib'} transparent animationType="fade" onRequestClose={closeSheet}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <View style={[styles.sheet, { maxHeight: '72%' }]}>
+          <SheetRise style={[styles.sheet, { maxHeight: '72%' }]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>
@@ -3655,14 +3656,14 @@ export default function DesignCanvasScreen() {
                 </ScrollView>
               </>
             )}
-          </View>
+          </SheetRise>
         </TouchableOpacity>
       </Modal>
 
       {/* ── COLOR PICKER ── */}
-      <Modal visible={activeSheet === 'color'} transparent animationType="slide" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'color'} transparent animationType="fade" onRequestClose={closeSheet}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <View style={[styles.sheet, { maxHeight: '70%' }]}>
+          <SheetRise style={[styles.sheet, { maxHeight: '70%' }]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>Color</Text>
@@ -3788,14 +3789,14 @@ export default function DesignCanvasScreen() {
                 })}
               </View>
             )}
-          </View>
+          </SheetRise>
         </TouchableOpacity>
       </Modal>
 
       {/* ── LAYER MANAGER ── */}
-      <Modal visible={activeSheet === 'layers'} transparent animationType="slide" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'layers'} transparent animationType="fade" onRequestClose={closeSheet}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <View style={[styles.sheet, { maxHeight: '70%' }]}>
+          <SheetRise style={[styles.sheet, { maxHeight: '70%' }]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>Layers</Text>
@@ -3862,14 +3863,14 @@ export default function DesignCanvasScreen() {
                 </View>
               ))}
             </ScrollView>
-          </View>
+          </SheetRise>
         </TouchableOpacity>
       </Modal>
 
       {/* ── LAYER OPTIONS ── */}
-      <Modal visible={activeSheet === 'layerOptions'} transparent animationType="slide" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'layerOptions'} transparent animationType="fade" onRequestClose={closeSheet}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <View style={styles.sheet}>
+          <SheetRise style={styles.sheet}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>{layerOptionsLayer?.name ?? 'Layer'}</Text>
@@ -3948,7 +3949,7 @@ export default function DesignCanvasScreen() {
                 <Text style={[styles.layerActionPillText, { color: RED }]}>Delete</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </SheetRise>
         </TouchableOpacity>
       </Modal>
 
@@ -3963,9 +3964,9 @@ export default function DesignCanvasScreen() {
       />
 
       {/* ── CANVAS RESIZE / CROP SHEET ── */}
-      <Modal visible={activeSheet === 'canvasResize'} transparent animationType="slide" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'canvasResize'} transparent animationType="fade" onRequestClose={closeSheet}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <View style={styles.sheet}>
+          <SheetRise style={styles.sheet}>
             <SheetHandle />
             <Text style={styles.sheetTitle}>Canvas Size & Crop</Text>
 
@@ -4031,14 +4032,14 @@ export default function DesignCanvasScreen() {
                 </TouchableOpacity>
               )}
             </View>
-          </View>
+          </SheetRise>
         </TouchableOpacity>
       </Modal>
 
       {/* ── EXPORT SHEET ── */}
-      <Modal visible={activeSheet === 'export'} transparent animationType="slide" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'export'} transparent animationType="fade" onRequestClose={closeSheet}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <View style={styles.sheet}>
+          <SheetRise style={styles.sheet}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>Export</Text>
@@ -4105,14 +4106,14 @@ export default function DesignCanvasScreen() {
                 </TouchableOpacity>
               ));
             })()}
-          </View>
+          </SheetRise>
         </TouchableOpacity>
       </Modal>
 
       {/* ── CANVAS INFO ── */}
-      <Modal visible={activeSheet === 'canvasInfo'} transparent animationType="slide" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'canvasInfo'} transparent animationType="fade" onRequestClose={closeSheet}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <View style={styles.sheet}>
+          <SheetRise style={styles.sheet}>
             <SheetHandle />
             <Text style={styles.sheetTitle}>Canvas Info</Text>
             {[
@@ -4135,7 +4136,7 @@ export default function DesignCanvasScreen() {
             <TouchableOpacity style={styles.addBtn} onPress={closeSheet}>
               <Text style={styles.addBtnText}>Close</Text>
             </TouchableOpacity>
-          </View>
+          </SheetRise>
         </TouchableOpacity>
       </Modal>
 
@@ -4199,9 +4200,9 @@ export default function DesignCanvasScreen() {
       </Modal>
 
       {/* ── SELECTION SETTINGS MODAL ── */}
-      <Modal visible={activeSheet === 'selection'} transparent animationType="slide" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'selection'} transparent animationType="fade" onRequestClose={closeSheet}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <View style={styles.sheet}>
+          <SheetRise style={styles.sheet}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>Selection Settings</Text>
@@ -4235,14 +4236,14 @@ export default function DesignCanvasScreen() {
                 <Text style={styles.fontChipText}>Clear</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </SheetRise>
         </TouchableOpacity>
       </Modal>
 
       {/* ── TRANSFORM SETTINGS MODAL ── */}
-      <Modal visible={activeSheet === 'transformTool'} transparent animationType="slide" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'transformTool'} transparent animationType="fade" onRequestClose={closeSheet}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <View style={styles.sheet}>
+          <SheetRise style={styles.sheet}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>Transform Settings</Text>
@@ -4285,14 +4286,14 @@ export default function DesignCanvasScreen() {
               <Feather name="refresh-cw" size={12} color={MUTED} />
               <Text style={styles.fontChipText}>Reset Transform</Text>
             </TouchableOpacity>
-          </View>
+          </SheetRise>
         </TouchableOpacity>
       </Modal>
 
       {/* ── ADJUSTMENTS (CURVES) PANEL ── */}
-      <Modal visible={activeSheet === 'adjustments'} transparent animationType="slide" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'adjustments'} transparent animationType="fade" onRequestClose={closeSheet}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <View style={[styles.sheet, { maxHeight: '70%' }]}>
+          <SheetRise style={[styles.sheet, { maxHeight: '70%' }]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>Curves</Text>
@@ -4426,7 +4427,7 @@ export default function DesignCanvasScreen() {
                 })()}
               </>
             )}
-          </View>
+          </SheetRise>
         </TouchableOpacity>
       </Modal>
 
@@ -4583,9 +4584,9 @@ function WrenchActionsSheet({
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose} />
-      <View style={[styles.wrenchSheet, { paddingBottom: insets.bottom + SP.md }]}>
+      <SheetRise style={[styles.wrenchSheet, { paddingBottom: insets.bottom + SP.md }]}>
         <SheetHandle />
 
         {/* Tab row */}
@@ -4990,7 +4991,7 @@ function WrenchActionsSheet({
           )}
 
         </ScrollView>
-      </View>
+      </SheetRise>
     </Modal>
   );
 }
@@ -5024,9 +5025,9 @@ function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGH
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
-        <View style={[styles.sheet, { maxHeight: '85%' }]}>
+        <SheetRise style={[styles.sheet, { maxHeight: '85%' }]}>
           <SheetHandle />
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.sheetHeaderRow}>
@@ -5103,7 +5104,7 @@ function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGH
               <Text style={styles.addBtnText}>Add to Canvas</Text>
             </TouchableOpacity>
           </ScrollView>
-        </View>
+        </SheetRise>
       </TouchableOpacity>
     </Modal>
   );

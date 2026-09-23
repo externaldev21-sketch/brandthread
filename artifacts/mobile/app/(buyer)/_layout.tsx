@@ -53,6 +53,9 @@ function BuyerTabLayout() {
       screenOptions={{
         freezeOnBlur: true,
         headerShown: false,
+        // Scenes glide a little sideways as they cross-fade, in the direction
+        // of the tab tapped, so switching tabs feels spatial rather than a cut.
+        animation: 'shift',
         sceneStyle: { backgroundColor: colors.background },
       }}
     >

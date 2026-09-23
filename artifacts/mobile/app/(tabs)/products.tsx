@@ -17,6 +17,7 @@ import { CachedImage } from '@/components/CachedImage';
 import { getProducts, getProductStats, archiveProduct, unarchiveProduct, deleteProduct, restoreProduct, duplicateProduct } from '@/services/productService';
 import { Product, ProductFilter } from '@/services/productTypes';
 import { formatCents, integerPercent } from '@/lib/money';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -217,12 +218,12 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete }: ActionS
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType="fade"
       presentationStyle="overFullScreen"
       onRequestClose={closeSheet}
     >
       <Pressable style={sh.overlay} onPress={closeSheet} />
-      <View style={sh.sheet}>
+      <SheetRise style={sh.sheet}>
         <View style={sh.handle} />
         <Text style={sh.sheetTitle} numberOfLines={1}>{p.name}</Text>
         <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
@@ -236,7 +237,7 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete }: ActionS
             </PressableScale>
           ))}
         </ScrollView>
-      </View>
+      </SheetRise>
     </Modal>
   );
 }
@@ -274,12 +275,12 @@ function FilterModal({ visible, current, onApply, onClose }: FilterModalProps) {
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType="fade"
       presentationStyle="overFullScreen"
       onRequestClose={onClose}
     >
       <Pressable style={sh.overlay} onPress={onClose} />
-      <View style={[sh.sheet, { paddingBottom: SP.xl }]}>
+      <SheetRise style={[sh.sheet, { paddingBottom: SP.xl }]}>
         <View style={sh.handle} />
         <Text style={sh.sheetTitle}>Filter Products</Text>
         <View style={fm.chips}>
@@ -297,7 +298,7 @@ function FilterModal({ visible, current, onApply, onClose }: FilterModalProps) {
           onPress={() => { onApply(selected); onClose(); }}
           style={{ marginTop: SP.md, marginHorizontal: SP.md }}
         />
-      </View>
+      </SheetRise>
     </Modal>
   );
 }
@@ -327,9 +328,9 @@ function SortModal({
   const sh = React.useMemo(() => createSheetStyles(theme), [theme]);
   const PURPLE_LIGHT = theme.accentLight;
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={sh.overlay} onPress={onClose} />
-      <View style={sh.sheet}>
+      <SheetRise style={sh.sheet}>
         <View style={sh.handle} />
         <Text style={sh.sheetTitle}>Sort Products</Text>
         {SORT_OPTIONS.map(({ key, label }) => (
@@ -345,7 +346,7 @@ function SortModal({
             {current === key && <Feather name="check" size={ICON.sm} color={PURPLE_LIGHT} />}
           </TouchableOpacity>
         ))}
-      </View>
+      </SheetRise>
     </Modal>
   );
 }

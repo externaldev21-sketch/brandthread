@@ -26,6 +26,7 @@ import {
 import type {
   ModerationAction, ModerationQueue, ModerationQueueItem, ProfileSummary, ReportTargetType,
 } from '@/lib/safetyTypes';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 type Status = 'open' | 'resolved';
 type TypeFilter = 'all' | ReportTargetType;
@@ -356,9 +357,9 @@ function ReviewSheet({
   );
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={s.scrim} onPress={onClose} accessibilityLabel="Close review" />
-      <View style={[s.sheet, { paddingBottom: insets.bottom + SP.md }]}>
+      <SheetRise style={[s.sheet, { paddingBottom: insets.bottom + SP.md }]}>
         <View style={s.sheetHandle} />
         <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={s.sheetHeader}>
@@ -468,7 +469,7 @@ function ReviewSheet({
             </View>
           ) : null}
         </ScrollView>
-      </View>
+      </SheetRise>
     </Modal>
   );
 }

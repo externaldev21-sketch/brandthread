@@ -29,15 +29,16 @@ describe('glass surfaces and translucency', () => {
     expect(brandthreadUI).not.toMatch(/backgroundColor: CARD,[ \n]*borderRadius: RADIUS.md,[ \n]*opacity: anim/);
   });
 
-  it('uses glass tokens for tab bars', () => {
-    // The seller tab bar was extracted to SellerGlobalTabBar.tsx (global shell);
-    // (tabs)/_layout.tsx delegates rendering to that component.
+  it('uses the same frosted glass for both tab bars', () => {
+    // Buyer and seller bars share one glass surface so they read as one app.
     const sellerTabBar = readFileSync(compPath('SellerGlobalTabBar.tsx'), 'utf8');
     const buyerTabBar = readFileSync(compPath('buyer-nav/BuyerTabBar.tsx'), 'utf8');
-    
-    expect(sellerTabBar).toContain('SURFACE_GLASS');
-    expect(buyerTabBar).toContain('<BlurView');
-    expect(buyerTabBar).toContain('`${theme.background}8C`');
+    const sharedParts = readFileSync(compPath('tab-bar/TabBarParts.tsx'), 'utf8');
+
+    expect(sellerTabBar).toContain('<TabBarGlass');
+    expect(buyerTabBar).toContain('<TabBarGlass');
+    expect(sharedParts).toContain('<BlurView');
+    expect(sharedParts).toContain('`${theme.background}8C`');
   });
 
   it('uses transparent overlays for product loading', () => {

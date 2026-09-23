@@ -59,6 +59,7 @@ import { ThreadShareSheet } from '@/components/ThreadShareSheet';
 import { shouldAnimateCartSuccess } from '@/lib/cartFlight';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { BuyerNavIcon } from '@/components/buyer-nav/BuyerNavIcon';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 const THREAD_PAGE_SIZE = 30;
 
@@ -2090,12 +2091,12 @@ export default function FeedScreen({
       )}
 
       {/* ─ Notifications sheet ─ */}
-      <Modal visible={showNotifs} animationType="slide" transparent onRequestClose={() => setShowNotifs(false)}>
+      <Modal visible={showNotifs} animationType="fade" transparent onRequestClose={() => setShowNotifs(false)}>
         <View style={styles.modalBackdrop}>
           <TouchableWithoutFeedback onPress={() => setShowNotifs(false)}>
             <View style={StyleSheet.absoluteFill} />
           </TouchableWithoutFeedback>
-          <View style={[styles.commentsSheet, { paddingBottom: Math.max(previewBottomInset, 16) }]}>
+          <SheetRise style={[styles.commentsSheet, { paddingBottom: Math.max(previewBottomInset, 16) }]}>
             <View style={styles.commentsHandle} />
             <Text style={styles.commentsTitle}>Notifications</Text>
             <View style={{ gap: 14, paddingTop: 4 }}>
@@ -2103,12 +2104,12 @@ export default function FeedScreen({
               <Text style={styles.notifRow}>Meridian Co. started following you</Text>
               <Text style={styles.notifRow}>@street.era replied to your comment</Text>
             </View>
-          </View>
+          </SheetRise>
         </View>
       </Modal>
       <Modal
         visible={showRepostEducation}
-        animationType="slide"
+        animationType="fade"
         transparent
         statusBarTranslucent
         onRequestClose={() => setShowRepostEducation(false)}
@@ -2117,7 +2118,7 @@ export default function FeedScreen({
           <TouchableWithoutFeedback onPress={() => setShowRepostEducation(false)}>
             <View style={StyleSheet.absoluteFill} />
           </TouchableWithoutFeedback>
-          <View style={[styles.repostEducationSheet, { paddingBottom: Math.max(previewBottomInset, 16) }]}>
+          <SheetRise style={[styles.repostEducationSheet, { paddingBottom: Math.max(previewBottomInset, 16) }]}>
             <TouchableOpacity
               style={styles.repostEducationClose}
               onPress={() => setShowRepostEducation(false)}
@@ -2165,7 +2166,7 @@ export default function FeedScreen({
             >
               <Text style={[styles.repostEducationOkayText, { color: theme.onAccent }]}>OK</Text>
             </TouchableOpacity>
-          </View>
+          </SheetRise>
         </View>
       </Modal>
       {shopSelection && (

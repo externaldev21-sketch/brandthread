@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 const feed = readFileSync(resolve(process.cwd(), 'app/(tabs)/feed.tsx'), 'utf8');
 const bar = readFileSync(resolve(process.cwd(), 'components/buyer-nav/BuyerTabBar.tsx'), 'utf8');
 const metrics = readFileSync(resolve(process.cwd(), 'components/buyer-nav/buyerTabBarMetrics.ts'), 'utf8');
+const parts = readFileSync(resolve(process.cwd(), 'components/tab-bar/TabBarParts.tsx'), 'utf8');
 
 describe('buyer Thread chrome', () => {
   it('uses the cart as the final header action instead of create post', () => {
@@ -15,14 +16,10 @@ describe('buyer Thread chrome', () => {
     expect(topBar).not.toContain('name="user-plus"');
   });
 
-  it('gives the Profile circle enough room for its icon and full label', () => {
-    // The circle is exactly as tall as the capsule (58–64pt) and keeps an
-    // 11pt minimum label, per the readable-text floor.
+  it('draws the Profile circle exactly as tall as the capsule', () => {
     expect(metrics).toContain('const circleSize = capsuleHeight;');
-    expect(bar).toContain('width: metrics.circleSize');
-    expect(bar).toContain('height: metrics.circleSize');
-    expect(bar).toContain('borderRadius: metrics.circleSize / 2');
-    expect(metrics).toContain('labelSize: isTablet ? 12 : 11');
+    expect(bar).toContain('size={metrics.circleSize}');
+    expect(parts).toContain('width: size, height: size, borderRadius: size / 2');
   });
 
   it('fits every Thread page to the measured tab scene and never crops photos', () => {

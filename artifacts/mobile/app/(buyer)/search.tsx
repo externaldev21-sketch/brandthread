@@ -20,6 +20,7 @@ import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useBuyerSearch } from '@/contexts/BuyerSearchContext';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { FONT, FS } from '@/lib/theme';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 type PersonResult = {
   userId: string; name: string; username: string | null;
@@ -291,7 +292,7 @@ export default function SearchScreen() {
       <Modal
         visible={showFilters}
         transparent
-        animationType="slide"
+        animationType="fade"
         statusBarTranslucent
         onRequestClose={() => setShowFilters(false)}
       >
@@ -302,7 +303,7 @@ export default function SearchScreen() {
             accessibilityRole="button"
             accessibilityLabel="Dismiss search filters"
           />
-          <View style={[styles.filterSheet, { backgroundColor: card, borderColor: border, paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <SheetRise style={[styles.filterSheet, { backgroundColor: card, borderColor: border, paddingBottom: Math.max(insets.bottom, 16) }]}>
             <View style={styles.sheetHandle} />
             <View style={styles.sheetTitleRow}>
               <View>
@@ -334,7 +335,7 @@ export default function SearchScreen() {
                 <Text style={[styles.applyText, { color: theme.onAccent }]}>Apply</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </SheetRise>
         </KeyboardAvoidingView>
       </Modal>
 
