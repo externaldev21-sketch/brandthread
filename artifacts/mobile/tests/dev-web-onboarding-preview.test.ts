@@ -23,4 +23,14 @@ describe('dev web onboarding walkthrough', () => {
     expect(onboarding).toContain("window.location.assign('/?bt_preview=buyer')");
     expect(onboarding).toContain("window.location.assign('/?bt_preview=seller')");
   });
+
+  it('keeps the account form scrollable without the light browser scrollbar', () => {
+    const onboarding = read('../app/onboarding.tsx');
+    const accountForm = onboarding.slice(
+      onboarding.indexOf('// Main seller sign-up form'),
+      onboarding.indexOf('// ─── Shared Auth styles'),
+    );
+
+    expect(accountForm).toContain('showsVerticalScrollIndicator={false}');
+  });
 });

@@ -1344,7 +1344,11 @@ function SharedAuthStep({
   // Main seller sign-up form: single-column labeled fields
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={ssa.scroll} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={ssa.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={ssa.headline}>Create your account</Text>
         <Text style={ssa.sub}>Build your brand on Brandthread.</Text>
 
