@@ -437,9 +437,9 @@ export function ShopProductSheet({
 
       const hasAnyStock = p.variants.some(v => v.isAvailable);
       setPhase(hasAnyStock ? 'ready' : 'sold_out');
-    } catch (err) {
+    } catch {
       setPhase('error');
-      setErrorMsg(err instanceof Error ? err.message : 'Could not load product.');
+      setErrorMsg("Couldn't load this product. Tap to retry.");
     }
   }, [selection.tags]);
 
@@ -501,9 +501,9 @@ export function ShopProductSheet({
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setPhase('added');
       void flyProductToCart(newCount);
-    } catch (err) {
+    } catch {
       setPhase('ready');
-      setVariantError(err instanceof Error ? err.message : 'Could not add to cart.');
+      setVariantError("Couldn't add to bag. Try again.");
     }
   }
 
@@ -527,9 +527,9 @@ export function ShopProductSheet({
       dismissSheet(() => {
         router.push('/thread-checkout' as never);
       });
-    } catch (err) {
+    } catch {
       setPhase('ready');
-      setVariantError(err instanceof Error ? err.message : 'Could not start checkout.');
+      setVariantError("Couldn't start checkout. Try again.");
     }
   }
 

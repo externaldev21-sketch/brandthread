@@ -22,6 +22,7 @@ import { flushPendingBuyerOnboardingSync } from '@/lib/buyerOnboardingSync';
 import { RoleProvider } from '@/contexts/RoleContext';
 import { ThreadPullProvider } from '@/contexts/ThreadPullTransitionContext';
 import { AppThemeProvider, useAppTheme } from '@/contexts/AppThemeContext';
+import { PrimaryButton } from '@/components/BrandthreadUI';
 import { AppIconProvider } from '@/contexts/AppIconContext';
 import BootScreen from '@/components/BootScreen';
 import * as Notifications from 'expo-notifications';
@@ -731,12 +732,18 @@ function RootLayoutNav() {
         <Text style={{ color: '#9898A6', fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 21, textAlign: 'center' }}>
           This feature is paused while we make improvements. Your existing work is still safe.
         </Text>
-        <Pressable
-          onPress={() => router.back()}
-          style={{ marginTop: 8, minHeight: 44, paddingHorizontal: 22, borderRadius: 10, backgroundColor: '#F5F5F7', alignItems: 'center', justifyContent: 'center' }}
-        >
-          <Text style={{ color: '#FFFFFF', fontFamily: 'Inter_600SemiBold', fontSize: 14 }}>Go back</Text>
-        </Pressable>
+        <PrimaryButton
+          label="Go back"
+          small
+          style={{ marginTop: 8 }}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/');
+            }
+          }}
+        />
       </View>
     );
   }

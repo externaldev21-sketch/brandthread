@@ -591,10 +591,10 @@ export function FilterChip({ label, active, onPress, count }: FilterChipProps) {
       accessibilityState={{ selected: active }}
       style={[fcS.chip, { backgroundColor: palette.card, borderColor: palette.border }, active && [fcS.active, { backgroundColor: theme.accentDim, borderColor: theme.accent + '88' }]]}
     >
-      <Text style={[fcS.label, { color: palette.mutedForeground }, active && [fcS.activeLabel, { color: theme.onAccent }]]}>{label}</Text>
+      <Text style={[fcS.label, { color: palette.mutedForeground }, active && [fcS.activeLabel, { color: theme.accentLight }]]}>{label}</Text>
       {count !== undefined && (
         <View style={[fcS.count, active && [fcS.activeCount, { backgroundColor: theme.accentDim }]]}>
-          <Text style={[fcS.countText, { color: palette.mutedForeground }, active && [fcS.activeCountText, { color: theme.onAccent }]]}>{count}</Text>
+          <Text style={[fcS.countText, { color: palette.mutedForeground }, active && [fcS.activeCountText, { color: theme.accentLight }]]}>{count}</Text>
         </View>
       )}
     </PressableScale>
