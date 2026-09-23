@@ -7,7 +7,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, FlatList, StyleSheet, RefreshControl, ActivityIndicator,
+  View, Text, FlatList, StyleSheet, RefreshControl, ActivityIndicator, Pressable,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -134,17 +134,17 @@ export default function BlockedAndMutedScreen() {
         {(['blocked', 'muted'] as const).map((key) => {
           const active = tab === key;
           return (
-            <PressableScale
+            <Pressable
               key={key}
               onPress={() => { Haptics.selectionAsync(); setTab(key); }}
-              style={[s.segmentItem, active && s.segmentItemActive]}
+              style={({ pressed }) => [s.segmentItem, active && s.segmentItemActive, pressed && !active && { opacity: 0.7 }]}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
             >
               <Text style={[s.segmentText, active && s.segmentTextActive]}>
                 {key === 'blocked' ? 'Blocked' : 'Muted'}
               </Text>
-            </PressableScale>
+            </Pressable>
           );
         })}
       </View>

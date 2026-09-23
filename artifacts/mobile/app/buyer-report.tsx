@@ -313,7 +313,8 @@ export default function ReportScreen() {
                   value={alsoBlock}
                   onValueChange={setAlsoBlock}
                   trackColor={{ false: theme.border, true: theme.accent }}
-                  thumbColor={Platform.OS === 'android' ? theme.text : undefined}
+                  thumbColor={alsoBlock ? theme.onAccent : theme.text}
+                  {...({ activeThumbColor: theme.onAccent } as object)}
                   accessibilityLabel={`Also block ${ownerName}`}
                 />
               </View>

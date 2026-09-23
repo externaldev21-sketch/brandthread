@@ -926,7 +926,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   confirmTitle: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.lg },
   confirmBody: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, marginTop: 6 },
   confirmPrimary: { marginTop: SP.lg, height: 50, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
-  confirmPrimaryText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.base },
+  confirmPrimaryText: { color: '#1A0A0A', fontFamily: FONT.bold, fontSize: FS.base },
   confirmSecondary: { height: 48, alignItems: 'center', justifyContent: 'center' },
   confirmSecondaryText: { color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.base },
 });

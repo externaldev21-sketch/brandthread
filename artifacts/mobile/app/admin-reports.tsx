@@ -159,17 +159,17 @@ export default function ReviewQueueScreen() {
             {(['open', 'resolved'] as const).map((key) => {
               const active = status === key;
               return (
-                <PressableScale
+                <Pressable
                   key={key}
                   onPress={() => { Haptics.selectionAsync(); setStatus(key); }}
-                  style={[s.segmentItem, active && s.segmentItemActive]}
+                  style={({ pressed }) => [s.segmentItem, active && s.segmentItemActive, pressed && !active && { opacity: 0.7 }]}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: active }}
                 >
                   <Text style={[s.segmentText, active && s.segmentTextActive]}>
                     {key === 'open' ? `Open${summary ? ` · ${summary.open}` : ''}` : 'Resolved'}
                   </Text>
-                </PressableScale>
+                </Pressable>
               );
             })}
           </View>
