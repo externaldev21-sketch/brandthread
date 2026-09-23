@@ -442,7 +442,7 @@ function AuthGate() {
 
     // Allow public access to specific buyer routes for guests
     const isGuestAllowedRoute =
-      (inBuyerGroup && ['discover', 'search', 'cart'].includes(segments[1] as string)) ||
+      (inBuyerGroup && ['discover', 'search', 'cart'].includes((segments as readonly string[])[1] ?? '')) ||
       ['buyer-product-detail', 'buyer-checkout', 'seller-profile'].includes(segments[0] as string);
 
     // DEV bypass (all platforms): skip auth and go straight to dashboard.
