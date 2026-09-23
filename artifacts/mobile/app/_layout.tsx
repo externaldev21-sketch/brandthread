@@ -53,6 +53,8 @@ import { captureNotificationEvent, flushNotificationEvents } from '@/lib/notific
 import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
 import { SellerGlobalTabBar } from '@/components/SellerGlobalTabBar';
 import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
+import AppLockGate from '@/components/security/AppLockGate';
+import LegalAcceptanceGate from '@/components/legal/LegalAcceptanceGate';
 import { SellerShellProvider, useSellerShell } from '@/contexts/SellerShellContext';
 
 // Presentation routes must remain transparent so the active runtime shell is
@@ -142,6 +144,7 @@ const SELLER_TAB_BAR_EXCLUDED_SEGMENTS = new Set([
   // Legal public pages — reachable without any session
   'privacy',
   'terms',
+  'community-guidelines',
   // CI navigation isolation probe
   'navigation-isolation-probe',
   // Buyer app group — buyer sessions only; seller role gating prevents cross-exposure
@@ -266,7 +269,7 @@ const DEV_FORCE_ONBOARDING_START = false;
 
 // Screens that don't require authentication
 const AUTH_SCREENS = ['sign-in', 'forgot-password', 'splash'];
-const PUBLIC_SCREENS = ['privacy', 'terms', ...(NAVIGATION_ISOLATION_TEST ? ['navigation-isolation-probe'] : [])];
+const PUBLIC_SCREENS = ['privacy', 'terms', 'community-guidelines', ...(NAVIGATION_ISOLATION_TEST ? ['navigation-isolation-probe'] : [])];
 
 // ─── Auth gate ────────────────────────────────────────────────────────────────
 function AuthGate() {
@@ -891,6 +894,7 @@ function RootLayoutNav() {
         <Stack.Screen name="buyer-privacy-settings"  options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="privacy"                 options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="terms"                   options={{ headerShown: false, animation: 'fade' }} />
+        <Stack.Screen name="community-guidelines"    options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="buyer-saved"             options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-blocked"              options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-payment-methods"     options={{ headerShown: false, animation: 'slide_from_right' }} />
@@ -991,6 +995,8 @@ function RootLayoutNav() {
       <ServiceConfigurer />
       <PushRegistrar />
       <MarketingPixelTracker />
+      <LegalAcceptanceGate />
+      <AppLockGate />
     </View>
   );
 }

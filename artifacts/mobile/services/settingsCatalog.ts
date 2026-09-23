@@ -76,7 +76,7 @@ export const SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     items: [
       { label: 'App theme', description: 'Choose your Brandthread color finish', aliases: ['theme', 'color', 'appearance', 'dark mode'], icon: 'droplet', route: '/app-theme', audience: 'shared' },
       { label: 'Notifications', description: 'Manage push and email notification preferences', aliases: ['alerts', 'push', 'email'], icon: 'bell', route: '/notifications-settings', audience: 'shared' },
-      { label: 'Biometric unlock', description: 'Use Face ID or fingerprint to unlock Brandthread', aliases: ['face id', 'fingerprint', 'touch id'], icon: 'unlock', route: '/biometric-unlock', audience: 'shared' },
+      { label: 'App Lock', description: 'Require Face ID, Touch ID or fingerprint to open Brandthread', aliases: ['face id', 'fingerprint', 'touch id', 'biometric', 'passcode', 'lock'], icon: 'lock', route: '/biometric-unlock', audience: 'shared' },
       { label: 'App icon', description: 'Choose the icon used on your device', aliases: ['home screen icon'], icon: 'smartphone', route: '/app-icon', audience: 'shared' },
     ],
   },

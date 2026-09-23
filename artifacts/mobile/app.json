@@ -308,7 +308,13 @@
         }
       ],
       "expo-audio",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Brandthread uses Face ID to unlock the app when App Lock is turned on."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

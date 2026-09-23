@@ -450,6 +450,11 @@ export interface LocalUserProfile {
   appIconId: string | null;
   brandName: string | null;
   onboardingComplete: boolean;
+  /** Version of the Terms/Guidelines/Privacy Policy the person agreed to. */
+  termsVersion?: string | null;
+  termsAcceptedAt?: string | null;
+  /** Set when a moderator suspends the account. */
+  suspendedAt?: string | null;
 }
 
 export interface ShopifyImportJob {
