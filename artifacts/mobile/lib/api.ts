@@ -710,6 +710,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       },
       registerViaInvite: (token: string, body: any) =>
         post<any>(`/api/manufacturers/register-via-invite/${encodeURIComponent(token)}`, body),
+      /** Upload a factory/production photo for the signed-in manufacturer.
+       *  Requires an already-registered manufacturer profile (invite/claim
+       *  flow) — anonymous public applications cannot attach photos. */
+      uploadPhoto: (image: { uri: string; mimeType?: string | null }) =>
+        uploadImage<{ photo: string; photos: string[]; revision: number }>(
+          '/api/manufacturers/me/photos', image, getToken, getCacheScope,
+        ),
       favorites: {
         list: () => get<Array<{ manufacturerId: string; createdAt: string }>>('/api/manufacturers/favorites'),
         add: (manufacturerId: string) =>

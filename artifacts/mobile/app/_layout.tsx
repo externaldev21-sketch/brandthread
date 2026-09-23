@@ -115,27 +115,70 @@ function RuntimeThemeShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── Seller tab bar shell allow-list ─────────────────────────────────────────
+// ─── Seller tab bar full-screen deny-list ────────────────────────────────────
 // The bar is `position: absolute` (SellerGlobalTabBar.tsx) so it physically
 // overlays whatever is underneath it — it is NOT a harmless flex sibling.
-// A deny-list therefore requires remembering to add every new full-screen or
-// modal route (create-post's camera controls, the Add Product form, the Plans
-// paywall modal, Settings and Billing — all of which have their own close X —
-// were missing from the previous deny-list and got the bar drawn on top of
-// them). An allow-list of "shell" routes is safer: the bar shows ONLY on the
-// primary seller tab screens (the `(tabs)` route group: Dashboard/Home, Feed,
-// Following, Products, Orders, Profile, Marketing, Analytics, More, Studio —
-// see app/(tabs)/_layout.tsx) and is hidden everywhere else by default,
-// including on every new full-screen/modal/pushed route added in the future.
+// It should show on every normal seller screen by default — the seller
+// `(tabs)` shell AND every pushed management screen (Settings, Billing, Team,
+// Customers, Payments, order/return/dispute detail, Manufacturer hub, and
+// dozens more) — and be hidden ONLY on the small, explicit set of genuine
+// full-screen creation/camera/checkout flows below, where the bar would
+// visually collide with the screen's own bottom-anchored controls (see
+// docs/polish/punch-list.md, "floating tab bar" / Top 20 item #16, and the
+// web-screenshot visual pass).
+//
+// This is a DENY-list (not an allow-list) on purpose: an allow-list defaults
+// new pushed routes to "hidden", which silently regresses every ordinary
+// seller screen (Settings, Billing, Customers, etc.) the moment it's added —
+// that was the regression this comment used to defend as intentional. A
+// short, curated deny-list of the few screens that are actually full-bleed
+// keeps the default correct (bar shows) for everything else, present and
+// future.
 //
 // This affects the SELLER tab bar only. The buyer tab bar is a separate
 // component/gate entirely (see the buyer `(buyer)` group layout) and is not
 // touched here.
-const SELLER_TAB_BAR_SHELL_SEGMENTS = new Set([
-  // The seller tab-root group — Dashboard, Products, Orders, Profile, plus the
-  // hidden-but-routable tabs (Studio, More, Feed, Following, Analytics,
-  // Marketing). See app/(tabs)/_layout.tsx.
-  '(tabs)',
+const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
+  // Boot: "/" renders BootScreen with no segment; AuthGate redirects immediately
+  'index',
+  // Auth flow — no seller session
+  'splash',
+  'sign-in',
+  'forgot-password',
+  // Onboarding — session incomplete, role not yet confirmed
+  'onboarding',
+  // Post-onboarding buyer screen — not a seller route
+  'thread-explainer',
+  // Legal public pages — reachable without any session
+  'privacy',
+  'terms',
+  'community-guidelines',
+  // CI navigation isolation probe
+  'navigation-isolation-probe',
+  // Buyer app group — buyer sessions only; seller role gating prevents cross-exposure
+  '(buyer)',
+
+  // ── Genuine full-screen creation / camera / checkout flows ──
+  // Registered as a full-screen modal presentation below — real camera UI
+  // with its own shutter/mode controls anchored to the bottom of the screen.
+  'camera-capture',
+  'create-post',
+  // Full-page form with its own bottom "Publish"/"Uploading photos…" CTA.
+  'add-product',
+  // Paywall — screenshots showed the bar literally overlapping it.
+  'plans',
+  // Full-bleed canvas editor with its own bottom toolbar (layers, crop, etc.);
+  // the other design-studio screens (template/asset pickers, AI tool forms)
+  // are normal scrollable screens and keep the bar.
+  'design-canvas',
+  // Storefront-from-AI wizard and its full-screen generating/progress screen.
+  'store-generate',
+  'store-generating',
+  // Multi-step quote wizard with its own step header/footer.
+  'quote-request',
+  // Seller livestream — real full-screen camera/broadcast controls.
+  'seller-go-live',
+  'seller-live',
 ]);
 
 // ─── SellerBarGate ────────────────────────────────────────────────────────────
@@ -147,11 +190,9 @@ const SELLER_TAB_BAR_SHELL_SEGMENTS = new Set([
 // AuthGate is the single authority that reads AsyncStorage and the server
 // profile. SellerBarGate consumes SellerShellContext — no parallel read.
 //
-// It is gated by an ALLOW-LIST (SELLER_TAB_BAR_SHELL_SEGMENTS): the bar shows
-// only on the seller `(tabs)` shell screens, and is hidden by default on every
-// other seller route (full-screen flows like Create Post, Add Product, Plans,
-// Settings, Billing, and any future route) — see the allow-list comment above
-// for why a deny-list was unsafe here.
+// It is gated by a DENY-list (SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS): the bar
+// shows by default on every seller route, and is hidden only on the small,
+// explicit set of genuine full-screen flows — see the deny-list comment above.
 
 function SellerBarGate() {
   const { isActiveSeller } = useSellerShell();
@@ -165,12 +206,13 @@ function SellerBarGate() {
 
   const showBar = isActiveSeller || isPreviewSeller;
 
-  // Allow-list: first segment determines the route. The bar renders only on
-  // the seller shell's own tab screens (see SELLER_TAB_BAR_SHELL_SEGMENTS).
+  // Deny-list: first segment determines the route. The bar renders on every
+  // seller route except the curated full-screen set (see
+  // SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS).
   const firstSegment = (segments[0] as string | undefined) ?? '';
-  const isShellRoute = SELLER_TAB_BAR_SHELL_SEGMENTS.has(firstSegment);
+  const isFullScreenRoute = SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS.has(firstSegment);
 
-  if (!showBar || !isShellRoute) return null;
+  if (!showBar || isFullScreenRoute) return null;
 
   return (
     <>

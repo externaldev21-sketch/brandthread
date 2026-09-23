@@ -7,10 +7,12 @@
  *  2. Design Studio back arrow present (design.tsx).
  *  3. Four primary tab destinations preserved.
  *  4. Studio radial menu and AI button wiring.
- *  5. Allow-list of seller shell routes: the bar shows ONLY on the `(tabs)`
- *     group, and full-screen/modal seller routes (create-post, add-product,
- *     plans, settings, billing, etc.) are NOT in the allow-list, so the bar
- *     never overlays them (it is `position: absolute`, not a flex sibling).
+ *  5. Deny-list of full-screen seller routes: the bar shows by default on
+ *     every seller route — including normal pushed screens like settings,
+ *     billing, team, customers, payments, order-detail, seller-profile,
+ *     manufacturer-hub — and is hidden ONLY on the curated set of genuine
+ *     full-screen creation/camera/checkout flows (create-post, add-product,
+ *     plans, etc.), since the bar (position: absolute) would overlay them.
  *  6. Seller root route inclusion: key routes map to a primary tab.
  *  7. Route-to-active-tab classification present in SellerGlobalTabBar.
  *  8. SellerShellContext is used as the authoritative source — no parallel
@@ -131,59 +133,126 @@ describe('tab freeze/detach behavior', () => {
   });
 });
 
-// ─── 5. Allow-list of seller shell routes ─────────────────────────────────────
+// ─── 5. Deny-list of full-screen seller routes ────────────────────────────────
 
-describe('seller bar shell allow-list', () => {
-  it('the allow-list only contains the (tabs) shell group', () => {
-    expect(rootLayout).toContain('SELLER_TAB_BAR_SHELL_SEGMENTS');
-    const setBlock = rootLayout.match(
-      /const SELLER_TAB_BAR_SHELL_SEGMENTS = new Set\(\[([\s\S]*?)\]\)/,
+describe('seller bar full-screen deny-list', () => {
+  const setBlock = () =>
+    rootLayout.match(
+      /const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set\(\[([\s\S]*?)\]\)/,
     );
-    expect(setBlock, 'SELLER_TAB_BAR_SHELL_SEGMENTS set must exist').toBeTruthy();
-    const setBody = setBlock![1];
-    expect(setBody).toContain("'(tabs)'");
+
+  it('the SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS deny-list exists', () => {
+    expect(rootLayout).toContain('SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS');
+    expect(setBlock(), 'SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS set must exist').toBeTruthy();
   });
 
-  // These full-screen/modal seller routes must NOT be in the allow-list, so
-  // the bar (position: absolute) never overlays their own controls/close X.
-  const mustNotShowBar = [
+  // The `(tabs)` shell group must never appear in a deny-list, since that
+  // would hide the bar on every primary tab screen.
+  it('does not deny-list the (tabs) shell group', () => {
+    const setBody = setBlock()![1];
+    expect(setBody).not.toContain("'(tabs)'");
+  });
+
+  // Genuine full-screen creation/camera/checkout flows: the bar
+  // (position: absolute) would overlay their own bottom-anchored controls.
+  const mustHideBar = [
     'create-post',
     'camera-capture',
     'add-product',
     'plans',
-    'settings',
-    'billing',
-    'team-invite',
-    'seller-profile',
-    'buyer-product-detail',
-    'buyer-checkout',
-    'buyer-post-comments',
-    'buyer-report',
-    'design',
     'design-canvas',
-    'store-builder',
-    'content',
-    'analytics-sales',
-    'finance',
-    'team',
-    'manufacturer',
+    'store-generate',
+    'store-generating',
+    'quote-request',
+    'seller-go-live',
+    'seller-live',
   ];
 
-  for (const route of mustNotShowBar) {
-    it(`does NOT show the seller bar on full-screen/modal route "${route}"`, () => {
-      const setBlock = rootLayout.match(
-        /const SELLER_TAB_BAR_SHELL_SEGMENTS = new Set\(\[([\s\S]*?)\]\)/,
-      );
-      expect(setBlock).toBeTruthy();
-      const setBody = setBlock![1];
-      // The route should NOT be a quoted string in the allow-list body
+  for (const route of mustHideBar) {
+    it(`hides the seller bar on genuine full-screen route "${route}"`, () => {
+      const setBody = setBlock()![1];
+      expect(setBody).toContain(`'${route}'`);
+    });
+  }
+
+  // Normal pushed seller management screens — the bar must show on all of
+  // these, so none of them may appear in the deny-list.
+  const mustShowBar = [
+    'settings',
+    'general-settings',
+    'security',
+    'notifications-settings',
+    'billing',
+    'team',
+    'team-invite',
+    'taxes-duties',
+    'integrations',
+    'edit-profile',
+    'customers',
+    'customer-accounts',
+    'customer-events',
+    'customer-privacy',
+    'payments',
+    'payouts',
+    'finance',
+    'order-detail',
+    'return-detail',
+    'refund-detail',
+    'dispute-detail',
+    'shipping',
+    'product-detail',
+    'product-import',
+    'product-store',
+    'store-collections',
+    'store-nav',
+    'store-pages',
+    'store-policies',
+    'store-publish',
+    'store-seo',
+    'store-preview',
+    'store-editor',
+    'seller-profile',
+    'seller-verification',
+    'seller-data-export',
+    'discounts',
+    'inventory',
+    'locations',
+    'admin-reports',
+    'manufacturer-hub',
+    'manufacturer-messages',
+    'manufacturer-onboard',
+    'invite-manufacturer',
+    'quote-detail',
+    'sample-detail',
+    'production-detail',
+    'automation',
+    'community-chat',
+    'request-sample',
+    'design-garment',
+    'design-templates',
+    'design-brand-assets',
+    'design-ai-photoshoot',
+    'design-bg-replace',
+    'design-campaign',
+    'design-mockup-to-model',
+    'design-text-to-design',
+    'design-mockup-preview',
+    'lifestyle-images',
+    'tech-pack-generator',
+    '(tabs)',
+  ];
+
+  for (const route of mustShowBar) {
+    it(`does NOT hide the seller bar on normal seller route "${route}"`, () => {
+      const setBody = setBlock()![1];
       expect(setBody).not.toContain(`'${route}'`);
     });
   }
 
-  it('uses an allow-list check (isShellRoute), not a deny-list, to gate the bar', () => {
-    expect(rootLayout).toContain('isShellRoute');
-    expect(rootLayout).not.toContain('SELLER_TAB_BAR_EXCLUDED_SEGMENTS');
+  it('uses a deny-list check (isFullScreenRoute), not an allow-list, to gate the bar', () => {
+    expect(rootLayout).toContain('isFullScreenRoute');
+    expect(rootLayout).not.toContain('SELLER_TAB_BAR_SHELL_SEGMENTS');
+    expect(rootLayout).not.toContain('isShellRoute');
   });
 });
 

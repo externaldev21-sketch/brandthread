@@ -5,12 +5,13 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, Platform, Linking,
+  ScrollView, Alert, Platform, Linking, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { FS } from '@/lib/theme';
@@ -61,6 +62,14 @@ const INITIAL: FormData = {
   agreeTerms: false,
 };
 
+// Factory photos can only be attached once a manufacturer profile exists —
+// POST /api/manufacturers/me/photos requires an authenticated manufacturer
+// record, which only exists on the invite-token (Clerk-authenticated) path.
+// Anonymous public applications (no invite token) cannot attach photos at
+// application time; they upload photos later after their application is
+// claimed and approved.
+const MAX_PHOTOS = 8;
+
 export default function ManufacturerOnboardScreen() {
   const colors = useColors();
   const s = React.useMemo(() => createStyles(colors), [colors]);
@@ -71,6 +80,29 @@ export default function ManufacturerOnboardScreen() {
   const [step, setStep]   = useState(0);
   const [form, setForm]   = useState<FormData>(INITIAL);
   const [submitting, setSubmitting] = useState(false);
+  // Only used on the invite-token path — see MAX_PHOTOS comment above.
+  const [photos, setPhotos] = useState<{ uri: string }[]>([]);
+
+  async function pickPhotos() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Permission required', 'Please allow access to your photo library in Settings.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.9,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      setPhotos((prev) => [...prev, ...result.assets.map((a) => ({ uri: a.uri }))].slice(0, MAX_PHOTOS));
+    }
+  }
+
+  function removePhoto(index: number) {
+    haptic('light');
+    setPhotos((prev) => prev.filter((_, i) => i !== index));
+  }
 
   function set<K extends keyof FormData>(key: K, val: FormData[K]) {
     setForm((f) => ({ ...f, [key]: val }));
@@ -141,8 +173,19 @@ export default function ManufacturerOnboardScreen() {
       if (inviteToken) {
         // Private invite path — user must be signed in to their Clerk account
         await api.manufacturers.registerViaInvite(inviteToken, payload);
+        // Factory photos can only be attached once the profile exists.
+        // Upload failures are non-fatal — the manufacturer can add photos
+        // later from their profile; don't block a successful registration.
+        for (const photo of photos) {
+          try {
+            await api.manufacturers.uploadPhoto(photo);
+          } catch (photoErr) {
+            console.warn('Factory photo upload failed', photoErr);
+          }
+        }
       } else {
-        // Public apply path — no Clerk account required
+        // Public apply path — no Clerk account required, so photos cannot
+        // be attached yet (see MAX_PHOTOS comment above).
         await api.manufacturers.public.apply(payload);
       }
 
@@ -205,6 +248,28 @@ export default function ManufacturerOnboardScreen() {
             <Field label="City" value={form.city} onChange={(v) => set('city', v)} placeholder="e.g. Guangzhou" />
             <Field label="Phone / WhatsApp" value={form.phone} onChange={(v) => set('phone', v)} placeholder="+1 234 567 890" keyboardType="phone-pad" />
             <Field label="Website (optional)" value={form.website} onChange={(v) => set('website', v)} placeholder="https://yourfactory.com" keyboardType="url" />
+
+            {!!inviteToken && (
+              <>
+                <Text style={[s.groupLabel, { marginTop: 4 }]}>Factory Photos (optional)</Text>
+                <View style={s.photoGrid}>
+                  {photos.map((photo, i) => (
+                    <View key={photo.uri + i} style={s.photoThumb}>
+                      <Image source={{ uri: photo.uri }} style={{ width: '100%', height: '100%' }} />
+                      <TouchableOpacity style={s.photoRemove} onPress={() => removePhoto(i)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Feather name="x" size={12} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                  {photos.length < MAX_PHOTOS && (
+                    <TouchableOpacity style={s.photoAdd} onPress={pickPhotos} activeOpacity={0.75}>
+                      <Feather name="camera" size={18} color={colors.primary} />
+                      <Text style={s.photoAddText}>Add</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </>
+            )}
           </View>
         )}
 
@@ -295,7 +360,10 @@ export default function ManufacturerOnboardScreen() {
               <Row label="MOQ"        value={form.moq ? `${form.moq} pcs` : '—'} />
               <Row label="Lead Time"  value={form.leadTimeDays ? `${form.leadTimeDays} days` : '—'} />
               <Row label="Price from" value={form.pricePerUnit ? `${form.pricePerUnit} ${form.currency}` : '—'} />
-              <Row label="Specialties" value={form.specialties.join(', ') || '—'} last />
+              <Row label="Specialties" value={form.specialties.join(', ') || '—'} last={!inviteToken} />
+              {!!inviteToken && (
+                <Row label="Photos" value={photos.length > 0 ? `${photos.length} added` : '—'} last />
+              )}
             </View>
 
             <View style={s.termsRow}>

@@ -1,4 +1,4 @@
-import { Router } from "express";
+import express, { Router } from "express";
 import { db, products, productVariants } from "@workspace/db";
 import { eq, desc, sql, and, isNull, gt, ne } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -7,8 +7,25 @@ import { logActivity, reqActor } from "../lib/activityLog";
 import crypto from "crypto";
 import { canRestoreProduct, PRODUCT_DELETE_RECOVERY_WINDOW_MS } from "../lib/productRecovery";
 import { getVerifiedPlanAccess, sendPlanLimitReached, sendPlanLookupUnavailable } from "../lib/planAccess";
+import { ObjectStorageService } from "../lib/objectStorage";
 
 const router = Router();
+const objectStorage = new ObjectStorageService();
+
+const PRODUCT_IMAGE_MIMES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+const MAX_PRODUCT_IMAGE_BYTES = 8 * 1024 * 1024;
+
+function hasValidImageSignature(bytes: Buffer, contentType: string): boolean {
+  if (contentType === "image/jpeg" || contentType === "image/jpg") {
+    return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  }
+  if (contentType === "image/png") {
+    return bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  }
+  return bytes.length >= 12
+    && bytes.subarray(0, 4).toString() === "RIFF"
+    && bytes.subarray(8, 12).toString() === "WEBP";
+}
 /** Short server-side recovery interval; exported so integration tests need not
  * depend on a magic number. */
 export { PRODUCT_DELETE_RECOVERY_WINDOW_MS } from "../lib/productRecovery";
@@ -41,6 +58,48 @@ async function hasProductCapacity(tx: any, ownerId: string, limit: number | null
     ));
   return (result?.count ?? 0) + requested <= limit;
 }
+
+// POST /api/products/images — upload a raw product photo, return its object
+// path for inclusion in a product's `images` array. Mirrors the seller
+// avatar upload route: raw image bytes in the body, Content-Type declares
+// the mime type, stored via ObjectStorageService.
+router.post(
+  "/images",
+  requireRole("manager"),
+  express.raw({ type: "image/*", limit: MAX_PRODUCT_IMAGE_BYTES }),
+  async (req, res): Promise<void> => {
+    const ownerId = (req as any).clerkUserId as string;
+    const contentType = String(req.headers["content-type"] ?? "").split(";")[0].toLowerCase();
+    const bytes = req.body as Buffer;
+
+    if (!PRODUCT_IMAGE_MIMES.has(contentType)) {
+      res.status(400).json({ error: "Use a JPEG, PNG, or WebP image for a product photo." });
+      return;
+    }
+    if (!Buffer.isBuffer(bytes) || bytes.length === 0 || bytes.length > MAX_PRODUCT_IMAGE_BYTES) {
+      res.status(400).json({ error: "Product images must be no larger than 8 MB." });
+      return;
+    }
+    if (!hasValidImageSignature(bytes, contentType)) {
+      res.status(400).json({ error: "The uploaded file does not match its declared image type." });
+      return;
+    }
+
+    let objectPath: string | null = null;
+    try {
+      objectPath = await objectStorage.createObjectEntityFromBuffer(bytes, contentType);
+      await objectStorage.trySetObjectEntityAclPolicy(objectPath, {
+        owner: ownerId,
+        visibility: "private",
+      });
+      res.status(201).json({ objectPath });
+    } catch (err) {
+      if (objectPath) await objectStorage.deleteObjectEntity(objectPath).catch(() => {});
+      req.log.error({ err, ownerId }, "Could not upload product image");
+      res.status(500).json({ error: "Product image could not be uploaded" });
+    }
+  },
+);
 
 // GET /api/products — scoped to the authenticated user's brand
 router.get("/", async (req, res) => {
