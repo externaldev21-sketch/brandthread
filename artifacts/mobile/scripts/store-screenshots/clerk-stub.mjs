@@ -63,6 +63,8 @@ export function clerkStubScript(user) {
     user: clerkUser,
     client,
     organization: null,
+    // useAuth()/useUser()/useSession() read the signed-in state from here.
+    __internal_lastEmittedResources: { client, session, user: clerkUser, organization: null },
     // Must stay undefined: @clerk/react then marks itself "ready" once load() resolves.
     status: undefined,
     telemetry: { record: noop },

@@ -369,11 +369,33 @@ many app sessions send performance timings; `SENTRY_ENVIRONMENT` and
 ```powershell
 cd artifacts\mobile
 pnpm exec playwright install chromium   # once
-pnpm run screenshots
+pnpm run screenshots                    # about 10 minutes
+pnpm run screenshots -- --skip-build    # re-capture without rebuilding (about 5 minutes)
+pnpm run screenshots -- --only cart,checkout --devices iphone-6.9in
 ```
 
-This builds the web version of the app, fills it with polished demo data
-(no real accounts or server needed) and saves App Store and Play Store
-screenshots to `artifacts/mobile/store-screenshots/`, one folder per device
-size. See `store-screenshots/README.md` in that folder for the list of
-screens, sizes and which store field each folder goes in.
+This builds the web version of the app and signs in a demo account. The
+screens are filled with polished demo data: the Northline Studio seller and a
+buyer shopping four labels, with product photos cut from Brandthread's own
+generated artwork. No real accounts, server or payments are involved. Every
+run is pinned to the same moment, Friday 4:30 pm, so countdowns, "2h ago"
+labels and the sales chart come out identical each time.
+
+Output goes to `artifacts/mobile/store-screenshots/`, one folder per store
+size:
+
+| Folder | Upload to | Pixels |
+| --- | --- | --- |
+| `iphone-6.9in/` | App Store Connect → iPhone 6.9" Display | 1320 × 2868 |
+| `ipad-13in/` | App Store Connect → iPad 13" Display | 2064 × 2752 |
+| `android-phone/` | Play Console → Phone screenshots | 1080 × 1920 |
+| `android-tablet-7in/` | Play Console → 7-inch tablet screenshots | 1200 × 1920 |
+| `android-tablet-10in/` | Play Console → 10-inch tablet screenshots | 1600 × 2560 |
+
+Screens, in order: buyer feed, shoppable product sheet, discover, cart,
+checkout, seller dashboard, manufacturer hub, theme picker. If a screen can't
+render (for example, while another branch rebuilds it), the run skips it and
+still saves the rest. `store-screenshots/README.md` lists what was skipped
+and why. Add `--strict` to make that an error instead. The demo data is in
+`scripts/store-screenshots/demo-data.mjs`; edit it to change products,
+prices or names.

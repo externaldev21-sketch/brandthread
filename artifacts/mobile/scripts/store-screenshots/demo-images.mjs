@@ -18,7 +18,8 @@ const SOURCES = {
   texture: 'abstract_texture.jpg',
 };
 
-// crop: [x, y, size] in the 1024×1024 source; filter: CSS canvas filter.
+// crop: [x, y, size] (square) or [x, y, width, height] in the 1024×1024 source;
+// filter: CSS canvas filter.
 export const DEMO_IMAGES = {
   'hoodie-ember': { source: 'hoodie', crop: [96, 40, 944], filter: 'none' },
   'hoodie-graphite': { source: 'hoodie', crop: [96, 40, 944], filter: 'grayscale(1) contrast(1.08) brightness(1.08)' },
@@ -34,6 +35,9 @@ export const DEMO_IMAGES = {
   'look-mono': { source: 'model', crop: [0, 0, 1024], filter: 'grayscale(1) contrast(1.05)' },
   'portrait-rust': { source: 'model', crop: [380, 40, 280], filter: 'none' },
   'portrait-mono': { source: 'model', crop: [380, 40, 280], filter: 'grayscale(1)' },
+  'story-rust': { source: 'model', crop: [224, 0, 576, 1024], filter: 'none' },
+  'story-mono': { source: 'model', crop: [224, 0, 576, 1024], filter: 'grayscale(1) contrast(1.05)' },
+  'story-hoodie': { source: 'hoodie', crop: [224, 0, 576, 1024], filter: 'none' },
   'texture-ember': { source: 'texture', crop: [0, 0, 1024], filter: 'none' },
   'texture-mono': { source: 'texture', crop: [0, 0, 1024], filter: 'grayscale(1) brightness(0.9)' },
 };
@@ -68,22 +72,22 @@ export async function ensureDemoImages(browser, outDir) {
       const recipe = DEMO_IMAGES[name];
       const base64 = await page.evaluate(async ({ src, crop, filter, size }) => {
         const canvas = document.createElement('canvas');
+        const [x, y, w, h = w] = crop;
         canvas.width = size;
-        canvas.height = size;
+        canvas.height = Math.round((size * h) / w);
         const ctx = canvas.getContext('2d');
         if (!src) {
           const gradient = ctx.createLinearGradient(0, 0, size, size);
           gradient.addColorStop(0, '#2a2a2e');
           gradient.addColorStop(1, '#0c0c0e');
           ctx.fillStyle = gradient;
-          ctx.fillRect(0, 0, size, size);
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
         } else {
           const img = new Image();
           img.src = src;
           await img.decode();
           ctx.filter = filter;
-          const [x, y, side] = crop;
-          ctx.drawImage(img, x, y, side, side, 0, 0, size, size);
+          ctx.drawImage(img, x, y, w, h, 0, 0, canvas.width, canvas.height);
         }
         return canvas.toDataURL('image/jpeg', 0.86).split(',')[1];
       }, { src: sources[recipe.source], crop: recipe.crop, filter: recipe.filter, size: OUTPUT_SIZE });

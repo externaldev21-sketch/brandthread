@@ -455,6 +455,9 @@ export default function SellerHomeCommerceDashboard({
           nestedScrollEnabled
           directionalLockEnabled
           showsHorizontalScrollIndicator={false}
+          // Without flexGrow: 0 the row stretches vertically on wide screens
+          // (iPad, tablets, web), turning the pills into tall capsules.
+          style={{ flexGrow: 0 }}
           contentContainerStyle={styles.rangeRow}
         >
           {RANGES.map((item) => {

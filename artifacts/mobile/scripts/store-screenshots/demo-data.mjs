@@ -17,8 +17,18 @@ const img = (name) => `${IMAGE_HOST}/demo/${name}.jpg`;
 
 const HOUR = 36e5;
 const DAY = 24 * HOUR;
-const iso = (msAgo) => new Date(Date.now() - msAgo).toISOString();
-const isoAhead = (msAhead) => new Date(Date.now() + msAhead).toISOString();
+
+/**
+ * Every screenshot is taken at the same moment, Friday 18 September 2026 at
+ * 4:30 pm in Los Angeles, so relative times, countdowns and the sales chart
+ * are identical on every run. The capture script sets the browser clock and
+ * time zone to match.
+ */
+export const DEMO_TIME_ZONE = 'America/Los_Angeles';
+export const DEMO_NOW = Date.parse('2026-09-18T23:30:00Z');
+const DEMO_LOCAL_MIDNIGHT = Date.parse('2026-09-18T07:00:00Z');
+const iso = (msAgo) => new Date(DEMO_NOW - msAgo).toISOString();
+const isoAhead = (msAhead) => new Date(DEMO_NOW + msAhead).toISOString();
 
 export const SELLER_USER = {
   id: 'user_northline',
@@ -118,8 +128,8 @@ function publicDrop(drop) {
     name: drop.name,
     isLive: drop.live,
     isEnded: false,
-    releaseAt: new Date(Date.now() + drop.releaseIn).toISOString(),
-    endsAt: new Date(Date.now() + drop.endsIn).toISOString(),
+    releaseAt: isoAhead(drop.releaseIn),
+    endsAt: isoAhead(drop.endsIn),
     currentPriceCents: products[0].priceCents,
     claimedUnits: products[0].claimedUnits,
     remainingUnits: products[0].remainingUnits,
@@ -137,6 +147,115 @@ const TRENDING = [
   { brand: 'northline', caption: 'Studio day. Sampling the FW26 cargo in rust.' },
   { brand: 'field', caption: 'Clay or stone? Vote for the next colourway.' },
 ].map((row, i) => ({ id: `post_trending_${i + 1}`, rank: i + 1, brand: BRANDS[row.brand].name, brandId: BRANDS[row.brand].id, caption: row.caption }));
+
+// ─── Buyer data (Jordan Reyes) ────────────────────────────────────────────────
+
+const FEED_POSTS = [
+  { brand: 'northline', image: 'story-rust', caption: 'Drop 04 is live. Ember season, cut heavy and made to last.', products: ['prod_nl_jacket_rust', 'prod_nl_cargo_rust'], likes: 18400, comments: 612, reposts: 1290, hoursAgo: 2 },
+  { brand: 'ember', image: 'story-hoodie', caption: 'Boxy fleece in graphite. 480gsm, brushed inside.', products: ['prod_ea_hoodie_graphite'], likes: 9360, comments: 204, reposts: 441, hoursAgo: 5 },
+  { brand: 'field', image: 'runner-rust', caption: 'Trail Runner 02 — city miles, weekend trails.', products: ['prod_fo_runner_rust'], likes: 22100, comments: 731, reposts: 1640, hoursAgo: 9 },
+  { brand: 'quiet', image: 'hoodie-moss', caption: 'Moss, midnight and bone. The loopback capsule lands Friday.', products: ['prod_qh_hoodie_moss', 'prod_qh_hoodie_midnight'], likes: 7020, comments: 188, reposts: 350, hoursAgo: 20 },
+  { brand: 'northline', image: 'story-mono', caption: 'Studio day: sampling the FW26 shell in onyx.', products: ['prod_ea_jacket_onyx'], likes: 11800, comments: 276, reposts: 715, hoursAgo: 30 },
+];
+
+function feedPosts() {
+  return FEED_POSTS.map((post, i) => {
+    const brand = BRANDS[post.brand];
+    return {
+      id: `post_demo_${i + 1}`,
+      userId: brand.clerkId,
+      seller: { brandName: brand.name, displayName: brand.name, avatarUrl: brand.avatar },
+      caption: post.caption,
+      mediaType: 'photo',
+      mediaUrls: [img(post.image)],
+      mediaUrl: img(post.image),
+      thumbnailUrl: img(post.image),
+      taggedProducts: post.products.map((id) => {
+        const product = PUBLIC_PRODUCTS.find((p) => p.id === id);
+        return { productId: id, name: product.name, priceCents: product.priceCents };
+      }),
+      likesCount: post.likes,
+      commentsCount: post.comments,
+      repostsCount: post.reposts,
+      createdAt: iso(post.hoursAgo * HOUR),
+    };
+  });
+}
+
+function cartItem(productId, size, lineId, extra = {}) {
+  const product = PUBLIC_PRODUCTS.find((p) => p.id === productId);
+  const brand = Object.values(BRANDS).find((b) => b.clerkId === product.sellerId);
+  return {
+    id: lineId,
+    productId,
+    variantId: `${productId}_${size.toLowerCase()}`,
+    productName: product.name,
+    variantTitle: size,
+    imageUri: product.images[0],
+    sellerId: brand.clerkId,
+    sellerName: brand.name,
+    sellerHandle: `@${brand.handle}`,
+    priceCents: product.priceCents,
+    quantity: 1,
+    maxQuantity: 6,
+    isPreOrder: false,
+    inventoryPolicy: 'deny',
+    isAvailable: true,
+    addedAt: iso(3 * HOUR),
+    ...extra,
+  };
+}
+
+export const CART = {
+  items: [
+    cartItem('prod_nl_hoodie_ember', 'M', 'line_1'),
+    cartItem('prod_nl_jacket_rust', 'L', 'line_2', { maxQuantity: 3 }),
+    cartItem('prod_fo_runner_rust', '10', 'line_3', { compareAtPriceCents: 19500 }),
+  ],
+  savedItems: [{ ...cartItem('prod_qh_hoodie_moss', 'M', 'saved_1'), savedAt: iso(DAY) }],
+};
+
+/** A filled checkout ready for review, so the screen never calls Stripe. */
+export function checkoutSession() {
+  const groups = {};
+  for (const item of CART.items) (groups[item.sellerId] ??= { sellerName: item.sellerName, items: [] }).items.push(item);
+  const deliveryGroups = Object.entries(groups).map(([sellerId, group]) => ({
+    sellerId,
+    sellerName: group.sellerName,
+    items: group.items,
+    selectedMethodId: `seller_rate_${sellerId}`,
+    availableMethods: [{ id: `seller_rate_${sellerId}`, carrier: 'Seller shipping', service: 'Express courier (2–3 days)', priceCents: 1200, estimatedDays: 3, estimatedDelivery: 'Arrives in 2–3 days', trackingIncluded: true, isRecommended: true }],
+    hasPreOrder: false,
+  }));
+  const subtotalCents = CART.items.reduce((sum, item) => sum + item.priceCents * item.quantity, 0);
+  const shippingTotalCents = deliveryGroups.length * 1200;
+  return {
+    id: 'checkout_demo',
+    cartId: 'cart_demo',
+    step: 'review',
+    contact: { email: BUYER_USER.email, phone: '+1 (503) 555-0142', marketingConsent: false, orderUpdates: 'email' },
+    shippingAddress: { firstName: 'Jordan', lastName: 'Reyes', line1: '1120 NW Everett Street', line2: 'Apt 5C', city: 'Portland', state: 'OR', postalCode: '97209', country: 'US', phone: '+1 (503) 555-0142' },
+    savedAddresses: [],
+    deliveryGroups,
+    discounts: [],
+    summary: { subtotalCents, discountTotalCents: 0, shippingTotalCents, taxTotalCents: 0, totalCents: subtotalCents + shippingTotalCents, currency: 'USD' },
+    acknowledgments: [{ key: 'terms', label: 'I agree to the Brandthread Terms of Service and Refund Policy.', required: true, acknowledged: true }],
+    isBuyNow: false,
+    idempotencyKey: 'checkout_demo_key',
+    createdAt: iso(10 * 60e3),
+    updatedAt: iso(5 * 60e3),
+  };
+}
+
+const REVIEWS = {
+  reviews: [
+    { id: 'rev_1', rating: 5, body: 'Heaviest hoodie I own and it still drapes. Sized true.', createdAt: iso(6 * DAY) },
+    { id: 'rev_2', rating: 5, body: 'The ember colour is even better in person.', createdAt: iso(14 * DAY) },
+    { id: 'rev_3', rating: 4, body: 'Great fit, sleeves run slightly long.', createdAt: iso(30 * DAY) },
+  ],
+  avgRating: 4.8,
+  totalCount: 126,
+};
 
 // ─── Seller data (Northline Studio) ───────────────────────────────────────────
 
@@ -207,16 +326,15 @@ function sellerOrders(count = 9) {
 }
 
 function homeAnalytics(range) {
-  const midnight = new Date();
-  midnight.setHours(0, 0, 0, 0);
+  const midnight = new Date(DEMO_LOCAL_MIDNIGHT);
   const config = {
     today: [6, 4 * HOUR, midnight],
     yesterday: [6, 4 * HOUR, new Date(midnight - DAY)],
     week: [7, DAY, new Date(midnight - 6 * DAY)],
-    live: [6, 10 * 60e3, new Date(Date.now() - HOUR)],
+    live: [6, 10 * 60e3, new Date(DEMO_NOW - HOUR)],
   }[range] ?? [6, 4 * HOUR, midnight];
   const amounts = {
-    today: [9800, 22000, 48600, 61200, 52400, 30800],
+    today: [3400, 9800, 46800, 71200, 52400, 0], // 4:30 pm: the 8 pm bucket has not started
     yesterday: [6800, 31200, 52400, 70800, 64400, 38400],
     week: [182400, 241800, 156200, 298600, 211000, 334400, 249000],
     live: [9800, 6800, 22000, 14200, 9400, 19600],
@@ -259,7 +377,7 @@ function sellerConversations(count = 5) {
   const minutesAgo = [4, 38, 190, 1500, 2900];
   return Array.from({ length: count }, (_, i) => {
     const [name, handle, initials, color, message, type, orderNumber, productName] = people[i % people.length];
-    const ts = Date.now() - (minutesAgo[i] ?? 2900 + i * 90) * 60e3;
+    const ts = DEMO_NOW - (minutesAgo[i] ?? 2900 + i * 90) * 60e3;
     return {
       id: `cv_${i + 1}`,
       type,
@@ -306,6 +424,7 @@ function profileFor(role) {
 export function respond({ method, path, query, role, options = {} }) {
   const p = path.replace(/^\/api\/v1/, '').replace(/^\/api/, '');
   const get = method === 'GET';
+  if (p === '/auth/sync') return profileFor(role);
   if (!get) return { ok: true };
 
   const byId = (list) => (id) => list.find((item) => item.id === decodeURIComponent(id));
@@ -320,10 +439,19 @@ export function respond({ method, path, query, role, options = {} }) {
   // Public / buyer
   if (p === '/public/products/high-demand') return PUBLIC_PRODUCTS.slice(0, Number(query.get('limit') ?? 6));
   if (p === '/public/products') return PUBLIC_PRODUCTS.slice(0, Number(query.get('limit') ?? PUBLIC_PRODUCTS.length));
-  if ((match = p.match(/^\/public\/products\/([^/]+)$/))) return byId(PUBLIC_PRODUCTS)(match[1]);
   if (p === '/public/drops') return DROPS.map(publicDrop);
   if ((match = p.match(/^\/public\/drops\/([^/]+)$/))) return DROPS.map(publicDrop).find((d) => d.id === match[1]);
   if (p === '/public/trending') return { trending: TRENDING.slice(0, Number(query.get('limit') ?? 20)) };
+  if ((match = p.match(/^\/public\/products\/([^/]+)\/related$/))) return PUBLIC_PRODUCTS.filter((item) => item.id !== match[1]).slice(0, 5);
+  if ((match = p.match(/^\/public\/products\/([^/]+)$/))) return byId(PUBLIC_PRODUCTS)(match[1]);
+  if (p.startsWith('/reviews/product/')) return REVIEWS;
+  if (p === '/public/posts' || p === '/posts/feed') return role === 'buyer' ? feedPosts() : [];
+  if (p === '/posts/repost-context') return {};
+  if (p === '/live/active') return { streams: [] };
+  if (p.startsWith('/social/status/')) return { isFollowing: false, followersCount: 24800 };
+  if (p === '/buyer/cart') return CART;
+  if (p === '/buyer/notifications') return [];
+  if (p === '/shipping-rates/calculate') return { shippingCents: 1200, rateName: 'Express courier (2–3 days)', isFree: false };
 
   // Seller
   if (p === '/analytics/home') return homeAnalytics(query.get('range') ?? 'today');
@@ -357,12 +485,23 @@ export function respond({ method, path, query, role, options = {} }) {
 export function localStorageSeed(role, options = {}) {
   const user = role === 'seller' ? SELLER_USER : BUYER_USER;
   const seed = {
-    'bt:cookie-consent': JSON.stringify({ version: 1, timestamp: Date.now(), necessary: true, analytics: false, marketing: false }),
+    'bt:cookie-consent': JSON.stringify({ version: 1, timestamp: DEMO_NOW, necessary: true, analytics: false, marketing: false }),
     'bt:feature-flags:v1': JSON.stringify({ aiPhotoShoot: true, outfitSwap: true, boosts: true, manufacturerHub: true }),
     [`@brandthread/app-theme:v1:${user.id}`]: options.themeId ?? 'monochrome',
     '@brandthread/app-theme:v1:guest': options.themeId ?? 'monochrome',
   };
+  if (role === 'buyer') {
+    seed[`bt:checkout:${user.id}:v1`] = JSON.stringify(checkoutSession());
+    seed['bt:repost-education:preview:v1'] = '1';
+  }
   if (role === 'seller') {
+    // A finished "Set up your business" checklist, so the dashboard shows the business, not onboarding.
+    const done = ['verify_account', 'connect_payments', 'first_product', 'shipping_rates', 'customize_store', 'publish_store', 'first_post', 'connect_manufacturer'];
+    seed[`@brandthread/setup_state:${user.id}`] = JSON.stringify({
+      started: true, dismissed: false, currentStep: null,
+      tasks: [...done.map((id) => ({ id, completed: true })), { id: 'connect_domain', skipped: true }],
+      dismissedTips: [], openedFeatures: ['create-post'], lastUpdated: DEMO_NOW,
+    });
     seed['@brandthread/products'] = JSON.stringify(options.productCount ? manySellerProducts(options.productCount) : SELLER_PRODUCTS);
     seed['@brandthread/migration_v1_demo_purged'] = '1';
   }

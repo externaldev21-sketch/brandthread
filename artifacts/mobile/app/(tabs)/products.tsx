@@ -4,7 +4,8 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, ScrollView, FlatList, StyleSheet, Alert, Share, Modal, Pressable, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert, Share, Modal, Pressable, TouchableOpacity } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -55,12 +56,14 @@ interface Stats {
 
 interface ProductRowProps {
   product: Product;
-  onPress: () => void;
-  onMore: () => void;
+  onPress: (product: Product) => void;
+  onMore: (product: Product) => void;
   isLast: boolean;
 }
 
-function ProductRow({ product, onPress, onMore, isLast }: ProductRowProps) {
+// Memoized with stable handlers so a recycled row only re-renders when its own
+// product changes, not on every search keystroke or stats refresh.
+const ProductRow = React.memo(function ProductRow({ product, onPress, onMore, isLast }: ProductRowProps) {
   const { theme } = useAppTheme();
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const { error: RED, warning: ORANGE, success: SUCCESS, card: CARD, border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE } = theme;
@@ -83,14 +86,14 @@ function ProductRow({ product, onPress, onMore, isLast }: ProductRowProps) {
     <>
       <TouchableOpacity
         activeOpacity={0.82}
-        onPress={onPress}
+        onPress={() => onPress(product)}
         style={[s.productRow, { backgroundColor: palette.card ?? CARD, borderColor: palette.border ?? BORDER }]}
         accessibilityLabel={`${product.name}, ${statusLabel(product.status)}, ${formatCents(price)}`}
       >
         {/* Square thumbnail */}
         <View style={s.rowThumb}>
           {coverUri ? (
-            <CachedImage source={{ uri: coverUri }} style={s.rowThumbImg} contentFit="cover" />
+            <CachedImage source={{ uri: coverUri }} style={s.rowThumbImg} contentFit="cover" recyclingKey={product.id} />
           ) : (
             <LinearGradient colors={gradColors} style={s.rowThumbImg} />
           )}
@@ -125,7 +128,7 @@ function ProductRow({ product, onPress, onMore, isLast }: ProductRowProps) {
         {/* More button */}
         <TouchableOpacity
           style={s.rowMoreBtn}
-          onPress={e => { e.stopPropagation(); onMore(); }}
+          onPress={e => { e.stopPropagation(); onMore(product); }}
           hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
           accessibilityLabel={`More actions for ${product.name}`}
         >
@@ -135,7 +138,7 @@ function ProductRow({ product, onPress, onMore, isLast }: ProductRowProps) {
       {!isLast && <View style={s.rowDivider} />}
     </>
   );
-}
+});
 
 // ─── Action Sheet ─────────────────────────────────────────────────────────────
 
@@ -388,10 +391,17 @@ export default function ProductsScreen() {
     } catch { /* use defaults */ }
   }, []);
 
+  // Search runs 250 ms after typing stops instead of on every keystroke.
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery.trim()), 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const loadProducts = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await getProducts({ filter, text: searchQuery || undefined });
+      const result = await getProducts({ filter, text: debouncedQuery || undefined });
       setProducts(Array.isArray(result) ? result : []);
       await loadStats();
     } catch {
@@ -399,12 +409,10 @@ export default function ProductsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [filter, searchQuery, loadStats]);
+  }, [filter, debouncedQuery, loadStats]);
 
-  useEffect(() => {
-    loadProducts();
-  }, [loadProducts]);
-
+  // useFocusEffect also re-runs while focused whenever loadProducts changes
+  // (filter or search), so a separate mount effect would load everything twice.
   useFocusEffect(useCallback(() => {
     loadProducts();
   }, [loadProducts]));
@@ -445,12 +453,6 @@ export default function ProductsScreen() {
         },
       ]
     );
-  }
-
-  function openActionSheet(product: Product) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setActionProduct(product);
-    setActionSheetVisible(true);
   }
 
   async function handleExportProducts() {
@@ -494,14 +496,24 @@ export default function ProductsScreen() {
   const currentSortLabel = SORT_OPTIONS.find(o => o.key === sort)?.label ?? 'Sort';
   const hasActiveFilter = filter !== 'all';
 
+  const openProduct = useCallback((product: Product) => {
+    router.push(('/product-detail?id=' + product.id) as never);
+  }, [router]);
+
+  const openActionSheet = useCallback((product: Product) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setActionProduct(product);
+    setActionSheetVisible(true);
+  }, []);
+
   const renderProduct = useCallback(({ item, index }: { item: Product; index: number }) => (
     <ProductRow
       product={item}
-      onPress={() => router.push(('/product-detail?id=' + item.id) as never)}
-      onMore={() => openActionSheet(item)}
+      onPress={openProduct}
+      onMore={openActionSheet}
       isLast={index === sortedProducts.length - 1}
     />
-  ), [router, sortedProducts.length]);
+  ), [openProduct, openActionSheet, sortedProducts.length]);
 
   const keyExtractor = useCallback((item: Product) => item.id, []);
 
@@ -618,7 +630,7 @@ export default function ProductsScreen() {
       </View>
 
       {/* ── Product list ── */}
-      <FlatList
+      <FlashList
         data={sortedProducts}
         keyExtractor={keyExtractor}
         renderItem={renderProduct}
@@ -626,7 +638,6 @@ export default function ProductsScreen() {
         ListEmptyComponent={loading ? null : ListEmpty}
         contentContainerStyle={s.listContent}
         showsVerticalScrollIndicator={false}
-        ItemSeparatorComponent={null}
       />
 
       {/* Action sheet */}

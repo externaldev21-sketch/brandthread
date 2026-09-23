@@ -8,7 +8,7 @@ import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import path from 'node:path';
 import { clerkStubScript } from './clerk-stub.mjs';
-import { BUYER_USER, IMAGE_HOST, SELLER_USER, localStorageSeed, respond } from './demo-data.mjs';
+import { BUYER_USER, DEMO_NOW, DEMO_TIME_ZONE, IMAGE_HOST, SELLER_USER, localStorageSeed, respond } from './demo-data.mjs';
 
 export const MOBILE_ROOT = path.resolve(import.meta.dirname, '../..');
 export const WORK_DIR = path.join(MOBILE_ROOT, '.store-screenshots');
@@ -69,7 +69,7 @@ export async function serveBuild(buildDir) {
   const deadline = Date.now() + 15_000;
   for (;;) {
     try {
-      const response = await fetch(`${origin}/`);
+      const response = await fetch(`${origin}/status`);
       if (response.ok) break;
     } catch {
       // not up yet
@@ -112,10 +112,13 @@ export async function openContext(browser, { device, role, origin, images, seedO
     hasTouch: device.isMobile,
     userAgent: device.userAgent,
     locale: 'en-US',
-    timezoneId: 'America/Los_Angeles',
+    timezoneId: DEMO_TIME_ZONE,
     colorScheme: 'dark',
     reducedMotion: 'reduce',
   });
+  // The demo data is written for one fixed moment (see DEMO_NOW); the clock
+  // keeps ticking from there so animations and timers behave normally.
+  await context.clock.install({ time: DEMO_NOW });
   const user = role === 'seller' ? SELLER_USER : BUYER_USER;
   await context.addInitScript(clerkStubScript(user));
   await context.addInitScript((seed) => {
@@ -181,4 +184,20 @@ export async function waitForQuietNetwork(activity, quietMs = 700, timeout = 10_
   while (Date.now() < deadline && Date.now() - activity.lastApiAt < quietMs) {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
+}
+
+/**
+ * Loads the app at "/" first: once Clerk reports the demo account signed in,
+ * the app remounts its navigation tree once and settles on "/". Navigating
+ * client-side after that lands on the target screen with everything loaded.
+ */
+export async function openScreen(page, activity, origin, role, target, { beforeNavigate } = {}) {
+  await page.goto(`${origin}/?bt_preview=${role}`);
+  await page.waitForFunction(() => window.Clerk?.loaded === true, undefined, { timeout: 20_000 });
+  await waitForQuietNetwork(activity, 800, 15_000);
+  await beforeNavigate?.();
+  await page.evaluate((url) => {
+    history.pushState(history.state, '', url);
+    window.dispatchEvent(new PopStateEvent('popstate', { state: history.state }));
+  }, `${target}${target.includes('?') ? '&' : '?'}bt_preview=${role}`);
 }

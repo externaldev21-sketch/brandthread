@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity,
+  View, Text, TouchableOpacity,
   Alert, StyleSheet,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -428,26 +429,36 @@ export default function InboxScreen() {
 
       {/* Conversations list */}
       {activeTab === 'Follows' ? (
-        <FlatList
-          data={followNotifications}
-          keyExtractor={item => item.id}
-          renderItem={renderFollowRow}
-          ListEmptyComponent={renderEmptyState}
-          style={s.listSurface}
-          contentContainerStyle={[s.listContent, { paddingBottom: barInset + SP.md }, followNotifications.length === 0 && s.listEmptyContainer]}
-          showsVerticalScrollIndicator={false}
-        />
+        followNotifications.length === 0 ? (
+          <View style={[s.listSurface, s.listContent, { paddingBottom: barInset + SP.md }, s.listEmptyContainer]}>
+            {renderEmptyState()}
+          </View>
+        ) : (
+          <View style={s.listSurface}>
+            <FlashList
+              data={followNotifications}
+              keyExtractor={item => item.id}
+              renderItem={renderFollowRow}
+              contentContainerStyle={StyleSheet.flatten([s.listContent, { paddingBottom: barInset + SP.md }])}
+              showsVerticalScrollIndicator={false}
+            />
+          </View>
+        )
+      ) : filteredConvs.length === 0 ? (
+        <View style={[s.listSurface, s.listContent, { paddingBottom: barInset + SP.md }, s.listEmptyContainer]}>
+          {renderEmptyState()}
+        </View>
       ) : (
-        <FlatList
-          data={filteredConvs}
-          keyExtractor={item => item.id}
-          renderItem={renderConvRow}
-          ListEmptyComponent={renderEmptyState}
-          style={s.listSurface}
-          contentContainerStyle={[s.listContent, { paddingBottom: barInset + SP.md }, filteredConvs.length === 0 && s.listEmptyContainer]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        />
+        <View style={s.listSurface}>
+          <FlashList
+            data={filteredConvs}
+            keyExtractor={item => item.id}
+            renderItem={renderConvRow}
+            contentContainerStyle={StyleSheet.flatten([s.listContent, { paddingBottom: barInset + SP.md }])}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          />
+        </View>
       )}
     </View>
   );

@@ -4,7 +4,8 @@
  */
 
 import React, { useState, useCallback, useMemo, useRef } from 'react';
-import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, Share, SectionList } from 'react-native';
+import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, Share } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,6 +37,33 @@ interface OrderSection {
   title: string;
   data: Order[];
 }
+
+/** One recyclable list row: a date header, an order, or the gap after a date group. */
+type OrderListItem =
+  | { type: 'header'; key: string; title: string; count: number }
+  | { type: 'order'; key: string; order: Order; isLast: boolean }
+  | { type: 'gap'; key: string };
+
+/** Flattens date sections into rows so FlashList can recycle them by type. */
+export function flattenOrderSections(sections: OrderSection[]): OrderListItem[] {
+  const rows: OrderListItem[] = [];
+  for (const section of sections) {
+    rows.push({ type: 'header', key: `header:${section.title}`, title: section.title, count: section.data.length });
+    section.data.forEach((order, index) => {
+      rows.push({ type: 'order', key: order.id, order, isLast: index === section.data.length - 1 });
+    });
+    rows.push({ type: 'gap', key: `gap:${section.title}` });
+  }
+  return rows;
+}
+
+type OrderRowActions = {
+  press: (order: Order) => void;
+  longPress: (orderId: string) => void;
+  markProcessing: (orderId: string) => void;
+  markReady: (orderId: string) => void;
+  ship: (orderId: string) => void;
+};
 
 type OrderListFilter = OrderFilterKey | 'unpaid' | 'open' | 'archived';
 type OrderListOrder = Order & {
@@ -572,6 +600,54 @@ function FilterSheet({
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
+/**
+ * A memoized order row plus its swipe action. Handlers arrive as one stable
+ * object, so scrolling or polling does not re-render rows whose order and
+ * selection state are unchanged.
+ */
+const OrderListRow = React.memo(function OrderListRow({
+  order, isLast, selected, selectionMode, actions,
+}: {
+  order: Order;
+  isLast: boolean;
+  selected: boolean;
+  selectionMode: boolean;
+  actions: OrderRowActions;
+}) {
+  const { theme } = useAppTheme();
+  const swipeAction =
+    order.status === 'new'
+      ? { label: 'Accept', icon: 'check-circle' as const, color: theme.accent, run: () => actions.markProcessing(order.id) }
+      : order.status === 'processing'
+        ? { label: 'Ready', icon: 'package' as const, color: theme.accentLight, run: () => actions.markReady(order.id) }
+        : order.status === 'ready_to_ship'
+          ? { label: 'Ship', icon: 'send' as const, color: theme.success, run: () => actions.ship(order.id) }
+          : { label: 'Open', icon: 'arrow-right' as const, color: theme.accent, run: () => actions.press(order) };
+
+  return (
+    <SwipeActionRow
+      label={swipeAction.label}
+      icon={swipeAction.icon}
+      color={swipeAction.color}
+      onAction={swipeAction.run}
+      disabled={selectionMode}
+      accessibilityLabel={`${swipeAction.label} order ${order.orderNumber}`}
+    >
+      <OrderRow
+        order={order}
+        selected={selected}
+        selectionMode={selectionMode}
+        onPress={() => actions.press(order)}
+        onLongPress={() => actions.longPress(order.id)}
+        onMarkProcessing={() => actions.markProcessing(order.id)}
+        onMarkReady={() => actions.markReady(order.id)}
+        onShip={() => actions.ship(order.id)}
+        isLast={isLast}
+      />
+    </SwipeActionRow>
+  );
+});
+
 export default function OrdersScreen() {
   const { theme } = useAppTheme();
   const s = React.useMemo(() => createStyles(theme), [theme]);
@@ -699,8 +775,10 @@ export default function OrdersScreen() {
     return base;
   }, [orders, ordersOwnerId, userId, searchQuery, activeFilter, sort]);
 
-  // Date-grouped sections
+  // Date-grouped sections, flattened into recyclable rows
   const sections = useMemo(() => groupByDate(filtered), [filtered]);
+  const listRows = useMemo(() => flattenOrderSections(sections), [sections]);
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
   // Filter counts
   const filterCounts = useMemo(() => {
@@ -815,49 +893,55 @@ export default function OrdersScreen() {
   const hasActiveFilter = activeFilter !== 'all';
   const currentSortLabel = SORTS.find(s => s.key === sort)?.label ?? 'Sort';
 
-  const renderSectionHeader = useCallback(({ section }: { section: OrderSection }) => (
-    <View style={s.sectionHeader}>
-      <Text style={s.sectionTitle}>{section.title}</Text>
-      <Text style={s.sectionCount}>{section.data.length} {section.data.length === 1 ? 'order' : 'orders'}</Text>
-    </View>
-  ), []);
+  // Row handlers go through a ref so every row receives the same function
+  // identities; memoized rows then re-render only when their own order or
+  // selection state changes.
+  const actionsRef = useRef<OrderRowActions>({
+    press: handleCardPress,
+    longPress: handleLongPress,
+    markProcessing: handleMarkProcessing,
+    markReady: handleMarkReady,
+    ship: handleShip,
+  });
+  actionsRef.current = {
+    press: handleCardPress,
+    longPress: handleLongPress,
+    markProcessing: handleMarkProcessing,
+    markReady: handleMarkReady,
+    ship: handleShip,
+  };
+  const rowActions = useMemo<OrderRowActions>(() => ({
+    press: (order) => actionsRef.current.press(order),
+    longPress: (orderId) => actionsRef.current.longPress(orderId),
+    markProcessing: (orderId) => actionsRef.current.markProcessing(orderId),
+    markReady: (orderId) => actionsRef.current.markReady(orderId),
+    ship: (orderId) => actionsRef.current.ship(orderId),
+  }), []);
 
-  const renderItem = useCallback(({ item, index, section }: { item: Order; index: number; section: OrderSection }) => {
-    const isLast = index === section.data.length - 1;
-    const swipeAction =
-      item.status === 'new'
-        ? { label: 'Accept', icon: 'check-circle' as const, color: theme.accent, run: () => handleMarkProcessing(item.id) }
-        : item.status === 'processing'
-          ? { label: 'Ready', icon: 'package' as const, color: BLUE, run: () => handleMarkReady(item.id) }
-          : item.status === 'ready_to_ship'
-            ? { label: 'Ship', icon: 'send' as const, color: SUCCESS, run: () => handleShip(item.id) }
-            : { label: 'Open', icon: 'arrow-right' as const, color: theme.accent, run: () => handleCardPress(item) };
-
+  const selectionMode = selectedIds.length > 0;
+  const renderItem = useCallback(({ item }: { item: OrderListItem }) => {
+    if (item.type === 'header') {
+      return (
+        <View style={s.sectionHeader}>
+          <Text style={s.sectionTitle}>{item.title}</Text>
+          <Text style={s.sectionCount}>{item.count} {item.count === 1 ? 'order' : 'orders'}</Text>
+        </View>
+      );
+    }
+    if (item.type === 'gap') return <View style={{ height: SP.sm }} />;
     return (
-      <SwipeActionRow
-        label={swipeAction.label}
-        icon={swipeAction.icon}
-        color={swipeAction.color}
-        onAction={swipeAction.run}
-        disabled={selectedIds.length > 0}
-        accessibilityLabel={`${swipeAction.label} order ${item.orderNumber}`}
-      >
-        <OrderRow
-          order={item}
-          selected={selectedIds.includes(item.id)}
-          selectionMode={selectedIds.length > 0}
-          onPress={() => handleCardPress(item)}
-          onLongPress={() => handleLongPress(item.id)}
-          onMarkProcessing={() => handleMarkProcessing(item.id)}
-          onMarkReady={() => handleMarkReady(item.id)}
-          onShip={() => handleShip(item.id)}
-          isLast={isLast}
-        />
-      </SwipeActionRow>
+      <OrderListRow
+        order={item.order}
+        isLast={item.isLast}
+        selected={selectedIdSet.has(item.order.id)}
+        selectionMode={selectionMode}
+        actions={rowActions}
+      />
     );
-  }, [selectedIds, handleCardPress, handleLongPress, handleMarkProcessing, handleMarkReady, handleShip, theme.accent]);
+  }, [s, selectedIdSet, selectionMode, rowActions]);
 
-  const keyExtractor = useCallback((o: Order) => o.id, []);
+  const keyExtractor = useCallback((row: OrderListItem) => row.key, []);
+  const getItemType = useCallback((row: OrderListItem) => row.type, []);
 
   const ListHeaderComponent = useCallback(() => (
     <View style={s.listHeader}>
@@ -971,12 +1055,12 @@ export default function OrdersScreen() {
       </View>
 
       {/* ── Order list (section list for date groups) ── */}
-      <SectionList
-        sections={sections}
+      <FlashList
+        data={listRows}
         keyExtractor={keyExtractor}
+        getItemType={getItemType}
         renderItem={renderItem}
-        renderSectionHeader={renderSectionHeader}
-        renderSectionFooter={() => <View style={{ height: SP.sm }} />}
+        extraData={selectedIdSet}
         ListHeaderComponent={ListHeaderComponent}
         ListEmptyComponent={ListEmptyComponent}
         contentContainerStyle={[
@@ -984,9 +1068,7 @@ export default function OrdersScreen() {
           filtered.length === 0 && { flexGrow: 1 },
           { paddingBottom: insets.bottom + COMP.tabBarH + (selectedIds.length > 0 ? 80 : SP.md) },
         ]}
-        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
-        stickySectionHeadersEnabled={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
