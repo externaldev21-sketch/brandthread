@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
@@ -57,6 +58,7 @@ const EMPTY_MESSAGES: Record<Tab, { icon: keyof typeof Feather.glyphMap; title: 
 
 export default function InboxScreen() {
   const insets = useSafeAreaInsets();
+  const barInset = useBuyerTabBarInset();
   const router = useRouter();
   const api = useApi();
   const { theme } = useAppTheme();
@@ -432,7 +434,7 @@ export default function InboxScreen() {
           renderItem={renderFollowRow}
           ListEmptyComponent={renderEmptyState}
           style={s.listSurface}
-          contentContainerStyle={[s.listContent, followNotifications.length === 0 && s.listEmptyContainer]}
+          contentContainerStyle={[s.listContent, { paddingBottom: barInset + SP.md }, followNotifications.length === 0 && s.listEmptyContainer]}
           showsVerticalScrollIndicator={false}
         />
       ) : (
@@ -442,7 +444,7 @@ export default function InboxScreen() {
           renderItem={renderConvRow}
           ListEmptyComponent={renderEmptyState}
           style={s.listSurface}
-          contentContainerStyle={[s.listContent, filteredConvs.length === 0 && s.listEmptyContainer]}
+          contentContainerStyle={[s.listContent, { paddingBottom: barInset + SP.md }, filteredConvs.length === 0 && s.listEmptyContainer]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         />

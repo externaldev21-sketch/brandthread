@@ -2,126 +2,142 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const layout = readFileSync(resolve(process.cwd(), 'app/(buyer)/_layout.tsx'), 'utf8');
-const profile = readFileSync(resolve(process.cwd(), 'app/(buyer)/profile.tsx'), 'utf8');
-const search = readFileSync(resolve(process.cwd(), 'app/(buyer)/search.tsx'), 'utf8');
+const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 
-describe('buyer bottom navigation layout', () => {
-  it('renders the four-action capsule + separate Profile circle', () => {
-    expect(layout).toContain("name=\"index\"");
-    expect(layout).toContain("title: 'Home'");
-    expect(layout).toContain("name=\"search\"");
-    expect(layout).toContain("name=\"inbox\"");
-    expect(layout).toContain("name=\"profile\"");
-    expect(layout).toContain('testID="buyer-bottom-tab-bar"');
-    // four nav items defined
-    expect(layout).toContain("name: 'index'");
-    expect(layout).toContain("name: 'discover'");
-    expect(layout).toContain("name: 'inbox'");
-    expect(layout).toContain("name: 'search'");
+const layout = read('app/(buyer)/_layout.tsx');
+const bar = read('components/buyer-nav/BuyerTabBar.tsx');
+const searchContext = read('contexts/BuyerSearchContext.tsx');
+const search = read('app/(buyer)/search.tsx');
+const profile = read('app/(buyer)/profile.tsx');
+const feed = read('app/(tabs)/feed.tsx');
+
+const tabItemsBlock = bar.slice(bar.indexOf('export const BUYER_TAB_ITEMS'), bar.indexOf('type Slot'));
+
+describe('buyer navigation contract', () => {
+  it('renders Home · Discover · Inbox · Search in the capsule and Profile in a separate circle', () => {
+    expect(layout).toContain('<BuyerTabBar {...props} inboxBadgeCount={inboxBadgeCount} />');
+    for (const route of ['index', 'discover', 'inbox', 'search', 'profile']) {
+      expect(layout).toContain(`name="${route}"`);
+    }
+    expect(tabItemsBlock).toContain("{ route: 'index', label: 'Home', icon: 'home' }");
+    expect(tabItemsBlock).toContain("{ route: 'discover', label: 'Discover', icon: 'discover' }");
+    expect(tabItemsBlock).toContain("{ route: 'inbox', label: 'Inbox', icon: 'inbox' }");
+    expect(tabItemsBlock).toContain("{ route: 'search', label: 'Search', icon: 'search' }");
+    expect(tabItemsBlock).not.toContain('profile');
+    expect(bar).toContain('testID="buyer-bottom-tab-bar"');
+    expect(bar).toContain("testID={searchActive ? 'buyer-search-close' : 'buyer-tab-profile'}");
   });
 
-  it('uses a frosted glass capsule with BlurView and theme-driven tokens', () => {
-    expect(layout).toContain("BlurView");
-    expect(layout).toContain("from 'expo-blur'");
-    expect(layout).toContain('tabBarBackground');
-    expect(layout).toContain('borderCol');
-    expect(layout).toContain("from 'react-native-svg'");
-    expect(layout).toContain('hairlineWidth');
-  });
-
-  it('has a standalone Profile circle button — no label inside it', () => {
-    // profile button exists
-    expect(layout).toContain('testID="buyer-tab-profile"');
-    expect(layout).toContain('profileButton');
-    // Profile circle has width/height/borderRadius 54/27
-    expect(layout).toContain('width: 54');
-    expect(layout).toContain('height: 54');
-    expect(layout).toContain('borderRadius: 27');
-    // No Profile label text node inside the circle (only NavIcon)
-    // The "Profile" label lives only in tabLabel for accessibility, not rendered text
-  });
-
-  it('exposes Home tab in Search mode', () => {
-    expect(layout).toContain('testID="buyer-search-home"');
-    expect(layout).toContain('testID="buyer-tab-search-input"');
-    expect(layout).toContain('testID="buyer-tab-search-clear"');
-    expect(layout).toContain('testID="buyer-tab-search-filters"');
-    expect(layout).toContain('searchMode');
-    expect(layout).toContain('searchField');
-    expect(layout).toContain('searchHome');
-  });
-
-  it('tracks keyboard frames with an Expo Go-safe Animated spring', () => {
-    expect(layout).toContain("keyboardWillChangeFrame");
-    expect(layout).toContain("keyboardDidShow");
-    expect(layout).not.toContain("from 'react-native-keyboard-controller'");
-    expect(layout).toContain('Animated.spring');
-    expect(layout).toContain('translateY: barTranslate');
-    expect(layout).toContain('damping:');
-    expect(layout).toContain('stiffness:');
-  });
-
-  it('bases the search morph on the measured capsule width', () => {
-    expect(layout).toContain('onLayout={measurePill}');
-    expect(layout).toContain('event.nativeEvent.layout.width');
-    expect(layout).toContain('Animated.multiply');
-    expect(layout).toContain('searchTransition');
-    expect(layout).not.toContain('translateX: 280');
-  });
-
-  it('dismisses keyboard when navigating away from search', () => {
-    expect(layout).toContain('Keyboard.dismiss');
-  });
-
-  it('uses theme-driven accent for filter icon and active tint', () => {
-    expect(layout).toContain('accent={theme.accent}');
-    expect(layout).toContain("color={accent}");
-  });
-
-  it('passes typed queries and filter requests into the hidden Search screen', () => {
-    expect(layout).toContain("router.setParams({ q: value }");
-    expect(layout).toContain("router.setParams({ filters: '1' }");
-    expect(search).toContain('useLocalSearchParams<{ q?: string; filters?: string }>');
-    expect(search).toContain("if (typeof tabQuery === 'string') setQuery(tabQuery)");
-    expect(search).toContain("if (filterRequest !== '1') return");
-  });
-
-  it('keeps every compact control at a 44-point effective touch target', () => {
-    expect(layout).toContain('minWidth: 44');
-    expect(layout).toContain('minHeight: 44');
-    expect(layout).toContain('hitSlop={14}');
-    expect(layout).toContain('hitSlop={13}');
-  });
-
-  it('has an unread badge on Inbox', () => {
-    expect(layout).toContain('TabBadge');
-    expect(layout).toContain('inboxBadgeCount');
-    expect(layout).toContain('onAccent');
-  });
-
-  it('keeps Friends reachable from Profile menu sheet', () => {
-    expect(profile).toContain("'/(buyer)/friends'");
-    expect(profile).toContain('label="Friends"');
-  });
-
-  it('calls Home consistently — screen title is Home not Thread', () => {
-    expect(layout).toContain("title: 'Home'");
-    expect(layout).toContain("tabBarAccessibilityLabel: 'Home tab'");
-    // searchHome button also uses 'Home tab' accessibility label
-    expect(layout).toContain("accessibilityLabel=\"Home tab\"");
+  it('names the first tab Home everywhere', () => {
+    expect(layout).toContain("name=\"index\" options={{ title: 'Home', tabBarAccessibilityLabel: 'Home tab' }}");
     expect(layout).not.toContain("title: 'Thread'");
+    expect(bar).toContain('`${item.label} tab`');
+    expect(read('app/(buyer)/cart.tsx')).not.toContain('Browse Thread');
   });
 
-  it('hides Friends from the capsule tab bar', () => {
-    // Friends route is present but hidden (href: null)
-    expect(layout).toContain("name=\"friends\"");
-    expect(layout).toContain("href: null");
-    // Friends is NOT in BUYER_NAV_ITEMS
-    const navItemsBlock = layout.slice(
-      layout.indexOf('BUYER_NAV_ITEMS'),
-      layout.indexOf('useKeyboardOffset'),
-    );
-    expect(navItemsBlock).not.toContain("friends");
+  it('keeps Friends reachable from Home and Profile without a slot of its own', () => {
+    expect(layout).toContain("name=\"friends\" options={{ title: 'Friends', href: null }}");
+    expect(tabItemsBlock).not.toContain('friends');
+    expect(feed).toContain("router.navigate('/(buyer)/friends' as never)");
+    expect(feed).toContain('testID="buyer-home-friends"');
+    expect(profile).toContain("'/(buyer)/friends'");
+    // Friends, Cart and Orders light up the control they were opened from.
+    expect(bar).toContain("friends: 'index'");
+    expect(bar).toContain("cart: 'index'");
+    expect(bar).toContain("orders: 'profile'");
+  });
+
+  it('uses real frosted glass with theme tokens, a hairline border and an unclipped shadow', () => {
+    expect(bar).toContain("from 'expo-blur'");
+    expect(bar).toContain('<BlurView');
+    expect(bar).toContain('useAppTheme');
+    expect(bar).toContain('`${theme.background}8C`');
+    expect(bar).toContain('StyleSheet.hairlineWidth');
+    expect(bar).toContain('boxShadow:');
+    // The shadow wrapper must not clip, or iOS drops the shadow.
+    const shadowBlock = bar.slice(bar.indexOf('  shadow: {'), bar.indexOf('  slotRow: {'));
+    expect(shadowBlock).not.toContain('overflow');
+  });
+
+  it('shows a clear active state, an unread Inbox badge, haptics and tab accessibility', () => {
+    expect(bar).toContain('styles.indicator');
+    expect(bar).toContain('withSpring(x, INDICATOR_SPRING)');
+    expect(bar).toContain('<UnreadBadge count={badgeCount} theme={theme} />');
+    expect(bar).toContain("unread ${badge === 1 ? 'item' : 'items'}");
+    expect(bar).toContain('hapticSelection()');
+    expect(bar).toContain('accessibilityRole="tab"');
+    expect(bar).toContain('accessibilityState={{ selected: focused }}');
+    expect(bar).toContain('accessibilityRole="tablist"');
+    expect(bar).toContain("navigation.emit({ type: 'tabPress'");
+  });
+
+  it('keeps every control at a 44pt touch target', () => {
+    expect(bar).toContain('minWidth: 44');
+    expect(bar).toContain('minHeight: 44');
+    // 36pt field buttons + 4pt hitSlop on every side = 44pt.
+    expect(bar).toContain('width: 36');
+    expect(bar).toContain('hitSlop={4}');
+  });
+});
+
+describe('buyer search morph', () => {
+  it('keeps Home in the capsule while search is open', () => {
+    expect(bar).toContain("testID={isHome && searchActive ? 'buyer-search-home' : `buyer-tab-${item.route}`}");
+    expect(bar).toContain("const coveredBySearch = !isHome && searchActive;");
+    // Home is never wrapped in an animated style that could hide it.
+    expect(bar).toContain('if (isHome) return <View key={item.route}>{slot}</View>;');
+  });
+
+  it('slides the field out of the Search slot using measured widths, not fixed pixels', () => {
+    expect(bar).toContain('onLayout={onSlotRowLayout}');
+    expect(bar).toContain('event.nativeEvent.layout.width');
+    expect(bar).toContain('const slot = slotRowWidth.value / BUYER_TAB_SLOT_COUNT;');
+    expect(bar).toContain('const collapsedLeft = pad + slot * 3.5 - FIELD_GLYPH_CENTER;');
+    expect(bar).toContain('const expandedLeft = pad + slot + 2;');
+    expect(bar).not.toMatch(/translateX: \d{3}/);
+  });
+
+  it('cannot bounce: the spring is critically damped and clamped', () => {
+    expect(bar).toContain('overshootClamping: true');
+    expect(bar).toContain('withSpring(target, MORPH_SPRING, onDone)');
+    expect(bar).toContain('useReducedMotion()');
+  });
+
+  it('rides the keyboard on the UI thread only while search is open', () => {
+    expect(bar).toContain('useAnimatedKeyboard({');
+    expect(bar).toContain('isStatusBarTranslucentAndroid: true');
+    expect(bar).toContain('isNavigationBarTranslucentAndroid: true');
+    expect(bar).toContain('searchActive && <NativeKeyboardFollower target={keyboardHeight} />');
+    expect(bar).toContain('keyboardHeight.value + metrics.keyboardGap - metrics.bottomOffset');
+    expect(bar).not.toContain("from 'react-native-keyboard-controller'");
+  });
+
+  it('always offers clear, filters and close, and closing reverses the morph and the keyboard', () => {
+    expect(bar).toContain('testID="buyer-tab-search-input"');
+    expect(bar).toContain('accessibilityLabel="Search Brandthread"');
+    expect(bar).toContain('testID="buyer-tab-search-clear"');
+    expect(bar).toContain('testID="buyer-tab-search-filters"');
+    expect(bar).toContain("accessibilityLabel={searchActive ? 'Close search' : 'Profile tab'}");
+    const close = bar.slice(bar.indexOf('const closeSearch'), bar.indexOf('const openFilters'));
+    expect(close).toContain('dismissKeyboard()');
+    expect(close).toContain('returnRouteRef.current');
+    expect(bar).toContain('Keyboard.dismiss()');
+    // The field leaves the tree once the reverse animation finishes.
+    expect(bar).toContain('runOnJS(setFieldMounted)(false)');
+  });
+
+  it('routes the typed query through context instead of navigation params', () => {
+    expect(bar).not.toContain('setParams');
+    expect(search).not.toContain('router.setParams');
+    expect(bar).toContain('onChangeText={setQuery}');
+    expect(search).toContain('useBuyerSearch()');
+    expect(search).toContain('handledFiltersRequest');
+    expect(searchContext).toContain('keyboardHeight: SharedValue<number>');
+    expect(layout).toContain('<BuyerSearchProvider>');
+  });
+
+  it('keeps search results clear of the bar and the keyboard', () => {
+    expect(search).toContain('height: barInset + keyboardHeight.value + 16');
+    expect(search).toContain('keyboardDismissMode="on-drag"');
   });
 });

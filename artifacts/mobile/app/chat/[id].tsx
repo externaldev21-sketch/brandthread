@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList, KeyboardAvoidingView, Platform, StyleSheet,
-  Text, TextInput, TouchableOpacity, useColorScheme, View,
+  Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -134,8 +134,9 @@ const bub = StyleSheet.create({
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const scheme  = useColorScheme();
-  const isDark  = scheme !== 'light';
+  // Brandthread is dark-only (app.json userInterfaceStyle: "dark"); web must
+  // not fall back to the light palette when the browser prefers light.
+  const isDark  = true;
   const insets  = useSafeAreaInsets();
   const router  = useRouter();
   const colors = useColors();

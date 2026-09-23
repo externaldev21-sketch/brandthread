@@ -4,6 +4,7 @@ import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@clerk/expo';
 import { useRouter } from 'expo-router';
@@ -191,6 +192,7 @@ function BuyerOrderCard({ order, onPress }: { order: BuyerOrderView; onPress: ()
 export default function BuyerOrdersScreen() {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const barInset = useBuyerTabBarInset();
   const router = useRouter();
   const { userId } = useAuth();
 
@@ -338,7 +340,7 @@ export default function BuyerOrdersScreen() {
               contentContainerStyle={{
                 paddingHorizontal: SP.md,
                 paddingTop: SP.sm,
-                paddingBottom: Math.max(insets.bottom, SP.md) + COMP.tabBarH + SP.md,
+                paddingBottom: barInset + SP.md,
                 gap: SP.md,
               }}
               renderItem={({ item }) => (

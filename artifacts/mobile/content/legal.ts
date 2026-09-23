@@ -364,7 +364,7 @@ const PRIVACY: LegalDocumentContent = {
     {
       title: 'Device permissions',
       bullets: [
-        'Camera, microphone and photos — only when you choose to capture or upload media, go live, or make a call.',
+        'Camera, microphone and photos — only when you choose to capture or upload media, record a voice message, go live, or make a call.',
         'Face ID, Touch ID or fingerprint — only if you turn on App Lock. Your biometric data never leaves your device; the operating system only tells Brandthread whether unlocking succeeded.',
         'Notifications — only after you allow them.',
       ],

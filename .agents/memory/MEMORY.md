@@ -7,7 +7,7 @@
 - [Clerk Expo v3 Signals API](clerk-expo-v3-signals-api.md) — @clerk/expo v3 hooks return SignInFutureResource; use password()+finalize() not create()+setActive(); Metro needs _tmp_ blockList fix.
 - [Brandthread backend architecture](brandthread-backend-architecture.md) — ownerId scoping, transactional orders, lib/db build requirement, clerkClient usage, healthz double-path gotcha.
 - [Inbox structural flattening](inbox-flattening-pattern.md) — Brandthread screens (profile, inbox) use flat Instagram-style rows, no card chrome; keep new screens consistent.
-- [Buyer/Seller navigation](buyer-seller-nav.md) — buyer bar is Home·Discover·Inbox·Search plus separate Profile; Search transforms the capsule into an inline field.
+- [Buyer/Seller navigation](buyer-seller-nav.md) — buyer bar is Home·Discover·Inbox·Search plus a Profile/Close circle; search slides in beside a fixed Home; screens pad by useBuyerTabBarInset().
 - [User-scoped onboarding state](user-scoped-onboarding-state.md) — auth-gated local completion and identity writes must be owned by a Clerk user, never a shared device-global key.
 - [Onboarding architecture](onboarding-architecture.md) — Clerk account creation is the literal first step for buyer and seller; user-scoped draft migration preserves equivalent screens across reorderings.
 - [Manufacturer payout and call integrity](manufacturer-payout-call-integrity.md) — payout truth, reversal accounting, exact callbacks, and participant-scoped call events must stay idempotent across provider races.
