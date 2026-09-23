@@ -6,7 +6,7 @@ import React, { useState } from 'react';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Alert, Image, Dimensions,
+  StyleSheet, ActivityIndicator, Alert, Image, Dimensions, Modal, FlatList,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -29,7 +29,10 @@ import {
 import {
   generateDesignFromText, GenerateDesignResult, createBrandAsset,
 } from '@/services/designService';
+import { getProducts, updateProduct } from '@/services/productService';
+import type { Product, ProductMedia } from '@/services/productTypes';
 import { File, Paths } from 'expo-file-system';
+import * as Haptics from 'expo-haptics';
 
 const { width: SW } = Dimensions.get('window');
 const COL_W = (SW - SP.lg * 2 - SP.sm) / 2;
@@ -58,6 +61,10 @@ export default function TextToDesignScreen() {
   const [count, setCount] = useState(4);
   const [isGenerating, setIsGenerating] = useState(false);
   const [results, setResults] = useState<GenerateDesignResult | null>(null);
+  const [showProductPicker, setShowProductPicker] = useState(false);
+  const [pickerProducts, setPickerProducts] = useState<Product[]>([]);
+  const [loadingPickerProducts, setLoadingPickerProducts] = useState(false);
+  const [pickerImageUri, setPickerImageUri] = useState<string | null>(null);
 
   async function pickReference() {
     const res = await ImagePicker.launchImageLibraryAsync({
@@ -104,6 +111,53 @@ export default function TextToDesignScreen() {
       Alert.alert('Generation failed', 'Please try again.');
     } finally {
       setIsGenerating(false);
+    }
+  }
+
+  async function handleAddToProduct(uri: string) {
+    if (!uri.startsWith('data:')) { Alert.alert('Nothing to add', 'Generate this design first.'); return; }
+    setPickerImageUri(uri);
+    setLoadingPickerProducts(true);
+    try {
+      const all = await getProducts();
+      const active = all.filter(p => p.status !== 'archived');
+      if (active.length === 0) {
+        Alert.alert('No products', 'Create a product first, then add this design to its media gallery.');
+        return;
+      }
+      setPickerProducts(active);
+      setShowProductPicker(true);
+    } catch {
+      Alert.alert('Couldn’t load products', 'Try again.');
+    } finally {
+      setLoadingPickerProducts(false);
+    }
+  }
+
+  async function confirmAddToProduct(product: Product) {
+    setShowProductPicker(false);
+    const uri = pickerImageUri;
+    if (!uri) return;
+    try {
+      const existing = product.media ?? [];
+      const newMedia: ProductMedia = {
+        id: `text-to-design-${Date.now()}`,
+        type: 'image',
+        uri,
+        altText: 'AI-generated design',
+        isCover: false,
+        sortOrder: existing.length,
+        createdAt: new Date().toISOString(),
+      };
+      const updated = await updateProduct(product.id, { media: [...existing, newMedia] });
+      if (updated) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert('Added', `Added to "${product.name ?? 'product'}" media gallery.`);
+      } else {
+        Alert.alert('Couldn’t update product', 'Try again.');
+      }
+    } catch {
+      Alert.alert('Couldn’t add to product', 'Try again.');
     }
   }
 
@@ -176,10 +230,7 @@ export default function TextToDesignScreen() {
                   >
                     <Feather name="bookmark" size={ICON.sm} color={PURPLE} />
                   </TouchableOpacity>
-                  <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Try in Garment', 'Preview this design on a garment using the 3D renderer.')}>
-                    <Feather name="layers" size={ICON.sm} color={CYAN} />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Add to Product', 'Attach this design to a product listing from the product detail screen.')}>
+                  <TouchableOpacity style={s.actionBtn} onPress={() => handleAddToProduct(uri)}>
                     <Feather name="package" size={ICON.sm} color={FG} />
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -212,6 +263,48 @@ export default function TextToDesignScreen() {
             </TouchableOpacity>
           </View>
         </ScrollView>
+
+        <Modal
+          visible={showProductPicker}
+          animationType="slide"
+          presentationStyle="formSheet"
+          onRequestClose={() => setShowProductPicker(false)}
+        >
+          <View style={s.pickerRoot}>
+            <View style={s.pickerHeader}>
+              <Text style={s.pickerTitle}>Choose a product</Text>
+              <TouchableOpacity onPress={() => setShowProductPicker(false)} activeOpacity={0.7}>
+                <Feather name="x" size={ICON.sm} color={FG} />
+              </TouchableOpacity>
+            </View>
+            <Text style={s.pickerSub}>The design will be added to the product's media gallery.</Text>
+            {loadingPickerProducts ? (
+              <ActivityIndicator style={{ marginTop: 40 }} color={PURPLE} />
+            ) : (
+              <FlatList
+                data={pickerProducts}
+                keyExtractor={p => p.id}
+                contentContainerStyle={{ padding: SP.md }}
+                renderItem={({ item }) => (
+                  <TouchableOpacity style={s.productRow} onPress={() => confirmAddToProduct(item)} activeOpacity={0.82}>
+                    {item.media?.[0]?.uri ? (
+                      <Image source={{ uri: item.media[0].uri }} style={s.productThumb} resizeMode="cover" />
+                    ) : (
+                      <View style={[s.productThumb, s.productThumbEmpty]}>
+                        <Feather name="package" size={ICON.md} color={SUBTLE} />
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.productName} numberOfLines={1}>{item.name}</Text>
+                      <Text style={s.productStatus}>{item.status}</Text>
+                    </View>
+                    <Feather name="chevron-right" size={ICON.xs} color={MUTED} />
+                  </TouchableOpacity>
+                )}
+              />
+            )}
+          </View>
+        </Modal>
       </BrandthreadScreen>
     );
   }
@@ -223,7 +316,7 @@ export default function TextToDesignScreen() {
         <View style={s.loadingOverlay}>
           <ActivityIndicator size="large" color={PURPLE} />
           <Text style={s.loadingText}>Generating your design…</Text>
-          <Text style={s.loadingSubtext}>This takes ~3 seconds</Text>
+          <Text style={s.loadingSubtext}>Usually under a minute.</Text>
         </View>
       )}
       <BrandthreadHeader title="Text to Design" onBack={() => router.back()} />
@@ -625,5 +718,27 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: FS.sm,
     color: FG,
   },
+  pickerRoot: {
+    flex: 1, backgroundColor: BG, paddingTop: SP.md,
+  },
+  pickerHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.lg,
+  },
+  pickerTitle: {
+    fontFamily: FONT.bold, fontSize: FS.lg, color: FG,
+  },
+  pickerSub: {
+    fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED,
+    paddingHorizontal: SP.lg, marginTop: SP.xs, marginBottom: SP.sm,
+  },
+  productRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.md,
+    backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
+    padding: SP.sm, marginBottom: SP.sm,
+  },
+  productThumb: { width: 52, height: 52, borderRadius: RADIUS.sm },
+  productThumbEmpty: { backgroundColor: CARD_ELEVATED, alignItems: 'center', justifyContent: 'center' },
+  productName: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, marginBottom: 4 },
+  productStatus: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
   });
 };

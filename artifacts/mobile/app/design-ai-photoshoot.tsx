@@ -2,11 +2,11 @@
  * Brandthread Design Studio — AI Photoshoot
  * Route: /design-ai-photoshoot
  */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Alert, Dimensions, Image,
+  StyleSheet, ActivityIndicator, Alert, Dimensions, Image, Modal, FlatList,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -25,10 +25,13 @@ import {
   ModelStyleKind, SceneStyleKind, LightingStyleKind, ImageRatioKind,
 } from '@/services/designTypes';
 import {
-  generatePhotoshoot, GeneratePhotoshootResult,
+  generatePhotoshoot, GeneratePhotoshootResult, createBrandAsset,
 } from '@/services/designService';
+import { getProducts, updateProduct } from '@/services/productService';
+import type { Product, ProductMedia } from '@/services/productTypes';
 import { useApi } from '@/hooks/useApi';
 import { File, Paths } from 'expo-file-system';
+import * as Haptics from 'expo-haptics';
 
 const { width: SW } = Dimensions.get('window');
 const COL_W = (SW - SP.lg * 2 - SP.sm) / 2;
@@ -102,8 +105,6 @@ export default function AIPhotoshootScreen() {
     });
   }
 
-  const counterRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   useEffect(() => {
     let active = true;
     setLoadingProducts(true);
@@ -165,18 +166,123 @@ export default function AIPhotoshootScreen() {
     }
   }
 
+  // Result actions: Add to Product / Seller post / Store Builder / Campaign
+  const [showProductPicker, setShowProductPicker] = useState(false);
+  const [pickerProducts, setPickerProducts] = useState<Product[]>([]);
+  const [loadingPickerProducts, setLoadingPickerProducts] = useState(false);
+
+  function imagesToUse(): string[] {
+    if (!results) return [];
+    const uris = selected.size > 0
+      ? Array.from(selected).map(i => results.imageUris[i])
+      : results.imageUris;
+    return uris.filter(u => !!u);
+  }
+
+  async function handleAddToProduct() {
+    if (imagesToUse().length === 0) {
+      Alert.alert('Nothing to add', 'Generate or select photos first.');
+      return;
+    }
+    setLoadingPickerProducts(true);
+    try {
+      const all = await getProducts();
+      const active = all.filter(p => p.status !== 'archived');
+      if (active.length === 0) {
+        Alert.alert('No products', 'Create a product first, then add these photos to its media gallery.');
+        return;
+      }
+      setPickerProducts(active);
+      setShowProductPicker(true);
+    } catch {
+      Alert.alert('Couldn’t load products', 'Try again.');
+    } finally {
+      setLoadingPickerProducts(false);
+    }
+  }
+
+  async function confirmAddToProduct(product: Product) {
+    setShowProductPicker(false);
+    const uris = imagesToUse();
+    try {
+      const existing = product.media ?? [];
+      const newMedia: ProductMedia[] = uris.map((uri, i) => ({
+        id: `photoshoot-${Date.now()}-${i}`,
+        type: 'image',
+        uri,
+        altText: 'AI photoshoot image',
+        isCover: false,
+        sortOrder: existing.length + i,
+        createdAt: new Date().toISOString(),
+      }));
+      const updated = await updateProduct(product.id, { media: [...existing, ...newMedia] });
+      if (updated) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert('Added', `${uris.length} photo${uris.length === 1 ? '' : 's'} added to "${product.name ?? 'product'}".`);
+      } else {
+        Alert.alert('Couldn’t update product', 'Try again.');
+      }
+    } catch {
+      Alert.alert('Couldn’t add to product', 'Try again.');
+    }
+  }
+
+  async function handleSaveToBrandAssets(tags: string[]): Promise<boolean> {
+    const uris = imagesToUse();
+    if (uris.length === 0) {
+      Alert.alert('Nothing to save', 'Generate or select photos first.');
+      return false;
+    }
+    try {
+      await Promise.all(uris.map((uri, i) => createBrandAsset({
+        name: `Photoshoot ${new Date().toLocaleDateString()} ${i + 1}`,
+        type: 'photo',
+        uri,
+        tags,
+      })));
+      return true;
+    } catch {
+      Alert.alert('Couldn’t save', 'Try again.');
+      return false;
+    }
+  }
+
+  async function handleSellerPost() {
+    const ok = await handleSaveToBrandAssets(['photoshoot', 'content-asset']);
+    if (!ok) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert(
+      'Saved to Brand Assets',
+      'Open the post composer and select these photos from the asset picker.',
+      [{ text: 'Open composer', onPress: () => router.push('/create-post' as never) }, { text: 'OK' }],
+    );
+  }
+
+  async function handleStoreBuilder() {
+    const ok = await handleSaveToBrandAssets(['photoshoot', 'store-asset']);
+    if (!ok) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert(
+      'Saved to Brand Assets',
+      'Open Store Builder and select these photos from the asset picker.',
+      [{ text: 'Open Store Builder', onPress: () => router.push('/store-builder' as never) }, { text: 'OK' }],
+    );
+  }
+
+  async function handleCampaign() {
+    const ok = await handleSaveToBrandAssets(['photoshoot', 'campaign-asset']);
+    if (!ok) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert(
+      'Saved to Brand Assets',
+      'Open Create ad and select these photos as your creative.',
+      [{ text: 'Open Create ad', onPress: () => router.push('/design-campaign' as never) }, { text: 'OK' }],
+    );
+  }
+
   async function handleGenerate() {
     setIsGenerating(true);
     setGeneratedCount(0);
-    // Mock progress counter
-    let n = 0;
-    counterRef.current = setInterval(() => {
-      n += 1;
-      setGeneratedCount(Math.min(n, count));
-      if (n >= count) {
-        if (counterRef.current) clearInterval(counterRef.current);
-      }
-    }, 3000 / count);
 
     try {
       const result = await generatePhotoshoot({
@@ -188,13 +294,16 @@ export default function AIPhotoshootScreen() {
         imageRatio,
         count,
       });
+      // generatePhotoshoot resolves all images together (no per-image
+      // completion signal is exposed), so once it resolves we know the
+      // full count finished — this is not a fake timer, just a single jump.
+      setGeneratedCount(result.imageUris.length);
       setResults(result);
       setSelected(new Set());
     } catch (error: any) {
       Alert.alert('Generation failed', error?.message || 'Please try again.');
     } finally {
       setIsGenerating(false);
-      if (counterRef.current) clearInterval(counterRef.current);
     }
   }
 
@@ -239,7 +348,7 @@ export default function AIPhotoshootScreen() {
           showsVerticalScrollIndicator={false}
         >
           <Text style={s.resultsMeta}>
-            {results.imageUris.length} photos · {results.modelStyle} · {results.sceneStyle}
+            {results.imageUris.length} photos · {MODEL_STYLES.find(m => m.value === modelStyle)?.label ?? modelStyle} · {SCENE_STYLES.find(sc => sc.value === sceneStyle)?.label ?? sceneStyle}
           </Text>
           <View style={s.grid}>
             {results.imageUris.map((uri, idx) => {
@@ -283,10 +392,10 @@ export default function AIPhotoshootScreen() {
                 { label: 'Save all', icon: 'save', onPress: () => handleSaveAll(results!.imageUris) },
                 { label: 'Save selected', icon: 'bookmark', onPress: () => handleSaveSelected(results!.imageUris, selected) },
                 { label: 'Retry', icon: 'refresh-cw', onPress: handleGenerate },
-                { label: 'Add to Product', icon: 'package', onPress: () => Alert.alert('Add to Product', 'Attach these AI photos directly to a product listing in your store.') },
-                { label: 'Seller post', icon: 'send', onPress: () => Alert.alert('Create Post', 'Share these photos as a Thread post to your brand feed.') },
-                { label: 'Store Builder', icon: 'shopping-bag', onPress: () => Alert.alert('Store Builder', 'Use these photos as hero images or banners in your Store Builder.') },
-                { label: 'Campaign', icon: 'trending-up', onPress: () => Alert.alert('Campaign', 'Add these photos to a marketing campaign for your next drop.') },
+                { label: 'Add to Product', icon: 'package', onPress: handleAddToProduct },
+                { label: 'Seller post', icon: 'send', onPress: handleSellerPost },
+                { label: 'Store Builder', icon: 'shopping-bag', onPress: handleStoreBuilder },
+                { label: 'Campaign', icon: 'trending-up', onPress: handleCampaign },
               ].map(a => (
                 <TouchableOpacity key={a.label} style={s.actionItem} onPress={a.onPress}>
                   <View style={s.actionItemIcon}>
@@ -305,6 +414,52 @@ export default function AIPhotoshootScreen() {
             </Text>
           </View>
         </ScrollView>
+
+        <Modal
+          visible={showProductPicker}
+          animationType="slide"
+          presentationStyle="formSheet"
+          onRequestClose={() => setShowProductPicker(false)}
+        >
+          <View style={s.pickerRoot}>
+            <View style={s.pickerHeader}>
+              <Text style={s.pickerTitle}>Choose a product</Text>
+              <TouchableOpacity onPress={() => setShowProductPicker(false)} activeOpacity={0.7}>
+                <Feather name="x" size={ICON.sm} color={FG} />
+              </TouchableOpacity>
+            </View>
+            <Text style={s.pickerSub}>Selected photos will be added to the product's media gallery.</Text>
+            {loadingPickerProducts ? (
+              <ActivityIndicator style={{ marginTop: 40 }} color={PURPLE} />
+            ) : (
+              <FlatList
+                data={pickerProducts}
+                keyExtractor={p => p.id}
+                contentContainerStyle={{ padding: SP.md }}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={s.productOption}
+                    onPress={() => confirmAddToProduct(item)}
+                    activeOpacity={0.82}
+                  >
+                    {item.media?.[0]?.uri ? (
+                      <Image source={{ uri: item.media[0].uri }} style={s.productCover} resizeMode="cover" />
+                    ) : (
+                      <View style={[s.productCover, s.productCoverEmpty]}>
+                        <Feather name="package" size={ICON.md} color={SUBTLE} />
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.productOptionName} numberOfLines={1}>{item.name}</Text>
+                      <Text style={s.productOptionMeta}>{item.status}</Text>
+                    </View>
+                    <Feather name="chevron-right" size={ICON.xs} color={MUTED} />
+                  </TouchableOpacity>
+                )}
+              />
+            )}
+          </View>
+        </Modal>
       </BrandthreadScreen>
     );
   }
@@ -315,10 +470,8 @@ export default function AIPhotoshootScreen() {
       {isGenerating && (
         <View style={s.loadingOverlay}>
           <ActivityIndicator size="large" color={PURPLE} />
-          <Text style={s.loadingText}>
-            Generating {generatedCount}/{count} images…
-          </Text>
-          <Text style={s.loadingSubtext}>Applying your photoshoot settings</Text>
+          <Text style={s.loadingText}>Shooting your photos…</Text>
+          <Text style={s.loadingSubtext}>This usually takes under a minute.</Text>
         </View>
       )}
 
@@ -1100,6 +1253,30 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: FS.sm,
     color: MUTED,
     lineHeight: 18,
+  },
+  pickerRoot: {
+    flex: 1,
+    backgroundColor: BG,
+    paddingTop: SP.md,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SP.lg,
+  },
+  pickerTitle: {
+    fontFamily: FONT.bold,
+    fontSize: FS.lg,
+    color: FG,
+  },
+  pickerSub: {
+    fontFamily: FONT.regular,
+    fontSize: FS.sm,
+    color: MUTED,
+    paddingHorizontal: SP.lg,
+    marginTop: SP.xs,
+    marginBottom: SP.sm,
   },
   });
 };

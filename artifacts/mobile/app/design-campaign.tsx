@@ -1026,9 +1026,9 @@ export default function CreateAdScreen() {
           <View style={[styles.successIcon, { backgroundColor: SUCCESS_DIM }]}>
             <Feather name="check" size={32} color={SUCCESS} />
           </View>
-          <Text style={styles.stageHeading}>Ad activated!</Text>
+          <Text style={styles.stageHeading}>Your ad is live</Text>
           <Text style={[styles.stageSub, { textAlign: 'center' }]}>
-            Payment confirmed and campaign is live. Activation was verified server-side — not from the browser redirect alone.
+            Payment confirmed. We'll start showing it right away.
           </Text>
           <Text style={[styles.stageSub, { textAlign: 'center', color: SUBTLE, fontSize: FS.xs }]}>
             Estimated reach: {reach.low.toLocaleString()}–{reach.high.toLocaleString()} people (estimate only — not a delivered-impression guarantee).
