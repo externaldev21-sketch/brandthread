@@ -35,9 +35,9 @@ export default function TaxesDutiesScreen() {
       await api.taxes.enable();
       setProviderConfigured(true);
       setIncludeSalesTax(true);
-      Alert.alert('Stripe Tax configured', 'Stripe will calculate checkout tax from the buyer destination when an applicable registration is active.');
+      Alert.alert('Automatic tax turned on', 'Tax will be calculated from the buyer destination when an applicable registration is active.');
     } catch (err: any) {
-      Alert.alert('Error', err.message ?? 'Failed to enable Stripe Tax');
+      Alert.alert("Couldn't turn on automatic tax. Try again.");
     } finally {
       setSaving(false);
     }
@@ -53,15 +53,15 @@ export default function TaxesDutiesScreen() {
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
           <View style={styles.rowStart}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Stripe Tax checkout calculation</Text>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Automatic sales tax</Text>
             <Feather name="info" size={14} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
           </View>
 
           <View style={[styles.dutiesSetupRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Configure Stripe Tax</Text>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Turn on automatic tax</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
-                Stripe calculates sales tax from the buyer's checkout destination and your active Stripe registrations.
+                Sales tax is calculated from the buyer's checkout destination and your active tax registrations.
               </Text>
             </View>
             <TouchableOpacity onPress={handleSetup} disabled={saving || providerConfigured} activeOpacity={0.7} style={[styles.manageBtn, { borderColor: colors.border }]}>
@@ -86,8 +86,8 @@ export default function TaxesDutiesScreen() {
           <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 14 }]}>How checkout tax works</Text>
 
           <Checkbox
-            label="Use destination-based Stripe Tax at checkout"
-            description="Stripe adds its calculated tax to the buyer's charged total when an applicable registration is active."
+            label="Use destination-based automatic tax at checkout"
+            description="The calculated tax is added to the buyer's charged total when an applicable registration is active."
             checked={includeSalesTax}
             onPress={() => {
               haptic();
@@ -96,7 +96,7 @@ export default function TaxesDutiesScreen() {
             colors={colors}
           />
           <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
-            Stripe product tax codes, registrations, and the final address entered in Checkout determine taxability. Brandthread does not apply a local rate table or override Stripe's result.
+            Product tax codes, registrations, and the final address entered at checkout determine taxability. Brandthread does not apply a local rate table or override this result.
           </Text>
         </View>
 
@@ -113,7 +113,7 @@ export default function TaxesDutiesScreen() {
             <View style={[styles.serviceIcon, { backgroundColor: '#22C55E' }]}>
               <Feather name="dollar-sign" size={13} color="#FFFFFF" />
             </View>
-            <Text style={[styles.rowLabel, { color: colors.foreground, flex: 1 }]}>Stripe Tax</Text>
+            <Text style={[styles.rowLabel, { color: colors.foreground, flex: 1 }]}>Automatic tax</Text>
             <View style={[styles.onPill, { backgroundColor: providerConfigured ? colors.success + '26' : colors.secondary }]}>
               <Text style={[styles.onPillText, { color: providerConfigured ? colors.success : colors.mutedForeground }]}>
                 {providerConfigured ? 'Configured' : 'Not configured'}
@@ -122,7 +122,7 @@ export default function TaxesDutiesScreen() {
           </View>
           <Text style={[styles.rowDescription, { color: colors.mutedForeground, marginTop: 8 }]}>
             {providerConfigured
-              ? 'Stripe calculates tax from the checkout destination and active Stripe registrations.'
+              ? 'Tax is calculated from the checkout destination and your active registrations.'
               : 'An app preference alone does not activate tax collection or prove compliance.'}
           </Text>
           <Text style={[styles.rowDescription, { color: colors.mutedForeground, marginTop: 6 }]}>
@@ -157,7 +157,7 @@ export default function TaxesDutiesScreen() {
               )}
               {annualReport?.forms?.length > 0 && (
                 <Text style={[styles.rowDescription, { color: colors.success }]}>
-                  {annualReport.forms.length} Stripe-generated form{annualReport.forms.length === 1 ? '' : 's'} available.
+                  Tax forms ready: {annualReport.forms.length}.
                 </Text>
               )}
             </View>

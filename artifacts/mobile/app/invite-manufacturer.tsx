@@ -2,15 +2,16 @@
  * Invite Manufacturer Screen
  */
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
-  KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView, Platform, Animated, Share,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
 
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
@@ -51,6 +52,19 @@ export default function InviteManufacturerScreen() {
   const [submitted, setSubmitted] = useState(false);
   const [inviteLink, setInviteLink] = useState('');
   const [fieldErrors, setFieldErrors] = useState<{ companyName?: string; email?: string }>({});
+  const [toastVisible, setToastVisible] = useState(false);
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function showCopiedToast() {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToastVisible(true);
+    Animated.timing(toastOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+    toastTimer.current = setTimeout(() => {
+      Animated.timing(toastOpacity, { toValue: 0, duration: 150, useNativeDriver: true }).start();
+      setToastVisible(false);
+    }, 2000);
+  }
 
   function validate(): boolean {
     const errors: { companyName?: string; email?: string } = {};
@@ -108,8 +122,17 @@ export default function InviteManufacturerScreen() {
     }
   }
 
-  function handleCopyLink() {
-    Alert.alert('Link copied', inviteLink);
+  async function handleCopyLink() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await Clipboard.setStringAsync(inviteLink);
+    showCopiedToast();
+  }
+
+  async function handleShareLink() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await Share.share({ message: inviteLink });
+    } catch { /* user cancelled the share sheet */ }
   }
 
   // ── Success state ────────────────────────────────────────────────────────
@@ -149,7 +172,7 @@ export default function InviteManufacturerScreen() {
             </View>
             <Text style={s.linkText} numberOfLines={2}>{inviteLink}</Text>
             <Text style={s.linkNote}>
-              No email service is connected — share this link manually with the manufacturer.
+              Share this link with {companyName || 'the manufacturer'} so they can join.
             </Text>
           </GradientCard>
 
@@ -160,11 +183,23 @@ export default function InviteManufacturerScreen() {
             style={{ marginTop: SP.sm }}
           />
           <SecondaryButton
+            label="Share link"
+            onPress={handleShareLink}
+            icon="share"
+            style={{ marginTop: SP.sm }}
+          />
+          <SecondaryButton
             label="Done"
             onPress={() => router.back()}
             style={{ marginTop: SP.sm }}
           />
         </ScrollView>
+
+        {/* Copy toast */}
+        <Animated.View pointerEvents="none" style={[s.toast, { opacity: toastOpacity }]}>
+          <Feather name="check-circle" size={14} color={theme.onAccent} />
+          <Text style={s.toastText}>Link copied</Text>
+        </Animated.View>
       </View>
     );
   }
@@ -281,10 +316,10 @@ export default function InviteManufacturerScreen() {
         </BrandthreadCard>
 
         <PrimaryButton
-          label="Send Invitation"
+          label="Create invite link"
           onPress={handleSubmit}
           loading={submitting}
-          icon="send"
+          icon="link"
           style={s.submitBtn}
         />
       </ScrollView>
@@ -375,4 +410,11 @@ const s = StyleSheet.create({
   linkNote: {
     fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, lineHeight: 18,
   },
+  toast: {
+    position: 'absolute', top: 56, alignSelf: 'center', zIndex: 99,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: SUCCESS, borderRadius: 24,
+    paddingHorizontal: 16, paddingVertical: 9,
+  },
+  toastText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: ON_DARK },
 });

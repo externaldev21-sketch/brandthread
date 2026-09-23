@@ -6,20 +6,20 @@
  *   mfrId         — manufacturer UUID (for creating threads)
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Image,
-  ScrollView, RefreshControl,
+  ScrollView, RefreshControl, ActionSheetIOS, Modal,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import { BrandthreadHeader, StatusBadge } from '@/components/BrandthreadUI';
+import { BrandthreadHeader, StatusBadge, PrimaryButton } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_FOCUS,
@@ -56,6 +56,8 @@ function fmtCents(c: number) { return formatCents(c); }
 // ─── Message Bubble ───────────────────────────────────────────────────────────
 
 function ApiMessageBubble({ msg, onOpenOrder }: { msg: ApiMessage; onOpenOrder: (id: string, type: string) => void }) {
+  const { theme } = useAppTheme();
+  const bubS = useMemo(() => makeBubS(theme), [theme]);
   const isSeller = msg.senderRole === 'seller';
   const isSystem = msg.senderRole === 'system' || msg.messageType === 'system';
 
@@ -113,7 +115,7 @@ function ApiMessageBubble({ msg, onOpenOrder }: { msg: ApiMessage; onOpenOrder: 
             {card?.walletBalance !== undefined && (
               <View>
                 <Text style={bubS.cardKey}>Wallet</Text>
-                <Text style={[bubS.cardVal, { color: SUCCESS }]}>{fmtCents(card.walletBalance)}</Text>
+                <Text style={[bubS.cardVal, { color: theme.success }]}>{fmtCents(card.walletBalance)}</Text>
               </View>
             )}
           </View>
@@ -131,7 +133,7 @@ function ApiMessageBubble({ msg, onOpenOrder }: { msg: ApiMessage; onOpenOrder: 
     <View style={[bubS.row, isSeller ? bubS.rowRight : bubS.rowLeft]}>
       <View style={{ maxWidth: '78%' }}>
         <View style={[bubS.bubble, isSeller ? bubS.sellerBubble : bubS.mfgBubble]}>
-          <Text style={[bubS.msgText, isSeller && { color: '#fff' }]}>{msg.content}</Text>
+          <Text style={[bubS.msgText, isSeller && { color: theme.onAccent }]}>{msg.content}</Text>
         </View>
         <Text style={[bubS.timestamp, isSeller ? { textAlign: 'right' } : {}]}>
           {fmtTime(msg.sentAt)}
@@ -141,7 +143,7 @@ function ApiMessageBubble({ msg, onOpenOrder }: { msg: ApiMessage; onOpenOrder: 
   );
 }
 
-const bubS = StyleSheet.create({
+const makeBubS = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   row: { marginVertical: 3, paddingHorizontal: SP.md },
   rowRight: { flexDirection: 'row', justifyContent: 'flex-end' },
   rowLeft:  { flexDirection: 'row', justifyContent: 'flex-start' },
@@ -152,19 +154,19 @@ const bubS = StyleSheet.create({
     maxWidth: '100%',
   },
   sellerBubble: {
-    backgroundColor: PURPLE,
+    backgroundColor: theme.accent,
     borderBottomRightRadius: 4,
   },
   mfgBubble: {
-    backgroundColor: CARD_ELEVATED,
+    backgroundColor: theme.cardElevated,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
     borderBottomLeftRadius: 4,
   },
   msgText: {
     fontSize: FS.base,
     fontFamily: FONT.regular,
-    color: FG,
+    color: theme.text,
     lineHeight: 20,
   },
   systemWrap: {
@@ -175,14 +177,14 @@ const bubS = StyleSheet.create({
   systemText: {
     fontSize: FS.xs,
     fontFamily: FONT.regular,
-    color: SUBTLE,
+    color: theme.subtle,
     fontStyle: 'italic',
     textAlign: 'center',
   },
   timestamp: {
     fontSize: FS.xs,
     fontFamily: FONT.regular,
-    color: SUBTLE,
+    color: theme.subtle,
     marginTop: 3,
   },
   imageMsg: {
@@ -191,18 +193,18 @@ const bubS = StyleSheet.create({
     borderRadius: RADIUS.md,
   },
   cardMsg: {
-    backgroundColor: CARD_ELEVATED,
+    backgroundColor: theme.cardElevated,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
     borderRadius: RADIUS.lg,
     padding: SP.md,
     maxWidth: 280,
   },
-  cardLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
-  cardTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
-  cardKey:   { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  cardVal:   { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  cardDesc:  { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 6 },
+  cardLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.muted },
+  cardTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: theme.text },
+  cardKey:   { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
+  cardVal:   { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
+  cardDesc:  { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 6 },
 });
 
 // ─── Sample Card Dialog ────────────────────────────────────────────────────────
@@ -216,6 +218,8 @@ function SampleCardDialog({
   onSend: (cardData: any) => void;
   onClose: () => void;
 }) {
+  const { theme } = useAppTheme();
+  const dlgS = useMemo(() => makeDlgS(theme), [theme]);
   const [title, setTitle]       = useState('');
   const [qty, setQty]           = useState('1');
   const [price, setPrice]       = useState('');
@@ -248,7 +252,7 @@ function SampleCardDialog({
         <View style={dlgS.header}>
           <Text style={dlgS.title}>{isBulk ? '📦' : '🧵'} Send {label}</Text>
           <TouchableOpacity onPress={onClose}>
-            <Feather name="x" size={20} color={MUTED} />
+            <Feather name="x" size={20} color={theme.muted} />
           </TouchableOpacity>
         </View>
 
@@ -259,24 +263,24 @@ function SampleCardDialog({
           <DlgField label="Notes (optional)" value={desc} onChange={setDesc} multiline />
         </ScrollView>
 
-        <TouchableOpacity style={dlgS.sendBtn} onPress={handleSend}>
-          <Text style={dlgS.sendBtnText}>Send {label} Card</Text>
-        </TouchableOpacity>
+        <PrimaryButton label={`Send ${label} Card`} onPress={handleSend} style={{ marginTop: SP.md }} />
       </View>
     </View>
   );
 }
 
 function DlgField({ label, value, onChange, placeholder, keyboard, multiline }: any) {
+  const { theme } = useAppTheme();
+  const dlgS = useMemo(() => makeDlgS(theme), [theme]);
   return (
     <View style={{ marginBottom: 14 }}>
-      <Text style={{ fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, marginBottom: 6 }}>{label}</Text>
+      <Text style={{ fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted, marginBottom: 6 }}>{label}</Text>
       <TextInput
         style={[dlgS.input, multiline && { height: 72, textAlignVertical: 'top' }]}
         value={value}
         onChangeText={onChange}
         placeholder={placeholder}
-        placeholderTextColor={SUBTLE}
+        placeholderTextColor={theme.subtle}
         keyboardType={keyboard}
         multiline={multiline}
         returnKeyType="done"
@@ -285,28 +289,79 @@ function DlgField({ label, value, onChange, placeholder, keyboard, multiline }: 
   );
 }
 
-const dlgS = StyleSheet.create({
+const makeDlgS = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   overlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.7)', // theme-exempt: scrim over the screen behind the sheet
     justifyContent: 'flex-end', zIndex: 999,
   },
   sheet: {
-    backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
+    backgroundColor: theme.card, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
     padding: SP.lg, paddingBottom: 40, maxHeight: '80%',
   },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.md },
-  title:  { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
+  title:  { fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text },
   input: {
-    backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER,
+    backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border,
     borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: 12,
-    fontSize: FS.base, fontFamily: FONT.regular, color: FG,
+    fontSize: FS.base, fontFamily: FONT.regular, color: theme.text,
   },
-  sendBtn: {
-    backgroundColor: PURPLE, borderRadius: RADIUS.md, paddingVertical: 14,
-    alignItems: 'center', marginTop: SP.md,
+});
+
+// ─── Attach sheet (Android/web) ────────────────────────────────────────────────
+// Full option list reachable via a real sheet, since Android's Alert.alert caps
+// at 3 visible buttons and would silently drop 2 of these 5 options.
+
+function AttachSheet({
+  visible, options, onClose,
+}: {
+  visible: boolean;
+  options: { icon: string; label: string; onPress: () => void }[];
+  onClose: () => void;
+}) {
+  const { theme } = useAppTheme();
+  const as = useMemo(() => makeAttachSheetS(theme), [theme]);
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity style={as.overlay} activeOpacity={1} onPress={onClose}>
+        <View style={as.sheet}>
+          <View style={as.handle} />
+          {options.map((opt) => (
+            <TouchableOpacity
+              key={opt.label}
+              style={as.row}
+              onPress={() => { onClose(); opt.onPress(); }}
+              activeOpacity={0.7}
+            >
+              <Text style={as.rowIcon}>{opt.icon}</Text>
+              <Text style={as.rowLabel}>{opt.label}</Text>
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity style={as.cancelBtn} onPress={onClose} activeOpacity={0.7}>
+            <Text style={as.cancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
+const makeAttachSheetS = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)', // theme-exempt: scrim over the screen behind the sheet
+    justifyContent: 'flex-end',
   },
-  sendBtnText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#fff' },
+  sheet: {
+    backgroundColor: theme.card, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
+    paddingHorizontal: SP.lg, paddingTop: SP.sm, paddingBottom: 40,
+  },
+  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: 'center', marginBottom: SP.md },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 },
+  rowIcon: { fontSize: 20, width: 26, textAlign: 'center' },
+  rowLabel: { fontSize: FS.base, fontFamily: FONT.medium, color: theme.text },
+  cancelBtn: { marginTop: SP.sm, paddingVertical: 14, alignItems: 'center', borderTopWidth: 1, borderTopColor: theme.border },
+  cancelText: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.muted },
 });
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
@@ -335,6 +390,7 @@ export default function ManufacturerMessagesScreen() {
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [cardDialog, setCardDialog] = useState<'sample_card' | 'bulk_card' | null>(null);
+  const [attachSheetVisible, setAttachSheetVisible] = useState(false);
 
   const inputRef = useRef<TextInput>(null);
   const listRef  = useRef<FlatList>(null);
@@ -545,23 +601,32 @@ export default function ManufacturerMessagesScreen() {
     router.push(`/call-screen?${query.toString()}` as never);
   }
 
-  function handleAttachPress() {
-    const actions: any[] = [
-      { text: '🖼️  Send Photo',       onPress: handlePhotoSend },
-    ];
-    actions.push({ text: '🧵 Send Sample Order Card', onPress: () => setCardDialog('sample_card') });
-    actions.push({ text: '📦 Send Bulk Order Card',   onPress: () => setCardDialog('bulk_card')   });
-    actions.push({
-      text: '📞 Start Voice Call',
-      onPress: () => handleStartCall('voice'),
-    });
-    actions.push({
-      text: '📹 Start Video Call',
-      onPress: () => handleStartCall('video'),
-    });
-    actions.push({ text: 'Cancel', style: 'cancel' });
+  // 5 real options + Cancel = 6 buttons. Android's Alert.alert only renders 3
+  // buttons, silently dropping the rest, so this uses ActionSheetIOS on iOS
+  // and a full-height in-app sheet (below) on Android/web so every option is
+  // reachable on both platforms.
+  const attachOptions: { icon: string; label: string; onPress: () => void }[] = [
+    { icon: '🖼️', label: 'Send Photo',            onPress: handlePhotoSend },
+    { icon: '🧵', label: 'Send Sample Order Card', onPress: () => setCardDialog('sample_card') },
+    { icon: '📦', label: 'Send Bulk Order Card',   onPress: () => setCardDialog('bulk_card') },
+    { icon: '📞', label: 'Start Voice Call',       onPress: () => handleStartCall('voice') },
+    { icon: '📹', label: 'Start Video Call',       onPress: () => handleStartCall('video') },
+  ];
 
-    Alert.alert('Attach', 'Choose an action', actions);
+  function handleAttachPress() {
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: [...attachOptions.map(o => `${o.icon}  ${o.label}`), 'Cancel'],
+          cancelButtonIndex: attachOptions.length,
+        },
+        (index) => {
+          if (index < attachOptions.length) attachOptions[index].onPress();
+        },
+      );
+      return;
+    }
+    setAttachSheetVisible(true);
   }
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -588,6 +653,14 @@ export default function ManufacturerMessagesScreen() {
           onClose={() => setCardDialog(null)}
         />
       )}
+
+      {/* Attach sheet — Android/web equivalent of the iOS ActionSheetIOS above,
+          so all 5 options are reachable (Android's Alert.alert caps at 3 buttons). */}
+      <AttachSheet
+        visible={attachSheetVisible}
+        options={attachOptions}
+        onClose={() => setAttachSheetVisible(false)}
+      />
 
       {/* Header */}
       <View style={{ paddingTop: insets.top, backgroundColor: BG, borderBottomWidth: 1, borderBottomColor: BORDER }}>

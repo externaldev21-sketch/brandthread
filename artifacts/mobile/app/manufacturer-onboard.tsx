@@ -5,19 +5,18 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, Platform, Image,
+  ScrollView, Alert, Platform, Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import * as ImagePicker from 'expo-image-picker';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { FS } from '@/lib/theme';
 
 
-const STEPS = ['Account', 'Company', 'Specialties', 'Photos & Pricing', 'Review'];
+const STEPS = ['Account', 'Company', 'Specialties', 'Pricing', 'Review'];
 
 const SPECIALTY_OPTIONS = [
   'T-Shirts', 'Hoodies', 'Sweatpants', 'Shorts', 'Jackets',
@@ -35,8 +34,6 @@ const PRODUCTION_MODES = [
 interface FormData {
   // Step 0 — Account
   email: string;
-  password: string;
-  confirmPassword: string;
   // Step 1 — Company
   companyName: string;
   country: string;
@@ -48,8 +45,7 @@ interface FormData {
   productionModes: string[];
   moq: string;
   leadTimeDays: string;
-  // Step 3 — Photos & Pricing
-  photos: string[];   // local URIs
+  // Step 3 — Pricing
   pricePerUnit: string;
   currency: string;
   sampleCost: string;
@@ -58,10 +54,10 @@ interface FormData {
 }
 
 const INITIAL: FormData = {
-  email: '', password: '', confirmPassword: '',
+  email: '',
   companyName: '', country: '', city: '', website: '', phone: '',
   specialties: [], productionModes: [], moq: '', leadTimeDays: '',
-  photos: [], pricePerUnit: '', currency: 'USD', sampleCost: '',
+  pricePerUnit: '', currency: 'USD', sampleCost: '',
   agreeTerms: false,
 };
 
@@ -92,20 +88,9 @@ export default function ManufacturerOnboardScreen() {
     Haptics.impactAsync(t === 'light' ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Medium);
   }
 
-  async function pickPhoto() {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo access to upload factory images.'); return; }
-    const res = await ImagePicker.launchImageLibraryAsync({ allowsMultipleSelection: true, quality: 0.8 });
-    if (!res.canceled) {
-      set('photos', [...form.photos, ...res.assets.map((a) => a.uri)].slice(0, 8));
-    }
-  }
-
   function validateStep(): string | null {
     if (step === 0) {
       if (!form.email.includes('@')) return 'Enter a valid email address.';
-      if (form.password.length < 8)   return 'Password must be at least 8 characters.';
-      if (form.password !== form.confirmPassword) return 'Passwords do not match.';
     }
     if (step === 1) {
       if (!form.companyName.trim()) return 'Company name is required.';
@@ -143,11 +128,13 @@ export default function ManufacturerOnboardScreen() {
         city:             form.city || undefined,
         specialty:        form.specialties[0] ?? 'Apparel',
         description:      form.specialties.join(', '),
+        productionModes:  form.productionModes.length > 0 ? form.productionModes : undefined,
         moq:              parseInt(form.moq) || 100,
         contactEmail:     form.email,
+        contactPhone:     form.phone || undefined,
         website:          form.website || undefined,
         priceRange:       form.pricePerUnit ? `$${form.pricePerUnit}/${form.currency}` : '',
-        sampleTurnaround: '2–4 weeks',
+        sampleCost:       form.sampleCost ? `$${form.sampleCost}` : undefined,
         bulkTurnaround:   `${form.leadTimeDays || '30'} days`,
       };
 
@@ -202,11 +189,9 @@ export default function ManufacturerOnboardScreen() {
         {/* ── STEP 0: Account ── */}
         {step === 0 && (
           <View style={s.stepWrap}>
-            <Text style={s.stepTitle}>Create your manufacturer account</Text>
-            <Text style={s.stepSub}>Your login for receiving quote requests and messages from brand founders.</Text>
+            <Text style={s.stepTitle}>Your contact email</Text>
+            <Text style={s.stepSub}>Where you'll receive quote requests and messages from brand founders.</Text>
             <Field label="Business Email" value={form.email} onChange={(v) => set('email', v)} placeholder="production@nightshiftstudio.co" keyboardType="email-address" />
-            <Field label="Password" value={form.password} onChange={(v) => set('password', v)} placeholder="Min. 8 characters" secure />
-            <Field label="Confirm Password" value={form.confirmPassword} onChange={(v) => set('confirmPassword', v)} placeholder="Re-enter password" secure />
           </View>
         )}
 
@@ -268,32 +253,11 @@ export default function ManufacturerOnboardScreen() {
           </View>
         )}
 
-        {/* ── STEP 3: Photos & Pricing ── */}
+        {/* ── STEP 3: Pricing ── */}
         {step === 3 && (
           <View style={s.stepWrap}>
-            <Text style={s.stepTitle}>Photos & pricing</Text>
-            <Text style={s.stepSub}>Upload up to 8 photos — factory floor, samples, or finished pieces. Brands browse these before reaching out.</Text>
-
-            {/* Photo upload grid */}
-            <View style={s.photoGrid}>
-              {form.photos.map((uri, i) => (
-                <View key={i} style={s.photoThumb}>
-                  <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                  <TouchableOpacity
-                    style={s.photoRemove}
-                    onPress={() => set('photos', form.photos.filter((_, idx) => idx !== i))}
-                  >
-                    <Feather name="x" size={12} color={colors.primaryForeground} />
-                  </TouchableOpacity>
-                </View>
-              ))}
-              {form.photos.length < 8 && (
-                <TouchableOpacity style={s.photoAdd} onPress={pickPhoto} activeOpacity={0.8}>
-                  <Feather name="plus" size={22} color={colors.primary} />
-                  <Text style={[s.photoAddText, { color: colors.primary }]}>Add Photo</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+            <Text style={s.stepTitle}>Pricing</Text>
+            <Text style={s.stepSub}>Give brand founders a starting point — exact pricing is worked out per quote.</Text>
 
             <View style={s.row}>
               <View style={{ flex: 2 }}>
@@ -334,24 +298,27 @@ export default function ManufacturerOnboardScreen() {
               <Row label="Specialties" value={form.specialties.join(', ') || '—'} last />
             </View>
 
-            <View style={[s.reviewCard, { marginTop: 12 }]}>
-              <Text style={s.photoCount}>{form.photos.length} photo{form.photos.length !== 1 ? 's' : ''} uploaded</Text>
+            <View style={s.termsRow}>
+              <TouchableOpacity
+                onPress={() => { haptic('light'); set('agreeTerms', !form.agreeTerms); }}
+                activeOpacity={0.8}
+                style={{ flexDirection: 'row', flex: 1 }}
+              >
+                <View style={[s.checkbox, form.agreeTerms && [s.checkboxActive, { backgroundColor: colors.primary, borderColor: colors.primary }]]}>
+                  {form.agreeTerms && <Feather name="check" size={12} color={colors.primaryForeground} />}
+                </View>
+                <Text style={s.termsText}>
+                  I agree to the{' '}
+                  <Text
+                    style={{ color: colors.primary, textDecorationLine: 'underline' }}
+                    onPress={() => { haptic('light'); Linking.openURL('https://brandthread.app/terms'); }}
+                  >
+                    Brandthread Manufacturer Terms
+                  </Text>
+                  {' '}and understand payments are held in escrow until delivery is confirmed.
+                </Text>
+              </TouchableOpacity>
             </View>
-
-            <TouchableOpacity
-              style={s.termsRow}
-              onPress={() => { haptic('light'); set('agreeTerms', !form.agreeTerms); }}
-              activeOpacity={0.8}
-            >
-              <View style={[s.checkbox, form.agreeTerms && [s.checkboxActive, { backgroundColor: colors.primary, borderColor: colors.primary }]]}>
-                {form.agreeTerms && <Feather name="check" size={12} color={colors.primaryForeground} />}
-              </View>
-              <Text style={s.termsText}>
-                I agree to the{' '}
-                <Text style={{ color: colors.primary }}>Brandthread Manufacturer Terms</Text>
-                {' '}and understand payments are held in escrow until delivery is confirmed.
-              </Text>
-            </TouchableOpacity>
           </View>
         )}
       </ScrollView>

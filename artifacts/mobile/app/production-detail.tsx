@@ -7,13 +7,14 @@ import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, Toucha
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BrandthreadCard, BrandthreadHeader, GradientCard, SecondaryButton, StatusBadge } from '@/components/BrandthreadUI';
+import { BrandthreadCard, BrandthreadHeader, GradientCard, SecondaryButton, StatusBadge, EmptyState } from '@/components/BrandthreadUI';
 import { getProductionOrder, getOrCreateConversation } from '@/services/manufacturerService';
 import { getBulkWalletOptions, payBulkOrderFromWallet, BulkWalletOption } from '@/services/manufacturerService';
 import { ProductionOrder, PRODUCTION_STAGES } from '@/services/manufacturerTypes';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useApi } from '@/lib/api';
 
 function fmtDate(value?: string) {
   return value ? new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
@@ -26,11 +27,13 @@ export default function ProductionDetailScreen() {
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const api = useApi();
   const insets = useSafeAreaInsets();
   const [order, setOrder] = useState<ProductionOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [wallets, setWallets] = useState<BulkWalletOption[]>([]);
+  const [dropNames, setDropNames] = useState<Record<string, string>>({});
   const [requiredCents, setRequiredCents] = useState(0);
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState('');
@@ -58,11 +61,20 @@ export default function ProductionDetailScreen() {
       setRequiredCents(options.requiredCents);
       setSelectedWalletId(current => current && options.wallets.some(wallet => wallet.id === current && wallet.eligible)
         ? current : options.wallets.find(wallet => wallet.eligible)?.id ?? null);
+      // Resolve each wallet's dropId to a human name — the wallet list itself
+      // only carries the raw drop UUID.
+      const uniqueDropIds = [...new Set(options.wallets.map(w => w.dropId))];
+      const drops = await Promise.all(uniqueDropIds.map(dropId =>
+        (api.drops.get(dropId) as Promise<any>).catch(() => null),
+      ));
+      setDropNames(Object.fromEntries(
+        uniqueDropIds.map((dropId, i) => [dropId, drops[i]?.name ?? drops[i]?.title ?? 'Drop']),
+      ));
     } catch (err: any) {
       setWallets([]);
       setPaymentError('Wallet payment options are unavailable right now.');
     }
-  }, [id]);
+  }, [id, api]);
 
   useEffect(() => {
     load();
@@ -84,7 +96,7 @@ export default function ProductionDetailScreen() {
       const message = String(err?.message ?? '');
       setPaymentError(
         message.includes('payouts are not ready')
-          ? 'The manufacturer must finish Stripe verification before this wallet payment can be released. Message them, then retry.'
+          ? 'The manufacturer needs to finish payout setup before this wallet payment can be released. Message them, then retry.'
           : 'Wallet payment could not be completed. Please retry.',
       );
     } finally {
@@ -110,6 +122,12 @@ export default function ProductionDetailScreen() {
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <BrandthreadHeader title="Production" onBack={() => router.back()} />
         <View style={styles.center}>
+          <EmptyState
+            icon="layers"
+            title="Order not found"
+            description="It may have been withdrawn."
+            action={{ label: 'Back', onPress: () => router.back() }}
+          />
         </View>
       </View>
     );
@@ -142,7 +160,7 @@ export default function ProductionDetailScreen() {
             <Text style={styles.heading}>Pay from a drop wallet</Text>
             <Text style={styles.walletHelp}>
               {order.manufacturerPayoutReady !== true
-                ? 'Payment is unavailable until the manufacturer connects and verifies their Stripe payout account. Message them, then refresh this order.'
+                ? 'The manufacturer needs to finish payout setup before you can pay. Message them, then refresh.'
                 : `This bulk order requires ${formatCents(requiredCents || order.totalCostCents)}. Wallet payments may take a moment to reconcile.`}
             </Text>
             {order.walletPaymentState === 'processing' ? (
@@ -153,7 +171,7 @@ export default function ProductionDetailScreen() {
               wallets.map(wallet => (
                 <TouchableOpacity key={wallet.id} disabled={!wallet.eligible || paying} onPress={() => setSelectedWalletId(wallet.id)}
                   style={[styles.wallet, selectedWalletId === wallet.id && styles.walletSelected, !wallet.eligible && styles.walletDisabled]}>
-                  <View><Text style={styles.value}>Drop wallet</Text><Text style={styles.label}>{wallet.dropId}</Text></View>
+                  <View><Text style={styles.value}>{dropNames[wallet.dropId] ?? 'Drop'} wallet</Text></View>
                   <Text style={[styles.value, !wallet.eligible && styles.walletError]}>{formatCents(wallet.availableCents)}</Text>
                 </TouchableOpacity>
               ))
