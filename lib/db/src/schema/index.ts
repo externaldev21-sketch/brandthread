@@ -3,6 +3,7 @@ export * from './manufacturers';
 export * from './freelancers';
 export * from './subscriptionEntitlements';
 export * from './security';
+export * from './money';
 import { manufacturers } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
 
@@ -238,6 +239,14 @@ export const drops = pgTable('drops', {
   payoutStatus: text('payout_status').notNull().default('pending'), // 'pending'|'held'|'processing'|'paid'
   estimatedPayoutDate: timestamp('estimated_payout_date'),
   stripePayoutId: text('stripe_payout_id'),
+  // Held-funds lifecycle for pre-order drops (null for pre-made drops):
+  // collecting | production | fulfilling | completed | failing | failed.
+  // Transitions are defined in api-server lib/money/stateMachines.ts.
+  escrowState: text('escrow_state'),
+  // If unshipped preorders remain after this moment, buyers are auto-refunded.
+  fulfillmentDeadlineAt: timestamp('fulfillment_deadline_at', { withTimezone: true }),
+  escrowFailedAt: timestamp('escrow_failed_at', { withTimezone: true }),
+  escrowFailureReason: text('escrow_failure_reason'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -300,6 +309,23 @@ export const orders = pgTable('orders', {
   // Stripe payment fields
   stripePaymentIntentId: text('stripe_payment_intent_id'),
   stripeCheckoutSessionId: text('stripe_checkout_session_id'),
+  // ── Money state (see api-server lib/money) ──────────────────────────────
+  // 'destination' = in-stock order paid straight to the seller;
+  // 'held' = preorder-drop order whose funds Brandthread holds until ship.
+  chargeModel: text('charge_model'),
+  // settled_direct | held | release_pending | released | refunded
+  fundsState: text('funds_state'),
+  stripeChargeId: text('stripe_charge_id'),
+  stripeTransferId: text('stripe_transfer_id'),
+  stripeApplicationFeeId: text('stripe_application_fee_id'),
+  platformFeeCents: integer('platform_fee_cents').notNull().default(0),
+  // Stripe's processing fee for this charge (actual when known).
+  processingFeeCents: integer('processing_fee_cents').notNull().default(0),
+  // Processing fee the seller was charged (estimate on destination charges).
+  processingFeeChargedCents: integer('processing_fee_charged_cents').notNull().default(0),
+  sellerNetCents: integer('seller_net_cents').notNull().default(0),
+  refundedCents: integer('refunded_cents').notNull().default(0),
+  platformFeeRefundedCents: integer('platform_fee_refunded_cents').notNull().default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -439,6 +465,11 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   // The paid-order webhook consumes it atomically with order creation.
   loyaltyToken: text('loyalty_token'),
   loyaltyDiscountCents: integer('loyalty_discount_cents').notNull().default(0),
+  // Money decisions fixed when the Stripe session was created.
+  chargeModel: text('charge_model'),        // 'destination' | 'held'
+  dropId: uuid('drop_id'),                  // server-derived from the products
+  platformFeeCents: integer('platform_fee_cents'),
+  processingFeeEstimateCents: integer('processing_fee_estimate_cents'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

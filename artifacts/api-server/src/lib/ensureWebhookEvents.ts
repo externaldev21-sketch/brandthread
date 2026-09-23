@@ -29,6 +29,7 @@ const REQUIRED_EVENTS = [
   "transfer.updated",
   "transfer.reversed",
   "charge.refunded",
+  "charge.refund.updated",
   "customer.subscription.created",
   "customer.subscription.updated",
   "customer.subscription.trial_will_end",

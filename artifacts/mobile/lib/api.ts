@@ -15,6 +15,7 @@ import {
   dismissNetworkNotice,
   reportNetworkError,
 } from '@/lib/networkNotice';
+import type { FinanceSummary } from '@/lib/financeSummary';
 
 const BASE =
   process.env.EXPO_PUBLIC_API_BASE_URL ??
@@ -1786,6 +1787,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     /** Finance / Payouts dashboard — real Stripe Connect data */
     finance: {
       balance:      () => freshGet<any>('/api/finance/balance'),
+      /** Held vs on-the-way vs available vs paid out, from the money ledger. */
+      summary:      () => freshGet<FinanceSummary>('/api/finance/summary'),
       payouts:      (limit?: number) => get<any>(`/api/finance/payouts${limit ? `?limit=${limit}` : ''}`),
       transactions: (limit?: number, type?: string) => {
         const q = new URLSearchParams();

@@ -49,6 +49,24 @@ import {
   type StripeWebhookClaim,
 } from "../lib/stripeWebhookLedger";
 import { sellerPlanFromStripeLookupKey } from "../lib/stripePlanMapping";
+import { splitOrder } from "../lib/money/fees";
+import { fetchChargeDetails, type ChargeDetails } from "../lib/money/stripeMoney";
+import {
+  lockDrop, recordBulkPaidFromHeld, recordBulkReversalToHeld, recordOrderPaid,
+} from "../lib/money/escrow";
+import { postLedgerTransaction } from "../lib/money/ledger";
+import { recordExternalRefunds, recordRefundFailedLater, refundOrder } from "../lib/money/refunds";
+
+/**
+ * Which Stripe mode the configured secret key belongs to. An event from the
+ * other mode (e.g. a test-mode event reaching production) is rejected even
+ * with a valid signature, so test payments can never create live orders.
+ */
+export function expectedLivemode(secretKey = process.env.STRIPE_SECRET_KEY ?? ""): boolean | null {
+  if (/^(sk|rk)_live_/.test(secretKey)) return true;
+  if (/^(sk|rk)_test_/.test(secretKey)) return false;
+  return null;
+}
 
 const router = Router();
 
@@ -154,6 +172,13 @@ router.post("/stripe", async (req: Request, res: Response) => {
       error: "Invalid Stripe event",
       code: "VALIDATION_ERROR",
     });
+    return;
+  }
+
+  const livemode = expectedLivemode();
+  if (typeof event.livemode === "boolean" && livemode !== null && event.livemode !== livemode) {
+    req.log.warn({ eventId: event.id, eventLivemode: event.livemode }, "Stripe webhook from the wrong mode rejected");
+    res.status(400).json({ error: "Event mode does not match this server", code: "LIVEMODE_MISMATCH" });
     return;
   }
 
@@ -282,14 +307,31 @@ router.post("/stripe", async (req: Request, res: Response) => {
       case "transfer.reversed":
         await handleManufacturerTransferReversed(event.data.object, event.id);
         break;
-      case "charge.refunded":
-        await handleManufacturerCardReversal({
+      case "charge.refunded": {
+        const handledAsManufacturerCard = await handleManufacturerCardReversal({
           paymentIntentId: stripeReferenceId(event.data.object.payment_intent),
           chargeId: event.data.object.id ?? null,
           cumulativeReversedCents: event.data.object.amount_refunded,
           providerEventId: event.id,
           source: "refund",
         });
+        if (!handledAsManufacturerCard && Number.isSafeInteger(event.data.object.amount_refunded)) {
+          // Refunds made through lib/money/refunds.ts are already recorded;
+          // this only picks up refunds issued elsewhere (Stripe dashboard).
+          await recordExternalRefunds({
+            paymentIntentId: stripeReferenceId(event.data.object.payment_intent),
+            chargeId: event.data.object.id ?? null,
+            cumulativeRefundedCents: event.data.object.amount_refunded,
+            providerEventId: event.id,
+          });
+        }
+        break;
+      }
+
+      case "charge.refund.updated":
+        if (event.data.object?.status === "failed" && typeof event.data.object.id === "string") {
+          await recordRefundFailedLater(event.data.object.id);
+        }
         break;
 
       // ── Seller platform subscription (billed to seller's own payment method) ──
@@ -580,6 +622,20 @@ export async function handleCheckoutPaid(
   const rawItems = csRecord.items as CartItem[];
   const ownerId  = csRecord.sellerId;
 
+  // How this checkout was charged was decided (server-side) when the session
+  // was created. Sessions created before that existed are inferred from the
+  // metadata they carried.
+  const chargeModel: "destination" | "held" = csRecord.chargeModel === "held"
+    || (!csRecord.chargeModel && Boolean(metadata["dropId"]))
+    ? "held"
+    : "destination";
+  const orderDropId: string | null = csRecord.dropId ?? metadata["dropId"] ?? null;
+  // The exact Stripe fee and charge ids. If Stripe cannot be reached the
+  // webhook fails and Stripe retries, rather than recording a guess.
+  const chargeDetails: ChargeDetails = piId && stripe?.paymentIntents
+    ? await fetchChargeDetails(stripe, piId)
+    : { chargeId: null, processingFeeCents: null, transferId: null, applicationFeeId: null };
+
   // ── Aggregate quantities by variantId (all-or-nothing requires per-variant totals)
   // Even if buyer.ts rejected duplicates, aggregate here as a safety net.
   const aggregated = new Map<string, CartItem>();
@@ -673,7 +729,7 @@ export async function handleCheckoutPaid(
     const orderNumber   = `BT-${String(count + 1).padStart(5, "0")}`;
 
     // Step 4: Insert order — pending if stock OK, refund_pending if oversold
-    const dropId: string | undefined = metadata["dropId"];
+    const dropId: string | null = orderDropId;
     const [order] = await tx
       .insert(orders)
       .values({
@@ -696,6 +752,34 @@ export async function handleCheckoutPaid(
       })
       .returning();
     createdOrderId = order.id;
+
+    // Money: fee split, charge ids, funds state and ledger, in this same
+    // transaction as the order row (lib/money/escrow.ts).
+    const split = splitOrder({
+      subtotalCents,
+      discountCents: Math.min(stripeDiscountCents, subtotalCents),
+      shippingCents,
+      taxCents,
+      grossCents: totalCents,
+      processingFeeCents: chargeModel === "held" ? chargeDetails.processingFeeCents : undefined,
+    });
+    const decidedPlatformFee = chargeModel === "destination" && csRecord.platformFeeCents != null
+      ? Math.min(csRecord.platformFeeCents, totalCents)
+      : split.platformFeeCents;
+    await recordOrderPaid(tx, {
+      orderId: order.id,
+      sellerId: ownerId,
+      dropId: chargeModel === "held" ? dropId : null,
+      chargeModel,
+      split: { ...split, platformFeeCents: decidedPlatformFee },
+      // Sessions created before processing pass-through charged only 5%.
+      processingFeeChargedCents: chargeModel === "destination"
+        ? csRecord.processingFeeEstimateCents ?? 0
+        : undefined,
+      charge: chargeDetails,
+      paymentIntentId: piId,
+      occurredAt: successfulPaymentAt,
+    });
 
     await recordPaidPhysicalOrder({
       ...order,
@@ -816,19 +900,23 @@ export async function handleCheckoutPaid(
       { stripeSessionId: sessionId, itemCount: oversoldItems.length },
       "Oversold order after payment; issuing refund",
     );
-    if (piId && stripe) {
+    if (piId && createdOrderId) {
       try {
-        await stripe.refunds.create({
-          payment_intent: piId,
-          metadata: {
-            reason:         "oversold",
-            oversold_items: oversoldItems.join(", "),
-            session_id:     sessionId,
+        await refundOrder({
+          orderId: createdOrderId,
+          reason: "oversold",
+          initiatedBy: "system:checkout-webhook",
+          idempotencyKey: `oversold/${createdOrderId}`,
+          cancelOrder: {
+            reason: "out_of_stock",
+            notes: "An item sold out while you were paying, so you were refunded automatically.",
+            restock: false,
           },
         });
         logger.info({ paymentIntentId: piId, stripeSessionId: sessionId }, "Automatic refund issued for oversold order");
       } catch (refundErr) {
-        // Refund failed — order remains "refund_pending" for manual review
+        // The order stays refund_pending (visible for review). A webhook
+        // retry or a person can re-run it with the same idempotency key.
         logger.error({ err: refundErr, paymentIntentId: piId, stripeSessionId: sessionId }, "Automatic refund for oversold order failed");
       }
     }
@@ -872,18 +960,9 @@ export async function handleCheckoutPaid(
       }
     }
 
-    // ── Auto-credit drop wallet (Fix #1) ───────────────────────────────────
-    // If this order is part of a drop, credit the drop's escrow wallet so
-    // the per-order release-order endpoint has funds to transfer at ship time.
-    const dropId: string | undefined = metadata["dropId"];
-    if (dropId && createdOrderId) {
-      try {
-        await creditDropWallet(dropId, createdOrderId, subtotalCents, piId);
-      } catch (walletErr) {
-        // Non-fatal — log for manual recovery; order record is committed
-        logger.error({ err: walletErr, orderId: createdOrderId, dropId }, "Auto-crediting drop wallet failed");
-      }
-    }
+    // Held preorder funds were deposited to the drop's wallet and ledger in
+    // the order transaction above (recordOrderPaid) — never as a separate,
+    // skippable step.
   }
 }
 
@@ -918,50 +997,6 @@ async function awardPurchasePoints(order: {
     referenceId: order.id,
     note: `Purchase reward for order ${order.id}`,
   }, transaction);
-}
-
-// ── Drop wallet auto-credit helper ──────────────────────────────────────────
-// Uses SELECT FOR UPDATE to prevent concurrent duplicate deposits.
-async function creditDropWallet(
-  dropId: string,
-  orderId: string,
-  amountCents: number,
-  stripePaymentIntentId: string | null,
-): Promise<void> {
-  await db.transaction(async (tx) => {
-    // Lock wallet row — prevents concurrent deposits from double-crediting
-    const lockResult = await tx.execute(
-      sql`SELECT id, balance_cents FROM drop_wallets WHERE drop_id = ${dropId}::uuid FOR UPDATE LIMIT 1`,
-    );
-    const walletRow = (lockResult as any).rows?.[0];
-    if (!walletRow) {
-      logger.warn({ dropId, orderId }, "Drop wallet not found for auto-credit");
-      return;
-    }
-
-    // Idempotency guard — skip if this order was already deposited
-    const already = await tx.execute(
-      sql`SELECT id FROM drop_wallet_transactions WHERE wallet_id = ${walletRow.id}::uuid AND order_id = ${orderId}::uuid AND type = 'deposit' LIMIT 1`,
-    );
-    if ((already as any).rows?.length > 0) {
-      logger.info({ orderId, dropId }, "Drop wallet was already credited for order; skipping");
-      return;
-    }
-
-    // Atomic balance increment (avoids read-modify-write race)
-    await tx.execute(
-      sql`UPDATE drop_wallets SET balance_cents = balance_cents + ${amountCents}, updated_at = NOW() WHERE id = ${walletRow.id}::uuid`,
-    );
-
-    await tx.insert(dropWalletTransactions).values({
-      walletId:         walletRow.id as string,
-      type:             "deposit",
-      amountCents,
-      orderId,
-      description:      "Buyer order payment (auto-credited on checkout.session.completed)",
-      stripeTransferId: stripePaymentIntentId ?? undefined,
-    });
-  });
 }
 
 // ── Seller subscription handlers ────────────────────────────────────────────
@@ -1555,6 +1590,22 @@ async function handleManufacturerCheckoutPaid(session: any, providerEventId?: st
   }).where(and(eq(sampleOrders.id, row.order.id), eq(sampleOrders.status, "pending_payment")))
     .returning({ id: sampleOrders.id });
   if (updated) {
+    // Sample/bulk card: the seller's card paid the manufacturer directly
+    // (destination charge); Brandthread kept its application fee.
+    const feeCents = Math.min(row.order.platformFeeCents, row.order.priceCents);
+    await db.transaction((tx) => postLedgerTransaction(tx, {
+      idempotencyKey: `manufacturer-card/${row.order.id}`,
+      kind: "manufacturer_card_paid",
+      sellerId: row.order.sellerId,
+      sampleOrderId: row.order.id,
+      stripeObjectId: paymentIntentId,
+      memo: `${row.order.orderType === "bulk" ? "Bulk" : "Sample"} card paid by the seller's card`,
+      postings: [
+        { account: "seller_card_payments", partyId: row.order.sellerId, amountCents: -row.order.priceCents },
+        { account: "manufacturer_paid", partyId: row.order.manufacturerId, amountCents: row.order.priceCents - feeCents },
+        { account: "platform_revenue", amountCents: feeCents },
+      ],
+    }));
     await db.insert(manufacturerActivityEvents).values({
       manufacturerId: row.order.manufacturerId,
       sampleOrderId: row.order.id,
@@ -1596,6 +1647,9 @@ async function handleManufacturerTransfer(transfer: any, providerEventId: string
     }).where(and(eq(sampleOrders.id, order.id), eq(sampleOrders.walletPaymentState, "processing")))
       .returning({ id: sampleOrders.id });
     if (updated) {
+      const [lockTarget] = await tx.select({ dropId: dropWallets.dropId })
+        .from(dropWallets).where(eq(dropWallets.id, walletId)).limit(1);
+      if (lockTarget) await lockDrop(tx, lockTarget.dropId);
       await tx.update(dropWallets).set({
         releasedCents: sql`${dropWallets.releasedCents} + ${order.priceCents}`,
         reservedCents: sql`GREATEST(${dropWallets.reservedCents} - ${order.priceCents}, 0)`,
@@ -1609,6 +1663,18 @@ async function handleManufacturerTransfer(transfer: any, providerEventId: string
         description: `Bulk order payment: ${order.title}`,
         stripeTransferId: transfer.id,
       });
+      const [wallet] = await tx.select({ dropId: dropWallets.dropId })
+        .from(dropWallets).where(eq(dropWallets.id, walletId)).limit(1);
+      if (wallet) {
+        await recordBulkPaidFromHeld(tx, {
+          sampleOrderId: order.id,
+          dropId: wallet.dropId,
+          sellerId: order.sellerId,
+          manufacturerId: order.manufacturerId,
+          amountCents: order.priceCents,
+          transferId: transfer.id,
+        });
+      }
     }
     if (updated) {
       const [claimed] = await tx.insert(manufacturerActivityEvents).values({
@@ -1794,6 +1860,9 @@ async function handleManufacturerTransferReversed(transfer: any, providerEventId
       paymentReviewState: reviewState,
       updatedAt: new Date(),
     }).where(eq(sampleOrders.id, order.id));
+    const [reversalLock] = await tx.select({ dropId: dropWallets.dropId })
+      .from(dropWallets).where(eq(dropWallets.id, order.walletId)).limit(1);
+    if (reversalLock) await lockDrop(tx, reversalLock.dropId);
     // A reversal returns funds from the manufacturer's transfer to the
     // seller's wallet. releasedCents is reduced so availableCents becomes
     // truthful immediately; the immutable negative ledger line records it.
@@ -1809,6 +1878,19 @@ async function handleManufacturerTransferReversed(transfer: any, providerEventId
       description: `${reviewState === "reversed" ? "Full" : "Partial"} bulk payment reversal: ${order.title}`,
       stripeTransferId: transfer.id,
     });
+    const [reversalWallet] = await tx.select({ dropId: dropWallets.dropId })
+      .from(dropWallets).where(eq(dropWallets.id, order.walletId)).limit(1);
+    if (reversalWallet) {
+      await recordBulkReversalToHeld(tx, {
+        providerEventId,
+        sampleOrderId: order.id,
+        dropId: reversalWallet.dropId,
+        sellerId: order.sellerId,
+        manufacturerId: order.manufacturerId,
+        amountCents: reversedCents,
+        transferId: transfer.id,
+      });
+    }
     const [manufacturer] = await tx.select({ clerkId: manufacturers.clerkId })
       .from(manufacturers).where(eq(manufacturers.id, order.manufacturerId)).limit(1);
     if (manufacturer?.clerkId) {
