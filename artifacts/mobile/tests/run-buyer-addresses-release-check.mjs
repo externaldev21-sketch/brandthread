@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 import {
@@ -14,6 +14,23 @@ const resultsRoot = resolve(
   process.env.NATIVE_BUYER_ADDRESSES_RESULTS_ROOT ??
     `test-results/buyer-addresses-accessibility/${platform || "unknown"}`,
 );
+const lifecyclePath = resolve(resultsRoot, "fixture-lifecycle.json");
+const lifecycle = {
+  platform,
+  prepared: false,
+  accountCreated: false,
+  signInAndSeededAddressesVerified: false,
+  oneShotRecoveryVerified: false,
+  cleanupAttempted: false,
+  cleanupVerified: false,
+};
+
+async function retainLifecycleEvidence() {
+  await mkdir(resultsRoot, { recursive: true });
+  await writeFile(lifecyclePath, `${JSON.stringify(lifecycle, null, 2)}\n`, {
+    mode: 0o600,
+  });
+}
 
 function requireEnvironment(name) {
   const value = process.env[name]?.trim();
@@ -36,6 +53,8 @@ function run(command, extraEnvironment = {}) {
   });
 }
 
+await retainLifecycleEvidence();
+
 if (!["ios", "android"].includes(platform)) {
   throw new Error('NATIVE_BUYER_ADDRESSES_PLATFORM must be "ios" or "android"');
 }
@@ -55,29 +74,35 @@ requireEnvironment("NATIVE_BUYER_ADDRESSES_CONTROL_TOKEN");
 requireEnvironment("NATIVE_BUYER_ADDRESSES_CLERK_SECRET_KEY");
 const checkCommand = "node tests/buyer-addresses.device.mjs";
 
-await mkdir(resultsRoot, { recursive: true });
-
 let failure;
 let account;
 try {
   account = await prepareBuyerAddressFixture();
+  lifecycle.prepared = true;
+  lifecycle.accountCreated = account.created;
+  await retainLifecycleEvidence();
   await run(checkCommand, {
     NATIVE_BUYER_ADDRESSES_REQUIRED: "1",
     NATIVE_BUYER_ADDRESSES_EXPECT_RETRY: "0",
     NATIVE_BUYER_ADDRESSES_RESULTS_DIR: resolve(resultsRoot, "normal"),
   });
+  lifecycle.signInAndSeededAddressesVerified = true;
+  await retainLifecycleEvidence();
   await armBuyerAddressFailure(account);
   await run(checkCommand, {
     NATIVE_BUYER_ADDRESSES_REQUIRED: "1",
     NATIVE_BUYER_ADDRESSES_EXPECT_RETRY: "1",
     NATIVE_BUYER_ADDRESSES_RESULTS_DIR: resolve(resultsRoot, "retry"),
   });
+  lifecycle.oneShotRecoveryVerified = true;
 } catch (error) {
   account ??= error?.fixtureAccount;
   failure = error;
 } finally {
+  lifecycle.cleanupAttempted = true;
   try {
     await cleanupBuyerAddressFixture(account);
+    lifecycle.cleanupVerified = Boolean(account?.id);
   } catch (cleanupError) {
     failure = failure
       ? new AggregateError(
@@ -86,6 +111,7 @@ try {
         )
       : cleanupError;
   }
+  await retainLifecycleEvidence();
 }
 
 if (failure) throw failure;

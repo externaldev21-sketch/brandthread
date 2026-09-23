@@ -3,6 +3,8 @@ name: Mobile shipping-address accessibility
 on:
   workflow_call:
   workflow_dispatch:
+  schedule:
+    - cron: "17 9 * * 2"
   push:
     tags:
       - "mobile-v*"
@@ -43,7 +45,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: buyer-addresses-accessibility-ios
-          path: artifacts/mobile/test-results/buyer-addresses-accessibility/ios/**/*.xml
+          path: artifacts/mobile/test-results/buyer-addresses-accessibility/ios/**/*
           if-no-files-found: error
           retention-days: 30
 
@@ -79,12 +81,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: buyer-addresses-accessibility-android
-          path: artifacts/mobile/test-results/buyer-addresses-accessibility/android/**/*.xml
+          path: artifacts/mobile/test-results/buyer-addresses-accessibility/android/**/*
           if-no-files-found: error
           retention-days: 30
 
   mobile-release:
     name: Approve mobile release
+    if: github.event_name != 'schedule'
     needs: [ios, android]
     runs-on: ubuntu-latest
     steps:

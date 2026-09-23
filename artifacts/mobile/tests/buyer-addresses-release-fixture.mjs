@@ -41,9 +41,17 @@ function labels() {
 async function jsonRequest(url, options) {
   const response = await fetch(url, options);
   const text = await response.text();
-  const body = text ? JSON.parse(text) : null;
+  let body = null;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    if (response.ok) throw new Error(`${options.method ?? "GET"} request returned invalid JSON`);
+  }
   if (!response.ok) {
-    throw new Error(`${options.method ?? "GET"} ${url} failed (${response.status}): ${text}`);
+    const requestTarget = new URL(url);
+    throw new Error(
+      `${options.method ?? "GET"} ${requestTarget.origin}${requestTarget.pathname} failed (${response.status})`,
+    );
   }
   return body;
 }
@@ -84,6 +92,7 @@ async function findUser(email) {
 async function ensureUser() {
   const { email, password } = accountCredentials();
   let user = await findUser(email);
+  const created = !user;
   if (!user) {
     user = await clerkRequest("/users", {
       method: "POST",
@@ -102,7 +111,7 @@ async function ensureUser() {
       body: JSON.stringify({ password, skip_password_checks: true }),
     });
   }
-  return { id: user.id, email, password };
+  return { id: user.id, email, created };
 }
 
 async function listSessions(userId) {
@@ -120,6 +129,7 @@ async function revokeSessions(userId) {
 
 export async function prepareBuyerAddressFixture() {
   const account = await ensureUser();
+  const fixtureAccount = { id: account.id, created: account.created };
   try {
     await revokeSessions(account.id);
     await controlRequest("/buyer-addresses/prepare", {
@@ -127,9 +137,9 @@ export async function prepareBuyerAddressFixture() {
       email: account.email,
       labels: labels(),
     });
-    return account;
+    return fixtureAccount;
   } catch (error) {
-    error.fixtureAccount = account;
+    error.fixtureAccount = fixtureAccount;
     throw error;
   }
 }

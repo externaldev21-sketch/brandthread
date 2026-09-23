@@ -58,4 +58,28 @@ describe('buyer shipping-address accessibility contract', () => {
     expect(fixture).toContain('/buyer-addresses/cleanup');
     expect(fixture).toContain('revokeSessions');
   });
+
+  it('runs credential-safe fixture checks on a schedule without approving a release', () => {
+    const workflow = readFileSync(
+      new URL('../../../.github/workflows/mobile-shipping-address-accessibility.yml', import.meta.url),
+      'utf8',
+    );
+    const wrapper = readFileSync(
+      new URL('./run-buyer-addresses-release-check.mjs', import.meta.url),
+      'utf8',
+    );
+    const deviceCheck = readFileSync(
+      new URL('./buyer-addresses.device.mjs', import.meta.url),
+      'utf8',
+    );
+    expect(workflow).toContain('schedule:');
+    expect(workflow).toContain("if: github.event_name != 'schedule'");
+    expect(workflow).toContain('buyer-addresses-accessibility/ios/**/*');
+    expect(workflow).toContain('buyer-addresses-accessibility/android/**/*');
+    expect(wrapper).toContain('fixture-lifecycle.json');
+    expect(wrapper).toContain('oneShotRecoveryVerified');
+    expect(wrapper).toContain('cleanupVerified');
+    expect(deviceCheck).toContain('failure-page-source.xml');
+    expect(deviceCheck).toContain('[REDACTED_PASSWORD]');
+  });
 });

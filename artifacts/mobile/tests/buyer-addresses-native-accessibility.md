@@ -29,9 +29,11 @@ The required mode fails instead of skipping when Appium is unavailable. Without 
 ## Release gate
 
 `.github/workflows/mobile-shipping-address-accessibility.yml` runs the check for both native
-platforms on mobile release tags and when called by another release workflow. Its mobile-release
-gate cannot pass until both platform jobs pass. Each configured device runner must provide an
-installed, sign-in-capable release build and these environment values:
+platforms weekly, on mobile release tags, and when called by another release workflow. Scheduled
+runs exercise the same account creation, sign-in, address seeding, one-shot recovery, and cleanup
+lifecycle without creating the `mobile-release` approval job. For release-triggered runs, that gate
+cannot pass until both platform jobs pass. Each configured device runner must provide an installed,
+sign-in-capable release build and these environment values:
 
 - `APPIUM_SERVER_URL` and the platform's Appium capabilities.
 - `NATIVE_BUYER_ADDRESSES_DISPOSABLE_ACCOUNT`, JSON containing the disposable account's `email`
@@ -45,5 +47,5 @@ The checked-in fixture utility performs prepare, one-shot failure arming, and cl
 platforms. Cleanup removes seeded addresses and revokes every disposable-account session even when
 a check fails. Credentials remain runner secrets and are never checked into the repository.
 
-The release wrapper rejects any missing prerequisite instead of skipping. GitHub uploads the XML
-trees for each platform and scenario even when the check fails.
+The release wrapper rejects any missing prerequisite instead of skipping. GitHub uploads redacted
+XML trees plus a credential-free lifecycle report for each platform even when the check fails.

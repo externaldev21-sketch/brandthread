@@ -54,6 +54,20 @@ function accountCredentials() {
   );
 }
 
+function redactCredentials(value) {
+  const credentials = accountCredentials();
+  if (!credentials) return value;
+  return String(value)
+    .split(credentials.email).join('[REDACTED_EMAIL]')
+    .split(credentials.password).join('[REDACTED_PASSWORD]');
+}
+
+async function writeSourceEvidence(fileName) {
+  await writeFile(resolve(outputDir, fileName), redactCredentials(await source()), {
+    mode: 0o600,
+  });
+}
+
 async function request(path, body, method = 'POST', allowFailure = false) {
   const response = await fetch(`${baseUrl}${path}`, {
     method,
@@ -200,11 +214,11 @@ try {
   await openAddresses();
 
   if (expectRetry) {
-    await writeFile(resolve(outputDir, 'retry-error-page-source.xml'), await source());
+    await writeSourceEvidence('retry-error-page-source.xml');
     await assertButton('Go back');
     await assertButton('Retry loading saved addresses');
     await tap('Retry loading saved addresses');
-    await writeFile(resolve(outputDir, 'retry-completed-page-source.xml'), await source());
+    await writeSourceEvidence('retry-completed-page-source.xml');
     console.log(`Verified ${platform} back and retry actions in the native accessibility tree.`);
   } else {
     const [first, second] = labels;
@@ -213,7 +227,11 @@ try {
       `Delete ${label} address`,
     ]);
     const initialSource = await source();
-    await writeFile(resolve(outputDir, 'address-list-page-source.xml'), initialSource);
+    await writeFile(
+      resolve(outputDir, 'address-list-page-source.xml'),
+      redactCredentials(initialSource),
+      { mode: 0o600 },
+    );
     assertSourceOrder(initialSource, ['Go back', ...orderedActions]);
 
     await assertButton('Go back');
@@ -243,11 +261,18 @@ try {
     await waitFor(`Set ${first} as default address`);
     await tap(`Set ${first} as default address`);
     await waitFor(`Set ${second} as default address`);
-    await writeFile(resolve(outputDir, 'completed-page-source.xml'), await source());
+    await writeSourceEvidence('completed-page-source.xml');
     console.log(
       `Verified ${platform} address focus order, edit, delete dialog, close, set-default, and checkbox state.`,
     );
   }
+} catch (error) {
+  if (sessionId) {
+    try {
+      await writeSourceEvidence('failure-page-source.xml');
+    } catch {}
+  }
+  throw error;
 } finally {
   if (sessionId) await request(`/session/${sessionId}`, undefined, 'DELETE', true);
 }
