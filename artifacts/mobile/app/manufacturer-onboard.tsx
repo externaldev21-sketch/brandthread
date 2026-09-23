@@ -360,7 +360,7 @@ function Field({ label, value, onChange, placeholder, keyboardType, secure }: {
         value={value}
         onChangeText={onChange}
         placeholder={placeholder}
-        placeholderTextColor={colors.muted}
+        placeholderTextColor={colors.mutedForeground}
         keyboardType={keyboardType}
         secureTextEntry={secure}
         autoCapitalize={secure || keyboardType === 'email-address' ? 'none' : 'words'}
@@ -386,26 +386,26 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   header:      { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
   backBtn:     { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.text },
-  headerSub:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.muted, marginTop: 1 },
+  headerSub:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, marginTop: 1 },
   progressTrack: { height: 3, backgroundColor: colors.border },
   progressFill:  { height: 3, backgroundColor: colors.primary, borderRadius: 2 },
 
   stepWrap:  { gap: 0 },
   stepTitle: { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.text, marginBottom: 6 },
-  stepSub:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.muted, lineHeight: 19, marginBottom: 24 },
+  stepSub:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, lineHeight: 19, marginBottom: 24 },
 
-  groupLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+  groupLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
   chipGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip:       { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
   chipActive: { backgroundColor: colors.accent, borderColor: colors.primary },
-  chipText:   { fontSize: 12, fontFamily: 'Inter_500Medium', color: colors.muted },
+  chipText:   { fontSize: 12, fontFamily: 'Inter_500Medium', color: colors.mutedForeground },
   chipTextActive: { color: colors.primary },
 
   row: { flexDirection: 'row', gap: 12 },
 
   // Field
   fieldWrap:  { marginBottom: 16 },
-  fieldLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', color: colors.muted, marginBottom: 6 },
+  fieldLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', color: colors.mutedForeground, marginBottom: 6 },
   fieldInput: {
     backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
     borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
@@ -427,15 +427,15 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   // Review
   reviewCard:  { backgroundColor: colors.card, borderRadius: 14, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   reviewRow:   { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, gap: 20 },
-  reviewLabel: { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.muted },
+  reviewLabel: { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.mutedForeground },
   reviewValue: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: colors.text, flex: 1, textAlign: 'right' },
-  photoCount:  { fontSize: 13, fontFamily: 'Inter_500Medium', color: colors.muted, textAlign: 'center', paddingVertical: 14 },
+  photoCount:  { fontSize: 13, fontFamily: 'Inter_500Medium', color: colors.mutedForeground, textAlign: 'center', paddingVertical: 14 },
 
   // Terms
   termsRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginTop: 20 },
   checkbox:     { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
   checkboxActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  termsText:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.muted, flex: 1, lineHeight: 19 },
+  termsText:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, flex: 1, lineHeight: 19 },
 
   // Bottom
   bottomBar: { paddingHorizontal: 20, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.background },

@@ -303,7 +303,7 @@ export default function PostAnalyticsScreen() {
         <Text style={styles.headerTitle}>Post Analytics</Text>
         <TouchableOpacity style={styles.rangePill} onPress={cycleRange}>
           <Text style={styles.rangePillText}>{activeRange}</Text>
-          <Feather name="chevron-down" size={12} color={colors.muted} style={{ marginLeft: 2 }} />
+          <Feather name="chevron-down" size={12} color={colors.mutedForeground} style={{ marginLeft: 2 }} />
         </TouchableOpacity>
       </View>
 
@@ -413,11 +413,11 @@ export default function PostAnalyticsScreen() {
             <Text style={styles.revenueValue}>{formatRevenue(analytics.revenue)}</Text>
           </View>
           <View style={[styles.revenueCard, { flex: 1 }]}>
-            <Text style={[styles.revenueLabel, { color: colors.muted }]}>Purchases</Text>
+            <Text style={[styles.revenueLabel, { color: colors.mutedForeground }]}>Purchases</Text>
             <Text style={styles.revenueValue}>{analytics.purchases}</Text>
           </View>
           <View style={[styles.revenueCard, { flex: 1 }]}>
-            <Text style={[styles.revenueLabel, { color: colors.muted }]}>Conversion</Text>
+            <Text style={[styles.revenueLabel, { color: colors.mutedForeground }]}>Conversion</Text>
             <Text style={styles.revenueValue}>{conversionPct}%</Text>
           </View>
         </View>
@@ -590,7 +590,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     paddingVertical: 5,
   },
   rangePillText: {
-    color: colors.muted,
+    color: colors.mutedForeground,
     fontSize: 13,
     fontWeight: '500',
   },
@@ -642,7 +642,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     paddingVertical: 2,
   },
   typeBadgeText: {
-    color: colors.muted,
+    color: colors.mutedForeground,
     fontSize: 11,
     textTransform: 'capitalize',
   },
@@ -693,7 +693,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     marginTop: 6,
   },
   heroLabel: {
-    color: colors.muted,
+    color: colors.mutedForeground,
     fontSize: 12,
   },
   heroChange: {
@@ -726,7 +726,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     fontWeight: '700',
   },
   unavailableText: {
-    color: colors.muted,
+    color: colors.mutedForeground,
     fontSize: 13,
     lineHeight: 19,
   },
@@ -758,7 +758,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     fontWeight: '600',
   },
   analyticsDetail: {
-    color: colors.muted,
+    color: colors.mutedForeground,
     fontSize: 11,
     lineHeight: 16,
   },
@@ -776,7 +776,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     gap: 8,
   },
   engLabel: {
-    color: colors.muted,
+    color: colors.mutedForeground,
     fontSize: 13,
     width: 110,
   },
@@ -815,7 +815,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     marginTop: 6,
   },
   retentionXLabel: {
-    color: colors.muted,
+    color: colors.mutedForeground,
     fontSize: FS.xs,
   },
   retentionStats: {
@@ -824,7 +824,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     marginTop: 4,
   },
   retentionStat: {
-    color: colors.muted,
+    color: colors.mutedForeground,
     fontSize: 12,
   },
 
@@ -869,7 +869,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     justifyContent: 'center',
   },
   countryInitialsText: {
-    color: colors.muted,
+    color: colors.mutedForeground,
     fontSize: FS.xs,
     fontWeight: '700',
   },
@@ -901,7 +901,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     fontWeight: '700',
   },
   peakHourSub: {
-    color: colors.muted,
+    color: colors.mutedForeground,
     fontSize: 12,
   },
 
