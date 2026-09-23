@@ -10,8 +10,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
  * it pads its content by `occupiedHeight`.
  *
  * The capsule is sized to its four slots rather than stretched edge to edge
- * (roughly 77–84% of a phone's width including the Profile circle), and iPad
- * gets its own larger, centred proportions instead of a stretched phone bar.
+ * (roughly 84–89% of a phone's width including the Profile circle — a slim,
+ * long pill rather than a stretched or chunky block), and iPad gets its own
+ * larger, centred proportions instead of a stretched phone bar.
  */
 
 export const BUYER_TAB_SLOT_COUNT = 4;
@@ -69,8 +70,10 @@ export function getBuyerTabBarMetrics({ width, height, bottomInset }: MetricsInp
         ? 'regular'
         : 'large';
 
-  const itemWidth = { compact: 60, regular: 63, large: 66, tablet: 84 }[sizeClass];
-  const capsuleHeight = { compact: 58, regular: 60, large: 60, tablet: 64 }[sizeClass];
+  // Wider slots and a shorter capsule read as a sleek, long pill instead of a
+  // chunky block, while keeping every control at least 44pt tall.
+  const itemWidth = { compact: 63, regular: 70, large: 76, tablet: 92 }[sizeClass];
+  const capsuleHeight = { compact: 50, regular: 52, large: 52, tablet: 56 }[sizeClass];
   const capsulePadding = 4;
   const gap = isTablet ? 12 : 8;
   const circleSize = capsuleHeight;
@@ -99,7 +102,7 @@ export function getBuyerTabBarMetrics({ width, height, bottomInset }: MetricsInp
     circleSize,
     gap,
     bottomOffset,
-    fieldHeight: capsuleHeight - (isTablet ? 18 : 16),
+    fieldHeight: capsuleHeight - (isTablet ? 12 : 8),
     keyboardGap: 8,
     iconSize: isTablet ? 26 : 24,
     labelSize: isTablet ? 12 : 11,
