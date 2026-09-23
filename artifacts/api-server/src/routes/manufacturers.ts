@@ -571,6 +571,8 @@ router.post("/register-via-invite/:token", async (req, res) => {
       businessName: mfr.businessName,
       invited: true,
       idempotencyKey: `manufacturer-signup/${mfr.id}`,
+    }).then((sent) => {
+      if (!sent) req.log.error({ manufacturerId: mfr.id }, "Manufacturer signup email delivery failed");
     }).catch((err) => {
       req.log.error({ err, manufacturerId: mfr.id }, "Manufacturer signup email delivery failed");
     });
@@ -819,6 +821,8 @@ router.post("/register", async (req, res) => {
       to: signupEmail,
       businessName: mfr.businessName,
       idempotencyKey: `manufacturer-signup/${mfr.id}`,
+    }).then((sent) => {
+      if (!sent) req.log.error({ manufacturerId: mfr.id }, "Manufacturer signup email delivery failed");
     }).catch((err) => {
       req.log.error({ err, manufacturerId: mfr.id }, "Manufacturer signup email delivery failed");
     });

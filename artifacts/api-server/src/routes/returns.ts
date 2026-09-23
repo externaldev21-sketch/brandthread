@@ -6,6 +6,7 @@ import { orderGrossCents, refundOrder, RefundError } from "../lib/money/refunds"
 import crypto from "crypto";
 import { reversePurchasePointsOnce } from "./loyalty";
 import { sendReturnStatusEmail } from "../lib/brandthreadEmail";
+import { logger } from "../lib/logger";
 
 const router = Router();
 router.use(requireAuth);
@@ -26,7 +27,7 @@ async function notifyReturnStatus(returnId: string, status: "pending" | "approve
     return;
   }
 
-  await sendReturnStatusEmail({
+  const sent = await sendReturnStatusEmail({
     to: row.buyerEmail,
     orderNumber: row.orderNumber,
     status,
@@ -34,6 +35,9 @@ async function notifyReturnStatus(returnId: string, status: "pending" | "approve
     sellerResponse,
     idempotencyKey: `return-status/${returnId}/${status}`,
   });
+  if (!sent) {
+    logger.warn({ returnId, status }, "Return status email delivery failed");
+  }
 }
 
 // ─── BUYER ENDPOINTS ──────────────────────────────────────────────────────────
