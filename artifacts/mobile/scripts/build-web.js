@@ -28,8 +28,12 @@ const ROUTE_METADATA = {
     title: 'Terms of Service | Brandthread',
     description: 'Terms governing Brandthread accounts, social commerce, marketplace orders, seller subscriptions, content, AI tools, and platform conduct.',
   },
+  '/community-guidelines': {
+    title: 'Community Guidelines | Brandthread',
+    description: 'The rules for posting, selling, commenting, live shopping and messaging on Brandthread, and how we enforce them.',
+  },
 };
-const PUBLIC_ROUTES = ['/', '/privacy', '/terms'];
+const PUBLIC_ROUTES = ['/', '/privacy', '/terms', '/community-guidelines'];
 
 function domainFromEnvironment() {
   const isPublishedBuild =

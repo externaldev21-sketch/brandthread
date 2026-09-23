@@ -24,6 +24,11 @@ import {
 } from 'expo-audio';
 import { formatCents } from '@/lib/money';
 import { notifyConversationReadFailure } from '@/lib/conversationReadEvents';
+import { confirmUnblock } from '@/lib/safety';
+import {
+  BlockedComposer, openConversationOptions, openMessageOptions, REMOVED_MESSAGE_TEXT,
+  type DmMessagingState,
+} from '@/components/safety/DmSafety';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -115,6 +120,7 @@ export default function SellerConversationScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
+  const [messaging, setMessaging] = useState<DmMessagingState>({ blockedByMe: false, unavailable: false });
   const { user } = useUser();
   const myId = user?.id ?? '';
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -182,6 +188,8 @@ export default function SellerConversationScreen() {
       ]);
       if (generationRef.current !== generation) return;
       setConv(c as ConvView);
+      const safety = (c as { messaging?: DmMessagingState }).messaging;
+      setMessaging({ blockedByMe: !!safety?.blockedByMe, unavailable: !!safety?.unavailable });
     } catch (e) {
       console.error('Failed to load conversation', e);
     } finally {
@@ -223,6 +231,7 @@ export default function SellerConversationScreen() {
   // ── Derived ─────────────────────────────────────────────────────────────────
 
   const other = conv?.participants.find((p) => p.userId !== myId) ?? null;
+  const messagingBlocked = messaging.blockedByMe || messaging.unavailable;
   const canSend = (text.trim().length > 0 || pendingAttachment != null) && !isSending && !!id;
 
   // ── Attach helpers ──────────────────────────────────────────────────────────
@@ -525,8 +534,21 @@ export default function SellerConversationScreen() {
     }
     const { msg } = item;
     const isOwn = msg.fromId === myId;
+    const removed = (msg as { removedByModeration?: boolean }).removedByModeration === true;
     return (
-      <View style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start' }]}>
+      <TouchableOpacity
+        activeOpacity={0.9}
+        disabled={isOwn || removed || !other}
+        onLongPress={() => other && openMessageOptions({
+          router,
+          messageId: msg.id,
+          text: msg.text,
+          counterpart: { userId: other.userId, name: other.name },
+        })}
+        delayLongPress={350}
+        style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start' }]}
+        accessibilityHint={isOwn ? undefined : 'Long press to report this message'}
+      >
         {!isOwn && (
           <View style={[s.msgAvatar, { backgroundColor: msg.fromColor || PURPLE }]}>
             <Text style={s.msgAvatarInitials}>{msg.fromInitials || (msg.fromName?.[0] ?? '?')}</Text>
@@ -547,11 +569,13 @@ export default function SellerConversationScreen() {
           {/* Attachment */}
           {msg.attachment && renderMsgAttachment(msg.attachment)}
           {/* Text — hide the single-space placeholder */}
-          {msg.text && msg.text.trim().length > 0 && (
+          {removed ? (
+            <Text style={[s.msgText, { color: MUTED, fontStyle: 'italic' }]}>{REMOVED_MESSAGE_TEXT}</Text>
+          ) : msg.text && msg.text.trim().length > 0 && (
             <Text style={s.msgText}>{msg.text}</Text>
           )}
         </View>
-      </View>
+      </TouchableOpacity>
     );
   }
 
@@ -601,6 +625,23 @@ export default function SellerConversationScreen() {
             </TouchableOpacity>
           </>
         )}
+        {other ? (
+          <TouchableOpacity
+            style={s.headerCallBtn}
+            onPress={() => openConversationOptions({
+              router,
+              social: api.social,
+              counterpart: { userId: other.userId, name: other.name },
+              messaging,
+              onChange: setMessaging,
+            })}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Conversation options"
+          >
+            <Feather name="more-horizontal" size={ICON.md} color={FG} />
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       {/* Order context card */}
@@ -655,6 +696,18 @@ export default function SellerConversationScreen() {
       )}
 
       {/* Input row */}
+      {messagingBlocked && other ? (
+        <BlockedComposer
+          counterpartName={other.name}
+          messaging={messaging}
+          bottomInset={insets.bottom}
+          onUnblock={async () => {
+            if (await confirmUnblock({ userId: other.userId, name: other.name }, api.social.unblock)) {
+              setMessaging((current) => ({ ...current, blockedByMe: false }));
+            }
+          }}
+        />
+      ) : (
       <View style={[s.inputRow, { paddingBottom: insets.bottom + SP.sm }]}>
         {/* Attach button */}
         <TouchableOpacity
@@ -711,6 +764,7 @@ export default function SellerConversationScreen() {
           <Feather name="send" size={ICON.sm} color={canSend ? PURPLE : MUTED} />
         </TouchableOpacity>
       </View>
+      )}
 
       {/* ── Media picker sheet ─────────────────────────────────────────────── */}
       <Modal

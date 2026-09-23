@@ -82,6 +82,13 @@ export const users = pgTable('users', {
   // A tombstone is retained after an account erasure request.  Keeping the
   // Clerk subject prevents a delayed client sync from creating a fresh profile.
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  // Platform suspension set by a moderator. Suspended accounts cannot publish
+  // and their public content is hidden from every surface.
+  suspendedAt: timestamp('suspended_at', { withTimezone: true }),
+  suspensionReason: text('suspension_reason'),
+  // Terms of Service / Community Guidelines / Privacy Policy acceptance.
+  termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }),
+  termsVersion: text('terms_version'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -372,6 +379,10 @@ export const posts = pgTable('posts', {
     showLikeCount: true,
   }),
   postStatus: text('post_status').notNull().default('published'), // 'draft' | 'scheduled' | 'published' | 'archived' | 'deleted'
+  // 'visible' | 'held' (caption flagged, hidden until reviewed) | 'removed' (moderator)
+  moderationStatus: text('moderation_status').notNull().default('visible'),
+  moderationReason: text('moderation_reason'),
+  moderatedAt: timestamp('moderated_at', { withTimezone: true }),
   scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
   publishedAt: timestamp('published_at', { withTimezone: true }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -916,8 +927,63 @@ export const reports = pgTable('reports', {
   description: text('description'),
   // 'pending' | 'reviewed' | 'actioned' | 'dismissed'
   status:      text('status').notNull().default('pending'),
+  /** Clerk ID of the person responsible for the reported content. */
+  targetOwnerId:    text('target_owner_id'),
+  /** Server-captured snapshot so moderators see what was reported. */
+  contentExcerpt:   text('content_excerpt'),
+  /** 'user' for member reports, 'auto_filter' for content held by the abuse filter. */
+  source:           text('source').notNull().default('user'),
+  /** 'dismiss' | 'remove_content' | 'suspend_user' */
+  resolutionAction: text('resolution_action'),
+  resolutionNote:   text('resolution_note'),
+  resolvedBy:       text('resolved_by'),
+  resolvedAt:       timestamp('resolved_at', { withTimezone: true }),
   createdAt:   timestamp('created_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  statusCreatedIdx: index('reports_status_created_idx').on(table.status, table.createdAt),
+  targetIdx: index('reports_target_idx').on(table.targetType, table.targetId),
+  reporterTargetIdx: index('reports_reporter_target_idx').on(table.reporterId, table.targetType, table.targetId),
+}));
+
+// ─── Thread comments (server-side, moderated) ────────────────────────────────
+
+export const postComments = pgTable('post_comments', {
+  id:               uuid('id').primaryKey().defaultRandom(),
+  postId:           uuid('post_id').notNull().references(() => posts.id, { onDelete: 'cascade' }),
+  authorId:         text('author_id').notNull(),
+  parentId:         uuid('parent_id'),
+  body:             text('body').notNull(),
+  // 'visible' | 'held' (hidden until reviewed; author-only) | 'removed'
+  moderationStatus: text('moderation_status').notNull().default('visible'),
+  moderationReason: text('moderation_reason'),
+  moderatedAt:      timestamp('moderated_at', { withTimezone: true }),
+  moderatedBy:      text('moderated_by'),
+  createdAt:        timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt:        timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  parentFk: foreignKey({ columns: [table.parentId], foreignColumns: [table.id] }).onDelete('cascade'),
+  postCreatedIdx: index('post_comments_post_created_idx').on(table.postId, table.createdAt),
+  authorIdx: index('post_comments_author_idx').on(table.authorId),
+}));
+
+export const postCommentLikes = pgTable('post_comment_likes', {
+  commentId: uuid('comment_id').notNull().references(() => postComments.id, { onDelete: 'cascade' }),
+  userId:    text('user_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.commentId, table.userId] }),
+  userIdx: index('post_comment_likes_user_idx').on(table.userId),
+}));
+
+// ─── Muted words (per-user feed/comment filter) ──────────────────────────────
+
+export const mutedWords = pgTable('muted_words', {
+  userId:    text('user_id').notNull(),
+  phrase:    text('phrase').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.userId, table.phrase] }),
+}));
 
 // ─── Pre-order reserves (demand signal, no charge) ────────────────────────────
 

@@ -23,6 +23,7 @@ import {
 import { formatCents } from '@/lib/money';
 import * as WebBrowser from 'expo-web-browser';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
+import { apiErrorMessage, confirmBlock, reportHref } from '@/lib/safety';
 
 const LIVE_RED = '#FF3B30';
 const { width: W, height: H } = Dimensions.get('window');
@@ -31,7 +32,7 @@ const { width: W, height: H } = Dimensions.get('window');
 let AgoraModule: any = null;
 try { AgoraModule = require('react-native-agora'); } catch {}
 
-interface Comment { id: string; display_name: string; message: string; created_at: string; }
+interface Comment { id: string; user_id?: string; display_name: string; message: string; created_at: string; }
 interface ProductTag { productId: string; productName: string; priceCents: number; highlighted?: boolean; }
 
 export default function BuyerLiveScreen() {
@@ -195,7 +196,65 @@ function BuyerLiveNativeScreen() {
         message: msg,
         displayName: user?.firstName ?? user?.username ?? 'Viewer',
       });
-    } catch {}
+    } catch (error) {
+      // Live chat can't wait for review, so filtered messages are withdrawn
+      // with the reason and the draft restored for editing.
+      setComments(prev => prev.filter(c => c.id !== optimistic.id));
+      setCommentText(msg);
+      Alert.alert('Message not sent', apiErrorMessage(error, 'Check your connection and try again.'));
+    }
+  }
+
+  function openStreamOptions() {
+    const sellerId: string | undefined = stream?.seller_id;
+    const sellerName: string = stream?.brand_name ?? stream?.seller_name ?? 'this seller';
+    Alert.alert(sellerName, undefined, [
+      {
+        text: 'Report live stream',
+        onPress: () => router.push(reportHref({
+          targetType: 'live',
+          targetId: params.streamId,
+          label: stream?.title ?? `${sellerName} live`,
+          ownerId: sellerId,
+          ownerName: sellerName,
+        }) as never),
+      },
+      ...(sellerId ? [{
+        text: `Block ${sellerName}`,
+        style: 'destructive' as const,
+        onPress: async () => {
+          if (await confirmBlock({ userId: sellerId, name: sellerName }, api.social.block)) handleLeave(true);
+        },
+      }] : []),
+      { text: 'Cancel', style: 'cancel' as const },
+    ]);
+  }
+
+  function openChatMessageOptions(comment: Comment) {
+    if (!comment.user_id || comment.user_id === user?.id) return;
+    const authorId = comment.user_id;
+    Alert.alert(comment.display_name, comment.message, [
+      {
+        text: 'Report message',
+        onPress: () => router.push(reportHref({
+          targetType: 'live_comment',
+          targetId: comment.id,
+          label: `${comment.display_name}: “${comment.message.slice(0, 80)}”`,
+          ownerId: authorId,
+          ownerName: comment.display_name,
+        }) as never),
+      },
+      {
+        text: `Block ${comment.display_name}`,
+        style: 'destructive',
+        onPress: async () => {
+          if (await confirmBlock({ userId: authorId, name: comment.display_name }, api.social.block)) {
+            setComments(prev => prev.filter(c => c.user_id !== authorId));
+          }
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   }
 
   async function openPurchase(tag: ProductTag) {
@@ -336,7 +395,15 @@ function BuyerLiveNativeScreen() {
             <Feather name="eye" size={13} color="#fff" />
             <Text style={s.viewerText}>{viewerCount.toLocaleString()}</Text>
           </View>
-          <TouchableOpacity onPress={() => handleLeave(true)} style={s.leaveBtn}>
+          <TouchableOpacity
+            onPress={openStreamOptions}
+            style={s.leaveBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Live stream options"
+          >
+            <Feather name="more-horizontal" size={20} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => handleLeave(true)} style={s.leaveBtn} accessibilityLabel="Leave live stream">
             <Feather name="x" size={20} color="#fff" />
           </TouchableOpacity>
         </View>
@@ -377,13 +444,20 @@ function BuyerLiveNativeScreen() {
           style={s.commentScroll}
           contentContainerStyle={s.commentContent}
           showsVerticalScrollIndicator={false}
-          pointerEvents="none"
+          pointerEvents="box-none"
         >
           {comments.map(c => (
-            <View key={c.id} style={s.commentRow}>
+            <TouchableOpacity
+              key={c.id}
+              style={s.commentRow}
+              activeOpacity={0.85}
+              onLongPress={() => openChatMessageOptions(c)}
+              delayLongPress={350}
+              accessibilityHint="Long press to report or block"
+            >
               <Text style={s.commentName}>{c.display_name} </Text>
               <Text style={s.commentMsg}>{c.message}</Text>
-            </View>
+            </TouchableOpacity>
           ))}
         </ScrollView>
         <View style={[s.inputRow, { paddingBottom: insets.bottom + 8 }]}>

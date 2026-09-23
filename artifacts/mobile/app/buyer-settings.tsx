@@ -102,7 +102,7 @@ export default function BuyerSettingsScreen() {
       return;
     }
     if (row.action === 'delete') {
-      router.push('/buyer-account-control' as never);
+      router.push('/delete-account' as never);
       return;
     }
     if (row.route) router.push(row.route as never);

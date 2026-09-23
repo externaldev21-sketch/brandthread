@@ -13,8 +13,16 @@ import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
 import type { Conversation, Message } from '@/services/socialTypes';
 import { FS } from '@/lib/theme';
+import { apiErrorMessage, confirmUnblock } from '@/lib/safety';
+import {
+  BlockedComposer, openConversationOptions, openMessageOptions, REMOVED_MESSAGE_TEXT,
+  type DmMessagingState,
+} from '@/components/safety/DmSafety';
 
-type ChatMessage = Omit<Message, 'status'> & { status: 'sent' | 'delivered' | 'read' | 'failed' };
+type ChatMessage = Omit<Message, 'status'> & {
+  status: 'sent' | 'delivered' | 'read' | 'failed';
+  removedByModeration?: boolean;
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -36,11 +44,12 @@ function formatDay(ts: number) {
 
 // ─── Message bubble ───────────────────────────────────────────────────────────
 
-function Bubble({ msg, prevMsg, isDark, currentUserId }: {
+function Bubble({ msg, prevMsg, isDark, currentUserId, onLongPress }: {
   msg: ChatMessage;
   prevMsg: ChatMessage | null;
   isDark: boolean;
   currentUserId: string | null | undefined;
+  onLongPress?: (msg: ChatMessage) => void;
 }) {
   const colors = useColors();
   const fg       = isDark ? '#F7F7FA' : '#0A0A0B';
@@ -65,8 +74,19 @@ function Bubble({ msg, prevMsg, isDark, currentUserId }: {
         </View>
       )}
 
-      <View style={[bub.row, isMe ? bub.rowMe : bub.rowThem]}>
-        {isMe ? (
+      <TouchableOpacity
+        style={[bub.row, isMe ? bub.rowMe : bub.rowThem]}
+        activeOpacity={0.9}
+        disabled={isMe || msg.removedByModeration || !onLongPress}
+        onLongPress={() => onLongPress?.(msg)}
+        delayLongPress={350}
+        accessibilityHint={isMe ? undefined : 'Long press to report this message'}
+      >
+        {msg.removedByModeration ? (
+          <View style={[bub.bubble, bub.bubbleThem, { backgroundColor: 'transparent', borderWidth: 1, borderColor: mutedFg + '55' }]}>
+            <Text style={[bub.textThem, { color: mutedFg, fontStyle: 'italic', fontSize: 13 }]}>{REMOVED_MESSAGE_TEXT}</Text>
+          </View>
+        ) : isMe ? (
           <LinearGradient
             colors={[colors.accent, colors.primary]}
             start={{ x: 0, y: 0 }}
@@ -80,7 +100,7 @@ function Bubble({ msg, prevMsg, isDark, currentUserId }: {
             <Text style={[bub.textThem, { color: fg }]}>{msg.text}</Text>
           </View>
         )}
-      </View>
+      </TouchableOpacity>
 
       <Text style={[
         bub.timestamp,
@@ -130,6 +150,7 @@ export default function ChatScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [messaging, setMessaging] = useState<DmMessagingState>({ blockedByMe: false, unavailable: false });
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
   const bg      = isDark ? '#121110' : '#F4F3FA';
@@ -166,6 +187,8 @@ export default function ChatScreen() {
         ]);
         if (!active) return;
         setConversation(loadedConversation as Conversation);
+        const safety = (loadedConversation as { messaging?: DmMessagingState }).messaging;
+        setMessaging({ blockedByMe: !!safety?.blockedByMe, unavailable: !!safety?.unavailable });
         setMessages((Array.isArray(loadedMessages) ? loadedMessages : []) as ChatMessage[]);
         try {
           await api.conversations.markRead(id);
@@ -207,7 +230,7 @@ export default function ChatScreen() {
       ]);
     } catch (error) {
       setText(trimmed);
-      setSendError(error instanceof Error ? `Message was not sent: ${error.message}` : 'Message was not sent. Please try again.');
+      setSendError(`Message was not sent. ${apiErrorMessage(error, 'Please try again.')}`);
     } finally {
       setIsSending(false);
     }
@@ -256,14 +279,21 @@ export default function ChatScreen() {
           </View>
         </TouchableOpacity>
 
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TouchableOpacity style={[s.headerBtn, { borderColor: border }]} activeOpacity={0.7}>
-            <Feather name="phone" size={17} color={muted} />
-          </TouchableOpacity>
-          <TouchableOpacity style={[s.headerBtn, { borderColor: border }]} activeOpacity={0.7}>
-            <Feather name="video" size={17} color={muted} />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={[s.headerBtn, { borderColor: border }]}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Conversation options"
+          onPress={() => openConversationOptions({
+            router,
+            social: api.social,
+            counterpart: { userId: participant.userId, name: participant.name },
+            messaging,
+            onChange: setMessaging,
+          })}
+        >
+          <Feather name="more-horizontal" size={17} color={fg} />
+        </TouchableOpacity>
       </View>
 
       {/* Messages */}
@@ -292,12 +322,30 @@ export default function ChatScreen() {
               prevMsg={prev}
               isDark={isDark}
                currentUserId={userId}
+              onLongPress={(message) => openMessageOptions({
+                router,
+                messageId: message.id,
+                text: message.text,
+                counterpart: { userId: participant.userId, name: participant.name },
+              })}
             />
           );
         }}
       />
 
       {/* Input */}
+      {messaging.blockedByMe || messaging.unavailable ? (
+        <BlockedComposer
+          counterpartName={participant.name}
+          messaging={messaging}
+          bottomInset={insets.bottom}
+          onUnblock={async () => {
+            if (await confirmUnblock({ userId: participant.userId, name: participant.name }, api.social.unblock)) {
+              setMessaging((current) => ({ ...current, blockedByMe: false }));
+            }
+          }}
+        />
+      ) : (
       <View style={[s.inputRow, { backgroundColor: headerBg, borderTopColor: border, paddingBottom: Math.max(insets.bottom, 12) }]}>
         <View style={[s.inputWrap, { backgroundColor: inputBg, borderColor: border }]}>
           <TextInput
@@ -324,6 +372,7 @@ export default function ChatScreen() {
           </LinearGradient>
         </TouchableOpacity>
       </View>
+      )}
     </KeyboardAvoidingView>
   );
 }

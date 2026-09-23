@@ -39,6 +39,9 @@ import notificationsFeedRouter from "./notifications-feed";
 import notificationPrefsRouter from "./notification-prefs";
 import postsRouter from "./posts";
 import reportsRouter from "./reports";
+import postCommentsRouter from "./post-comments";
+import moderationRouter from "./moderation";
+import safetyRouter from "./safety";
 import socialRouter from "./social";
 import referralsRouter from "./referrals";
 import shippingRatesRouter from "./shipping-rates";
@@ -149,8 +152,13 @@ router.use("/seller/subscription",       subscriptionRouter); // router applies 
 router.use("/seller/verification",       tc, sellerVerificationRouter);
 router.use("/seller",                    tc, sellerProfileRouter);
 router.use("/reviews",                   tc, reviewsRouter);
+// Comments are attributed to the person writing them, so they are mounted
+// ahead of the team-context posts router.
+router.use("/posts",                     postCommentsRouter);
 router.use("/posts",                     tc, postsRouter);
 router.use("/reports",                   reportsRouter);
+router.use("/moderation",                moderationRouter);
+router.use("/safety",                    safetyRouter);
 router.use("/social",                    socialRouter);
 router.use("/referrals",                 referralsRouter);
 router.use("/shipping-rates",            tc, shippingRatesRouter);

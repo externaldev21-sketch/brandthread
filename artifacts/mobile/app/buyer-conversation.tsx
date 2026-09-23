@@ -34,6 +34,8 @@ import {
 } from 'expo-audio';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@clerk/expo';
+import { apiErrorMessage, confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
+import { BlockedComposer, type DmMessagingState } from '@/components/safety/DmSafety';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 
@@ -144,6 +146,9 @@ export default function BuyerConversationScreen() {
   const flatListRef = useRef<FlatList<ListRow>>(null);
   const api = useApi();
   const { userId } = useAuth();
+  /** The signed-in Clerk user; legacy local records used the literal 'me'. */
+  const myId = userId ?? MY_USER_ID;
+  const [messaging, setMessaging] = useState<DmMessagingState>({ blockedByMe: false, unavailable: false });
 
   const [conv, setConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -203,6 +208,8 @@ export default function BuyerConversationScreen() {
       }
 
       setConv(loadedConv);
+      const safety = (loadedConv as { messaging?: DmMessagingState } | null)?.messaging;
+      setMessaging({ blockedByMe: !!safety?.blockedByMe, unavailable: !!safety?.unavailable });
       if (loadedConv) {
         const msgs = await getMessages(loadedConv.id);
         setMessages(msgs);
@@ -244,9 +251,9 @@ export default function BuyerConversationScreen() {
   // order. Resolve the seller explicitly so attachment pickers never load the
   // buyer's own catalog.
   const participant = conv?.participants.find(
-    (p) => p.accountType === 'seller' && p.userId !== MY_USER_ID,
+    (p) => p.accountType === 'seller' && p.userId !== myId && p.userId !== MY_USER_ID,
   ) ?? conv?.participants.find((p) => p.accountType === 'seller')
-    ?? conv?.participants.find((p) => p.userId !== MY_USER_ID)
+    ?? conv?.participants.find((p) => p.userId !== myId && p.userId !== MY_USER_ID)
     ?? conv?.participants[0]
     ?? null;
   const displayName = participant?.name ?? params.participantName ?? 'Unknown';
@@ -578,7 +585,7 @@ export default function BuyerConversationScreen() {
       setMessages(msgs);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
     } catch (e) {
-      Alert.alert('Error', 'Failed to send message. Please try again.');
+      Alert.alert('Message not sent', apiErrorMessage(e, 'Please check your connection and try again.'));
       setText(t);
       setSelectedAttachment(att);
     } finally {
@@ -599,38 +606,34 @@ export default function BuyerConversationScreen() {
           router.back();
         },
       },
+      messaging.blockedByMe
+        ? {
+            text: `Unblock ${participant.name}`,
+            onPress: async () => {
+              if (await confirmUnblock({ userId: participant.userId, name: participant.name }, api.social.unblock)) {
+                setMessaging((current) => ({ ...current, blockedByMe: false }));
+              }
+            },
+          }
+        : {
+            text: `Block ${participant.name}`,
+            style: 'destructive' as const,
+            onPress: async () => {
+              if (await confirmBlock({ userId: participant.userId, name: participant.name }, api.social.block)) {
+                setMessaging((current) => ({ ...current, blockedByMe: true }));
+              }
+            },
+          },
       {
-        text: 'Block user',
-        style: 'destructive',
+        text: `Report ${participant.name}`,
         onPress: () => {
-          Alert.alert(
-            `Block ${participant.name}?`,
-            'They will no longer be able to message you.',
-            [
-              {
-                text: 'Block',
-                style: 'destructive',
-                onPress: async () => {
-                  const { blockUser } = await import('@/services/socialService');
-                  await blockUser({
-                    userId: participant.userId,
-                    name: participant.name,
-                    handle: participant.handle,
-                    initials: participant.initials,
-                    color: participant.color,
-                  });
-                  router.back();
-                },
-              },
-              { text: 'Cancel', style: 'cancel' },
-            ],
-          );
-        },
-      },
-      {
-        text: 'Report',
-        onPress: () => {
-          router.push(`/buyer-report?targetType=profile&targetId=${participant.userId}&targetLabel=${encodeURIComponent(participant.name)}` as never);
+          router.push(reportHref({
+            targetType: 'profile',
+            targetId: participant.userId,
+            label: participant.name,
+            ownerId: participant.userId,
+            ownerName: participant.name,
+          }) as never);
         },
       },
       { text: 'Cancel', style: 'cancel' },
@@ -640,7 +643,7 @@ export default function BuyerConversationScreen() {
   // ── Message long press ──────────────────────────────────────────────────────
 
   function longPressMessage(msg: Message) {
-    const isOwn = msg.fromId === MY_USER_ID;
+    const isOwn = msg.fromId === myId || msg.fromId === MY_USER_ID;
     const options: Alert['alert'] extends (t: string, m: string | undefined, b: infer B) => void ? B : never = [
       {
         text: 'Reply',
@@ -676,12 +679,20 @@ export default function BuyerConversationScreen() {
         ),
       });
     }
-    options.push({
-      text: 'Report',
-      onPress: () => {
-        router.push(`/buyer-report?targetType=message&targetId=${msg.id}&targetLabel=Message` as never);
-      },
-    });
+    if (!isOwn) {
+      options.push({
+        text: 'Report message',
+        onPress: () => {
+          router.push(reportHref({
+            targetType: 'message',
+            targetId: msg.id,
+            label: participant ? `Message from ${participant.name}` : 'Message',
+            ownerId: participant?.userId,
+            ownerName: participant?.name,
+          }) as never);
+        },
+      });
+    }
     options.push({ text: 'Cancel', style: 'cancel' as const, onPress: () => {} });
     Alert.alert('Message Options', undefined, options as any);
   }
@@ -700,7 +711,7 @@ export default function BuyerConversationScreen() {
     }
 
     const { msg } = item;
-    const isOwn = msg.fromId === MY_USER_ID;
+    const isOwn = msg.fromId === myId || msg.fromId === MY_USER_ID;
 
     // Count reactions
     const reactionMap: Record<string, number> = {};
@@ -947,7 +958,18 @@ export default function BuyerConversationScreen() {
       )}
 
       {/* Input row */}
-      {!isDisabled ? (
+      {participant && (messaging.blockedByMe || messaging.unavailable) ? (
+        <BlockedComposer
+          counterpartName={participant.name}
+          messaging={messaging}
+          bottomInset={insets.bottom}
+          onUnblock={async () => {
+            if (await confirmUnblock({ userId: participant.userId, name: participant.name }, api.social.unblock)) {
+              setMessaging((current) => ({ ...current, blockedByMe: false }));
+            }
+          }}
+        />
+      ) : !isDisabled ? (
         <View>
           {selectedAttachment && (
             <View style={s.selectedAttachment}>

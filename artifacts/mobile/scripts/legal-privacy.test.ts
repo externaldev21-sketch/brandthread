@@ -13,17 +13,28 @@ describe('public legal documents', () => {
   it.each([
     ['privacy', 'Privacy Policy'],
     ['terms', 'Terms of Service'],
-  ])('defines the public /%s route with legal-review warnings', (route, title) => {
+    ['community-guidelines', 'Community Guidelines'],
+  ])('defines the public /%s route from the single legal source', (route, title) => {
     const source = fs.readFileSync(path.join(projectRoot, 'app', `${route}.tsx`), 'utf8');
     expect(source).toContain(`<title>${title} | Brandthread</title>`);
-    expect(source).toContain('not legal advice');
-    expect(source).toContain('REQUIRED BEFORE LAUNCH');
+    expect(source).toContain('<LegalDocument docId=');
+  });
+
+  it('marks every legal document as a draft that needs legal review before launch', () => {
+    const legal = fs.readFileSync(path.join(projectRoot, 'content', 'legal.ts'), 'utf8');
+    expect(legal).toContain('not legal advice');
+    expect(legal).toContain('pending review by qualified counsel');
+    expect(legal).toContain('must be completed before launch');
+    expect(legal).toContain('[LEGAL ENTITY NAME]');
+    const component = fs.readFileSync(path.join(projectRoot, 'components', 'legal', 'LegalDocument.tsx'), 'utf8');
+    expect(component).toContain('Draft — pending legal review');
+    expect(component).toContain('OWNER + COUNSEL ACTION REQUIRED');
   });
 
   it('does not claim GPS collection or cross-app advertising tracking', () => {
-    const privacy = fs.readFileSync(path.join(projectRoot, 'app', 'privacy.tsx'), 'utf8');
-    expect(privacy).toContain('no active request for GPS-derived precise or coarse device location');
-    expect(privacy).toContain('track your activity across other companies’ apps and websites');
+    const legal = fs.readFileSync(path.join(projectRoot, 'content', 'legal.ts'), 'utf8');
+    expect(legal).toContain('We don’t request precise GPS location.');
+    expect(legal).toContain('doesn’t use a device advertising identifier or track you across other companies’ apps');
   });
 
   it('injects pre-hydration metadata for both production legal URLs', () => {
@@ -31,6 +42,7 @@ describe('public legal documents', () => {
     expect(buildScript).toContain("'https://brandthread.app'");
     expect(buildScript).toContain("'Privacy Policy | Brandthread'");
     expect(buildScript).toContain("'Terms of Service | Brandthread'");
+    expect(buildScript).toContain("'Community Guidelines | Brandthread'");
     expect(buildScript).toContain('<meta name=\"description\"');
     expect(buildScript).toContain('<title\\b[^>]*>');
   });

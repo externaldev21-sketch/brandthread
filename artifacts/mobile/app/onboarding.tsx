@@ -6,6 +6,8 @@
  * BUYER:  1=Auth  2=Name  3=Style  4=Loading  5=Notifications  6=Success
  * SELLER: 1=Auth  2=Name  3=BrandName  4=BrandStage  5=Goals  6=Plan  7=Loading  8=Notifications  9=Success
  */
+import { LegalConsent } from '@/components/legal/LegalConsent';
+import { rememberPendingConsent } from '@/lib/legalConsent';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -771,6 +773,24 @@ function BuyerAuthStep({
   const [error, setError]               = useState('');
   const [clearingSession, setClearSession] = useState(false);
   const [usernameError, setUsernameError] = useState('');
+  // Explicit agreement to the Terms, Community Guidelines and Privacy Policy
+  // is required before any account is created (email, Google or Apple).
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [consentError, setConsentError] = useState(false);
+  function requireConsent(): boolean {
+    if (!agreedToTerms) {
+      setConsentError(true);
+      setError('Please agree to the Terms of Service and Community Guidelines to continue.');
+      return false;
+    }
+    void rememberPendingConsent();
+    return true;
+  }
+  function updateConsent(value: boolean) {
+    setAgreedToTerms(value);
+    setConsentError(false);
+    setError((current) => current.startsWith('Please agree') ? '' : current);
+  }
 
   const USERNAME_REGEX_AUTH = /^[a-zA-Z0-9_]{3,30}$/;
   const isUsernameValid = USERNAME_REGEX_AUTH.test(username.trim());
@@ -793,6 +813,7 @@ function BuyerAuthStep({
 
   async function handleSignUp() {
     if (!canSubmit || loading) return;
+    if (!requireConsent()) return;
     if (isSignedIn) {
       const who = currentEmail ? `as ${currentEmail}` : 'with another account';
       setError(`You are currently signed in ${who}. Tap "Sign out and create another account" below.`);
@@ -860,6 +881,7 @@ function BuyerAuthStep({
   }
 
   async function handleOAuth(startFlow: () => Promise<any>, provider: string) {
+    if (!requireConsent()) return;
     setOAuth(provider);
     setError('');
     try {
@@ -1057,14 +1079,10 @@ function BuyerAuthStep({
 
           {error ? <Text style={sba.error}>{error}</Text> : null}
 
+          <LegalConsent checked={agreedToTerms} onChange={updateConsent} showError={consentError} style={{ marginBottom: 16 }} />
+
           <PrimaryButton label={loading ? 'Creating account…' : 'Create account'} onPress={handleSignUp} disabled={!canSubmit} loading={loading} />
 
-          <Text style={sba.legal}>
-            By continuing you agree to our{' '}
-            <Text style={{ color: theme.accentLight }} onPress={() => Linking.openURL('https://brandthread.app/terms')}>Terms</Text>
-            {' and '}
-            <Text style={{ color: theme.accentLight }} onPress={() => Linking.openURL('https://brandthread.app/privacy')}>Privacy Policy</Text>.
-          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
     );
@@ -1076,6 +1094,8 @@ function BuyerAuthStep({
       <ScrollView contentContainerStyle={sba.chooseScroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <Text style={sba.chooseHeadline}>Sign up</Text>
         <Text style={sba.chooseSub}>Discover brands, buy products, and follow the drops that move you.</Text>
+
+        <LegalConsent checked={agreedToTerms} onChange={updateConsent} showError={consentError} style={{ marginBottom: 20 }} />
 
         {/* Google row */}
         <TouchableOpacity
@@ -1141,12 +1161,6 @@ function BuyerAuthStep({
           <Text style={sba.signInLinkText}>Already have an account? <Text style={{ color: theme.accentLight }}>Sign in</Text></Text>
         </TouchableOpacity>
 
-        <Text style={sba.legal}>
-          By continuing you agree to our{' '}
-          <Text style={{ color: theme.accentLight }} onPress={() => Linking.openURL('https://brandthread.app/terms')}>Terms</Text>
-          {' and '}
-          <Text style={{ color: theme.accentLight }} onPress={() => Linking.openURL('https://brandthread.app/privacy')}>Privacy Policy</Text>.
-        </Text>
       </ScrollView>
     </View>
   );
@@ -1198,6 +1212,24 @@ function SharedAuthStep({
   const [error, setError]             = useState('');
   const [clearingSession, setClearSession] = useState(false);
   const [usernameError, setUsernameError] = useState('');
+  // Explicit agreement to the Terms, Community Guidelines and Privacy Policy
+  // is required before any account is created (email, Google or Apple).
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [consentError, setConsentError] = useState(false);
+  function requireConsent(): boolean {
+    if (!agreedToTerms) {
+      setConsentError(true);
+      setError('Please agree to the Terms of Service and Community Guidelines to continue.');
+      return false;
+    }
+    void rememberPendingConsent();
+    return true;
+  }
+  function updateConsent(value: boolean) {
+    setAgreedToTerms(value);
+    setConsentError(false);
+    setError((current) => current.startsWith('Please agree') ? '' : current);
+  }
 
   const USERNAME_REGEX_AUTH = /^[a-zA-Z0-9_]{3,30}$/;
   const isUsernameValid = USERNAME_REGEX_AUTH.test(username.trim());
@@ -1221,6 +1253,7 @@ function SharedAuthStep({
 
   async function handleSignUp() {
     if (!canSubmit || loading) return;
+    if (!requireConsent()) return;
     if (!passwordsMatch) { setError('Passwords do not match.'); return; }
     if (isSignedIn && !allowSignedInAccountCreation) {
       const who = currentEmail ? `as ${currentEmail}` : 'with another account';
@@ -1297,6 +1330,7 @@ function SharedAuthStep({
   }
 
   async function handleOAuth(startFlow: () => Promise<any>, provider: string) {
+    if (!requireConsent()) return;
     setOAuth(provider);
     setError('');
     try {
@@ -1548,6 +1582,8 @@ function SharedAuthStep({
           <Text style={ssa.hint}>Enter the code from the friend who invited you.</Text>
         </View>
 
+        <LegalConsent checked={agreedToTerms} onChange={updateConsent} showError={consentError} style={{ marginBottom: 16 }} />
+
         {error ? <Text style={ssa.error}>{error}</Text> : null}
 
         <PrimaryButton label={loading ? 'Creating account…' : 'Create account'} onPress={handleSignUp} disabled={!canSubmit} loading={loading} />
@@ -1585,12 +1621,6 @@ function SharedAuthStep({
           </TouchableOpacity>
         )}
 
-        <Text style={ssa.legal}>
-          By continuing you agree to our{' '}
-          <Text style={{ color: theme.accentLight }} onPress={() => Linking.openURL('https://brandthread.app/terms')}>Terms</Text>
-          {' and '}
-          <Text style={{ color: theme.accentLight }} onPress={() => Linking.openURL('https://brandthread.app/privacy')}>Privacy Policy</Text>.
-        </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );

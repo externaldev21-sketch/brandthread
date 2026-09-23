@@ -30,6 +30,7 @@ import {
   BLUE, ORANGE, RED, FONT, FS, SP, RADIUS, ICON, ACCENT,
 } from '@/lib/theme';
 import { buildCanonicalProfileUrl } from '@/lib/shareProfile';
+import { confirmBlock, reportHref } from '@/lib/safety';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TILE_SIZE = Math.floor((SCREEN_WIDTH - 2) / 3);
@@ -562,18 +563,32 @@ export default function SellerProfileScreen() {
       'What would you like to do?',
       [
         { text: 'Share profile', onPress: handleShare },
-        {
-          text: 'Report seller',
-          style: 'destructive',
-          onPress: () => router.push((
-            '/buyer-report?targetType=seller&targetId=' + encodeURIComponent(sellerId) +
-            '&targetLabel=' + encodeURIComponent(profile.brandName)
-          ) as never),
-        },
-        { text: 'Cancel', style: 'cancel' },
+        ...(isOwner ? [] : [
+          {
+            text: 'Report seller',
+            onPress: () => router.push(reportHref({
+              targetType: 'profile',
+              targetId: sellerId,
+              label: profile.brandName,
+              ownerId: sellerId,
+              ownerName: profile.brandName,
+            }) as never),
+          },
+          {
+            text: `Block ${profile.brandName}`,
+            style: 'destructive' as const,
+            onPress: async () => {
+              if (await confirmBlock({ userId: sellerId, name: profile.brandName }, api.social.block)) {
+                if (router.canGoBack()) router.back();
+                else router.replace('/(buyer)/' as never);
+              }
+            },
+          },
+        ]),
+        { text: 'Cancel', style: 'cancel' as const },
       ]
     );
-  }, [profile, handleShare, router, canonicalSellerId]);
+  }, [profile, handleShare, router, canonicalSellerId, isOwner, api]);
 
   const handlePostPress = useCallback((post: SellerPost) => {
     setSelectedPost(post);

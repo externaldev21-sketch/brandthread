@@ -20,6 +20,7 @@ vi.mock("drizzle-orm", () => ({
   and: (...conditions: unknown[]) => conditions,
   desc: (value: unknown) => value,
   eq: (...values: unknown[]) => values,
+  or: (...conditions: unknown[]) => conditions,
   sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }),
 }));
 
@@ -60,6 +61,8 @@ vi.mock("@workspace/db", () => {
 
 import reportsRouter from "../reports";
 
+const MESSAGE_ID = "6f1c2f0e-8a54-4d2b-9f7e-1d2c3b4a5e6f";
+
 let server: Server;
 let base = "";
 
@@ -81,14 +84,14 @@ describe("message report deduplication", () => {
   it("does not increment message or conversation moderation state for a duplicate report", async () => {
     state.updateCalls = 0;
     state.selectResults = [
-      [{ id: "message-1", conversationId: "conversation-1" }],
+      [{ id: MESSAGE_ID, senderId: "message-author", body: "hello", conversationId: "conversation-1" }],
       [{ userId: "reporting-user" }],
     ];
 
     const response = await fetch(`${base}/api/reports`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ targetType: "message", targetId: "message-1", reason: "spam" }),
+      body: JSON.stringify({ targetType: "message", targetId: MESSAGE_ID, reason: "spam" }),
     });
 
     expect(response.status).toBe(200);

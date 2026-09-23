@@ -13,6 +13,12 @@ tags:
     description: Secure voice and video call operations
   - name: manufacturers
     description: Manufacturer portal operations
+  - name: safety
+    description: Comments, reports, blocks and muted words (App Store guideline 1.2)
+  - name: moderation
+    description: Moderator review queue and enforcement actions
+  - name: account
+    description: Account deletion, legal acceptance and sign-in sessions
 
 paths:
   /healthz:
@@ -724,6 +730,343 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/ManufacturerPaymentActivity" }
 
+  # ── Trust & safety (App Store 1.2) ──────────────────────────────────────────
+
+  /posts/{postId}/comments:
+    parameters:
+      - { name: postId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: listPostComments
+      tags: [safety]
+      summary: List comments; hides blocked people, muted words and held comments (except the viewer's own)
+      description: Pages of 50 top-level comments, newest first. Pass `?before=<nextCursor>` for the next page.
+      responses:
+        "200":
+          description: Comment thread
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommentThread" }
+        "404": { description: Post not found or hidden by a block }
+    post:
+      operationId: createPostComment
+      tags: [safety]
+      summary: Comment or reply. Slurs/threats are rejected; profanity and abuse are held for review.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateCommentInput" }
+      responses:
+        "201":
+          description: Created (possibly held for review)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreatedComment" }
+        "403": { description: "Comments disabled, blocked, or account suspended" }
+        "422":
+          description: Rejected by the content filter
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ContentRejected" }
+
+  /posts/{postId}/comments/{commentId}:
+    parameters:
+      - { name: postId, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: commentId, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      operationId: deletePostComment
+      tags: [safety]
+      summary: Delete a comment (author or post owner)
+      responses:
+        "200": { description: Deleted, content: { application/json: { schema: { $ref: "#/components/schemas/OkResponse" } } } }
+        "403": { description: Not the author or post owner }
+
+  /posts/{postId}/comments/{commentId}/like:
+    parameters:
+      - { name: postId, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: commentId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: likePostComment
+      tags: [safety]
+      summary: Like or unlike a comment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LikeCommentInput" }
+      responses:
+        "200":
+          description: Updated like state
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [liked, likesCount]
+                properties:
+                  liked: { type: boolean }
+                  likesCount: { type: integer, minimum: 0 }
+
+  /reports:
+    post:
+      operationId: createReport
+      tags: [safety]
+      summary: Report a post, video, live stream, comment, story, product, profile or DM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateReportInput" }
+      responses:
+        "201":
+          description: Report filed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Report" }
+        "200":
+          description: The same person already has an open report on this item
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [already_reported] }
+                  id: { type: string, format: uuid }
+        "400": { description: "Invalid reason, missing note for \"other\", or self-report" }
+        "404": { description: Content not found }
+
+  /moderation/me:
+    get:
+      operationId: getModerationAccess
+      tags: [moderation]
+      summary: Whether the signed-in person can review reports
+      responses:
+        "200":
+          description: Moderator flag
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [isModerator]
+                properties:
+                  isModerator: { type: boolean }
+
+  /moderation/reports:
+    get:
+      operationId: listModerationReports
+      tags: [moderation]
+      summary: Review queue (moderators only)
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string, enum: [open, resolved, all] } }
+        - { name: type, in: query, required: false, schema: { $ref: "#/components/schemas/ReportTargetType" } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0 } }
+      responses:
+        "200":
+          description: Queue page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModerationQueue" }
+        "403": { description: Moderator access required }
+
+  /moderation/reports/{reportId}/resolve:
+    parameters:
+      - { name: reportId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: resolveModerationReport
+      tags: [moderation]
+      summary: Dismiss, remove the content, or suspend the owner. Resolves every open report on the same item.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResolveReportInput" }
+      responses:
+        "200":
+          description: Resolved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResolveReportResult" }
+        "403": { description: Moderator access required }
+
+  /moderation/users/{userId}/reinstate:
+    parameters:
+      - { name: userId, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: reinstateUser
+      tags: [moderation]
+      summary: Lift a suspension
+      responses:
+        "200": { description: Reinstated, content: { application/json: { schema: { $ref: "#/components/schemas/OkResponse" } } } }
+
+  /safety/muted-words:
+    get:
+      operationId: listMutedWords
+      tags: [safety]
+      summary: My muted words and phrases
+      responses:
+        "200":
+          description: Muted words
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [words, limit]
+                properties:
+                  words: { type: array, items: { $ref: "#/components/schemas/MutedWord" } }
+                  limit: { type: integer }
+    post:
+      operationId: addMutedWord
+      tags: [safety]
+      summary: Mute a word, phrase, #hashtag or @handle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MutedWordInput" }
+      responses:
+        "201": { description: Added, content: { application/json: { schema: { $ref: "#/components/schemas/MutedWord" } } } }
+        "409": { description: Limit reached }
+
+  /safety/muted-words/{phrase}:
+    parameters:
+      - { name: phrase, in: path, required: true, schema: { type: string } }
+    delete:
+      operationId: removeMutedWord
+      tags: [safety]
+      summary: Unmute a word or phrase
+      responses:
+        "200": { description: Removed, content: { application/json: { schema: { $ref: "#/components/schemas/OkResponse" } } } }
+
+  /social/blocks:
+    get:
+      operationId: listBlockedAccounts
+      tags: [safety]
+      summary: Accounts I have blocked
+      responses:
+        "200":
+          description: Blocked accounts, newest first
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/BlockedAccount" } }
+
+  /social/block:
+    post:
+      operationId: blockAccount
+      tags: [safety]
+      summary: Block someone. Hides both people from each other and stops messages and comments.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BlockAccountInput" }
+      responses:
+        "200": { description: Blocked, content: { application/json: { schema: { $ref: "#/components/schemas/OkResponse" } } } }
+
+  /social/block/{userId}:
+    parameters:
+      - { name: userId, in: path, required: true, schema: { type: string } }
+    delete:
+      operationId: unblockAccount
+      tags: [safety]
+      summary: Unblock someone
+      responses:
+        "200": { description: Unblocked, content: { application/json: { schema: { $ref: "#/components/schemas/OkResponse" } } } }
+
+  # ── Account controls (App Store 5.1.1(v)) ───────────────────────────────────
+
+  /auth/account/deletion-check:
+    get:
+      operationId: getAccountDeletionCheck
+      tags: [account]
+      summary: What deletion removes, what is retained, and anything that must be settled first
+      responses:
+        "200":
+          description: Eligibility
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccountDeletionCheck" }
+
+  /auth/account:
+    delete:
+      operationId: deleteAccount
+      tags: [account]
+      summary: Permanently delete the account, its data, and the Clerk user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DeleteAccountInput" }
+      responses:
+        "200": { description: Deleted, content: { application/json: { schema: { $ref: "#/components/schemas/OkResponse" } } } }
+        "409":
+          description: Open orders, held funds or disputes must be settled first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error, code, blockers]
+                properties:
+                  error: { type: string }
+                  code: { type: string, enum: [DELETION_BLOCKED] }
+                  blockers: { type: array, items: { $ref: "#/components/schemas/DeletionBlocker" } }
+
+  /auth/legal-acceptance:
+    post:
+      operationId: acceptLegalTerms
+      tags: [account]
+      summary: Record agreement to the Terms, Community Guidelines and Privacy Policy version shown
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LegalAcceptanceInput" }
+      responses:
+        "200":
+          description: Recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [termsVersion, termsAcceptedAt]
+                properties:
+                  termsVersion: { type: string }
+                  termsAcceptedAt: { type: string, format: date-time }
+
+  /auth/sessions:
+    get:
+      operationId: listAccountSessions
+      tags: [account]
+      summary: Active Clerk sessions with device and approximate location
+      responses:
+        "200":
+          description: Sessions, current first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sessions]
+                properties:
+                  sessions: { type: array, items: { $ref: "#/components/schemas/AccountSession" } }
+
+  /auth/sessions/{sessionId}:
+    parameters:
+      - { name: sessionId, in: path, required: true, schema: { type: string } }
+    delete:
+      operationId: revokeAccountSession
+      tags: [account]
+      summary: Sign out one device
+      responses:
+        "200": { description: Revoked, content: { application/json: { schema: { $ref: "#/components/schemas/RevokeSessionsResult" } } } }
+
+  /auth/sessions/revoke-others:
+    post:
+      operationId: revokeOtherAccountSessions
+      tags: [account]
+      summary: Sign out every device except this one
+      responses:
+        "200": { description: Revoked, content: { application/json: { schema: { $ref: "#/components/schemas/RevokeSessionsResult" } } } }
+
 components:
   schemas:
     HealthStatus:
@@ -1173,3 +1516,285 @@ components:
         orderType: { type: ["string", "null"], enum: [sample, bulk, null] }
         metadata: { type: object, additionalProperties: true }
         createdAt: { type: string, format: date-time }
+
+    # ── Trust & safety ───────────────────────────────────────────────────────────
+
+    OkResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+
+    ProfileSummary:
+      type: object
+      required: [userId, name, handle, initials, suspended, deleted]
+      properties:
+        userId: { type: string }
+        name: { type: string }
+        handle: { type: string }
+        initials: { type: string }
+        avatarUrl: { type: ["string", "null"] }
+        accountType: { type: ["string", "null"] }
+        suspended: { type: boolean }
+        deleted: { type: boolean }
+
+    Comment:
+      type: object
+      required: [id, postId, parentId, body, createdAt, author, likesCount, likedByMe, isMine, canDelete, pendingReview, replies]
+      properties:
+        id: { type: string, format: uuid }
+        postId: { type: string, format: uuid }
+        parentId: { type: ["string", "null"], format: uuid }
+        body: { type: string }
+        createdAt: { type: string, format: date-time }
+        author: { $ref: "#/components/schemas/ProfileSummary" }
+        likesCount: { type: integer, minimum: 0 }
+        likedByMe: { type: boolean }
+        isMine: { type: boolean }
+        canDelete: { type: boolean }
+        pendingReview:
+          type: boolean
+          description: Held by the content filter; only the author can see it until a moderator reviews it.
+        replies: { type: array, items: { $ref: "#/components/schemas/Comment" } }
+
+    CommentThread:
+      type: object
+      required: [comments, total, hiddenByMutedWords, commentsDisabled, canComment, nextCursor]
+      properties:
+        comments: { type: array, items: { $ref: "#/components/schemas/Comment" } }
+        total: { type: integer, minimum: 0 }
+        hiddenByMutedWords: { type: integer, minimum: 0 }
+        commentsDisabled: { type: boolean }
+        canComment: { type: boolean }
+        nextCursor: { type: ["string", "null"], format: date-time }
+
+    CreateCommentInput:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string, minLength: 1, maxLength: 1000 }
+        parentId: { type: ["string", "null"], format: uuid }
+
+    CreatedComment:
+      type: object
+      required: [comment, moderation]
+      properties:
+        comment: { $ref: "#/components/schemas/Comment" }
+        moderation:
+          type: object
+          required: [status]
+          properties:
+            status: { type: string, enum: [visible, held] }
+            message: { type: string }
+
+    ContentRejected:
+      type: object
+      required: [error, category, code]
+      properties:
+        error: { type: string }
+        category: { type: string, enum: [spam_scam, explicit_sexual, harassment, hate_speech, profanity, abuse] }
+        code: { type: string, enum: [CONTENT_REJECTED] }
+
+    ReportTargetType:
+      type: string
+      enum: [post, video, live, live_comment, comment, story, product, profile, message]
+
+    ReportReason:
+      type: string
+      enum: [spam, harassment, nudity, hate, violence, ip_counterfeit, scam, other]
+
+    CreateReportInput:
+      type: object
+      required: [targetType, targetId, reason]
+      properties:
+        targetType: { $ref: "#/components/schemas/ReportTargetType" }
+        targetId: { type: string }
+        reason: { $ref: "#/components/schemas/ReportReason" }
+        note:
+          type: string
+          maxLength: 1000
+          description: Required when reason is "other".
+
+    Report:
+      type: object
+      required: [id, targetType, targetId, reason, status, source, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        targetType: { type: string }
+        targetId: { type: string }
+        targetLabel: { type: ["string", "null"] }
+        targetOwnerId: { type: ["string", "null"] }
+        contentExcerpt: { type: ["string", "null"] }
+        reason: { type: string }
+        description: { type: ["string", "null"] }
+        status: { type: string, enum: [pending, reviewed, actioned, dismissed] }
+        source: { type: string, enum: [user, auto_filter] }
+        createdAt: { type: string, format: date-time }
+
+    ModerationQueueItem:
+      type: object
+      required: [id, status, source, targetType, targetId, reason, createdAt, openReportsOnTarget, ownerPriorActions]
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [pending, reviewed, actioned, dismissed] }
+        source: { type: string, enum: [user, auto_filter] }
+        targetType: { type: string }
+        targetId: { type: string }
+        targetLabel: { type: ["string", "null"] }
+        contentExcerpt: { type: ["string", "null"] }
+        reason: { type: string }
+        note: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        resolution:
+          type: ["object", "null"]
+          properties:
+            action: { type: ["string", "null"] }
+            note: { type: ["string", "null"] }
+            resolvedAt: { type: ["string", "null"], format: date-time }
+        owner:
+          oneOf:
+            - { $ref: "#/components/schemas/ProfileSummary" }
+            - { type: "null" }
+        reporter:
+          oneOf:
+            - { $ref: "#/components/schemas/ProfileSummary" }
+            - { type: "null" }
+        openReportsOnTarget: { type: integer, minimum: 0 }
+        ownerPriorActions: { type: integer, minimum: 0 }
+
+    ModerationQueue:
+      type: object
+      required: [items, hasMore, summary]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/ModerationQueueItem" } }
+        hasMore: { type: boolean }
+        summary:
+          type: object
+          required: [open, heldByFilter, resolvedToday]
+          properties:
+            open: { type: integer }
+            heldByFilter: { type: integer }
+            resolvedToday: { type: integer }
+
+    ResolveReportInput:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [dismiss, remove_content, suspend_user] }
+        note: { type: string, maxLength: 1000 }
+
+    ResolveReportResult:
+      type: object
+      required: [ok, status, action, resolvedReports, signedOut]
+      properties:
+        ok: { type: boolean }
+        status: { type: string, enum: [dismissed, actioned] }
+        action: { type: string, enum: [dismiss, remove_content, suspend_user] }
+        resolvedReports: { type: integer, minimum: 1 }
+        suspendedUserId: { type: ["string", "null"] }
+        signedOut: { type: boolean }
+
+    MutedWord:
+      type: object
+      required: [phrase, createdAt]
+      properties:
+        phrase: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    BlockedAccount:
+      type: object
+      required: [userId, name, handle, initials, color, blockedAt]
+      properties:
+        userId: { type: string }
+        name: { type: string }
+        handle: { type: string }
+        initials: { type: string }
+        avatarUrl: { type: ["string", "null"] }
+        accountType: { type: ["string", "null"] }
+        color: { type: string }
+        blockedAt: { type: string, format: date-time }
+
+    # ── Account controls ─────────────────────────────────────────────────────────
+
+    DeletionBlocker:
+      type: object
+      required: [code, title, detail, count, amountCents, actionRoute, actionLabel]
+      properties:
+        code:
+          type: string
+          enum:
+            - seller_open_orders
+            - seller_held_funds
+            - seller_reserved_label_funds
+            - seller_open_returns
+            - seller_open_disputes
+            - seller_payout_in_flight
+            - buyer_orders_awaiting_shipment
+        title: { type: string }
+        detail: { type: string }
+        count: { type: integer, minimum: 0 }
+        amountCents: { type: ["integer", "null"] }
+        actionRoute: { type: string }
+        actionLabel: { type: string }
+
+    AccountDeletionCheck:
+      type: object
+      required: [canDelete, accountType, blockers, willDelete, willRetain]
+      properties:
+        canDelete: { type: boolean }
+        accountType: { type: ["string", "null"] }
+        blockers: { type: array, items: { $ref: "#/components/schemas/DeletionBlocker" } }
+        willDelete: { type: array, items: { type: string } }
+        willRetain: { type: array, items: { type: string } }
+
+    AccountSession:
+      type: object
+      required: [id, current, status, device, isMobile, lastActiveAt, createdAt]
+      properties:
+        id: { type: string }
+        current: { type: boolean }
+        status: { type: string }
+        device: { type: string }
+        browser: { type: ["string", "null"] }
+        isMobile: { type: boolean }
+        location: { type: ["string", "null"] }
+        ipAddress: { type: ["string", "null"] }
+        lastActiveAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+
+    RevokeSessionsResult:
+      type: object
+      required: [ok, revoked]
+      properties:
+        ok: { type: boolean }
+        revoked: { type: integer, minimum: 0 }
+
+    LikeCommentInput:
+      type: object
+      required: [liked]
+      properties:
+        liked: { type: boolean }
+
+    MutedWordInput:
+      type: object
+      required: [phrase]
+      properties:
+        phrase: { type: string, minLength: 1, maxLength: 60 }
+
+    BlockAccountInput:
+      type: object
+      required: [userId]
+      properties:
+        userId: { type: string }
+
+    DeleteAccountInput:
+      type: object
+      required: [confirmation]
+      properties:
+        confirmation: { type: string, enum: [DELETE] }
+
+    LegalAcceptanceInput:
+      type: object
+      required: [version]
+      properties:
+        version: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}(\\.[0-9]+)?$" }

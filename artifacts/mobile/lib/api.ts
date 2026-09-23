@@ -4,6 +4,10 @@
  * Every request attaches the Clerk Bearer token supplied by getToken().
  */
 import { useAuth } from '@clerk/expo';
+import type {
+  AccountDeletionCheck, AccountSession, BlockedAccount, CommentThread, CreatedComment,
+  ModerationAction, ModerationQueue, MutedWord, ReportReasonId, ReportTargetType,
+} from './safetyTypes';
 import { useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -446,6 +450,11 @@ export interface LocalUserProfile {
   appIconId: string | null;
   brandName: string | null;
   onboardingComplete: boolean;
+  /** Version of the Terms/Guidelines/Privacy Policy the person agreed to. */
+  termsVersion?: string | null;
+  termsAcceptedAt?: string | null;
+  /** Set when a moderator suspends the account. */
+  suspendedAt?: string | null;
 }
 
 export interface ShopifyImportJob {
@@ -561,6 +570,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         false,
         getCacheScope,
       ),
+      /** Everything deletion removes/retains, plus anything that must be settled first. */
+      deletionCheck: () => freshGet<AccountDeletionCheck>('/api/auth/account/deletion-check'),
+      /** Record agreement to the Terms, Community Guidelines and Privacy Policy version shown. */
+      acceptLegal: (version: string) =>
+        post<{ termsVersion: string; termsAcceptedAt: string }>('/api/auth/legal-acceptance', { version }),
+      /** Real Clerk sessions for this account (Login Activity). */
+      sessions: () => freshGet<{ sessions: AccountSession[] }>('/api/auth/sessions'),
+      revokeSession: (sessionId: string) =>
+        del<{ ok: boolean; revoked: number }>(`/api/auth/sessions/${encodeURIComponent(sessionId)}`),
+      revokeOtherSessions: () =>
+        post<{ ok: boolean; revoked: number }>('/api/auth/sessions/revoke-others', {}),
       /** Download an authenticated portability export for the active account. */
       exportData: (include: Array<'profile' | 'orders' | 'messages'>) =>
         post<{
@@ -1422,16 +1442,52 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     /** Content reporting (buyers and sellers can submit reports) */
     reports: {
+      /** Report content or a person. `note` is required when reason is "other". */
       submit: (body: {
-        targetType: string; targetId: string; targetLabel?: string;
-        reason: string; description?: string;
-      }) => post<any>('/api/reports', body),
-      /** Admin/moderation list — optionally filtered by status */
-      list: (status?: string) =>
-        get<any[]>(`/api/reports${status ? `?status=${encodeURIComponent(status)}` : ''}`),
-      /** Update a report's review status (reviewed | actioned | dismissed | pending) */
-      updateStatus: (id: string, status: string) =>
-        patch<any>(`/api/reports/${encodeURIComponent(id)}/status`, { status }),
+        targetType: ReportTargetType; targetId: string;
+        reason: ReportReasonId; note?: string;
+      }) => post<{ id?: string; status: string }>('/api/reports', body),
+    },
+    /** Moderator review queue (users.role = admin). */
+    moderation: {
+      me: () => freshGet<{ isModerator: boolean }>('/api/moderation/me'),
+      queue: (params: { status?: 'open' | 'resolved' | 'all'; type?: ReportTargetType; offset?: number } = {}) => {
+        const query = new URLSearchParams();
+        if (params.status) query.set('status', params.status);
+        if (params.type) query.set('type', params.type);
+        if (params.offset) query.set('offset', String(params.offset));
+        const suffix = query.toString();
+        return freshGet<ModerationQueue>(`/api/moderation/reports${suffix ? `?${suffix}` : ''}`);
+      },
+      resolve: (reportId: string, action: ModerationAction, note?: string) =>
+        post<{ ok: boolean; status: string; resolvedReports: number; signedOut: boolean }>(
+          `/api/moderation/reports/${encodeURIComponent(reportId)}/resolve`,
+          { action, ...(note ? { note } : {}) },
+        ),
+      reinstate: (userId: string) =>
+        post<{ ok: boolean }>(`/api/moderation/users/${encodeURIComponent(userId)}/reinstate`, {}),
+    },
+    /** Personal safety settings. */
+    safety: {
+      mutedWords: () => freshGet<{ words: MutedWord[]; limit: number }>('/api/safety/muted-words'),
+      muteWord: (phrase: string) =>
+        post<MutedWord & { alreadyMuted?: boolean }>('/api/safety/muted-words', { phrase }),
+      unmuteWord: (phrase: string) =>
+        del<{ ok: boolean }>(`/api/safety/muted-words/${encodeURIComponent(phrase)}`),
+    },
+    /** Thread post comments (filtered, block-aware, moderated). */
+    comments: {
+      list: (postId: string, before?: string) =>
+        freshGet<CommentThread>(`/api/posts/${encodeURIComponent(postId)}/comments${before ? `?before=${encodeURIComponent(before)}` : ''}`),
+      create: (postId: string, body: string, parentId?: string | null) =>
+        post<CreatedComment>(`/api/posts/${encodeURIComponent(postId)}/comments`, { body, ...(parentId ? { parentId } : {}) }),
+      remove: (postId: string, commentId: string) =>
+        del<{ ok: boolean }>(`/api/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}`),
+      like: (postId: string, commentId: string, liked: boolean) =>
+        post<{ liked: boolean; likesCount: number }>(
+          `/api/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}/like`,
+          { liked },
+        ),
     },
     /** Buyer-to-buyer social graph: follows, profiles, search */
     social: {
@@ -1504,12 +1560,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Unblock a user */
       unblock: (userId: string) =>
         del<{ ok: boolean }>(`/api/social/block/${encodeURIComponent(userId)}`),
-      /** List users I have blocked */
-      blocks: () =>
-        get<Array<{
-          userId: string; name: string; handle: string;
-          initials: string; color: string; blockedAt: string;
-        }>>('/api/social/blocks'),
+      /** List users I have blocked, newest first */
+      blocks: () => freshGet<BlockedAccount[]>('/api/social/blocks'),
     },
     /** Referral / invite-code system */
     referrals: {
@@ -1788,7 +1840,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     /** Security — login sessions */
     security: {
-      sessions: () => get<{ sessions: any[] }>('/api/ai/sessions'),
+      /** @deprecated Use auth.sessions(), which includes device details and the current session. */
+      sessions: () => freshGet<{ sessions: AccountSession[] }>('/api/auth/sessions'),
     },
     /** Pre-order demand signals (product reservation). */
     preorder: {
