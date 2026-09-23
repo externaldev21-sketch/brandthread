@@ -10,6 +10,7 @@ const labels = (process.env.NATIVE_BUYER_ADDRESS_LABELS ?? 'Home,Office')
   .map((label) => label.trim())
   .filter(Boolean);
 const expectRetry = process.env.NATIVE_BUYER_ADDRESSES_EXPECT_RETRY === '1';
+const disposableAccount = process.env.NATIVE_BUYER_ADDRESSES_DISPOSABLE_ACCOUNT;
 const outputDir = resolve(
   process.env.NATIVE_BUYER_ADDRESSES_RESULTS_DIR
     ?? `test-results/buyer-addresses-accessibility/${platform || 'unknown'}`,
@@ -25,6 +26,12 @@ if (!endpoint || !platform) {
 }
 if (!['ios', 'android'].includes(platform)) {
   throw new Error('NATIVE_BUYER_ADDRESSES_PLATFORM must be "ios" or "android"');
+}
+if (required && !disposableAccount) {
+  throw new Error(
+    'Native shipping-address accessibility release checks require '
+      + 'NATIVE_BUYER_ADDRESSES_DISPOSABLE_ACCOUNT',
+  );
 }
 if (!expectRetry && labels.length < 2) {
   throw new Error('NATIVE_BUYER_ADDRESS_LABELS must name at least two seeded addresses');
@@ -150,10 +157,11 @@ try {
   await openAddresses();
 
   if (expectRetry) {
+    await writeFile(resolve(outputDir, 'retry-error-page-source.xml'), await source());
     await assertButton('Go back');
     await assertButton('Retry loading saved addresses');
     await tap('Retry loading saved addresses');
-    await writeFile(resolve(outputDir, 'retry-page-source.xml'), await source());
+    await writeFile(resolve(outputDir, 'retry-completed-page-source.xml'), await source());
     console.log(`Verified ${platform} back and retry actions in the native accessibility tree.`);
   } else {
     const [first, second] = labels;
@@ -162,8 +170,8 @@ try {
       `Delete ${label} address`,
     ]);
     const initialSource = await source();
-    assertSourceOrder(initialSource, ['Go back', ...orderedActions]);
     await writeFile(resolve(outputDir, 'address-list-page-source.xml'), initialSource);
+    assertSourceOrder(initialSource, ['Go back', ...orderedActions]);
 
     await assertButton('Go back');
     for (const action of orderedActions) await assertButton(action);

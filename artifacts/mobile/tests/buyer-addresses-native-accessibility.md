@@ -1,6 +1,6 @@
 # Shipping-address native accessibility verification
 
-The Appium check uses the native iOS or Android accessibility tree, not the web DOM. It verifies the back/close, edit, delete, retry, and set-default actions; the default checkbox's checked state; and address-card focus order. XML evidence is written under `test-results/buyer-addresses-accessibility/<platform>/`.
+The Appium check uses the native iOS or Android accessibility tree, not the web DOM. It verifies the back/close, edit, delete, retry, and set-default actions; the default checkbox's checked state; and address-card focus order. Release XML evidence is written under `test-results/buyer-addresses-accessibility/<platform>/<normal|retry>/`.
 
 ## Test account
 
@@ -25,3 +25,23 @@ NATIVE_BUYER_ADDRESSES_PLATFORM=android NATIVE_BUYER_ADDRESSES_EXPECT_RETRY=1 NA
 ```
 
 The required mode fails instead of skipping when Appium is unavailable. Without `NATIVE_BUYER_ADDRESSES_REQUIRED=1`, local runs skip cleanly when no device server is configured.
+
+## Release gate
+
+`.github/workflows/mobile-shipping-address-accessibility.yml` runs the check for both native
+platforms on mobile release tags and when called by another release workflow. Its mobile-release
+gate cannot pass until both platform jobs pass. Each configured device runner must provide an
+installed, sign-in-capable release build and these environment values:
+
+- `APPIUM_SERVER_URL` and the platform's Appium capabilities.
+- `NATIVE_BUYER_ADDRESSES_DISPOSABLE_ACCOUNT`, a non-production account identifier.
+- `NATIVE_BUYER_ADDRESS_LABELS`, naming exactly two addresses.
+- `NATIVE_BUYER_ADDRESSES_PREPARE_COMMAND`, which signs in the disposable buyer and resets it to
+  exactly two addresses in the named order (first default).
+- `NATIVE_BUYER_ADDRESSES_ARM_FAILURE_COMMAND`, which makes the next address-list request fail
+  once and then recover so the Retry action can succeed.
+- `NATIVE_BUYER_ADDRESSES_CLEANUP_COMMAND`, which removes the seeded addresses/session even when a
+  check fails.
+
+The release wrapper rejects any missing prerequisite instead of skipping. GitHub uploads the XML
+trees for each platform and scenario even when the check fails.

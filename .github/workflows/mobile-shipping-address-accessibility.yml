@@ -1,0 +1,94 @@
+name: Mobile shipping-address accessibility
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  push:
+    tags:
+      - "mobile-v*"
+
+permissions:
+  contents: read
+
+jobs:
+  ios:
+    name: iOS shipping-address screen reader
+    runs-on: [self-hosted, mobile-accessibility, ios]
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: artifacts/mobile
+    env:
+      APPIUM_SERVER_URL: ${{ secrets.IOS_APPIUM_SERVER_URL }}
+      APPIUM_IOS_CAPABILITIES: ${{ secrets.IOS_APPIUM_CAPABILITIES }}
+      NATIVE_BUYER_ADDRESSES_PLATFORM: ios
+      NATIVE_BUYER_ADDRESSES_DISPOSABLE_ACCOUNT: ${{ secrets.IOS_DISPOSABLE_BUYER_ACCOUNT }}
+      NATIVE_BUYER_ADDRESS_LABELS: Home,Office
+      NATIVE_BUYER_ADDRESSES_PREPARE_COMMAND: ${{ secrets.IOS_BUYER_ADDRESSES_PREPARE_COMMAND }}
+      NATIVE_BUYER_ADDRESSES_ARM_FAILURE_COMMAND: ${{ secrets.IOS_BUYER_ADDRESSES_ARM_FAILURE_COMMAND }}
+      NATIVE_BUYER_ADDRESSES_CLEANUP_COMMAND: ${{ secrets.IOS_BUYER_ADDRESSES_CLEANUP_COMMAND }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run verify:release:buyer-addresses
+      - name: Retain iOS accessibility trees
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: buyer-addresses-accessibility-ios
+          path: artifacts/mobile/test-results/buyer-addresses-accessibility/ios/**/*.xml
+          if-no-files-found: error
+          retention-days: 30
+
+  android:
+    name: Android shipping-address screen reader
+    runs-on: [self-hosted, mobile-accessibility, android]
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: artifacts/mobile
+    env:
+      APPIUM_SERVER_URL: ${{ secrets.ANDROID_APPIUM_SERVER_URL }}
+      APPIUM_ANDROID_CAPABILITIES: ${{ secrets.ANDROID_APPIUM_CAPABILITIES }}
+      NATIVE_BUYER_ADDRESSES_PLATFORM: android
+      NATIVE_BUYER_ADDRESSES_DISPOSABLE_ACCOUNT: ${{ secrets.ANDROID_DISPOSABLE_BUYER_ACCOUNT }}
+      NATIVE_BUYER_ADDRESS_LABELS: Home,Office
+      NATIVE_BUYER_ADDRESSES_PREPARE_COMMAND: ${{ secrets.ANDROID_BUYER_ADDRESSES_PREPARE_COMMAND }}
+      NATIVE_BUYER_ADDRESSES_ARM_FAILURE_COMMAND: ${{ secrets.ANDROID_BUYER_ADDRESSES_ARM_FAILURE_COMMAND }}
+      NATIVE_BUYER_ADDRESSES_CLEANUP_COMMAND: ${{ secrets.ANDROID_BUYER_ADDRESSES_CLEANUP_COMMAND }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run verify:release:buyer-addresses
+      - name: Retain Android accessibility trees
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: buyer-addresses-accessibility-android
+          path: artifacts/mobile/test-results/buyer-addresses-accessibility/android/**/*.xml
+          if-no-files-found: error
+          retention-days: 30
+
+  mobile-release:
+    name: Approve mobile release
+    needs: [ios, android]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm native accessibility release gate
+        run: |
+          echo "iOS and Android shipping-address accessibility checks passed."
+          echo "The mobile release may proceed."
