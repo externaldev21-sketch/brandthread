@@ -21,7 +21,7 @@ export default function Index() {
     if (!__DEV__) return;
     if (!rootNavigationState?.key) return;
     const effectivePreviewRole = Platform.OS === 'web'
-      ? (previewRole === 'buyer' ? 'buyer' : 'seller')
+      ? (previewRole === 'buyer' || previewRole === 'seller' ? previewRole : null)
       : DEV_BYPASS_ROLE;
     if (!effectivePreviewRole) return;
     const redirect = setTimeout(() => {
@@ -30,7 +30,12 @@ export default function Index() {
     return () => clearTimeout(redirect);
   }, [previewRole, rootNavigationState?.key, router]);
 
-  if (__DEV__ && Platform.OS === 'web' && params.bt_capture === '1') {
+  if (
+    __DEV__
+    && Platform.OS === 'web'
+    && params.bt_capture === '1'
+    && (previewRole === 'buyer' || previewRole === 'seller')
+  ) {
     return (
       <Redirect
         href={{

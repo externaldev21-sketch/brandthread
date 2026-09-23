@@ -1845,6 +1845,7 @@ export default function OnboardingScreen() {
     deviceFlow,
     deviceStep,
     deviceProbe,
+    previewUser,
   } = useLocalSearchParams<{
     postAuth?: string;
     addAccount?: string;
@@ -1852,9 +1853,11 @@ export default function OnboardingScreen() {
     deviceFlow?: string;
     deviceStep?: string;
     deviceProbe?: string;
+    previewUser?: string;
   }>();
   const insets  = useSafeAreaInsets();
   const isAddAccount = addAccount === '1';
+  const isDevWebPreviewUser = __DEV__ && Platform.OS === 'web' && previewUser === '1';
   const deviceProbeEnabled = __DEV__ && deviceProbe === '1';
   const deviceProbeFlow: Flow | null = __DEV__ && (deviceFlow === 'buyer' || deviceFlow === 'seller')
     ? deviceFlow
@@ -2121,10 +2124,10 @@ export default function OnboardingScreen() {
     if (!selectedFlow) return;
     const initiatedAt = performance.now();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // After AccountType (step 0), go to path-specific Auth (step 1)
-    const next = selectedFlow === 'buyer'
-      ? BUYER_STEP_INDEX.AUTH
-      : SELLER_STEP_INDEX.AUTH;
+    // The dev-web walkthrough already showed auth before entering onboarding.
+    const next = isDevWebPreviewUser
+      ? selectedFlow === 'buyer' ? BUYER_STEP_INDEX.NAME : SELLER_STEP_INDEX.NAME
+      : selectedFlow === 'buyer' ? BUYER_STEP_INDEX.AUTH : SELLER_STEP_INDEX.AUTH;
     void AsyncStorage.multiSet([
       [PENDING_FLOW_KEY, selectedFlow],
       [ONBOARDING_KEY, 'false'],
@@ -2150,6 +2153,10 @@ export default function OnboardingScreen() {
   async function finishBuyer(retryAttempt = false) {
     if (finishing) return;
     setFinishing(true);
+    if (isDevWebPreviewUser && typeof window !== 'undefined') {
+      window.location.assign('/?bt_preview=buyer');
+      return;
+    }
     let profileId: string | null = null;
     let failureStage = 'required-profile';
     let pendingSyncQueued = false;
@@ -2244,6 +2251,11 @@ export default function OnboardingScreen() {
   async function finishSeller() {
     if (finishing) return;
     setFinishing(true);
+    if (isDevWebPreviewUser && typeof window !== 'undefined') {
+      await selectTheme(selectedThemeId);
+      window.location.assign('/?bt_preview=seller');
+      return;
+    }
     try {
       const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ') || firstName.trim();
       const uname = username.trim().toLowerCase();

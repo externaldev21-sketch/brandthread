@@ -16,9 +16,9 @@ Keep test and spec modules outside Expo Router's `app/` directory.
 - Put route regression tests in a top-level test directory, never beside route files under `app/`. Expo Router can evaluate those files while building the route graph; a Vitest import outside its runner makes static rendering return HTTP 500.
 
 ## Dev preview bypass
-Development web previews default to the buyer role, seed local onboarding/role state at module scope, and skip the Clerk gate + auth redirects. `?bt_preview=seller` explicitly switches design review to the seller role. Group segments are stripped from web URLs (`/(buyer)/discover` → `/discover`); bare `/` redirects to the effective preview role's home.
-**Why:** the screenshot browser and canvas iframes are stateless — no Clerk session, no localStorage — so without this, no auth-gated screen can ever be shown or captured outside a tester run.
-**How to apply:** use the bare preview URL for buyer review and add `?bt_preview=seller` for seller review. Screens tied to the Clerk user render fallbacks. The bypass is web + development only and never changes production or native end-user onboarding.
+The bare development web preview restarts the first-launch walkthrough on every full page load: splash, real sign-in UI, account-type choice, onboarding, then the matching dashboard. A dev-only preview-user continuation bypasses Clerk without changing production auth. `?bt_preview=buyer` and `?bt_preview=seller` remain explicit dashboard shortcuts.
+**Why:** owners need to review the complete first-launch experience repeatedly in the stateless phone-frame preview, while authenticated dashboard captures still need deterministic buyer/seller entry points.
+**How to apply:** use the bare preview URL for onboarding review. Use `?bt_preview=buyer` or `?bt_preview=seller` only when a dashboard shortcut is intended. Keep the reset and preview-user path limited to development web; native/device and production behavior must remain unchanged.
 
 Authenticated seller tools cannot treat this navigation bypass as a real Clerk session. In dev web seller preview, initialize review-only UI state synchronously from the route role and skip protected API calls; keep uploads, writes, checkout, and activation behind real authentication.
 

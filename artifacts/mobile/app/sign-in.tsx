@@ -65,6 +65,7 @@ export default function SignInScreen() {
   const canSubmit    = email.includes('@') && password.length >= 1;
   const canVerifyTotp = totpCode.length === 6;
   const currentEmail = user?.primaryEmailAddress?.emailAddress ?? '';
+  const showPreviewUser = __DEV__ && Platform.OS === 'web' && !isAddAccount;
 
   function finalizeSignIn() {
     return signIn.finalize({
@@ -477,6 +478,22 @@ export default function SignInScreen() {
                 : <Text style={[s.primaryBtnText, getOnAccentTextStyle(theme)]}>Sign in</Text>}
             </LinearGradient>
           </TouchableOpacity>
+
+          {showPreviewUser && (
+            <TouchableOpacity
+              style={[s.secondaryBtn, { marginBottom: 10 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Continue as preview user"
+              onPress={() => {
+                Haptics.selectionAsync();
+                router.replace('/onboarding?previewUser=1' as never);
+              }}
+              activeOpacity={0.85}
+              testID="continue-as-preview-user"
+            >
+              <Text style={s.secondaryBtnText}>Continue as preview user</Text>
+            </TouchableOpacity>
+          )}
 
           {/* ── Create account ─────────────────────────────────────────────────── */}
           <TouchableOpacity

@@ -310,8 +310,8 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 }
 
 // ─── DEV design-preview bypass (web + dev builds only) ───────────────────────
-// The development web preview defaults to the seller experience and skips the
-// Clerk/onboarding gates. ?bt_preview=buyer remains available for buyer review.
+// The default development web preview starts at the real first-launch flow.
+// Explicit ?bt_preview=buyer and ?bt_preview=seller links still jump to dashboards.
 // This is inert on native and in production builds.
 // ─── DEV: bypass all auth + onboarding on every platform ─────────────────────
 // Set to 'buyer' or 'seller' to jump straight to that dashboard on device.
@@ -321,8 +321,10 @@ const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_T
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
   if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web' || typeof window === 'undefined') return null;
   const v = new URLSearchParams(window.location.search).get('bt_preview');
-  return v === 'buyer' ? 'buyer' : 'seller';
+  return v === 'buyer' || v === 'seller' ? v : null;
 })();
+const DEV_WEB_ONBOARDING_PREVIEW =
+  __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined' && PREVIEW_ROLE === null;
 
 // Seed storage so AuthGate doesn't loop waiting on onboarding data.
 if (PREVIEW_ROLE && typeof localStorage !== 'undefined') {
@@ -374,6 +376,7 @@ function AuthGate() {
   const [threadExplainerSeen, setThreadExplainerSeen] = useState<boolean | null>(null);
   const [splashSeen, setSplashSeen]               = useState<boolean | null>(null);
   const [pendingInvite, setPendingInvite]         = useState<string | null>(null);
+  const [devWebPreviewReady, setDevWebPreviewReady] = useState(!DEV_WEB_ONBOARDING_PREVIEW);
   const prevSignedInRef = useRef<boolean | null>(null);
 
   // Clear per-account caches on sign-out so a different account gets fresh data.
@@ -414,6 +417,30 @@ function AuthGate() {
       ]);
       router.replace('/splash');
     })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded]);
+
+  // A full reload of the default dev-web preview always restarts the walkthrough.
+  useEffect(() => {
+    if (!DEV_WEB_ONBOARDING_PREVIEW || devForcedRef.current || !isLoaded) return;
+    devForcedRef.current = true;
+    void (async () => {
+      try { if (isSignedIn) await signOut(); } catch {}
+      await AsyncStorage.multiRemove([
+        ONBOARDING_KEY, ONBOARDING_OWNER_KEY, 'user_role', 'splash_seen',
+        'onboarding_draft', 'onboarding_pending_flow',
+        'onboarding_first_name', 'onboarding_brand_name',
+        'onboarding_brand_stage', 'onboarding_goals',
+        'onboarding_style_interests', 'onboarding_selected_plan',
+      ]);
+      setOnboardingDone(false);
+      setStoredRole(null);
+      setSplashSeen(false);
+      setActiveSeller(false);
+      setDevWebPreviewReady(true);
+      router.replace('/splash');
+    })();
+  // This reset is intentionally once per full dev-web page load.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded]);
 
@@ -505,6 +532,7 @@ function AuthGate() {
     // its navigation key prevents the initial auth redirect from racing that
     // mount and producing a blank error screen in web previews.
     if (!rootNavigationState?.key) return;
+    if (!devWebPreviewReady) return;
 
     const inAuthScreen    = AUTH_SCREENS.includes(segments[0] as string);
     const inOnboarding    = segments[0] === 'onboarding';
@@ -595,7 +623,7 @@ function AuthGate() {
     } else if (onboardingDone && storedRole === 'seller' && inBuyerGroup) {
       router.replace('/(tabs)/' as never);
     }
-  }, [addAccount, isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole, threadExplainerSeen, splashSeen, pendingInvite, rootNavigationState?.key]);
+  }, [addAccount, isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole, threadExplainerSeen, splashSeen, pendingInvite, rootNavigationState?.key, devWebPreviewReady]);
 
   return null;
 }
