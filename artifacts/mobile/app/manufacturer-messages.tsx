@@ -51,6 +51,9 @@ interface ApiMessage {
 type Row = { kind: 'message'; message: ApiMessage } | { kind: 'day'; id: string; label: string };
 
 const MAX_PHOTOS = 6;
+// react-native-web renders inverted lists upside down, so web uses a normal
+// chronological list that follows the newest message instead.
+const INVERTED = Platform.OS !== 'web';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -229,7 +232,8 @@ export default function ManufacturerMessagesScreen() {
     return () => { clearInterval(timer); clearInterval(clock); };
   }, [threadId, loadMessages]);
 
-  const rows = useMemo(() => buildRows(messages), [messages]);
+  const rows = useMemo(() => (INVERTED ? buildRows(messages) : buildRows(messages).reverse()), [messages]);
+  const listRef = useRef<FlatList<Row>>(null);
   const localTime = localTimeLabel(mfrTimeZone);
 
   // ── Sending ──────────────────────────────────────────────────────────────────
@@ -361,8 +365,10 @@ export default function ManufacturerMessagesScreen() {
       {header}
 
       <FlatList
+        ref={listRef}
         data={rows}
-        inverted
+        inverted={INVERTED}
+        onContentSizeChange={() => { if (!INVERTED) listRef.current?.scrollToEnd({ animated: false }); }}
         keyExtractor={(row) => (row.kind === 'day' ? row.id : row.message.id)}
         renderItem={({ item }) => {
           if (item.kind === 'day') {
@@ -395,7 +401,7 @@ export default function ManufacturerMessagesScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} tintColor={FG} onRefresh={() => { if (!threadId) return; setRefreshing(true); void loadMessages(threadId); }} />}
         ListEmptyComponent={
-          <View style={[s.emptyWrap, { transform: [{ scaleY: -1 }] }]} testID="thread-empty">
+          <View style={[s.emptyWrap, INVERTED && { transform: [{ scaleY: -1 }] }]} testID="thread-empty">
             <Feather name="message-circle" size={28} color={SUBTLE} />
             <Text style={s.emptyTitle}>Start the conversation</Text>
             <Text style={s.emptyText}>Share your designs, references and target price. When {mfrName} is ready, they'll send a sample card you can pay right here.</Text>

@@ -557,8 +557,8 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
   return (
     <View style={card.root}>
       {/* Compact directory tile: image first, then the key sourcing details. */}
-      <TouchableOpacity onPress={onProfile} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={`View ${mfg.name} profile`}>
-        <View style={card.cover}>
+      <View style={card.cover}>
+        <TouchableOpacity onPress={onProfile} activeOpacity={0.85} style={card.coverTouch} accessibilityRole="button" accessibilityLabel={`View ${mfg.name} profile`}>
           {mfg.profileImageUri ? (
             <Image source={{ uri: mfg.profileImageUri }} style={card.coverImage} resizeMode="cover" />
           ) : (
@@ -566,6 +566,7 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
               <Text style={card.coverFallbackText}>{mfg.name.charAt(0)}</Text>
             </View>
           )}
+        </TouchableOpacity>
           {mfg.yearsInBusiness > 0 && (
             <View style={card.yearsBadge}>
               <Text style={card.yearsText}>{mfg.yearsInBusiness} {mfg.yearsInBusiness === 1 ? 'yr' : 'yrs'}</Text>
@@ -582,7 +583,6 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
             <Feather name="heart" size={15} color={saved ? RED : FG} />
           </TouchableOpacity>
         </View>
-      </TouchableOpacity>
 
       <View style={card.topRow}>
         <View style={card.nameCol}>
@@ -634,6 +634,7 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
 const card = StyleSheet.create({
   root:          { flex: 1, minWidth: 0, backgroundColor: CARD_GLASS, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginBottom: SP.sm, padding: SP.sm },
   cover:         { height: 112, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: PURPLE_DIM, position: 'relative', marginBottom: SP.sm },
+  coverTouch:    { flex: 1 },
   coverImage:    { width: '100%', height: '100%' },
   coverFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   coverFallbackText: { fontSize: 34, fontFamily: FONT.bold, color: PURPLE_LIGHT },
@@ -1328,7 +1329,8 @@ function OrderRowCard({ order, router }: { order: SellerOrderRow; router: Return
   const reached = stageIndex(order.status) + 1;
   const awaiting = order.status === 'pending_payment';
   return (
-    <TouchableOpacity style={prodCard.root} activeOpacity={0.85} onPress={() => router.push((`/production-detail?id=${order.id}`) as never)} testID={`order-row-${order.id}`}>
+    <View style={prodCard.root} testID={`order-row-${order.id}`}>
+      <TouchableOpacity activeOpacity={0.85} onPress={() => router.push((`/production-detail?id=${order.id}`) as never)} accessibilityRole="button" accessibilityLabel={`Open tracker for ${order.title}`}>
       <View style={prodCard.topRow}>
         <View style={prodCard.nameCol}>
           <Text style={prodCard.productName} numberOfLines={1}>{order.title}</Text>
@@ -1342,15 +1344,16 @@ function OrderRowCard({ order, router }: { order: SellerOrderRow; router: Return
         </View>
       )}
       <Text style={prodCard.stage}>{awaiting ? 'Pay the card to start production' : reached > 0 ? `Stage ${reached} of 6 · ${orderStatusLabel(order.status)}` : orderStatusLabel(order.status)}</Text>
+      </TouchableOpacity>
       <View style={prodCard.actionRow}>
-        <View style={prodCard.btn}><Text style={prodCard.btnText}>{awaiting ? 'Review & pay' : 'Open tracker'}</Text></View>
+        <TouchableOpacity style={prodCard.btn} onPress={() => router.push((`/production-detail?id=${order.id}`) as never)}><Text style={prodCard.btnText}>{awaiting ? 'Review & pay' : 'Open tracker'}</Text></TouchableOpacity>
         {!!order.threadId && (
           <TouchableOpacity style={prodCard.btn} onPress={() => router.push((`/manufacturer-messages?threadId=${order.threadId}`) as never)}>
             <Text style={prodCard.btnText}>Message</Text>
           </TouchableOpacity>
         )}
       </View>
-    </TouchableOpacity>
+    </View>
   );
 }
 
