@@ -70,11 +70,13 @@ vi.mock("../../middlewares/requireAuth", () => ({
 }));
 
 import {
-  db, disputes, drops, dropWallets, dropWalletTransactions, manufacturers, orders, users,
+  db, disputes, drops, dropWallets, dropWalletTransactions, manufacturers, orderReleases, orders, users,
 } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
 import disputesRouter from "../disputes";
 import walletsRouter from "../drop-wallet";
+import { recordOrderPaid } from "../../lib/money/escrow";
+import { splitOrder } from "../../lib/money/fees";
 
 const RUN = `task252_${Date.now()}`;
 const SELLER = `${RUN}_seller`;
@@ -94,6 +96,7 @@ async function call(path: string, options: { method?: string; user?: string; bod
 async function seedDrop(ownerId = SELLER) {
   const [drop] = await db.insert(drops).values({
     ownerId, name: `${RUN} drop`, type: "pre-order", status: "active",
+    escrowState: "collecting", fulfillmentDeadlineAt: new Date(Date.now() + 30 * 86_400_000),
   }).returning();
   return drop;
 }
@@ -122,6 +125,9 @@ async function clearRows() {
     WHERE wallet_id IN (SELECT id FROM drop_wallets WHERE seller_id IN (${SELLER}, ${OTHER}))
   `);
   await db.delete(dropWallets).where(sql`${dropWallets.sellerId} IN (${SELLER}, ${OTHER})`);
+  // Release records keep a strict foreign key to their order. (Ledger rows
+  // are append-only and reference nothing, so they stay.)
+  await db.delete(orderReleases).where(sql`${orderReleases.sellerId} IN (${SELLER}, ${OTHER})`);
   await db.delete(disputes).where(sql`${disputes.sellerId} IN (${SELLER}, ${OTHER})`);
   await db.delete(orders).where(sql`${orders.ownerId} IN (${SELLER}, ${OTHER})`);
   await db.delete(drops).where(sql`${drops.ownerId} IN (${SELLER}, ${OTHER})`);
@@ -221,6 +227,25 @@ describe("disputes", () => {
 });
 
 describe("drop wallet", () => {
+  /** A preorder paid through checkout: held by Brandthread, net of 5% (no Stripe fee in this fixture). */
+  async function seedHeldOrder(dropId: string, overrides: any = {}) {
+    const order = await seedOrder(dropId, SELLER, { stripePaymentIntentId: `pi_${RUN}_${Math.random().toString(36).slice(2)}`, ...overrides });
+    await db.transaction((tx) => recordOrderPaid(tx, {
+      orderId: order.id,
+      sellerId: SELLER,
+      dropId,
+      chargeModel: "held",
+      split: splitOrder({
+        subtotalCents: 10_000, discountCents: 0, shippingCents: 0, taxCents: 0,
+        grossCents: 10_000, processingFeeCents: 0,
+      }),
+      charge: { chargeId: `ch_${order.id}`, processingFeeCents: 0, transferId: null, applicationFeeId: null },
+      paymentIntentId: order.stripePaymentIntentId,
+      occurredAt: new Date(),
+    }));
+    return order;
+  }
+
   it("creates idempotently, enforces drop ownership, and exposes its wallet", async () => {
     const drop = await seedDrop();
     const attempts = await Promise.all([
@@ -233,109 +258,78 @@ describe("drop wallet", () => {
     expect((await call(`/api/drop-wallets/${drop.id}`)).body.availableCents).toBe(0);
   });
 
-  it("records integer-cent deposits atomically under concurrent requests", async () => {
+  it("never lets a seller credit a wallet: preorder payments are deposited automatically", async () => {
     const drop = await seedDrop(); await wallet(drop.id);
-    const orderA = await seedOrder(drop.id); const orderB = await seedOrder(drop.id);
-    const bad = await call(`/api/drop-wallets/${drop.id}/deposit`, { method: "POST", body: { orderId: orderA.id, amountCents: "100" } });
-    expect(bad.status).toBe(400);
-    const fractional = await call(`/api/drop-wallets/${drop.id}/deposit`, { method: "POST", body: { orderId: orderA.id, amountCents: 100.5 } });
-    expect(fractional.status).toBe(400);
-    const [a, b] = await Promise.all([
-      call(`/api/drop-wallets/${drop.id}/deposit`, { method: "POST", body: { orderId: orderA.id, amountCents: 10_001 } }),
-      call(`/api/drop-wallets/${drop.id}/deposit`, { method: "POST", body: { orderId: orderB.id, amountCents: 9_999 } }),
-    ]);
-    expect([a.status, b.status]).toEqual([200, 200]);
-    const retry = await call(`/api/drop-wallets/${drop.id}/deposit`, {
-      method: "POST", body: { orderId: orderA.id, amountCents: 10_001 },
-    });
-    expect(retry).toMatchObject({ status: 200, body: { deposited: true, duplicate: true } });
-    expect((await call(`/api/drop-wallets/${drop.id}`)).body.balanceCents).toBe(20_000);
+    const order = await seedOrder(drop.id);
+    const forged = await call(`/api/drop-wallets/${drop.id}/deposit`, { method: "POST", body: { orderId: order.id, amountCents: 10_000 } });
+    expect(forged).toMatchObject({ status: 410, body: { code: "DEPOSITS_ARE_AUTOMATIC" } });
+    expect((await call(`/api/drop-wallets/${drop.id}`)).body.balanceCents).toBe(0);
+
+    await seedHeldOrder(drop.id);
+    const state = await call(`/api/drop-wallets/${drop.id}`);
+    expect(state.body).toMatchObject({ balanceCents: 9_500, heldCents: 9_500, availableCents: 9_500 });
+    expect(state.body.transactions.filter((t: any) => t.type === "deposit")).toHaveLength(1);
   });
 
-  it("requires tracked, owned orders and sufficient funds before release", async () => {
+  it("requires tracked, owned, held orders before release", async () => {
     const drop = await seedDrop(); await wallet(drop.id);
-    const untracked = await seedOrder(drop.id);
-    expect((await call(`/api/drop-wallets/${drop.id}/release-order/${untracked.id}`, { method: "POST" })).status).toBe(400);
+    const untracked = await seedHeldOrder(drop.id);
+    expect(await call(`/api/drop-wallets/${drop.id}/release-order/${untracked.id}`, { method: "POST" }))
+      .toMatchObject({ status: 409, body: { code: "NO_TRACKING" } });
     const foreign = await seedOrder(drop.id, OTHER, { trackingNumber: "foreign" });
     expect((await call(`/api/drop-wallets/${drop.id}/release-order/${foreign.id}`, { method: "POST" })).status).toBe(404);
-    await db.update(orders).set({ trackingNumber: "1ZREADY" }).where(eq(orders.id, untracked.id));
-    const insufficient = await call(`/api/drop-wallets/${drop.id}/release-order/${untracked.id}`, { method: "POST" });
-    expect(insufficient.status).toBe(400);
+    const direct = await seedOrder(drop.id, SELLER, { trackingNumber: "1ZDIRECT", chargeModel: "destination", fundsState: "settled_direct" });
+    expect(await call(`/api/drop-wallets/${drop.id}/release-order/${direct.id}`, { method: "POST" }))
+      .toMatchObject({ status: 409, body: { code: "NOT_HELD" } });
+    expect(fake.transfers).toHaveLength(0);
   });
 
   it("releases once, tracks the order transaction, and concurrent releases never double-transfer", async () => {
     const drop = await seedDrop(); await wallet(drop.id);
-    const order = await seedOrder(drop.id, SELLER, { trackingNumber: "1ZRELEASE", subtotalCents: 10_000 });
-    await call(`/api/drop-wallets/${drop.id}/deposit`, { method: "POST", body: { orderId: order.id, amountCents: 10_000 } });
+    const order = await seedHeldOrder(drop.id, { trackingNumber: "1ZRELEASE" });
     fake.transferDelay(30);
     const responses = await Promise.all([
       call(`/api/drop-wallets/${drop.id}/release-order/${order.id}`, { method: "POST" }),
       call(`/api/drop-wallets/${drop.id}/release-order/${order.id}`, { method: "POST" }),
     ]);
-    expect(responses.map(r => r.status).sort()).toEqual([200, 409]);
+    // One request pays; the other sees the same release still in flight.
+    expect(responses.map(r => r.status).sort()).toEqual([200, 202]);
     expect(fake.transfers).toHaveLength(1);
-    expect(fake.transfers[0].amount).toBe(9500);
-    expect(fake.transfers[0].idempotencyKey).toBe(
-      `drop-wallet-release/${(await call(`/api/drop-wallets/${drop.id}`)).body.id}/${order.id}`,
-    );
+    expect(fake.transfers[0]).toMatchObject({
+      amount: 9_500,
+      source_transaction: `ch_${order.id}`,
+      idempotencyKey: `order-release/${order.id}/1`,
+    });
     const state = await call(`/api/drop-wallets/${drop.id}`);
-    expect(state.body.releasedCents).toBe(10_000);
+    expect(state.body).toMatchObject({ releasedCents: 9_500, heldCents: 0, reservedCents: 0 });
     expect(state.body.transactions.filter((t: any) => t.type === "release")).toHaveLength(1);
-    expect((await call(`/api/drop-wallets/${drop.id}/release-order/${order.id}`, { method: "POST" })).status).toBe(409);
+    expect(state.body.releases[0]).toMatchObject({ orderId: order.id, state: "paid", amountCents: 9_500 });
+    const again = await call(`/api/drop-wallets/${drop.id}/release-order/${order.id}`, { method: "POST" });
+    expect(again).toMatchObject({ status: 200, body: { released: true } });
+    expect(fake.transfers).toHaveLength(1);
   });
 
-  it("does not record a release when Stripe's transfer provider fails", async () => {
+  it("does not record a release as paid when Stripe's transfer provider fails", async () => {
     const drop = await seedDrop(); await wallet(drop.id);
-    const order = await seedOrder(drop.id, SELLER, { trackingNumber: "1ZFAIL" });
-    await call(`/api/drop-wallets/${drop.id}/deposit`, { method: "POST", body: { orderId: order.id, amountCents: 10_000 } });
+    const order = await seedHeldOrder(drop.id, { trackingNumber: "1ZFAIL" });
     fake.failTransfers(true);
-    expect((await call(`/api/drop-wallets/${drop.id}/release-order/${order.id}`, { method: "POST" })).status).toBe(500);
+    const response = await call(`/api/drop-wallets/${drop.id}/release-order/${order.id}`, { method: "POST" });
+    expect(response).toMatchObject({ status: 202, body: { released: false, state: "transferring" } });
     const state = await call(`/api/drop-wallets/${drop.id}`);
-    expect(state.body.releasedCents).toBe(0);
+    expect(state.body).toMatchObject({ releasedCents: 0, heldCents: 9_500, reservedCents: 9_500 });
     expect(state.body.transactions.filter((t: any) => t.type === "release")).toHaveLength(0);
+    const [current] = await db.select().from(orders).where(eq(orders.id, order.id));
+    expect(current.fundsState).toBe("release_pending");
   });
 
-  it("validates shipping payment, ownership, balance, and updates order tracking", async () => {
+  it("sends label purchases through the in-app label flow", async () => {
     const drop = await seedDrop(); await wallet(drop.id);
-    const order = await seedOrder(drop.id);
-    const foreignOrder = await seedOrder(drop.id, OTHER);
-    expect((await call(`/api/drop-wallets/${drop.id}/pay-shipping/${order.id}`, { method: "POST", body: { labelCents: 0 } })).status).toBe(400);
-    expect((await call(`/api/drop-wallets/${drop.id}/pay-shipping/${order.id}`, { user: OTHER, method: "POST", body: { labelCents: 100 } })).status).toBe(404);
-    // A seller must not reserve their balance against another seller's order.
-    expect((await call(`/api/drop-wallets/${drop.id}/pay-shipping/${foreignOrder.id}`, { method: "POST", body: { labelCents: 100 } })).status).toBe(404);
-    expect((await call(`/api/drop-wallets/${drop.id}/pay-shipping/${order.id}`, { method: "POST", body: { labelCents: 100 } })).status).toBe(400);
-    await call(`/api/drop-wallets/${drop.id}/deposit`, { method: "POST", body: { orderId: order.id, amountCents: 500 } });
-    const paid = await call(`/api/drop-wallets/${drop.id}/pay-shipping/${order.id}`, {
+    const order = await seedHeldOrder(drop.id);
+    const response = await call(`/api/drop-wallets/${drop.id}/pay-shipping/${order.id}`, {
       method: "POST", body: { labelCents: 125, carrier: "UPS", trackingNumber: "1ZSHIP" },
     });
-    expect(paid.status).toBe(200);
-    const duplicate = await call(`/api/drop-wallets/${drop.id}/pay-shipping/${order.id}`, {
-      method: "POST", body: { labelCents: 125, carrier: "UPS", trackingNumber: "1ZSHIP" },
-    });
-    expect(duplicate).toMatchObject({ status: 200, body: { duplicate: true } });
-    const [updated] = await db.select().from(orders).where(and(eq(orders.id, order.id), eq(orders.ownerId, SELLER)));
-    expect(updated).toMatchObject({ status: "shipped", carrier: "UPS", trackingNumber: "1ZSHIP" });
-    expect((await call(`/api/drop-wallets/${drop.id}`)).body.reservedCents).toBe(125);
-  });
-
-  it("serializes concurrent shipping payments without losing reservations", async () => {
-    const drop = await seedDrop(); await wallet(drop.id);
-    const orderA = await seedOrder(drop.id);
-    const orderB = await seedOrder(drop.id);
-    await call(`/api/drop-wallets/${drop.id}/deposit`, {
-      method: "POST", body: { orderId: orderA.id, amountCents: 200 },
-    });
-    const attempts = await Promise.all([
-      call(`/api/drop-wallets/${drop.id}/pay-shipping/${orderA.id}`, {
-        method: "POST", body: { labelCents: 150 },
-      }),
-      call(`/api/drop-wallets/${drop.id}/pay-shipping/${orderB.id}`, {
-        method: "POST", body: { labelCents: 150 },
-      }),
-    ]);
-    expect(attempts.map(result => result.status).sort()).toEqual([200, 400]);
-    const state = await call(`/api/drop-wallets/${drop.id}`);
-    expect(state.body.reservedCents).toBe(150);
-    expect(state.body.transactions.filter((txn: any) => txn.type === "shipping_payment")).toHaveLength(1);
+    expect(response).toMatchObject({ status: 410, body: { code: "USE_IN_APP_LABELS" } });
+    const [unchanged] = await db.select().from(orders).where(and(eq(orders.id, order.id), eq(orders.ownerId, SELLER)));
+    expect(unchanged).toMatchObject({ status: "pending", trackingNumber: null, fundsState: "held" });
   });
 });

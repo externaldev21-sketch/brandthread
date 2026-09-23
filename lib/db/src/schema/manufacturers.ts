@@ -291,6 +291,8 @@ export const dropWallets = pgTable('drop_wallets', {
   releasedCents:      integer('released_cents').notNull().default(0),
   reservedCents:      integer('reserved_cents').notNull().default(0),
   stripeTransferGroup: text('stripe_transfer_group'),
+  // 2 = balances are seller-net amounts kept in step with the money ledger.
+  ledgerVersion:      integer('ledger_version').notNull().default(2),
   createdAt:          timestamp('created_at').defaultNow().notNull(),
   updatedAt:          timestamp('updated_at').defaultNow().notNull(),
 }, (t) => ({

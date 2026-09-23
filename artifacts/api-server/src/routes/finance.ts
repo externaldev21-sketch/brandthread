@@ -7,11 +7,15 @@
  * GET  /transactions            balance transaction list (for finance P&L view)
  * GET  /statement.csv           download CSV of transactions
  * POST /payout                  manually trigger a payout (if manual schedule)
+ * GET  /summary                 held vs releasing vs available vs paid out
  */
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { users, orderFundReservations, sellerCashoutAttempts } from "@workspace/db";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import {
+  users, orderFundReservations, sellerCashoutAttempts, drops, orders, orderReleases,
+  ledgerPostings, ledgerTransactions,
+} from "@workspace/db";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 import { stripe } from "../lib/stripe";
@@ -100,7 +104,11 @@ router.get("/balance", requireRole("owner"), async (req, res) => {
         .from(orderFundReservations)
         .where(and(
           eq(orderFundReservations.ownerId, sellerId),
-          inArray(orderFundReservations.status, ["reserved", "spent"]),
+          // Only labels still being bought are in flight. A bought label's
+          // cost is recovered from the Stripe balance itself (transfer
+          // reversal), so counting "spent" here would charge it twice and
+          // shrink the balance forever.
+          eq(orderFundReservations.status, "reserved"),
         )),
       db.select({
         idempotencyKey: sellerCashoutAttempts.idempotencyKey,
@@ -166,6 +174,180 @@ router.get("/balance", requireRole("owner"), async (req, res) => {
   } catch (err: any) {
     req.log.error({ err }, "Failed to load balance");
     res.status(err.status ?? 500).json({ error: err.message ?? "Failed to load balance" });
+  }
+});
+
+// ─── GET /api/finance/summary ─────────────────────────────────────────────────
+// Where every dollar of the seller's sales is right now, from the money
+// ledger (lib/money/ledger.ts) plus Stripe's live balance:
+//   held       preorder money Brandthread is holding until each order ships
+//   releasing  shipped preorders whose transfer to the seller is in flight
+//   available  in the seller's Stripe balance, ready to cash out
+//   pending    in the seller's Stripe balance, still settling
+//   paidOut    everything Brandthread has sent to the seller's Stripe account
+//   owed       what the seller owes Brandthread (e.g. a failed drop's
+//              refunds after the bulk order was paid, unrecovered labels)
+router.get("/summary", requireRole("owner"), async (req, res) => {
+  const sellerId = getSellerId(req);
+  try {
+    const sellerSums = await db.select({
+      account: ledgerPostings.account,
+      total: sql<string>`COALESCE(SUM(${ledgerPostings.amountCents}), 0)`,
+    }).from(ledgerPostings)
+      .where(and(
+        eq(ledgerPostings.partyId, sellerId),
+        inArray(ledgerPostings.account, ["seller_held", "seller_paid_out", "platform_funds_advanced"]),
+      ))
+      .groupBy(ledgerPostings.account);
+    const sum = (account: string) => Number(sellerSums.find((row) => row.account === account)?.total ?? 0);
+    const advanced = sum("platform_funds_advanced");
+    // Per drop: a positive balance is held for the seller; a negative
+    // balance on a finished drop is a shortfall the seller owes.
+    const heldByDrop = await db.execute(sql`
+      SELECT
+        COALESCE(SUM(GREATEST(x.total, 0)), 0) AS held,
+        COALESCE(SUM(CASE WHEN x.total < 0 AND d.escrow_state IN ('failed', 'completed') THEN -x.total ELSE 0 END), 0) AS owed
+      FROM (
+        SELECT drop_id, SUM(amount_cents) AS total FROM ledger_postings
+        WHERE account = 'seller_held' AND party_id = ${sellerId}
+        GROUP BY drop_id
+      ) x
+      LEFT JOIN drops d ON d.id = x.drop_id
+    `);
+    const heldRow = heldByDrop.rows[0] as { held: string; owed: string } | undefined;
+    const heldTotal = Number(heldRow?.held ?? 0);
+    const dropShortfallOwed = Number(heldRow?.owed ?? 0);
+
+    const [dropRows, releasing, fees, activity] = await Promise.all([
+      db.select({
+        dropId: drops.id,
+        name: drops.name,
+        escrowState: drops.escrowState,
+        fulfillmentDeadlineAt: drops.fulfillmentDeadlineAt,
+        heldCents: sql<string>`COALESCE((
+          SELECT SUM(p.amount_cents) FROM ledger_postings p
+          WHERE p.account = 'seller_held' AND p.party_id = ${sellerId} AND p.drop_id = drops.id
+        ), 0)`,
+        ordersHeld: sql<number>`(SELECT count(*)::int FROM orders o WHERE o.drop_id = drops.id AND o.funds_state = 'held')`,
+        ordersReleased: sql<number>`(SELECT count(*)::int FROM orders o WHERE o.drop_id = drops.id AND o.funds_state = 'released')`,
+        ordersRefunded: sql<number>`(SELECT count(*)::int FROM orders o WHERE o.drop_id = drops.id AND o.funds_state = 'refunded')`,
+      }).from(drops)
+        .where(and(eq(drops.ownerId, sellerId), eq(drops.type, "pre-order")))
+        .orderBy(desc(drops.createdAt))
+        .limit(50),
+      db.select({
+        count: sql<number>`count(*)::int`,
+        total: sql<string>`COALESCE(SUM(${orderReleases.amountCents}), 0)`,
+      }).from(orderReleases)
+        .where(and(
+          eq(orderReleases.sellerId, sellerId),
+          inArray(orderReleases.state, ["pending", "transferring", "failed"]),
+        )),
+      db.select({
+        platformFees: sql<string>`COALESCE(SUM(${orders.platformFeeCents} - ${orders.platformFeeRefundedCents}), 0)`,
+        processingFees: sql<string>`COALESCE(SUM(${orders.processingFeeChargedCents}), 0)`,
+        grossSales: sql<string>`COALESCE(SUM(${orders.grossChargedCents}), 0)`,
+        refunded: sql<string>`COALESCE(SUM(${orders.refundedCents}), 0)`,
+      }).from(orders)
+        .where(and(eq(orders.ownerId, sellerId), sql`${orders.chargeModel} IS NOT NULL`)),
+      db.select({
+        id: ledgerTransactions.id,
+        kind: ledgerTransactions.kind,
+        memo: ledgerTransactions.memo,
+        orderId: ledgerTransactions.orderId,
+        dropId: ledgerTransactions.dropId,
+        occurredAt: ledgerTransactions.occurredAt,
+        sellerEffectCents: sql<string>`COALESCE((
+          SELECT SUM(p.amount_cents) FROM ledger_postings p
+          WHERE p.transaction_id = ledger_transactions.id AND p.party_id = ${sellerId}
+            AND p.account IN ('seller_held', 'seller_paid_out', 'platform_funds_advanced')
+        ), 0)`,
+      }).from(ledgerTransactions)
+        .where(eq(ledgerTransactions.sellerId, sellerId))
+        .orderBy(desc(ledgerTransactions.occurredAt))
+        .limit(25),
+    ]);
+
+    // Live Stripe balance. The ledger part of the summary still renders if
+    // Stripe is unreachable; the app shows those two figures as unavailable.
+    let stripeBalance: { available: number; pending: number } | null = null;
+    let paidToBankCents: number | null = null;
+    let stripeError = false;
+    const accountId = await getStripeAccount(sellerId);
+    if (stripe && accountId) {
+      try {
+        const [balance, reservationRows, payoutPage] = await Promise.all([
+          stripe.balance.retrieve({}, { stripeAccount: accountId }),
+          db.select({ reserved: sql<number>`COALESCE(SUM(${orderFundReservations.amountCents}), 0)::int` })
+            .from(orderFundReservations)
+            .where(and(eq(orderFundReservations.ownerId, sellerId), eq(orderFundReservations.status, "reserved"))),
+          stripe.payouts.list({ limit: 100 }, { stripeAccount: accountId }),
+        ]);
+        const avail = balance.available.find((entry) => entry.currency === PAYOUT_CURRENCY)?.amount ?? 0;
+        const pend = balance.pending.find((entry) => entry.currency === PAYOUT_CURRENCY)?.amount ?? 0;
+        stripeBalance = {
+          available: cashOutableAmount(avail, Number(reservationRows[0]?.reserved ?? 0)),
+          pending: pend,
+        };
+        paidToBankCents = payoutPage.data
+          .filter((payout) => payout.status === "paid" && payout.currency === PAYOUT_CURRENCY)
+          .reduce((total, payout) => total + payout.amount, 0);
+      } catch (err) {
+        stripeError = true;
+        req.log.warn({ err }, "Stripe balance unavailable for finance summary");
+      }
+    }
+
+    const money = (cents: number) => ({ amount: cents, formatted: formatCents(cents) });
+    res.json({
+      currency: PAYOUT_CURRENCY,
+      connected: Boolean(accountId),
+      stripeError,
+      held: {
+        ...money(heldTotal),
+        drops: dropRows.map((row) => {
+          const held = Number(row.heldCents);
+          return {
+            dropId: row.dropId,
+            name: row.name,
+            escrowState: row.escrowState,
+            fulfillmentDeadlineAt: row.fulfillmentDeadlineAt?.toISOString() ?? null,
+            heldCents: Math.max(0, held),
+            shortfallCents: held < 0 ? -held : 0,
+            ordersHeld: row.ordersHeld,
+            ordersReleased: row.ordersReleased,
+            ordersRefunded: row.ordersRefunded,
+          };
+        }),
+      },
+      releasing: { ...money(Number(releasing[0]?.total ?? 0)), count: releasing[0]?.count ?? 0 },
+      available: stripeBalance ? money(stripeBalance.available) : null,
+      pending: stripeBalance ? money(stripeBalance.pending) : null,
+      paidOut: {
+        ...money(sum("seller_paid_out")),
+        toBank: paidToBankCents === null ? null : money(paidToBankCents),
+      },
+      owed: money(Math.max(0, -advanced) + dropShortfallOwed),
+      credit: money(Math.max(0, advanced)),
+      lifetime: {
+        grossSales: money(Number(fees[0]?.grossSales ?? 0)),
+        refunded: money(Number(fees[0]?.refunded ?? 0)),
+        platformFees: money(Number(fees[0]?.platformFees ?? 0)),
+        processingFees: money(Number(fees[0]?.processingFees ?? 0)),
+      },
+      activity: activity.map((row) => ({
+        id: row.id,
+        kind: row.kind,
+        description: row.memo,
+        orderId: row.orderId,
+        dropId: row.dropId,
+        occurredAt: row.occurredAt.toISOString(),
+        sellerEffectCents: Number(row.sellerEffectCents),
+      })),
+    });
+  } catch (err) {
+    req.log.error({ err }, "Failed to load finance summary");
+    res.status(500).json({ error: "Failed to load finance summary" });
   }
 });
 
@@ -388,7 +570,11 @@ router.post("/payout", requireRole("owner"), async (req, res) => {
             .from(orderFundReservations)
             .where(and(
               eq(orderFundReservations.ownerId, sellerId),
-              inArray(orderFundReservations.status, ["reserved", "spent"]),
+              // Only labels still being bought are in flight. A bought label's
+          // cost is recovered from the Stripe balance itself (transfer
+          // reversal), so counting "spent" here would charge it twice and
+          // shrink the balance forever.
+          eq(orderFundReservations.status, "reserved"),
             )),
           tx.select({ amountCents: sellerCashoutAttempts.amountCents })
             .from(sellerCashoutAttempts)

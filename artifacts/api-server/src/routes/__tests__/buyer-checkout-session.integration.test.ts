@@ -10,7 +10,7 @@ import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
-import { db, checkoutSessions, productVariants, products, users } from "@workspace/db";
+import { db, checkoutSessions, drops, productVariants, products, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 const TEST_SUFFIX = crypto.randomBytes(6).toString("hex");
@@ -163,7 +163,8 @@ async function seedProduct(options: { priceCents?: number; stock?: number } = {}
     .insert(productVariants)
     .values({
       productId,
-      sku: `checkout-test-sku-${TEST_SUFFIX}`,
+      // Unique per seed: a product's variants can outlive its cleanup.
+      sku: `checkout-test-sku-${TEST_SUFFIX}-${crypto.randomUUID()}`,
       priceCents: options.priceCents ?? 2_500,
       stock: options.stock ?? 10,
       size: "M",
@@ -352,15 +353,53 @@ describe("POST /api/buyer/checkout/session", () => {
     expect(fakeStripe.sessionCreates).toHaveLength(0);
   });
 
-  it("sets the application fee to 5% of the server-resolved subtotal", async () => {
+  it("sets the application fee to 5% of the server-resolved subtotal plus Stripe processing", async () => {
     const result = await postCheckout(checkoutBody());
 
     expect(result.status).toBe(200);
     const createCall = fakeStripe.sessionCreates[0];
-    expect(createCall.params.payment_intent_data.application_fee_amount).toBe(250);
+    // 2 × $25.00 = $50.00 → 5% = 250¢; processing 2.9% + 30¢ of $50 = 175¢.
+    expect(createCall.params.payment_intent_data.application_fee_amount).toBe(425);
     expect(createCall.params.payment_intent_data.transfer_data.destination).toBe(
       SELLER_ACCOUNT_ID,
     );
+    const [saved] = await db.select().from(checkoutSessions)
+      .where(eq(checkoutSessions.stripeSessionId, result.body.sessionId)).limit(1);
+    expect(saved).toMatchObject({
+      chargeModel: "destination",
+      dropId: null,
+      platformFeeCents: 250,
+      processingFeeEstimateCents: 175,
+    });
+  });
+
+  it("holds a preorder on the platform instead of paying the seller directly", async () => {
+    const [drop] = await db.insert(drops).values({
+      ownerId: SELLER_ID,
+      name: "Checkout preorder drop",
+      type: "pre-order",
+      escrowState: "collecting",
+      fulfillmentDeadlineAt: new Date(Date.now() + 30 * 86_400_000),
+    }).returning({ id: drops.id });
+    await db.update(products).set({ dropId: drop.id }).where(eq(products.id, productId));
+
+    const result = await postCheckout(checkoutBody());
+
+    expect(result.status).toBe(200);
+    const intent = fakeStripe.sessionCreates[0].params.payment_intent_data;
+    expect(intent.transfer_data).toBeUndefined();
+    expect(intent.application_fee_amount).toBeUndefined();
+    expect(intent.transfer_group).toBe(`drop_${drop.id}`);
+    expect(intent.metadata).toMatchObject({ chargeModel: "held", dropId: drop.id });
+    const [saved] = await db.select().from(checkoutSessions)
+      .where(eq(checkoutSessions.stripeSessionId, result.body.sessionId)).limit(1);
+    expect(saved).toMatchObject({ chargeModel: "held", dropId: drop.id });
+  });
+
+  it("ignores a client dropId that does not match the products", async () => {
+    const result = await postCheckout(checkoutBody({ dropId: crypto.randomUUID() }));
+    expect(result).toMatchObject({ status: 400, body: { code: "DROP_MISMATCH" } });
+    expect(fakeStripe.sessionCreates).toHaveLength(0);
   });
 
   it("returns the same Stripe session when the idempotency key is retried", async () => {
