@@ -10,12 +10,12 @@ describe('development app preview routing', () => {
     expect(layoutSource).toContain(
       "if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web' || typeof window === 'undefined') return null;",
     );
-    expect(layoutSource).toContain("return v === 'seller' ? 'seller' : 'buyer';");
+    expect(layoutSource).toContain("return v === 'buyer' ? 'buyer' : 'seller';");
     expect(indexSource).toContain(
       "const effectivePreviewRole = Platform.OS === 'web'",
     );
     expect(indexSource).toContain(
-      "previewRole === 'seller' ? '/(tabs)' : '/(buyer)'",
+      "previewRole === 'buyer' ? '/(buyer)' : '/(tabs)'",
     );
   });
 });

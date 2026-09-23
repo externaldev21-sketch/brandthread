@@ -21,7 +21,7 @@ export default function Index() {
     if (!__DEV__) return;
     if (!rootNavigationState?.key) return;
     const effectivePreviewRole = Platform.OS === 'web'
-      ? (previewRole === 'seller' ? 'seller' : 'buyer')
+      ? (previewRole === 'buyer' ? 'buyer' : 'seller')
       : DEV_BYPASS_ROLE;
     if (!effectivePreviewRole) return;
     const redirect = setTimeout(() => {
@@ -34,7 +34,7 @@ export default function Index() {
     return (
       <Redirect
         href={{
-          pathname: previewRole === 'seller' ? '/(tabs)' : '/(buyer)',
+          pathname: previewRole === 'buyer' ? '/(buyer)' : '/(tabs)',
           params,
         }}
       />
