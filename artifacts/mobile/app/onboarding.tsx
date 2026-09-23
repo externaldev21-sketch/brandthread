@@ -1235,6 +1235,17 @@ function SharedAuthStep({
   const isUsernameValid = USERNAME_REGEX_AUTH.test(username.trim());
   const passwordsMatch = password === confirmPassword;
   const canSubmit = email.includes('@') && password.length >= 8 && passwordsMatch && isUsernameValid && formFirstName.trim().length >= 1;
+  const missingFields: string[] = [];
+  if (!email.includes('@')) missingFields.push('a valid email');
+  if (formFirstName.trim().length < 1) missingFields.push('your first name');
+  if (password.length < 8) missingFields.push('a password (8+ characters)');
+  else if (!passwordsMatch) missingFields.push('matching passwords');
+  if (!isUsernameValid) missingFields.push('a username');
+  const missingFieldsHint = missingFields.length === 0
+    ? ''
+    : missingFields.length === 1
+      ? `Add ${missingFields[0]} to continue.`
+      : `Add ${missingFields.slice(0, -1).join(', ')} and ${missingFields[missingFields.length - 1]} to continue.`;
   const canVerify = code.length === 6;
   const currentEmail = user?.primaryEmailAddress?.emailAddress ?? '';
 
@@ -1303,7 +1314,11 @@ function SharedAuthStep({
     setLoading(true);
     setError('');
     try {
-      await signUp.verifications.verifyEmailCode({ code });
+      const { error: verifyError } = await signUp.verifications.verifyEmailCode({ code });
+      if (verifyError) {
+        setError("That code isn't right. Check your email and try again.");
+        return;
+      }
       if (signUp.status === 'complete') {
         await signUp.finalize({
           navigate: ({ decorateUrl }: { decorateUrl: (url: string) => string }) => {
@@ -1530,13 +1545,12 @@ function SharedAuthStep({
         {/* Divider */}
         <View style={ssa.divider}>
           <View style={ssa.divLine} />
-          <Text style={ssa.divText}>optional</Text>
           <View style={ssa.divLine} />
         </View>
 
         {/* Username */}
         <View style={ssa.inputWrap}>
-          <Text style={ssa.label}>Choose your @username</Text>
+          <Text style={ssa.label}>Username</Text>
           <TextInput
             testID="onboarding-username-input"
             style={[ssa.input, usernameError ? { borderColor: ERR } : undefined]}
@@ -1587,6 +1601,7 @@ function SharedAuthStep({
         {error ? <Text style={ssa.error}>{error}</Text> : null}
 
         <PrimaryButton label={loading ? 'Creating account…' : 'Create account'} onPress={handleSignUp} disabled={!canSubmit} loading={loading} />
+        {!canSubmit && missingFieldsHint ? <Text style={ssa.hint}>{missingFieldsHint}</Text> : null}
 
         {/* OAuth options below the main CTA */}
         <View style={ssa.divider}>

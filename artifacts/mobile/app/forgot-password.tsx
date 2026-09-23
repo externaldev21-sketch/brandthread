@@ -43,10 +43,10 @@ export default function ForgotPasswordScreen() {
     setLoading(true);
     setError('');
     try {
-      await (signIn as any).create({
-        identifier: email.trim().toLowerCase(),
-        strategy: 'reset_password_email_code',
-      });
+      const { error: createError } = await signIn.create({ identifier: email.trim().toLowerCase() });
+      if (createError) { setError(mapError(createError)); return; }
+      const { error: sendError } = await signIn.resetPasswordEmailCode.sendCode();
+      if (sendError) { setError(mapError(sendError)); return; }
       setStep('code');
     } catch (e: any) {
       setError(mapError(e));
@@ -62,11 +62,10 @@ export default function ForgotPasswordScreen() {
     setLoading(true);
     setError('');
     try {
-      await (signIn as any).attemptFirstFactor({
-        strategy: 'reset_password_email_code',
-        code,
-        password,
-      });
+      const { error: verifyError } = await signIn.resetPasswordEmailCode.verifyCode({ code });
+      if (verifyError) { setError("That code isn't right. Check your email and try again."); return; }
+      const { error: submitError } = await signIn.resetPasswordEmailCode.submitPassword({ password });
+      if (submitError) { setError(mapError(submitError)); return; }
       setStep('done');
     } catch (e: any) {
       setError(mapError(e));
