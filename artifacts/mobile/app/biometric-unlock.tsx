@@ -1,160 +1,203 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Switch, StyleSheet, Platform, Alert, ActivityIndicator } from 'react-native';
-import { useColors } from '@/hooks/useColors';
-import { ScreenHeader } from '@/components/ScreenHeader';
-import * as LocalAuthentication from 'expo-local-authentication';
-import * as SecureStore from 'expo-secure-store';
+/**
+ * App Lock settings. Turning it on (or off) requires a successful Face ID /
+ * Touch ID / fingerprint or device-passcode check. The lock itself is
+ * enforced by AppLockGate on launch and on return from the background.
+ */
+import React, { useCallback, useMemo, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Linking, Platform } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+import { HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
+import {
+  GRACE_OPTIONS, authenticateForAppLock, getDeviceSecurity, loadAppLockSettings, saveAppLockSettings,
+  type AppLockSettings, type DeviceSecurity, type GraceSeconds,
+} from '@/lib/appLock';
 
-const BIOMETRIC_KEY = 'bt:biometric:enabled';
+export default function AppLockSettingsScreen() {
+  const { theme } = useAppTheme();
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
 
-export default function BiometricUnlockScreen() {
-  const colors = useColors();
-  const [faceId, setFaceId] = useState(false);
-  const [supported, setSupported] = useState<boolean | null>(null);
-  const [biometricType, setBiometricType] = useState<string>('Face ID');
+  const [device, setDevice] = useState<DeviceSecurity | null>(null);
+  const [settings, setSettings] = useState<AppLockSettings>({ enabled: false, graceSeconds: 0 });
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      if (Platform.OS === 'web') {
-        setSupported(false);
-        setLoading(false);
-        return;
-      }
-      try {
-        // Check hardware support
-        const hasHardware = await LocalAuthentication.hasHardwareAsync();
-        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-        setSupported(hasHardware && isEnrolled);
-
-        // Detect biometric type label
-        if (hasHardware) {
-          const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-          if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-            setBiometricType(Platform.OS === 'ios' ? 'Face ID' : 'Face Recognition');
-          } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-            setBiometricType(Platform.OS === 'ios' ? 'Touch ID' : 'Fingerprint');
-          } else if (types.includes(LocalAuthentication.AuthenticationType.IRIS)) {
-            setBiometricType('Iris Scan');
-          }
-        }
-
-        const saved = await SecureStore.getItemAsync(BIOMETRIC_KEY);
-        setFaceId(saved === 'true');
-      } catch { /* device may not support */ }
-      setLoading(false);
-    })();
+  const load = useCallback(async () => {
+    const [nextDevice, nextSettings] = await Promise.all([getDeviceSecurity(), loadAppLockSettings()]);
+    setDevice(nextDevice);
+    setSettings(nextSettings);
+    setLoading(false);
   }, []);
 
-  async function toggle() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
-    if (!supported) {
-      Alert.alert(
-        'Not available',
-        Platform.OS === 'web'
-          ? 'Biometric unlock is not available on web.'
-          : 'Your device does not have biometrics enrolled. Set up Face ID or fingerprint in device Settings first.',
-      );
+  const label = device?.label ?? 'Face ID';
+  const available = !!device?.supported && !!device?.hasDeviceSecurity;
+
+  async function toggle(nextEnabled: boolean) {
+    if (!available || busy) return;
+    setBusy(true);
+    setMessage(null);
+    const result = await authenticateForAppLock({
+      reason: nextEnabled ? `Turn on App Lock with ${label}` : 'Turn off App Lock',
+    });
+    if (!result.success) {
+      setBusy(false);
+      if (!result.cancelled) setMessage('We couldn’t verify it’s you, so nothing changed.');
       return;
     }
+    const next = { ...settings, enabled: nextEnabled };
+    await saveAppLockSettings(next);
+    setSettings(next);
+    setBusy(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
 
-    const enabling = !faceId;
-
-    if (enabling) {
-      // Require a successful biometric auth before enabling
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: `Confirm your identity to enable ${biometricType}`,
-        cancelLabel: 'Cancel',
-        disableDeviceFallback: false,
-      });
-
-      if (!result.success) {
-        Alert.alert('Authentication failed', 'Biometric unlock was not enabled.');
-        return;
-      }
-    }
-
-    const next = enabling;
-    setFaceId(next);
-    if (Platform.OS !== 'web') {
-      await SecureStore.setItemAsync(BIOMETRIC_KEY, next ? 'true' : 'false');
-    }
-
-    if (enabling) {
-      Alert.alert(
-        `${biometricType} enabled`,
-        `You will be prompted to authenticate with ${biometricType} the next time you open the app.`,
-      );
-    }
+  async function chooseGrace(graceSeconds: GraceSeconds) {
+    Haptics.selectionAsync();
+    const next = { ...settings, graceSeconds };
+    setSettings(next);
+    await saveAppLockSettings(next);
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader title="Security" />
+    <View style={[s.root, { paddingTop: insets.top }]}>
+      <View style={s.header}>
+        <PressableScale onPress={() => router.back()} style={s.headerBtn} accessibilityLabel="Back" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Feather name="arrow-left" size={ICON.lg} color={theme.text} />
+        </PressableScale>
+        <Text style={s.headerTitle}>App Lock</Text>
+        <View style={s.headerBtn} />
+      </View>
+
       {loading ? (
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
+        <View style={s.center}><ActivityIndicator color={theme.text} /></View>
       ) : (
-        <>
-          <View style={[styles.row, { borderBottomColor: colors.border }]}>
-            <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={[styles.label, { color: colors.foreground }]}>
-                Unlock with {biometricType}
-              </Text>
-              {!supported && (
-                <Text style={[styles.sublabel, { color: colors.mutedForeground }]}>
-                  {Platform.OS === 'web'
-                    ? 'Not available on web'
-                    : 'No biometrics enrolled — set up in device Settings'}
+        <ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + SP.xxl }}>
+          <View style={s.hero}>
+            <View style={s.heroIcon}>
+              <Feather name={label === 'Passcode' ? 'hash' : 'lock'} size={24} color={theme.text} />
+            </View>
+            <Text style={s.heroTitle}>Lock Brandthread with {label}</Text>
+            <Text style={s.heroBody}>
+              Keep your orders, messages and payouts private. When App Lock is on, Brandthread asks for {label} every time it opens.
+              {label !== 'Passcode' ? ' Your device passcode always works as a backup.' : ''}
+            </Text>
+          </View>
+
+          {!device?.supported ? (
+            <View style={s.notice}>
+              <Feather name="smartphone" size={16} color={theme.text} />
+              <Text style={s.noticeText}>App Lock is available in the Brandthread iOS and Android apps.</Text>
+            </View>
+          ) : !device.hasDeviceSecurity ? (
+            <View style={s.notice}>
+              <Feather name="alert-triangle" size={16} color={theme.warning} />
+              <View style={{ flex: 1 }}>
+                <Text style={s.noticeText}>
+                  Set up a device passcode{Platform.OS === 'ios' ? ', Face ID or Touch ID' : ' or fingerprint'} first, then come back to turn on App Lock.
                 </Text>
+                <PressableScale onPress={() => Linking.openSettings()} accessibilityRole="button" style={{ marginTop: 8 }}>
+                  <Text style={s.link}>Open Settings</Text>
+                </PressableScale>
+              </View>
+            </View>
+          ) : null}
+
+          <View style={[s.card, !available && { opacity: 0.5 }]}>
+            <View style={s.row}>
+              <View style={{ flex: 1, paddingRight: SP.md }}>
+                <Text style={s.rowTitle}>Require {label}</Text>
+                <Text style={s.rowSub}>{settings.enabled ? 'On — required to open the app' : 'Off'}</Text>
+              </View>
+              {busy ? <ActivityIndicator color={theme.text} /> : (
+                <HapticSwitch
+                  value={settings.enabled}
+                  onValueChange={toggle}
+                  disabled={!available}
+                  trackColor={{ false: theme.border, true: theme.accent }}
+                  thumbColor={settings.enabled ? theme.onAccent : theme.text}
+                  {...({ activeThumbColor: theme.onAccent } as object)}
+                  accessibilityLabel={`Require ${label}`}
+                />
               )}
             </View>
-            <Switch
-              value={faceId}
-              onValueChange={toggle}
-              disabled={Platform.OS === 'web'}
-              trackColor={{ false: colors.border, true: colors.primary }}
-              thumbColor={Platform.OS === 'android' ? '#FFFFFF' : undefined}
-            />
           </View>
-          {faceId && (
-            <View style={[styles.infoRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.infoText, { color: colors.mutedForeground }]}>
-                {biometricType} unlock is active. You'll be prompted when opening the app.
-              </Text>
+
+          {message ? (
+            <View style={[s.notice, { borderColor: theme.error + '55' }]}>
+              <Feather name="alert-circle" size={16} color={theme.error} />
+              <Text style={s.noticeText}>{message}</Text>
             </View>
-          )}
-        </>
+          ) : null}
+
+          {settings.enabled ? (
+            <>
+              <Text style={s.sectionLabel}>REQUIRE AFTER LEAVING THE APP</Text>
+              <View style={s.card}>
+                {GRACE_OPTIONS.map((option, index) => {
+                  const selected = settings.graceSeconds === option.seconds;
+                  return (
+                    <PressableScale
+                      key={option.seconds}
+                      onPress={() => chooseGrace(option.seconds)}
+                      style={[s.row, index > 0 && s.rowDivider]}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected }}
+                    >
+                      <Text style={[s.rowTitle, { flex: 1 }]}>{option.label}</Text>
+                      <View style={[s.radio, selected && s.radioOn]}>
+                        {selected ? <View style={s.radioDot} /> : null}
+                      </View>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+              <Text style={s.footnote}>
+                Brandthread always locks when it’s opened fresh. Apps in the background for less than the time you choose open without asking.
+              </Text>
+            </>
+          ) : null}
+        </ScrollView>
       )}
-      <View style={[styles.body, { backgroundColor: colors.secondary }]} />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  loadingWrap: { paddingTop: 40, alignItems: 'center' },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
+const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: 'transparent' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.md },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  hero: { alignItems: 'center', paddingVertical: SP.lg },
+  heroIcon: {
+    width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, marginBottom: SP.md,
   },
-  label: { fontSize: 14, fontFamily: 'Inter_500Medium' },
-  sublabel: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  infoRow: {
-    marginHorizontal: 20,
-    marginTop: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+  heroTitle: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.xl, letterSpacing: -0.4, textAlign: 'center' },
+  heroBody: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, textAlign: 'center', marginTop: SP.sm, maxWidth: 340 },
+  notice: {
+    flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', padding: SP.md, marginBottom: SP.md,
+    borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
   },
-  infoText: { fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 18 },
-  body: { flex: 1 },
+  noticeText: { flex: 1, color: theme.text, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19 },
+  link: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm, textDecorationLine: 'underline' },
+  card: { backgroundColor: theme.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, overflow: 'hidden' },
+  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, minHeight: 60 },
+  rowDivider: { borderTopWidth: 1, borderTopColor: theme.borderSubtle },
+  rowTitle: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.base },
+  rowSub: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs + 1, marginTop: 2 },
+  sectionLabel: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11, letterSpacing: 1, marginTop: SP.lg, marginBottom: SP.sm },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: theme.muted, alignItems: 'center', justifyContent: 'center' },
+  radioOn: { borderColor: theme.text },
+  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: theme.text },
+  footnote: { color: theme.subtle, fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 17, marginTop: SP.sm },
 });

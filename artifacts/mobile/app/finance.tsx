@@ -11,6 +11,8 @@ import { RoleLockedView } from '@/components/RoleLockedView';
 import { SUCCESS, ORANGE, FS } from '@/lib/theme';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { formatCents } from '@/lib/money';
+import { FinanceMoneyFlow } from '@/components/FinanceMoneyFlow';
+import type { FinanceSummary } from '@/lib/financeSummary';
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -34,6 +36,9 @@ export default function FinanceScreen() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [balance,      setBalance]      = useState<any>(null);
   const [loading,      setLoading]      = useState(true);
+  // Held vs on-the-way vs available vs paid out (owner only on the server).
+  const [summary,      setSummary]      = useState<FinanceSummary | null>(null);
+  const [summaryError, setSummaryError] = useState(false);
 
   // Subscription status for the dashboard card
   const [subStatus, setSubStatus] = useState<{
@@ -42,6 +47,12 @@ export default function FinanceScreen() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setSummaryError(false);
+    // Loaded independently: a Stripe hiccup on the transactions list must not
+    // hide the ledger figures, and vice versa.
+    const summaryRequest = api.finance.summary()
+      .then((next) => setSummary(next))
+      .catch(() => setSummaryError(true));
     try {
       const [bal, txs, sub] = await Promise.all([
         api.finance.balance(),
@@ -54,6 +65,7 @@ export default function FinanceScreen() {
     } catch {
       // Keep the empty state when finance data is unavailable.
     }
+    await summaryRequest;
     setLoading(false);
   }, []);
 
@@ -174,7 +186,14 @@ export default function FinanceScreen() {
         </TouchableOpacity>
       )}
 
-      {/* Overview */}
+      {/* Where the money is — from the money ledger + live Stripe balance.
+          Managers cannot read owner balances, so they keep the overview. */}
+      {!isReadOnly && (
+        <FinanceMoneyFlow summary={summary} loading={loading} error={summaryError} onRetry={load} />
+      )}
+
+      {/* Overview (Stripe balance) — shown when the ledger summary is unavailable */}
+      {(isReadOnly || (!summary && summaryError)) && (
       <View style={styles.overviewRow}>
         {overviewCards.map((card) => (
           <View key={card.label} style={[styles.overviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -184,6 +203,7 @@ export default function FinanceScreen() {
           </View>
         ))}
       </View>
+      )}
 
       {/* P&L */}
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Summary</Text>

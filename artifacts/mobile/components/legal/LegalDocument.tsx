@@ -11,40 +11,29 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import {
+  EFFECTIVE_DATE, IS_DRAFT, LEGAL_DOCUMENTS, LEGAL_DOCUMENT_ORDER, LEGAL_OPEN_ITEMS, LEGAL_VERSION,
+  type LegalDocId,
+} from '@/content/legal';
 
-export interface LegalSection {
-  title: string;
-  paragraphs?: string[];
-  bullets?: string[];
-}
+export type { LegalSection } from '@/content/legal';
 
 interface LegalDocumentProps {
-  eyebrow: string;
-  title: string;
-  summary: string;
-  effectiveDate: string;
-  reviewNotice: string;
-  sections: LegalSection[];
-  companionRoute: '/privacy' | '/terms';
-  companionLabel: string;
+  docId: LegalDocId;
 }
 
-export default function LegalDocument({
-  eyebrow,
-  title,
-  summary,
-  effectiveDate,
-  reviewNotice,
-  sections,
-  companionRoute,
-  companionLabel,
-}: LegalDocumentProps) {
+/**
+ * Renders one of the legal documents from content/legal.ts — the single
+ * source for the Terms of Service, Privacy Policy and Community Guidelines.
+ */
+export default function LegalDocument({ docId }: LegalDocumentProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   const topInset = Platform.OS === 'web' ? Math.max(insets.top, 67) : insets.top;
   const bottomInset = Platform.OS === 'web' ? Math.max(insets.bottom, 34) : insets.bottom;
+  const doc = LEGAL_DOCUMENTS[docId];
 
   function leaveDocument() {
     if (router.canGoBack()) {
@@ -71,40 +60,51 @@ export default function LegalDocument({
             style={({ pressed }) => [styles.brandButton, pressed && styles.pressed]}
           >
             <View style={styles.brandMark}>
-              <Text style={styles.brandMarkText}>B</Text>
+              <Feather name="arrow-left" size={16} color={theme.onAccent} />
             </View>
             <Text style={styles.brandName}>Brandthread</Text>
           </Pressable>
-          <Pressable
-            accessibilityRole="link"
-            accessibilityLabel={`Open ${companionLabel}`}
-            onPress={() => router.push(companionRoute)}
-            style={({ pressed }) => [styles.companionLink, pressed && styles.pressed]}
-          >
-            <Text style={styles.companionText}>{companionLabel}</Text>
-            <Feather name="arrow-up-right" size={15} color={theme.accentLight} />
-          </Pressable>
+        </View>
+
+        <View style={styles.switcher} accessibilityRole="tablist">
+          {LEGAL_DOCUMENT_ORDER.map((id) => {
+            const item = LEGAL_DOCUMENTS[id];
+            const active = id === docId;
+            return (
+              <Pressable
+                key={id}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                onPress={() => { if (!active) router.replace(item.route); }}
+                style={({ pressed }) => [styles.switchItem, active && styles.switchItemActive, pressed && styles.pressed]}
+              >
+                <Text style={[styles.switchText, active && styles.switchTextActive]}>{item.shortTitle}</Text>
+              </Pressable>
+            );
+          })}
         </View>
 
         <View style={styles.hero}>
-          <Text style={styles.eyebrow}>{eyebrow}</Text>
-          <Text accessibilityRole="header" style={styles.title}>{title}</Text>
-          <Text style={styles.summary}>{summary}</Text>
-          <Text style={styles.date}>Effective date: {effectiveDate}</Text>
+          <Text style={styles.eyebrow}>{doc.eyebrow}</Text>
+          <Text accessibilityRole="header" style={styles.title}>{doc.title}</Text>
+          <Text style={styles.summary}>{doc.summary}</Text>
+          <Text style={styles.date}>Effective {EFFECTIVE_DATE} · Version {LEGAL_VERSION}</Text>
         </View>
 
-        <View accessibilityRole="summary" style={styles.reviewNotice}>
-          <View style={styles.noticeIcon}>
-            <Feather name="alert-triangle" size={18} color={theme.accentLight} />
+        {IS_DRAFT ? (
+          <View accessibilityRole="summary" style={styles.reviewNotice}>
+            <View style={styles.noticeIcon}>
+              <Feather name="alert-triangle" size={18} color={theme.warning} />
+            </View>
+            <View style={styles.noticeCopy}>
+              <Text style={styles.noticeTitle}>Draft — pending legal review</Text>
+              <Text style={styles.noticeText}>{doc.reviewNotice}</Text>
+            </View>
           </View>
-          <View style={styles.noticeCopy}>
-            <Text style={styles.noticeTitle}>Legal review required before launch</Text>
-            <Text style={styles.noticeText}>{reviewNotice}</Text>
-          </View>
-        </View>
+        ) : null}
 
         <View style={styles.sections}>
-          {sections.map((section, sectionIndex) => (
+          {doc.sections.map((section, sectionIndex) => (
             <View key={section.title} style={styles.section}>
               <View style={styles.sectionHeading}>
                 <Text style={styles.sectionNumber}>
@@ -127,17 +127,21 @@ export default function LegalDocument({
           ))}
         </View>
 
-        <View style={styles.placeholderCard}>
-          <Text style={styles.placeholderLabel}>OWNER + COUNSEL ACTION REQUIRED</Text>
-          <Text style={styles.placeholderTitle}>Complete these facts before launch</Text>
-          <Text style={styles.placeholderText}>
-            [LEGAL ENTITY NAME] · [POSTAL ADDRESS] · [PRIVACY/LEGAL CONTACT] ·
-            [GOVERNING LAW AND COURTS] · [FINAL RETENTION SCHEDULE]
-          </Text>
-        </View>
+        {IS_DRAFT ? (
+          <View style={styles.placeholderCard}>
+            <Text style={styles.placeholderLabel}>OWNER + COUNSEL ACTION REQUIRED</Text>
+            <Text style={styles.placeholderTitle}>Complete before launch</Text>
+            {LEGAL_OPEN_ITEMS.map((item) => (
+              <View key={item} style={styles.bulletRow}>
+                <View style={[styles.bullet, { backgroundColor: theme.warning }]} />
+                <Text style={styles.placeholderText}>{item}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         <Text style={styles.footer}>
-          © {new Date().getFullYear()} Brandthread. Draft document for legal review.
+          © {new Date().getFullYear()} Brandthread.{IS_DRAFT ? ' Draft document pending legal review.' : ''}
         </Text>
       </ScrollView>
     </View>
@@ -161,7 +165,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-    marginBottom: 54,
+    marginBottom: 28,
   },
   brandButton: {
     flexDirection: 'row',
@@ -188,25 +192,36 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     fontSize: 17,
     letterSpacing: -0.3,
   },
-  companionLink: {
+  pressed: {
+    opacity: 0.7,
+  },
+  switcher: {
     flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 1,
-    gap: 6,
+    padding: 4,
+    marginBottom: 36,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: theme.border,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
     backgroundColor: theme.card,
+    alignSelf: 'flex-start',
   },
-  companionText: {
-    color: theme.accentLight,
+  switchItem: {
+    paddingHorizontal: 16,
+    height: 34,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  switchItemActive: {
+    backgroundColor: theme.accent,
+  },
+  switchText: {
+    color: theme.muted,
     fontFamily: 'Inter_600SemiBold',
     fontSize: 13,
   },
-  pressed: {
-    opacity: 0.7,
+  switchTextActive: {
+    color: theme.onAccent,
   },
   hero: {
     paddingBottom: 34,
@@ -249,8 +264,8 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     marginBottom: 42,
     padding: 18,
     borderWidth: 1,
-    borderColor: theme.accentLight,
-    backgroundColor: theme.accentDim,
+    borderColor: theme.warning + '66',
+    backgroundColor: theme.card,
     borderRadius: 16,
   },
   noticeIcon: {
@@ -349,6 +364,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     marginBottom: 8,
   },
   placeholderText: {
+    flex: 1,
     color: theme.muted,
     fontFamily: 'Inter_500Medium',
     fontSize: 13,

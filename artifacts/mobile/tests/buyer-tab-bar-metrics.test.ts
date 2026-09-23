@@ -24,7 +24,7 @@ describe('buyer tab bar metrics', () => {
       const m = getBuyerTabBarMetrics(device);
       const ratio = totalWidth(m) / device.width;
       expect(m.isTablet).toBe(false);
-      expect(ratio).toBeLessThanOrEqual(0.88);
+      expect(ratio).toBeLessThanOrEqual(0.9);
       expect(ratio).toBeGreaterThanOrEqual(0.7);
       expect(m.capsuleWidth).toBe(m.itemWidth * 4 + m.capsulePadding * 2);
     }

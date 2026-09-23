@@ -21,6 +21,16 @@ import postVideoRouter, {
 } from "./post-video";
 import postSlideRouter from "./post-slide";
 import { validateSlideOverlays, MAX_SLIDES } from "../lib/slideValidation";
+import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
+import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
+import {
+  enqueueAutoFilterReport,
+  isBlockedEitherWay,
+  mutedPhrasesFor,
+  notBlockedWith,
+  optionalViewerId,
+  publishingRestriction,
+} from "../lib/safety";
 
 const router = Router();
 
@@ -35,14 +45,15 @@ function validObjectPath(value: unknown): value is string {
     !value.split("/").includes("..");
 }
 
+/** Published, public, not held/removed by moderation, author in good standing. */
 function visiblePostCondition(now = new Date()) {
-  return and(
-    sql<boolean>`coalesce((${posts.visibility}->>'isPublic')::boolean, true) = true`,
-    or(
-      eq(posts.postStatus, "published"),
-      and(eq(posts.postStatus, "scheduled"), lte(posts.scheduledAt, now)),
-    ),
-  );
+  return publicPostCondition(now);
+}
+
+/** Caption + hashtags are what other people read, so both are filtered. */
+function publicPostText(caption: unknown, hashtags: unknown): string {
+  const tags = Array.isArray(hashtags) ? hashtags.filter((tag) => typeof tag === "string") : [];
+  return [typeof caption === "string" ? caption : "", ...tags].join(" ").trim();
 }
 
 function parseScheduledAt(value: unknown): Date | null | undefined {
@@ -236,9 +247,7 @@ async function postDetails(postRows: typeof posts.$inferSelect[]) {
     db.select({ postId: interactions.postId, cnt: count() }).from(interactions)
       .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "repost")))
       .groupBy(interactions.postId),
-    db.select({ postId: interactions.postId, cnt: count() }).from(interactions)
-      .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "comment")))
-      .groupBy(interactions.postId),
+    visibleCommentCounts(postIds),
   ]);
   const sellerById = new Map(sellerRows.map((seller) => [seller.clerkId, seller]));
   const tagsByPost: Record<string, typeof tagRows> = {};
@@ -247,7 +256,7 @@ async function postDetails(postRows: typeof posts.$inferSelect[]) {
     Object.fromEntries(rows.filter((row) => row.postId).map((row) => [row.postId, Number(row.cnt)]));
   const likesByPost = countByPost(likeRows);
   const repostsByPost = countByPost(repostRows);
-  const commentsByPost = countByPost(commentRows);
+  const commentsByPost = Object.fromEntries(commentRows);
 
   return postRows.map((post) => {
     const seller = sellerById.get(post.userId);
@@ -298,7 +307,7 @@ router.get("/feed", requireAuth, async (req, res) => {
     }
 
     // 2. Fetch posts from those followed accounts (seller-only gate via users join)
-    const rows = await db
+    const pageRows = await db
       .select({
         id:          posts.id,
         userId:      posts.userId,
@@ -327,10 +336,16 @@ router.get("/feed", requireAuth, async (req, res) => {
         eq(users.accountType, "seller"),        // seller-only gate
         inArray(posts.userId, followedIds),     // followed-only gate
       ))
-      .where(visiblePostCondition())
+      .where(and(visiblePostCondition(), notBlockedWith(clerkId, posts.userId)))
       .orderBy(desc(posts.createdAt))
       .limit(lim)
       .offset(off);
+
+    // Muted words hide matching captions from this viewer only.
+    const muted = await mutedPhrasesFor(clerkId);
+    const rows = muted.length === 0
+      ? pageRows
+      : pageRows.filter((row) => !matchesMutedWords(publicPostText(row.caption, row.hashtags), muted));
 
     if (rows.length === 0) {
       return res.json([]);
@@ -365,11 +380,7 @@ router.get("/feed", requireAuth, async (req, res) => {
         .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "repost")))
         .groupBy(interactions.postId),
 
-      db
-        .select({ postId: interactions.postId, cnt: count() })
-        .from(interactions)
-        .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "comment")))
-        .groupBy(interactions.postId),
+      visibleCommentCounts(postIds),
     ]);
 
     // Index by postId for O(1) lookup
@@ -382,8 +393,7 @@ router.get("/feed", requireAuth, async (req, res) => {
     for (const r of likeRows) if (r.postId) likesByPost[r.postId] = Number(r.cnt);
     const repostsByPost: Record<string, number> = {};
     for (const r of repostRows) if (r.postId) repostsByPost[r.postId] = Number(r.cnt);
-    const commentsByPost: Record<string, number> = {};
-    for (const r of commentRows) if (r.postId) commentsByPost[r.postId] = Number(r.cnt);
+    const commentsByPost: Record<string, number> = Object.fromEntries(commentRows);
 
     // ─── Boost ranking: find active boosts for this page of posts ────────────
     const now = new Date();
@@ -498,6 +508,22 @@ router.post("/", requireAuth, async (req, res) => {
     scheduledAt?:       string | null;
   };
 
+  const restriction = await publishingRestriction(clerkId);
+  if (restriction) return res.status(restriction.status).json(restriction.body);
+
+  if (caption !== undefined && caption !== null && typeof caption !== "string") {
+    return res.status(400).json({ error: "caption must be a string" });
+  }
+  const captionDecision = evaluateContent(publicPostText(caption, hashtags), "public");
+  if (captionDecision.action === "reject") {
+    return res.status(422).json({
+      error: `${captionDecision.reason} Edit your caption and try again.`,
+      category: captionDecision.category,
+      code: "CONTENT_REJECTED",
+    });
+  }
+  const captionHeld = captionDecision.action === "hold";
+
   const parsedScheduledAt = parseScheduledAt(scheduledAt);
   if (scheduledAt !== undefined && parsedScheduledAt === undefined) {
     return res.status(400).json({ error: "scheduledAt must be a valid ISO date or null" });
@@ -595,8 +621,21 @@ router.post("/", requireAuth, async (req, res) => {
     postStatus,
     scheduledAt: postStatus === "scheduled" ? parsedScheduledAt : null,
     publishedAt: postStatus === "published" ? now : null,
+    moderationStatus: captionHeld ? "held" : "visible",
+    moderationReason: captionDecision.action === "hold" ? captionDecision.category : null,
     updatedAt: now,
   }).returning();
+
+  if (captionDecision.action === "hold") {
+    await enqueueAutoFilterReport({
+      targetType: post.mediaType === "video" ? "video" : "post",
+      targetId: post.id,
+      ownerId: clerkId,
+      excerpt: publicPostText(caption, hashtags),
+      category: captionDecision.category,
+      label: post.mediaType === "video" ? "Video" : "Post",
+    }).catch((err) => req.log.error({ err, postId: post.id }, "Could not queue held caption for review"));
+  }
 
   // Determine which composed paths to set ACL on
   const allComposedPaths = [
@@ -639,7 +678,13 @@ router.post("/", requireAuth, async (req, res) => {
     }
   }
 
-  return res.status(201).json({ ...post, taggedProducts });
+  return res.status(201).json({
+    ...post,
+    taggedProducts,
+    moderation: captionHeld
+      ? { status: "held", message: "Your caption is in review. The post stays hidden from others until a moderator approves it." }
+      : { status: "visible" },
+  });
 });
 
 // ─── GET /api/posts/mine ─────────────────────────────────────────────────────
@@ -733,6 +778,38 @@ router.patch("/:id", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "aspectRatio must be 9:16, 3:4, or 1:1" });
     }
     updates.aspectRatio = body.aspectRatio as string;
+  }
+  if (body.caption !== undefined && typeof body.caption !== "string") {
+    return res.status(400).json({ error: "caption must be a string" });
+  }
+  if (body.hashtags !== undefined && (!Array.isArray(body.hashtags) || body.hashtags.some((tag) => typeof tag !== "string"))) {
+    return res.status(400).json({ error: "hashtags must be an array of strings" });
+  }
+  if (body.caption !== undefined || body.hashtags !== undefined) {
+    const nextText = publicPostText(
+      body.caption !== undefined ? body.caption : existing.caption,
+      body.hashtags !== undefined ? body.hashtags : existing.hashtags,
+    );
+    const decision = evaluateContent(nextText, "public");
+    if (decision.action === "reject") {
+      return res.status(422).json({
+        error: `${decision.reason} Edit your caption and try again.`,
+        category: decision.category,
+        code: "CONTENT_REJECTED",
+      });
+    }
+    if (decision.action === "hold" && existing.moderationStatus === "visible") {
+      updates.moderationStatus = "held";
+      updates.moderationReason = decision.category;
+      await enqueueAutoFilterReport({
+        targetType: existing.mediaType === "video" ? "video" : "post",
+        targetId: existing.id,
+        ownerId: clerkId,
+        excerpt: nextText,
+        category: decision.category,
+        label: existing.mediaType === "video" ? "Video" : "Post",
+      });
+    }
   }
   if (body.caption !== undefined) {
     if (typeof body.caption !== "string") return res.status(400).json({ error: "caption must be a string" });
@@ -1029,6 +1106,10 @@ router.get("/:id", async (req, res) => {
     .where(and(eq(posts.id, id), visiblePostCondition()))
     .limit(1);
   if (!post) return res.status(404).json({ error: "Post not found" });
+  const viewerId = optionalViewerId(req);
+  if (viewerId && viewerId !== post.userId && await isBlockedEitherWay(viewerId, post.userId)) {
+    return res.status(404).json({ error: "Post not found" });
+  }
 
   const [sellerRows, tags, likeRows, repostRows] = await Promise.all([
     db.select({ displayName: users.displayName, brandName: users.brandName, verified: users.verified })

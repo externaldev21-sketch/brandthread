@@ -18,10 +18,12 @@
 import express, { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
-import { sampleOrders, manufacturers, manufacturerThreads, manufacturerActivityEvents, manufacturerRelationships, dropWallets, dropWalletTransactions } from "@workspace/db";
+import { sampleOrders, manufacturers, manufacturerThreads, manufacturerActivityEvents, manufacturerRelationships, dropWallets, dropWalletTransactions, drops } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireStripe, PLATFORM_COMMISSION_RATE, computeApplicationFeeCents } from "../lib/stripe";
+import { lockDrop, recordBulkPaidFromHeld } from "../lib/money/escrow";
+import { DROP_OPEN_STATES } from "../lib/money/stateMachines";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 import { publishNotification } from "./notifications-feed";
@@ -756,6 +758,17 @@ router.post("/:id/pay-from-wallet", async (req, res) => {
       res.status(409).json({ error: "This bulk order is not eligible for wallet payment" }); return;
     }
     if (wallet.sellerId !== sellerId) { res.status(403).json({ error: "Wallet does not belong to you" }); return; }
+    // Held preorder money can only fund production while its drop is live;
+    // a failing or finished drop's money belongs to refunds / releases.
+    const [walletDrop] = await db.select({ escrowState: drops.escrowState })
+      .from(drops).where(eq(drops.id, wallet.dropId)).limit(1);
+    if (!walletDrop?.escrowState || !(DROP_OPEN_STATES as readonly string[]).includes(walletDrop.escrowState)) {
+      res.status(409).json({
+        error: "This drop's held funds can no longer pay for production",
+        code: "DROP_FUNDS_UNAVAILABLE",
+      });
+      return;
+    }
     if (!row.mfrStripeId) { res.status(409).json({ error: "Manufacturer cannot receive wallet payment" }); return; }
     const connectedAccount = await stripe.accounts.retrieve(row.mfrStripeId);
     if (connectedAccount.deleted || !connectedAccount.charges_enabled
@@ -785,6 +798,7 @@ router.post("/:id/pay-from-wallet", async (req, res) => {
         sql`${sampleOrders.walletId} IS NULL`, sql`${sampleOrders.stripeTransferId} IS NULL`,
       )).returning({ id: sampleOrders.id });
       if (!claim) return false;
+      await lockDrop(tx, wallet.dropId);
       const [reserved] = await tx.update(dropWallets).set({
         reservedCents: sql`${dropWallets.reservedCents} + ${order.priceCents}`,
         updatedAt: new Date(),
@@ -838,6 +852,7 @@ router.post("/:id/pay-from-wallet", async (req, res) => {
         .returning();
       let reconciled = finalized[0];
       if (reconciled) {
+        await lockDrop(tx, wallet.dropId);
         await tx.update(dropWallets).set({
           releasedCents: sql`${dropWallets.releasedCents} + ${order.priceCents}`,
           reservedCents: sql`GREATEST(${dropWallets.reservedCents} - ${order.priceCents}, 0)`,
@@ -847,6 +862,14 @@ router.post("/:id/pay-from-wallet", async (req, res) => {
           walletId, type: "bulk_payment", amountCents: order.priceCents,
           sampleOrderId: order.id, description: `Bulk order payment: ${order.title}`, stripeTransferId,
         }).onConflictDoNothing();
+        await recordBulkPaidFromHeld(tx, {
+          sampleOrderId: order.id,
+          dropId: wallet.dropId,
+          sellerId,
+          manufacturerId: order.manufacturerId,
+          amountCents: order.priceCents,
+          transferId: stripeTransferId,
+        });
       } else {
         [reconciled] = await tx.select().from(sampleOrders).where(and(
           eq(sampleOrders.id, order.id),

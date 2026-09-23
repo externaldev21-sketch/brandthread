@@ -20,6 +20,7 @@ import {
 import { useApi } from '@/lib/api';
 import { useAuth } from '@clerk/expo';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
+import { confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
 
 const { width } = Dimensions.get('window');
 const GRID_GAP  = 1;
@@ -156,20 +157,27 @@ export default function BuyerOtherProfileScreen() {
   const handleRestrict = async () => { setMoreSheetOpen(false); await restrictUser({ userId: canonicalUserId, name: displayName, handle, initials, color }); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); };
   const handleBlock = async () => {
     setMoreSheetOpen(false);
-    try {
-      if (iBlockedThem) {
-        await api.social.unblock(canonicalUserId);
-        setProfile(prev => prev ? { ...prev, iBlockedThem: false } : prev);
+    const subject = { userId: canonicalUserId, name: displayName };
+    if (iBlockedThem) {
+      if (await confirmUnblock(subject, api.social.unblock)) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } else {
-        await api.social.block(canonicalUserId);
-        router.back();
+        await loadProfile();
       }
-    } catch {
-      Alert.alert('Error', 'Could not update block status.');
+    } else if (await confirmBlock(subject, api.social.block)) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.back();
     }
   };
-  const handleReport = () => { setMoreSheetOpen(false); router.push(`/buyer-report?targetType=profile&targetId=${canonicalUserId}&targetLabel=${encodeURIComponent(displayName)}&targetUserId=${canonicalUserId}` as any); };
+  const handleReport = () => {
+    setMoreSheetOpen(false);
+    router.push(reportHref({
+      targetType: 'profile',
+      targetId: canonicalUserId,
+      label: displayName,
+      ownerId: canonicalUserId,
+      ownerName: displayName,
+    }) as never);
+  };
 
   const postTypeIcon = (type: string) => type === 'photo' ? 'image' : type === 'slideshow' ? 'layers' : 'video';
 
@@ -241,6 +249,24 @@ export default function BuyerOtherProfileScreen() {
               <Text style={styles.followsYouText}>Follows you</Text>
             </View>
           )}
+          {iBlockedThem ? (
+            <TouchableOpacity
+              onPress={handleBlock}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`Unblock ${displayName}`}
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14,
+                padding: 12, borderRadius: 14, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
+              }}
+            >
+              <Feather name="slash" size={16} color={theme.text} />
+              <Text style={{ flex: 1, color: theme.muted, fontSize: 13, lineHeight: 18 }}>
+                You blocked {displayName}. You won’t see each other’s posts, comments or messages.
+              </Text>
+              <Text style={{ color: theme.text, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>Unblock</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {/* ── Stats ── */}

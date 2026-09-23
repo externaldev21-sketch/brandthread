@@ -22,6 +22,7 @@ import {
 import { eq, and, desc, inArray, sql, or } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { moderateMessage } from "../lib/contentModerator";
+import { blockRelation, publishingRestriction } from "../lib/safety";
 import { publishNotification } from "./notifications-feed";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 
@@ -29,15 +30,6 @@ const router = Router();
 router.use(requireAuth);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-async function isBlockedBy(viewerId: string, targetId: string): Promise<boolean> {
-  const [row] = await db
-    .select({ blockerId: blocks.blockerId })
-    .from(blocks)
-    .where(and(eq(blocks.blockerId, targetId), eq(blocks.blockedId, viewerId)))
-    .limit(1);
-  return !!row;
-}
 
 async function isFollowedBy(followerId: string, targetId: string): Promise<boolean> {
   const [row] = await db
@@ -107,9 +99,11 @@ function adaptMessage(m: typeof messages.$inferSelect) {
     fromName:       m.senderName,
     fromInitials:   m.senderInitials,
     fromColor:      m.senderColor,
-    text:           m.body,
-    attachment:     (m.attachment as any) ?? undefined,
-    attachments:    (m.attachments as any[]) ?? [],
+    // Moderator-removed messages keep their place in the thread without content.
+    text:           m.moderationStatus === "removed" ? "" : m.body,
+    removedByModeration: m.moderationStatus === "removed",
+    attachment:     m.moderationStatus === "removed" ? undefined : (m.attachment as any) ?? undefined,
+    attachments:    m.moderationStatus === "removed" ? [] : (m.attachments as any[]) ?? [],
     replyToId:      m.replyToId ?? undefined,
     replyPreview:   undefined,
     reactions:      [],
@@ -196,8 +190,12 @@ router.post("/", async (req, res) => {
 
   if (!participant?.userId) return res.status(400).json({ error: "participant.userId required" });
 
-  // ── Block check: recipient has blocked sender ─────────────────────────────
-  if (await isBlockedBy(myUserId, participant.userId)) {
+  // ── Block check (both directions) ─────────────────────────────────────────
+  const relation = await blockRelation(myUserId, participant.userId);
+  if (relation === "blocked_by_me") {
+    return res.status(403).json({ error: "You blocked this account. Unblock them to send a message.", code: "BLOCKED_BY_ME" });
+  }
+  if (relation !== "none") {
     return res.status(403).json({ error: "Unable to start this conversation.", code: "BLOCKED" });
   }
 
@@ -330,7 +328,16 @@ router.get("/:id", async (req, res) => {
   ]);
 
   if (!conv) return res.status(404).json({ error: "Conversation not found" });
-  return res.json(buildConversationView(conv, parts, userId));
+  const counterpart = parts.find((p) => p.userId !== userId);
+  const relation = counterpart ? await blockRelation(userId, counterpart.userId) : "none";
+  return res.json({
+    ...buildConversationView(conv, parts, userId),
+    messaging: {
+      // The composer is replaced with an unblock prompt / unavailable notice.
+      blockedByMe: relation === "blocked_by_me" || relation === "mutual",
+      unavailable: relation === "blocked_me" || relation === "mutual",
+    },
+  });
 });
 
 // ─── GET /api/conversations/:id/messages ─────────────────────────────────────
@@ -392,6 +399,9 @@ router.post("/:id/messages", async (req, res) => {
     });
   }
 
+  const restriction = await publishingRestriction(userId);
+  if (restriction) return res.status(restriction.status).json(restriction.body);
+
   // ── Sender membership ────────────────────────────────────────────────────
   const [sender] = await db.select().from(conversationParticipants)
     .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
@@ -416,6 +426,16 @@ router.post("/:id/messages", async (req, res) => {
 
     if (blockRows.length > 0) {
       return res.status(403).json({ error: "Unable to send message.", code: "BLOCKED" });
+    }
+
+    // The sender blocked a recipient: they must unblock before messaging.
+    const myBlockRows = await db
+      .select({ blockedId: blocks.blockedId })
+      .from(blocks)
+      .where(and(eq(blocks.blockerId, userId), inArray(blocks.blockedId, otherIds)))
+      .limit(1);
+    if (myBlockRows.length > 0) {
+      return res.status(403).json({ error: "You blocked this account. Unblock them to send a message.", code: "BLOCKED_BY_ME" });
     }
 
     if (sender.accountType !== "seller") {

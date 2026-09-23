@@ -370,6 +370,12 @@
         }
       ],
       "expo-asset",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Brandthread uses Face ID to unlock the app when App Lock is turned on."
+        }
+      ],
       "expo-updates",
       [
         "@sentry/react-native/expo",

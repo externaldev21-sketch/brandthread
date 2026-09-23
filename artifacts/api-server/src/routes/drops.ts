@@ -11,6 +11,10 @@ import {
 import { eq, desc, and, notExists } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { deliverDropBroadcast } from "../lib/dropBroadcast";
+import {
+  defaultFulfillmentDeadline, failDrop, validateFulfillmentDeadline,
+} from "../lib/money/dropLifecycle";
+import { maybeCompleteDrop } from "../lib/money/escrow";
 
 const router = Router();
 router.use(requireAuth);
@@ -30,6 +34,10 @@ const dropFields = {
   payoutStatus: drops.payoutStatus,
   estimatedPayoutDate: drops.estimatedPayoutDate,
   stripePayoutId: drops.stripePayoutId,
+  escrowState: drops.escrowState,
+  fulfillmentDeadlineAt: drops.fulfillmentDeadlineAt,
+  escrowFailedAt: drops.escrowFailedAt,
+  escrowFailureReason: drops.escrowFailureReason,
   createdAt: drops.createdAt,
   updatedAt: drops.updatedAt,
 };
@@ -67,12 +75,26 @@ router.get("/", async (req, res) => {
 // POST /api/drops
 router.post("/", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const { name, type, estimatedShipDate, estimatedPayoutDate } = req.body;
+  const { name, type, estimatedShipDate, estimatedPayoutDate, fulfillmentDeadlineAt } = req.body;
   if (!name || typeof name !== "string") { res.status(400).json({ error: "name required" }); return; }
   if (!["pre-order", "pre-made"].includes(type)) {
     res.status(400).json({ error: "type must be 'pre-order' or 'pre-made'" }); return;
   }
-  // Pre Order funds are held in escrow until shipped; Pre Made follows standard payout schedule
+  const shipDate = estimatedShipDate ? new Date(estimatedShipDate) : undefined;
+  if (shipDate && Number.isNaN(shipDate.valueOf())) {
+    res.status(400).json({ error: "estimatedShipDate must be a valid ISO date" }); return;
+  }
+  // Pre-order money is held by Brandthread until each order ships, and is
+  // refunded automatically if unshipped orders remain after the deadline.
+  let deadline: Date | undefined;
+  if (type === "pre-order") {
+    deadline = fulfillmentDeadlineAt
+      ? new Date(fulfillmentDeadlineAt)
+      : defaultFulfillmentDeadline({ estimatedShipDate: shipDate ?? null });
+    const deadlineError = validateFulfillmentDeadline(deadline);
+    if (deadlineError) { res.status(400).json({ error: deadlineError, code: "INVALID_DEADLINE" }); return; }
+  }
+  // Pre Order funds are held until shipped; Pre Made follows standard payout schedule
   const payoutStatus = type === "pre-order" ? "held" : "pending";
 
   const [drop] = await db.insert(drops).values({
@@ -80,8 +102,9 @@ router.post("/", async (req, res) => {
     name,
     type,
     payoutStatus,
-    estimatedShipDate: estimatedShipDate ? new Date(estimatedShipDate) : undefined,
+    estimatedShipDate: shipDate,
     estimatedPayoutDate: estimatedPayoutDate ? new Date(estimatedPayoutDate) : undefined,
+    ...(type === "pre-order" ? { escrowState: "collecting", fulfillmentDeadlineAt: deadline } : {}),
   }).returning();
   res.status(201).json(drop);
 });
@@ -123,9 +146,11 @@ router.get("/:id", async (req, res) => {
 router.patch("/:id", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
 
+  // payoutStatus / stripePayoutId are derived from real money state and are
+  // no longer writable by the seller.
   const {
-    name, status, mfgProgress, payoutStatus, estimatedShipDate, stripePayoutId,
-    scheduledBroadcastAt,
+    name, status, mfgProgress, estimatedShipDate,
+    scheduledBroadcastAt, fulfillmentDeadlineAt,
   } = req.body;
   const scheduleWasProvided = Object.prototype.hasOwnProperty.call(req.body, "scheduledBroadcastAt");
 
@@ -142,10 +167,21 @@ router.patch("/:id", async (req, res) => {
     id: drops.id,
     status: drops.status,
     releaseAt: drops.releaseAt,
+    escrowState: drops.escrowState,
   }).from(drops)
     .where(and(eq(drops.id, req.params.id), eq(drops.ownerId, ownerId)))
     .limit(1);
   if (!currentDrop) { res.status(404).json({ error: "Not found" }); return; }
+
+  let deadline: Date | undefined;
+  if (fulfillmentDeadlineAt !== undefined) {
+    if (!currentDrop.escrowState || !["collecting", "production", "fulfilling"].includes(currentDrop.escrowState)) {
+      res.status(409).json({ error: "This drop has no open preorder deadline to change", code: "DEADLINE_LOCKED" }); return;
+    }
+    deadline = new Date(fulfillmentDeadlineAt);
+    const deadlineError = validateFulfillmentDeadline(deadline);
+    if (deadlineError) { res.status(400).json({ error: deadlineError, code: "INVALID_DEADLINE" }); return; }
+  }
 
   let scheduledBroadcastDate: Date | null | undefined;
   if (scheduleWasProvided) {
@@ -197,9 +233,8 @@ router.patch("/:id", async (req, res) => {
       ...(name             && { name }),
       ...(status           && { status }),
       ...(mfgProgress      !== undefined && { mfgProgress }),
-      ...(payoutStatus     && { payoutStatus }),
       ...(estimatedShipDate && { estimatedShipDate: new Date(estimatedShipDate) }),
-      ...(stripePayoutId   && { stripePayoutId }),
+      ...(deadline && { fulfillmentDeadlineAt: deadline }),
       ...(scheduleWasProvided && { scheduledBroadcastAt: scheduledBroadcastDate }),
       updatedAt: new Date(),
     })
@@ -211,7 +246,37 @@ router.patch("/:id", async (req, res) => {
     }
     res.status(404).json({ error: "Not found" }); return;
   }
+  // Closing sales can complete a drop whose orders have all shipped.
+  if (status === "closed" || status === "fulfilled") await maybeCompleteDrop(db, updated.id);
   res.json(updated);
+});
+
+// ─── POST /api/drops/:id/cancel-preorders ────────────────────────────────────
+// The seller cancels a preorder drop: every buyer whose order has not
+// shipped is refunded in full, automatically. Orders already shipped keep
+// their release. Requires { confirm: true } because it cannot be undone.
+router.post("/:id/cancel-preorders", async (req, res): Promise<void> => {
+  const sellerId = (req as any).clerkUserId as string;
+  if (req.body?.confirm !== true) {
+    res.status(400).json({ error: "Send { confirm: true } to refund every unshipped preorder", code: "CONFIRM_REQUIRED" });
+    return;
+  }
+  const [drop] = await db.select({ id: drops.id, type: drops.type, escrowState: drops.escrowState })
+    .from(drops).where(and(eq(drops.id, req.params.id), eq(drops.ownerId, sellerId))).limit(1);
+  if (!drop) { res.status(404).json({ error: "Drop not found" }); return; }
+  if (drop.type !== "pre-order" || !drop.escrowState) {
+    res.status(409).json({ error: "Only preorder drops hold buyer money", code: "NOT_A_PREORDER_DROP" }); return;
+  }
+  if (drop.escrowState === "completed" || drop.escrowState === "failed") {
+    res.status(409).json({ error: `This drop is already ${drop.escrowState}`, code: "DROP_FINISHED" }); return;
+  }
+  try {
+    const summary = await failDrop(drop.id, "seller_cancelled", sellerId);
+    res.json(summary);
+  } catch (err) {
+    req.log.error({ err, dropId: drop.id }, "Failed to cancel preorder drop");
+    res.status(500).json({ error: "Could not cancel the drop. Refunds will be retried automatically." });
+  }
 });
 
 // ─── GET /api/drops/:id/broadcast-preview ────────────────────────────────────

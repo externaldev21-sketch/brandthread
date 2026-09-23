@@ -9,7 +9,8 @@ import {
   db, checkoutSessions, orders, productVariants, products, users, shippingRates,
 } from "@workspace/db";
 import { and, eq, isNull } from "drizzle-orm";
-import { computeApplicationFeeCents, mapStripeError, requireStripe } from "../lib/stripe";
+import { mapStripeError, requireStripe } from "../lib/stripe";
+import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
@@ -149,6 +150,19 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
     if (!seller?.stripeAccountId || seller.stripeAccountStatus !== "active") {
       return res.status(400).json({ error: "Seller payment account is not active. Please try again later." });
     }
+    let chargePlan: ChargePlan;
+    try {
+      chargePlan = await resolveChargePlan({
+        productIds: items.map((item: { productId: string }) => item.productId),
+        sellerId,
+        clientDropId: typeof dropId === "string" && dropId.trim() ? dropId.trim() : null,
+      });
+    } catch (planError) {
+      if (planError instanceof CheckoutPlanError) {
+        return res.status(planError.status).json({ error: planError.message, code: planError.code });
+      }
+      throw planError;
+    }
     const key = typeof clientIdempotencyKey === "string" && clientIdempotencyKey.trim() ? clientIdempotencyKey.trim() : null;
     if (key) {
       const [existing] = await db.select().from(checkoutSessions).where(eq(checkoutSessions.clientIdempotencyKey, key)).limit(1);
@@ -172,6 +186,12 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       tax_behavior: "exclusive",
       product_data: { name: rate?.name ?? "Shipping" },
     }, quantity: 1 });
+    const money = paymentIntentMoney({
+      plan: chargePlan,
+      sellerStripeAccountId: seller.stripeAccountId,
+      merchandiseCents: subtotalCents,
+      preTaxTotalCents: subtotalCents + shippingCents,
+    });
     const checkoutIdValue = crypto.randomUUID();
     const accessToken = guestAccessToken(checkoutIdValue);
     let checkout: { id: string };
@@ -180,6 +200,10 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
         id: checkoutIdValue,
         buyerId: null, guestEmail: email, guestAccessTokenHash: tokenHash(accessToken), sellerId, items: cartItems,
         shippingAddress: shippingAddressValue, ...(key ? { clientIdempotencyKey: key } : {}),
+        chargeModel: chargePlan.chargeModel,
+        dropId: chargePlan.dropId,
+        platformFeeCents: money.platformFeeCents,
+        processingFeeEstimateCents: money.processingFeeEstimateCents,
       }).returning({ id: checkoutSessions.id });
     } catch (error: any) {
       // A concurrent duplicate request lost the DB uniqueness race. Reuse only
@@ -204,7 +228,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       throw error;
     }
     checkoutId = checkout.id;
-    const validDropId = typeof dropId === "string" && dropId.trim() ? dropId.trim() : undefined;
+    const validDropId = chargePlan.dropId ?? undefined;
     stripeStarted = true;
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
@@ -218,8 +242,11 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       customer_email: email,
       metadata: { csRef: checkout.id, guest: "true", ...(validDropId ? { dropId: validDropId } : {}) },
       payment_intent_data: {
-        metadata: { ...(validDropId ? { dropId: validDropId } : {}) },
-        ...(validDropId ? {} : { transfer_data: { destination: seller.stripeAccountId }, application_fee_amount: computeApplicationFeeCents(subtotalCents) }),
+        ...money.paymentIntentData,
+        metadata: {
+          ...(money.paymentIntentData.metadata as Record<string, string>),
+          ...(validDropId ? { dropId: validDropId } : {}),
+        },
       },
     }, key ? { idempotencyKey: `guest_cs_${key}` } : {});
     await db.update(checkoutSessions).set({ stripeSessionId: session.id }).where(eq(checkoutSessions.id, checkout.id));
