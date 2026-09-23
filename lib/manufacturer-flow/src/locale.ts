@@ -157,11 +157,12 @@ export function formatTimestamp(value: string | Date, options: { timeZone?: stri
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   const timeZone = options.timeZone && isValidTimeZone(options.timeZone) ? options.timeZone : undefined;
-  try {
-    return new Intl.DateTimeFormat(options.locale ?? "en-US", {
-      timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "shortOffset",
-    }).format(date);
-  } catch {
-    return date.toISOString();
+  const base: Intl.DateTimeFormatOptions = { timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" };
+  // Older mobile ICU builds (Hermes on some Android versions) lack "shortOffset".
+  for (const timeZoneName of ["shortOffset", "short", undefined] as const) {
+    try {
+      return new Intl.DateTimeFormat(options.locale ?? "en-US", { ...base, ...(timeZoneName ? { timeZoneName } : {}) }).format(date);
+    } catch { /* try the next, simpler format */ }
   }
+  return date.toISOString();
 }
