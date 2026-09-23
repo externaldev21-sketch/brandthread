@@ -49,7 +49,7 @@ export function OrderCard({ order, threadId }: { order: OrderCardSnapshot; threa
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary"><Icon className="h-5 w-5 text-primary" /></div>
         <div className="min-w-0 flex-1">
           <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{orderTypeLabel(order.orderType)} card</p>
-          <p className="truncate font-semibold" title={order.title}>{order.title}</p>
+          <p className="line-clamp-2 break-words font-semibold leading-snug" title={order.title}>{order.title}</p>
           <p className="text-sm text-muted-foreground">{order.quantity.toLocaleString("en-US")} {order.quantity === 1 ? "piece" : "pieces"}</p>
         </div>
         <p className="shrink-0 font-mono text-base font-semibold" data-testid={`order-card-price-${order.id}`}>{formatMoney(order.priceCents, order.currency)}</p>

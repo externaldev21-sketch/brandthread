@@ -1065,7 +1065,9 @@ router.get("/me/dashboard", async (req, res) => {
   const pendingMessages = threads.reduce((sum, t) => sum + t.manufacturerUnreadCount, 0);
   const totalRevenue    = completed.reduce((s, o) => s + o.priceCents, 0);
 
-  const recentOrders = await withSellerNames(sharedOrders.slice(0, 5).map(serializeSampleOrder));
+  const named = new Map((await withSellerNames(sharedOrders.map(serializeSampleOrder))).map((order) => [order.id, order]));
+  const withName = (order: typeof sampleOrders.$inferSelect) => named.get(order.id)!;
+  const recentOrders = sharedOrders.slice(0, 5).map(withName);
 
   return res.json({
     activeOrders, pendingMessages, completedOrders,
@@ -1078,14 +1080,14 @@ router.get("/me/dashboard", async (req, res) => {
       createdAt: thread.createdAt.toISOString(),
     })),
     sampleOrders: {
-      active: active.filter((o) => o.orderType === "sample").map(serializeSampleOrder),
-      completed: completed.filter((o) => o.orderType === "sample").map(serializeSampleOrder),
+      active: active.filter((o) => o.orderType === "sample").map(withName),
+      completed: completed.filter((o) => o.orderType === "sample").map(withName),
     },
     bulkOrders: {
-      active: active.filter((o) => o.orderType === "bulk").map(serializeSampleOrder),
-      completed: completed.filter((o) => o.orderType === "bulk").map(serializeSampleOrder),
+      active: active.filter((o) => o.orderType === "bulk").map(withName),
+      completed: completed.filter((o) => o.orderType === "bulk").map(withName),
     },
-    orderHistory: completed.map(serializeSampleOrder),
+    orderHistory: completed.map(withName),
   });
 });
 

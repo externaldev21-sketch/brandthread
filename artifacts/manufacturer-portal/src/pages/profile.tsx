@@ -288,7 +288,7 @@ export default function Profile() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Country</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select key={field.value || "unset"} value={field.value} onValueChange={field.onChange}>
                       <FormControl>
                         <SelectTrigger className="h-11 bg-card border-border" data-testid="select-profile-country"><SelectValue placeholder="Choose a country" /></SelectTrigger>
                       </FormControl>
@@ -387,7 +387,7 @@ export default function Profile() {
                 render={({ field }) => (
                   <FormItem className="md:col-span-2">
                     <FormLabel>Time zone</FormLabel>
-                    <TimeZoneSelect value={field.value} onChange={field.onChange} />
+                    <TimeZoneSelect key={field.value || "unset"} value={field.value} onChange={field.onChange} />
                     <p className="text-xs text-muted-foreground">Sellers see your local time — {localTimeLabel(field.value) ?? "choose a zone"} — so they know when to expect replies.</p>
                     <FormMessage />
                   </FormItem>

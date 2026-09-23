@@ -95,7 +95,10 @@ export default function Onboarding() {
     contactEmail: "", contactPhone: "", website: "", timeZone: browserTimeZone(),
   });
   const [timeZoneTouched, setTimeZoneTouched] = useState(false);
-  const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((current) => ({ ...current, [key]: value }));
+  const set = <K extends keyof Form>(key: K, value: Form[K]) => {
+    setForm((current) => ({ ...current, [key]: value }));
+    setErrors((current) => (current[key] ? { ...current, [key]: undefined } : current));
+  };
 
   useEffect(() => {
     const email = user?.primaryEmailAddress?.emailAddress;

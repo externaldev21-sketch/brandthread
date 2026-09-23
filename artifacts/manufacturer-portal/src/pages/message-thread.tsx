@@ -55,7 +55,7 @@ export default function MessageThread({ threadId }: { threadId: string }) {
   useEffect(() => {
     // Follow new messages without yanking the view on every poll.
     if (messages && messages.length !== lastCount.current) {
-      endOfMessagesRef.current?.scrollIntoView({ behavior: lastCount.current === 0 ? "auto" : "smooth" });
+      endOfMessagesRef.current?.scrollIntoView({ behavior: lastCount.current === 0 ? "auto" : "smooth", block: "nearest" });
       lastCount.current = messages.length;
     }
   }, [messages]);
@@ -184,7 +184,7 @@ export default function MessageThread({ threadId }: { threadId: string }) {
         <ThreadCall threadId={threadId} />
       </div>
 
-      <div className="flex-1 space-y-6 overflow-y-auto p-4 md:p-6" data-testid="thread-messages">
+      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4 md:p-6" data-testid="thread-messages">
         {messages?.length === 0 && (
           <div className="mx-auto max-w-sm py-16 text-center" data-testid="status-empty-thread">
             <MessageSquare className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
@@ -290,7 +290,8 @@ export default function MessageThread({ threadId }: { threadId: string }) {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleSend(); } }}
-            placeholder={`Message ${thread.buyerName}… (Enter to send, Shift+Enter for a new line)`}
+            placeholder={`Message ${thread.buyerName}…`}
+            title="Enter to send · Shift+Enter for a new line"
             className="max-h-[150px] min-h-[44px] resize-none border-border bg-secondary/30"
             data-testid="input-message-draft"
           />

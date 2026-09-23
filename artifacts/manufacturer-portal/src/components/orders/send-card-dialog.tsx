@@ -56,6 +56,7 @@ export function SendCardDialog({
     },
   });
 
+  const clearError = (key: keyof CardFieldErrors) => setErrors((current) => (current[key] ? { ...current, [key]: undefined } : current));
   const priceCents = parseAmountToCents(price);
   const qty = Number(quantity);
   const perUnit = priceCents && orderType === "bulk" && Number.isInteger(qty) && qty > 0 ? Math.round(priceCents / qty) : null;
@@ -106,21 +107,21 @@ export function SendCardDialog({
 
           <div className="space-y-1.5">
             <Label htmlFor="card-title">What are you making?</Label>
-            <Input id="card-title" value={title} maxLength={CARD_LIMITS.titleMax} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Heavyweight hoodie, washed black" data-testid="input-card-title" />
+            <Input id="card-title" value={title} maxLength={CARD_LIMITS.titleMax} onChange={(event) => { setTitle(event.target.value); clearError("title"); }} placeholder="e.g. Heavyweight hoodie, washed black" data-testid="input-card-title" />
             {errors.title && <p className="text-xs text-destructive">{errors.title}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="card-quantity">Quantity (pieces)</Label>
-              <Input id="card-quantity" inputMode="numeric" value={quantity} onChange={(event) => setQuantity(event.target.value.replace(/[^\d]/g, ""))} placeholder={orderType === "bulk" ? "e.g. 500" : "1"} data-testid="input-card-quantity" />
+              <Input id="card-quantity" inputMode="numeric" value={quantity} onChange={(event) => { setQuantity(event.target.value.replace(/[^\d]/g, "")); clearError("quantity"); }} placeholder={orderType === "bulk" ? "e.g. 500" : "1"} data-testid="input-card-quantity" />
               {errors.quantity && <p className="text-xs text-destructive">{errors.quantity}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="card-price">Total price</Label>
               <div className="relative">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">US$</span>
-                <Input id="card-price" inputMode="decimal" value={price} onChange={(event) => setPrice(event.target.value)} placeholder="0.00" className="pl-11 font-mono" data-testid="input-card-price" />
+                <Input id="card-price" inputMode="decimal" value={price} onChange={(event) => { setPrice(event.target.value); clearError("priceCents"); }} placeholder="0.00" className="pl-11 font-mono" data-testid="input-card-price" />
               </div>
               {errors.priceCents
                 ? <p className="text-xs text-destructive">{errors.priceCents}</p>
