@@ -310,9 +310,9 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 }
 
 // ─── DEV design-preview bypass (web + dev builds only) ───────────────────────
-// The default development web preview starts at the real first-launch flow.
-// Explicit ?bt_preview=buyer and ?bt_preview=seller links still jump to dashboards.
-// This is inert on native and in production builds.
+// The default development web preview opens the populated seller workspace.
+// Explicit ?bt_preview=buyer and ?bt_preview=seller links switch preview roles.
+// The __DEV__ and web guards keep this inert on native and in production builds.
 // ─── DEV: bypass all auth + onboarding on every platform ─────────────────────
 // Set to 'buyer' or 'seller' to jump straight to that dashboard on device.
 // Set back to null when you're ready to test real sign-in.
@@ -321,7 +321,7 @@ const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_T
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
   if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web' || typeof window === 'undefined') return null;
   const v = new URLSearchParams(window.location.search).get('bt_preview');
-  return v === 'buyer' || v === 'seller' ? v : null;
+  return v === 'buyer' ? 'buyer' : 'seller';
 })();
 const DEV_WEB_ONBOARDING_PREVIEW =
   __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined' && PREVIEW_ROLE === null;

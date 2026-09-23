@@ -21,7 +21,7 @@ const RoleContext = createContext<RoleContextValue>({
 function getDevPreviewRole(): UserRole {
   if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined') return null;
   const value = new URLSearchParams(window.location.search).get('bt_preview');
-  return value === 'seller' ? 'seller' : 'buyer';
+  return value === 'buyer' ? 'buyer' : 'seller';
 }
 
 export function RoleProvider({ children }: { children: React.ReactNode }) {

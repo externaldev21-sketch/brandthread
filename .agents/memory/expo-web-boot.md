@@ -16,9 +16,9 @@ Keep test and spec modules outside Expo Router's `app/` directory.
 - Put route regression tests in a top-level test directory, never beside route files under `app/`. Expo Router can evaluate those files while building the route graph; a Vitest import outside its runner makes static rendering return HTTP 500.
 
 ## Dev preview bypass
-The bare development web preview restarts the first-launch walkthrough on every full page load: splash, real sign-in UI, account-type choice, onboarding, then the matching dashboard. A dev-only preview-user continuation bypasses Clerk without changing production auth. `?bt_preview=buyer` and `?bt_preview=seller` remain explicit dashboard shortcuts.
-**Why:** owners need to review the complete first-launch experience repeatedly in the stateless phone-frame preview, while authenticated dashboard captures still need deterministic buyer/seller entry points.
-**How to apply:** use the bare preview URL for onboarding review. Use `?bt_preview=buyer` or `?bt_preview=seller` only when a dashboard shortcut is intended. Keep the reset and preview-user path limited to development web; native/device and production behavior must remain unchanged.
+The bare development web preview opens a synthetic Demo Seller session with populated seller dashboard data. `?bt_preview=buyer` switches to Demo Buyer, and the dev-only account switcher exposes both identities. Onboarding remains intact but is not the default preview entry.
+**Why:** the owner wants Replit’s phone-frame preview optimized for reviewing populated seller screens without repeating authentication or onboarding.
+**How to apply:** use the bare preview URL for seller review and `?bt_preview=buyer` for buyer review. Keep the bypass, synthetic identities, and demo financial values limited to development web; native/device and production users must retain real auth and onboarding.
 
 Authenticated seller tools cannot treat this navigation bypass as a real Clerk session. In dev web seller preview, initialize review-only UI state synchronously from the route role and skip protected API calls; keep uploads, writes, checkout, and activation behind real authentication.
 

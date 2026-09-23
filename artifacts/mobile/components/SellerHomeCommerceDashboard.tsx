@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ApiError } from '@/lib/networkNotice';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { subscribeStoreContext } from '@/lib/api';
 import {
@@ -88,6 +89,23 @@ const RANGES: Array<{ id: TimeRange; label: string }> = [
   { id: 'week', label: 'This week' },
 ];
 
+function previewSellerHomeAnalytics(range: TimeRange): SellerHomeAnalyticsSnapshot['data'] {
+  const now = Date.now();
+  const totals = [12900, 8999, 21499, 5999, 14999, 27248, 7999, 18998];
+  return {
+    range,
+    totalCents: totals.reduce((sum, value) => sum + value, 0),
+    orderCount: 12,
+    visitorCount: 684,
+    toFulfill: 4,
+    toCapture: 2,
+    buckets: totals.map((totalCents, index) => ({
+      bucket: new Date(now - (totals.length - index - 1) * 60 * 60 * 1000).toISOString(),
+      totalCents,
+      orderCount: index % 3 === 0 ? 2 : 1,
+    })),
+  };
+}
 // ─── Skeleton shimmer row ────────────────────────────────────────────────────
 function SkeletonBlock({ width, height, style }: { width?: number | string; height: number; style?: object }) {
   return (
@@ -182,6 +200,8 @@ export default function SellerHomeCommerceDashboard({
   const palette = theme as typeof theme & Record<string, string>;
   const { currentRole, isLoadingRole } = useTeamRole();
   const { isTablet } = useBreakpoint();
+  const sellerPreview = isSellerDevPreview();
+  const analyticsUserId = sellerPreview ? userId ?? 'demo-seller' : userId;
   const [range, setRange] = useState<TimeRange>('today');
   const [snapshot, setSnapshot] = useState<SellerHomeAnalyticsSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -191,7 +211,7 @@ export default function SellerHomeCommerceDashboard({
   const [cashingOut, setCashingOut] = useState(false);
   const balanceGenerationRef = useRef(0);
   const payoutAttemptKeyRef = useRef<string | null>(null);
-  const data = selectSellerHomeAnalytics(snapshot, userId, range);
+  const data = selectSellerHomeAnalytics(snapshot, analyticsUserId, range);
 
   const [walkthroughVisible, setWalkthroughVisible] = useState(false);
   const [celebrationVisible, setCelebrationVisible] = useState(false);
@@ -230,12 +250,20 @@ export default function SellerHomeCommerceDashboard({
   }, [onSetupStateChange, setupComplete, setupState.celebrated, userId]);
 
   useEffect(() => {
-    if (!userId) {
+    if (sellerPreview) {
+      setSnapshot({
+        key: sellerHomeAnalyticsKey(analyticsUserId ?? 'demo-seller', range),
+        data: previewSellerHomeAnalytics(range),
+      });
+      setLoading(false);
+      return;
+    }
+    if (!analyticsUserId) {
       setLoading(false);
       return;
     }
     let active = true;
-    const requestKey = sellerHomeAnalyticsKey(userId, range);
+    const requestKey = sellerHomeAnalyticsKey(analyticsUserId, range);
     setLoading(true);
     api.analytics.home(range)
       .then((next) => {
@@ -255,10 +283,22 @@ export default function SellerHomeCommerceDashboard({
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [api, range, userId]);
+  }, [analyticsUserId, api, range, sellerPreview]);
 
   const loadFinanceBalance = useCallback(async () => {
     const generation = ++balanceGenerationRef.current;
+    if (sellerPreview) {
+      setFinanceBalance({
+        available: { amount: 428122, currency: 'usd', formatted: '$4,281.22' },
+        pending: { amount: 184250, currency: 'usd', formatted: '$1,842.50' },
+        connected: true,
+        payoutsEnabled: true,
+        bankConnected: true,
+        processingCashout: null,
+      });
+      setFinanceLoading(false);
+      return;
+    }
     if (!userId || isLoadingRole || currentRole !== 'owner') {
       setFinanceBalance(null);
       setFinanceLoading(isLoadingRole);
@@ -280,7 +320,7 @@ export default function SellerHomeCommerceDashboard({
         setFinanceLoading(false);
       }
     }
-  }, [api, currentRole, isLoadingRole, userId]);
+  }, [api, currentRole, isLoadingRole, sellerPreview, userId]);
 
   useEffect(() => {
     void loadFinanceBalance();

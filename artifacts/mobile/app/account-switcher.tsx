@@ -13,6 +13,7 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -64,6 +65,16 @@ export default function AccountSwitcherScreen() {
   const { isLoaded: authLoaded, sessionId: activeSessionId } = useAuth();
   const { sessions, isLoaded, setActive } = useSessionList();
   const [switchingId, setSwitchingId] = useState<string | null>(null);
+  const isDevWebPreview = __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined';
+  const previewRole = isDevWebPreview
+    ? new URLSearchParams(window.location.search).get('bt_preview') === 'buyer' ? 'buyer' : 'seller'
+    : null;
+
+  function handlePreviewRoleSwitch(role: 'buyer' | 'seller') {
+    if (!isDevWebPreview || role === previewRole) return;
+    Haptics.selectionAsync();
+    window.location.assign(`/?bt_preview=${role}`);
+  }
 
   async function handleSwitch(targetSessionId: string) {
     if (!setActive || targetSessionId === activeSessionId || switchingId) return;
@@ -131,6 +142,53 @@ export default function AccountSwitcherScreen() {
         showsVerticalScrollIndicator={false}
         alwaysBounceVertical={false}
       >
+        {isDevWebPreview && (
+          <View style={s.section}>
+            <Text style={s.sectionLabel}>Preview accounts</Text>
+            <View style={s.card}>
+              {([
+                { role: 'seller' as const, name: 'Demo Seller', email: 'seller@brandthread.demo' },
+                { role: 'buyer' as const, name: 'Demo Buyer', email: 'buyer@brandthread.demo' },
+              ]).map((account, index) => {
+                const isActive = previewRole === account.role;
+                return (
+                  <React.Fragment key={account.role}>
+                    <TouchableOpacity
+                      style={[s.sessionRow, isActive && s.sessionRowActive]}
+                      onPress={() => handlePreviewRoleSwitch(account.role)}
+                      activeOpacity={isActive ? 1 : 0.75}
+                      accessibilityRole="button"
+                      accessibilityLabel={isActive ? `${account.name}, current account` : `Switch to ${account.name}`}
+                      accessibilityState={{ selected: isActive }}
+                    >
+                      <View style={[s.avatarWrap, isActive && s.avatarWrapActive]}>
+                        <View style={s.avatarFallback}>
+                          <Text style={s.avatarInitials}>{account.role === 'seller' ? 'DS' : 'DB'}</Text>
+                        </View>
+                        {isActive && <View style={s.activeDot} accessibilityLabel="Active" />}
+                      </View>
+                      <View style={s.sessionInfo}>
+                        <Text style={s.sessionName}>{account.name}</Text>
+                        <Text style={s.sessionEmail}>{account.email}</Text>
+                      </View>
+                      <View style={s.sessionRight}>
+                        {isActive ? (
+                          <View style={s.activeBadge}>
+                            <Text style={s.activeBadgeText}>Current</Text>
+                          </View>
+                        ) : (
+                          <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                    {index === 0 && <View style={s.divider} />}
+                  </React.Fragment>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
         {/* ── Session list ── */}
         {activeSessions.length > 0 && (
           <View style={s.section}>
