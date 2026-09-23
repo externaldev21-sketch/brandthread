@@ -22,7 +22,7 @@ import { sampleOrders, manufacturers, manufacturerThreads, manufacturerActivityE
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireStripe, PLATFORM_COMMISSION_RATE, computeApplicationFeeCents } from "../lib/stripe";
-import { recordBulkPaidFromHeld } from "../lib/money/escrow";
+import { lockDrop, recordBulkPaidFromHeld } from "../lib/money/escrow";
 import { DROP_OPEN_STATES } from "../lib/money/stateMachines";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
@@ -798,6 +798,7 @@ router.post("/:id/pay-from-wallet", async (req, res) => {
         sql`${sampleOrders.walletId} IS NULL`, sql`${sampleOrders.stripeTransferId} IS NULL`,
       )).returning({ id: sampleOrders.id });
       if (!claim) return false;
+      await lockDrop(tx, wallet.dropId);
       const [reserved] = await tx.update(dropWallets).set({
         reservedCents: sql`${dropWallets.reservedCents} + ${order.priceCents}`,
         updatedAt: new Date(),
@@ -851,6 +852,7 @@ router.post("/:id/pay-from-wallet", async (req, res) => {
         .returning();
       let reconciled = finalized[0];
       if (reconciled) {
+        await lockDrop(tx, wallet.dropId);
         await tx.update(dropWallets).set({
           releasedCents: sql`${dropWallets.releasedCents} + ${order.priceCents}`,
           reservedCents: sql`GREATEST(${dropWallets.reservedCents} - ${order.priceCents}, 0)`,

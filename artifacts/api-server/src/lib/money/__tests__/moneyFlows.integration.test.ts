@@ -226,6 +226,57 @@ describe("per-order release of held preorder funds", () => {
     await expectLedgerBalanced();
   });
 
+  it("releases many orders of one drop concurrently without deadlocks or bulk-cost drift", async () => {
+    const seller = await seedSeller("concurrent");
+    const drop = await seedDrop(seller);
+    const prices = [1_234, 5_678, 999, 2_500, 4_321, 777];
+    const placed = [];
+    for (const [i, price] of prices.entries()) {
+      const product = await seedProduct(seller, { priceCents: price, dropId: drop.id });
+      placed.push((await pay({
+        sellerId: seller, buyerId: await seedBuyer(`cc-${i}`), chargeModel: "held", dropId: drop.id,
+        items: [{ ...product, quantity: 1 }], stripeFeeCents: 60 + i,
+      })).order);
+    }
+    const totalNet = placed.reduce((sum, order) => sum + order.sellerNetCents, 0);
+    const manufacturer = await seedManufacturer();
+    const bulk = await seedBulkOrder(seller, manufacturer.id, 7_001);
+    const wallet = await walletFor(drop.id);
+    expect((await call(app.base, "POST", `/api/sample-orders/${bulk.id}/pay-from-wallet`, seller, { walletId: wallet.id })).status).toBe(200);
+    for (const order of placed) await setTracking(order.id);
+    // A buyer refund races the releases too.
+    const [refunded, ...shipping] = placed;
+    await db.update(orders).set({ trackingNumber: null }).where(eq(orders.id, refunded.id));
+
+    const results = await Promise.all([
+      ...shipping.map((order) => releaseOrderFunds(order.id, "tracking")),
+      refundOrder({ orderId: refunded.id, reason: "buyer_cancelled", initiatedBy: "test", idempotencyKey: `cc/${refunded.id}` }),
+    ]);
+    const releaseResults = results.slice(0, shipping.length) as Awaited<ReturnType<typeof releaseOrderFunds>>[];
+    expect(releaseResults.every((r) => r.execution?.state === "paid")).toBe(true);
+
+    const releases = await db.select().from(orderReleases).where(eq(orderReleases.dropId, drop.id));
+    const allocated = releases.reduce((sum, r) => sum + r.bulkShareCents, 0);
+    const released = releases.reduce((sum, r) => sum + r.amountCents, 0);
+    // Whatever order things landed in, every cent is accounted for:
+    // released + still held + bulk paid + the refunded buyer's seller share
+    // = what all the orders netted.
+    const refundedOrder = await reloadOrder(refunded.id);
+    expect(refundedOrder).toMatchObject({ fundsState: "refunded", refundedCents: 1_234 });
+    const refundShare = 1_234 - refundedOrder.platformFeeRefundedCents;
+    expect(released + await held(seller, { dropId: drop.id }) + 7_001 + refundShare).toBe(totalNet);
+    expect(allocated).toBeLessThanOrEqual(7_001);
+    // One transfer per order with money left to release. (When a refund
+    // lands mid-way, the remaining orders absorb the bulk cost, so a small
+    // order's release can legitimately be $0 and needs no transfer.)
+    const releaseTransfers = fake.state.transfers.filter((t) => t.metadata?.kind === "order_release");
+    expect(releaseTransfers).toHaveLength(releases.filter((r) => r.amountCents > 0).length);
+    expect(new Set(releaseTransfers.map((t) => t.metadata.orderId)).size).toBe(releaseTransfers.length);
+    expect(releaseTransfers.reduce((sum, t) => sum + t.amount, 0)).toBe(released);
+    await expectWalletMatchesLedger(drop.id, seller);
+    await expectLedgerBalanced();
+  });
+
   it("retries a lost transfer response with the same idempotency key (never a second transfer)", async () => {
     const seller = await seedSeller("lost");
     const buyer = await seedBuyer("lost");

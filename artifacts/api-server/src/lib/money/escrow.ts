@@ -117,11 +117,21 @@ export async function ensureDropWallet(executor: DbExecutor, dropId: string, sel
   return existing.id;
 }
 
+/**
+ * Lock order for held money, everywhere: order row → drop row → wallet row.
+ * Every path that touches a drop wallet takes the drop lock first, so two
+ * concurrent money operations on one drop can never deadlock.
+ */
+export async function lockDrop(executor: DbExecutor, dropId: string): Promise<void> {
+  await executor.execute(sql`SELECT id FROM drops WHERE id = ${dropId}::uuid FOR UPDATE`);
+}
+
 async function adjustWallet(
   executor: DbExecutor,
   dropId: string,
   delta: { balance?: number; released?: number; reserved?: number },
 ): Promise<void> {
+  await lockDrop(executor, dropId);
   await executor.update(dropWallets).set({
     balanceCents: sql`${dropWallets.balanceCents} + ${delta.balance ?? 0}`,
     releasedCents: sql`${dropWallets.releasedCents} + ${delta.released ?? 0}`,

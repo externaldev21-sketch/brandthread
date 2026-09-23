@@ -7,7 +7,9 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 import { createShipment, findTransaction, purchaseTransaction, refundTransaction } from "../lib/shippo";
 import { isPendingProviderPurchase } from "../lib/shippingOperationPolicy";
-import { executeOrderRelease, recordLabelPurchased, recordLabelVoided, recoverLabelCost, requestOrderRelease } from "../lib/money/escrow";
+import {
+  executeOrderRelease, lockDrop, recordLabelPurchased, recordLabelVoided, recoverLabelCost, requestOrderRelease,
+} from "../lib/money/escrow";
 import { orderHeldCents } from "../lib/money/ledger";
 import { logger } from "../lib/logger";
 
@@ -173,6 +175,7 @@ router.post("/:orderId/purchase", requireRole("staff"), async (req, res) => {
         }
       }
       if (order.drop_id) {
+        await lockDrop(tx, order.drop_id);
         const walletLock = await tx.execute(sql`
           SELECT * FROM drop_wallets WHERE drop_id = ${order.drop_id}::uuid AND seller_id = ${ownerId} FOR UPDATE
         `);
@@ -247,6 +250,7 @@ router.post("/:orderId/purchase", requireRole("staff"), async (req, res) => {
           .where(eq(orderFundReservations.shippingLabelId, label.id));
         const [order] = await tx.select({ dropId: orders.dropId }).from(orders).where(eq(orders.id, label.orderId)).limit(1);
         if (order?.dropId) {
+          await lockDrop(tx, order.dropId);
           await tx.update(dropWallets).set({
             reservedCents: sql`GREATEST(0, ${dropWallets.reservedCents} - ${label.priceCents})`,
             updatedAt: new Date(),

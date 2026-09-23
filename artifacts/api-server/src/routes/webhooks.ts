@@ -52,7 +52,7 @@ import { sellerPlanFromStripeLookupKey } from "../lib/stripePlanMapping";
 import { splitOrder } from "../lib/money/fees";
 import { fetchChargeDetails, type ChargeDetails } from "../lib/money/stripeMoney";
 import {
-  recordBulkPaidFromHeld, recordBulkReversalToHeld, recordOrderPaid,
+  lockDrop, recordBulkPaidFromHeld, recordBulkReversalToHeld, recordOrderPaid,
 } from "../lib/money/escrow";
 import { postLedgerTransaction } from "../lib/money/ledger";
 import { recordExternalRefunds, recordRefundFailedLater, refundOrder } from "../lib/money/refunds";
@@ -1647,6 +1647,9 @@ async function handleManufacturerTransfer(transfer: any, providerEventId: string
     }).where(and(eq(sampleOrders.id, order.id), eq(sampleOrders.walletPaymentState, "processing")))
       .returning({ id: sampleOrders.id });
     if (updated) {
+      const [lockTarget] = await tx.select({ dropId: dropWallets.dropId })
+        .from(dropWallets).where(eq(dropWallets.id, walletId)).limit(1);
+      if (lockTarget) await lockDrop(tx, lockTarget.dropId);
       await tx.update(dropWallets).set({
         releasedCents: sql`${dropWallets.releasedCents} + ${order.priceCents}`,
         reservedCents: sql`GREATEST(${dropWallets.reservedCents} - ${order.priceCents}, 0)`,
@@ -1857,6 +1860,9 @@ async function handleManufacturerTransferReversed(transfer: any, providerEventId
       paymentReviewState: reviewState,
       updatedAt: new Date(),
     }).where(eq(sampleOrders.id, order.id));
+    const [reversalLock] = await tx.select({ dropId: dropWallets.dropId })
+      .from(dropWallets).where(eq(dropWallets.id, order.walletId)).limit(1);
+    if (reversalLock) await lockDrop(tx, reversalLock.dropId);
     // A reversal returns funds from the manufacturer's transfer to the
     // seller's wallet. releasedCents is reduced so availableCents becomes
     // truthful immediately; the immutable negative ledger line records it.
