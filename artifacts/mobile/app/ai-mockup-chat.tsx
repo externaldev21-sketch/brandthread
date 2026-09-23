@@ -34,7 +34,7 @@ const SUGGESTED = [
 const INITIAL_MSG: Message = {
   id: '0',
   role: 'assistant',
-  content: "Hi! I'm your AI mockup designer, powered by Nano Banana 3. Describe your brand, garment, and design idea in your own words, and I'll turn it into a photorealistic clothing mockup.",
+  content: "Describe the garment, your brand and the design — I'll turn it into a photo-real mockup.",
 };
 
 export default function AIMockupChatScreen() {
@@ -77,7 +77,7 @@ export default function AIMockupChatScreen() {
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: err?.message ?? 'Something went wrong generating your mockup. Please try again.',
+        content: "Couldn't create that mockup. Try rewording it.",
         error: true,
       };
       setMessages((prev) => [aiMsg, ...prev]);
@@ -94,7 +94,7 @@ export default function AIMockupChatScreen() {
     >
       <ScreenHeader
         title="AI Clothing Mockups"
-        subtitle="Powered by Nano Banana 3"
+        subtitle="AI-generated mockups"
         rightElement={
           <View style={[styles.statusBadge, { backgroundColor: colors.accent }]}>
             <Text style={[styles.statusText, { color: colors.success }]}>Online</Text>

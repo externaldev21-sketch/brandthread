@@ -1,29 +1,15 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Alert, Modal } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { EmptyState } from '@/components/BrandthreadUI';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { FS } from '@/lib/theme';
-
-type CanvasTile = {
-  id: string;
-  dims: string;
-  ratio: number;
-  dark?: boolean;
-  hasContent?: boolean;
-};
-
-const CANVASES: CanvasTile[] = [
-  { id: 'c1', dims: '1320 \u00d7 2868px', ratio: 1320 / 2868, hasContent: true },
-  { id: 'c2', dims: '11" \u00d7 8.5"',    ratio: 11 / 8.5,     dark: true },
-  { id: 'c3', dims: '6" \u00d7 9.5"',     ratio: 6 / 9.5 },
-  { id: 'c4', dims: '2048 \u00d7 2048px', ratio: 1,            dark: true },
-  { id: 'c5', dims: '210 \u00d7 297mm',   ratio: 210 / 297 },
-  { id: 'c6', dims: '6" \u00d7 4"',       ratio: 6 / 4 },
-];
+import { getProjects } from '@/services/designService';
+import { DesignProject } from '@/services/designTypes';
 
 const STUDIO_TOOLS = [
   { label: 'AI Clothing Mockups', icon: 'image' as const, desc: 'Generate photorealistic product mockups', badge: 'Popular' },
@@ -58,6 +44,18 @@ export default function AIStudioScreen() {
   const [selected, setSelected] = useState<string | null>(null);
   const [mode, setMode] = useState<'ai' | 'manual'>('ai');
   const [newCanvasVisible, setNewCanvasVisible] = useState(false);
+  const [projects, setProjects] = useState<DesignProject[] | null>(null);
+
+  const loadProjects = useCallback(() => {
+    getProjects().then(setProjects).catch(() => setProjects([]));
+  }, []);
+
+  useFocusEffect(useCallback(() => { loadProjects(); }, [loadProjects]));
+
+  function openProject(project: DesignProject) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push(`/design-canvas?id=${project.id}` as never);
+  }
 
   function openCanvas(preset: SizePreset) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -151,30 +149,41 @@ export default function AIStudioScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.canvasGrid}>
-            {CANVASES.map((c) => (
-              <TouchableOpacity
-                key={c.id}
-                style={styles.canvasCell}
-                activeOpacity={0.8}
-                onPress={() => openCanvas({ label: 'Untitled Artwork', dims: c.dims, ratio: c.ratio })}
-              >
-                <View style={[styles.canvasTile, { borderColor: colors.border }]}>
-                  <View style={[styles.canvasShape, {
-                    aspectRatio: c.ratio,
-                    backgroundColor: c.dark ? '#1C1C1C' : '#FFFFFF',
-                    ...(c.ratio >= 1
-                      ? { width: '90%' }
-                      : { height: '90%' }),
-                  }]}>
-                    {c.hasContent && <Feather name="user" size={18} color="#B8B8B8" />}
-                  </View>
-                </View>
-                <Text style={[styles.canvasLabel, { color: colors.foreground }]}>Untitled Artwork</Text>
-                <Text style={[styles.canvasDims, { color: colors.mutedForeground }]}>{c.dims}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {projects && projects.length === 0 ? (
+            <EmptyState
+              icon="edit-3"
+              title="No designs yet"
+              description="Start a canvas or import artwork."
+              action={{ label: 'New canvas', onPress: () => setNewCanvasVisible(true) }}
+              style={{ marginTop: 24 }}
+            />
+          ) : (
+            <View style={styles.canvasGrid}>
+              {(projects ?? []).map((p) => {
+                const ratio = p.canvas.width / p.canvas.height;
+                return (
+                  <TouchableOpacity
+                    key={p.id}
+                    style={styles.canvasCell}
+                    activeOpacity={0.8}
+                    onPress={() => openProject(p)}
+                  >
+                    <View style={[styles.canvasTile, { borderColor: colors.border }]}>
+                      <View style={[styles.canvasShape, {
+                        aspectRatio: ratio,
+                        backgroundColor: p.canvas.backgroundHex || '#FFFFFF',
+                        ...(ratio >= 1 ? { width: '90%' } : { height: '90%' }),
+                      }]}>
+                        {!p.thumbnail && <Feather name="image" size={18} color="#B8B8B8" />}
+                      </View>
+                    </View>
+                    <Text style={[styles.canvasLabel, { color: colors.foreground }]} numberOfLines={1}>{p.name || 'Untitled design'}</Text>
+                    <Text style={[styles.canvasDims, { color: colors.mutedForeground }]}>{`${p.canvas.width} × ${p.canvas.height}px`}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
         </ScrollView>
       ) : (
       <ScrollView

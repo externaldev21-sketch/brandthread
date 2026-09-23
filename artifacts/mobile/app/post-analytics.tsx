@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { PostAnalyticsResponse, useApi } from '@/lib/api';
+import { EmptyState } from '@/components/BrandthreadUI';
 import { useColors } from '@/hooks/useColors';
 import { FS } from '@/lib/theme';
 
@@ -174,7 +175,20 @@ export default function PostAnalyticsScreen() {
 
   if (!analytics) {
     return (
-      <View style={styles.notFound}>
+      <View style={styles.root}>
+        <View style={[styles.header, { paddingTop: insets.top }]}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <Feather name="arrow-left" size={20} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.notFound}>
+          <EmptyState
+            icon="bar-chart-2"
+            title="Couldn't load stats"
+            description="Pull to refresh or try again."
+            action={{ label: 'Try again', onPress: loadPost }}
+          />
+        </View>
       </View>
     );
   }

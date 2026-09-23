@@ -17,6 +17,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import {
@@ -37,6 +38,7 @@ const BORDER_COLOR = 'rgba(255,255,255,0.07)';
 export default function AiBrandMemoryScreen() {
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { getToken } = useAuth();
   const [localMemory, setLocalMemory] = useState<BrandMemory | null>(null);
   const [saving, setSaving] = useState(false);
@@ -103,7 +105,7 @@ export default function AiBrandMemoryScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.headerBack}>
           <Feather name="chevron-left" size={24} color={FG} />
         </TouchableOpacity>
@@ -201,7 +203,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SP.md,
-    paddingTop: 56,
     paddingBottom: SP.md,
     borderBottomWidth: 1,
     borderBottomColor: BORDER_COLOR,

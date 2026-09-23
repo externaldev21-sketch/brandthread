@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Platform, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Platform, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,8 +14,9 @@ import {
   PURPLE, PURPLE_DIM, PURPLE_LIGHT, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
   FONT, FS,
 } from '@/lib/theme';
-import { getProfitAnalytics, getPayoutAnalytics, getFilterState, exportAnalytics } from '@/services/analyticsService';
+import { getProfitAnalytics, getPayoutAnalytics, getFilterState } from '@/services/analyticsService';
 import { ProfitAnalytics, PayoutAnalytics, ProfitLineItem, AnalyticsMetric, AnalyticsFilterState } from '@/services/analyticsTypes';
+import { EmptyState } from '@/components/BrandthreadUI';
 
 function MiniBar({ points, color = SUCCESS }: { points: Array<{ value: number }>; color?: string }) {
   const colors = useColors();
@@ -88,14 +89,6 @@ export default function AnalyticsProfitScreen() {
           <Text style={s.pageTitle}>Profit & Payout</Text>
           <Text style={s.subtitle}>{filter?.dateRange.label ?? '30 days'}</Text>
         </View>
-        <TouchableOpacity onPress={async () => {
-          if (!filter) return;
-          Alert.alert('Exporting…');
-          await exportAnalytics('profit', filter.dateRange);
-          Alert.alert('Export ready', 'Profit CSV generated.');
-        }} style={s.iconBtn}>
-          <Feather name="share" size={16} color={PURPLE} />
-        </TouchableOpacity>
       </View>
 
       {/* Tab toggle */}
@@ -106,6 +99,15 @@ export default function AnalyticsProfitScreen() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {tab === 'profit' && !profit && (
+        <EmptyState
+          icon="trending-up"
+          title="Profit insights are on the way"
+          description="We'll show margins once your sales and costs sync."
+          style={{ marginTop: 24 }}
+        />
+      )}
 
       {tab === 'profit' && profit && (
         <>
@@ -164,6 +166,15 @@ export default function AnalyticsProfitScreen() {
             ))}
           </View>
         </>
+      )}
+
+      {tab === 'payout' && !payout && (
+        <EmptyState
+          icon="dollar-sign"
+          title="Profit insights are on the way"
+          description="We'll show margins once your sales and costs sync."
+          style={{ marginTop: 24 }}
+        />
       )}
 
       {tab === 'payout' && payout && (

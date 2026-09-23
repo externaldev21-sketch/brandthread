@@ -16,6 +16,7 @@ import {
 } from '@/lib/theme';
 import { getInventoryAnalytics, getFilterState } from '@/services/analyticsService';
 import { InventoryAnalytics, InventoryProductRow, AnalyticsMetric, AnalyticsFilterState } from '@/services/analyticsTypes';
+import { EmptyState } from '@/components/BrandthreadUI';
 
 function statusColor(status: InventoryProductRow['status']): string {
   switch (status) { case 'healthy': return SUCCESS; case 'low': return ORANGE; case 'out': return RED; case 'overstock': return BLUE; }
@@ -124,6 +125,15 @@ export default function AnalyticsInventoryScreen() {
         </TouchableOpacity>
       </View>
 
+      {!data ? (
+        <EmptyState
+          icon="archive"
+          title="Inventory insights are on the way"
+          description="We'll show stock levels once your inventory syncs."
+          style={{ marginTop: 24 }}
+        />
+      ) : (
+      <>
       {/* Alert cards */}
       <View style={s.alertRow}>
         {data && data.outOfStockCount.value > 0 && (
@@ -190,11 +200,11 @@ export default function AnalyticsInventoryScreen() {
       </View>
 
       {listData.length === 0 ? (
-        <View style={s.emptyState}>
-          <Feather name="archive" size={36} color={MUTED} />
-          <Text style={s.emptyTitle}>No inventory data</Text>
-          <Text style={s.emptyBody}>Inventory insights will appear after products and stock are added.</Text>
-        </View>
+        <EmptyState
+          icon="archive"
+          title="No inventory data"
+          description="Inventory insights will appear after products and stock are added."
+        />
       ) : (
         <View style={s.card}>
           {listData.map((p, i) => (
@@ -204,6 +214,8 @@ export default function AnalyticsInventoryScreen() {
             </View>
           ))}
         </View>
+      )}
+      </>
       )}
 
       <View style={{ height: 120 }} />
