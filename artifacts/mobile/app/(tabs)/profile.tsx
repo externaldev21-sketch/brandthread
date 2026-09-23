@@ -28,6 +28,7 @@ interface SellerProfileData {
   subscriptionPlanId: string | null;
   totalLikes:         number;
   profileImageUrl:    string | null;
+  verified:           boolean;
   metrics: {
     revenueCents: number;
     visitors: number;
@@ -106,6 +107,7 @@ export default function ProfileScreen() {
         subscriptionPlanId: data.subscriptionPlanId ?? null,
         totalLikes:         data.totalLikes ?? 0,
         profileImageUrl:    data.profileImageUrl ?? null,
+        verified:           data.verified === true,
         metrics: data.metrics ?? {
           revenueCents: 0,
           visitors: 0,
@@ -189,6 +191,7 @@ export default function ProfileScreen() {
         subscriptionPlanId: current?.subscriptionPlanId ?? null,
         totalLikes: current?.totalLikes ?? 0,
         profileImageUrl: current?.profileImageUrl ?? null,
+        verified: current?.verified ?? false,
         metrics: current?.metrics ?? {
           revenueCents: 0,
           visitors: 0,
@@ -303,7 +306,7 @@ export default function ProfileScreen() {
             <Text style={s.brandName} numberOfLines={1}>
               {profile?.brandName || profile?.displayName || 'My Brand'}
             </Text>
-            <Feather name="check-circle" size={16} color={colors.primary} />
+            {profile?.verified && <Feather name="check-circle" size={16} color={colors.primary} />}
           </View>
         </TouchableOpacity>
 

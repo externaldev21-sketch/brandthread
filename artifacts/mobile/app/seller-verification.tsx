@@ -151,9 +151,10 @@ export default function SellerVerificationScreen() {
         Alert.alert('Already verified', 'Your account is already verified.');
         loadStatus();
       } else if (code === 'IDENTITY_NOT_ENABLED') {
+        if (__DEV__) console.warn('[seller-verification] Stripe Identity not enabled for this account', err);
         Alert.alert(
-          'Stripe Identity not enabled',
-          'Your Stripe account needs Stripe Identity enabled. Log in to your Stripe Dashboard → More → Identity to activate it.',
+          'Verification is unavailable right now',
+          'We’re on it. Try again later or contact support.',
         );
       } else {
         Alert.alert('Error', 'Could not start verification. Please try again later.');

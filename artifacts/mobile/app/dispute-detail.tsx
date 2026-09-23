@@ -89,6 +89,8 @@ export default function DisputeDetailScreen() {
   const [submittingEvidence, setSubmittingEvidence] = useState(false);
   const [internalNote, setInternalNote] = useState('');
   const [addingNote, setAddingNote] = useState(false);
+  const [conceding, setConceding] = useState(false);
+  const [submittingAll, setSubmittingAll] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -193,7 +195,7 @@ export default function DisputeDetailScreen() {
       setEvidenceDesc('');
       await load();
     } catch (err: any) {
-      Alert.alert('Error', err.message ?? 'Failed to submit evidence');
+      Alert.alert('Couldn’t submit evidence', 'Try again.');
     } finally {
       setSubmittingEvidence(false);
     }
@@ -210,10 +212,61 @@ export default function DisputeDetailScreen() {
       setInternalNote('');
       await load();
     } catch (err: any) {
-      Alert.alert('Error', err.message ?? 'Failed to add note');
+      Alert.alert('Couldn’t add note', 'Try again.');
     } finally {
       setAddingNote(false);
     }
+  };
+
+  const handleConcede = () => {
+    Alert.alert(
+      'Accept this dispute?',
+      `The buyer gets a full refund of ${formatCents(dispute!.amountCents)}. You can't undo this.`,
+      [
+        { text: 'Keep disputing', style: 'cancel' },
+        {
+          text: 'Accept and refund',
+          style: 'destructive',
+          onPress: async () => {
+            if (conceding) return;
+            setConceding(true);
+            try {
+              await api.disputes.accept(dispute!.id);
+              await load();
+            } catch (err: any) {
+              Alert.alert('Couldn’t accept this dispute', 'Try again.');
+            } finally {
+              setConceding(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleSubmitAll = () => {
+    Alert.alert(
+      'Submit all evidence?',
+      'This sends everything above to the card network for review. You can’t add more after this.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Submit',
+          onPress: async () => {
+            if (submittingAll) return;
+            setSubmittingAll(true);
+            try {
+              await api.disputes.submitAll(dispute!.id);
+              await load();
+            } catch (err: any) {
+              Alert.alert('Couldn’t submit evidence', 'Try again.');
+            } finally {
+              setSubmittingAll(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -352,14 +405,6 @@ export default function DisputeDetailScreen() {
                 multiline
               />
 
-              <TouchableOpacity
-                style={styles.fileNoteRow}
-                onPress={() => Alert.alert('Attach Files', 'File attachment will be available in the next release.')}
-              >
-                <Feather name="paperclip" size={ICON.xs} color={MUTED} />
-                <Text style={styles.fileNoteText}>Attach files → tap to add</Text>
-              </TouchableOpacity>
-
               <PrimaryButton
                 label="Submit Evidence"
                 onPress={handleSubmitEvidence}
@@ -378,21 +423,10 @@ export default function DisputeDetailScreen() {
           {!isFinal && (
             <View style={styles.actionsGap}>
               <SecondaryButton
-                label="Accept Dispute (Concede)"
-                onPress={() => Alert.alert(
-                  'Are you sure?',
-                  'This cannot be undone. You will concede the dispute and the customer will be refunded.',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Concede', style: 'destructive', onPress: () => Alert.alert('Dispute Conceded', 'The dispute has been conceded and the customer will be refunded.') },
-                  ]
-                )}
+                label={conceding ? 'Accepting…' : 'Accept Dispute (Concede)'}
+                onPress={handleConcede}
+                disabled={conceding}
                 accent={RED}
-              />
-              <SecondaryButton
-                label="Message Support"
-                onPress={() => Alert.alert('Support', 'Open the inbox to contact Brandthread support about this dispute.')}
-                accent={CYAN}
               />
             </View>
           )}
@@ -401,7 +435,8 @@ export default function DisputeDetailScreen() {
             <View style={{ marginTop: SP.sm }}>
               <PrimaryButton
                 label="Submit All Evidence"
-                onPress={() => Alert.alert('Submit Evidence', 'This will finalize and submit all evidence to the payment processor for review.')}
+                onPress={handleSubmitAll}
+                loading={submittingAll}
                 icon="send"
               />
             </View>

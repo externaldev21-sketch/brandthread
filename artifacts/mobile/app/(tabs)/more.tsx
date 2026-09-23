@@ -17,6 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUser, useAuth } from '@clerk/expo';
 import { getSetupState, completionPercent, SetupState } from '@/lib/setupStore';
 import { useApi } from '@/lib/api';
+import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { FONT, FS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, SecondaryButton, NavigationCard, StatusBadge } from '@/components/BrandthreadUI';
@@ -120,6 +121,8 @@ export default function MoreScreen() {
     Object.fromEntries(SECTIONS.map(s => [s.key, true])),
   );
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const { plan } = useSubscriptionPlan();
+  const planLabel = plan === 'pro' ? 'PRO' : plan === 'growth' ? 'GROWTH' : 'FREE';
 
   useEffect(() => {
     getSetupState().then(setSetupState);
@@ -200,7 +203,7 @@ export default function MoreScreen() {
               <Text style={styles.userName}>{displayName}</Text>
               {!!email && <Text style={styles.userEmail}>{email}</Text>}
               <View style={styles.badgeRow}>
-                <StatusBadge label="PRO" variant="purple" />
+                <StatusBadge label={planLabel} variant={plan === 'starter' ? 'neutral' : 'purple'} />
               </View>
             </View>
           </View>
