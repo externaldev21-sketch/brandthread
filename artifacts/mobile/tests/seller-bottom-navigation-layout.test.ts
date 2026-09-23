@@ -7,8 +7,10 @@
  *  2. Design Studio back arrow present (design.tsx).
  *  3. Four primary tab destinations preserved.
  *  4. Studio radial menu and AI button wiring.
- *  5. Minimal exclusion list (boot/auth/onboarding/legal/buyer-group only).
- *     Seller routes that were previously wrongly excluded are now INCLUDED.
+ *  5. Allow-list of seller shell routes: the bar shows ONLY on the `(tabs)`
+ *     group, and full-screen/modal seller routes (create-post, add-product,
+ *     plans, settings, billing, etc.) are NOT in the allow-list, so the bar
+ *     never overlays them (it is `position: absolute`, not a flex sibling).
  *  6. Seller root route inclusion: key routes map to a primary tab.
  *  7. Route-to-active-tab classification present in SellerGlobalTabBar.
  *  8. SellerShellContext is used as the authoritative source — no parallel
@@ -129,36 +131,28 @@ describe('tab freeze/detach behavior', () => {
   });
 });
 
-// ─── 5. Minimal exclusion list — only boot/auth/onboarding/legal/buyer ────────
+// ─── 5. Allow-list of seller shell routes ─────────────────────────────────────
 
-describe('minimal seller bar exclusion list', () => {
-  // These routes MUST be excluded (no seller session)
-  const mustExclude = [
-    'index',      // boot BootScreen
-    'splash',
-    'sign-in',
-    'forgot-password',
-    'onboarding',
-    'privacy',
-    'terms',
-    '(buyer)',    // buyer app group
-  ];
+describe('seller bar shell allow-list', () => {
+  it('the allow-list only contains the (tabs) shell group', () => {
+    expect(rootLayout).toContain('SELLER_TAB_BAR_SHELL_SEGMENTS');
+    const setBlock = rootLayout.match(
+      /const SELLER_TAB_BAR_SHELL_SEGMENTS = new Set\(\[([\s\S]*?)\]\)/,
+    );
+    expect(setBlock, 'SELLER_TAB_BAR_SHELL_SEGMENTS set must exist').toBeTruthy();
+    const setBody = setBlock![1];
+    expect(setBody).toContain("'(tabs)'");
+  });
 
-  for (const route of mustExclude) {
-    it(`correctly excludes "${route}" (no seller session on this route)`, () => {
-      expect(rootLayout).toContain(`'${route}'`);
-      expect(rootLayout).toContain('SELLER_TAB_BAR_EXCLUDED_SEGMENTS');
-    });
-  }
-
-  // These seller routes must NOT be in the exclusion set
-  const mustInclude = [
+  // These full-screen/modal seller routes must NOT be in the allow-list, so
+  // the bar (position: absolute) never overlays their own controls/close X.
+  const mustNotShowBar = [
     'create-post',
     'camera-capture',
-    'seller-go-live',
-    'seller-live',
-    'buyer-live',
+    'add-product',
     'plans',
+    'settings',
+    'billing',
     'team-invite',
     'seller-profile',
     'buyer-product-detail',
@@ -172,24 +166,25 @@ describe('minimal seller bar exclusion list', () => {
     'analytics-sales',
     'finance',
     'team',
-    'settings',
     'manufacturer',
   ];
 
-  for (const route of mustInclude) {
-    it(`does NOT exclude seller route "${route}" from the tab bar`, () => {
-      // The route must not appear inside the SELLER_TAB_BAR_EXCLUDED_SEGMENTS set literal.
-      // We check the exclusion set block: it starts after the const declaration and
-      // ends before the closing ]);
+  for (const route of mustNotShowBar) {
+    it(`does NOT show the seller bar on full-screen/modal route "${route}"`, () => {
       const setBlock = rootLayout.match(
-        /const SELLER_TAB_BAR_EXCLUDED_SEGMENTS = new Set\(\[([\s\S]*?)\]\)/,
+        /const SELLER_TAB_BAR_SHELL_SEGMENTS = new Set\(\[([\s\S]*?)\]\)/,
       );
-      expect(setBlock, 'SELLER_TAB_BAR_EXCLUDED_SEGMENTS set must exist').toBeTruthy();
+      expect(setBlock).toBeTruthy();
       const setBody = setBlock![1];
-      // The route should NOT be a quoted string in the set body
+      // The route should NOT be a quoted string in the allow-list body
       expect(setBody).not.toContain(`'${route}'`);
     });
   }
+
+  it('uses an allow-list check (isShellRoute), not a deny-list, to gate the bar', () => {
+    expect(rootLayout).toContain('isShellRoute');
+    expect(rootLayout).not.toContain('SELLER_TAB_BAR_EXCLUDED_SEGMENTS');
+  });
 });
 
 // ─── 6. Seller root route inclusion in route-to-tab map ──────────────────────

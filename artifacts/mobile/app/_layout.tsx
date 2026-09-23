@@ -115,41 +115,27 @@ function RuntimeThemeShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── Seller tab bar exclusion list ───────────────────────────────────────────
-// The bar shows on EVERY authenticated seller screen by default.
-// Only exclude routes where the seller identity/shell does not exist at all:
-//   • Boot/auth/onboarding (no session yet)
-//   • Legal public pages (reachable without auth)
-//   • The Expo Router root index (BootScreen redirect — no segment)
-//   • The navigation isolation test probe (CI only)
-//   • The buyer app group — buyer accounts never see the seller shell
-//     (role gating already prevents this; explicit exclusion avoids any flash)
+// ─── Seller tab bar shell allow-list ─────────────────────────────────────────
+// The bar is `position: absolute` (SellerGlobalTabBar.tsx) so it physically
+// overlays whatever is underneath it — it is NOT a harmless flex sibling.
+// A deny-list therefore requires remembering to add every new full-screen or
+// modal route (create-post's camera controls, the Add Product form, the Plans
+// paywall modal, Settings and Billing — all of which have their own close X —
+// were missing from the previous deny-list and got the bar drawn on top of
+// them). An allow-list of "shell" routes is safer: the bar shows ONLY on the
+// primary seller tab screens (the `(tabs)` route group: Dashboard/Home, Feed,
+// Following, Products, Orders, Profile, Marketing, Analytics, More, Studio —
+// see app/(tabs)/_layout.tsx) and is hidden everywhere else by default,
+// including on every new full-screen/modal/pushed route added in the future.
 //
-// Full-screen seller routes (create-post, camera-capture, seller-go-live,
-// seller-live, buyer-live, buyer-story-*, plans, team-invite, seller-profile,
-// buyer-product-detail, buyer-checkout, buyer-post-comments, buyer-report, etc.)
-// are intentionally NOT excluded — the bar is a normal flex sibling and does
-// not physically overlay these screens. Role gating prevents buyer accounts
-// from seeing it on buyer-facing screens.
-const SELLER_TAB_BAR_EXCLUDED_SEGMENTS = new Set([
-  // Boot: "/" renders BootScreen with no segment; AuthGate redirects immediately
-  'index',
-  // Auth flow — no seller session
-  'splash',
-  'sign-in',
-  'forgot-password',
-  // Onboarding — session incomplete, role not yet confirmed
-  'onboarding',
-  // Post-onboarding buyer screen — not a seller route
-  'thread-explainer',
-  // Legal public pages — reachable without any session
-  'privacy',
-  'terms',
-  'community-guidelines',
-  // CI navigation isolation probe
-  'navigation-isolation-probe',
-  // Buyer app group — buyer sessions only; seller role gating prevents cross-exposure
-  '(buyer)',
+// This affects the SELLER tab bar only. The buyer tab bar is a separate
+// component/gate entirely (see the buyer `(buyer)` group layout) and is not
+// touched here.
+const SELLER_TAB_BAR_SHELL_SEGMENTS = new Set([
+  // The seller tab-root group — Dashboard, Products, Orders, Profile, plus the
+  // hidden-but-routable tabs (Studio, More, Feed, Following, Analytics,
+  // Marketing). See app/(tabs)/_layout.tsx.
+  '(tabs)',
 ]);
 
 // ─── SellerBarGate ────────────────────────────────────────────────────────────
@@ -161,9 +147,11 @@ const SELLER_TAB_BAR_EXCLUDED_SEGMENTS = new Set([
 // AuthGate is the single authority that reads AsyncStorage and the server
 // profile. SellerBarGate consumes SellerShellContext — no parallel read.
 //
-// The exclusion list is intentionally minimal (boot/auth/onboarding/legal/buyer
-// group only). Every normal seller screen — including full-screen modals that
-// are flex siblings of the bar — shows the tab bar.
+// It is gated by an ALLOW-LIST (SELLER_TAB_BAR_SHELL_SEGMENTS): the bar shows
+// only on the seller `(tabs)` shell screens, and is hidden by default on every
+// other seller route (full-screen flows like Create Post, Add Product, Plans,
+// Settings, Billing, and any future route) — see the allow-list comment above
+// for why a deny-list was unsafe here.
 
 function SellerBarGate() {
   const { isActiveSeller } = useSellerShell();
@@ -177,11 +165,12 @@ function SellerBarGate() {
 
   const showBar = isActiveSeller || isPreviewSeller;
 
-  // Check exclusion list: first segment determines the route
+  // Allow-list: first segment determines the route. The bar renders only on
+  // the seller shell's own tab screens (see SELLER_TAB_BAR_SHELL_SEGMENTS).
   const firstSegment = (segments[0] as string | undefined) ?? '';
-  const isExcluded = SELLER_TAB_BAR_EXCLUDED_SEGMENTS.has(firstSegment);
+  const isShellRoute = SELLER_TAB_BAR_SHELL_SEGMENTS.has(firstSegment);
 
-  if (!showBar || isExcluded) return null;
+  if (!showBar || !isShellRoute) return null;
 
   return (
     <>
