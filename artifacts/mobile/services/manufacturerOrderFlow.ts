@@ -171,3 +171,25 @@ export async function payOrderCard(order: Pick<OrderCardSnapshot, 'id' | 'status
   }
   return { status: 'pending', message: 'Checkout didn\'t return a confirmation. If you paid, the card will update shortly.' };
 }
+
+export type SellerOrderRow = {
+  id: string;
+  orderType: 'sample' | 'bulk' | string;
+  title: string;
+  quantity: number;
+  priceCents: number;
+  status: string;
+  threadId: string | null;
+  manufacturerId: string;
+  manufacturerName: string | null;
+  manufacturerCountry: string | null;
+  trackingNumber: string | null;
+  updatedAt: string;
+};
+
+/** The seller's sample and bulk orders with their raw tracker status. */
+export async function getSellerOrders(): Promise<SellerOrderRow[]> {
+  const rows = await serviceRequest<SellerOrderRow[]>('/api/sample-orders');
+  if (!Array.isArray(rows)) throw new Error('Orders returned an invalid response.');
+  return rows;
+}

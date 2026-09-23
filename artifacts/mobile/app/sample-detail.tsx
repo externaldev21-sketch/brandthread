@@ -696,7 +696,11 @@ export default function SampleDetailScreen() {
           )}
 
           {/* ── STATUS TIMELINE ──────────────────────────────────── */}
-          <SectionHeader title="Progress" style={s.sectionHeader} />
+          <SectionHeader
+            title="Progress"
+            action={{ label: 'Live tracker', onPress: () => router.push({ pathname: '/production-detail', params: { id: sample.id } } as never) }}
+            style={s.sectionHeader}
+          />
           <BrandthreadCard style={s.section}>
             <SampleTimeline
               currentStatus={sample.status}

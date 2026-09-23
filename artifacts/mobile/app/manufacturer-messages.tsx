@@ -1,36 +1,38 @@
 /**
- * Manufacturer Messages Screen
+ * Seller ↔ manufacturer conversation: one ongoing thread for the whole job.
+ * Photos from the camera or camera roll, the manufacturer's priced sample /
+ * bulk cards (paid right here via Stripe), and production updates as they
+ * happen.
+ *
  * Params:
- *   threadId      — real DB thread UUID (takes priority)
- *   mfrName       — manufacturer display name (pre-fill header)
- *   mfrId         — manufacturer UUID (for creating threads)
+ *   threadId — thread UUID (takes priority)
+ *   mfrName  — manufacturer display name (pre-fills the header)
+ *   mfrId    — manufacturer UUID (opens or creates the thread)
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useColors } from '@/hooks/useColors';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Image,
-  ScrollView, RefreshControl,
+  ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable,
+  RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import { BrandthreadHeader, StatusBadge } from '@/components/BrandthreadUI';
-import { useApi } from '@/lib/api';
-import {
-  BG, CARD, CARD_ELEVATED, BORDER, BORDER_FOCUS,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, ORANGE, ORANGE_DIM, SUCCESS, SUCCESS_DIM,
-  FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
-import { formatCents, parseDecimalToCents } from '@/lib/money';
-import { getEntitlementRejection } from '@/lib/entitlementError';
-import { PendingManufacturerOperations } from '@/services/manufacturerIdempotency';
 import { useAuth } from '@clerk/expo';
+import { localTimeLabel } from '@workspace/manufacturer-flow';
+import { BrandthreadHeader, EmptyState, SecondaryButton } from '@/components/BrandthreadUI';
+import OrderCardBubble from '@/components/manufacturer/OrderCardBubble';
+import { useOrderCardPayment } from '@/components/manufacturer/useOrderCardPayment';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useApi } from '@/lib/api';
+import { getEntitlementRejection } from '@/lib/entitlementError';
+import {
+  BG, BORDER, CARD, CARD_ELEVATED, FG, FONT, FS, ICON, MUTED, RADIUS, RED, SP, SUBTLE,
+} from '@/lib/theme';
+import { PendingManufacturerOperations } from '@/services/manufacturerIdempotency';
+import { getCallAvailability, type OrderCardSnapshot } from '@/services/manufacturerOrderFlow';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -42,8 +44,13 @@ interface ApiMessage {
   messageType: string;   // 'text' | 'image' | 'sample_card' | 'bulk_card' | 'system'
   mediaUrls: string[];
   cardData: Record<string, unknown> | null;
+  order?: OrderCardSnapshot | null;
   sentAt: string;
 }
+
+type Row = { kind: 'message'; message: ApiMessage } | { kind: 'day'; id: string; label: string };
+
+const MAX_PHOTOS = 6;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -51,293 +58,106 @@ function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
-function fmtCents(c: number) { return formatCents(c); }
+function dayLabel(iso: string) {
+  const date = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date(); yesterday.setDate(today.getDate() - 1);
+  if (date.toDateString() === today.toDateString()) return 'Today';
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return date.toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric',
+    ...(date.getFullYear() === today.getFullYear() ? {} : { year: 'numeric' }),
+  });
+}
 
-// ─── Message Bubble ───────────────────────────────────────────────────────────
+/** Newest-first rows for the inverted list, with a day separator above each day. */
+function buildRows(newestFirst: ApiMessage[]): Row[] {
+  const rows: Row[] = [];
+  newestFirst.forEach((message, index) => {
+    rows.push({ kind: 'message', message });
+    const older = newestFirst[index + 1];
+    const label = dayLabel(message.sentAt);
+    if (!older || dayLabel(older.sentAt) !== label) rows.push({ kind: 'day', id: `day-${message.id}`, label });
+  });
+  return rows;
+}
 
-function ApiMessageBubble({ msg, onOpenOrder }: { msg: ApiMessage; onOpenOrder: (id: string, type: string) => void }) {
-  const isSeller = msg.senderRole === 'seller';
-  const isSystem = msg.senderRole === 'system' || msg.messageType === 'system';
+// ─── Bubbles ──────────────────────────────────────────────────────────────────
 
-  if (isSystem) {
-    return (
-      <View style={bubS.systemWrap}>
-        <Text style={bubS.systemText}>{msg.content}</Text>
-        <Text style={bubS.timestamp}>{fmtTime(msg.sentAt)}</Text>
+function SystemLine({ msg }: { msg: ApiMessage }) {
+  return (
+    <View style={bub.systemWrap} testID={`system-message-${msg.id}`}>
+      <View style={bub.systemPill}>
+        <Feather name="info" size={12} color={SUBTLE} />
+        <Text style={bub.systemText}>{msg.content}</Text>
       </View>
-    );
-  }
+      <Text style={bub.systemTime}>{fmtTime(msg.sentAt)}</Text>
+    </View>
+  );
+}
 
-  if (msg.messageType === 'image' && msg.mediaUrls.length > 0) {
-    return (
-      <View style={[bubS.row, isSeller ? bubS.rowRight : bubS.rowLeft]}>
-        <View style={{ maxWidth: '75%' }}>
-          <Image
-            source={{ uri: msg.mediaUrls[0] }}
-            style={bubS.imageMsg}
-            resizeMode="cover"
-          />
-          <Text style={[bubS.timestamp, isSeller ? { textAlign: 'right' } : {}]}>
-            {fmtTime(msg.sentAt)}
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
-  if (msg.messageType === 'sample_card' || msg.messageType === 'bulk_card') {
-    const card = msg.cardData as any;
-    const icon = msg.messageType === 'sample_card' ? '🧵' : '📦';
-    const label = msg.messageType === 'sample_card' ? 'Sample Order' : 'Bulk Order';
-    return (
-      <View style={[bubS.row, isSeller ? bubS.rowRight : bubS.rowLeft]}>
-        <TouchableOpacity style={bubS.cardMsg} onPress={() => card?.orderId && onOpenOrder(card.orderId, card.orderType)}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <Text style={{ fontSize: 20 }}>{icon}</Text>
-            <Text style={bubS.cardLabel}>{label}</Text>
+function MessageBubble({ msg, accent, onAccent, onOpenImage }: { msg: ApiMessage; accent: string; onAccent: string; onOpenImage: (uri: string) => void }) {
+  const mine = msg.senderRole === 'seller';
+  const images = msg.messageType === 'image' ? msg.mediaUrls : [];
+  const files = msg.messageType === 'image' ? [] : msg.mediaUrls;
+  const autoCaption = /^(📷 Photo|Sent (a photo|\d+ photos|an attachment))$/.test(msg.content);
+  const showText = !!msg.content && !(autoCaption && (images.length || files.length));
+  return (
+    <View style={[bub.row, mine ? bub.right : bub.left]} testID={`message-${msg.id}`}>
+      <View style={{ maxWidth: '80%' }}>
+        {images.length > 0 && (
+          <View style={[bub.grid, images.length === 1 && { width: 220 }]}>
+            {images.map((uri) => (
+              <Pressable key={uri} onPress={() => onOpenImage(uri)} accessibilityRole="imagebutton" accessibilityLabel="Open photo">
+                <Image source={{ uri }} style={images.length === 1 ? bub.imageSingle : bub.imageTile} resizeMode="cover" />
+              </Pressable>
+            ))}
           </View>
-          {card?.title && <Text style={bubS.cardTitle}>{card.title}</Text>}
-          <View style={{ flexDirection: 'row', gap: 16, marginTop: 6 }}>
-            {card?.quantity && (
-              <View>
-                <Text style={bubS.cardKey}>Qty</Text>
-                <Text style={bubS.cardVal}>{card.quantity}</Text>
-              </View>
-            )}
-            {card?.priceCents && (
-              <View>
-                <Text style={bubS.cardKey}>Price</Text>
-                <Text style={bubS.cardVal}>{fmtCents(card.priceCents)}</Text>
-              </View>
-            )}
-            {card?.walletBalance !== undefined && (
-              <View>
-                <Text style={bubS.cardKey}>Wallet</Text>
-                <Text style={[bubS.cardVal, { color: SUCCESS }]}>{fmtCents(card.walletBalance)}</Text>
-              </View>
-            )}
+        )}
+        {files.map((uri) => (
+          <View key={uri} style={[bub.file, mine && { alignSelf: 'flex-end' }]}>
+            <Feather name="file-text" size={14} color={FG} />
+            <Text style={bub.fileText}>Attachment</Text>
           </View>
-          {card?.description && (
-            <Text style={[bubS.cardDesc]}>{card.description}</Text>
-          )}
-          <Text style={bubS.timestamp}>{fmtTime(msg.sentAt)}</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  // Default text bubble
-  return (
-    <View style={[bubS.row, isSeller ? bubS.rowRight : bubS.rowLeft]}>
-      <View style={{ maxWidth: '78%' }}>
-        <View style={[bubS.bubble, isSeller ? bubS.sellerBubble : bubS.mfgBubble]}>
-          <Text style={[bubS.msgText, isSeller && { color: '#fff' }]}>{msg.content}</Text>
-        </View>
-        <Text style={[bubS.timestamp, isSeller ? { textAlign: 'right' } : {}]}>
-          {fmtTime(msg.sentAt)}
-        </Text>
+        ))}
+        {showText && (
+          <View style={[bub.bubble, mine ? [bub.mine, { backgroundColor: accent }] : bub.theirs, images.length > 0 && { marginTop: 4 }]}>
+            <Text style={[bub.text, mine && { color: onAccent }]}>{msg.content}</Text>
+          </View>
+        )}
+        <Text style={[bub.time, mine && { textAlign: 'right' }]}>{fmtTime(msg.sentAt)}</Text>
       </View>
     </View>
   );
 }
 
-const bubS = StyleSheet.create({
-  row: { marginVertical: 3, paddingHorizontal: SP.md },
-  rowRight: { flexDirection: 'row', justifyContent: 'flex-end' },
-  rowLeft:  { flexDirection: 'row', justifyContent: 'flex-start' },
-  bubble: {
-    borderRadius: RADIUS.lg,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-    maxWidth: '100%',
-  },
-  sellerBubble: {
-    backgroundColor: PURPLE,
-    borderBottomRightRadius: 4,
-  },
-  mfgBubble: {
-    backgroundColor: CARD_ELEVATED,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderBottomLeftRadius: 4,
-  },
-  msgText: {
-    fontSize: FS.base,
-    fontFamily: FONT.regular,
-    color: FG,
-    lineHeight: 20,
-  },
-  systemWrap: {
-    alignItems: 'center',
-    marginVertical: SP.sm,
-    paddingHorizontal: SP.lg,
-  },
-  systemText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: SUBTLE,
-    fontStyle: 'italic',
-    textAlign: 'center',
-  },
-  timestamp: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: SUBTLE,
-    marginTop: 3,
-  },
-  imageMsg: {
-    width: 200,
-    height: 200,
-    borderRadius: RADIUS.md,
-  },
-  cardMsg: {
-    backgroundColor: CARD_ELEVATED,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: RADIUS.lg,
-    padding: SP.md,
-    maxWidth: 280,
-  },
-  cardLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
-  cardTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
-  cardKey:   { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  cardVal:   { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  cardDesc:  { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 6 },
-});
-
-// ─── Sample Card Dialog ────────────────────────────────────────────────────────
-
-function SampleCardDialog({
-  type,
-  onSend,
-  onClose,
-}: {
-  type: 'sample_card' | 'bulk_card';
-  onSend: (cardData: any) => void;
-  onClose: () => void;
-}) {
-  const [title, setTitle]       = useState('');
-  const [qty, setQty]           = useState('1');
-  const [price, setPrice]       = useState('');
-  const [desc, setDesc]         = useState('');
-
-  const isBulk = type === 'bulk_card';
-  const label  = isBulk ? 'Bulk Order' : 'Sample Order';
-
-  function handleSend() {
-    if (!title.trim() || !price.trim()) {
-      Alert.alert('Required', 'Title and price are required.'); return;
-    }
-    const priceCents = parseDecimalToCents(price);
-    if (priceCents === null || priceCents <= 0) {
-      Alert.alert('Invalid price', 'Enter a valid amount with up to two decimal places.'); return;
-    }
-    onSend({
-      title:      title.trim(),
-      quantity:   parseInt(qty) || 1,
-      priceCents,
-      orderType:  isBulk ? 'bulk' : 'sample',
-      description: desc.trim() || undefined,
-    });
-    onClose();
-  }
-
-  return (
-    <View style={dlgS.overlay}>
-      <View style={dlgS.sheet}>
-        <View style={dlgS.header}>
-          <Text style={dlgS.title}>{isBulk ? '📦' : '🧵'} Send {label}</Text>
-          <TouchableOpacity onPress={onClose}>
-            <Feather name="x" size={20} color={MUTED} />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
-          <DlgField label="Title" value={title} onChange={setTitle} placeholder={isBulk ? 'e.g. 500 Hoodies — White' : 'e.g. Sample Hoodie — Black'} />
-          <DlgField label="Quantity" value={qty} onChange={setQty} keyboard="numeric" />
-          <DlgField label="Price (USD)" value={price} onChange={setPrice} keyboard="decimal-pad" placeholder="0.00" />
-          <DlgField label="Notes (optional)" value={desc} onChange={setDesc} multiline />
-        </ScrollView>
-
-        <TouchableOpacity style={dlgS.sendBtn} onPress={handleSend}>
-          <Text style={dlgS.sendBtnText}>Send {label} Card</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
-
-function DlgField({ label, value, onChange, placeholder, keyboard, multiline }: any) {
-  return (
-    <View style={{ marginBottom: 14 }}>
-      <Text style={{ fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, marginBottom: 6 }}>{label}</Text>
-      <TextInput
-        style={[dlgS.input, multiline && { height: 72, textAlignVertical: 'top' }]}
-        value={value}
-        onChangeText={onChange}
-        placeholder={placeholder}
-        placeholderTextColor={SUBTLE}
-        keyboardType={keyboard}
-        multiline={multiline}
-        returnKeyType="done"
-      />
-    </View>
-  );
-}
-
-const dlgS = StyleSheet.create({
-  overlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'flex-end', zIndex: 999,
-  },
-  sheet: {
-    backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
-    padding: SP.lg, paddingBottom: 40, maxHeight: '80%',
-  },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.md },
-  title:  { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
-  input: {
-    backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER,
-    borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: 12,
-    fontSize: FS.base, fontFamily: FONT.regular, color: FG,
-  },
-  sendBtn: {
-    backgroundColor: PURPLE, borderRadius: RADIUS.md, paddingVertical: 14,
-    alignItems: 'center', marginTop: SP.md,
-  },
-  sendBtnText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#fff' },
-});
-
-// ─── Main Screen ──────────────────────────────────────────────────────────────
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function ManufacturerMessagesScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const { theme } = useAppTheme();
-  const params = useLocalSearchParams<{
-    threadId?: string;
-    mfrName?: string;
-    mfrId?: string;
-  }>();
-  const router  = useRouter();
-  const insets  = useSafeAreaInsets();
-  const api     = useApi();
+  const params = useLocalSearchParams<{ threadId?: string; mfrName?: string; mfrId?: string }>();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const api = useApi();
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
 
-  const [resolvedThreadId, setResolvedThreadId] = useState<string | null>(params.threadId ?? null);
-  const [mfrDisplayName, setMfrDisplayName] = useState(params.mfrName ?? 'Manufacturer');
+  const [threadId, setThreadId] = useState<string | null>(params.threadId ?? null);
+  const [mfrName, setMfrName] = useState(params.mfrName ?? 'Manufacturer');
   const [manufacturerId, setManufacturerId] = useState(params.mfrId ?? '');
-
-  // API mode state
-  const [apiMessages,    setApiMessages]    = useState<ApiMessage[]>([]);
-  const [inputText,  setInputText]  = useState('');
-  const [sending,    setSending]    = useState(false);
-  const [loading,    setLoading]    = useState(true);
+  const [mfrTimeZone, setMfrTimeZone] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ApiMessage[]>([]);
+  const [draft, setDraft] = useState('');
+  const [pending, setPending] = useState<ImagePicker.ImagePickerAsset[]>([]);
+  const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [cardDialog, setCardDialog] = useState<'sample_card' | 'bulk_card' | null>(null);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [callsInfoOpen, setCallsInfoOpen] = useState(false);
+  const [callingEnabled, setCallingEnabled] = useState(false);
+  const [viewer, setViewer] = useState<string | null>(null);
+  const [, setClock] = useState(0);
 
-  const inputRef = useRef<TextInput>(null);
-  const listRef  = useRef<FlatList>(null);
   const pendingOperations = useRef(new PendingManufacturerOperations());
 
   const showUpgrade = useCallback((error: unknown): boolean => {
@@ -354,373 +174,382 @@ export default function ManufacturerMessagesScreen() {
     return true;
   }, [router]);
 
-  // ── Load ──────────────────────────────────────────────────────────────────────
-
-  const loadApiMessages = useCallback(async (threadId: string) => {
+  const loadMessages = useCallback(async (id: string) => {
     try {
-      const msgs = await api.manufacturers.threads.messages.list(threadId);
-      setApiMessages(msgs.reverse()); // newest first for inverted list
-    } catch (e) {
-      if (showUpgrade(e)) return;
-      console.error('Failed to load messages:', e);
+      const rows: ApiMessage[] = await api.manufacturers.threads.messages.list(id);
+      setMessages([...rows].reverse());
+      setLoadError(null);
+    } catch (error) {
+      if (!showUpgrade(error)) setLoadError('Messages could not be loaded. Check your connection and try again.');
     } finally {
       setRefreshing(false);
     }
   }, [api, showUpgrade]);
 
+  const { pay, payingId, outcome } = useOrderCardPayment(() => { if (threadId) void loadMessages(threadId); });
+
   useEffect(() => {
     if (!authLoaded || !isSignedIn) return;
+    let cancelled = false;
     (async () => {
       setLoading(true);
-      if (resolvedThreadId) {
-        try {
+      try {
+        let id = threadId;
+        if (!id && params.mfrId) {
+          const thread = await api.manufacturers.threads.create({ manufacturerId: params.mfrId, subject: 'General' });
+          id = thread.id;
+          if (!cancelled) setThreadId(thread.id);
+        }
+        if (id) {
           const threads = await api.manufacturers.threads.list();
-          const thread = threads.find((item: any) => item.id === resolvedThreadId);
-          if (thread) {
-            setMfrDisplayName(thread.manufacturerName);
+          const thread = threads.find((item: any) => item.id === id);
+          if (thread && !cancelled) {
+            setMfrName(thread.manufacturerName ?? 'Manufacturer');
             setManufacturerId(thread.manufacturerId);
+            setMfrTimeZone(thread.manufacturerTimeZone ?? null);
           }
-        } catch (error) {
-          if (showUpgrade(error)) return;
+          await loadMessages(id);
+        } else if (!cancelled) {
+          setLoadError('This conversation link is incomplete.');
         }
-        await loadApiMessages(resolvedThreadId);
-      } else if (params.mfrId) {
-        // Create or get thread for this manufacturer
-        try {
-          const thread = await api.manufacturers.threads.create({
-            manufacturerId: params.mfrId,
-            subject: 'General',
-          });
-          setResolvedThreadId(thread.id);
-          // Messages will load via the effect below
-        } catch (error) {
-          showUpgrade(error);
-        }
+      } catch (error) {
+        if (!showUpgrade(error) && !cancelled) setLoadError('This conversation could not be opened. Check your connection and try again.');
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
     })();
+    void getCallAvailability().then((enabled) => { if (!cancelled) setCallingEnabled(enabled); });
+    return () => { cancelled = true; };
   }, [authLoaded, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // When threadId resolves, load messages
   useEffect(() => {
-    if (resolvedThreadId) {
-      loadApiMessages(resolvedThreadId).catch(() => {});
-    }
-  }, [resolvedThreadId, loadApiMessages]);
-  useEffect(() => {
-    if (!resolvedThreadId) return;
-    const timer = setInterval(() => loadApiMessages(resolvedThreadId), 5_000);
-    return () => clearInterval(timer);
-  }, [resolvedThreadId, loadApiMessages]);
+    if (!threadId) return;
+    const timer = setInterval(() => { void loadMessages(threadId); }, 5_000);
+    const clock = setInterval(() => setClock((tick) => tick + 1), 60_000);
+    return () => { clearInterval(timer); clearInterval(clock); };
+  }, [threadId, loadMessages]);
 
-  // ── Send text ─────────────────────────────────────────────────────────────────
+  const rows = useMemo(() => buildRows(messages), [messages]);
+  const localTime = localTimeLabel(mfrTimeZone);
 
-  async function handleSend() {
-    const text = inputText.trim();
-    if (!text) return;
+  // ── Sending ──────────────────────────────────────────────────────────────────
+
+  async function send() {
+    const text = draft.trim();
+    if ((!text && pending.length === 0) || !threadId || sending) return;
     setSending(true);
-    const signature = `${resolvedThreadId}:${text}`;
-    const operation = pendingOperations.current.get('text', signature);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-    if (resolvedThreadId) {
-      try {
-        const msg = await api.manufacturers.threads.messages.send(resolvedThreadId, {
-          clientRequestId: operation.clientRequestId,
-          content:     text,
-          messageType: 'text',
-        });
-        setApiMessages(prev => [{ ...msg }, ...prev]);
-        setInputText('');
-        pendingOperations.current.complete('text', signature);
-      } catch (error) {
-        if (!showUpgrade(error)) Alert.alert('Error', 'Could not send message.');
-      }
-    }
-    setSending(false);
-  }
-
-  // ── Send photo ────────────────────────────────────────────────────────────────
-
-  async function handlePhotoSend() {
-    if (!resolvedThreadId) return;
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('Permission needed', 'Allow photo access to share images.'); return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-      base64: false,
-    });
-    if (result.canceled) return;
-
-    setSending(true);
-    const asset = result.assets[0];
-    const signature = `${resolvedThreadId}:${asset.uri}`;
-    const operation = pendingOperations.current.get('photo', signature);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const assets = pending;
+    const signature = `${threadId}:${text}:${assets.map((asset) => asset.uri).join('|')}`;
+    const operation = pendingOperations.current.get(assets.length ? 'photo' : 'text', signature);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
-      if (!operation.metadata?.objectPath) {
-        const upload = await api.manufacturers.threads.uploadAttachment(resolvedThreadId, {
-          uri: asset.uri,
-          mimeType: asset.mimeType,
-        });
-        operation.metadata = { objectPath: upload.objectPath };
+      let mediaUrls: string[] | undefined;
+      if (assets.length) {
+        // Uploaded paths survive a failed send so a retry doesn't re-upload.
+        const uploaded = operation.metadata?.objectPaths ? String(operation.metadata.objectPaths).split('|') : [];
+        for (const asset of assets.slice(uploaded.length)) {
+          const result = await api.manufacturers.threads.uploadAttachment(threadId, { uri: asset.uri, mimeType: asset.mimeType });
+          uploaded.push(result.objectPath);
+          operation.metadata = { objectPaths: uploaded.join('|') };
+        }
+        mediaUrls = uploaded;
       }
-
-      const msg = await api.manufacturers.threads.messages.send(resolvedThreadId, {
+      const message = await api.manufacturers.threads.messages.send(threadId, {
         clientRequestId: operation.clientRequestId,
-        content:     '📷 Photo',
-        messageType: 'image',
-        mediaUrls:   [operation.metadata.objectPath],
+        content: text || (assets.length === 1 ? 'Sent a photo' : assets.length ? `Sent ${assets.length} photos` : ''),
+        messageType: assets.length ? 'image' : 'text',
+        mediaUrls,
       });
-      setApiMessages(prev => [{ ...msg }, ...prev]);
-      pendingOperations.current.complete('photo', signature);
-    } catch (e) {
-      if (!showUpgrade(e)) Alert.alert('Error', 'Could not send photo.');
-    }
-    setSending(false);
-  }
-
-  // ── Send card ─────────────────────────────────────────────────────────────────
-
-  async function handleSendCard(cardType: 'sample_card' | 'bulk_card', cardData: any) {
-    if (!resolvedThreadId || !manufacturerId) return;
-    setSending(true);
-    const signature = `${resolvedThreadId}:${manufacturerId}:${cardType}:${JSON.stringify(cardData)}`;
-    const orderOperation = pendingOperations.current.get('order-card', signature);
-    const messageOperation = pendingOperations.current.get('message-card', signature);
-    try {
-      const order = await api.manufacturers.sampleOrders.create({
-        clientRequestId: orderOperation.clientRequestId,
-        manufacturerId,
-        threadId: resolvedThreadId,
-        orderType: cardType === 'sample_card' ? 'sample' : 'bulk',
-        title: cardData.title,
-        description: cardData.description,
-        quantity: cardData.quantity,
-        priceCents: cardData.priceCents,
-      });
-      const label = cardType === 'sample_card' ? 'Sample Order Card' : 'Bulk Order Card';
-      const msg = await api.manufacturers.threads.messages.send(resolvedThreadId, {
-        clientRequestId: messageOperation.clientRequestId,
-        content:     label,
-        messageType: cardType,
-        cardData: { ...cardData, orderId: order.id },
-      });
-      setApiMessages(prev => [{ ...msg }, ...prev]);
-      pendingOperations.current.complete('order-card', signature);
-      pendingOperations.current.complete('message-card', signature);
-      router.push(
-        `${cardType === 'bulk_card' ? '/production-detail' : '/sample-detail'}?id=${encodeURIComponent(order.id)}&paymentPrompt=1` as never,
-      );
+      setMessages((current) => [message, ...current.filter((item) => item.id !== message.id)]);
+      setDraft('');
+      setPending([]);
+      pendingOperations.current.complete(assets.length ? 'photo' : 'text', signature);
     } catch (error) {
-      if (!showUpgrade(error)) Alert.alert('Error', 'Could not send card.');
+      if (!showUpgrade(error)) Alert.alert('Not sent', 'Your message didn\'t go through. Check your connection and tap send again.');
+    } finally {
+      setSending(false);
     }
-    setSending(false);
   }
 
-  // ── Attach menu ───────────────────────────────────────────────────────────────
-
-  function handleStartCall(mode: 'voice' | 'video') {
-    if (!resolvedThreadId) {
-      Alert.alert('Call unavailable', 'This conversation is not ready for calls.');
+  async function pickPhotos(source: 'camera' | 'library') {
+    setAttachOpen(false);
+    const room = MAX_PHOTOS - pending.length;
+    if (room <= 0) { Alert.alert('Photo limit', `You can send up to ${MAX_PHOTOS} photos at once.`); return; }
+    const permission = source === 'camera'
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        source === 'camera' ? 'Camera access needed' : 'Photo access needed',
+        source === 'camera' ? 'Allow camera access in Settings to take photos for your manufacturer.' : 'Allow photo access in Settings to share images from your camera roll.',
+      );
       return;
     }
-    const initials = mfrDisplayName
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map(part => part[0]?.toUpperCase())
-      .join('') || '?';
+    const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.8 };
+    const result = source === 'camera'
+      ? await ImagePicker.launchCameraAsync(options)
+      : await ImagePicker.launchImageLibraryAsync({ ...options, allowsMultipleSelection: true, selectionLimit: room, orderedSelection: true });
+    if (result.canceled) return;
+    setPending((current) => [...current, ...result.assets].slice(0, MAX_PHOTOS));
+  }
+
+  function startCall(mode: 'voice' | 'video') {
+    if (!callingEnabled) { setCallsInfoOpen(true); return; }
+    if (!threadId) return;
+    const initials = mfrName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || '?';
     const query = new URLSearchParams({
-      conversationId: resolvedThreadId,
-      participantName: mfrDisplayName,
-      participantInitials: initials,
-      participantColor: PURPLE,
-      mode,
-      manufacturerCall: '1',
+      conversationId: threadId, participantName: mfrName, participantInitials: initials,
+      participantColor: theme.accent, mode, manufacturerCall: '1',
     });
     router.push(`/call-screen?${query.toString()}` as never);
   }
 
-  function handleAttachPress() {
-    const actions: any[] = [
-      { text: '🖼️  Send Photo',       onPress: handlePhotoSend },
-    ];
-    actions.push({ text: '🧵 Send Sample Order Card', onPress: () => setCardDialog('sample_card') });
-    actions.push({ text: '📦 Send Bulk Order Card',   onPress: () => setCardDialog('bulk_card')   });
-    actions.push({
-      text: '📞 Start Voice Call',
-      onPress: () => handleStartCall('voice'),
-    });
-    actions.push({
-      text: '📹 Start Video Call',
-      onPress: () => handleStartCall('video'),
-    });
-    actions.push({ text: 'Cancel', style: 'cancel' });
+  const openTracker = (order: OrderCardSnapshot) => {
+    router.push({ pathname: '/production-detail', params: { id: order.id } } as never);
+  };
 
-    Alert.alert('Attach', 'Choose an action', actions);
-  }
+  // ── Render ───────────────────────────────────────────────────────────────────
 
-  // ── Render ────────────────────────────────────────────────────────────────────
+  const header = (
+    <View style={{ paddingTop: insets.top, backgroundColor: BG, borderBottomWidth: 1, borderBottomColor: BORDER }}>
+      <BrandthreadHeader
+        title={mfrName}
+        subtitle={localTime ? `${localTime} for them` : 'Manufacturer conversation'}
+        onBack={() => router.back()}
+        rightElement={
+          <View style={{ flexDirection: 'row', gap: SP.xs, alignItems: 'center' }}>
+            {manufacturerId ? (
+              <TouchableOpacity onPress={() => router.push({ pathname: '/manufacturer-profile', params: { id: manufacturerId } } as never)} style={s.headerBtn} accessibilityLabel="View manufacturer profile">
+                <Feather name="info" size={16} color={FG} />
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity onPress={() => startCall('voice')} accessibilityRole="button" accessibilityLabel={callingEnabled ? 'Start voice call' : 'Calls coming soon'} testID="manufacturer-voice-call" style={[s.headerBtn, !callingEnabled && { opacity: 0.55 }]}>
+              <Feather name="phone" size={16} color={FG} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => startCall('video')} accessibilityRole="button" accessibilityLabel={callingEnabled ? 'Start video call' : 'Calls coming soon'} testID="manufacturer-video-call" style={[s.headerBtn, !callingEnabled && { opacity: 0.55 }]}>
+              <Feather name="video" size={16} color={FG} />
+            </TouchableOpacity>
+          </View>
+        }
+      />
+    </View>
+  );
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={PURPLE} />
+      <View style={{ flex: 1 }}>
+        {header}
+        <View style={s.center} testID="thread-loading"><ActivityIndicator color={FG} /><Text style={s.centerText}>Loading conversation…</Text></View>
+      </View>
+    );
+  }
+
+  if (loadError && messages.length === 0) {
+    return (
+      <View style={{ flex: 1 }}>
+        {header}
+        <View style={s.center}>
+          <EmptyState icon="wifi-off" title="Conversation unavailable" description={loadError} />
+          <SecondaryButton label="Try again" onPress={() => { setLoading(true); if (threadId) void loadMessages(threadId).finally(() => setLoading(false)); else router.back(); }} />
+        </View>
       </View>
     );
   }
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: 'transparent' }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={0}
-    >
-      {/* Card dialogs (above everything) */}
-      {cardDialog && (
-        <SampleCardDialog
-          type={cardDialog}
-          onSend={(cd) => handleSendCard(cardDialog, cd)}
-          onClose={() => setCardDialog(null)}
-        />
-      )}
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {header}
 
-      {/* Header */}
-      <View style={{ paddingTop: insets.top, backgroundColor: BG, borderBottomWidth: 1, borderBottomColor: BORDER }}>
-        <BrandthreadHeader
-          title={mfrDisplayName}
-          subtitle="Manufacturer conversation"
-          onBack={() => router.back()}
-          rightElement={
-            <View style={{ flexDirection: 'row', gap: SP.xs }}>
-              <TouchableOpacity
-                onPress={() => handleStartCall('voice')}
-                accessibilityRole="button"
-                accessibilityLabel="Start voice call"
-                testID="manufacturer-voice-call"
-                style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' }}
-              >
-                <Feather name="phone" size={16} color={PURPLE_LIGHT} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => handleStartCall('video')}
-                accessibilityRole="button"
-                accessibilityLabel="Start video call"
-                testID="manufacturer-video-call"
-                style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' }}
-              >
-                <Feather name="video" size={16} color={PURPLE_LIGHT} />
-              </TouchableOpacity>
-            </View>
-          }
-        />
-      </View>
-
-      {/* Messages */}
       <FlatList
-          ref={listRef}
-          data={apiMessages}
-          keyExtractor={m => m.id}
-          inverted
-          renderItem={({ item }) => <ApiMessageBubble msg={item} onOpenOrder={(orderId, orderType) =>
-            router.push(`${orderType === 'bulk' ? '/production-detail' : '/sample-detail'}?id=${orderId}&paymentPrompt=1` as never)
-          } />}
-          contentContainerStyle={{ paddingVertical: SP.md }}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {
-            if (!resolvedThreadId) return;
-            setRefreshing(true);
-            loadApiMessages(resolvedThreadId);
-          }} tintColor={PURPLE} />}
-          ListEmptyComponent={
-            <View style={{ alignItems: 'center', marginTop: 40 }}>
-              <Text style={{ color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.sm }}>
-                No messages yet. Say hello!
-              </Text>
-            </View>
+        data={rows}
+        inverted
+        keyExtractor={(row) => (row.kind === 'day' ? row.id : row.message.id)}
+        renderItem={({ item }) => {
+          if (item.kind === 'day') {
+            return (
+              <View style={s.dayRow}><View style={s.dayLine} /><Text style={s.dayText}>{item.label}</Text><View style={s.dayLine} /></View>
+            );
           }
-         />
+          const msg = item.message;
+          if (msg.senderRole === 'system' || msg.messageType === 'system') return <SystemLine msg={msg} />;
+          if ((msg.messageType === 'sample_card' || msg.messageType === 'bulk_card')) {
+            if (!msg.order) {
+              return <SystemLine msg={{ ...msg, content: `${msg.content || 'Order card'} · no longer available` }} />;
+            }
+            return (
+              <OrderCardBubble
+                order={msg.order}
+                fromMe={msg.senderRole === 'seller'}
+                time={fmtTime(msg.sentAt)}
+                paying={payingId === msg.order.id}
+                payOutcome={outcome?.orderId === msg.order.id ? outcome.result : null}
+                onPay={(order) => void pay(order)}
+                onChanged={() => { if (threadId) void loadMessages(threadId); }}
+                onOpenTracker={openTracker}
+              />
+            );
+          }
+          return <MessageBubble msg={msg} accent={theme.accent} onAccent={theme.onAccent} onOpenImage={setViewer} />;
+        }}
+        contentContainerStyle={{ paddingVertical: SP.md, flexGrow: 1 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} tintColor={FG} onRefresh={() => { if (!threadId) return; setRefreshing(true); void loadMessages(threadId); }} />}
+        ListEmptyComponent={
+          <View style={[s.emptyWrap, { transform: [{ scaleY: -1 }] }]} testID="thread-empty">
+            <Feather name="message-circle" size={28} color={SUBTLE} />
+            <Text style={s.emptyTitle}>Start the conversation</Text>
+            <Text style={s.emptyText}>Share your designs, references and target price. When {mfrName} is ready, they'll send a sample card you can pay right here.</Text>
+          </View>
+        }
+      />
 
-      {/* Input Bar */}
-      <View style={[s.inputArea, { paddingBottom: Math.max(insets.bottom, SP.md) }]}>
+      {loadError ? <Text style={s.inlineError}>{loadError}</Text> : null}
+
+      <View style={[s.composer, { paddingBottom: Math.max(insets.bottom, SP.md) }]}>
+        {pending.length > 0 && (
+          <View style={s.previewRow} testID="pending-photos">
+            {pending.map((asset, index) => (
+              <View key={`${asset.uri}-${index}`} style={s.previewTile}>
+                <Image source={{ uri: asset.uri }} style={s.previewImage} />
+                <TouchableOpacity style={s.previewRemove} onPress={() => setPending((current) => current.filter((_, i) => i !== index))} accessibilityLabel="Remove photo">
+                  <Feather name="x" size={12} color={FG} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
         <View style={s.inputRow}>
-          <TouchableOpacity
-            onPress={handleAttachPress}
-            style={s.iconBtn}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Feather name="paperclip" size={ICON.sm} color={MUTED} />
+          <TouchableOpacity onPress={() => setAttachOpen(true)} style={s.iconBtn} accessibilityLabel="Add photos" testID="button-attach">
+            <Feather name="image" size={ICON.sm} color={FG} />
           </TouchableOpacity>
           <TextInput
-            ref={inputRef}
-            style={s.textInput}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder="Message…"
+            style={s.input}
+            value={draft}
+            onChangeText={setDraft}
+            placeholder={`Message ${mfrName}…`}
             placeholderTextColor={SUBTLE}
             multiline
-            returnKeyType="default"
+            testID="input-message"
           />
           <TouchableOpacity
-            onPress={handleSend}
-            style={[s.sendBtn, { backgroundColor: theme.accent }, (!inputText.trim() || sending) && { opacity: 0.4 }]}
-            disabled={!inputText.trim() || sending}
+            onPress={() => void send()}
+            style={[s.sendBtn, { backgroundColor: theme.accent }, ((!draft.trim() && !pending.length) || sending) && { opacity: 0.4 }]}
+            disabled={(!draft.trim() && !pending.length) || sending}
+            accessibilityLabel="Send"
+            testID="button-send"
           >
-            {sending
-              ? <ActivityIndicator size="small" color={theme.onAccent} />
-              : <Feather name="send" size={ICON.sm} color={theme.onAccent} />
-            }
+            {sending ? <ActivityIndicator size="small" color={theme.onAccent} /> : <Feather name="send" size={ICON.sm} color={theme.onAccent} />}
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Attach sheet */}
+      <Modal visible={attachOpen} transparent animationType="slide" onRequestClose={() => setAttachOpen(false)}>
+        <Pressable style={s.backdrop} onPress={() => setAttachOpen(false)}>
+          <Pressable style={[s.sheet, { paddingBottom: Math.max(insets.bottom, SP.lg) }]}>
+            <View style={s.grabber} />
+            <Text style={s.sheetTitle}>Share photos</Text>
+            {([
+              { key: 'camera', icon: 'camera', label: 'Take a photo', hint: 'Samples, fabric, fit on body' },
+              { key: 'library', icon: 'image', label: 'Choose from camera roll', hint: `Up to ${MAX_PHOTOS} at once` },
+            ] as const).map((option) => (
+              <TouchableOpacity key={option.key} style={s.sheetRow} onPress={() => void pickPhotos(option.key)} testID={`attach-${option.key}`}>
+                <View style={s.sheetIcon}><Feather name={option.icon} size={18} color={FG} /></View>
+                <View style={{ flex: 1 }}><Text style={s.sheetLabel}>{option.label}</Text><Text style={s.sheetHint}>{option.hint}</Text></View>
+                <Feather name="chevron-right" size={16} color={SUBTLE} />
+              </TouchableOpacity>
+            ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Calls coming soon */}
+      <Modal visible={callsInfoOpen} transparent animationType="fade" onRequestClose={() => setCallsInfoOpen(false)}>
+        <Pressable style={[s.backdrop, { justifyContent: 'center', padding: SP.lg }]} onPress={() => setCallsInfoOpen(false)}>
+          <Pressable style={s.dialog} testID="calls-coming-soon">
+            <View style={s.dialogIcon}><Feather name="video" size={22} color={FG} /></View>
+            <Text style={s.dialogTitle}>Voice & video calls are coming soon</Text>
+            <Text style={s.dialogText}>
+              Until then, keep everything in this conversation. Photos, order cards and production updates stay in one place for you and {mfrName}.
+              {localTime ? `\n\nIt's ${localTime} for them right now.` : ''}
+            </Text>
+            <TouchableOpacity style={[s.dialogBtn, { backgroundColor: theme.accent }]} onPress={() => setCallsInfoOpen(false)}>
+              <Text style={[s.dialogBtnText, { color: theme.onAccent }]}>Got it</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Full-screen photo viewer */}
+      <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer(null)}>
+        <Pressable style={s.viewer} onPress={() => setViewer(null)} accessibilityLabel="Close photo">
+          {viewer ? <Image source={{ uri: viewer }} style={{ width: '100%', height: '80%' }} resizeMode="contain" /> : null}
+          <View style={[s.viewerClose, { top: insets.top + SP.sm }]}><Feather name="x" size={22} color="#fff" /></View>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
+const bub = StyleSheet.create({
+  row: { marginVertical: 3, paddingHorizontal: SP.md },
+  right: { flexDirection: 'row', justifyContent: 'flex-end' },
+  left: { flexDirection: 'row', justifyContent: 'flex-start' },
+  bubble: { borderRadius: RADIUS.lg, paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  mine: { borderBottomRightRadius: 4 },
+  theirs: { backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, borderBottomLeftRadius: 4 },
+  text: { fontSize: FS.base, fontFamily: FONT.regular, color: FG, lineHeight: 21 },
+  time: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginTop: 3 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, width: 226, borderRadius: RADIUS.md, overflow: 'hidden' },
+  imageSingle: { width: 220, height: 240, borderRadius: RADIUS.md },
+  imageTile: { width: 111, height: 111 },
+  file: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.md, backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, marginBottom: 4 },
+  fileText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
+  systemWrap: { alignItems: 'center', marginVertical: SP.sm, paddingHorizontal: SP.lg },
+  systemPill: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, maxWidth: 320 },
+  systemText: { flexShrink: 1, fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, lineHeight: 16 },
+  systemTime: { fontSize: 10, fontFamily: FONT.regular, color: SUBTLE, marginTop: 3 },
+});
+
 const s = StyleSheet.create({
-  inputArea: {
-    backgroundColor: CARD,
-    borderTopWidth: 1,
-    borderTopColor: BORDER,
-    paddingTop: SP.sm,
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.md, padding: SP.lg },
+  centerText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  headerBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: CARD_ELEVATED, alignItems: 'center', justifyContent: 'center' },
+  dayRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.lg, marginVertical: SP.sm },
+  dayLine: { flex: 1, height: 1, backgroundColor: BORDER },
+  dayText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: SUBTLE },
+  emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl, gap: SP.sm, paddingVertical: SP.xl },
+  emptyTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
+  emptyText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 19 },
+  inlineError: { fontSize: FS.xs, fontFamily: FONT.medium, color: RED, textAlign: 'center', paddingVertical: 4 },
+  composer: { backgroundColor: CARD, borderTopWidth: 1, borderTopColor: BORDER, paddingTop: SP.sm },
+  previewRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
+  previewTile: { width: 56, height: 56, borderRadius: RADIUS.sm, overflow: 'hidden' },
+  previewImage: { width: '100%', height: '100%' },
+  previewRemove: { position: 'absolute', top: 3, right: 3, width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center' },
+  inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: SP.sm, paddingHorizontal: SP.md },
+  iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: CARD_ELEVATED },
+  input: {
+    flex: 1, minHeight: 40, maxHeight: 120, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
+    paddingHorizontal: SP.md, paddingTop: 10, paddingBottom: 10, fontSize: FS.base, fontFamily: FONT.regular, color: FG,
   },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: SP.sm,
-    paddingHorizontal: SP.md,
-  },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  textInput: {
-    flex: 1,
-    minHeight: 40,
-    maxHeight: 120,
-    backgroundColor: CARD_ELEVATED,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-    fontSize: FS.base,
-    fontFamily: FONT.regular,
-    color: FG,
-  },
-  sendBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  sendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SP.lg, gap: SP.sm },
+  grabber: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, marginBottom: SP.sm },
+  sheetTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG, marginBottom: 4 },
+  sheetRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: SP.sm + 2 },
+  sheetIcon: { width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: CARD_ELEVATED, alignItems: 'center', justifyContent: 'center' },
+  sheetLabel: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
+  sheetHint: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  dialog: { backgroundColor: CARD, borderRadius: RADIUS.xl, padding: SP.lg, borderWidth: 1, borderColor: BORDER, alignItems: 'center', gap: SP.sm },
+  dialogIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: CARD_ELEVATED, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  dialogTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG, textAlign: 'center' },
+  dialogText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 19 },
+  dialogBtn: { marginTop: SP.sm, alignSelf: 'stretch', height: 46, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
+  dialogBtnText: { fontSize: FS.base, fontFamily: FONT.bold },
+  viewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center' },
+  viewerClose: { position: 'absolute', right: SP.lg, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
 });

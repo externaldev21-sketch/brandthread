@@ -38,8 +38,10 @@ import {
   getFavoriteManufacturerIds, unfavoriteManufacturer,
   getQuoteRequests, getQuotes, acceptQuote, declineQuote, withdrawQuoteRequest,
   getSamples, getProductionOrders,
-  getConversations, getOrCreateConversation,
+  getConversations, getOrCreateConversation, type DirectorySort,
 } from '@/services/manufacturerService';
+import { getDirectoryFacets, getSellerOrders, type DirectoryFacets, type SellerOrderRow } from '@/services/manufacturerOrderFlow';
+import { formatMoney, orderStatusLabel, stageIndex } from '@workspace/manufacturer-flow';
 import {
   Manufacturer, ManufacturerRelationship, QuoteRequest, Quote, Sample,
   ProductionOrder, ManufacturerConversation, PRODUCTION_STAGES,
@@ -153,7 +155,8 @@ export default function ManufacturerHub() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { tab, from } = useLocalSearchParams<{ tab?: string; from?: string }>();
-  const [activeTab, setActiveTab] = useState<Tab>(tab === 'messages' ? 'messages' : 'discover');
+  const isTab = (value: unknown): value is Tab => TABS.some((item) => item.key === value);
+  const [activeTab, setActiveTab] = useState<Tab>(isTab(tab) ? tab : 'discover');
   const isSellerSetup = isSellerSetupOrigin(from);
 
   function leaveSetupDestination() {
@@ -169,7 +172,7 @@ export default function ManufacturerHub() {
   const hasGrowthAccess = !GROWTH_PLAN_ENFORCEMENT_ENABLED || hasPlan('growth');
 
   useEffect(() => {
-    if (tab === 'messages') setActiveTab('messages');
+    if (isTab(tab)) setActiveTab(tab);
   }, [tab]);
 
   // Native modals use a global portal, so the gate must follow route focus.
@@ -272,21 +275,16 @@ function HubHeader({ activeTab, router, onLeave }: {
       <Text style={[s.headerTitle, { flex: 1, marginHorizontal: SP.sm }]}>Manufacturer Hub</Text>
 
       <View style={s.headerActions}>
-        {/* Invite button shown on Discover tab — add your own off-platform manufacturer */}
-        {activeTab === 'discover' && (
-          <TouchableOpacity
-            style={s.headerBtn}
-            onPress={() => router.push('/invite-manufacturer' as never)}
-            activeOpacity={0.75}
-          >
-            <Feather name="user-plus" size={ICON.sm} color={PURPLE_LIGHT} />
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity style={s.headerBtn} onPress={() => {}}>
-          <Feather name="search" size={ICON.sm} color={FG} />
-        </TouchableOpacity>
-        <TouchableOpacity style={s.headerBtn} onPress={() => {}}>
-          <Feather name="sliders" size={ICON.sm} color={FG} />
+        {/* Invite your own (off-platform) manufacturer with a private signup link */}
+        <TouchableOpacity
+          style={s.headerBtn}
+          onPress={() => router.push('/invite-manufacturer' as never)}
+          activeOpacity={0.75}
+          accessibilityRole="button"
+          accessibilityLabel="Invite your own manufacturer"
+          testID="button-invite-manufacturer"
+        >
+          <Feather name="plus" size={ICON.md} color={FG} />
         </TouchableOpacity>
       </View>
     </View>
@@ -305,6 +303,9 @@ interface Filters {
   leadTimeDaysMax: number | undefined;
   verifiedOnly: boolean;
   ratingMin: number | undefined;
+  minYears: number | undefined;
+  hasPhotos: boolean;
+  sort: DirectorySort;
 }
 
 const DEFAULT_FILTERS: Filters = {
@@ -315,7 +316,16 @@ const DEFAULT_FILTERS: Filters = {
   leadTimeDaysMax: undefined,
   verifiedOnly: false,
   ratingMin: undefined,
+  minYears: undefined,
+  hasPhotos: false,
+  sort: 'recommended',
 };
+
+function activeFilterCount(f: Filters) {
+  return [f.country, f.category, f.moqMax, f.unitPriceMaxCents, f.leadTimeDaysMax, f.ratingMin, f.minYears]
+    .filter((value) => value !== '' && value !== undefined).length
+    + (f.verifiedOnly ? 1 : 0) + (f.hasPhotos ? 1 : 0);
+}
 
 function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const [manufacturers, setManufacturers] = useState<Manufacturer[]>([]);
@@ -344,6 +354,9 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
           leadTimeDaysMax: f.leadTimeDaysMax,
           verifiedOnly: f.verifiedOnly || undefined,
           ratingMin: f.ratingMin,
+          minYears: f.minYears,
+          hasPhotos: f.hasPhotos || undefined,
+          sort: f.sort,
         }),
         getFavoriteManufacturerIds(),
       ]);
@@ -439,11 +452,15 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
           />
         )}
         <TouchableOpacity
-          style={[s.filterBtn, Object.values(filters).some(v => v !== '' && v !== false && v !== undefined) && s.filterBtnActive]}
+          style={[s.filterBtn, activeFilterCount(filters) > 0 && s.filterBtnActive]}
           onPress={() => setFilterModalVisible(true)}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Filter manufacturers"
+          testID="button-directory-filters"
         >
           <Feather name="sliders" size={ICON.sm} color={PURPLE_LIGHT} />
+          {activeFilterCount(filters) > 0 && <Text style={s.filterCount}>{activeFilterCount(filters)}</Text>}
         </TouchableOpacity>
       </View>
 
@@ -482,8 +499,25 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
         contentContainerStyle={[s.listContent, s.gridContent]}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={PURPLE} />}
+        ListHeaderComponent={!loading && !loadError && visibleManufacturers.length > 0 ? (
+          <Text style={s.resultCount} testID="directory-result-count">
+            {visibleManufacturers.length} {visibleManufacturers.length === 1 ? 'manufacturer' : 'manufacturers'}
+            {activeFilterCount(filters) > 0 ? ' match your filters' : ''}
+          </Text>
+        ) : null}
         ListEmptyComponent={
-            loading || loadError ? null : (
+            loading ? (
+              <View style={s.skeletonGrid} testID="directory-loading">
+                {[0, 1, 2, 3].map((item) => <View key={item} style={s.skeletonTile} />)}
+              </View>
+            ) : loadError ? (
+              <EmptyState
+                icon="wifi-off"
+                title="Directory unavailable"
+                description="We couldn't load manufacturers. Check your connection and try again."
+                action={{ label: 'Try again', onPress: () => { setLoading(true); load(); } }}
+              />
+            ) : (
             <EmptyState
               icon={favoritesOnly ? 'heart' : 'search'}
               title={favoritesOnly ? 'No favorite manufacturers yet' : 'No manufacturers found'}
@@ -532,6 +566,11 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
               <Text style={card.coverFallbackText}>{mfg.name.charAt(0)}</Text>
             </View>
           )}
+          {mfg.yearsInBusiness > 0 && (
+            <View style={card.yearsBadge}>
+              <Text style={card.yearsText}>{mfg.yearsInBusiness} {mfg.yearsInBusiness === 1 ? 'yr' : 'yrs'}</Text>
+            </View>
+          )}
           <TouchableOpacity
             style={card.saveOverlay}
             onPress={onSave}
@@ -555,7 +594,7 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
               </View>
             )}
           </View>
-          <Text style={card.location} numberOfLines={1}>{mfg.city}, {mfg.country}</Text>
+          <Text style={card.location} numberOfLines={1}>{[mfg.city, mfg.country].filter(Boolean).join(', ')}</Text>
           <View style={card.ratingRow}>
             <Feather name="star" size={12} color={GOLD} />
             <Text style={card.ratingText}>{mfg.reviewCount > 0 ? mfg.rating.toFixed(1) : 'Not rated'}</Text>
@@ -598,6 +637,8 @@ const card = StyleSheet.create({
   coverImage:    { width: '100%', height: '100%' },
   coverFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   coverFallbackText: { fontSize: 34, fontFamily: FONT.bold, color: PURPLE_LIGHT },
+  yearsBadge:    { position: 'absolute', left: 7, bottom: 7, paddingHorizontal: 7, paddingVertical: 3, borderRadius: RADIUS.pill, backgroundColor: 'rgba(10,10,11,0.78)' },
+  yearsText:     { fontSize: 10, fontFamily: FONT.semibold, color: FG },
   saveOverlay:   { position: 'absolute', top: 7, right: 7, width: 28, height: 28, borderRadius: 14, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
   topRow:        { marginBottom: SP.xs },
   nameCol:       { flex: 1 },
@@ -628,9 +669,16 @@ function FilterModal({ visible, filters, onApply, onClose }: {
   onClose: () => void;
 }) {
   const [local, setLocal] = useState<Filters>(filters);
+  const [facets, setFacets] = useState<DirectoryFacets | null>(null);
+  const [facetError, setFacetError] = useState(false);
   const insets = useSafeAreaInsets();
 
-  useEffect(() => { if (visible) setLocal(filters); }, [visible]);
+  useEffect(() => {
+    if (!visible) return;
+    setLocal(filters);
+    setFacetError(false);
+    getDirectoryFacets().then(setFacets).catch(() => setFacetError(true));
+  }, [visible]);
 
   const set = <K extends keyof Filters>(key: K, val: Filters[K]) =>
     setLocal(prev => ({ ...prev, [key]: val }));
@@ -651,17 +699,31 @@ function FilterModal({ visible, filters, onApply, onClose }: {
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={fm.scroll}>
 
-          <Text style={fm.sectionLabel}>Country</Text>
+          <Text style={fm.sectionLabel}>Sort by</Text>
           <View style={fm.chipRow}>
-            {['Portugal', 'China', 'United States', 'Turkey'].map(c => (
-              <FilterChip key={c} label={c} active={local.country === c} onPress={() => toggle('country', c as any)} />
+            {([['recommended', 'Recommended'], ['experience', 'Most experience'], ['rating', 'Top rated'], ['moq', 'Lowest MOQ'], ['newest', 'Newest']] as const).map(([val, label]) => (
+              <FilterChip key={val} label={label} active={local.sort === val} onPress={() => set('sort', val)} />
             ))}
           </View>
 
-          <Text style={fm.sectionLabel}>Category</Text>
+          <Text style={fm.sectionLabel}>Country</Text>
           <View style={fm.chipRow}>
-            {['Hoodies', 'T-Shirts', 'Activewear', 'Denim', 'Outerwear'].map(c => (
-              <FilterChip key={c} label={c} active={local.category === c} onPress={() => toggle('category', c as any)} />
+            {facets?.countries.length ? facets.countries.map(c => (
+              <FilterChip key={c.name} label={c.name} count={c.count} active={local.country === c.name} onPress={() => toggle('country', c.name as any)} />
+            )) : <Text style={fm.hint}>{facetError ? 'Countries could not be loaded.' : facets ? 'No manufacturers listed yet.' : 'Loading…'}</Text>}
+          </View>
+
+          <Text style={fm.sectionLabel}>Specialty</Text>
+          <View style={fm.chipRow}>
+            {facets?.specialties.length ? facets.specialties.map(c => (
+              <FilterChip key={c.name} label={c.name} count={c.count} active={local.category === c.name} onPress={() => toggle('category', c.name as any)} />
+            )) : <Text style={fm.hint}>{facetError ? 'Specialties could not be loaded.' : facets ? 'No manufacturers listed yet.' : 'Loading…'}</Text>}
+          </View>
+
+          <Text style={fm.sectionLabel}>Years in business</Text>
+          <View style={fm.chipRow}>
+            {[{ label: 'Any', val: undefined }, { label: '3+ years', val: 3 }, { label: '5+ years', val: 5 }, { label: '10+ years', val: 10 }, { label: '20+ years', val: 20 }].map(({ label, val }) => (
+              <FilterChip key={label} label={label} active={local.minYears === val} onPress={() => set('minYears', val)} />
             ))}
           </View>
 
@@ -694,6 +756,15 @@ function FilterModal({ visible, filters, onApply, onClose }: {
           </View>
 
           <View style={fm.switchRow}>
+            <Text style={fm.switchLabel}>Has factory photos</Text>
+            <Switch
+              value={local.hasPhotos}
+              onValueChange={v => set('hasPhotos', v)}
+              trackColor={{ true: PURPLE, false: BORDER }}
+              thumbColor={ON_DARK}
+            />
+          </View>
+          <View style={fm.switchRow}>
             <Text style={fm.switchLabel}>Verified only</Text>
             <Switch
               value={local.verifiedOnly}
@@ -724,6 +795,7 @@ const fm = StyleSheet.create({
   chipRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   switchRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.lg, paddingVertical: SP.sm },
   switchLabel: { fontSize: FS.base, fontFamily: FONT.medium, color: FG },
+  hint:        { fontSize: FS.sm, fontFamily: FONT.regular, color: SUBTLE },
   footer:      { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.md, borderTopWidth: 1, borderTopColor: BORDER },
   resetBtn:    { flex: 1 },
   applyBtn:    { flex: 2 },
@@ -735,7 +807,6 @@ const fm = StyleSheet.create({
 
 function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const [relationships, setRelationships] = useState<ManufacturerRelationship[]>([]);
-  const [mfgMap, setMfgMap] = useState<Record<string, Manufacturer>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
@@ -744,18 +815,11 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
     try {
       setError(false);
       const rels = await getRelationships();
-      const safeRels = Array.isArray(rels) ? rels : [];
+      const safeRels = (Array.isArray(rels) ? rels : []).filter((rel) => rel.manufacturer);
       setRelationships(safeRels);
       await completeSetupTaskWhen('connect_manufacturer', safeRels.length > 0);
-      const map: Record<string, Manufacturer> = {};
-      await Promise.all(safeRels.map(async rel => {
-        const mfg = await getManufacturer(rel.manufacturerId);
-        if (mfg) map[mfg.id] = mfg;
-      }));
-      setMfgMap(map);
     } catch (e) {
-      setRelationships([]);
-      setError(true);
+      if (!showManufacturerUpgrade(e, router)) setError(true);
       console.error(e);
     } finally {
       setLoading(false);
@@ -765,37 +829,36 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
 
   useFocusEffect(useCallback(() => { setLoading(true); load(); }, []));
 
-  const showMore = (rel: ManufacturerRelationship, mfg: Manufacturer) => {
-    const options = ['Message', 'Request Quote', 'Cancel'];
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options, cancelButtonIndex: 2 },
-        idx => {
-          if (idx === 0) getOrCreateConversation(mfg.id)
-            .then(conv => router.push((`/manufacturer-messages?threadId=${conv.id}`) as never))
-            .catch(() => Alert.alert('Message unavailable', 'Could not open a conversation. Please try again.'));
-          if (idx === 1) router.push((`/quote-request?manufacturerId=${mfg.id}`) as never);
-        }
-      );
-    } else {
-      Alert.alert(mfg.name, 'Choose action', [
-        { text: 'Message', onPress: () => getOrCreateConversation(mfg.id)
-          .then(conv => router.push((`/manufacturer-messages?threadId=${conv.id}`) as never))
-          .catch(() => Alert.alert('Message unavailable', 'Could not open a conversation. Please try again.')) },
-        { text: 'Request Quote', onPress: () => router.push((`/quote-request?manufacturerId=${mfg.id}`) as never) },
-        { text: 'Cancel', style: 'cancel' },
-      ]);
-    }
+  const openThread = (rel: ManufacturerRelationship) => {
+    const go = (threadId: string) => router.push((`/manufacturer-messages?threadId=${threadId}`) as never);
+    if (rel.threadId) { go(rel.threadId); return; }
+    getOrCreateConversation(rel.manufacturerId)
+      .then((conv) => go(conv.id))
+      .catch((e) => { if (!showManufacturerUpgrade(e, router)) Alert.alert('Message unavailable', 'Could not open a conversation. Please try again.'); });
   };
 
-  if (error) return <View style={s.flex} />;
+  if (loading && relationships.length === 0) {
+    return <View style={s.skeletonList} testID="relationships-loading">{[0, 1, 2].map((item) => <View key={item} style={s.skeletonRow} />)}</View>;
+  }
 
-  if (!loading && relationships.length === 0) {
+  if (error) {
+    return (
+      <EmptyState
+        icon="wifi-off"
+        title="Couldn't load your manufacturers"
+        description="Check your connection and try again."
+        action={{ label: 'Try again', onPress: () => { setLoading(true); load(); } }}
+        style={s.emptyState}
+      />
+    );
+  }
+
+  if (relationships.length === 0) {
     return (
       <EmptyState
         icon="users"
         title="Build your production network."
-        description="Save manufacturers and track your relationships here."
+        description="Message a manufacturer from Discover, or invite one you already work with. They'll appear here with their orders and messages."
         action={{ label: 'Invite a manufacturer', onPress: () => router.push('/invite-manufacturer' as never), icon: 'user-plus' }}
         style={s.emptyState}
       />
@@ -807,47 +870,43 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
       data={relationships}
       keyExtractor={item => item.id}
       renderItem={({ item: rel }) => {
-        const mfg = mfgMap[rel.manufacturerId];
-        if (!mfg) return null;
+        const mfg = rel.manufacturer!;
+        const counts = [
+          rel.activeOrders ? `${rel.activeOrders} active ${rel.activeOrders === 1 ? 'order' : 'orders'}` : null,
+          rel.awaitingPayment ? `${rel.awaitingPayment} awaiting payment` : null,
+          !rel.activeOrders && rel.totalOrders ? `${rel.totalOrders} past ${rel.totalOrders === 1 ? 'order' : 'orders'}` : null,
+        ].filter(Boolean).join(' · ') || 'No orders yet';
         return (
-          <View style={relCard.root}>
-            <View style={relCard.topRow}>
+          <View style={relCard.root} testID={`relationship-${mfg.id}`}>
+            <TouchableOpacity style={relCard.topRow} activeOpacity={0.8} onPress={() => router.push((`/manufacturer-profile?id=${mfg.id}`) as never)}>
               <View style={relCard.avatar}>
-                <Text style={relCard.avatarText}>{mfg.name.charAt(0)}</Text>
+                {mfg.photo ? <Image source={{ uri: mfg.photo }} style={relCard.avatarImage} /> : <Text style={relCard.avatarText}>{mfg.businessName.charAt(0)}</Text>}
               </View>
               <View style={relCard.info}>
                 <View style={relCard.nameRow}>
-                  <Text style={relCard.name} numberOfLines={1}>{mfg.name}</Text>
-                  <StatusBadge label={rel.status} variant={relStatusVariant(rel.status)} small />
+                  <Text style={relCard.name} numberOfLines={1}>{mfg.businessName}</Text>
+                  {!mfg.isPublicDirectory && <StatusBadge label="Private" variant="neutral" small />}
                 </View>
-                <Text style={relCard.location}>{mfg.city}, {mfg.country}</Text>
-                <Text style={relCard.counts}>
-                  Products: {rel.activeProductIds.length} · Quotes: 0 · Samples: 0
-                </Text>
-                {rel.lastMessagePreview && (
-                  <Text style={relCard.lastMsg} numberOfLines={1}>
-                    "{rel.lastMessagePreview}" · {timeAgo(rel.lastMessageAt)}
-                  </Text>
-                )}
+                <Text style={relCard.location}>{[mfg.city, mfg.country].filter(Boolean).join(', ')}{mfg.yearsInBusiness ? ` · ${mfg.yearsInBusiness} yrs` : ''}</Text>
+                <Text style={[relCard.counts, rel.awaitingPayment ? { color: ORANGE } : null]}>{counts}</Text>
               </View>
-            </View>
+              {rel.unreadCount > 0 && (
+                <View style={relCard.unread}><Text style={relCard.unreadText}>{rel.unreadCount > 9 ? '9+' : rel.unreadCount}</Text></View>
+              )}
+            </TouchableOpacity>
             <View style={relCard.divider} />
             <View style={relCard.actionRow}>
-              <TouchableOpacity style={relCard.btn} onPress={() => getOrCreateConversation(mfg.id).then(conv => router.push((`/manufacturer-messages?threadId=${conv.id}`) as never))}>
-                <Feather name="message-circle" size={ICON.sm} color={CYAN} />
-                <Text style={[relCard.btnText, { color: CYAN }]}>Message</Text>
+              <TouchableOpacity style={relCard.btn} onPress={() => openThread(rel)} testID={`relationship-message-${mfg.id}`}>
+                <Feather name="message-circle" size={ICON.sm} color={FG} />
+                <Text style={[relCard.btnText, { color: FG }]}>Message</Text>
               </TouchableOpacity>
               <TouchableOpacity style={relCard.btn} onPress={() => router.push((`/quote-request?manufacturerId=${mfg.id}`) as never)}>
-                <Feather name="file-text" size={ICON.sm} color={PURPLE_LIGHT} />
-                <Text style={[relCard.btnText, { color: PURPLE_LIGHT }]}>Quote</Text>
+                <Feather name="file-text" size={ICON.sm} color={MUTED} />
+                <Text style={relCard.btnText}>Quote</Text>
               </TouchableOpacity>
               <TouchableOpacity style={relCard.btn} onPress={() => router.push((`/manufacturer-profile?id=${mfg.id}`) as never)}>
                 <Feather name="user" size={ICON.sm} color={MUTED} />
                 <Text style={relCard.btnText}>Profile</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={relCard.btn} onPress={() => showMore(rel, mfg)}>
-                <Feather name="more-horizontal" size={ICON.sm} color={MUTED} />
-                <Text style={relCard.btnText}>More</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -863,8 +922,11 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
 const relCard = StyleSheet.create({
   root:     { backgroundColor: CARD_GLASS, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginHorizontal: SP.md, marginBottom: SP.md, padding: SP.md },
   topRow:   { flexDirection: 'row', gap: SP.md },
-  avatar:   { width: 44, height: 44, borderRadius: 22, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER_ACTIVE },
+  avatar:   { width: 44, height: 44, borderRadius: 22, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER_ACTIVE, overflow: 'hidden' },
   avatarText:{ fontSize: FS.md, fontFamily: FONT.bold, color: PURPLE_LIGHT },
+  avatarImage:{ width: '100%', height: '100%' },
+  unread:   { minWidth: 20, height: 20, borderRadius: 10, backgroundColor: FG, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, alignSelf: 'center' },
+  unreadText:{ fontSize: 11, fontFamily: FONT.bold, color: BG },
   info:     { flex: 1 },
   nameRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.xs },
   name:     { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, flex: 1 },
@@ -1122,15 +1184,20 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
     return () => clearInterval(timer);
   }, [load]);
 
-  if (loading) return <View style={s.centered}><ActivityIndicator color={PURPLE} /></View>;
-  if (error) return <View style={s.flex} />;
+  if (loading && samples.length === 0) return <View style={s.skeletonList}>{[0, 1].map((item) => <View key={item} style={s.skeletonRow} />)}</View>;
+  if (error) {
+    return (
+      <EmptyState icon="wifi-off" title="Couldn't load samples" description="Check your connection and try again."
+        action={{ label: 'Try again', onPress: () => { setLoading(true); load(); } }} style={s.emptyState} />
+    );
+  }
   if (samples.length === 0) {
     return (
       <EmptyState
         icon="package"
         title="Your samples will appear here."
-        description="Request samples from manufacturers to review quality before production."
-        action={{ label: 'Create sample', onPress: () => router.push('/quote-request' as never), icon: 'plus' }}
+        description="Message a manufacturer about your design. When they send a sample card in chat, pay it there and track it here."
+        action={{ label: 'Find a manufacturer', onPress: () => router.setParams({ tab: 'discover' } as never), icon: 'search' }}
         style={s.emptyState}
       />
     );
@@ -1154,6 +1221,9 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
             )}
             <Text style={smpCard.details}>Type: {item.type.replace(/_/g, ' ')} · Cost: {formatCents(item.costCents)}</Text>
             <View style={smpCard.actionRow}>
+              <TouchableOpacity style={smpCard.btn} onPress={() => router.push((`/production-detail?id=${item.id}`) as never)}>
+                <Text style={smpCard.btnText}>{item.status === 'pending_payment' || item.status === 'awaiting_payment' ? 'Review & pay' : 'Track'}</Text>
+              </TouchableOpacity>
               <TouchableOpacity style={smpCard.btn} onPress={() => router.push((`/sample-detail?id=${item.id}`) as never)}>
                 <Text style={smpCard.btnText}>Details</Text>
               </TouchableOpacity>
@@ -1197,7 +1267,7 @@ const smpCard = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function ProductionTab({ router }: { router: ReturnType<typeof useRouter> }) {
-  const [productionOrders, setProductionOrders] = useState<ProductionOrder[]>([]);
+  const [orders, setOrders] = useState<SellerOrderRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
@@ -1205,10 +1275,10 @@ function ProductionTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const load = useCallback(async () => {
     try {
       setError(false);
-      const orders = await getProductionOrders();
-      setProductionOrders(orders);
+      const rows = await getSellerOrders();
+      setOrders(rows.filter((order) => order.orderType === 'bulk'));
     } catch (e) {
-      setError(true);
+      if (!showManufacturerUpgrade(e, router)) setError(true);
       console.error(e);
     } finally {
       setLoading(false);
@@ -1222,15 +1292,20 @@ function ProductionTab({ router }: { router: ReturnType<typeof useRouter> }) {
     return () => clearInterval(timer);
   }, [load]);
 
-  if (loading) return <View style={s.centered}><ActivityIndicator color={PURPLE} /></View>;
-  if (error) return <View style={s.flex} />;
-  if (productionOrders.length === 0) {
+  if (loading && orders.length === 0) return <View style={s.skeletonList} testID="production-loading">{[0, 1].map((item) => <View key={item} style={s.skeletonRow} />)}</View>;
+  if (error) {
+    return (
+      <EmptyState icon="wifi-off" title="Couldn't load production orders" description="Check your connection and try again."
+        action={{ label: 'Try again', onPress: () => { setLoading(true); load(); } }} style={s.emptyState} />
+    );
+  }
+  if (orders.length === 0) {
     return (
       <EmptyState
         icon="layers"
-        title="Approved products move into production here."
-        description="Accept a quote to start a production order."
-        action={{ label: 'View quotes', onPress: () => router.push('/manufacturer-hub' as never), icon: 'file-text' }}
+        title="Bulk orders show up here."
+        description="When a manufacturer sends you a bulk order card in chat and you pay it, you can follow every stage of production here."
+        action={{ label: 'Open messages', onPress: () => router.setParams({ tab: 'messages' } as never), icon: 'message-circle' }}
         style={s.emptyState}
       />
     );
@@ -1238,56 +1313,44 @@ function ProductionTab({ router }: { router: ReturnType<typeof useRouter> }) {
 
   return (
     <FlatList
-      data={productionOrders}
+      data={orders}
       keyExtractor={item => item.id}
-      renderItem={({ item: order }) => {
-        const stageKeys = PRODUCTION_STAGES.map(s => s.key);
-        const currentIdx = stageKeys.indexOf(order.currentStage);
-        const progressPct = Math.round((currentIdx / (PRODUCTION_STAGES.length - 1)) * 100);
-        const currentStageLabel = PRODUCTION_STAGES.find(s => s.key === order.currentStage)?.label ?? order.currentStage;
-
-        return (
-          <View style={prodCard.root}>
-            <View style={prodCard.topRow}>
-              <View style={prodCard.nameCol}>
-                <Text style={prodCard.productName} numberOfLines={1}>{order.productName}</Text>
-                <Text style={prodCard.mfgLine}>{order.manufacturerName ?? 'Manufacturer'} · {order.quantity} units</Text>
-              </View>
-              <StatusBadge label={order.status} variant={productionStatusVariant(order.status)} small />
-            </View>
-
-            <Text style={prodCard.stage}>
-              Stage {currentIdx + 1}/{PRODUCTION_STAGES.length}: {currentStageLabel}
-              {order.estimatedCompletionDate ? `  ·  Est: ${fmtDate(order.estimatedCompletionDate)}` : ''}
-            </Text>
-
-            <Text style={prodCard.costs}>
-              Cost: {formatCents(order.totalCostCents)} · Paid: {formatCents(order.depositAmountCents)} · Remaining: {formatCents(order.remainingBalanceCents)}
-            </Text>
-
-            {/* Progress bar */}
-            <View style={prodCard.track}>
-              <View style={[prodCard.fill, { width: `${progressPct}%` as any }]} />
-            </View>
-            <Text style={prodCard.pct}>{progressPct}%</Text>
-
-            <View style={prodCard.actionRow}>
-              <TouchableOpacity style={prodCard.btn} onPress={() => router.push((`/production-detail?id=${order.id}`) as never)}>
-                <Text style={prodCard.btnText}>Details</Text>
-              </TouchableOpacity>
-              {!!order.threadId && (
-                <TouchableOpacity style={prodCard.btn} onPress={() => router.push((`/manufacturer-messages?threadId=${order.threadId}`) as never)}>
-                  <Text style={prodCard.btnText}>Message</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        );
-      }}
+      renderItem={({ item: order }) => <OrderRowCard order={order} router={router} />}
       contentContainerStyle={s.listContent}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={PURPLE} />}
     />
+  );
+}
+
+/** Compact six-stage summary for a sample or bulk order. */
+function OrderRowCard({ order, router }: { order: SellerOrderRow; router: ReturnType<typeof useRouter> }) {
+  const reached = stageIndex(order.status) + 1;
+  const awaiting = order.status === 'pending_payment';
+  return (
+    <TouchableOpacity style={prodCard.root} activeOpacity={0.85} onPress={() => router.push((`/production-detail?id=${order.id}`) as never)} testID={`order-row-${order.id}`}>
+      <View style={prodCard.topRow}>
+        <View style={prodCard.nameCol}>
+          <Text style={prodCard.productName} numberOfLines={1}>{order.title}</Text>
+          <Text style={prodCard.mfgLine}>{order.manufacturerName ?? 'Manufacturer'} · {order.quantity.toLocaleString('en-US')} pcs · {formatMoney(order.priceCents)}</Text>
+        </View>
+        <StatusBadge label={orderStatusLabel(order.status)} variant={awaiting ? 'warning' : order.status === 'delivered' ? 'success' : order.status === 'cancelled' ? 'neutral' : 'info'} small />
+      </View>
+      {order.status !== 'cancelled' && (
+        <View style={prodCard.segments}>
+          {Array.from({ length: 6 }, (_, index) => <View key={index} style={[prodCard.segment, index < reached && prodCard.segmentDone]} />)}
+        </View>
+      )}
+      <Text style={prodCard.stage}>{awaiting ? 'Pay the card to start production' : reached > 0 ? `Stage ${reached} of 6 · ${orderStatusLabel(order.status)}` : orderStatusLabel(order.status)}</Text>
+      <View style={prodCard.actionRow}>
+        <View style={prodCard.btn}><Text style={prodCard.btnText}>{awaiting ? 'Review & pay' : 'Open tracker'}</Text></View>
+        {!!order.threadId && (
+          <TouchableOpacity style={prodCard.btn} onPress={() => router.push((`/manufacturer-messages?threadId=${order.threadId}`) as never)}>
+            <Text style={prodCard.btnText}>Message</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </TouchableOpacity>
   );
 }
 
@@ -1302,6 +1365,9 @@ const prodCard = StyleSheet.create({
   track:      { height: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: RADIUS.pill, overflow: 'hidden', marginBottom: SP.xs },
   fill:       { height: '100%', borderRadius: RADIUS.pill, backgroundColor: PURPLE },
   pct:        { fontSize: FS.xs, fontFamily: FONT.semibold, color: PURPLE_LIGHT, marginBottom: SP.sm },
+  segments:   { flexDirection: 'row', gap: 4, marginBottom: SP.sm },
+  segment:    { flex: 1, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.08)' },
+  segmentDone:{ backgroundColor: FG },
   actionRow:  { flexDirection: 'row', gap: SP.sm, flexWrap: 'wrap' },
   btn:        { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD_ELEVATED },
   advanceBtn: { borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM },
@@ -1431,6 +1497,12 @@ const s = StyleSheet.create({
   searchInput:  { flex: 1, height: 36, backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER_ACTIVE, paddingHorizontal: SP.md, fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
   filterBtn:    { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   filterBtnActive:{ borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM },
+  filterCount:  { position: 'absolute', top: -5, right: -5, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: FG, color: BG, fontSize: 10, fontFamily: FONT.bold, textAlign: 'center', lineHeight: 16, overflow: 'hidden' },
+  resultCount:  { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, paddingHorizontal: SP.md, marginBottom: SP.sm },
+  skeletonList: { padding: SP.md, gap: SP.md },
+  skeletonRow:  { height: 132, borderRadius: RADIUS.lg, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+  skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, paddingHorizontal: SP.md },
+  skeletonTile: { width: '48%', height: 260, borderRadius: RADIUS.lg, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
   discoverModeRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
   inlineError: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginHorizontal: SP.md, marginBottom: SP.sm, padding: SP.sm, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: ORANGE, backgroundColor: '#2B1E0F' },
   inlineErrorText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: ORANGE },
