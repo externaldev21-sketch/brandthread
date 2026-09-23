@@ -188,6 +188,8 @@ export interface StoreGenerationAnswers {
   features: StoreFeature[];
   logoUri?: string;
   moodBoardUris: string[];
+  /** Photos the seller uploaded for a given existing-content bucket (e.g. 'product_photos', 'campaign_images'). */
+  contentUploads?: Record<string, string[]>;
 }
 
 export interface StoreGenerationResult {

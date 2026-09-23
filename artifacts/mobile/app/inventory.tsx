@@ -5,7 +5,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
-  TextInput, StyleSheet, RefreshControl, ActivityIndicator, Alert,
+  TextInput, StyleSheet, RefreshControl, ActivityIndicator, Alert, Share,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -261,8 +261,12 @@ export default function InventoryScreen() {
   }, [items]);
 
   const handleExport = useCallback(async () => {
-    const csv = await exportInventoryCsv();
-    Alert.alert('Export Ready', csv.slice(0, 300) + '\n\n…(full CSV copied)');
+    try {
+      const csv = await exportInventoryCsv();
+      await Share.share({ message: csv, title: 'Inventory export' });
+    } catch {
+      Alert.alert("Couldn't export inventory", 'Check your connection and try again.');
+    }
   }, []);
 
   const handleRefresh = useCallback(() => {
@@ -643,9 +647,9 @@ export default function InventoryScreen() {
                   style={s.alertBtn}
                 />
                 <SecondaryButton
-                  label="Set Threshold"
+                  label="Set alert level"
                   small
-                  onPress={() => Alert.alert('Set Threshold', 'Enter a new low-stock threshold for this item.')}
+                  onPress={() => router.push(('/inventory-detail?id=' + alert.itemId) as never)}
                   accent={PURPLE}
                   style={s.alertBtn}
                 />

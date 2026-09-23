@@ -595,7 +595,7 @@ export default function StorePreview() {
       {!fullscreen && webViewMode && (
         <View style={styles.webViewBadge}>
           <Feather name="globe" size={10} color={PURPLE_LIGHT} />
-          <Text style={styles.webViewBadgeText}>Live HTML Preview — tap 🌐 to return to native preview</Text>
+          <Text style={styles.webViewBadgeText}>Live site preview · tap the globe to go back</Text>
         </View>
       )}
 

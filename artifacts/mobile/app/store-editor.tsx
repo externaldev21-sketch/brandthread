@@ -408,9 +408,6 @@ export default function StoreEditor() {
                   <Text style={{ color: MUTED, fontSize: FS.sm, fontFamily: FONT.medium }}>
                     Slides: {(field('slides', []) as any[]).length}
                   </Text>
-                  <TouchableOpacity>
-                    <Text style={{ color: PURPLE_LIGHT, fontSize: FS.sm, fontFamily: FONT.semibold }}>Edit Slides →</Text>
-                  </TouchableOpacity>
                 </FieldRow>
               )}
             </>

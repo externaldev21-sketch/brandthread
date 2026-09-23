@@ -238,7 +238,7 @@ export default function LocationsScreen() {
               disabled={saving}
               style={[s.modalSaveBtn, { backgroundColor: colors.primary, opacity: saving ? 0.6 : 1 }]}
             >
-              {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.modalSaveBtnText}>Save</Text>}
+              {saving ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Text style={[s.modalSaveBtnText, { color: colors.primaryForeground }]}>Save</Text>}
             </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={s.modalBody}>
@@ -303,7 +303,7 @@ const s = StyleSheet.create({
   modalCloseBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   modalTitle: { fontSize: FS.base, fontFamily: FONT.bold },
   modalSaveBtn: { borderRadius: RADIUS.sm, paddingHorizontal: 16, paddingVertical: 8 },
-  modalSaveBtnText: { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.sm },
+  modalSaveBtnText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   modalBody: { padding: 20, gap: 16, paddingBottom: 60 },
   formField: { gap: 6 },
   formLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.6 },
