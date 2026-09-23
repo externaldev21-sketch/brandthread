@@ -1,8 +1,10 @@
 import { Router } from "express";
 import crypto from "node:crypto";
 import { db, orders, orderItems, customers, drops, productVariants, products, notificationsFeed, users, dropWallets, dropWalletTransactions } from "@workspace/db";
-import { eq, desc, sql, and, ne } from "drizzle-orm";
-import { stripe, PLATFORM_COMMISSION_RATE } from "../lib/stripe";
+import { eq, desc, sql, and, inArray } from "drizzle-orm";
+import { executeOrderRelease, requestOrderRelease } from "../lib/money/escrow";
+import { refundOrder, RefundError } from "../lib/money/refunds";
+import { orderStatusMachine, type OrderStatus } from "../lib/money/stateMachines";
 import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext, requireRole } from "../middlewares/requireRole";
 import { logActivity, reqActor } from "../lib/activityLog";
@@ -345,35 +347,110 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
     }
   }
 
-  // Build the update payload — include cancellation fields when cancelling
-  const updatePayload = buildOrderStatusUpdate(status, reason, notes);
+  const [current] = await db.select().from(orders)
+    .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId)))
+    .limit(1);
+  if (!current) { res.status(404).json({ error: "Not found" }); return; }
+  if (current.status === status) { res.json(current); return; }
+  const conflict = orderStatusTransitionConflict(current.status);
+  if (conflict) { res.status(409).json({ error: conflict }); return; }
+  const from = current.status as OrderStatus;
+  // The machine also has edges only the refund service may use (a completed
+  // return cancels a shipped order; a failed refund un-parks refund_pending).
+  const sellerMayMove = !["shipped", "delivered"].includes(current.status) || status !== "cancelled";
+  if (
+    current.status === "refund_pending"
+    || !sellerMayMove
+    || !orderStatusMachine.isState(from)
+    || !orderStatusMachine.can(from, status as OrderStatus)
+  ) {
+    res.status(409).json({
+      error: current.status === "refund_pending"
+        ? "A refund is in progress for this order."
+        : current.status === "shipped" || current.status === "delivered"
+          ? "This order has shipped. Refund it through a return instead."
+          : `An order that is ${current.status} cannot be marked ${status}.`,
+      code: "ILLEGAL_STATUS_TRANSITION",
+    });
+    return;
+  }
+  // Held preorder funds release per order on tracking, so a preorder can
+  // only be marked shipped once it has a tracking number.
+  if (status === "shipped" && current.chargeModel === "held" && !current.trackingNumber) {
+    res.status(409).json({
+      error: "Add a tracking number to ship a preorder — that is what releases its funds.",
+      code: "TRACKING_REQUIRED",
+    });
+    return;
+  }
 
-  // Atomically update only when status is actually changing — prevents duplicate
-  // notifications. Cancellation also reverses any purchase award in this same
-  // transaction, so a cancelled order never exposes spendable points.
   let transitioned: typeof orders.$inferSelect | undefined;
-  await db.transaction(async (tx) => {
-    [transitioned] = await tx.update(orders)
-      .set(updatePayload)
-      .where(and(
-        eq(orders.id, req.params.id),
-        eq(orders.ownerId, ownerId),
-        ne(orders.status, "cancelled"),        // buyer/seller cancellation is terminal
-        ne(orders.status, "label_purchasing"), // carrier purchase owns the order transition
-        ne(orders.status, status),           // skip the write if already at target status
-      ))
-      .returning();
-
-    if (status === "cancelled" && transitioned?.buyerId) {
-      await reversePurchasePointsOnce({
-        buyerId: transitioned.buyerId,
-        orderId: transitioned.id,
-        referenceId: `${transitioned.id}:seller-cancellation`,
-        requestedPoints: Math.floor(transitioned.totalCents / 100),
-        note: `Purchase reward reversed after seller cancellation of order ${transitioned.orderNumber}`,
-      }, tx);
+  if (status === "cancelled" && current.stripePaymentIntentId) {
+    // A paid order is only cancelled once the buyer's refund is confirmed.
+    try {
+      await refundOrder({
+        orderId: current.id,
+        reason: "seller_cancelled",
+        initiatedBy: reqActor(req).actorClerkId,
+        idempotencyKey: `seller-cancel/${current.id}`,
+        cancelOrder: { reason, notes: notes?.trim() || null, restock: true },
+        onSucceeded: async (tx, { order: locked }) => {
+          if (locked.buyer_id) {
+            await reversePurchasePointsOnce({
+              buyerId: locked.buyer_id,
+              orderId: locked.id,
+              referenceId: `${locked.id}:seller-cancellation`,
+              requestedPoints: Math.floor(locked.total_cents / 100),
+              note: `Purchase reward reversed after seller cancellation of order ${locked.order_number}`,
+            }, tx);
+          }
+        },
+      });
+    } catch (err) {
+      if (err instanceof RefundError) {
+        const httpStatus = err.status >= 500 ? 502 : err.status;
+        if (httpStatus >= 500) req.log.error({ err, orderId: current.id }, "Seller cancellation refund failed");
+        res.status(httpStatus).json({
+          error: httpStatus >= 500
+            ? "The buyer's refund could not be processed, so the order was not cancelled. Please try again."
+            : err.message,
+          code: err.code,
+        });
+        return;
+      }
+      throw err;
     }
-  });
+    [transitioned] = await db.select().from(orders).where(eq(orders.id, current.id)).limit(1);
+    if (transitioned?.status !== "cancelled") {
+      res.status(409).json({ error: "The order changed while cancelling. Refresh and try again." });
+      return;
+    }
+  } else {
+    // Build the update payload — include cancellation fields when cancelling
+    const updatePayload = buildOrderStatusUpdate(status, reason, notes);
+    // Conditional on the current status, so a concurrent change (or a buyer
+    // cancellation) wins cleanly and this request becomes a no-op.
+    await db.transaction(async (tx) => {
+      [transitioned] = await tx.update(orders)
+        .set(updatePayload)
+        .where(and(
+          eq(orders.id, req.params.id),
+          eq(orders.ownerId, ownerId),
+          eq(orders.status, current.status),
+        ))
+        .returning();
+
+      if (status === "cancelled" && transitioned?.buyerId) {
+        await reversePurchasePointsOnce({
+          buyerId: transitioned.buyerId,
+          orderId: transitioned.id,
+          referenceId: `${transitioned.id}:seller-cancellation`,
+          requestedPoints: Math.floor(transitioned.totalCents / 100),
+          note: `Purchase reward reversed after seller cancellation of order ${transitioned.orderNumber}`,
+        }, tx);
+      }
+    });
+  }
 
   if (!transitioned) {
     // Either not found, or order was already at the requested status (idempotent).
@@ -522,8 +599,9 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
       .where(and(
         eq(orders.id, req.params.id),
         eq(orders.ownerId, ownerId),
-        ne(orders.status, "label_purchasing"),
-        ne(orders.status, "shipped"),        // skip write if already shipped
+        // Only pre-shipment orders may become shipped: never a cancelled,
+        // refunding, already-shipped or label-purchasing order.
+        inArray(orders.status, orderStatusMachine.sourcesOf("shipped").filter((st) => st !== "label_purchasing")),
       ))
       .returning({ id: orders.id, buyerId: orders.buyerId, orderNumber: orders.orderNumber, dropId: orders.dropId, ownerId: orders.ownerId, subtotalCents: orders.subtotalCents });
   }
@@ -555,7 +633,7 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
     .where(and(
       eq(orders.id, req.params.id),
       eq(orders.ownerId, ownerId),
-      ne(orders.status, "label_purchasing"),
+      sql`${orders.status} NOT IN ('label_purchasing', 'cancelled', 'refund_pending')`,
       sql`(${trackingNumberChanged} OR ${carrierChanged} OR ${trackingStatusChanged} OR ${estimatedDeliveryChanged})`,
     ))
     .returning();
@@ -649,99 +727,26 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
     });
   }
 
-  // Auto-release drop wallet share when order ships
-  // Drop order payments sit on the platform account (escrow); on ship, we
-  // create a Stripe Transfer to the seller's Connect account (net of fee).
-  if (statusTransition?.dropId) {
-    setImmediate(() => {
-      autoReleaseDropOrder(statusTransition.id, statusTransition.ownerId, statusTransition.dropId!, statusTransition.subtotalCents)
-        .catch(err => logger.error({ err, orderId: statusTransition.id, dropId: statusTransition.dropId, sellerId: statusTransition.ownerId }, "Auto drop-wallet release failed"));
-    });
+  // Held preorder: this order now has tracking, so its own funds (and only
+  // its own) are released to the seller. The release is recorded before we
+  // respond; the Stripe transfer runs in the background and the money sweep
+  // retries it if anything interrupts it (lib/money/escrow.ts).
+  if (updated.chargeModel === "held" && updated.trackingNumber) {
+    try {
+      const release = await requestOrderRelease(updated.id, "tracking");
+      if (release.releaseId) {
+        const releaseId = release.releaseId;
+        setImmediate(() => {
+          executeOrderRelease(releaseId, { reclaimStale: true }).catch((err) =>
+            logger.error({ err, orderId: updated.id, releaseId }, "Order release transfer failed; sweep will retry"));
+        });
+      }
+    } catch (err) {
+      logger.error({ err, orderId: updated.id }, "Could not record the order release; sweep will retry");
+    }
   }
 
   res.json(updated);
 });
-
-// ─── Drop wallet auto-release helper ─────────────────────────────────────────
-// Called automatically when a drop order is marked shipped.
-async function autoReleaseDropOrder(
-  orderId: string,
-  sellerId: string,
-  dropId: string,
-  subtotalCents: number,
-): Promise<void> {
-  if (!stripe) {
-    logger.warn({ orderId, dropId, sellerId }, "Skipping drop-wallet auto-release because Stripe is not configured");
-    return;
-  }
-
-  const [user] = await db
-    .select({ stripeAccountId: users.stripeAccountId })
-    .from(users)
-    .where(eq(users.clerkId, sellerId))
-    .limit(1);
-
-  if (!user?.stripeAccountId) {
-    logger.warn({ orderId, dropId, sellerId }, "Skipping drop-wallet auto-release because seller has no Connect account");
-    return;
-  }
-
-  const feeCents      = Math.round(subtotalCents * PLATFORM_COMMISSION_RATE);
-  const transferCents = subtotalCents - feeCents;
-
-  await db.transaction(async (tx) => {
-    // Lock wallet row to prevent concurrent double-releases
-    const lockResult = await tx.execute(
-      sql`SELECT id, balance_cents, released_cents, reserved_cents, stripe_transfer_group FROM drop_wallets WHERE drop_id = ${dropId}::uuid FOR UPDATE LIMIT 1`,
-    );
-    const w = (lockResult as any).rows?.[0];
-    if (!w) {
-      logger.warn({ orderId, dropId, sellerId }, "Skipping drop-wallet auto-release because no wallet was found");
-      return;
-    }
-
-    // Idempotency — skip if already released for this order
-    const already = await tx.execute(
-      sql`SELECT id FROM drop_wallet_transactions WHERE wallet_id = ${w.id}::uuid AND order_id = ${orderId}::uuid AND type = 'release' LIMIT 1`,
-    );
-    if ((already as any).rows?.length > 0) { return; }
-
-    const available = w.balance_cents - w.released_cents - w.reserved_cents;
-    if (available < subtotalCents) {
-      logger.error({ orderId, dropId, sellerId, availableCents: available, requiredCents: subtotalCents }, "Drop-wallet auto-release has insufficient balance");
-      return;
-    }
-
-    let stripeTransferId: string | null = null;
-    if (transferCents > 0) {
-      try {
-        const transfer = await stripe!.transfers.create({
-          amount:         transferCents,
-          currency:       "usd",
-          destination:    user.stripeAccountId!,
-          transfer_group: w.stripe_transfer_group ?? `drop_${dropId}`,
-          metadata:       { dropId, orderId, sellerId, trigger: "auto_on_ship" },
-        });
-        stripeTransferId = transfer.id;
-      } catch (stripeErr) {
-        logger.error({ err: stripeErr, orderId, dropId, sellerId, transferCents }, "Drop-wallet Stripe transfer failed");
-        return; // Don't mark released if Stripe call failed
-      }
-    }
-
-    await tx.execute(
-      sql`UPDATE drop_wallets SET released_cents = released_cents + ${subtotalCents}, updated_at = NOW() WHERE id = ${w.id}::uuid`,
-    );
-
-    await tx.insert(dropWalletTransactions).values({
-      walletId:         w.id as string,
-      type:             "release",
-      amountCents:      subtotalCents,
-      orderId,
-      description:      `Auto-release on ship (net: $${(transferCents / 100).toFixed(2)}, fee: $${(feeCents / 100).toFixed(2)})`,
-      stripeTransferId: stripeTransferId ?? undefined,
-    });
-  });
-}
 
 export default router;

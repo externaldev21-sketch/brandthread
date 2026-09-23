@@ -1,4 +1,4 @@
--- Migration 084: manufacturer-issued order cards, tracker timeline, time zones.
+-- Migration 085: manufacturer-issued order cards, tracker timeline, time zones.
 -- Idempotent: safe to re-run.
 
 ALTER TABLE manufacturers ADD COLUMN IF NOT EXISTS time_zone TEXT;
@@ -34,10 +34,12 @@ INSERT INTO manufacturer_order_events (sample_order_id, manufacturer_id, actor_r
 SELECT id, manufacturer_id, 'manufacturer', 'shipped', carrier, tracking_number, shipped_at
 FROM sample_orders o
 WHERE shipped_at IS NOT NULL
+  AND EXISTS (SELECT 1 FROM manufacturers m WHERE m.id = o.manufacturer_id)
   AND NOT EXISTS (SELECT 1 FROM manufacturer_order_events e WHERE e.sample_order_id = o.id AND e.to_status = 'shipped');
 
 INSERT INTO manufacturer_order_events (sample_order_id, manufacturer_id, actor_role, to_status, created_at)
 SELECT id, manufacturer_id, 'manufacturer', 'delivered', delivered_at
 FROM sample_orders o
 WHERE delivered_at IS NOT NULL
+  AND EXISTS (SELECT 1 FROM manufacturers m WHERE m.id = o.manufacturer_id)
   AND NOT EXISTS (SELECT 1 FROM manufacturer_order_events e WHERE e.sample_order_id = o.id AND e.to_status = 'delivered');

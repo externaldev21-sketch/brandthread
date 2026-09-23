@@ -11,10 +11,20 @@
  */
 import { Router } from "express";
 import { db, users, follows, stories, storyLikes, storyViews, blocks, posts, interactions } from "@workspace/db";
-import { eq, and, or, ilike, ne, inArray, sql, gt, desc, count } from "drizzle-orm";
+import { eq, and, or, ilike, ne, inArray, sql, gt, desc, count, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { publishNotification } from "./notifications-feed";
 import { resolveToClerkId } from "./public";
+import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
+import { visibleCommentCounts } from "../lib/postVisibility";
+import {
+  authorInGoodStanding,
+  blockRelation,
+  mutedPhrasesFor,
+  notBlockedWith,
+  profilesById,
+  publishingRestriction,
+} from "../lib/safety";
 
 const router = Router();
 router.use(requireAuth);
@@ -72,7 +82,7 @@ function relationshipLockKey(firstUserId: string, secondUserId: string): string 
 
 async function buildBuyerPosts(viewerId: string, authorIds: string[], limit: number, offset: number) {
   if (authorIds.length === 0) return [];
-  const rows = await db.select({
+  const pageRows = await db.select({
     id: posts.id,
     userId: posts.userId,
     mediaUrl: posts.mediaUrl,
@@ -89,10 +99,20 @@ async function buildBuyerPosts(viewerId: string, authorIds: string[], limit: num
       eq(users.accountType, "buyer"),
       inArray(posts.userId, authorIds),
     ))
+    .where(and(
+      sql`${posts.postStatus} NOT IN ('deleted', 'archived', 'draft')`,
+      eq(posts.moderationStatus, "visible"),
+      authorInGoodStanding(posts.userId),
+      notBlockedWith(viewerId, posts.userId),
+    ))
     .orderBy(desc(posts.createdAt))
     .limit(limit)
     .offset(offset);
 
+  const muted = await mutedPhrasesFor(viewerId);
+  const rows = muted.length === 0
+    ? pageRows
+    : pageRows.filter((row) => row.userId === viewerId || !matchesMutedWords(row.caption, muted));
   if (rows.length === 0) return [];
   const postIds = rows.map((row) => row.id);
   const [likeRows, repostRows, commentRows, myRows] = await Promise.all([
@@ -102,9 +122,7 @@ async function buildBuyerPosts(viewerId: string, authorIds: string[], limit: num
     db.select({ postId: interactions.postId, n: count() }).from(interactions)
       .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "repost")))
       .groupBy(interactions.postId),
-    db.select({ postId: interactions.postId, n: count() }).from(interactions)
-      .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "comment")))
-      .groupBy(interactions.postId),
+    visibleCommentCounts(postIds),
     db.select({ postId: interactions.postId, type: interactions.type }).from(interactions)
       .where(and(
         inArray(interactions.postId, postIds),
@@ -116,7 +134,7 @@ async function buildBuyerPosts(viewerId: string, authorIds: string[], limit: num
     new Map(rows.filter((row) => row.postId).map((row) => [row.postId as string, Number(row.n)]));
   const likes = counts(likeRows);
   const reposts = counts(repostRows);
-  const comments = counts(commentRows);
+  const comments = commentRows;
   const mine = new Map<string, Set<string>>();
   for (const row of myRows) {
     if (!row.postId) continue;
@@ -296,18 +314,29 @@ router.get("/profile/:userId", async (req, res) => {
   const [user] = await db.select().from(users).where(eq(users.clerkId, other)).limit(1);
   if (!user) { res.status(404).json({ error: "User not found" }); return; }
 
-  // If the target has blocked the viewer, return 404 (profile invisible)
-  const [blockedRow] = await db.select({ blockerId: blocks.blockerId }).from(blocks)
-    .where(or(
-      and(eq(blocks.blockerId, other), eq(blocks.blockedId, myId)),
-      and(eq(blocks.blockerId, myId), eq(blocks.blockedId, other)),
-    )).limit(1);
-  if (blockedRow) { res.status(404).json({ error: "User not found" }); return; }
+  if (user.deletedAt || user.suspendedAt) { res.status(404).json({ error: "User not found" }); return; }
 
-  // Check if I have blocked them (viewer can still see profile, but flag is set)
-  const [iBlockedRow] = await db.select({ blockerId: blocks.blockerId }).from(blocks)
-    .where(and(eq(blocks.blockerId, myId), eq(blocks.blockedId, other))).limit(1);
-  const iBlockedThem = !!iBlockedRow;
+  // If the target has blocked the viewer, the profile is invisible (404).
+  // If the viewer blocked them, show only enough to recognise and unblock.
+  const relation = other === myId ? "none" : await blockRelation(myId, other);
+  if (relation === "blocked_me" || relation === "mutual") {
+    res.status(404).json({ error: "User not found" }); return;
+  }
+  if (relation === "blocked_by_me") {
+    res.json({
+      ...formatUser(user),
+      bio: null,
+      followersCount: 0,
+      followingCount: 0,
+      postsCount: 0,
+      isFollowing: false,
+      isFollowedBy: false,
+      isMutual: false,
+      iBlockedThem: true,
+    });
+    return;
+  }
+  const iBlockedThem = false;
 
   const [follsRow] = await db
     .select({ n: sql<number>`cast(count(*) as int)` })
@@ -354,9 +383,9 @@ router.get("/profile/:userId/posts", async (req, res) => {
   if (!canonicalClerkId) { res.status(404).json({ error: "User not found" }); return; }
   const other = canonicalClerkId;
 
-  const [blockedRow] = await db.select({ blockerId: blocks.blockerId }).from(blocks)
-    .where(and(eq(blocks.blockerId, other), eq(blocks.blockedId, myId))).limit(1);
-  if (blockedRow) { res.status(404).json({ error: "User not found" }); return; }
+  if (other !== myId && (await blockRelation(myId, other)) !== "none") {
+    res.status(404).json({ error: "User not found" }); return;
+  }
   if (other !== myId) {
     const mutual = await db.execute(sql`
       SELECT 1
@@ -460,6 +489,9 @@ router.get("/search", async (req, res) => {
       and(
         eq(users.accountType, "buyer"),
         ne(users.clerkId, myId),
+        isNull(users.suspendedAt),
+        isNull(users.deletedAt),
+        notBlockedWith(myId, users.clerkId),
         or(
           ilike(users.name,        pattern),
           ilike(users.displayName, pattern),
@@ -532,6 +564,19 @@ router.post("/stories", async (req, res) => {
     res.status(400).json({ error: "authorName and media[] required" }); return;
   }
 
+  const restriction = await publishingRestriction(myId);
+  if (restriction) { res.status(restriction.status).json(restriction.body); return; }
+
+  // Slurs and threats are filtered everywhere, including story text.
+  const storyText = media
+    .flatMap((item: any) => [item?.caption, item?.text, ...(Array.isArray(item?.textOverlays) ? item.textOverlays.map((o: any) => o?.text) : [])])
+    .filter((value: unknown): value is string => typeof value === "string")
+    .join(" ");
+  const storyDecision = evaluateContent(storyText, "dm");
+  if (storyDecision.action === "reject" && (storyDecision.category === "hate_speech" || storyDecision.category === "harassment")) {
+    res.status(422).json({ error: storyDecision.reason, category: storyDecision.category, code: "CONTENT_REJECTED" }); return;
+  }
+
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
   const [row] = await db.insert(stories).values({
@@ -576,6 +621,10 @@ router.get("/stories/user/:userId", async (req, res) => {
   const myId    = (req as any).clerkUserId as string;
   const authorId = req.params.userId;
   const now     = new Date();
+
+  if (authorId !== myId && (await blockRelation(myId, authorId)) !== "none") {
+    res.json([]); return;
+  }
 
   const rows = await db.select().from(stories)
     .where(and(eq(stories.authorId, authorId), gt(stories.expiresAt, now)));
@@ -653,10 +702,12 @@ router.post("/stories/:id/view", async (req, res) => {
 // POST /api/social/block — block a user; also removes any mutual follows
 router.post("/block", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
-  const { userId } = req.body as { userId?: string };
-  if (!userId || typeof userId !== "string") {
+  const { userId: rawUserId } = req.body as { userId?: string };
+  if (!rawUserId || typeof rawUserId !== "string") {
     res.status(400).json({ error: "userId required" }); return;
   }
+  // Accept a users.id alias as well as a Clerk ID.
+  const userId = (await resolveToClerkId(rawUserId)) ?? rawUserId;
   if (userId === myId) {
     res.status(400).json({ error: "Cannot block yourself" }); return;
   }
@@ -681,7 +732,7 @@ router.post("/block", async (req, res) => {
 // DELETE /api/social/block/:userId — unblock
 router.delete("/block/:userId", async (req, res) => {
   const myId   = (req as any).clerkUserId as string;
-  const target = req.params.userId;
+  const target = (await resolveToClerkId(req.params.userId)) ?? req.params.userId;
   await db.delete(blocks)
     .where(and(eq(blocks.blockerId, myId), eq(blocks.blockedId, target)));
   res.json({ ok: true });
@@ -697,33 +748,22 @@ router.get("/blocks", async (req, res) => {
 
   if (rows.length === 0) { res.json([]); return; }
 
-  const ids = rows.map(r => r.blockedId);
-  const profiles = await db
-    .select({
-      clerkId:     users.clerkId,
-      name:        users.name,
-      username:    users.username,
-      displayName: users.displayName,
-    })
-    .from(users)
-    .where(inArray(users.clerkId, ids));
-
-  const profileMap = new Map(profiles.map(p => [p.clerkId, p]));
-
-  res.json(rows.map(r => {
-    const p = profileMap.get(r.blockedId);
-    const displayName = p?.displayName || p?.name || r.blockedId;
-    // Derive initials from display name (first two words)
-    const initials = displayName.split(' ').slice(0, 2).map((w: string) => w[0]?.toUpperCase() ?? '').join('') || '??';
-    return {
-      userId:    r.blockedId,
-      name:      displayName,
-      handle:    p?.username ? `@${p.username}` : r.blockedId,
-      initials,
-      color:     '#8B5CF6',  // users table has no color column; use brand default
-      blockedAt: r.createdAt,
-    };
-  }));
+  const profiles = await profilesById(rows.map((r) => r.blockedId));
+  res.json(rows
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .map((r) => {
+      const p = profiles.get(r.blockedId);
+      return {
+        userId:      r.blockedId,
+        name:        p?.deleted ? "Deleted account" : p?.name ?? "Brandthread member",
+        handle:      p?.handle ?? "",
+        initials:    p?.initials ?? "BM",
+        avatarUrl:   p?.avatarUrl ?? null,
+        accountType: p?.accountType ?? null,
+        color:       "#3F3F46",
+        blockedAt:   r.createdAt,
+      };
+    }));
 });
 
 export default router;

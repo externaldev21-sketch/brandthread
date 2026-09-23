@@ -24,6 +24,7 @@ import {
 import { BuyerProduct, BuyerProductOption, BuyerProductVariant, CheckoutAttribution } from '@/services/cartTypes';
 import { useApi } from '@/hooks/useApi';
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
+import { reportHref } from '@/lib/safety';
 import { useAuth } from '@clerk/expo';
 import {
   BG, CARD, CARD_ELEVATED, BORDER,
@@ -876,14 +877,32 @@ export default function BuyerProductDetailScreen() {
             <Text style={s.sellerHandle}>{product.sellerHandle}</Text>
             <Feather name="chevron-right" size={14} color={MUTED} />
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => router.push(('/ip-report?listingId=' + encodeURIComponent(product.id)) as never)}
-            accessibilityRole="button"
-            accessibilityLabel="Report intellectual property infringement"
-            style={{ alignSelf: 'flex-start', marginBottom: SP.md }}
-          >
-            <Text style={{ color: MUTED, fontFamily: FONT.medium, fontSize: FS.xs, textDecorationLine: 'underline' }}>Report intellectual property infringement</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: SP.md, marginBottom: SP.md }}>
+            <TouchableOpacity
+              onPress={() => router.push(reportHref({
+                targetType: 'product',
+                targetId: product.id,
+                label: product.name,
+                ownerId: product.sellerId,
+                ownerName: product.sellerName,
+              }) as never)}
+              accessibilityRole="button"
+              accessibilityLabel="Report this listing"
+              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
+            >
+              <Feather name="flag" size={12} color={MUTED} />
+              <Text style={{ color: MUTED, fontFamily: FONT.medium, fontSize: FS.xs, textDecorationLine: 'underline' }}>Report listing</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push(('/ip-report?listingId=' + encodeURIComponent(product.id)) as never)}
+              accessibilityRole="button"
+              accessibilityLabel="Report intellectual property infringement"
+              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+            >
+              <Text style={{ color: MUTED, fontFamily: FONT.medium, fontSize: FS.xs, textDecorationLine: 'underline' }}>Report intellectual property infringement</Text>
+            </TouchableOpacity>
+          </View>
            {paymentUnavailable && (
              <View style={s.paymentWarningBanner} accessibilityRole="alert">
                <Feather name="alert-triangle" size={ICON.xs} color={ORANGE} />

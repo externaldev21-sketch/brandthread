@@ -7,7 +7,8 @@ import { eq, sql, inArray, or, asc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { awardLoyaltyPointsOnce } from "./loyalty";
 import { sendWelcomeEmail } from "../lib/brandthreadEmail";
-import { hasDeletionConfirmation } from "../lib/accountDeletion";
+import { getDeletionBlockers, hasDeletionConfirmation } from "../lib/accountDeletion";
+import { getAuth } from "@clerk/express";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
 import {
@@ -264,6 +265,48 @@ router.post("/data-export", requireAuth, async (req, res) => {
   }
 });
 
+// ─── GET /api/auth/account/deletion-check ───────────────────────────────────
+// Tells the app, before the person confirms, whether anything must be settled
+// first (open orders, held drop funds, disputes…) and exactly what deletion
+// removes versus what the law requires us to keep.
+router.get("/account/deletion-check", requireAuth, async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+  try {
+    const [account] = await db.select({ accountType: users.accountType, deletedAt: users.deletedAt })
+      .from(users).where(eq(users.clerkId, clerkUserId)).limit(1);
+    if (!account) {
+      res.status(404).json({ error: "Account record was not found." });
+      return;
+    }
+    const blockers = await getDeletionBlockers(clerkUserId);
+    const isSeller = account.accountType === "seller";
+    res.json({
+      canDelete: blockers.length === 0,
+      accountType: account.accountType,
+      blockers,
+      willDelete: [
+        "Your profile, username, photo and bio",
+        "Posts, comments, stories, likes, reposts and follows",
+        "Direct messages you sent",
+        "Saved items, cart, addresses and notification settings",
+        ...(isSeller ? [
+          "Your storefront, product listings, discount codes and shipping settings",
+          "Payout and subscription links to Stripe",
+        ] : []),
+        "Your sign-in (you'll be signed out on every device)",
+      ],
+      willRetain: [
+        "Order, payment, refund and tax records, with your name and address removed — kept as long as the law requires",
+        "Reports you made about other people's content, without your identity",
+        ...(isSeller ? ["Reviews buyers left on past orders, shown as from a deleted account"] : []),
+      ],
+    });
+  } catch (err) {
+    req.log.error({ err, clerkUserId }, "Deletion eligibility check failed");
+    res.status(500).json({ error: "We couldn't check your account right now. Try again." });
+  }
+});
+
 // ─── DELETE /api/auth/account ───────────────────────────────────────────────
 // Permanently erase an authenticated account. Financial/tax records are kept,
 // but are stripped of direct personal data. The user row is deliberately kept
@@ -285,6 +328,17 @@ router.delete("/account", requireAuth, async (req, res) => {
     }
 
     if (!account.deletedAt) {
+      // Never strand a buyer or a seller's customers: open orders, held drop
+      // funds, disputes and in-flight payouts must be settled first.
+      const blockers = await getDeletionBlockers(clerkUserId);
+      if (blockers.length > 0) {
+        res.status(409).json({
+          error: "Settle the items below before deleting your account.",
+          code: "DELETION_BLOCKED",
+          blockers,
+        });
+        return;
+      }
       await db.transaction(async (tx) => {
         const deletedSubject = `deleted:${account.id}`;
         // Private, device, social, preference and draft data.
@@ -308,6 +362,13 @@ router.delete("/account", requireAuth, async (req, res) => {
         await tx.execute(sql`DELETE FROM referrals WHERE inviter_id = ${clerkUserId} OR invitee_id = ${clerkUserId}`);
         await tx.execute(sql`DELETE FROM klaviyo_integrations WHERE owner_id = ${clerkUserId}`);
         await tx.execute(sql`DELETE FROM seller_subscription_entitlements WHERE clerk_user_id = ${clerkUserId}`);
+        await tx.execute(sql`DELETE FROM post_comment_likes WHERE user_id = ${clerkUserId}`);
+        await tx.execute(sql`DELETE FROM post_comments WHERE author_id = ${clerkUserId}`);
+        await tx.execute(sql`DELETE FROM muted_words WHERE user_id = ${clerkUserId}`);
+        // Reports the person filed stay in the moderation record without
+        // their identity; reports about their content keep the snapshot.
+        await tx.execute(sql`UPDATE reports SET reporter_id = ${deletedSubject} WHERE reporter_id = ${clerkUserId}`);
+        await tx.execute(sql`UPDATE reports SET target_owner_id = ${deletedSubject} WHERE target_owner_id = ${clerkUserId}`);
 
         // Conversations are private content. Preserve a counterpart's thread,
         // but remove the deleted person's messages, participant profile, and
@@ -356,6 +417,7 @@ router.delete("/account", requireAuth, async (req, res) => {
           brandType: null, brandStage: null, sellModel: null, website: null,
           stripeCustomerId: null, stripeAccountId: null, subscriptionId: null,
           stripeVerificationSessionId: null, notificationPreferences: {},
+          termsAcceptedAt: null, termsVersion: null,
           deletedAt: new Date(), updatedAt: new Date(),
         }).where(eq(users.clerkId, clerkUserId));
       });
@@ -370,6 +432,97 @@ router.delete("/account", requireAuth, async (req, res) => {
     res.status(502).json({
       error: "We could not complete account deletion. Database cleanup may have completed, but Clerk sign-in removal failed. Retry the request or contact support.",
     });
+  }
+});
+
+// ─── POST /api/auth/legal-acceptance ─────────────────────────────────────────
+// Records that the person agreed to the Terms of Service, Community Guidelines
+// and Privacy Policy version shown to them (sign-up checkbox or update prompt).
+const legalAcceptanceSchema = z.object({
+  version: z.string().trim().regex(/^[0-9]{4}-[0-9]{2}-[0-9]{2}(?:\.[0-9]+)?$/),
+}).passthrough();
+
+router.post("/legal-acceptance", requireAuth, validateRequest({ body: legalAcceptanceSchema }), async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+  const { version } = req.body as { version: string };
+  const acceptedAt = new Date();
+  const rows = await db.update(users)
+    .set({ termsAcceptedAt: acceptedAt, termsVersion: version, updatedAt: acceptedAt })
+    .where(eq(users.clerkId, clerkUserId))
+    .returning({ id: users.id });
+  if (rows.length === 0) {
+    res.status(404).json({ error: "User not found — call POST /auth/sync first" });
+    return;
+  }
+  res.json({ termsVersion: version, termsAcceptedAt: acceptedAt.toISOString() });
+});
+
+// ─── Sessions (Login Activity) ───────────────────────────────────────────────
+// Real Clerk sessions for the signed-in person, with the device, browser and
+// approximate location Clerk recorded for each one.
+function describeSession(session: Awaited<ReturnType<typeof clerkClient.sessions.getSessionList>>["data"][number], currentSessionId: string | null) {
+  const activity = session.latestActivity;
+  const deviceType = activity?.deviceType?.trim() || null;
+  const browser = [activity?.browserName, activity?.browserVersion?.split(".")[0]].filter(Boolean).join(" ") || null;
+  const location = [activity?.city, activity?.country].filter(Boolean).join(", ") || null;
+  const isMobile = !!activity?.isMobile;
+  return {
+    id: session.id,
+    current: session.id === currentSessionId,
+    status: session.status,
+    device: deviceType ?? (isMobile ? "Mobile device" : browser ? "Computer" : "Unknown device"),
+    browser,
+    isMobile,
+    location,
+    ipAddress: activity?.ipAddress ?? null,
+    lastActiveAt: new Date(session.lastActiveAt).toISOString(),
+    createdAt: new Date(session.createdAt).toISOString(),
+  };
+}
+
+router.get("/sessions", requireAuth, async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+  const currentSessionId = getAuth(req).sessionId ?? null;
+  try {
+    const list = await clerkClient.sessions.getSessionList({ userId: clerkUserId, status: "active", limit: 50 });
+    const sessions = list.data
+      .map((session) => describeSession(session, currentSessionId))
+      .sort((a, b) => Number(b.current) - Number(a.current) || b.lastActiveAt.localeCompare(a.lastActiveAt));
+    res.json({ sessions });
+  } catch (err) {
+    req.log.error({ err, clerkUserId }, "Failed to list sessions");
+    res.status(502).json({ error: "We couldn't load your sign-in activity. Try again." });
+  }
+});
+
+router.delete("/sessions/:sessionId", requireAuth, async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+  const sessionId = String(req.params.sessionId);
+  try {
+    const session = await clerkClient.sessions.getSession(sessionId);
+    if (session.userId !== clerkUserId) {
+      res.status(404).json({ error: "Session not found" });
+      return;
+    }
+    await clerkClient.sessions.revokeSession(sessionId);
+    res.json({ ok: true, revoked: 1 });
+  } catch (err) {
+    req.log.error({ err, clerkUserId, sessionId }, "Failed to revoke session");
+    res.status(502).json({ error: "We couldn't sign out that device. Try again." });
+  }
+});
+
+router.post("/sessions/revoke-others", requireAuth, async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+  const currentSessionId = getAuth(req).sessionId ?? null;
+  try {
+    const list = await clerkClient.sessions.getSessionList({ userId: clerkUserId, status: "active", limit: 100 });
+    const others = list.data.filter((session) => session.id !== currentSessionId);
+    await Promise.all(others.map((session) => clerkClient.sessions.revokeSession(session.id)));
+    res.json({ ok: true, revoked: others.length });
+  } catch (err) {
+    req.log.error({ err, clerkUserId }, "Failed to revoke other sessions");
+    res.status(502).json({ error: "We couldn't sign out your other devices. Try again." });
   }
 });
 

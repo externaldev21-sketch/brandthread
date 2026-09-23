@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db, returns, orders, users } from "@workspace/db";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { requireStripe } from "../lib/stripe";
+import { orderGrossCents, refundOrder, RefundError } from "../lib/money/refunds";
 import crypto from "crypto";
 import { reversePurchasePointsOnce } from "./loyalty";
 import { sendReturnStatusEmail } from "../lib/brandthreadEmail";
@@ -295,83 +295,76 @@ router.patch("/:id/status", async (req, res) => {
     }
 
     if (newStatus === "approved") {
-      // a. Look up the order's stripe_payment_intent_id
-      const [order] = await db
-        .select({
-          id: orders.id,
-          buyerId: orders.buyerId,
-          stripePaymentIntentId: orders.stripePaymentIntentId,
-          totalCents: orders.totalCents,
-        })
-        .from(orders)
-        .where(eq(orders.id, returnRow.orderId));
-
-      if (!order) {
-        return res.status(404).json({ error: "Associated order not found" });
+      if (bodyRefundAmount !== undefined && (!Number.isSafeInteger(bodyRefundAmount) || bodyRefundAmount <= 0)) {
+        return res.status(400).json({ error: "refundAmountCents must be a positive whole number of cents" });
+      }
+      // A return is refunded once. Approving again only retries a refund
+      // that could not be confirmed (same idempotency key → same refund).
+      if (returnRow.status === "refunded") return res.json(returnRow);
+      if (returnRow.status !== "pending" && returnRow.status !== "approved") {
+        return res.status(409).json({ error: `This return is already ${returnRow.status}` });
       }
 
-      // b. Determine refund amount
-      const refundAmountCents = bodyRefundAmount ?? order.totalCents;
-
       try {
-        // c. Issue Stripe refund
-        const stripePaymentIntentId = order.stripePaymentIntentId;
-        if (!stripePaymentIntentId) {
-          return res.status(400).json({ error: "Order has no associated Stripe payment intent" });
-        }
-
-        const stripe = requireStripe();
-        const refund = await stripe.refunds.create({
-          payment_intent: stripePaymentIntentId,
-          amount: refundAmountCents,
-          reason: "requested_by_customer",
-        });
-
-        // d. Record the refund, order cancellation, and proportional reward
-        // reversal together. A $12.99 refund reverses 12 points; repeated
-        // partial refunds are capped at the original purchase award.
-        const updated = await db.transaction(async (tx) => {
-          const [updatedReturn] = await tx
-            .update(returns)
-            .set({
+        // The refund service caps the amount at what is still refundable,
+        // pulls the seller's share back, returns the proportional 5% fee and
+        // posts the ledger — exactly once for this return.
+        await refundOrder({
+          orderId: returnRow.orderId,
+          amountCents: bodyRefundAmount,
+          reason: "return_approved",
+          initiatedBy: clerkUserId,
+          idempotencyKey: `return/${id}`,
+          precondition: (order) => {
+            if (order.owner_id !== clerkUserId) {
+              throw new RefundError("Only the seller can refund this order", 403, "FORBIDDEN");
+            }
+          },
+          onSucceeded: async (tx, { order, amountCents, refundId }) => {
+            await tx.update(returns).set({
               status: "refunded",
-              stripeRefundId: refund.id,
-              refundAmountCents,
+              refundAmountCents: amountCents,
               sellerResponse: sellerResponse ?? null,
               updatedAt: new Date(),
-            })
-            .where(eq(returns.id, id))
-            .returning();
-
-          await tx
-            .update(orders)
-            .set({ status: "cancelled", updatedAt: new Date() })
-            .where(eq(orders.id, returnRow.orderId));
-
-          if (order.buyerId) {
-            await reversePurchasePointsOnce({
-              buyerId: order.buyerId,
-              orderId: order.id,
-              referenceId: `${order.id}:return:${id}`,
-              requestedPoints: Math.floor(refundAmountCents / 100),
-              note: `Purchase reward reversed after refund for order ${order.id}`,
-            }, tx);
+            }).where(eq(returns.id, id));
+            // A partial return leaves the order as it was; a full refund of
+            // a shipped order closes it.
+            if (order.refunded_cents + amountCents >= orderGrossCents(order)) {
+              await tx.update(orders).set({ status: "cancelled", updatedAt: new Date() })
+                .where(and(eq(orders.id, order.id), inArray(orders.status, ["shipped", "delivered", "pending", "processing", "fulfilled"])));
+            }
+            if (order.buyer_id) {
+              await reversePurchasePointsOnce({
+                buyerId: order.buyer_id,
+                orderId: order.id,
+                referenceId: `${order.id}:return:${id}`,
+                requestedPoints: Math.floor(amountCents / 100),
+                note: `Purchase reward reversed after refund for order ${order.id} (refund ${refundId})`,
+              }, tx);
+            }
+          },
+        }).then(async (result) => {
+          if (result.stripeRefundId) {
+            await db.update(returns).set({ stripeRefundId: result.stripeRefundId }).where(eq(returns.id, id));
           }
-
-          return updatedReturn;
         });
 
+        const [updated] = await db.select().from(returns).where(eq(returns.id, id)).limit(1);
         void notifyReturnStatus(
           id,
-          updated.status as "approved" | "refunded",
+          "refunded",
           updated.refundAmountCents,
           updated.sellerResponse,
         ).catch((err) => {
           req.log.error({ err, returnId: id }, "Return status email delivery failed");
         });
         return res.json(updated);
-      } catch (stripeErr: any) {
-        // f. If Stripe fails, set status = 'approved' (not refunded yet)
+      } catch (refundErr: any) {
+        if (refundErr instanceof RefundError && refundErr.status < 500) {
+          return res.status(refundErr.status).json({ error: refundErr.message, code: refundErr.code });
+        }
+        req.log.error({ err: refundErr, returnId: id }, "Return refund could not be completed");
+        // Approved but not yet refunded; approving again retries safely.
         const [updated] = await db
           .update(returns)
           .set({
@@ -379,13 +372,15 @@ router.patch("/:id/status", async (req, res) => {
             sellerResponse: sellerResponse ?? null,
             updatedAt: new Date(),
           })
-          .where(eq(returns.id, id))
+          .where(and(eq(returns.id, id), inArray(returns.status, ["pending", "approved"])))
           .returning();
 
-        void notifyReturnStatus(id, "approved", null, updated.sellerResponse).catch((err) => {
-          req.log.error({ err, returnId: id }, "Return status email delivery failed");
-        });
-        return res.json(updated);
+        if (updated && returnRow.status === "pending") {
+          void notifyReturnStatus(id, "approved", null, updated.sellerResponse).catch((err) => {
+            req.log.error({ err, returnId: id }, "Return status email delivery failed");
+          });
+        }
+        return res.json(updated ?? returnRow);
       }
     } else {
       // status === 'denied'
@@ -397,8 +392,12 @@ router.patch("/:id/status", async (req, res) => {
           sellerResponse: sellerResponse ?? null,
           updatedAt: new Date(),
         })
-        .where(eq(returns.id, id))
+        // A refunded return cannot be "un-refunded" by denying it.
+        .where(and(eq(returns.id, id), inArray(returns.status, ["pending", "approved"])))
         .returning();
+      if (!updated) {
+        return res.status(409).json({ error: `This return is already ${returnRow.status}` });
+      }
 
       void notifyReturnStatus(id, "denied", null, updated.sellerResponse).catch((err) => {
         req.log.error({ err, returnId: id }, "Return status email delivery failed");

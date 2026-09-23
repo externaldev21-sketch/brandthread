@@ -8,7 +8,7 @@ const source = fs.readFileSync(path.join(projectRoot, 'scripts', 'build-web.js')
 describe('Brandthread public web discoverability', () => {
   it('uses the stable production origin and indexes only public brand/legal routes', () => {
     expect(source).toContain("const CANONICAL_ORIGIN = 'https://brandthread.app'");
-    expect(source).toContain("const PUBLIC_ROUTES = ['/', '/privacy', '/terms']");
+    expect(source).toContain("const PUBLIC_ROUTES = ['/', '/privacy', '/terms', '/community-guidelines']");
     expect(source).toContain("'noindex,nofollow'");
   });
 

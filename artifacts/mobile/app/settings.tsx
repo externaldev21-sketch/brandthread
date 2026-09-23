@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, Alert } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -99,6 +99,15 @@ export default function SettingsScreen() {
   const [accountScope, setAccountScope] = useState<'global' | 'us'>('global');
   const [scopeLoading, setScopeLoading] = useState(false);
   const [scopeSaving, setScopeSaving] = useState<'global' | 'us' | null>(null);
+  const [isModerator, setIsModerator] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    api.moderation.me()
+      .then((result) => { if (active) setIsModerator(result.isModerator); })
+      .catch(() => { if (active) setIsModerator(false); });
+    return () => { active = false; };
+  }, [api]);
 
   const topPad = Platform.OS === 'web' ? 24 : insets.top;
   const profileName = user?.fullName || user?.username || 'Your Brandthread profile';
@@ -167,7 +176,7 @@ export default function SettingsScreen() {
       return;
     }
     if (item.action === 'delete-account') {
-      router.push('/buyer-account-control' as never);
+      router.push('/delete-account' as never);
       return;
     }
     if (item.action === 'account-scope') {
@@ -182,7 +191,8 @@ export default function SettingsScreen() {
     const visible = SETTINGS_CATALOG.map((group) => ({
       ...group,
       items: group.items.filter((item) =>
-        item.audience === 'shared' || (isRoleLoaded && item.audience === role),
+        (item.audience === 'shared' || (isRoleLoaded && item.audience === role))
+        && (!item.requiresModerator || isModerator),
       ),
     })).filter((group) => group.items.length > 0);
     if (!q) return visible;
@@ -192,7 +202,7 @@ export default function SettingsScreen() {
         `${i.label} ${i.description} ${i.aliases.join(' ')}`.toLowerCase().includes(q),
       ),
     })).filter((g) => g.items.length > 0);
-  }, [query, role, isRoleLoaded]);
+  }, [query, role, isRoleLoaded, isModerator]);
 
   const themedStyles = useMemo(() => makeStyles(colors), [colors]);
 

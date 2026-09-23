@@ -347,38 +347,6 @@ export interface RestrictRecord {
   createdAt: string;
 }
 
-// ─── Reporting ────────────────────────────────────────────────────────────────
-
-export type ReportTargetType = 'profile' | 'post' | 'story' | 'message' | 'seller' | 'product';
-
-export type ReportReason =
-  | 'spam' | 'harassment' | 'hate_or_abuse' | 'scam'
-  | 'impersonation' | 'inappropriate_content'
-  | 'intellectual_property' | 'dangerous_product' | 'other';
-
-export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
-  spam: 'Spam',
-  harassment: 'Harassment',
-  hate_or_abuse: 'Hate or abuse',
-  scam: 'Scam',
-  impersonation: 'Impersonation',
-  inappropriate_content: 'Inappropriate content',
-  intellectual_property: 'Intellectual property',
-  dangerous_product: 'Dangerous product',
-  other: 'Other',
-};
-
-export interface Report {
-  id: string;
-  targetType: ReportTargetType;
-  targetId: string;
-  targetLabel?: string;
-  reason: ReportReason;
-  description: string;
-  blockAfterReport: boolean;
-  submittedAt: string;
-}
-
 // ─── Saved Content ────────────────────────────────────────────────────────────
 
 export type SavedItemType = 'post' | 'product' | 'collection' | 'store';

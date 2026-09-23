@@ -3,50 +3,58 @@
  * TikTok-style split modal: keeps the active post media visible above a
  * half-height comment thread, with one-level reply support.
  *
+ * Comments are server-backed and moderated:
+ *  - Slurs and threats are refused before posting (the draft is kept so it
+ *    can be edited); strong language and abuse post as "In review" and are
+ *    visible only to their author until a moderator approves them.
+ *  - Comments from blocked people and comments containing the viewer's muted
+ *    words are filtered out by the server.
+ *  - Every comment has a ⋯ menu: reply, report, block the author, or delete
+ *    (author or post owner). Confirmations happen inline in the sheet.
+ *
  * Interaction quality:
  *  - First-load: skeleton rows while fetching
  *  - Fetch failure: InlineError with retry (no Alert)
  *  - Posting: inline progress indicator on send button; InlineError on failure
- *  - Count sync: commentsCount updates from the authoritative list after a
- *    successful post (removes optimistic count from the temp item)
+ *  - Count sync: realCount comes from the authoritative list after a
+ *    successful post (removes the optimistic tmp_ item)
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, TextInput,
+  View, Text, FlatList, TouchableOpacity, TextInput, Modal, Pressable,
   KeyboardAvoidingView, Platform, StyleSheet, Animated,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useUser } from '@clerk/expo';
+import * as Haptics from 'expo-haptics';
 import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER,
-  FG, MUTED, SUBTLE, RED, ON_DARK,
-  FONT, FS, SP, RADIUS, ICON,
+  SURFACE, CARD, CARD_ELEVATED, BORDER,
+  FG, MUTED, SUBTLE, RED,
+  FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
-import {
-  getComments, postComment, likeComment, deleteComment,
-  subscribeSocial, MY_USER_ID, MY_COLOR, MY_INITIALS, MY_NAME, MY_HANDLE,
-} from '@/services/socialService';
-import type { Comment } from '@/services/socialTypes';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { InlineSpinner, InlineError } from '@/components/InlineFeedback';
 import { CachedImage } from '@/components/CachedImage';
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  return `${Math.floor(hrs / 24)}d`;
-}
+import { useApi } from '@/lib/api';
+import { apiErrorCode, apiErrorMessage, reportHref, shortRelativeTime, BLOCK_EXPLAINER } from '@/lib/safety';
+import type { ThreadComment } from '@/lib/safetyTypes';
 
 const QUICK_EMOJIS = ['😁', '🥰', '😂', '😮', '😉', '😅', '🥺'] as const;
+const MAX_COMMENT_LENGTH = 1000;
+
+/** A flattened list row: roots followed by their replies. */
+type Row = ThreadComment & { isReply: boolean; parentAuthorName?: string };
+
+function flatten(roots: ThreadComment[]): Row[] {
+  return roots.flatMap((root) => [
+    { ...root, isReply: false },
+    ...root.replies.map((reply) => ({ ...reply, isReply: true, parentAuthorName: root.author.name })),
+  ]);
+}
 
 // ─── Comment skeleton row ─────────────────────────────────────────────────────
 
@@ -80,6 +88,23 @@ const csk = StyleSheet.create({
   line:   { height: 9, borderRadius: 4, backgroundColor: SURFACE },
 });
 
+// ─── Avatar ───────────────────────────────────────────────────────────────────
+
+function Avatar({ uri, initials, size = 38 }: { uri?: string | null; initials: string; size?: number }) {
+  const { theme } = useAppTheme();
+  if (uri) {
+    return <CachedImage source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} contentFit="cover" />;
+  }
+  return (
+    <View style={{
+      width: size, height: size, borderRadius: size / 2, backgroundColor: theme.cardElevated,
+      borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center',
+    }}>
+      <Text style={{ color: theme.text, fontFamily: FONT.bold, fontSize: size > 34 ? FS.xs : 10 }}>{initials}</Text>
+    </View>
+  );
+}
+
 // ─── Comment Row ──────────────────────────────────────────────────────────────
 
 function CommentRow({
@@ -87,76 +112,76 @@ function CommentRow({
   postAuthorId,
   onLike,
   onReply,
-  onDelete,
+  onMore,
 }: {
-  comment: Comment;
+  comment: Row;
   postAuthorId: string;
-  onLike: (id: string) => void;
-  onReply: (comment: Comment) => void;
-  onDelete: (id: string) => void;
+  onLike: (comment: Row) => void;
+  onReply: (comment: Row) => void;
+  onMore: (comment: Row) => void;
 }) {
   const { theme } = useAppTheme();
   const s = makeStyles(theme);
-  const isOwn = comment.authorId === MY_USER_ID;
-  const isCreator = !!postAuthorId && comment.authorId === postAuthorId;
-  const isReply = !!comment.replyToId;
+  const isCreator = !!postAuthorId && comment.author.userId === postAuthorId;
   /** Optimistic comments carry a tmp_ prefix — show a subtle pending indicator */
   const isPending = comment.id.startsWith('tmp_');
 
-  const handleLongPress = () => {
-    if (!isOwn) return;
-    // We use a custom inline delete confirm rather than Alert
-    onDelete(comment.id);
-  };
-
   return (
     <TouchableOpacity
-      style={[s.commentRow, isReply && s.commentRowIndented, isPending && s.commentRowPending]}
+      style={[s.commentRow, comment.isReply && s.commentRowIndented, isPending && s.commentRowPending]}
       activeOpacity={0.8}
-      onLongPress={handleLongPress}
+      onLongPress={() => { if (!isPending) onMore(comment); }}
       delayLongPress={400}
+      accessibilityActions={[{ name: 'longpress', label: 'Comment options' }]}
+      onAccessibilityAction={() => { if (!isPending) onMore(comment); }}
     >
-      {/* Avatar */}
-      <View style={[s.avatar, { backgroundColor: comment.authorColor }]}>
-        <Text style={s.avatarText}>{comment.authorInitials}</Text>
-      </View>
+      <Avatar uri={comment.author.avatarUrl} initials={comment.author.initials} size={comment.isReply ? 30 : 38} />
 
       <View style={s.commentBody}>
-        {/* Reply banner */}
-        {isReply && comment.replyToText ? (
-          <View style={s.replyBanner}>
-            <Feather name="corner-up-left" size={10} color={MUTED} />
-            <Text style={s.replyBannerText} numberOfLines={1}>
-              {comment.replyToAuthorName}: {comment.replyToText}
-            </Text>
-          </View>
-        ) : null}
-
-        {/* Header */}
         <View style={s.commentHeader}>
-          <Text style={s.authorName}>{comment.authorName}</Text>
-          {isCreator && <Text style={[s.creatorBadge, { color: theme.accent }]}>· Creator</Text>}
+          <Text style={s.authorName} numberOfLines={1}>{comment.author.name}</Text>
+          {isCreator && <Text style={[s.creatorBadge, { color: theme.text }]}>· Creator</Text>}
           {isPending && <View style={s.pendingDot} />}
         </View>
 
-        {/* Text */}
-        <Text style={s.commentText}>{comment.text}</Text>
+        {comment.isReply && comment.parentAuthorName ? (
+          <Text style={s.replyContext}>Replying to {comment.parentAuthorName}</Text>
+        ) : null}
 
-        {/* Actions — hidden while pending */}
+        <Text style={[s.commentText, comment.pendingReview && s.commentTextHeld]}>{comment.body}</Text>
+
+        {comment.pendingReview ? (
+          <View style={s.reviewPill}>
+            <Feather name="eye-off" size={11} color={theme.warning} />
+            <Text style={s.reviewPillText}>In review · only you can see this</Text>
+          </View>
+        ) : null}
+
         <View style={s.commentMeta}>
-          <Text style={s.commentTime}>{isPending ? 'Posting…' : timeAgo(comment.createdAt)}</Text>
-          {!isPending && (
-            <TouchableOpacity style={s.replyBtn} onPress={() => onReply(comment)}>
+          <Text style={s.commentTime}>{isPending ? 'Posting…' : shortRelativeTime(comment.createdAt)}</Text>
+          {!isPending && !comment.pendingReview && (
+            <TouchableOpacity style={s.replyBtn} onPress={() => onReply(comment)} accessibilityRole="button">
               <Text style={s.replyLabel}>Reply</Text>
+            </TouchableOpacity>
+          )}
+          {!isPending && (
+            <TouchableOpacity
+              style={s.moreBtn}
+              onPress={() => onMore(comment)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={`More options for ${comment.author.name}'s comment`}
+            >
+              <Feather name="more-horizontal" size={16} color={MUTED} />
             </TouchableOpacity>
           )}
         </View>
       </View>
 
-      {!isPending && (
+      {!isPending && !comment.pendingReview && (
         <TouchableOpacity
           style={s.commentLike}
-          onPress={() => onLike(comment.id)}
+          onPress={() => onLike(comment)}
           accessibilityRole="button"
           accessibilityLabel={`${comment.likedByMe ? 'Unlike' : 'Like'} comment`}
         >
@@ -172,6 +197,110 @@ function CommentRow({
   );
 }
 
+// ─── Comment actions sheet ────────────────────────────────────────────────────
+
+type SheetStep = 'menu' | 'confirm-delete' | 'confirm-block';
+
+function CommentActionsSheet({
+  comment,
+  onClose,
+  onReply,
+  onReport,
+  onBlock,
+  onDelete,
+}: {
+  comment: Row | null;
+  onClose: () => void;
+  onReply: (comment: Row) => void;
+  onReport: (comment: Row) => void;
+  onBlock: (comment: Row) => Promise<void>;
+  onDelete: (comment: Row) => Promise<void>;
+}) {
+  const { theme } = useAppTheme();
+  const s = makeStyles(theme);
+  const insets = useSafeAreaInsets();
+  const [step, setStep] = useState<SheetStep>('menu');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => { setStep('menu'); setBusy(false); }, [comment?.id]);
+
+  if (!comment) return null;
+  const name = comment.author.name;
+
+  const run = async (action: (c: Row) => Promise<void>) => {
+    setBusy(true);
+    try { await action(comment); } finally { setBusy(false); }
+  };
+
+  const Option = ({ icon, label, destructive, onPress }: {
+    icon: keyof typeof Feather.glyphMap; label: string; destructive?: boolean; onPress: () => void;
+  }) => (
+    <TouchableOpacity style={s.sheetOption} onPress={onPress} accessibilityRole="button" activeOpacity={0.75}>
+      <Feather name={icon} size={18} color={destructive ? theme.error : theme.text} />
+      <Text style={[s.sheetOptionText, destructive && { color: theme.error }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={s.sheetScrim} onPress={onClose} accessibilityLabel="Dismiss" />
+      <View style={[s.sheetCard, { paddingBottom: Math.max(insets.bottom, SP.md) }]}>
+        <View style={s.sheetHandle} />
+        <View style={s.sheetPreview}>
+          <Avatar uri={comment.author.avatarUrl} initials={comment.author.initials} size={30} />
+          <View style={{ flex: 1 }}>
+            <Text style={s.sheetPreviewName}>{name}</Text>
+            <Text style={s.sheetPreviewText} numberOfLines={2}>{comment.body}</Text>
+          </View>
+        </View>
+
+        {step === 'menu' ? (
+          <View style={s.sheetGroup}>
+            {!comment.pendingReview ? (
+              <Option icon="corner-up-left" label="Reply" onPress={() => { onClose(); onReply(comment); }} />
+            ) : null}
+            {!comment.isMine ? (
+              <>
+                <Option icon="flag" label="Report comment" onPress={() => { onClose(); onReport(comment); }} />
+                <Option icon="slash" label={`Block ${name}`} destructive onPress={() => setStep('confirm-block')} />
+              </>
+            ) : null}
+            {comment.canDelete ? (
+              <Option icon="trash-2" label="Delete comment" destructive onPress={() => setStep('confirm-delete')} />
+            ) : null}
+          </View>
+        ) : (
+          <View style={s.confirmBlock}>
+            <Text style={s.confirmTitle}>
+              {step === 'confirm-block' ? `Block ${name}?` : 'Delete this comment?'}
+            </Text>
+            <Text style={s.confirmBody}>
+              {step === 'confirm-block'
+                ? BLOCK_EXPLAINER
+                : comment.isMine
+                  ? 'It will be removed for everyone. This can’t be undone.'
+                  : 'As the post owner you can remove comments from your post. This can’t be undone.'}
+            </Text>
+            <TouchableOpacity
+              style={[s.confirmPrimary, { backgroundColor: theme.error }, busy && { opacity: 0.6 }]}
+              disabled={busy}
+              onPress={() => run(step === 'confirm-block' ? onBlock : onDelete)}
+              accessibilityRole="button"
+            >
+              {busy
+                ? <InlineSpinner style={{ paddingVertical: 0 }} />
+                : <Text style={s.confirmPrimaryText}>{step === 'confirm-block' ? 'Block' : 'Delete'}</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity style={s.confirmSecondary} onPress={() => setStep('menu')} accessibilityRole="button">
+              <Text style={s.confirmSecondaryText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    </Modal>
+  );
+}
+
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function BuyerPostCommentsScreen() {
@@ -179,6 +308,8 @@ export default function BuyerPostCommentsScreen() {
   const s = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const api = useApi();
+  const { user } = useUser();
   const params = useLocalSearchParams<{
     postId: string;
     postAuthorId?: string;
@@ -220,56 +351,97 @@ export default function BuyerPostCommentsScreen() {
     return () => mediaPlayer.pause();
   }, [mediaPlayer, mediaUri, postType]));
 
-  const [comments, setComments] = useState<Comment[]>([]);
+  const myName = user?.fullName || user?.firstName || user?.username || 'You';
+  const myInitials = myName.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'Y';
+  const myAvatar = user?.hasImage ? user.imageUrl : null;
+
+  const [comments, setComments] = useState<Row[]>([]);
+  const [meta, setMeta] = useState({ hiddenByMutedWords: 0, commentsDisabled: false, canComment: true, nextCursor: null as string | null });
   const [inputText, setInputText] = useState('');
-  const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
+  const [replyingTo, setReplyingTo] = useState<Row | null>(null);
   const [sending, setSending] = useState(false);
   /** True only on the first load (no prior data) */
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   /** Error message shown inline below the count row */
   const [fetchError, setFetchError] = useState<string | null>(null);
   /** Transient post-failure message shown below the input */
   const [sendError, setSendError] = useState<string | null>(null);
+  /** Shown after a comment is held by the filter. */
+  const [heldNotice, setHeldNotice] = useState<string | null>(null);
+  const [actionsFor, setActionsFor] = useState<Row | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const listRef = useRef<FlatList>(null);
   const inputRef = useRef<TextInput>(null);
   const hasLoadedOnce = useRef(false);
 
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    setTimeout(() => setToast((current) => (current === message ? null : current)), 2600);
+  }, []);
+
   const load = useCallback(async () => {
+    if (!postId) { setLoading(false); return; }
     // Only show skeleton on the very first load; subsequent fetches are silent
     if (!hasLoadedOnce.current) setLoading(true);
     setFetchError(null);
     try {
-      const data = await getComments(postId);
-      setComments(data);
+      const thread = await api.comments.list(postId);
+      setComments(flatten(thread.comments));
+      setMeta({
+        hiddenByMutedWords: thread.hiddenByMutedWords,
+        commentsDisabled: thread.commentsDisabled,
+        canComment: thread.canComment,
+        nextCursor: thread.nextCursor,
+      });
       hasLoadedOnce.current = true;
-    } catch {
-      setFetchError('Could not load comments. Tap Retry to try again.');
+    } catch (error) {
+      setFetchError(apiErrorCode(error) === 'NOT_FOUND'
+        ? 'This post is no longer available.'
+        : 'Could not load comments. Tap Retry to try again.');
     } finally {
       setLoading(false);
     }
-  }, [postId]);
+  }, [api, postId]);
 
   useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    const unsub = subscribeSocial(() => load());
-    return unsub;
-  }, [load]);
+  const loadMore = useCallback(async () => {
+    if (!meta.nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const thread = await api.comments.list(postId, meta.nextCursor);
+      setComments((prev) => [...prev, ...flatten(thread.comments)]);
+      setMeta((prev) => ({ ...prev, nextCursor: thread.nextCursor }));
+    } catch {
+      // The footer keeps its "Load more" affordance for a manual retry.
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [api, loadingMore, meta.nextCursor, postId]);
 
-  const handleLike = async (commentId: string) => {
+  const postComment = useCallback(
+    (text: string, parentId?: string | null) => api.comments.create(postId, text, parentId),
+    [api, postId],
+  );
+
+  const handleLike = async (comment: Row) => {
+    const liked = !comment.likedByMe;
+    Haptics.selectionAsync();
     // Optimistic update
-    setComments(prev =>
-      prev.map(c =>
-        c.id === commentId
-          ? { ...c, likedByMe: !c.likedByMe, likesCount: c.likedByMe ? c.likesCount - 1 : c.likesCount + 1 }
-          : c,
-      ),
-    );
-    await likeComment(postId, commentId);
+    setComments(prev => prev.map(c => c.id === comment.id
+      ? { ...c, likedByMe: liked, likesCount: Math.max(0, c.likesCount + (liked ? 1 : -1)) }
+      : c));
+    try {
+      const result = await api.comments.like(postId, comment.id, liked);
+      setComments(prev => prev.map(c => c.id === comment.id ? { ...c, likedByMe: result.liked, likesCount: result.likesCount } : c));
+    } catch {
+      setComments(prev => prev.map(c => c.id === comment.id ? { ...c, likedByMe: comment.likedByMe, likesCount: comment.likesCount } : c));
+    }
   };
 
-  const handleReply = (comment: Comment) => {
+  const handleReply = (comment: Row) => {
     setReplyingTo(comment);
     inputRef.current?.focus();
   };
@@ -279,9 +451,39 @@ export default function BuyerPostCommentsScreen() {
     setInputText('');
   };
 
-  const handleDelete = async (commentId: string) => {
-    setComments(prev => prev.filter(c => c.id !== commentId));
-    await deleteComment(postId, commentId);
+  const handleReport = (comment: Row) => {
+    router.push(reportHref({
+      targetType: 'comment',
+      targetId: comment.id,
+      label: `${comment.author.name}: “${comment.body.slice(0, 80)}”`,
+      ownerId: comment.author.userId,
+      ownerName: comment.author.name,
+    }) as never);
+  };
+
+  const handleBlock = async (comment: Row) => {
+    try {
+      await api.social.block(comment.author.userId);
+      setActionsFor(null);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(`${comment.author.name} is blocked`);
+      await load();
+    } catch (error) {
+      setActionsFor(null);
+      setSendError(apiErrorMessage(error, 'Could not block this account. Try again.'));
+    }
+  };
+
+  const handleDelete = async (comment: Row) => {
+    try {
+      await api.comments.remove(postId, comment.id);
+      setActionsFor(null);
+      setComments(prev => prev.filter(c => c.id !== comment.id && c.parentId !== comment.id));
+      showToast('Comment deleted');
+    } catch (error) {
+      setActionsFor(null);
+      setSendError(apiErrorMessage(error, 'Could not delete this comment. Try again.'));
+    }
   };
 
   const handleSend = async () => {
@@ -289,50 +491,71 @@ export default function BuyerPostCommentsScreen() {
     if (!text || sending) return;
     setSending(true);
     setSendError(null);
-    const optimistic: Comment = {
+    setHeldNotice(null);
+    const parent = replyingTo;
+    const optimistic: Row = {
       id: `tmp_${Date.now()}`,
       postId,
-      authorId: MY_USER_ID,
-      authorName: MY_NAME,
-      authorHandle: MY_HANDLE,
-      authorInitials: MY_INITIALS,
-      authorColor: MY_COLOR,
-      text,
-      replyToId: replyingTo?.id,
-      replyToAuthorName: replyingTo?.authorName,
-      replyToText: replyingTo?.text,
-      likedByMe: false,
-      likesCount: 0,
+      parentId: parent ? (parent.parentId ?? parent.id) : null,
+      body: text,
       createdAt: new Date().toISOString(),
+      author: {
+        userId: user?.id ?? 'me', name: myName, handle: '', initials: myInitials,
+        avatarUrl: myAvatar, accountType: null, suspended: false, deleted: false,
+      },
+      likesCount: 0,
+      likedByMe: false,
+      isMine: true,
+      canDelete: true,
+      pendingReview: false,
+      replies: [],
+      isReply: !!parent,
+      parentAuthorName: parent?.author.name,
     };
-    setComments(prev => [optimistic, ...prev]);
+    setComments(prev => {
+      if (!parent) return [optimistic, ...prev];
+      const index = prev.findIndex(c => c.id === (parent.parentId ?? parent.id));
+      const next = [...prev];
+      next.splice(index + 1, 0, optimistic);
+      return next;
+    });
     setInputText('');
     setReplyingTo(null);
-    requestAnimationFrame(() => inputRef.current?.focus());
 
     try {
-      await postComment({
-        postId,
-        text,
-        replyToId: replyingTo?.id,
-        replyToAuthorName: replyingTo?.authorName,
-        replyToText: replyingTo?.text ? replyingTo.text.slice(0, 60) : undefined,
-      });
+      const created = await postComment(text, parent ? (parent.parentId ?? parent.id) : null);
+      if (created.moderation.status === 'held') {
+        setHeldNotice(created.moderation.message ?? 'Your comment is in review. Only you can see it for now.');
+      }
       // Successful post: remove the optimistic item and reload to get the
       // authoritative comment from the server with the real ID and count.
       setComments(prev => prev.filter(c => c.id !== optimistic.id));
       await load();
-    } catch {
-      // Remove optimistic item and show inline error
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      // Remove optimistic item, keep the draft for editing, show inline error
       setComments(prev => prev.filter(c => c.id !== optimistic.id));
-      setSendError('Could not post comment. Tap to retry.');
+      setInputText(text);
+      setReplyingTo(parent);
+      const code = apiErrorCode(error);
+      setSendError(
+        code === 'CONTENT_REJECTED' || code === 'ACCOUNT_SUSPENDED' || code === 'BLOCKED' || code === 'COMMENTS_DISABLED'
+          ? apiErrorMessage(error, 'This comment can’t be posted.')
+          : 'Could not post comment. Tap to retry.',
+      );
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setSending(false);
     }
   };
 
-  /** Real comment count (excludes temp optimistic items) */
-  const realCount = comments.filter(c => !c.id.startsWith('tmp_')).length;
+  /** Real comment count (excludes temp optimistic items and held comments) */
+  const realCount = useMemo(
+    () => comments.filter(c => !c.id.startsWith('tmp_') && !c.pendingReview).length,
+    [comments],
+  );
+
+  const composerLocked = meta.commentsDisabled || !meta.canComment;
 
   return (
     <View style={s.overlay}>
@@ -408,28 +631,66 @@ export default function BuyerPostCommentsScreen() {
               postAuthorId={postAuthorId}
               onLike={handleLike}
               onReply={handleReply}
-              onDelete={handleDelete}
+              onMore={setActionsFor}
             />
           )}
           ListEmptyComponent={
             !loading && !fetchError
-              ? <View style={s.emptyState}><Text style={s.emptyTitle}>Start the conversation</Text><Text style={s.emptyText}>Be the first to comment.</Text></View>
+              ? (
+                <View style={s.emptyState}>
+                  <Text style={s.emptyTitle}>{meta.commentsDisabled ? 'Comments are off' : 'Start the conversation'}</Text>
+                  <Text style={s.emptyText}>
+                    {meta.commentsDisabled ? 'The creator turned off comments for this post.' : 'Be the first to comment.'}
+                  </Text>
+                </View>
+              )
               : null
           }
+          ListFooterComponent={!loading ? (
+            <View style={s.listFooter}>
+              {meta.nextCursor ? (
+                <TouchableOpacity style={s.loadMore} onPress={loadMore} disabled={loadingMore} accessibilityRole="button">
+                  {loadingMore ? <InlineSpinner style={{ paddingVertical: 0 }} /> : <Text style={s.loadMoreText}>View older comments</Text>}
+                </TouchableOpacity>
+              ) : null}
+              {meta.hiddenByMutedWords > 0 ? (
+                <TouchableOpacity style={s.mutedNote} onPress={() => router.push('/muted-words' as never)} accessibilityRole="button">
+                  <Feather name="volume-x" size={12} color={SUBTLE} />
+                  <Text style={s.mutedNoteText}>
+                    {meta.hiddenByMutedWords} hidden by your muted words · <Text style={{ textDecorationLine: 'underline' }}>Manage</Text>
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          ) : null}
         />
+
+        {toast ? (
+          <View style={s.toast} pointerEvents="none" accessibilityLiveRegion="polite">
+            <Feather name="check" size={14} color={theme.onAccent} />
+            <Text style={s.toastText}>{toast}</Text>
+          </View>
+        ) : null}
 
         <View style={[s.inputWrap, { paddingBottom: Math.max(insets.bottom, SP.sm) }]}>
           {sendError ? (
-            <TouchableOpacity style={s.sendErrorBanner} onPress={() => setSendError(null)}>
+            <TouchableOpacity style={s.sendErrorBanner} onPress={() => setSendError(null)} accessibilityRole="alert">
               <Feather name="alert-circle" size={12} color={RED} />
-              <Text style={s.sendErrorText} numberOfLines={1}>{sendError}</Text>
+              <Text style={s.sendErrorText} numberOfLines={3}>{sendError}</Text>
               <Feather name="x" size={12} color={RED} />
+            </TouchableOpacity>
+          ) : null}
+          {heldNotice ? (
+            <TouchableOpacity style={s.heldBanner} onPress={() => setHeldNotice(null)} accessibilityRole="alert">
+              <Feather name="eye-off" size={12} color={theme.warning} />
+              <Text style={s.heldBannerText} numberOfLines={2}>{heldNotice}</Text>
+              <Feather name="x" size={12} color={MUTED} />
             </TouchableOpacity>
           ) : null}
           {replyingTo ? (
             <View style={s.replyingBanner}>
               <Text style={s.replyingLabel} numberOfLines={1}>
-                Replying to <Text style={[s.replyingName, { color: theme.accent }]}>{replyingTo.authorName}</Text>
+                Replying to <Text style={[s.replyingName, { color: theme.text }]}>{replyingTo.author.name}</Text>
               </Text>
               <TouchableOpacity onPress={handleCancelReply} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
                 <Feather name="x" size={14} color={MUTED} />
@@ -437,95 +698,104 @@ export default function BuyerPostCommentsScreen() {
             </View>
           ) : null}
 
-          <View style={s.emojiRow}>
-            {QUICK_EMOJIS.map(emoji => (
-              <TouchableOpacity
-                key={emoji}
-                style={s.emojiBtn}
-                onPress={() => {
-                  setInputText(value => `${value}${emoji}`);
-                  inputRef.current?.focus();
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={`Add ${emoji}`}
-              >
-                <Text style={s.emoji}>{emoji}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {composerLocked ? (
+            <View style={s.lockedComposer}>
+              {meta.commentsDisabled ? (
+                <Text style={s.lockedText}>Comments are turned off for this post.</Text>
+              ) : (
+                <TouchableOpacity onPress={() => router.push('/sign-in' as never)} accessibilityRole="button">
+                  <Text style={s.lockedText}>
+                    <Text style={{ color: theme.text, fontFamily: FONT.semibold }}>Sign in</Text> to join the conversation.
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <>
+              <View style={s.emojiRow}>
+                {QUICK_EMOJIS.map(emoji => (
+                  <TouchableOpacity
+                    key={emoji}
+                    style={s.emojiBtn}
+                    onPress={() => {
+                      setInputText(value => `${value}${emoji}`);
+                      inputRef.current?.focus();
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Add ${emoji}`}
+                  >
+                    <Text style={s.emoji}>{emoji}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-          <View style={s.inputRow}>
-            <View style={[s.inputAvatar, { backgroundColor: MY_COLOR }]}>
-              <Text style={s.inputAvatarText}>{MY_INITIALS}</Text>
-            </View>
-            <View style={s.inputShell}>
-              <TextInput
-                ref={inputRef}
-                style={s.input}
-                value={inputText}
-                onChangeText={setInputText}
-                placeholder={replyingTo ? `Reply to ${replyingTo.authorName}…` : 'Add comment…'}
-                placeholderTextColor={MUTED}
-                multiline
-                maxLength={500}
-                returnKeyType="default"
-              />
-              <TouchableOpacity
-                style={s.inputTool}
-                onPress={() => {
-                  setInputText(value => value.endsWith(' ') || !value ? `${value}@` : `${value} @`);
-                  inputRef.current?.focus();
-                }}
-                accessibilityLabel="Mention someone"
-              >
-                <Text style={s.mentionIcon}>@</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.inputTool} onPress={() => inputRef.current?.focus()} accessibilityLabel="Choose emoji">
-                <Feather name="smile" size={21} color={FG} />
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity
-              style={[s.sendBtn, { backgroundColor: theme.accent }, (!inputText.trim() || sending) && s.sendBtnDisabled]}
-              onPress={handleSend}
-              disabled={!inputText.trim() || sending}
-              accessibilityRole="button"
-              accessibilityLabel={sending ? 'Posting comment' : 'Send comment'}
-            >
-              {sending ? <InlineSpinner style={{ paddingVertical: 0 }} /> : <Feather name="arrow-up" size={18} color={theme.onAccent} />}
-            </TouchableOpacity>
-          </View>
+              <View style={s.inputRow}>
+                <Avatar uri={myAvatar} initials={myInitials} />
+                <View style={s.inputShell}>
+                  <TextInput
+                    ref={inputRef}
+                    style={s.input}
+                    value={inputText}
+                    onChangeText={setInputText}
+                    placeholder={replyingTo ? `Reply to ${replyingTo.author.name}…` : 'Add comment…'}
+                    placeholderTextColor={MUTED}
+                    multiline
+                    maxLength={MAX_COMMENT_LENGTH}
+                    returnKeyType="default"
+                    accessibilityLabel="Comment"
+                  />
+                  <TouchableOpacity
+                    style={s.inputTool}
+                    onPress={() => {
+                      setInputText(value => value.endsWith(' ') || !value ? `${value}@` : `${value} @`);
+                      inputRef.current?.focus();
+                    }}
+                    accessibilityLabel="Mention someone"
+                  >
+                    <Text style={s.mentionIcon}>@</Text>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity
+                  style={[s.sendBtn, { backgroundColor: theme.accent }, (!inputText.trim() || sending) && s.sendBtnDisabled]}
+                  onPress={handleSend}
+                  disabled={!inputText.trim() || sending}
+                  accessibilityRole="button"
+                  accessibilityLabel={sending ? 'Posting comment' : 'Send comment'}
+                >
+                  {sending ? <InlineSpinner style={{ paddingVertical: 0 }} /> : <Feather name="arrow-up" size={18} color={theme.onAccent} />}
+                </TouchableOpacity>
+              </View>
+              <Text style={s.guidelinesHint}>
+                Keep it respectful — comments follow our{' '}
+                <Text style={s.guidelinesLink} onPress={() => router.push('/community-guidelines' as never)}>Community Guidelines</Text>.
+              </Text>
+            </>
+          )}
         </View>
       </KeyboardAvoidingView>
+
+      <CommentActionsSheet
+        comment={actionsFor}
+        onClose={() => setActionsFor(null)}
+        onReply={handleReply}
+        onReport={handleReport}
+        onBlock={handleBlock}
+        onDelete={handleDelete}
+      />
     </View>
   );
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
-const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const PURPLE = theme.accent;
-  const PURPLE_DIM = theme.accentDim;
-  return StyleSheet.create({
-  container: { flex: 1 },
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(0,0,0,0.14)',
   },
-  backdrop: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-  },
-  mediaBackdrop: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    left: 0,
-    height: '50%',
-  },
+  backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
+  mediaBackdrop: { position: 'absolute', top: 0, right: 0, left: 0, height: '50%' },
   sheet: {
     height: '52%',
     overflow: 'hidden',
@@ -538,252 +808,125 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
 
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    height: 52,
-    paddingHorizontal: SP.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    height: 52, paddingHorizontal: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER,
   },
-  headerSide: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontFamily: FONT.bold,
-    fontSize: FS.sm,
-    color: FG,
-  },
+  headerSide: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontFamily: FONT.bold, fontSize: FS.sm, color: FG },
 
   listContent: { paddingTop: 4, paddingBottom: SP.md, flexGrow: 1 },
-  emptyState: { flex: 1, minHeight: 180, alignItems: 'center', justifyContent: 'center', gap: 5 },
+  emptyState: { flex: 1, minHeight: 180, alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: SP.lg },
   emptyTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.base },
-  emptyText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm },
-
-  countRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
-  },
-  divider: { flex: 1, height: 1, backgroundColor: BORDER },
-  countLabel: {
-    fontFamily: FONT.medium,
-    fontSize: FS.xs,
-    color: SUBTLE,
-  },
+  emptyText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center' },
+  listFooter: { alignItems: 'center', gap: SP.xs, paddingTop: SP.xs },
+  loadMore: { paddingVertical: SP.sm, paddingHorizontal: SP.md, minHeight: 36, justifyContent: 'center' },
+  loadMoreText: { color: MUTED, fontFamily: FONT.semibold, fontSize: FS.xs },
+  mutedNote: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: SP.xs },
+  mutedNoteText: { color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.xs },
 
   // Comment rows
   commentRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    paddingHorizontal: SP.md,
-    paddingVertical: 10,
+    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+    paddingHorizontal: SP.md, paddingVertical: 10,
   },
-  commentRowIndented: {
-    paddingLeft: SP.md + 42,
-  },
-  commentRowPending: {
-    opacity: 0.6,
-  },
-  avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  avatarText: {
-    fontFamily: FONT.bold,
-    fontSize: FS.xs,
-    color: ON_DARK,
-  },
+  commentRowIndented: { paddingLeft: SP.md + 48 },
+  commentRowPending: { opacity: 0.6 },
   commentBody: { flex: 1, minWidth: 0 },
-
-  replyBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 4,
-  },
-  replyBannerText: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    color: MUTED,
-    flex: 1,
-  },
-
-  commentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.xs,
-    marginBottom: 3,
-  },
-  authorName: {
-    fontFamily: FONT.medium,
-    fontSize: 13,
-    color: MUTED,
-  },
+  commentHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginBottom: 3 },
+  authorName: { fontFamily: FONT.medium, fontSize: 13, color: MUTED, flexShrink: 1 },
   creatorBadge: { fontFamily: FONT.semibold, fontSize: 13 },
-  commentTime: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    color: SUBTLE,
+  replyContext: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, marginBottom: 2 },
+  commentTime: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE },
+  pendingDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: SUBTLE, marginLeft: 2 },
+  commentText: { fontFamily: FONT.medium, fontSize: 14, color: FG, lineHeight: 19 },
+  commentTextHeld: { color: MUTED },
+  reviewPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start',
+    marginTop: 6, paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADIUS.pill,
+    borderWidth: 1, borderColor: theme.warning + '55', backgroundColor: theme.warning + '14',
   },
-  pendingDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: SUBTLE,
-    marginLeft: 2,
-  },
-  commentText: {
-    fontFamily: FONT.medium,
-    fontSize: 14,
-    color: FG,
-    lineHeight: 19,
-  },
+  reviewPillText: { color: theme.warning, fontFamily: FONT.medium, fontSize: 11 },
   commentMeta: { flexDirection: 'row', alignItems: 'center', gap: SP.md, marginTop: 5 },
-  replyBtn: { paddingVertical: 2, paddingRight: SP.sm },
+  replyBtn: { paddingVertical: 2, paddingRight: SP.xs },
+  moreBtn: { paddingVertical: 2, paddingHorizontal: 2 },
   commentLike: { width: 38, minHeight: 44, alignItems: 'center', justifyContent: 'center', gap: 2 },
-  commentActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.md,
-    marginTop: SP.xs,
+  actionLabel: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, textAlign: 'center' },
+  replyLabel: { fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED },
+
+  toast: {
+    position: 'absolute', alignSelf: 'center', bottom: 150,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: theme.accent, borderRadius: RADIUS.pill, paddingHorizontal: 14, paddingVertical: 8,
   },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  actionLabel: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    color: MUTED,
-    textAlign: 'center',
-  },
-  replyLabel: {
-    fontFamily: FONT.medium,
-    fontSize: FS.xs,
-    color: MUTED,
-  },
+  toastText: { color: theme.onAccent, fontFamily: FONT.semibold, fontSize: FS.xs },
 
   // Input
   inputWrap: {
-    borderTopWidth: 1,
-    borderTopColor: BORDER,
-    backgroundColor: CARD,
-    paddingTop: 6,
-    paddingHorizontal: 12,
+    borderTopWidth: 1, borderTopColor: BORDER, backgroundColor: CARD,
+    paddingTop: 6, paddingHorizontal: 12,
   },
   sendErrorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(248,113,113,0.1)',
-    borderRadius: RADIUS.sm,
-    paddingHorizontal: SP.sm,
-    paddingVertical: 5,
-    marginBottom: SP.xs,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(248,113,113,0.1)', borderRadius: RADIUS.sm,
+    paddingHorizontal: SP.sm, paddingVertical: 6, marginBottom: SP.xs,
   },
-  sendErrorText: {
-    flex: 1,
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    color: RED,
+  sendErrorText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.xs, color: RED, lineHeight: 16 },
+  heldBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: theme.warning + '14', borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.warning + '40',
+    paddingHorizontal: SP.sm, paddingVertical: 6, marginBottom: SP.xs,
   },
+  heldBannerText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.xs, color: FG, lineHeight: 16 },
   replyingBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: PURPLE_DIM,
-    borderRadius: RADIUS.sm,
-    paddingHorizontal: SP.sm,
-    paddingVertical: SP.xs,
-    marginBottom: SP.xs,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: theme.accentDim, borderRadius: RADIUS.sm,
+    paddingHorizontal: SP.sm, paddingVertical: SP.xs, marginBottom: SP.xs,
   },
-  replyingLabel: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    color: MUTED,
-    flex: 1,
-  },
-  replyingName: {
-    fontFamily: FONT.semibold,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  inputAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  emojiRow: {
-    minHeight: 42,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  emojiBtn: {
-    width: 40,
-    height: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  replyingLabel: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, flex: 1 },
+  replyingName: { fontFamily: FONT.semibold },
+  lockedComposer: { minHeight: 56, alignItems: 'center', justifyContent: 'center', paddingVertical: SP.sm },
+  lockedText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center' },
+  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  emojiRow: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  emojiBtn: { width: 40, height: 38, alignItems: 'center', justifyContent: 'center' },
   emoji: { fontSize: 23 },
   inputShell: {
-    flex: 1,
-    minHeight: 42,
-    maxHeight: 96,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: CARD_ELEVATED,
-    borderRadius: 21,
-    paddingLeft: 12,
-    paddingRight: 4,
-  },
-  inputAvatarText: {
-    fontFamily: FONT.bold,
-    fontSize: FS.xs,
-    color: ON_DARK,
+    flex: 1, minHeight: 42, maxHeight: 96, flexDirection: 'row', alignItems: 'center',
+    backgroundColor: CARD_ELEVATED, borderRadius: 21, paddingLeft: 12, paddingRight: 4,
   },
   input: {
-    flex: 1,
-    paddingHorizontal: 0,
-    paddingVertical: 9,
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: FG,
-    maxHeight: 88,
-    minHeight: 42,
+    flex: 1, paddingHorizontal: 0, paddingVertical: 9, fontFamily: FONT.regular,
+    fontSize: FS.sm, color: FG, maxHeight: 88, minHeight: 42,
   },
-  inputTool: {
-    width: 34,
-    height: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  inputTool: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   mentionIcon: { color: FG, fontFamily: FONT.bold, fontSize: 22, lineHeight: 24 },
-  sendBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  sendBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   sendBtnDisabled: { opacity: 0.28 },
-  });
-};
+  guidelinesHint: { color: SUBTLE, fontFamily: FONT.regular, fontSize: 11, textAlign: 'center', marginTop: 6 },
+  guidelinesLink: { color: MUTED, textDecorationLine: 'underline' },
+
+  // Actions sheet
+  sheetScrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.55)' },
+  sheetCard: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    backgroundColor: theme.card, borderTopLeftRadius: 22, borderTopRightRadius: 22,
+    borderWidth: 1, borderBottomWidth: 0, borderColor: theme.border, paddingHorizontal: SP.md,
+  },
+  sheetHandle: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, marginTop: SP.sm, marginBottom: SP.md },
+  sheetPreview: {
+    flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start',
+    paddingBottom: SP.md, borderBottomWidth: 1, borderBottomColor: theme.borderSubtle,
+  },
+  sheetPreviewName: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm },
+  sheetPreviewText: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19, marginTop: 2 },
+  sheetGroup: { paddingVertical: SP.xs },
+  sheetOption: { flexDirection: 'row', alignItems: 'center', gap: SP.md, minHeight: 52 },
+  sheetOptionText: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.base },
+  confirmBlock: { paddingTop: SP.md, paddingBottom: SP.xs },
+  confirmTitle: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.lg },
+  confirmBody: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, marginTop: 6 },
+  confirmPrimary: { marginTop: SP.lg, height: 50, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
+  confirmPrimaryText: { color: '#1A0A0A', fontFamily: FONT.bold, fontSize: FS.base },
+  confirmSecondary: { height: 48, alignItems: 'center', justifyContent: 'center' },
+  confirmSecondaryText: { color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.base },
+});

@@ -1,8 +1,9 @@
-import { pgTable, uuid, text, integer, timestamp, date, json, boolean, primaryKey, index, numeric, unique, uniqueIndex, foreignKey } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, timestamp, date, json, jsonb, boolean, primaryKey, index, numeric, unique, uniqueIndex, foreignKey } from 'drizzle-orm/pg-core';
 export * from './manufacturers';
 export * from './freelancers';
 export * from './subscriptionEntitlements';
 export * from './security';
+export * from './money';
 import { manufacturers } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
 
@@ -82,6 +83,13 @@ export const users = pgTable('users', {
   // A tombstone is retained after an account erasure request.  Keeping the
   // Clerk subject prevents a delayed client sync from creating a fresh profile.
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  // Platform suspension set by a moderator. Suspended accounts cannot publish
+  // and their public content is hidden from every surface.
+  suspendedAt: timestamp('suspended_at', { withTimezone: true }),
+  suspensionReason: text('suspension_reason'),
+  // Terms of Service / Community Guidelines / Privacy Policy acceptance.
+  termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }),
+  termsVersion: text('terms_version'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -231,6 +239,14 @@ export const drops = pgTable('drops', {
   payoutStatus: text('payout_status').notNull().default('pending'), // 'pending'|'held'|'processing'|'paid'
   estimatedPayoutDate: timestamp('estimated_payout_date'),
   stripePayoutId: text('stripe_payout_id'),
+  // Held-funds lifecycle for pre-order drops (null for pre-made drops):
+  // collecting | production | fulfilling | completed | failing | failed.
+  // Transitions are defined in api-server lib/money/stateMachines.ts.
+  escrowState: text('escrow_state'),
+  // If unshipped preorders remain after this moment, buyers are auto-refunded.
+  fulfillmentDeadlineAt: timestamp('fulfillment_deadline_at', { withTimezone: true }),
+  escrowFailedAt: timestamp('escrow_failed_at', { withTimezone: true }),
+  escrowFailureReason: text('escrow_failure_reason'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -293,6 +309,23 @@ export const orders = pgTable('orders', {
   // Stripe payment fields
   stripePaymentIntentId: text('stripe_payment_intent_id'),
   stripeCheckoutSessionId: text('stripe_checkout_session_id'),
+  // ── Money state (see api-server lib/money) ──────────────────────────────
+  // 'destination' = in-stock order paid straight to the seller;
+  // 'held' = preorder-drop order whose funds Brandthread holds until ship.
+  chargeModel: text('charge_model'),
+  // settled_direct | held | release_pending | released | refunded
+  fundsState: text('funds_state'),
+  stripeChargeId: text('stripe_charge_id'),
+  stripeTransferId: text('stripe_transfer_id'),
+  stripeApplicationFeeId: text('stripe_application_fee_id'),
+  platformFeeCents: integer('platform_fee_cents').notNull().default(0),
+  // Stripe's processing fee for this charge (actual when known).
+  processingFeeCents: integer('processing_fee_cents').notNull().default(0),
+  // Processing fee the seller was charged (estimate on destination charges).
+  processingFeeChargedCents: integer('processing_fee_charged_cents').notNull().default(0),
+  sellerNetCents: integer('seller_net_cents').notNull().default(0),
+  refundedCents: integer('refunded_cents').notNull().default(0),
+  platformFeeRefundedCents: integer('platform_fee_refunded_cents').notNull().default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -337,9 +370,9 @@ export const posts = pgTable('posts', {
   thumbnailUrl: text('thumbnail_url'),
   mediaUrls: json('media_urls').$type<string[]>().notNull().default([]),
   /** Ordered object storage paths for each composed slideshow slide (empty for video/photo) */
-  mediaPaths: json('media_paths').$type<string[]>().notNull().default([]),
+  mediaPaths: jsonb('media_paths').$type<string[]>().notNull().default([]),
   /** Per-slide overlay metadata. Each entry: { slideIndex, overlays: TextOverlay[] } */
-  slideOverlays: json('slide_overlays').$type<Array<{
+  slideOverlays: jsonb('slide_overlays').$type<Array<{
     slideIndex: number;
     overlays: Array<{
       id: string; text: string; x: number; y: number;
@@ -372,6 +405,10 @@ export const posts = pgTable('posts', {
     showLikeCount: true,
   }),
   postStatus: text('post_status').notNull().default('published'), // 'draft' | 'scheduled' | 'published' | 'archived' | 'deleted'
+  // 'visible' | 'held' (caption flagged, hidden until reviewed) | 'removed' (moderator)
+  moderationStatus: text('moderation_status').notNull().default('visible'),
+  moderationReason: text('moderation_reason'),
+  moderatedAt: timestamp('moderated_at', { withTimezone: true }),
   scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
   publishedAt: timestamp('published_at', { withTimezone: true }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -428,6 +465,11 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   // The paid-order webhook consumes it atomically with order creation.
   loyaltyToken: text('loyalty_token'),
   loyaltyDiscountCents: integer('loyalty_discount_cents').notNull().default(0),
+  // Money decisions fixed when the Stripe session was created.
+  chargeModel: text('charge_model'),        // 'destination' | 'held'
+  dropId: uuid('drop_id'),                  // server-derived from the products
+  platformFeeCents: integer('platform_fee_cents'),
+  processingFeeEstimateCents: integer('processing_fee_estimate_cents'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -916,8 +958,63 @@ export const reports = pgTable('reports', {
   description: text('description'),
   // 'pending' | 'reviewed' | 'actioned' | 'dismissed'
   status:      text('status').notNull().default('pending'),
+  /** Clerk ID of the person responsible for the reported content. */
+  targetOwnerId:    text('target_owner_id'),
+  /** Server-captured snapshot so moderators see what was reported. */
+  contentExcerpt:   text('content_excerpt'),
+  /** 'user' for member reports, 'auto_filter' for content held by the abuse filter. */
+  source:           text('source').notNull().default('user'),
+  /** 'dismiss' | 'remove_content' | 'suspend_user' */
+  resolutionAction: text('resolution_action'),
+  resolutionNote:   text('resolution_note'),
+  resolvedBy:       text('resolved_by'),
+  resolvedAt:       timestamp('resolved_at', { withTimezone: true }),
   createdAt:   timestamp('created_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  statusCreatedIdx: index('reports_status_created_idx').on(table.status, table.createdAt),
+  targetIdx: index('reports_target_idx').on(table.targetType, table.targetId),
+  reporterTargetIdx: index('reports_reporter_target_idx').on(table.reporterId, table.targetType, table.targetId),
+}));
+
+// ─── Thread comments (server-side, moderated) ────────────────────────────────
+
+export const postComments = pgTable('post_comments', {
+  id:               uuid('id').primaryKey().defaultRandom(),
+  postId:           uuid('post_id').notNull().references(() => posts.id, { onDelete: 'cascade' }),
+  authorId:         text('author_id').notNull(),
+  parentId:         uuid('parent_id'),
+  body:             text('body').notNull(),
+  // 'visible' | 'held' (hidden until reviewed; author-only) | 'removed'
+  moderationStatus: text('moderation_status').notNull().default('visible'),
+  moderationReason: text('moderation_reason'),
+  moderatedAt:      timestamp('moderated_at', { withTimezone: true }),
+  moderatedBy:      text('moderated_by'),
+  createdAt:        timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt:        timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  parentFk: foreignKey({ columns: [table.parentId], foreignColumns: [table.id] }).onDelete('cascade'),
+  postCreatedIdx: index('post_comments_post_created_idx').on(table.postId, table.createdAt),
+  authorIdx: index('post_comments_author_idx').on(table.authorId),
+}));
+
+export const postCommentLikes = pgTable('post_comment_likes', {
+  commentId: uuid('comment_id').notNull().references(() => postComments.id, { onDelete: 'cascade' }),
+  userId:    text('user_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.commentId, table.userId] }),
+  userIdx: index('post_comment_likes_user_idx').on(table.userId),
+}));
+
+// ─── Muted words (per-user feed/comment filter) ──────────────────────────────
+
+export const mutedWords = pgTable('muted_words', {
+  userId:    text('user_id').notNull(),
+  phrase:    text('phrase').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.userId, table.phrase] }),
+}));
 
 // ─── Pre-order reserves (demand signal, no charge) ────────────────────────────
 
@@ -1019,7 +1116,7 @@ export const designStudioProjects = pgTable('design_studio_projects', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   ownerIdx: index('design_studio_projects_owner_id_idx').on(table.ownerId),
-  idOwnerUnique: uniqueIndex('design_studio_projects_id_owner_unique').on(table.id, table.ownerId),
+  idOwnerUnique: unique('design_studio_projects_id_owner_unique').on(table.id, table.ownerId),
 }));
 
 export const designStudioAssets = pgTable('design_studio_assets', {
@@ -1363,9 +1460,9 @@ export const adCampaigns = pgTable('ad_campaigns', {
   /** 'video' | 'photos' — never mixed */
   mediaKind:              text('media_kind').notNull().default('photos'),
   /** Ordered object-storage paths (1 video or 1–5 photos) */
-  mediaObjectPaths:       json('media_object_paths').$type<string[]>().notNull().default([]),
+  mediaObjectPaths:       jsonb('media_object_paths').$type<string[]>().notNull().default([]),
   /** Parallel MIME type array aligned with mediaObjectPaths */
-  mediaMimeTypes:         json('media_mime_types').$type<string[]>().notNull().default([]),
+  mediaMimeTypes:         jsonb('media_mime_types').$type<string[]>().notNull().default([]),
 
   // ── Details ───────────────────────────────────────────────────────────────
   headline:               text('headline'),
@@ -1379,7 +1476,7 @@ export const adCampaigns = pgTable('ad_campaigns', {
 
   // ── Formats ────────────────────────────────────────────────────────────────
   /** JSON array of format keys: 'story_9x16' | 'square_1x1' | 'portrait_4x5' | 'landscape_16x9' */
-  formats:                json('formats').$type<string[]>().notNull().default([]),
+  formats:                jsonb('formats').$type<string[]>().notNull().default([]),
 
   // ── Budget / Duration / Reach ─────────────────────────────────────────────
   /** Integer cents: $5 (500) – $1000 (100000) */

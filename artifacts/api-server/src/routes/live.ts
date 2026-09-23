@@ -17,6 +17,8 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { evaluateContent } from "../lib/contentModerator";
+import { optionalViewerId, publishingRestriction } from "../lib/safety";
 
 const router = Router();
 
@@ -289,10 +291,26 @@ router.patch("/:id/products", requireAuth, async (req, res) => {
 
 // ─── POST /api/live/:id/comment ───────────────────────────────────────────────
 router.post("/:id/comment", requireAuth, async (req, res) => {
-  const userId = (req as any).userId as string;
+  const userId = (req as any).clerkUserId as string;
   const { message, displayName, avatarUrl } = req.body;
-  if (!message?.trim()) return res.status(400).json({ error: "message required" });
+  if (typeof message !== "string" || !message.trim()) return res.status(400).json({ error: "message required" });
   if (message.length > 500) return res.status(400).json({ error: "message too long" });
+
+  const restriction = await publishingRestriction(userId);
+  if (restriction) return res.status(restriction.status).json(restriction.body);
+
+  // Live chat is shown instantly, so it cannot wait in a review queue:
+  // anything the public filter would hold is declined with an explanation.
+  const decision = evaluateContent(message, "public");
+  if (decision.action !== "allow") {
+    return res.status(422).json({
+      error: decision.action === "reject"
+        ? decision.reason
+        : `${decision.reason} Keep live chat friendly — it's visible to everyone watching.`,
+      category: decision.category,
+      code: "CONTENT_REJECTED",
+    });
+  }
 
   try {
     const result = await db.execute(sql`
@@ -309,12 +327,21 @@ router.post("/:id/comment", requireAuth, async (req, res) => {
 // ─── GET /api/live/:id/comments ───────────────────────────────────────────────
 router.get("/:id/comments", async (req, res) => {
   const since = req.query.since as string | undefined;
+  const viewerId = optionalViewerId(req);
   try {
     const rows = await db.execute(sql`
       SELECT id, user_id, display_name, avatar_url, message, created_at
-      FROM live_comments
+      FROM live_comments lc
       WHERE stream_id = ${req.params.id}::uuid
         ${since ? sql`AND created_at > ${since}::timestamptz` : sql``}
+        AND NOT EXISTS (
+          SELECT 1 FROM users su WHERE su.clerk_id = lc.user_id AND su.suspended_at IS NOT NULL
+        )
+        ${viewerId ? sql`AND NOT EXISTS (
+          SELECT 1 FROM blocks b
+          WHERE (b.blocker_id = ${viewerId} AND b.blocked_id = lc.user_id)
+             OR (b.blocker_id = lc.user_id AND b.blocked_id = ${viewerId})
+        )` : sql``}
       ORDER BY created_at DESC
       LIMIT 80
     `);

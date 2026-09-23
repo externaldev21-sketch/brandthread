@@ -1769,3 +1769,459 @@ export const ListManufacturerPaymentActivityResponseItem = zod.object({
 export const ListManufacturerPaymentActivityResponse = zod.array(ListManufacturerPaymentActivityResponseItem)
 
 
+/**
+ * Pages of 50 top-level comments, newest first. Pass `?before=<nextCursor>` for the next page.
+ * @summary List comments; hides blocked people, muted words and held comments (except the viewer's own)
+ */
+export const ListPostCommentsParams = zod.object({
+  "postId": zod.coerce.string().uuid()
+})
+
+export const listPostCommentsResponseCommentsItemLikesCountMin = 0;
+
+export const listPostCommentsResponseTotalMin = 0;
+
+export const listPostCommentsResponseHiddenByMutedWordsMin = 0;
+
+
+
+export const ListPostCommentsResponse = zod.object({
+  "comments": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "postId": zod.string().uuid(),
+  "parentId": zod.string().uuid().nullable(),
+  "body": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "author": zod.object({
+  "userId": zod.string(),
+  "name": zod.string(),
+  "handle": zod.string(),
+  "initials": zod.string(),
+  "avatarUrl": zod.string().nullish(),
+  "accountType": zod.string().nullish(),
+  "suspended": zod.boolean(),
+  "deleted": zod.boolean()
+}),
+  "likesCount": zod.number().min(listPostCommentsResponseCommentsItemLikesCountMin),
+  "likedByMe": zod.boolean(),
+  "isMine": zod.boolean(),
+  "canDelete": zod.boolean(),
+  "pendingReview": zod.boolean().describe('Held by the content filter; only the author can see it until a moderator reviews it.'),
+  "replies": zod.array(zod.unknown())
+})),
+  "total": zod.number().min(listPostCommentsResponseTotalMin),
+  "hiddenByMutedWords": zod.number().min(listPostCommentsResponseHiddenByMutedWordsMin),
+  "commentsDisabled": zod.boolean(),
+  "canComment": zod.boolean(),
+  "nextCursor": zod.coerce.date().nullable()
+})
+
+
+/**
+ * @summary Comment or reply. Slurs/threats are rejected; profanity and abuse are held for review.
+ */
+export const CreatePostCommentParams = zod.object({
+  "postId": zod.coerce.string().uuid()
+})
+
+export const createPostCommentBodyBodyMax = 1000;
+
+
+
+export const CreatePostCommentBody = zod.object({
+  "body": zod.string().min(1).max(createPostCommentBodyBodyMax),
+  "parentId": zod.string().uuid().nullish()
+})
+
+export const createPostCommentResponseCommentLikesCountMin = 0;
+
+
+
+export const CreatePostCommentResponse = zod.object({
+  "comment": zod.object({
+  "id": zod.string().uuid(),
+  "postId": zod.string().uuid(),
+  "parentId": zod.string().uuid().nullable(),
+  "body": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "author": zod.object({
+  "userId": zod.string(),
+  "name": zod.string(),
+  "handle": zod.string(),
+  "initials": zod.string(),
+  "avatarUrl": zod.string().nullish(),
+  "accountType": zod.string().nullish(),
+  "suspended": zod.boolean(),
+  "deleted": zod.boolean()
+}),
+  "likesCount": zod.number().min(createPostCommentResponseCommentLikesCountMin),
+  "likedByMe": zod.boolean(),
+  "isMine": zod.boolean(),
+  "canDelete": zod.boolean(),
+  "pendingReview": zod.boolean().describe('Held by the content filter; only the author can see it until a moderator reviews it.'),
+  "replies": zod.array(zod.unknown())
+}),
+  "moderation": zod.object({
+  "status": zod.enum(['visible', 'held']),
+  "message": zod.string().optional()
+})
+})
+
+
+/**
+ * @summary Delete a comment (author or post owner)
+ */
+export const DeletePostCommentParams = zod.object({
+  "postId": zod.coerce.string().uuid(),
+  "commentId": zod.coerce.string().uuid()
+})
+
+export const DeletePostCommentResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Like or unlike a comment
+ */
+export const LikePostCommentParams = zod.object({
+  "postId": zod.coerce.string().uuid(),
+  "commentId": zod.coerce.string().uuid()
+})
+
+export const LikePostCommentBody = zod.object({
+  "liked": zod.boolean()
+})
+
+export const likePostCommentResponseLikesCountMin = 0;
+
+
+
+export const LikePostCommentResponse = zod.object({
+  "liked": zod.boolean(),
+  "likesCount": zod.number().min(likePostCommentResponseLikesCountMin)
+})
+
+
+/**
+ * @summary Report a post, video, live stream, comment, story, product, profile or DM
+ */
+export const createReportBodyNoteMax = 1000;
+
+
+
+export const CreateReportBody = zod.object({
+  "targetType": zod.enum(['post', 'video', 'live', 'live_comment', 'comment', 'story', 'product', 'profile', 'message']),
+  "targetId": zod.string(),
+  "reason": zod.enum(['spam', 'harassment', 'nudity', 'hate', 'violence', 'ip_counterfeit', 'scam', 'other']),
+  "note": zod.string().max(createReportBodyNoteMax).optional().describe('Required when reason is \"other\".')
+})
+
+export const CreateReportResponse = zod.object({
+  "status": zod.enum(['already_reported']),
+  "id": zod.string().uuid().optional()
+})
+
+
+/**
+ * @summary Whether the signed-in person can review reports
+ */
+export const GetModerationAccessResponse = zod.object({
+  "isModerator": zod.boolean()
+})
+
+
+/**
+ * @summary Review queue (moderators only)
+ */
+export const listModerationReportsQueryLimitMax = 100;
+
+export const listModerationReportsQueryOffsetMin = 0;
+
+
+
+export const ListModerationReportsQueryParams = zod.object({
+  "status": zod.enum(['open', 'resolved', 'all']).optional(),
+  "type": zod.enum(['post', 'video', 'live', 'live_comment', 'comment', 'story', 'product', 'profile', 'message']).optional(),
+  "limit": zod.coerce.number().min(1).max(listModerationReportsQueryLimitMax).optional(),
+  "offset": zod.coerce.number().min(listModerationReportsQueryOffsetMin).optional()
+})
+
+export const listModerationReportsResponseItemsItemOpenReportsOnTargetMin = 0;
+
+export const listModerationReportsResponseItemsItemOwnerPriorActionsMin = 0;
+
+
+
+export const ListModerationReportsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "status": zod.enum(['pending', 'reviewed', 'actioned', 'dismissed']),
+  "source": zod.enum(['user', 'auto_filter']),
+  "targetType": zod.string(),
+  "targetId": zod.string(),
+  "targetLabel": zod.string().nullish(),
+  "contentExcerpt": zod.string().nullish(),
+  "reason": zod.string(),
+  "note": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "resolution": zod.object({
+  "action": zod.string().nullish(),
+  "note": zod.string().nullish(),
+  "resolvedAt": zod.coerce.date().nullish()
+}).nullish(),
+  "owner": zod.union([zod.object({
+  "userId": zod.string(),
+  "name": zod.string(),
+  "handle": zod.string(),
+  "initials": zod.string(),
+  "avatarUrl": zod.string().nullish(),
+  "accountType": zod.string().nullish(),
+  "suspended": zod.boolean(),
+  "deleted": zod.boolean()
+}),zod.null()]).optional(),
+  "reporter": zod.union([zod.object({
+  "userId": zod.string(),
+  "name": zod.string(),
+  "handle": zod.string(),
+  "initials": zod.string(),
+  "avatarUrl": zod.string().nullish(),
+  "accountType": zod.string().nullish(),
+  "suspended": zod.boolean(),
+  "deleted": zod.boolean()
+}),zod.null()]).optional(),
+  "openReportsOnTarget": zod.number().min(listModerationReportsResponseItemsItemOpenReportsOnTargetMin),
+  "ownerPriorActions": zod.number().min(listModerationReportsResponseItemsItemOwnerPriorActionsMin)
+})),
+  "hasMore": zod.boolean(),
+  "summary": zod.object({
+  "open": zod.number(),
+  "heldByFilter": zod.number(),
+  "resolvedToday": zod.number()
+})
+})
+
+
+/**
+ * @summary Dismiss, remove the content, or suspend the owner. Resolves every open report on the same item.
+ */
+export const ResolveModerationReportParams = zod.object({
+  "reportId": zod.coerce.string().uuid()
+})
+
+export const resolveModerationReportBodyNoteMax = 1000;
+
+
+
+export const ResolveModerationReportBody = zod.object({
+  "action": zod.enum(['dismiss', 'remove_content', 'suspend_user']),
+  "note": zod.string().max(resolveModerationReportBodyNoteMax).optional()
+})
+
+
+
+
+export const ResolveModerationReportResponse = zod.object({
+  "ok": zod.boolean(),
+  "status": zod.enum(['dismissed', 'actioned']),
+  "action": zod.enum(['dismiss', 'remove_content', 'suspend_user']),
+  "resolvedReports": zod.number().min(1),
+  "suspendedUserId": zod.string().nullish(),
+  "signedOut": zod.boolean()
+})
+
+
+/**
+ * @summary Lift a suspension
+ */
+export const ReinstateUserParams = zod.object({
+  "userId": zod.coerce.string()
+})
+
+export const ReinstateUserResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary My muted words and phrases
+ */
+export const ListMutedWordsResponse = zod.object({
+  "words": zod.array(zod.object({
+  "phrase": zod.string(),
+  "createdAt": zod.coerce.date()
+})),
+  "limit": zod.number()
+})
+
+
+/**
+ * @summary Mute a word, phrase,
+ */
+export const addMutedWordBodyPhraseMax = 60;
+
+
+
+export const AddMutedWordBody = zod.object({
+  "phrase": zod.string().min(1).max(addMutedWordBodyPhraseMax)
+})
+
+export const AddMutedWordResponse = zod.object({
+  "phrase": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Unmute a word or phrase
+ */
+export const RemoveMutedWordParams = zod.object({
+  "phrase": zod.coerce.string()
+})
+
+export const RemoveMutedWordResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Accounts I have blocked
+ */
+export const ListBlockedAccountsResponseItem = zod.object({
+  "userId": zod.string(),
+  "name": zod.string(),
+  "handle": zod.string(),
+  "initials": zod.string(),
+  "avatarUrl": zod.string().nullish(),
+  "accountType": zod.string().nullish(),
+  "color": zod.string(),
+  "blockedAt": zod.coerce.date()
+})
+export const ListBlockedAccountsResponse = zod.array(ListBlockedAccountsResponseItem)
+
+
+/**
+ * @summary Block someone. Hides both people from each other and stops messages and comments.
+ */
+export const BlockAccountBody = zod.object({
+  "userId": zod.string()
+})
+
+export const BlockAccountResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Unblock someone
+ */
+export const UnblockAccountParams = zod.object({
+  "userId": zod.coerce.string()
+})
+
+export const UnblockAccountResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary What deletion removes, what is retained, and anything that must be settled first
+ */
+export const getAccountDeletionCheckResponseBlockersItemCountMin = 0;
+
+
+
+export const GetAccountDeletionCheckResponse = zod.object({
+  "canDelete": zod.boolean(),
+  "accountType": zod.string().nullable(),
+  "blockers": zod.array(zod.object({
+  "code": zod.enum(['seller_open_orders', 'seller_held_funds', 'seller_reserved_label_funds', 'seller_open_returns', 'seller_open_disputes', 'seller_payout_in_flight', 'buyer_orders_awaiting_shipment']),
+  "title": zod.string(),
+  "detail": zod.string(),
+  "count": zod.number().min(getAccountDeletionCheckResponseBlockersItemCountMin),
+  "amountCents": zod.number().nullable(),
+  "actionRoute": zod.string(),
+  "actionLabel": zod.string()
+})),
+  "willDelete": zod.array(zod.string()),
+  "willRetain": zod.array(zod.string())
+})
+
+
+/**
+ * @summary Permanently delete the account, its data, and the Clerk user
+ */
+export const DeleteAccountBody = zod.object({
+  "confirmation": zod.enum(['DELETE'])
+})
+
+export const DeleteAccountResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Record agreement to the Terms, Community Guidelines and Privacy Policy version shown
+ */
+export const acceptLegalTermsBodyVersionRegExp = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}(\\.[0-9]+)?$');
+
+
+export const AcceptLegalTermsBody = zod.object({
+  "version": zod.string().regex(acceptLegalTermsBodyVersionRegExp)
+})
+
+export const AcceptLegalTermsResponse = zod.object({
+  "termsVersion": zod.string(),
+  "termsAcceptedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Active Clerk sessions with device and approximate location
+ */
+export const ListAccountSessionsResponse = zod.object({
+  "sessions": zod.array(zod.object({
+  "id": zod.string(),
+  "current": zod.boolean(),
+  "status": zod.string(),
+  "device": zod.string(),
+  "browser": zod.string().nullish(),
+  "isMobile": zod.boolean(),
+  "location": zod.string().nullish(),
+  "ipAddress": zod.string().nullish(),
+  "lastActiveAt": zod.coerce.date(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Sign out one device
+ */
+export const RevokeAccountSessionParams = zod.object({
+  "sessionId": zod.coerce.string()
+})
+
+export const revokeAccountSessionResponseRevokedMin = 0;
+
+
+
+export const RevokeAccountSessionResponse = zod.object({
+  "ok": zod.boolean(),
+  "revoked": zod.number().min(revokeAccountSessionResponseRevokedMin)
+})
+
+
+/**
+ * @summary Sign out every device except this one
+ */
+export const revokeOtherAccountSessionsResponseRevokedMin = 0;
+
+
+
+export const RevokeOtherAccountSessionsResponse = zod.object({
+  "ok": zod.boolean(),
+  "revoked": zod.number().min(revokeOtherAccountSessionsResponseRevokedMin)
+})
+
+

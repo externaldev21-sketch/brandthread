@@ -3,12 +3,13 @@
  * delivers the same paid-order event.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   checkoutSessions,
   db,
   loyaltyPoints,
   notificationsFeed,
+  orderRefunds,
   orders,
   productVariants,
   products,
@@ -27,7 +28,8 @@ import { handleCheckoutPaid } from "../webhooks";
 
 const fakeStripe = vi.hoisted(() => ({
   refunds: {
-    create: vi.fn(async () => ({ id: "re_loyalty_awards_test" })),
+    // Real Stripe refund ids are unique (the refunds table enforces it).
+    create: vi.fn(async () => ({ id: `re_loyalty_awards_test_${Math.random().toString(36).slice(2)}` })),
   },
 }));
 
@@ -50,11 +52,20 @@ afterEach(async () => {
   while (testBuyerIds.length > 0) {
     const buyerId = testBuyerIds.pop()!;
     await db.delete(loyaltyPoints).where(eq(loyaltyPoints.buyerId, buyerId));
+    // Refund records keep a strict foreign key to their order.
+    await db.delete(orderRefunds).where(inArray(
+      orderRefunds.orderId,
+      db.select({ id: orders.id }).from(orders).where(eq(orders.buyerId, buyerId)),
+    ));
     await db.delete(orders).where(eq(orders.buyerId, buyerId));
     await db.delete(notificationsFeed).where(eq(notificationsFeed.userId, buyerId));
   }
   while (testStripeSessionIds.length > 0) {
     const stripeSessionId = testStripeSessionIds.pop()!;
+    await db.delete(orderRefunds).where(inArray(
+      orderRefunds.orderId,
+      db.select({ id: orders.id }).from(orders).where(eq(orders.stripeCheckoutSessionId, stripeSessionId)),
+    ));
     await db.delete(orders).where(eq(orders.stripeCheckoutSessionId, stripeSessionId));
   }
   while (testCheckoutIds.length > 0) {
@@ -358,7 +369,7 @@ describe("paid cart checkout rewards", () => {
     expect(rewards[0]?.points).toBe(Math.floor(fixture.totalCents / 100));
   });
 
-  it("does not award points to an oversold refund_pending order, including on replay", async () => {
+  it("does not award points to an oversold order, refunds it once, including on replay", async () => {
     const fixture = await seedPaidCartFixture({ stock: 0, totalCents: 12_399 });
     const session = {
       id: fixture.sessionId,
@@ -372,11 +383,12 @@ describe("paid cart checkout rewards", () => {
     await handleCheckoutPaid(session, "evt_loyalty_awards_oversold_retry");
 
     const [order] = await db
-      .select({ id: orders.id, status: orders.status })
+      .select({ id: orders.id, status: orders.status, cancellationReason: orders.cancellationReason })
       .from(orders)
       .where(eq(orders.stripeCheckoutSessionId, fixture.sessionId))
       .limit(1);
-    expect(order?.status).toBe("refund_pending");
+    // The automatic refund succeeded, so the order is closed as out of stock.
+    expect(order).toMatchObject({ status: "cancelled", cancellationReason: "out_of_stock" });
 
     const rewards = await db
       .select()

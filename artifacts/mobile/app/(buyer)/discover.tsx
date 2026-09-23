@@ -33,6 +33,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -604,6 +605,7 @@ const skCard = StyleSheet.create({
 
 export default function DiscoverScreen() {
   const insets    = useSafeAreaInsets();
+  const barInset = useBuyerTabBarInset();
   const router    = useRouter();
   const api       = useApi();
   const { theme } = useAppTheme();
@@ -808,7 +810,7 @@ export default function DiscoverScreen() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: palette.background ?? BG }}
-      contentContainerStyle={{ paddingBottom: 110 }}
+      contentContainerStyle={{ paddingBottom: barInset + SP.md }}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl

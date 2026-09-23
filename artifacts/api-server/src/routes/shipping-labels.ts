@@ -7,6 +7,11 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 import { createShipment, findTransaction, purchaseTransaction, refundTransaction } from "../lib/shippo";
 import { isPendingProviderPurchase } from "../lib/shippingOperationPolicy";
+import {
+  executeOrderRelease, lockDrop, recordLabelPurchased, recordLabelVoided, recoverLabelCost, requestOrderRelease,
+} from "../lib/money/escrow";
+import { orderHeldCents } from "../lib/money/ledger";
+import { logger } from "../lib/logger";
 
 const router = Router();
 router.use(requireAuth);
@@ -159,7 +164,18 @@ router.post("/:orderId/purchase", requireRole("staff"), async (req, res) => {
       }
 
       let wallet: any = null;
+      if (order.charge_model === "held" && order.drop_id) {
+        // A preorder's label is paid from that order's own held money, so a
+        // label can never eat into another buyer's order.
+        const held = await orderHeldCents(tx, order.id, ownerId);
+        if (held < priceCents) {
+          throw Object.assign(new Error("This order's held funds do not cover this label"), {
+            status: 409, code: "INSUFFICIENT_PENDING_FUNDS",
+          });
+        }
+      }
       if (order.drop_id) {
+        await lockDrop(tx, order.drop_id);
         const walletLock = await tx.execute(sql`
           SELECT * FROM drop_wallets WHERE drop_id = ${order.drop_id}::uuid AND seller_id = ${ownerId} FOR UPDATE
         `);
@@ -194,6 +210,7 @@ router.post("/:orderId/purchase", requireRole("staff"), async (req, res) => {
     }
 
     const providerFailure: { value: { code: string; message: string } | null } = { value: null };
+    const moneyFollowUp: { value: string | null } = { value: null };
     label = await db.transaction(async (tx) => {
       // Keep these database locks for the complete provider lookup/create. A
       // concurrent retry waits here; a crashed process releases them so the
@@ -233,6 +250,7 @@ router.post("/:orderId/purchase", requireRole("staff"), async (req, res) => {
           .where(eq(orderFundReservations.shippingLabelId, label.id));
         const [order] = await tx.select({ dropId: orders.dropId }).from(orders).where(eq(orders.id, label.orderId)).limit(1);
         if (order?.dropId) {
+          await lockDrop(tx, order.dropId);
           await tx.update(dropWallets).set({
             reservedCents: sql`GREATEST(0, ${dropWallets.reservedCents} - ${label.priceCents})`,
             updatedAt: new Date(),
@@ -254,14 +272,56 @@ router.post("/:orderId/purchase", requireRole("staff"), async (req, res) => {
       }).where(and(eq(shippingLabels.id, label.id), eq(shippingLabels.status, "purchasing"))).returning();
       await tx.update(orderFundReservations).set({ status: "spent", updatedAt: new Date() })
         .where(eq(orderFundReservations.shippingLabelId, label.id));
+      const [money] = await tx.select({
+        chargeModel: orders.chargeModel, dropId: orders.dropId, trackingNumber: orders.trackingNumber,
+      }).from(orders).where(eq(orders.id, label.orderId)).limit(1);
+      if (updated) {
+        await recordLabelPurchased(tx, {
+          labelId: label.id,
+          orderId: label.orderId,
+          sellerId: ownerId,
+          dropId: money?.dropId ?? null,
+          chargeModel: money?.chargeModel ?? null,
+          priceCents: label.priceCents,
+        });
+      }
       await tx.update(orders).set({
         status: label.previousOrderStatus ?? "processing",
+        // The label's tracking number is the order's tracking number.
+        ...(!money?.trackingNumber && transaction.tracking_number ? {
+          trackingNumber: transaction.tracking_number,
+          carrier: transaction.rate?.provider ?? label.carrier,
+          trackingStatus: "label_created",
+        } : {}),
         updatedAt: new Date(),
       }).where(and(eq(orders.id, label.orderId), eq(orders.status, "label_purchasing")));
+      moneyFollowUp.value = money?.chargeModel ?? null;
       return updated ?? label;
     });
     if (providerFailure.value) {
       return void res.status(409).json({ error: providerFailure.value.message, code: providerFailure.value.code });
+    }
+    // A generated tracking number releases a preorder's funds (per order);
+    // an in-stock order's label cost is recovered from the seller's balance.
+    if (moneyFollowUp.value === "held") {
+      try {
+        const release = await requestOrderRelease(label.orderId, "label");
+        if (release.releaseId) {
+          const releaseId = release.releaseId;
+          setImmediate(() => {
+            executeOrderRelease(releaseId, { reclaimStale: true }).catch((err) =>
+              logger.error({ err, releaseId }, "Order release after label failed; sweep will retry"));
+          });
+        }
+      } catch (err) {
+        logger.error({ err, orderId: label.orderId }, "Could not record order release after label; sweep will retry");
+      }
+    } else if (moneyFollowUp.value === "destination") {
+      const labelId = label.id;
+      setImmediate(() => {
+        recoverLabelCost(labelId).catch((err) =>
+          logger.error({ err, labelId }, "Label cost recovery failed; sweep will retry"));
+      });
     }
     res.status(201).json({ label, duplicate: false, fundingSource: "pending_order_funds" });
   } catch (err: any) {
@@ -320,13 +380,19 @@ router.post("/:orderId/:labelId/void", requireRole("staff"), async (req, res) =>
       }).where(eq(shippingLabels.id, label.id)).returning();
       if (!pending) {
         await tx.update(orderFundReservations).set({ status: "refunded", updatedAt: new Date() }).where(eq(orderFundReservations.shippingLabelId, label.id));
-        const [order] = await tx.select({ dropId: orders.dropId }).from(orders).where(eq(orders.id, label.orderId)).limit(1);
-        if (order?.dropId) {
-          await tx.update(dropWallets).set({
-            reservedCents: sql`GREATEST(0, ${dropWallets.reservedCents} - ${label.priceCents})`,
-            updatedAt: new Date(),
-          }).where(eq(dropWallets.dropId, order.dropId));
-        }
+        const orderId = label.orderId ?? label.order_id;
+        const [order] = await tx.select({ dropId: orders.dropId, chargeModel: orders.chargeModel })
+          .from(orders).where(eq(orders.id, orderId)).limit(1);
+        // The carrier refunded the label: undo exactly what the purchase did
+        // in the ledger and the drop wallet.
+        await recordLabelVoided(tx, {
+          labelId: label.id,
+          orderId,
+          sellerId: ownerId,
+          dropId: order?.dropId ?? null,
+          chargeModel: order?.chargeModel ?? null,
+          priceCents: label.priceCents ?? label.price_cents,
+        });
       }
       return next;
     });

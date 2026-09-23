@@ -5,16 +5,17 @@
 import { Router } from "express";
 import {
   db, checkoutSessions, orders, orderItems, productVariants, products, users, shippingRates, discountCodes, buyerAddresses,
+  drops,
 } from "@workspace/db";
 import { eq, and, desc, sql, isNull, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import {
   requireStripe,
   ensureStripeCustomer,
-  computeApplicationFeeCents,
-  PLATFORM_COMMISSION_RATE,
   mapStripeError,
 } from "../lib/stripe";
+import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
+import { refundOrder, RefundError } from "../lib/money/refunds";
 import {
   bindLoyaltyRedemptionToCheckout,
   LoyaltyRedemptionError,
@@ -26,10 +27,7 @@ import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { logger } from "../lib/logger";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
-import {
-  BUYER_CANCELLABLE_ORDER_STATUSES,
-  buyerCancellationEligibility,
-} from "../lib/buyerCancellationPolicy";
+import { buyerCancellationEligibility } from "../lib/buyerCancellationPolicy";
 
 const router = Router();
 router.use(requireAuth);
@@ -629,6 +627,23 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       return;
     }
 
+    // The server decides whether this is a held preorder or an in-stock
+    // order from the products themselves; a client dropId is only checked.
+    let chargePlan: ChargePlan;
+    try {
+      chargePlan = await resolveChargePlan({
+        productIds: items.map((item: { productId: string }) => item.productId),
+        sellerId,
+        clientDropId: typeof dropId === "string" && dropId.trim() ? dropId.trim() : null,
+      });
+    } catch (planError) {
+      if (planError instanceof CheckoutPlanError) {
+        res.status(planError.status).json({ error: planError.message, code: planError.code });
+        return;
+      }
+      throw planError;
+    }
+
     const hasKey = !!clientIdempotencyKey && typeof clientIdempotencyKey === "string";
     checkoutIdempotencyKey = hasKey ? clientIdempotencyKey : null;
 
@@ -765,9 +780,10 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       normalizedContactPhone,
     );
 
-    // ── Compute platform application fee (5% of order subtotal) ──────────
-    // For destination charges (regular orders): fee withheld automatically.
-    // For escrow/drop orders: fee deducted at transfer time (release-order).
+    // ── Fees (lib/money/fees.ts) ──────────────────────────────────────────
+    // In-stock: application fee = 5% of merchandise + Stripe processing
+    // estimate, withheld by Stripe. Held preorders: the exact split is made
+    // from Stripe's real fee when the payment is confirmed.
     const subtotalCents = cartItems.reduce(
       (sum, item) => sum + item.priceCents * item.quantity,
       0,
@@ -817,10 +833,20 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     // Persist the checkout before Stripe is contacted. Its ID is included in
     // the initial Stripe metadata, so a paid session is always reconstructable
     // by the webhook even if the later session-ID write is interrupted.
+    const money = paymentIntentMoney({
+      plan: chargePlan,
+      sellerStripeAccountId: seller.stripeAccountId,
+      merchandiseCents: Math.max(0, subtotalCents - (loyaltyRedemption?.discountCents ?? 0)),
+      preTaxTotalCents: Math.max(0, totalBeforeLoyaltyDiscountCents - (loyaltyRedemption?.discountCents ?? 0)),
+    });
     const insertValues = {
       buyerId,
       sellerId,
       items: cartItems,
+      chargeModel: chargePlan.chargeModel,
+      dropId: chargePlan.dropId,
+      platformFeeCents: money.platformFeeCents,
+      processingFeeEstimateCents: money.processingFeeEstimateCents,
       ...(loyaltyRedemption ? {
         loyaltyToken: loyaltyRedemption.token,
         loyaltyDiscountCents: loyaltyRedemption.discountCents,
@@ -894,23 +920,12 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       loyaltyCouponId = coupon.id;
     }
 
-    const applicationFeeCents = Math.min(
-      computeApplicationFeeCents(Math.max(0, subtotalCents - (loyaltyRedemption?.discountCents ?? 0))),
-      Math.max(0, totalBeforeLoyaltyDiscountCents - (loyaltyRedemption?.discountCents ?? 0)),
-    );
-
-    // Validate dropId if provided — must be a non-empty string
-    const validDropId: string | null =
-      dropId && typeof dropId === "string" && dropId.trim() ? dropId.trim() : null;
+    const validDropId = chargePlan.dropId;
 
     // ── Create Stripe Session after durable cart persistence ─────────────────
-    // Drop orders use the "separate charges + transfers" model:
-    //   • No transfer_data.destination — charge lands on platform account
-    //   • Funds are released to seller via stripe.transfers.create at ship time
-    //   • Platform fee is deducted from the transfer amount (not collected here)
-    // Regular orders use destination charges:
-    //   • transfer_data.destination sends funds directly to seller Connect account
-    //   • application_fee_amount keeps the platform commission
+    // Held preorders use separate charges and transfers: the charge lands on
+    // Brandthread's balance and each order is transferred to the seller when
+    // it ships (lib/money/escrow.ts). In-stock orders use destination charges.
     stripeCreationStarted = true;
     const session = await stripe.checkout.sessions.create(
       {
@@ -937,19 +952,15 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
           ...(validDropId ? { dropId: validDropId } : {}),
         },
         payment_intent_data: {
-          metadata: { buyerId, ...(validDropId ? { dropId: validDropId } : {}) },
+          ...money.paymentIntentData,
+          metadata: {
+            ...(money.paymentIntentData.metadata as Record<string, string>),
+            buyerId,
+            ...(validDropId ? { dropId: validDropId } : {}),
+          },
           // Save the payment method to the buyer's Customer for future
           // off-session Checkout payments.
           setup_future_usage: "off_session",
-          ...(validDropId
-            ? {
-                // Escrow model: platform holds the charge until release-order is triggered
-              }
-            : {
-                // Destination charge: funds flow directly to seller Connect account
-                transfer_data: { destination: seller.stripeAccountId },
-                application_fee_amount: applicationFeeCents,
-              }),
         },
       },
       hasKey ? { idempotencyKey: `cs_${clientIdempotencyKey}` } : {},
@@ -1194,122 +1205,101 @@ router.get("/orders/:id", async (req, res) => {
 // ─── Buyer Order Cancellation ────────────────────────────────────────────────
 /**
  * POST /api/buyer/orders/:id/cancel
- * Allows a buyer to cancel their own order through day 21 while it remains
- * pre-shipment. Automatically issues a full Stripe
- * refund via the stored payment intent. Fails explicitly if Stripe errors —
- * we never mark an order cancelled without confirming the refund.
+ * A buyer may cancel their own order through day 21 while it is still
+ * pre-shipment. A preorder can only be cancelled while its drop is still
+ * collecting orders (once the bulk order is being made, its money is spent).
+ *
+ * The refund runs through lib/money/refunds.ts: the order is parked in
+ * refund_pending, Stripe refunds the buyer (and, for in-stock orders, pulls
+ * the seller's share back), and only then is the order cancelled. We never
+ * mark an order cancelled without a confirmed refund.
  */
 router.post("/orders/:id/cancel", validateRequest({ params: uuidParamsSchema }), async (req, res) => {
   const id = req.params.id as string;
   try {
     const buyerId = (req as any).clerkUserId as string;
-    const PRE_SHIPMENT_STATUSES = [...BUYER_CANCELLABLE_ORDER_STATUSES];
-    const result = await db.transaction(async (tx) => {
-      // Lock the order before checking eligibility. Seller fulfillment updates
-      // must wait, so exactly one side wins the race.
-      const lockedResult = await tx.execute(sql`
-        SELECT id, order_number, status, created_at, total_cents, stripe_payment_intent_id
-        FROM orders
-        WHERE id = ${id}::uuid AND buyer_id = ${buyerId}
-        FOR UPDATE
-      `);
-      const order = (lockedResult as any).rows?.[0] as {
-        id: string;
-        order_number: string;
-        status: string;
-        created_at: Date | string;
-        total_cents: number;
-        stripe_payment_intent_id: string | null;
-      } | undefined;
+    const [order] = await db.select({
+      id: orders.id,
+      status: orders.status,
+      orderNumber: orders.orderNumber,
+      stripePaymentIntentId: orders.stripePaymentIntentId,
+      refundedCents: orders.refundedCents,
+    }).from(orders)
+      .where(and(eq(orders.id, id), eq(orders.buyerId, buyerId)))
+      .limit(1);
+    if (!order) {
+      res.status(404).json({ error: "Order not found", detail: "Order not found" });
+      return;
+    }
+    if (order.status === "cancelled") {
+      res.json({ cancelled: true, refunded: Boolean(order.stripePaymentIntentId), orderNumber: order.orderNumber });
+      return;
+    }
 
-      if (!order) {
-        throw Object.assign(new Error("Order not found"), { status: 404 });
-      }
-      if (order.status === "cancelled") {
-        return { cancelled: true, refunded: Boolean(order.stripe_payment_intent_id), orderNumber: order.order_number };
-      }
-      const eligibility = buyerCancellationEligibility(order.status, order.created_at);
-      if (eligibility.reason === "shipped_or_ineligible") {
-        throw Object.assign(new Error(`Only pre-shipment orders can be cancelled. Current status: ${order.status}.`), { status: 409 });
-      }
-      if (eligibility.reason === "window_expired") {
-        throw Object.assign(
-          new Error("Orders can only be cancelled through day 21 after placement. Contact the seller to request a cancellation."),
-          { status: 409 },
-        );
-      }
-
-      let refundId: string | null = null;
-      if (order.stripe_payment_intent_id) {
-        try {
-          const stripe = requireStripe();
-          const refund = await stripe.refunds.create({
-            payment_intent: order.stripe_payment_intent_id,
-            reason: "requested_by_customer",
-          }, {
-            idempotencyKey: `buyer-cancel/${order.id}`,
-          });
-          refundId = refund.id;
-        } catch (stripeErr) {
-          req.log.error({ err: stripeErr, orderId: id }, "Stripe refund failed for buyer cancellation");
-          throw Object.assign(
-            new Error("Refund could not be processed. Please contact support to cancel this order."),
-            { status: 502 },
+    const result = await refundOrder({
+      orderId: id,
+      reason: "buyer_cancelled",
+      initiatedBy: buyerId,
+      idempotencyKey: `buyer-cancel/${id}`,
+      cancelOrder: {
+        reason: "buyer_requested",
+        notes: "Cancelled by buyer within the 21-day cancellation window.",
+        restock: true,
+      },
+      precondition: async (locked, tx) => {
+        if (locked.buyer_id !== buyerId) throw new RefundError("Order not found", 404, "ORDER_NOT_FOUND");
+        const eligibility = buyerCancellationEligibility(locked.status, locked.created_at);
+        if (eligibility.reason === "shipped_or_ineligible") {
+          throw new RefundError(`Only pre-shipment orders can be cancelled. Current status: ${locked.status}.`, 409, "NOT_CANCELLABLE");
+        }
+        if (eligibility.reason === "window_expired") {
+          throw new RefundError(
+            "Orders can only be cancelled through day 21 after placement. Contact the seller to request a cancellation.",
+            409, "WINDOW_EXPIRED",
           );
         }
-      }
-
-      const items = await tx
-        .select({ variantId: orderItems.variantId, quantity: orderItems.quantity })
-        .from(orderItems)
-        .where(eq(orderItems.orderId, id));
-
-      await tx.update(orders)
-        .set({
-          status: "cancelled",
-          cancellationReason: "buyer_requested",
-          cancellationNotes: "Cancelled by buyer within the 21-day cancellation window.",
-          updatedAt: new Date(),
-        })
-        .where(and(eq(orders.id, id), inArray(orders.status, PRE_SHIPMENT_STATUSES)));
-
-      // Checkout fulfillment reserves stock when the paid order is created.
-      // A grace-period cancellation releases that reservation exactly once
-      // because the locked status transition above is single-use.
-      for (const item of items) {
-        if (item.variantId) {
-          await tx.update(productVariants)
-            .set({ stock: sql`${productVariants.stock} + ${item.quantity}` })
-            .where(eq(productVariants.id, item.variantId));
+        if (locked.charge_model === "held" && locked.drop_id) {
+          const [drop] = await tx.select({ escrowState: drops.escrowState })
+            .from(drops).where(eq(drops.id, locked.drop_id)).limit(1);
+          if (drop?.escrowState !== "collecting") {
+            throw new RefundError(
+              "This preorder is already in production, so it can't be cancelled. Contact the seller for help.",
+              409, "PREORDER_IN_PRODUCTION",
+            );
+          }
         }
-      }
-
-      if (order.stripe_payment_intent_id) {
+      },
+      onSucceeded: async (tx, { order: locked, refundId }) => {
         await reversePurchasePointsOnce({
           buyerId,
           orderId: id,
           referenceId: `${id}:refund:${refundId}`,
-          requestedPoints: Math.floor(order.total_cents / 100),
-          note: `Purchase reward reversed after cancellation of order ${order.order_number}`,
+          requestedPoints: Math.floor(locked.total_cents / 100),
+          note: `Purchase reward reversed after cancellation of order ${locked.order_number}`,
         }, tx);
-      }
-
-      return {
-        cancelled: true,
-        refunded: Boolean(order.stripe_payment_intent_id),
-        orderNumber: order.order_number,
-      };
+      },
     });
 
-    res.json(result);
+    res.json({ cancelled: true, refunded: result.amountCents > 0, orderNumber: order.orderNumber });
   } catch (err: any) {
-    const status = Number(err?.status) || 500;
-    if (status < 500) {
-      res.status(status).json({ error: status === 404 ? err.message : "Order cannot be cancelled", detail: err.message });
+    if (err instanceof RefundError) {
+      if (err.status === 404) {
+        res.status(404).json({ error: "Order not found", detail: err.message });
+        return;
+      }
+      if (err.status < 500) {
+        res.status(err.status).json({ error: "Order cannot be cancelled", detail: err.message, code: err.code });
+        return;
+      }
+      req.log.error({ err, orderId: id }, "Refund failed for buyer cancellation");
+      res.status(502).json({
+        error: "Refund could not be processed. Please contact support to cancel this order.",
+        code: err.code,
+      });
       return;
     }
     req.log.error({ err, orderId: id }, "Failed to cancel buyer order");
-    res.status(status).json({ error: err?.message || "Failed to cancel order" });
+    res.status(500).json({ error: "Failed to cancel order" });
   }
 });
 

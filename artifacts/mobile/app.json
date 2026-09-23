@@ -345,7 +345,13 @@
           "microphonePermission": "Brandthread uses your microphone to record sound for your videos and voice messages, and so others can hear you when you go live or join a call."
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Brandthread uses Face ID to unlock the app when App Lock is turned on."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
