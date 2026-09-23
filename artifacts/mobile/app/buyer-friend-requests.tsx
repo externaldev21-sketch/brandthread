@@ -136,9 +136,17 @@ export default function BuyerFriendRequestsScreen() {
   const handleFollowSuggestion = async (sug: FriendSuggestion) => {
     setSentSet(prev => new Set([...prev, sug.userId]));
     try {
-      // Also try local service for demo suggestions
-      await sendFriendRequest({ userId: sug.userId, name: sug.name, handle: sug.handle, initials: sug.initials, color: sug.color });
-    } catch { /* local only */ }
+      await api.social.follow(sug.userId);
+      // Keep the local social service in sync for anything that reads it.
+      await sendFriendRequest({ userId: sug.userId, name: sug.name, handle: sug.handle, initials: sug.initials, color: sug.color }).catch(() => {});
+    } catch {
+      setSentSet(prev => {
+        const next = new Set(prev);
+        next.delete(sug.userId);
+        return next;
+      });
+      Alert.alert('Couldn’t follow. Try again.');
+    }
   };
 
   // ── Navigate to profile ──────────────────────────────────────────────────────

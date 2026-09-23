@@ -11,7 +11,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK, ON_DARK_MUTED,
   SUCCESS, FONT, FS, SP, RADIUS,
@@ -162,27 +162,37 @@ export default function BuyerDropDetail() {
 
   const [drop, setDrop] = useState<DropDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
   const [notifyLoading, setNotifyLoading] = useState(false);
+  const [reloadGeneration, setReloadGeneration] = useState(0);
 
   useEffect(() => {
     let active = true;
     if (!dropId) {
       setLoading(false);
+      setLoadError(true);
       return () => { active = false; };
     }
+    setLoading(true);
+    setLoadError(false);
     Promise.all([
       api.publicDrops.get(dropId),
       api.publicDrops.notificationStatus(dropId).catch(() => ({ subscribed: false })),
     ]).then(([data, notification]) => {
       if (!active) return;
+      if (!data) {
+        setDrop(null);
+        setLoadError(true);
+        return;
+      }
       setDrop(data as DropDetail);
       setSubscribed(notification.subscribed);
       Animated.timing(entrance, { toValue: 1, duration: 650, useNativeDriver: true }).start();
-    }).catch(() => { if (active) setDrop(null); })
+    }).catch(() => { if (active) { setDrop(null); setLoadError(true); } })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [dropId]);
+  }, [dropId, reloadGeneration]);
 
   const countdown = useCountdown(drop?.releaseAt);
   const products = drop?.products ?? [];
@@ -209,7 +219,36 @@ export default function BuyerDropDetail() {
   if (loading) {
     return <View style={styles.center}><ActivityIndicator color={colors.primary} size="large" /></View>;
   }
-  if (!drop) return <View style={styles.center} />;
+  if (!drop) {
+    return (
+      <View style={[styles.center, { paddingHorizontal: 32, gap: 16 }]}>
+        <Feather name="alert-triangle" size={32} color={theme.muted} />
+        <Text style={{ color: theme.text, fontSize: 17, fontWeight: '600', textAlign: 'center' }}>
+          {loadError ? "Couldn't load this drop." : "This drop isn't available."}
+        </Text>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          {loadError && (
+            <TouchableOpacity
+              onPress={() => setReloadGeneration(g => g + 1)}
+              accessibilityRole="button"
+              accessibilityLabel="Try again"
+              style={{ paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14, backgroundColor: theme.accent }}
+            >
+              <Text style={[{ fontWeight: '600' }, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Try again</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            style={{ paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: theme.border }}
+          >
+            <Text style={{ color: theme.text, fontWeight: '600' }}>Back</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>

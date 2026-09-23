@@ -23,6 +23,7 @@ import {
   subscribeSocial,
 } from '@/services/socialService';
 import { useApi } from '@/lib/api';
+import { CachedImage } from '@/components/CachedImage';
 import { loadBuyerProfile } from '@/lib/buyerProfile';
 import { loadHighlights, type Highlight } from '@/lib/highlightsService';
 import type {
@@ -480,10 +481,26 @@ export default function ProfileScreen() {
                         onLongPress={() => handlePostLongPress(post)}
                       >
                         <View style={[styles.gridCellInner, { backgroundColor: CARD }]}>
-                          <Feather name={postTypeIcon(post.type)} size={ICON.md} color={MUTED} />
-                          {post.caption ? (
-                            <Text style={styles.gridCaption} numberOfLines={1}>{post.caption}</Text>
-                          ) : null}
+                          {post.mediaUrl ? (
+                            <CachedImage
+                              source={{ uri: post.mediaUrl }}
+                              style={StyleSheet.absoluteFill}
+                              contentFit="cover"
+                              cachePolicy="memory-disk"
+                              transition={150}
+                            />
+                          ) : (
+                            <Feather name={postTypeIcon(post.type)} size={ICON.md} color={MUTED} />
+                          )}
+                          {(post.type === 'video' || post.type === 'slideshow') && (
+                            <View style={styles.gridTypeBadge}>
+                              <Feather
+                                name={post.type === 'video' ? 'play' : 'copy'}
+                                size={12}
+                                color="#FFFFFF" // theme-exempt: icon over media badge scrim
+                              />
+                            </View>
+                          )}
                         </View>
                       </TouchableOpacity>
                     ))}
@@ -686,8 +703,13 @@ const styles = StyleSheet.create({
   gridContainer: { marginTop: SP.xs },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
   gridCell: { width: CELL_SIZE, height: CELL_SIZE, overflow: 'hidden' },
-  gridCellInner: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xs },
+  gridCellInner: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xs, overflow: 'hidden' },
   gridCaption: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, position: 'absolute', bottom: SP.xs, left: SP.xs, right: SP.xs },
+  gridTypeBadge: {
+    position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.45)', // theme-exempt: scrim over media
+    alignItems: 'center', justifyContent: 'center',
+  },
 
   // Reposts
   repostRow: { backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, marginHorizontal: SP.md, marginVertical: SP.xs, padding: SP.md },

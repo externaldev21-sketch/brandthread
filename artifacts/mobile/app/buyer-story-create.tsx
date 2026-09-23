@@ -9,12 +9,13 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { useUser } from '@clerk/expo';
 import {
   BG, SURFACE, CARD, BORDER,
   FG, MUTED, ON_DARK,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
-import { createStory, MY_USER_ID, MY_COLOR, MY_INITIALS, MY_HANDLE } from '@/services/socialService';
+import { createStory, MY_COLOR } from '@/services/socialService';
 import { useApi } from '@/lib/api';
 import type { StoryMedia, StoryPrivacySettings } from '@/services/socialTypes';
 import { useColors } from '@/hooks/useColors';
@@ -42,6 +43,10 @@ export default function BuyerStoryCreate() {
   const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router  = useRouter();
+  const { user } = useUser();
+  const myName = user?.fullName || user?.firstName || user?.username || 'You';
+  const myHandle = user?.username ? `@${user.username}` : '';
+  const myInitials = myName.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'Y';
   const api     = useApi();
   const params  = useLocalSearchParams<{ accountType?: string }>();
 
@@ -151,9 +156,9 @@ export default function BuyerStoryCreate() {
 
       // Persist to server (fire-and-forget)
       api.social.createStory({
-        authorName:        MY_USER_ID,
-        authorHandle:      MY_HANDLE,
-        authorInitials:    MY_INITIALS,
+        authorName:        myName,
+        authorHandle:      myHandle,
+        authorInitials:    myInitials,
         authorColor:       MY_COLOR,
         authorAccountType: (params.accountType as any) ?? 'buyer',
         media,

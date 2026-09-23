@@ -48,6 +48,70 @@ function EmojiPicker({ visible, onSelect, onClose }: {
   );
 }
 
+function HLFormModal({
+  visible, title, label, setLabel, emoji, coverColor, setCoverColor, coverColors,
+  onEmojiTrigger, onSave, onClose, s, insets,
+}: {
+  visible: boolean; title: string;
+  label: string; setLabel: (v: string) => void;
+  emoji: string;
+  coverColor: string; setCoverColor: (v: string) => void;
+  coverColors: string[];
+  onEmojiTrigger: () => void;
+  onSave: () => void; onClose: () => void;
+  s: ReturnType<typeof makeStyles>;
+  insets: { bottom: number };
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity style={sheet.backdrop} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity activeOpacity={1} style={[sheet.sheet, { paddingBottom: insets.bottom + SP.md }]}>
+          <View style={sheet.handle} />
+          <Text style={sheet.sheetTitle}>{title}</Text>
+          {/* Emoji picker trigger */}
+          <TouchableOpacity style={s.emojiTrigger} onPress={onEmojiTrigger}>
+            <Text style={{ fontSize: 36 }}>{emoji}</Text>
+            <Text style={s.emojiHint}>Tap to change</Text>
+          </TouchableOpacity>
+          {/* Label input */}
+          <TextInput
+            style={s.labelInput}
+            value={label}
+            onChangeText={setLabel}
+            placeholder="Highlight name"
+            placeholderTextColor={SUBTLE}
+            maxLength={20}
+            autoFocus
+          />
+          {/* Cover colour */}
+          <Text style={s.colorLabel}>Cover color</Text>
+          <View style={s.colorRow}>
+            {coverColors.map(c => (
+              <TouchableOpacity
+                key={c}
+                style={[s.colorSwatch, { backgroundColor: c }, coverColor === c && s.colorSwatchActive]}
+                onPress={() => setCoverColor(c)}
+              />
+            ))}
+          </View>
+          <View style={s.modalActions}>
+            <TouchableOpacity style={s.cancelBtn} onPress={onClose}>
+              <Text style={s.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.saveBtn, !label.trim() && { opacity: 0.4 }]}
+              onPress={onSave}
+              disabled={!label.trim()}
+            >
+              <Text style={s.saveBtnText}>Save</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
 export default function BuyerHighlightsManager() {
   const { theme } = useAppTheme();
   const PURPLE = theme.accent;
@@ -157,60 +221,6 @@ export default function BuyerHighlightsManager() {
     </View>
   );
 
-  function HLFormModal({ visible, title, onSave, onClose }: {
-    visible: boolean; title: string;
-    onSave: () => void; onClose: () => void;
-  }) {
-    return (
-      <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-        <TouchableOpacity style={sheet.backdrop} activeOpacity={1} onPress={onClose}>
-          <TouchableOpacity activeOpacity={1} style={[sheet.sheet, { paddingBottom: insets.bottom + SP.md }]}>
-            <View style={sheet.handle} />
-            <Text style={sheet.sheetTitle}>{title}</Text>
-            {/* Emoji picker trigger */}
-            <TouchableOpacity style={s.emojiTrigger} onPress={() => setEmojiPickerOpen(true)}>
-              <Text style={{ fontSize: 36 }}>{emoji}</Text>
-              <Text style={s.emojiHint}>Tap to change</Text>
-            </TouchableOpacity>
-            {/* Label input */}
-            <TextInput
-              style={s.labelInput}
-              value={label}
-              onChangeText={setLabel}
-              placeholder="Highlight name"
-              placeholderTextColor={SUBTLE}
-              maxLength={20}
-              autoFocus
-            />
-            {/* Cover colour */}
-            <Text style={s.colorLabel}>Cover colour</Text>
-            <View style={s.colorRow}>
-              {COVER_COLORS.map(c => (
-                <TouchableOpacity
-                  key={c}
-                  style={[s.colorSwatch, { backgroundColor: c }, coverColor === c && s.colorSwatchActive]}
-                  onPress={() => setCoverColor(c)}
-                />
-              ))}
-            </View>
-            <View style={s.modalActions}>
-              <TouchableOpacity style={s.cancelBtn} onPress={onClose}>
-                <Text style={s.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.saveBtn, !label.trim() && { opacity: 0.4 }]}
-                onPress={onSave}
-                disabled={!label.trim()}
-              >
-                <Text style={s.saveBtnText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
-    );
-  }
-
   return (
     <View style={[s.page, { paddingTop: insets.top }]}>
       <View style={s.header}>
@@ -244,15 +254,33 @@ export default function BuyerHighlightsManager() {
 
       <HLFormModal
         visible={creating}
-        title="New Highlight"
+        title="New highlight"
+        label={label}
+        setLabel={setLabel}
+        emoji={emoji}
+        coverColor={coverColor}
+        setCoverColor={setCoverColor}
+        coverColors={COVER_COLORS}
+        onEmojiTrigger={() => setEmojiPickerOpen(true)}
         onSave={handleSaveCreate}
         onClose={() => setCreating(false)}
+        s={s}
+        insets={insets}
       />
       <HLFormModal
         visible={!!editing}
-        title="Edit Highlight"
+        title="Edit highlight"
+        label={label}
+        setLabel={setLabel}
+        emoji={emoji}
+        coverColor={coverColor}
+        setCoverColor={setCoverColor}
+        coverColors={COVER_COLORS}
+        onEmojiTrigger={() => setEmojiPickerOpen(true)}
         onSave={handleSaveEdit}
         onClose={() => setEditing(null)}
+        s={s}
+        insets={insets}
       />
       <EmojiPicker
         visible={emojiPickerOpen}
