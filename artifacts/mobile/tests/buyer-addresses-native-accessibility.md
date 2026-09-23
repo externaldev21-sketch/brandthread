@@ -4,7 +4,7 @@ The Appium check uses the native iOS or Android accessibility tree, not the web 
 
 ## Test account
 
-Before the normal-state run, sign the installed Brandthread build into a disposable buyer account and seed two addresses in visible order. The first must be the default address and the second must not be default. Set `NATIVE_BUYER_ADDRESS_LABELS` if their labels are not `Home,Office`.
+The release wrapper creates or resets a disposable Clerk buyer, revokes stale sessions, and seeds two addresses in visible order. The first is the default address and the second is not. Set `NATIVE_BUYER_ADDRESS_LABELS` if their labels are not `Home,Office`.
 
 The set-default action changes the disposable account temporarily, then the check restores the first address as default before it exits. The delete action opens the native confirmation dialog and cancels it, so it does not remove data. Use separate disposable accounts when running platforms concurrently; sequential runs can reuse the same account.
 
@@ -34,14 +34,16 @@ gate cannot pass until both platform jobs pass. Each configured device runner mu
 installed, sign-in-capable release build and these environment values:
 
 - `APPIUM_SERVER_URL` and the platform's Appium capabilities.
-- `NATIVE_BUYER_ADDRESSES_DISPOSABLE_ACCOUNT`, a non-production account identifier.
+- `NATIVE_BUYER_ADDRESSES_DISPOSABLE_ACCOUNT`, JSON containing the disposable account's `email`
+  and `password`.
 - `NATIVE_BUYER_ADDRESS_LABELS`, naming exactly two addresses.
-- `NATIVE_BUYER_ADDRESSES_PREPARE_COMMAND`, which signs in the disposable buyer and resets it to
-  exactly two addresses in the named order (first default).
-- `NATIVE_BUYER_ADDRESSES_ARM_FAILURE_COMMAND`, which makes the next address-list request fail
-  once and then recover so the Retry action can succeed.
-- `NATIVE_BUYER_ADDRESSES_CLEANUP_COMMAND`, which removes the seeded addresses/session even when a
-  check fails.
+- `NATIVE_BUYER_ADDRESSES_API_BASE_URL`, the release API origin.
+- `NATIVE_BUYER_ADDRESSES_CONTROL_TOKEN`, matching the API's `RELEASE_TEST_CONTROL_TOKEN`.
+- `NATIVE_BUYER_ADDRESSES_CLERK_SECRET_KEY`, a Clerk backend key for the release-test instance.
+
+The checked-in fixture utility performs prepare, one-shot failure arming, and cleanup for both
+platforms. Cleanup removes seeded addresses and revokes every disposable-account session even when
+a check fails. Credentials remain runner secrets and are never checked into the repository.
 
 The release wrapper rejects any missing prerequisite instead of skipping. GitHub uploads the XML
 trees for each platform and scenario even when the check fails.

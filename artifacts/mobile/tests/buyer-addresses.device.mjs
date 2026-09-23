@@ -41,6 +41,19 @@ const baseUrl = endpoint.replace(/\/$/, '');
 const sleep = (ms) => new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
 let sessionId;
 
+function accountCredentials() {
+  if (!disposableAccount) return null;
+  try {
+    const parsed = JSON.parse(disposableAccount);
+    if (typeof parsed?.email === 'string' && typeof parsed?.password === 'string') {
+      return { email: parsed.email.trim().toLowerCase(), password: parsed.password };
+    }
+  } catch {}
+  throw new Error(
+    'NATIVE_BUYER_ADDRESSES_DISPOSABLE_ACCOUNT must be JSON with email and password',
+  );
+}
+
 async function request(path, body, method = 'POST', allowFailure = false) {
   const response = await fetch(`${baseUrl}${path}`, {
     method,
@@ -78,6 +91,15 @@ async function waitFor(label, timeout = 15_000) {
 async function tap(label) {
   const element = await waitFor(label);
   await request(`/session/${sessionId}/element/${element}/click`, {});
+}
+
+async function setValue(label, value) {
+  const element = await waitFor(label);
+  await request(`/session/${sessionId}/element/${element}/clear`, {});
+  await request(`/session/${sessionId}/element/${element}/value`, {
+    text: value,
+    value: [...value],
+  });
 }
 
 async function attribute(element, name) {
@@ -126,6 +148,26 @@ async function openAddresses() {
   });
 }
 
+async function signInDisposableBuyer() {
+  const credentials = accountCredentials();
+  if (!credentials) return;
+  await request(`/session/${sessionId}/execute/sync`, {
+    script: 'mobile: deepLink',
+    args: [{ url: 'brandthread://sign-in', package: bundleId }],
+  });
+
+  try {
+    await waitFor('Continue with this account', 3_000);
+    await tap('Sign out');
+    await waitFor('Email address');
+  } catch {}
+
+  await setValue('Email address', credentials.email);
+  await setValue('Password', credentials.password);
+  await tap('Sign in');
+  await sleep(1_000);
+}
+
 await rm(outputDir, { recursive: true, force: true });
 await mkdir(outputDir, { recursive: true });
 
@@ -154,6 +196,7 @@ try {
 
   const session = await request('/session', { capabilities: { alwaysMatch: capabilities } });
   sessionId = session.sessionId;
+  await signInDisposableBuyer();
   await openAddresses();
 
   if (expectRetry) {

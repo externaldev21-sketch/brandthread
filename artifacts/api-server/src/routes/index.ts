@@ -90,6 +90,7 @@ import shopifyImportRouter from "./shopify-import";
 import designStudioRouter from "./design-studio";
 import packagePresetsRouter from "./package-presets";
 import webhooksShippoRouter from "./webhooks-shippo";
+import releaseTestControlRouter from "./release-test-control";
 
 const router = Router();
 
@@ -102,6 +103,7 @@ router.use("/webhooks/shippo", webhooksShippoRouter);
 router.use("/support",         supportRouter);
 router.use("/support-chat",    supportChatRouter);
 router.use("/ip-cases",        ipCasesRouter);
+router.use("/release-test-control", releaseTestControlRouter);
 // Specific seller sub-paths BEFORE the seller catch-all
 router.use("/seller/export",   sellerExportRouter);
 

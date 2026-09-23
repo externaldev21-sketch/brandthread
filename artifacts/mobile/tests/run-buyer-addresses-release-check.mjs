@@ -1,6 +1,11 @@
 import { mkdir } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
+import {
+  armBuyerAddressFailure,
+  cleanupBuyerAddressFixture,
+  prepareBuyerAddressFixture,
+} from "./buyer-addresses-release-fixture.mjs";
 
 const platform = (
   process.env.NATIVE_BUYER_ADDRESSES_PLATFORM ?? ""
@@ -45,38 +50,34 @@ if (labels.length !== 2) {
   throw new Error("Release checks require exactly two seeded address labels");
 }
 
-const prepareCommand = requireEnvironment(
-  "NATIVE_BUYER_ADDRESSES_PREPARE_COMMAND",
-);
-const armFailureCommand = requireEnvironment(
-  "NATIVE_BUYER_ADDRESSES_ARM_FAILURE_COMMAND",
-);
-const cleanupCommand = requireEnvironment(
-  "NATIVE_BUYER_ADDRESSES_CLEANUP_COMMAND",
-);
+requireEnvironment("NATIVE_BUYER_ADDRESSES_API_BASE_URL");
+requireEnvironment("NATIVE_BUYER_ADDRESSES_CONTROL_TOKEN");
+requireEnvironment("NATIVE_BUYER_ADDRESSES_CLERK_SECRET_KEY");
 const checkCommand = "node tests/buyer-addresses.device.mjs";
 
 await mkdir(resultsRoot, { recursive: true });
 
 let failure;
+let account;
 try {
-  await run(prepareCommand);
+  account = await prepareBuyerAddressFixture();
   await run(checkCommand, {
     NATIVE_BUYER_ADDRESSES_REQUIRED: "1",
     NATIVE_BUYER_ADDRESSES_EXPECT_RETRY: "0",
     NATIVE_BUYER_ADDRESSES_RESULTS_DIR: resolve(resultsRoot, "normal"),
   });
-  await run(armFailureCommand);
+  await armBuyerAddressFailure(account);
   await run(checkCommand, {
     NATIVE_BUYER_ADDRESSES_REQUIRED: "1",
     NATIVE_BUYER_ADDRESSES_EXPECT_RETRY: "1",
     NATIVE_BUYER_ADDRESSES_RESULTS_DIR: resolve(resultsRoot, "retry"),
   });
 } catch (error) {
+  account ??= error?.fixtureAccount;
   failure = error;
 } finally {
   try {
-    await run(cleanupCommand);
+    await cleanupBuyerAddressFixture(account);
   } catch (cleanupError) {
     failure = failure
       ? new AggregateError(

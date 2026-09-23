@@ -410,6 +410,8 @@ export default function SignInScreen() {
           <View style={s.fieldWrap}>
             <Text style={s.label}>Email address</Text>
             <TextInput
+              testID="release-check-email"
+              accessibilityLabel="Email address"
               style={s.input}
               placeholder="you@yourbrand.com"
               placeholderTextColor={theme.subtle}
@@ -431,6 +433,8 @@ export default function SignInScreen() {
             </View>
             <View style={s.pwRow}>
               <TextInput
+                testID="release-check-password"
+                accessibilityLabel="Password"
                 style={[s.input, s.pwInput]}
                 placeholder="••••••••"
                 placeholderTextColor={theme.subtle}

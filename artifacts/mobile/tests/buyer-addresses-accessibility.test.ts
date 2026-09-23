@@ -36,5 +36,26 @@ describe('buyer shipping-address accessibility contract', () => {
     expect(deviceCheck).toContain("assertSourceOrder(initialSource");
     expect(deviceCheck).toContain("platform === 'ios' ? 'value' : 'checked'");
     expect(deviceCheck).toContain("Retry loading saved addresses");
+    expect(deviceCheck).toContain("signInDisposableBuyer");
+    expect(deviceCheck).toContain("NATIVE_BUYER_ADDRESSES_DISPOSABLE_ACCOUNT must be JSON");
+  });
+
+  it('keeps repository-owned release fixture lifecycle commands', () => {
+    const wrapper = readFileSync(
+      new URL('./run-buyer-addresses-release-check.mjs', import.meta.url),
+      'utf8',
+    );
+    const fixture = readFileSync(
+      new URL('./buyer-addresses-release-fixture.mjs', import.meta.url),
+      'utf8',
+    );
+    expect(wrapper).toContain('prepareBuyerAddressFixture');
+    expect(wrapper).toContain('armBuyerAddressFailure');
+    expect(wrapper).toContain('cleanupBuyerAddressFixture');
+    expect(wrapper).not.toContain('PREPARE_COMMAND');
+    expect(fixture).toContain('/buyer-addresses/prepare');
+    expect(fixture).toContain('/buyer-addresses/arm-failure');
+    expect(fixture).toContain('/buyer-addresses/cleanup');
+    expect(fixture).toContain('revokeSessions');
   });
 });
