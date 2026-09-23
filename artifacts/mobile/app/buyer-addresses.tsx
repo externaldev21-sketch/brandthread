@@ -214,21 +214,20 @@ export default function BuyerAddressesScreen() {
                 <TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" style={styles.input} placeholder="Phone number" placeholderTextColor={theme.subtle} />
               </View>
 
-              {!isDefault && (
-                <TouchableOpacity
-                  style={styles.defaultToggle}
-                  onPress={() => setIsDefault(!isDefault)}
-                  activeOpacity={0.7}
-                  accessibilityRole="checkbox"
-                  accessibilityLabel="Set as default address"
-                  accessibilityState={{ checked: isDefault }}
-                >
-                  <View style={[styles.checkbox, isDefault && styles.checkboxActive]}>
-                     {isDefault && <Feather name="check" size={14} color={theme.onAccent} />}
-                  </View>
-                  <Text style={styles.defaultToggleText}>Set as default address</Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={styles.defaultToggle}
+                onPress={() => setIsDefault(true)}
+                disabled={isDefault}
+                activeOpacity={0.7}
+                accessibilityRole="checkbox"
+                accessibilityLabel="Set as default address"
+                accessibilityState={{ checked: isDefault, disabled: isDefault }}
+              >
+                <View style={[styles.checkbox, isDefault && styles.checkboxActive]}>
+                   {isDefault && <Feather name="check" size={14} color={theme.onAccent} />}
+                </View>
+                <Text style={styles.defaultToggleText}>Set as default address</Text>
+              </TouchableOpacity>
 
               <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.7 }]} onPress={handleSave} disabled={saving} activeOpacity={0.8}>
                 {saving ? <ActivityIndicator color={theme.onAccent} /> : <Text style={styles.saveBtnText}>Save Address</Text>}
