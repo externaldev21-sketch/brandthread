@@ -53,6 +53,7 @@ vi.mock('react-native-safe-area-context', () => ({
 
 vi.mock('@expo/vector-icons', () => ({
   Feather: ({ name }: { name: string }) => React.createElement('Feather', { name }),
+  Ionicons: ({ name }: { name: string }) => React.createElement('Ionicons', { name }),
 }));
 
 vi.mock('expo-web-browser', () => ({
@@ -77,6 +78,13 @@ vi.mock('@/components/KeyboardAwareScrollViewCompat', () => {
   return {
     KeyboardAwareScrollViewCompat: (props: Record<string, unknown>) =>
       React.createElement('KeyboardAwareScrollViewCompat', props, props.children as React.ReactNode),
+  };
+});
+
+vi.mock('react-native-qrcode-svg', () => {
+  const React = require('react');
+  return {
+    default: (props: Record<string, unknown>) => React.createElement('QRCode', props),
   };
 });
 
@@ -249,8 +257,8 @@ describe('LoginMethods linked-account removal', () => {
 
     expect(currentUser.reload).not.toHaveBeenCalled();
     expect(alertMock).toHaveBeenLastCalledWith(
-      'Could not remove Apple',
-      'Session expired. Sign in again and retry.',
+      'Removal failed',
+      "Couldn't remove Apple. Try again.",
     );
     expect(rendererForTest.root.findByProps({ testID: 'remove-apple-login-method' })).toBeTruthy();
     expect(rendererForTest.root.findAllByProps({ testID: 'connect-apple-login-method' })).toHaveLength(0);
@@ -298,6 +306,6 @@ describe('LoginMethods linked-account removal', () => {
     expect(currentUser.reload).not.toHaveBeenCalled();
     expect(rendererForTest.root.findByProps({ testID: 'setup-password-login-method' })).toBeTruthy();
     expect(rendererForTest.root.findByProps({ testID: 'password-setup-error' }).props.children)
-      .toBe('Password was rejected by Clerk.');
+      .toBe("Couldn't add your password. Try again.");
   });
 });

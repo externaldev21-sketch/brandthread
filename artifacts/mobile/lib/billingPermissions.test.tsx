@@ -257,14 +257,14 @@ describe('owner-only billing actions', () => {
     renderer.unmount();
   });
 
-  it('preserves the billing portal fallback for non-role failures', async () => {
+  it('shows a human error instead of the deleted billing portal fallback for non-role failures', async () => {
     subscriptionPortalMock.mockRejectedValueOnce(serverError());
     const renderer = await renderScreen(BillingScreen);
 
     await press(renderer, 'seller-billing-payment-method');
 
-    expect(alertMock).not.toHaveBeenCalled();
-    expect(pushMock).toHaveBeenCalledWith('/plan-details');
+    expect(alertMock).toHaveBeenCalledWith("Couldn't open billing. Try again.");
+    expect(pushMock).not.toHaveBeenCalledWith('/plan-details');
     renderer.unmount();
   });
 
