@@ -13,7 +13,7 @@ import type {
   Message, MessageAttachment, MessageReaction,
   Story, StoryMedia, StoryPrivacySettings, StoryViewer,
   Notification, NotificationCategory, NotificationPreference,
-  BlockRecord, MuteRecord, RestrictRecord, Report, ReportReason, ReportTargetType,
+  BlockRecord, MuteRecord, RestrictRecord,
   SavedItem, SavedItemType, PrivacySettings, ProfileSearchResult,
   Comment,
 } from './socialTypes';
@@ -355,43 +355,70 @@ export async function getMyReposts(k: SocialKeys = K()): Promise<RepostRecord[]>
 }
 
 // ─── Comments ────────────────────────────────────────────────────────────────
+// Comments live on the server, where they are filtered, block-aware and
+// moderated (see /api/posts/:postId/comments). These helpers adapt the server
+// thread to the flat Comment shape older screens render.
 
-export async function getComments(postId: string, k: SocialKeys = K()): Promise<Comment[]> {
-  return load<Comment[]>(k.comments(postId), []);
+interface ServerComment {
+  id: string; postId: string; parentId: string | null; body: string; createdAt: string;
+  author: { userId: string; name: string; handle: string; initials: string };
+  likesCount: number; likedByMe: boolean; pendingReview: boolean; replies: ServerComment[];
+}
+
+function toLegacyComment(comment: ServerComment, parent?: ServerComment): Comment {
+  return {
+    id: comment.id,
+    postId: comment.postId,
+    authorId: comment.author.userId,
+    authorName: comment.author.name,
+    authorHandle: comment.author.handle,
+    authorInitials: comment.author.initials,
+    authorColor: '#27272A',
+    text: comment.body,
+    replyToId: parent?.id,
+    replyToAuthorName: parent?.author.name,
+    replyToText: parent?.body.slice(0, 60),
+    likedByMe: comment.likedByMe,
+    likesCount: comment.likesCount,
+    createdAt: comment.createdAt,
+  };
+}
+
+export async function getComments(postId: string): Promise<Comment[]> {
+  const thread = await serviceRequest<{ comments: ServerComment[] }>(
+    `/api/posts/${encodeURIComponent(postId)}/comments`,
+  );
+  return (thread.comments ?? []).flatMap((root) => [
+    toLegacyComment(root),
+    ...(root.replies ?? []).map((reply) => toLegacyComment(reply, root)),
+  ]);
 }
 
 export async function postComment(params: {
   postId: string;
   text: string;
   replyToId?: string;
-  replyToAuthorName?: string;
-  replyToText?: string;
 }): Promise<Comment> {
-  throw new Error('Buyer post comments are not available yet.');
+  const created = await serviceRequest<{ comment: ServerComment }>(
+    `/api/posts/${encodeURIComponent(params.postId)}/comments`,
+    { method: 'POST', body: JSON.stringify({ body: params.text, parentId: params.replyToId ?? null }) },
+  );
+  notify();
+  return toLegacyComment(created.comment);
 }
 
-export async function likeComment(postId: string, commentId: string): Promise<void> {
-  const k = K();
-  const comments = await getComments(postId, k);
-  const idx = comments.findIndex(c => c.id === commentId);
-  if (idx < 0) return;
-  comments[idx].likedByMe = !comments[idx].likedByMe;
-  comments[idx].likesCount += comments[idx].likedByMe ? 1 : -1;
-  await save(k.comments(postId), comments);
-  notify();
+export async function likeComment(postId: string, commentId: string, liked: boolean): Promise<void> {
+  await serviceRequest(
+    `/api/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}/like`,
+    { method: 'POST', body: JSON.stringify({ liked }) },
+  );
 }
 
 export async function deleteComment(postId: string, commentId: string): Promise<void> {
-  const k = K();
-  const comments = await getComments(postId, k);
-  const next = comments.filter(c => c.id !== commentId);
-  await save(k.comments(postId), next);
-  const posts = await getMyPosts(k);
-  const idx = posts.findIndex(p => p.id === postId);
-  if (idx >= 0) {
-    posts[idx].commentsCount = Math.max(0, posts[idx].commentsCount - 1);
-    await save(k.posts, posts);
-  }
+  await serviceRequest(
+    `/api/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}`,
+    { method: 'DELETE' },
+  );
   notify();
 }
 
@@ -1188,16 +1215,23 @@ export async function isBlocked(userId: string): Promise<boolean> {
   const blocks = await getBlockedUsers(k);
   return blocks.some(b => b.blockedUserId === userId);
 }
+/**
+ * Block someone. The server is the source of truth (it hides both people from
+ * each other everywhere and stops messages/comments); the local record only
+ * keeps this device's lists in sync. Throws if the server rejects the block.
+ */
 export async function blockUser(params: { userId: string; name: string; handle: string; initials: string; color: string; }): Promise<void> {
+  await serviceRequest('/api/social/block', { method: 'POST', body: JSON.stringify({ userId: params.userId }) });
   const k = K();
   const blocks = await getBlockedUsers(k);
-  if (blocks.some(b => b.blockedUserId === params.userId)) return;
+  if (blocks.some(b => b.blockedUserId === params.userId)) { notify(); return; }
   blocks.unshift({ id: uid(), blockedUserId: params.userId, blockedUserName: params.name, blockedUserHandle: params.handle, blockedUserInitials: params.initials, blockedUserColor: params.color, createdAt: iso() });
   await save(k.blocks, blocks);
   await removeFriend(params.userId, k);
   notify();
 }
 export async function unblockUser(userId: string): Promise<void> {
+  await serviceRequest(`/api/social/block/${encodeURIComponent(userId)}`, { method: 'DELETE' });
   const k = K();
   const blocks = await getBlockedUsers(k);
   await save(k.blocks, blocks.filter(b => b.blockedUserId !== userId)); notify();
@@ -1234,14 +1268,6 @@ export async function unrestrictUser(userId: string): Promise<void> {
   const k = K();
   const restricts = await getRestrictedUsers(k);
   await save(k.restricts, restricts.filter(r => r.restrictedUserId !== userId)); notify();
-}
-
-// ─── Reports ─────────────────────────────────────────────────────────────────
-
-export async function submitReport(params: { targetType: ReportTargetType; targetId: string; targetLabel?: string; reason: ReportReason; description: string; blockAfterReport: boolean; blockParams?: { userId: string; name: string; handle: string; initials: string; color: string }; }): Promise<Report> {
-  const report: Report = { id: uid(), targetType: params.targetType, targetId: params.targetId, targetLabel: params.targetLabel, reason: params.reason, description: params.description, blockAfterReport: params.blockAfterReport, submittedAt: iso() };
-  if (params.blockAfterReport && params.blockParams) await blockUser(params.blockParams);
-  return report;
 }
 
 // ─── Saved Content ────────────────────────────────────────────────────────────

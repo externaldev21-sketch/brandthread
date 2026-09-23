@@ -81,7 +81,7 @@ export default function BuyerPostViewer() {
   useEffect(() => {
     loadPost();
     if (params.postId) {
-      getComments(params.postId).then(setComments);
+      getComments(params.postId).then(setComments).catch(() => setComments([]));
     }
   }, [loadPost, params.postId]);
 

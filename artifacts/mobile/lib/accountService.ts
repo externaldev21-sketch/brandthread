@@ -12,20 +12,9 @@ const K = {
   deactivation: 'bt:account:deactivation:v1',
   deletion:     'bt:account:deletion:v1',
   dataExport:   'bt:account:data-export:v1',
-  sessions:     'bt:account:sessions:v1',
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface AccountSession {
-  id: string;
-  device: string;
-  os: string;
-  location: string;
-  lastActive: string;
-  current: boolean;
-  icon: 'smartphone' | 'monitor' | 'globe' | 'tablet';
-}
 
 export interface DeactivationRecord {
   active: boolean;
@@ -45,41 +34,6 @@ export interface DataExportRequest {
   categories: string[];
   /** Server-side export is not yet implemented. */
   serverProcessed: false;
-}
-
-// ─── Seed / Default data ─────────────────────────────────────────────────────
-
-const SEED_SESSIONS: AccountSession[] = [
-  { id: 'current', device: 'iPhone (this device)', os: 'iOS 18', location: 'New York, US', lastActive: 'Active now', current: true, icon: 'smartphone' },
-  { id: 's2', device: 'MacBook Pro', os: 'macOS Sequoia', location: 'New York, US', lastActive: '2 hours ago', current: false, icon: 'monitor' },
-  { id: 's3', device: 'Chrome · Windows', os: 'Windows 11', location: 'Los Angeles, US', lastActive: '5 days ago', current: false, icon: 'globe' },
-];
-
-// ─── Sessions ─────────────────────────────────────────────────────────────────
-
-export async function getSessions(): Promise<AccountSession[]> {
-  try {
-    const raw = await AsyncStorage.getItem(K.sessions);
-    if (!raw) {
-      await AsyncStorage.setItem(K.sessions, JSON.stringify(SEED_SESSIONS));
-      return [...SEED_SESSIONS];
-    }
-    return JSON.parse(raw) as AccountSession[];
-  } catch { return [...SEED_SESSIONS]; }
-}
-
-export async function removeSession(sessionId: string): Promise<AccountSession[]> {
-  const sessions = await getSessions();
-  const next = sessions.filter(s => s.id !== sessionId || s.current);
-  await AsyncStorage.setItem(K.sessions, JSON.stringify(next));
-  return next;
-}
-
-export async function removeAllOtherSessions(): Promise<AccountSession[]> {
-  const sessions = await getSessions();
-  const next = sessions.filter(s => s.current);
-  await AsyncStorage.setItem(K.sessions, JSON.stringify(next));
-  return next;
 }
 
 // ─── Deactivation ─────────────────────────────────────────────────────────────
@@ -134,7 +88,8 @@ export async function clearAccountLifecycleState(): Promise<void> {
     K.deactivation,
     K.deletion,
     K.dataExport,
-    K.sessions,
+    // Legacy on-device session list (replaced by real Clerk sessions).
+    'bt:account:sessions:v1',
     '@brandthread/onboarding_complete',
   ]);
 }

@@ -17,8 +17,10 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
-  getStories, trackStoryView, subscribeSocial,
+  getStories, trackStoryView, subscribeSocial, muteUser,
 } from '@/services/socialService';
+import { useAuth } from '@clerk/expo';
+import { confirmBlock, reportHref } from '@/lib/safety';
 import type { Story, StoryMedia } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 
@@ -44,6 +46,7 @@ export default function BuyerStoryViewer() {
   const { storyId, allStoryIds } = useLocalSearchParams<{ storyId: string; allStoryIds: string }>();
 
   const api = useApi();
+  const { userId: myUserId } = useAuth();
 
   const [stories, setStories] = useState<Story[]>([]);
   const [storyIdx, setStoryIdx] = useState(0);
@@ -331,19 +334,53 @@ export default function BuyerStoryViewer() {
             <Text style={styles.productTagText}>{currentSlide.productTagName}</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity
-          style={{ marginLeft: SP.sm, padding: SP.xs }}
-          onPress={() =>
-            Alert.alert('Options', '', [
-              { text: 'Mute' },
-              { text: 'Report', onPress: () => router.push('/buyer-problem-report' as any) },
-              { text: 'Block' },
-              { text: 'Cancel', style: 'cancel' },
-            ])
-          }
-        >
-          <Feather name="more-horizontal" size={ICON.md} color={ON_DARK} />
-        </TouchableOpacity>
+        {currentStory.authorId !== myUserId && currentStory.authorId !== 'me' ? (
+          <TouchableOpacity
+            style={{ marginLeft: SP.sm, padding: SP.xs }}
+            accessibilityRole="button"
+            accessibilityLabel="Story options"
+            onPress={() => {
+              setIsPaused(true);
+              const author = { userId: currentStory.authorId, name: currentStory.authorName };
+              Alert.alert(currentStory.authorName, undefined, [
+                {
+                  text: `Mute ${currentStory.authorName}`,
+                  onPress: async () => {
+                    await muteUser({
+                      userId: currentStory.authorId,
+                      name: currentStory.authorName,
+                      handle: currentStory.authorHandle,
+                      initials: currentStory.authorInitials,
+                      color: currentStory.authorColor,
+                    });
+                    router.back();
+                  },
+                },
+                {
+                  text: 'Report story',
+                  onPress: () => router.push(reportHref({
+                    targetType: 'story',
+                    targetId: currentStory.id,
+                    label: `${currentStory.authorName}'s story`,
+                    ownerId: currentStory.authorId,
+                    ownerName: currentStory.authorName,
+                  }) as never),
+                },
+                {
+                  text: `Block ${currentStory.authorName}`,
+                  style: 'destructive',
+                  onPress: async () => {
+                    if (await confirmBlock(author, api.social.block)) router.back();
+                    else setIsPaused(false);
+                  },
+                },
+                { text: 'Cancel', style: 'cancel', onPress: () => setIsPaused(false) },
+              ]);
+            }}
+          >
+            <Feather name="more-horizontal" size={ICON.md} color={ON_DARK} />
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       {/* BOTTOM BAR */}

@@ -101,7 +101,7 @@ const ACCOUNT_ITEMS: NavItem[] = [
   { icon: 'download',    label: 'Download My Data', desc: 'Export your products, orders and customers', accent: BLUE, route: '/seller-data-export' },
   { icon: 'droplet',     label: 'App theme',       desc: 'Change the colors of the whole app',       accent: PURPLE, route: '/app-theme' },
   { icon: 'settings',    label: 'Settings',       desc: 'App and account settings',      accent: MUTED,  route: '/settings' },
-  { icon: 'trash-2',     label: 'Delete Account', desc: 'Permanently erase your account', accent: RED, route: '/buyer-account-control' },
+  { icon: 'trash-2',     label: 'Delete Account', desc: 'Permanently erase your account', accent: RED, route: '/delete-account' },
   { icon: 'help-circle', label: 'Help & Support', desc: 'Guides, FAQs and contact us',  accent: CYAN,   route: '/help' },
 ];
 

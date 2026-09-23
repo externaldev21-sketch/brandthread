@@ -1,324 +1,280 @@
-import React, { useState, useCallback, useEffect } from 'react';
+/**
+ * Blocked & muted — manage who you've blocked (server-enforced everywhere),
+ * accounts you've muted on this device, and your muted words.
+ *
+ * Blocks come from GET /api/social/blocks; unblocking calls the server so the
+ * change applies on every device immediately.
+ */
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, Alert, StyleSheet,
+  View, Text, FlatList, StyleSheet, RefreshControl, ActivityIndicator,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
-import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  ON_DARK,
-  FONT, FS, SP, RADIUS, COMP, ICON,
-} from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
-import {
-  getMutedUsers, unmuteUser, subscribeSocial,
-} from '@/services/socialService';
-import { MuteRecord } from '@/services/socialTypes';
+import * as Haptics from 'expo-haptics';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+import { getMutedUsers, unmuteUser, subscribeSocial } from '@/services/socialService';
+import type { MuteRecord } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
+import { CachedImage } from '@/components/CachedImage';
+import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
+import { apiErrorMessage, confirmUnblock, shortRelativeTime } from '@/lib/safety';
+import type { BlockedAccount } from '@/lib/safetyTypes';
 
-type ApiBlockRecord = {
-  userId: string; name: string; handle: string;
-  initials: string; color: string; blockedAt: string;
-};
+type Tab = 'blocked' | 'muted';
 
-export default function BuyerBlocked() {
+export default function BlockedAndMutedScreen() {
   const { theme } = useAppTheme();
-  const PURPLE = theme.accent;
-  const PURPLE_DIM = theme.accentDim;
-  const GRAD_PRIMARY = theme.primaryGradient;
-  const styles = makeStyles(theme);
+  const s = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
   const params = useLocalSearchParams<{ tab?: string }>();
-  const [blocked, setBlocked] = useState<ApiBlockRecord[]>([]);
+
+  const [tab, setTab] = useState<Tab>(params.tab === 'muted' ? 'muted' : 'blocked');
+  const [blocked, setBlocked] = useState<BlockedAccount[]>([]);
   const [muted, setMuted] = useState<MuteRecord[]>([]);
-  const [activeTab, setActiveTab] = useState<'blocked' | 'muted'>(
-    params.tab === 'muted' ? 'muted' : 'blocked'
+  const [mutedWordCount, setMutedWordCount] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+
+  const load = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    setError(null);
+    const [b, m, w] = await Promise.allSettled([
+      api.social.blocks(),
+      getMutedUsers(),
+      api.safety.mutedWords(),
+    ]);
+    if (b.status === 'fulfilled') setBlocked(b.value);
+    else setError(apiErrorMessage(b.reason, 'We couldn’t load your blocked accounts.'));
+    if (m.status === 'fulfilled') setMuted(m.value);
+    if (w.status === 'fulfilled') setMutedWordCount(w.value.words.length);
+    setLoading(false);
+    setRefreshing(false);
+  }, [api]);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useEffect(() => subscribeSocial(() => { getMutedUsers().then(setMuted).catch(() => {}); }), []);
+
+  async function unblock(account: BlockedAccount) {
+    setPendingId(account.userId);
+    const done = await confirmUnblock({ userId: account.userId, name: account.name }, api.social.unblock);
+    setPendingId(null);
+    if (done) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setBlocked((prev) => prev.filter((row) => row.userId !== account.userId));
+    }
+  }
+
+  async function unmute(record: MuteRecord) {
+    Haptics.selectionAsync();
+    await unmuteUser(record.mutedUserId);
+    setMuted((prev) => prev.filter((row) => row.id !== record.id));
+  }
+
+  const renderAvatar = (uri: string | null | undefined, initials: string) => (
+    uri
+      ? <CachedImage source={{ uri }} style={s.avatar} contentFit="cover" />
+      : <View style={[s.avatar, s.avatarFallback]}><Text style={s.avatarText}>{initials}</Text></View>
   );
 
-  async function loadData() {
-    const [b, m] = await Promise.allSettled([api.social.blocks(), getMutedUsers()]);
-    if (b.status === 'fulfilled') setBlocked(b.value);
-    if (m.status === 'fulfilled') setMuted(m.value);
-  }
-
-  useFocusEffect(useCallback(() => { loadData(); }, []));
-
-  useEffect(() => {
-    const unsub = subscribeSocial(() => loadData());
-    return unsub;
-  }, []);
-
-  async function handleUnblock(userId: string, name: string) {
-    Alert.alert(
-      'Unblock',
-      `Unblock ${name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Unblock',
-          style: 'destructive',
-          onPress: async () => {
-            await api.social.unblock(userId);
-            loadData();
-          },
-        },
-      ]
-    );
-  }
-
-  async function handleUnmute(userId: string, name: string) {
-    Alert.alert(
-      'Unmute',
-      `Unmute ${name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Unmute',
-          onPress: async () => {
-            await unmuteUser(userId);
-            loadData();
-          },
-        },
-      ]
-    );
-  }
-
-  function renderBlockedItem({ item }: { item: ApiBlockRecord }) {
-    return (
-      <View style={styles.row}>
-        <View style={[styles.avatar, { backgroundColor: item.color }]}>
-          <Text style={styles.avatarText}>{item.initials}</Text>
-        </View>
-        <View style={styles.rowContent}>
-          <Text style={styles.rowName}>{item.name}</Text>
-          <Text style={styles.rowHandle}>{item.handle}</Text>
-        </View>
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => handleUnblock(item.userId, item.name)}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.actionBtnText}>Unblock</Text>
-        </TouchableOpacity>
+  const header = (
+    <View>
+      <View style={s.explainer}>
+        <Feather name="shield" size={16} color={theme.text} />
+        <Text style={s.explainerText}>
+          {tab === 'blocked'
+            ? 'Blocked accounts can’t find your profile, see your posts, comments or stories, or message you — and you won’t see theirs. They aren’t notified.'
+            : 'Muting hides someone’s stories and posts on this device without telling them. They can still message you.'}
+        </Text>
       </View>
-    );
-  }
-
-  function renderMutedItem({ item }: { item: MuteRecord }) {
-    return (
-      <View style={styles.row}>
-        <View style={[styles.avatar, { backgroundColor: item.mutedUserColor }]}>
-          <Text style={styles.avatarText}>{item.mutedUserInitials}</Text>
+      <PressableScale style={s.wordsRow} onPress={() => router.push('/muted-words' as never)} accessibilityRole="button">
+        <View style={s.wordsIcon}><Feather name="type" size={16} color={theme.text} /></View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.wordsTitle}>Muted words</Text>
+          <Text style={s.wordsSub}>
+            {mutedWordCount === null ? 'Hide comments and posts with words you choose'
+              : mutedWordCount === 0 ? 'None yet — hide comments and posts with words you choose'
+              : `${mutedWordCount} word${mutedWordCount === 1 ? '' : 's'} muted`}
+          </Text>
         </View>
-        <View style={styles.rowContent}>
-          <Text style={styles.rowName}>{item.mutedUserName}</Text>
-          <Text style={styles.rowHandle}>{item.mutedUserHandle}</Text>
+        <Feather name="chevron-right" size={18} color={theme.subtle} />
+      </PressableScale>
+      {error && tab === 'blocked' ? (
+        <View style={s.errorCard}>
+          <Feather name="alert-circle" size={16} color={theme.error} />
+          <Text style={s.errorText}>{error}</Text>
+          <PressableScale onPress={() => load(true)} accessibilityRole="button"><Text style={s.retry}>Retry</Text></PressableScale>
         </View>
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => handleUnmute(item.mutedUserId, item.mutedUserName)}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.actionBtnText}>Unmute</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  function BlockedEmpty() {
-    return (
-      <View style={styles.emptyContainer}>
-        <Feather name="slash" size={48} color={MUTED} />
-        <Text style={styles.emptyTitle}>No blocked accounts</Text>
-        <Text style={styles.emptyDesc}>Accounts you block will be listed here.</Text>
-      </View>
-    );
-  }
-
-  function MutedEmpty() {
-    return (
-      <View style={styles.emptyContainer}>
-        <Feather name="volume-x" size={48} color={MUTED} />
-        <Text style={styles.emptyTitle}>No muted accounts</Text>
-        <Text style={styles.emptyDesc}>Accounts you mute will be listed here.</Text>
-      </View>
-    );
-  }
+      ) : null}
+      <Text style={s.sectionLabel}>
+        {tab === 'blocked'
+          ? `${blocked.length} BLOCKED ACCOUNT${blocked.length === 1 ? '' : 'S'}`
+          : `${muted.length} MUTED ACCOUNT${muted.length === 1 ? '' : 'S'}`}
+      </Text>
+    </View>
+  );
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* HEADER */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="arrow-left" size={ICON.lg} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Blocked & Muted</Text>
-        <View style={styles.headerBtn} />
+    <View style={[s.root, { paddingTop: insets.top }]}>
+      <View style={s.header}>
+        <PressableScale onPress={() => router.back()} style={s.headerBtn} accessibilityLabel="Back" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Feather name="arrow-left" size={ICON.lg} color={theme.text} />
+        </PressableScale>
+        <Text style={s.headerTitle}>Blocked & muted</Text>
+        <View style={s.headerBtn} />
       </View>
 
-      {/* TAB BAR */}
-      <View style={styles.tabBar}>
-        {(['blocked', 'muted'] as const).map(tab => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tab, activeTab === tab && styles.tabActive]}
-            onPress={() => setActiveTab(tab)}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {tab === 'blocked' ? 'Blocked' : 'Muted'}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      <View style={s.segment} accessibilityRole="tablist">
+        {(['blocked', 'muted'] as const).map((key) => {
+          const active = tab === key;
+          return (
+            <PressableScale
+              key={key}
+              onPress={() => { Haptics.selectionAsync(); setTab(key); }}
+              style={[s.segmentItem, active && s.segmentItemActive]}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+            >
+              <Text style={[s.segmentText, active && s.segmentTextActive]}>
+                {key === 'blocked' ? 'Blocked' : 'Muted'}
+              </Text>
+            </PressableScale>
+          );
+        })}
       </View>
 
-      {/* CONTENT */}
-      {activeTab === 'blocked' ? (
+      {loading ? (
+        <View style={s.loading}><ActivityIndicator color={theme.text} /></View>
+      ) : tab === 'blocked' ? (
         <FlatList
           data={blocked}
-          keyExtractor={item => item.userId}
-          renderItem={renderBlockedItem}
-          ListEmptyComponent={<BlockedEmpty />}
-          contentContainerStyle={blocked.length === 0 ? styles.emptyList : undefined}
+          keyExtractor={(item) => item.userId}
+          ListHeaderComponent={header}
+          contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + SP.xxl }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={theme.text} />}
+          renderItem={({ item, index }) => (
+            <View style={[s.row, index === 0 && s.rowFirst, index === blocked.length - 1 && s.rowLast]}>
+              {renderAvatar(item.avatarUrl, item.initials)}
+              <View style={s.rowBody}>
+                <Text style={s.rowName} numberOfLines={1}>{item.name}</Text>
+                <Text style={s.rowMeta} numberOfLines={1}>
+                  {[item.handle, item.accountType === 'seller' ? 'Seller' : null, `Blocked ${shortRelativeTime(item.blockedAt)}`]
+                    .filter(Boolean).join(' · ')}
+                </Text>
+              </View>
+              <PressableScale
+                onPress={() => unblock(item)}
+                style={s.actionBtn}
+                disabled={pendingId === item.userId}
+                accessibilityRole="button"
+                accessibilityLabel={`Unblock ${item.name}`}
+              >
+                {pendingId === item.userId
+                  ? <ActivityIndicator size="small" color={theme.text} />
+                  : <Text style={s.actionText}>Unblock</Text>}
+              </PressableScale>
+            </View>
+          )}
+          ListEmptyComponent={!error ? (
+            <EmptyState
+              icon="slash"
+              title="You haven’t blocked anyone"
+              description="Block someone from their profile, a comment, or a message. You can unblock them here any time."
+              style={{ marginTop: SP.lg }}
+            />
+          ) : null}
         />
       ) : (
         <FlatList
           data={muted}
-          keyExtractor={item => item.id}
-          renderItem={renderMutedItem}
-          ListEmptyComponent={<MutedEmpty />}
-          contentContainerStyle={muted.length === 0 ? styles.emptyList : undefined}
+          keyExtractor={(item) => item.id}
+          ListHeaderComponent={header}
+          contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + SP.xxl }}
+          renderItem={({ item, index }) => (
+            <View style={[s.row, index === 0 && s.rowFirst, index === muted.length - 1 && s.rowLast]}>
+              {renderAvatar(null, item.mutedUserInitials)}
+              <View style={s.rowBody}>
+                <Text style={s.rowName} numberOfLines={1}>{item.mutedUserName}</Text>
+                <Text style={s.rowMeta} numberOfLines={1}>{item.mutedUserHandle}</Text>
+              </View>
+              <PressableScale onPress={() => unmute(item)} style={s.actionBtn} accessibilityRole="button" accessibilityLabel={`Unmute ${item.mutedUserName}`}>
+                <Text style={s.actionText}>Unmute</Text>
+              </PressableScale>
+            </View>
+          )}
+          ListEmptyComponent={(
+            <EmptyState
+              icon="volume-x"
+              title="No muted accounts"
+              description="Mute someone from their profile or story to quietly hide their posts and stories."
+              style={{ marginTop: SP.lg }}
+            />
+          )}
         />
       )}
     </View>
   );
 }
 
-const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: 'transparent',
+const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: 'transparent' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.md },
+  segment: {
+    flexDirection: 'row', marginHorizontal: SP.md, marginBottom: SP.md, padding: 4,
+    backgroundColor: theme.card, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.border,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
+  segmentItem: { flex: 1, height: 36, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
+  segmentItemActive: { backgroundColor: theme.accent },
+  segmentText: { color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.sm },
+  segmentTextActive: { color: theme.onAccent },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  explainer: {
+    flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start',
+    padding: SP.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
   },
-  headerBtn: {
-    width: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+  explainerText: { flex: 1, color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19 },
+  wordsRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.md, marginTop: SP.sm,
+    padding: SP.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
   },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: FS.md,
-    fontFamily: FONT.bold,
-    color: FG,
+  wordsIcon: {
+    width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border,
   },
-  tabBar: {
-    flexDirection: 'row',
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-    gap: SP.sm,
+  wordsTitle: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.base },
+  wordsSub: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs + 1, marginTop: 2 },
+  errorCard: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.sm, padding: SP.md,
+    borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.error + '55', backgroundColor: theme.card,
   },
-  tab: {
-    flex: 1,
-    height: 36,
-    borderRadius: RADIUS.pill,
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabActive: {
-    backgroundColor: theme.accentDim,
-    borderColor: theme.accent,
-  },
-  tabText: {
-    color: MUTED,
-    fontFamily: FONT.medium,
-    fontSize: FS.sm,
-  },
-  tabTextActive: {
-    color: theme.accent,
-    fontFamily: FONT.semibold,
-  },
+  errorText: { flex: 1, color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm },
+  retry: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm, textDecorationLine: 'underline' },
+  sectionLabel: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11, letterSpacing: 1, marginTop: SP.lg, marginBottom: SP.sm },
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.md,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
+    flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingHorizontal: SP.md, paddingVertical: 12,
+    backgroundColor: theme.card, borderLeftWidth: 1, borderRightWidth: 1, borderColor: theme.border,
+    borderTopWidth: 1, borderTopColor: theme.borderSubtle,
   },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: ON_DARK,
-    fontFamily: FONT.bold,
-    fontSize: FS.base,
-  },
-  rowContent: {
-    flex: 1,
-    marginLeft: SP.md,
-  },
-  rowName: {
-    color: FG,
-    fontFamily: FONT.semibold,
-    fontSize: FS.base,
-  },
-  rowHandle: {
-    color: MUTED,
-    fontSize: FS.sm,
-    marginTop: 2,
-  },
+  rowFirst: { borderTopLeftRadius: RADIUS.lg, borderTopRightRadius: RADIUS.lg, borderTopColor: theme.border },
+  rowLast: { borderBottomLeftRadius: RADIUS.lg, borderBottomRightRadius: RADIUS.lg, borderBottomWidth: 1 },
+  avatar: { width: 44, height: 44, borderRadius: 22 },
+  avatarFallback: { backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.sm },
+  rowBody: { flex: 1, minWidth: 0 },
+  rowName: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.base },
+  rowMeta: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs + 1, marginTop: 2 },
   actionBtn: {
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: theme.accent,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SP.md,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
+    minWidth: 88, height: 36, paddingHorizontal: 14, borderRadius: RADIUS.pill,
+    borderWidth: 1, borderColor: theme.border, backgroundColor: theme.cardElevated,
+    alignItems: 'center', justifyContent: 'center',
   },
-  actionBtnText: {
-    color: theme.accent,
-    fontSize: FS.sm,
-    fontFamily: FONT.medium,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingHorizontal: SP.lg,
-    marginTop: SP.xxl,
-  },
-  emptyTitle: {
-    color: FG,
-    fontFamily: FONT.semibold,
-    fontSize: FS.md,
-    marginTop: SP.md,
-    textAlign: 'center',
-  },
-  emptyDesc: {
-    color: MUTED,
-    fontSize: FS.sm,
-    textAlign: 'center',
-    marginTop: SP.sm,
-  },
-  emptyList: {
-    flex: 1,
-    justifyContent: 'flex-start',
-  },
+  actionText: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm },
 });

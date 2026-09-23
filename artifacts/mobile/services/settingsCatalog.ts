@@ -11,6 +11,8 @@ export interface SettingsCatalogItem {
   action?: 'sign-out' | 'delete-account' | 'account-scope';
   destructive?: boolean;
   requiresGrowth?: boolean;
+  /** Only shown to platform moderators (checked against the server). */
+  requiresModerator?: boolean;
   audience: SettingsAudience;
 }
 
@@ -62,6 +64,14 @@ export const SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     ],
   },
   {
+    title: 'Safety and privacy',
+    items: [
+      { label: 'Blocked accounts', description: 'See and unblock people you have blocked', aliases: ['block', 'unblock', 'blocked', 'muted accounts', 'mute'], icon: 'slash', route: '/buyer-blocked', audience: 'shared' },
+      { label: 'Muted words', description: 'Hide comments and posts that contain words you choose', aliases: ['mute words', 'filter', 'hide words', 'keywords'], icon: 'volume-x', route: '/muted-words', audience: 'shared' },
+      { label: 'Review reports', description: 'Moderate reported content and filter holds', aliases: ['moderation', 'reports', 'admin', 'queue'], icon: 'flag', route: '/admin-reports', audience: 'shared', requiresModerator: true },
+    ],
+  },
+  {
     title: 'App and notifications',
     items: [
       { label: 'App theme', description: 'Choose your Brandthread color finish', aliases: ['theme', 'color', 'appearance', 'dark mode'], icon: 'droplet', route: '/app-theme', audience: 'shared' },
@@ -75,6 +85,9 @@ export const SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     items: [
       { label: 'Help and support', description: 'Find guides, FAQs, and contact support', aliases: ['help', 'support', 'faq'], icon: 'help-circle', route: '/help', audience: 'shared' },
       { label: 'Download my data', description: 'Export your profile, orders, and messages', aliases: ['export', 'data', 'privacy'], icon: 'download', route: '/buyer-download-data', audience: 'shared' },
+      { label: 'Community Guidelines', description: 'What is and isn’t allowed on Brandthread', aliases: ['rules', 'guidelines', 'community', 'policy'], icon: 'book-open', route: '/community-guidelines', audience: 'shared' },
+      { label: 'Terms of Service', description: 'The agreement for buying and selling on Brandthread', aliases: ['terms', 'tos', 'legal', 'agreement', 'eula'], icon: 'file-text', route: '/terms', audience: 'shared' },
+      { label: 'Privacy Policy', description: 'How we collect, use and protect your data', aliases: ['privacy', 'data', 'legal', 'gdpr', 'ccpa'], icon: 'lock', route: '/privacy', audience: 'shared' },
       { label: 'Delete account', description: 'Permanently erase your account and private data', aliases: ['remove account', 'close account'], icon: 'trash-2', action: 'delete-account', destructive: true, audience: 'shared' },
       { label: 'Sign out', description: 'Sign out of this Brandthread account', aliases: ['log out', 'logout'], icon: 'log-out', action: 'sign-out', destructive: true, audience: 'shared' },
     ],
