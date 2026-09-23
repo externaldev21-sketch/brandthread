@@ -69,6 +69,11 @@ const REDUCED_MOTION = { duration: 160 } as const;
 
 const FIELD_GLYPH_CENTER = 22;
 
+// The active pill is sized from each tab's measured icon+label width plus
+// this much breathing room (half on each side), so it fully encloses long
+// labels like "Discover" and "Profile" instead of a fixed, guessed width.
+const INDICATOR_H_PADDING = 28;
+
 // ─── Keyboard tracking ────────────────────────────────────────────────────────
 // Mounted only while search is open, so Reanimated's Android inset listener is
 // never attached while buyers type elsewhere in the app. Both translucency
@@ -162,10 +167,11 @@ function UnreadBadge({ count, theme }: { count: number; theme: AppThemePreset })
 // ─── Tab slot ─────────────────────────────────────────────────────────────────
 
 function TabSlot({
-  item, focused, metrics, theme, badgeCount, onPress, onLongPress, testID, accessibilityLabel,
-  hiddenForSearch,
+  item, index, focused, metrics, theme, badgeCount, onPress, onLongPress, testID, accessibilityLabel,
+  hiddenForSearch, onContentLayout,
 }: {
   item: (typeof BUYER_TAB_ITEMS)[number];
+  index: number;
   focused: boolean;
   metrics: BuyerTabBarMetrics;
   theme: AppThemePreset;
@@ -175,8 +181,13 @@ function TabSlot({
   testID: string;
   accessibilityLabel: string;
   hiddenForSearch: boolean;
+  onContentLayout: (index: number, width: number) => void;
 }) {
   const color = focused ? theme.accent : theme.muted;
+  const handleContentLayout = useCallback(
+    (event: LayoutChangeEvent) => onContentLayout(index, event.nativeEvent.layout.width),
+    [index, onContentLayout],
+  );
   return (
     <Pressable
       accessibilityRole="tab"
@@ -195,21 +206,25 @@ function TabSlot({
         pressed && styles.pressed,
       ]}
     >
-      <View>
-        <BuyerNavIcon name={item.icon} color={color} focused={focused} size={metrics.iconSize} />
-        {item.route === 'inbox' && <UnreadBadge count={badgeCount} theme={theme} />}
+      {/* Measured (not fixed) so the active pill can hug this tab's real
+          icon+label width, including the longer "Discover"/"Profile" labels. */}
+      <View onLayout={handleContentLayout} style={styles.slotContent}>
+        <View>
+          <BuyerNavIcon name={item.icon} color={color} focused={focused} size={metrics.iconSize} />
+          {item.route === 'inbox' && <UnreadBadge count={badgeCount} theme={theme} />}
+        </View>
+        <Text
+          numberOfLines={1}
+          maxFontSizeMultiplier={1.2}
+          style={[
+            styles.label,
+            { fontSize: metrics.labelSize, color: focused ? theme.text : theme.muted },
+            focused && { fontFamily: FONT.semibold },
+          ]}
+        >
+          {item.label}
+        </Text>
       </View>
-      <Text
-        numberOfLines={1}
-        maxFontSizeMultiplier={1.2}
-        style={[
-          styles.label,
-          { fontSize: metrics.labelSize, color: focused ? theme.text : theme.muted },
-          focused && { fontFamily: FONT.semibold },
-        ]}
-      >
-        {item.label}
-      </Text>
     </Pressable>
   );
 }
@@ -276,17 +291,40 @@ export function BuyerTabBar({
   }, [slotRowWidth]);
 
   // ── Active indicator ───────────────────────────────────────────────────────
+  // Each tab's real icon+label width, measured via onLayout. Falls back to a
+  // full-slot estimate until the first layout pass lands.
+  const contentWidthFallback = metrics.itemWidth - 6 - INDICATOR_H_PADDING;
+  const contentWidths = useRef<number[]>(BUYER_TAB_ITEMS.map(() => contentWidthFallback));
+  const activeIndexRef = useRef(activeIndex);
+  useEffect(() => { activeIndexRef.current = activeIndex; }, [activeIndex]);
+
   const indicatorX = useSharedValue(Math.max(activeIndex, 0) * metrics.itemWidth);
+  const indicatorWidth = useSharedValue(contentWidthFallback + INDICATOR_H_PADDING);
   const indicatorVisible = useSharedValue(activeIndex >= 0 && !searchActive ? 1 : 0);
+
+  const onSlotContentLayout = useCallback((index: number, width: number) => {
+    contentWidths.current[index] = width;
+    // The tab that is already active snaps to its true size immediately,
+    // with no spring, so there is nothing to see settle.
+    if (index === activeIndexRef.current) {
+      indicatorWidth.set(Math.min(width + INDICATOR_H_PADDING, metrics.itemWidth + 32));
+    }
+  }, [indicatorWidth, metrics.itemWidth]);
+
   useEffect(() => {
     // Entering search only fades the pill where it is; it never glides
     // under the field that is sliding in.
     if (activeIndex >= 0 && !searchActive) {
       const x = activeIndex * metrics.itemWidth;
+      const targetWidth = Math.min(
+        (contentWidths.current[activeIndex] ?? contentWidthFallback) + INDICATOR_H_PADDING,
+        metrics.itemWidth + 32,
+      );
       indicatorX.set(reduceMotion ? withTiming(x, REDUCED_MOTION) : withSpring(x, INDICATOR_SPRING));
+      indicatorWidth.set(reduceMotion ? withTiming(targetWidth, REDUCED_MOTION) : withSpring(targetWidth, INDICATOR_SPRING));
     }
     indicatorVisible.set(withTiming(activeIndex >= 0 && !searchActive ? 1 : 0, { duration: 180 }));
-  }, [activeIndex, searchActive, metrics.itemWidth, reduceMotion, indicatorX, indicatorVisible]);
+  }, [activeIndex, searchActive, metrics.itemWidth, contentWidthFallback, reduceMotion, indicatorX, indicatorWidth, indicatorVisible]);
 
   // ── Animated styles ────────────────────────────────────────────────────────
   const pad = metrics.capsulePadding;
@@ -302,10 +340,16 @@ export function BuyerTabBar({
     return { width: base + searchExtraWidth * progress.value };
   });
 
-  const indicatorStyle = useAnimatedStyle(() => ({
-    opacity: indicatorVisible.value,
-    transform: [{ translateX: indicatorX.value }],
-  }));
+  const indicatorStyle = useAnimatedStyle(() => {
+    const width = indicatorWidth.value;
+    return {
+      opacity: indicatorVisible.value,
+      width,
+      // Centred within the itemWidth-wide column the pill's tab occupies,
+      // rather than pinned to the column's edge, so extra width grows evenly.
+      left: pad + indicatorX.value + (metrics.itemWidth - width) / 2,
+    };
+  });
 
   const fieldStyle = useAnimatedStyle(() => {
     const slot = slotRowWidth.value / BUYER_TAB_SLOT_COUNT;
@@ -420,9 +464,7 @@ export function BuyerTabBar({
           style={[
             styles.indicator,
             {
-              left: pad + 3,
               top: 4,
-              width: metrics.itemWidth - 6,
               height: metrics.capsuleHeight - 8,
               borderRadius: (metrics.capsuleHeight - 8) / 2,
             },
@@ -435,7 +477,7 @@ export function BuyerTabBar({
           onLayout={onSlotRowLayout}
           style={[styles.slotRow, { marginLeft: pad }]}
         >
-          {BUYER_TAB_ITEMS.map((item) => {
+          {BUYER_TAB_ITEMS.map((item, index) => {
             const focused = !searchActive && activeSlot === item.route;
             const isHome = item.route === 'index';
             const coveredBySearch = !isHome && searchActive;
@@ -446,6 +488,7 @@ export function BuyerTabBar({
             const slot = (
               <TabSlot
                 item={item}
+                index={index}
                 focused={focused}
                 metrics={metrics}
                 theme={theme}
@@ -455,6 +498,7 @@ export function BuyerTabBar({
                 testID={isHome && searchActive ? 'buyer-search-home' : `buyer-tab-${item.route}`}
                 accessibilityLabel={label}
                 hiddenForSearch={coveredBySearch}
+                onContentLayout={onSlotContentLayout}
               />
             );
             if (isHome) return <View key={item.route}>{slot}</View>;
@@ -627,12 +671,16 @@ const styles = StyleSheet.create({
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
+  },
+  slotContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
   },
   label: {
     fontFamily: FONT.medium,
     lineHeight: 14,
-    letterSpacing: 0.1,
+    letterSpacing: 0.2,
   },
   pressed: {
     opacity: 0.7,
@@ -728,6 +776,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
+    gap: 5,
   },
 });
