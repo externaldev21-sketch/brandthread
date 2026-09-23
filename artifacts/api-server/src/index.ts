@@ -1,5 +1,7 @@
+import "./instrument";
 import app from "./app";
 import { logger } from "./lib/logger";
+import { flushMonitoring } from "./lib/monitoring";
 import { startAbandonedCartJob } from "./jobs/abandonedCartRecovery";
 import { startTrendingJob }       from "./jobs/computeTrending";
 import { startTeamInviteReminderJob } from "./jobs/teamInviteReminder";
@@ -25,7 +27,8 @@ if (Number.isNaN(port) || port <= 0) {
 app.listen(port, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
-    process.exit(1);
+    void flushMonitoring().finally(() => process.exit(1));
+    return;
   }
 
   logger.info({ port }, "Server listening");

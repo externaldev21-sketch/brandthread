@@ -29,6 +29,7 @@ const SECTIONS: LegalSection[] = [
       'Camera, microphone, and photo library: only when you grant permission and use capture, posting, story, design, product, reporting, live-video, or export tools. Media-library location metadata access is disabled.',
       'Notifications: your device permission state, push token, platform, and notification preferences so we can deliver account, order, message, verification, and other notifications you request.',
       'Technical and service information: IP address, request and event timestamps, app/browser type, route and feature interactions, request identifiers, errors, security signals, and similar operational logs needed to run, secure, and troubleshoot the service.',
+      'Crash and performance reports: when the app, website, or our servers hit an error, a report with the error, stack trace, device model, operating system, app version, recent in-app actions, and performance timings is sent to our error-monitoring provider. These reports are used only to find and fix problems. They are not linked to your name, email address, or account, and are not used for advertising.',
       'Location: Brandthread currently uses addresses you enter, shipment tracking locations, business locations, customer-region summaries, and optional location text you add to content. The app does not include a device-location library, and our audit found no active request for GPS-derived precise or coarse device location. We will update this policy and request permission before collecting device location.',
       'Brandthread does not currently request your address book, use a native advertising identifier, or request App Tracking Transparency permission. The native app does not track your activity across other companies’ apps and websites for advertising. On the public website, optional Meta and TikTok measurement scripts load only when Brandthread has a real provider ID configured and you explicitly allow Marketing cookies; otherwise they remain disabled.',
     ],
@@ -52,7 +53,7 @@ const SECTIONS: LegalSection[] = [
     bullets: [
       'Clerk provides authentication and account infrastructure.',
       'Stripe processes payments, subscriptions, Stripe Connect onboarding and payouts, fraud checks, and Stripe Identity verification.',
-      'Cloud hosting, database, object-storage, email, push-notification, live-video, and security providers process data to operate Brandthread.',
+      'Cloud hosting, database, object-storage, email, push-notification, live-video, error-monitoring (Sentry), and security providers process data to operate Brandthread.',
       'AI providers process prompts and selected content to return requested AI features. We configure integrations for app functionality, not cross-app advertising.',
       'Buyers, sellers, manufacturers, freelancers, team members, carriers, and fulfillment participants receive the information needed for transactions or collaboration.',
       'We may disclose information to comply with law, protect people and the service, investigate abuse, complete a corporate transaction, or with your direction.',

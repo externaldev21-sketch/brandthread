@@ -69,6 +69,9 @@ async function buildAll() {
       "firebase-admin",
       "@parcel/watcher",
       "@sentry/profiling-node",
+      // Resolved from node_modules at runtime so its OpenTelemetry dependencies
+      // (also external above) load from its own pnpm directory.
+      "@sentry/node",
       "@tree-sitter/*",
       "aws-sdk",
       "classic-level",

@@ -1,0 +1,5 @@
+# Check text files out with LF line endings on every OS (including Windows).
+# The EAS Update runtime fingerprint hashes config and plugin files; CRLF
+# checkouts would give a Windows machine a different fingerprint than the
+# cloud build, and over-the-air updates would silently stop matching builds.
+* text=auto eol=lf
