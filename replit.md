@@ -26,6 +26,7 @@ A comprehensive clothing brand management mobile app covering 18 modules: brand 
 - `artifacts/api-server/` is the Express API. Route modules are in `src/routes/`; authentication middleware, object storage, payments, AI, and logging helpers are in `src/lib/` and `src/middlewares/`.
 - `lib/db/src/schema/index.ts` is the live Drizzle schema imported by the API. SQL changes belong in ordered, idempotent files under `lib/db/migrations/`, run by `lib/db/scripts/migrate.mjs`.
 - `lib/api-spec/openapi.yaml` is the contract source for generated API clients and Zod schemas. Regenerate them with the codegen command after changing that contract.
+- The buyer floating tab bar and its search morph live in `artifacts/mobile/components/buyer-nav/`; buyer screens behind it pad their content with `useBuyerTabBarInset()`.
 - Mobile theme tokens and shared visual constants are in `artifacts/mobile/lib/theme.ts`; the app is dark-only and uses a strict monochrome palette of true black/graphite surfaces with white and gray text.
 - `lib/integrations-openai-ai-server/` and `lib/integrations/openai_ai_integrations/` contain the Replit-managed OpenAI clients used by API AI features.
 

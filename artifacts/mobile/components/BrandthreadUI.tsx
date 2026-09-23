@@ -657,14 +657,16 @@ interface EmptyStateProps {
   action?: { label: string; onPress: () => void; icon?: keyof typeof Feather.glyphMap };
   secondaryAction?: { label: string; onPress: () => void };
   style?: StyleProp<ViewStyle>;
+  /** Drops the illustration for tight spaces, e.g. above an open keyboard. */
+  compact?: boolean;
 }
 
-export function EmptyState({ icon, title, description, action, secondaryAction, style }: EmptyStateProps) {
+export function EmptyState({ icon, title, description, action, secondaryAction, style, compact = false }: EmptyStateProps) {
   const { theme } = useAppTheme();
   const colors = useColors();
   return (
-    <View style={[esS.root, style]}>
-      <View style={esS.illustration} accessibilityElementsHidden>
+    <View style={[esS.root, compact && esS.rootCompact, style]}>
+      {!compact && <View style={esS.illustration} accessibilityElementsHidden>
         <View style={[esS.orbit, { borderColor: theme.accent + '30' }]} />
         <View style={[esS.spark, esS.sparkOne, { backgroundColor: theme.secondary }]} />
         <View style={[esS.spark, esS.sparkTwo, { backgroundColor: theme.accentLight }]} />
@@ -683,7 +685,7 @@ export function EmptyState({ icon, title, description, action, secondaryAction, 
             <View style={[esS.artLine, { backgroundColor: theme.secondary + '55', width: 24 }]} />
           </View>
         </LinearGradient>
-      </View>
+      </View>}
       <Text style={[esS.title, { color: colors.foreground }]}>{title}</Text>
       <Text style={[esS.desc, { color: colors.mutedForeground }]}>{description}</Text>
       {action && (
@@ -700,6 +702,7 @@ export function EmptyState({ icon, title, description, action, secondaryAction, 
 
 const esS = StyleSheet.create({
   root:    { alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl, paddingVertical: SP.xxl, gap: SP.sm },
+  rootCompact: { paddingVertical: SP.lg },
   illustration: { width: 150, height: 128, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm },
   orbit: { position: 'absolute', width: 122, height: 122, borderRadius: 61, borderWidth: 1 },
   floor: { position: 'absolute', bottom: 10, width: 94, height: 16, borderRadius: 12, transform: [{ scaleX: 1.2 }] },

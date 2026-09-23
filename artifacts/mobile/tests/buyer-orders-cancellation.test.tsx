@@ -37,6 +37,8 @@ vi.mock('react-native', () => {
     Text: nativeComponent('Text'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),
     View: nativeComponent('View'),
+    // The floating buyer tab bar inset reads the window size.
+    useWindowDimensions: () => ({ width: 393, height: 852, scale: 3, fontScale: 1 }),
   };
 });
 

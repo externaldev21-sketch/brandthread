@@ -15,6 +15,7 @@ import {
   ActivityIndicator, Alert, TextInput, RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -475,6 +476,7 @@ const makeSummaryStyles = (theme: AppThemePreset) => StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function CartScreen() {
+  const barInset = useBuyerTabBarInset();
   const { theme } = useAppTheme();
   const s = useMemo(() => makeScreenStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
@@ -769,7 +771,7 @@ export default function CartScreen() {
         <EmptyState
           icon="shopping-bag"
           title="Your cart is ready for something great."
-          description="Browse Thread and tap SHOP on products you love."
+          description="Browse Home and tap Shop on the pieces you love."
           action={{
             label: 'Discover Products',
             icon: 'compass',
@@ -791,7 +793,8 @@ export default function CartScreen() {
             contentContainerStyle={{
               paddingHorizontal: SP.md,
               paddingTop: SP.sm,
-              paddingBottom: insets.bottom + 140,
+              // Clears the checkout summary, which itself sits above the tab bar.
+              paddingBottom: barInset + 150,
             }}
           >
             {/* Seller groups */}
@@ -914,7 +917,7 @@ export default function CartScreen() {
 
           {/* Checkout button */}
           {hasItems && (
-          <View style={[s.checkoutBar, { paddingBottom: insets.bottom + SP.md }]}>
+          <View style={[s.checkoutBar, { paddingBottom: barInset + SP.xs }]}>
               <PressableScale
                 style={[s.checkoutBtn, { shadowColor: theme.shadowColor }]}
                 onPress={handleCheckout}
