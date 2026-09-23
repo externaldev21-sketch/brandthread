@@ -1019,12 +1019,12 @@ export async function getMessages(conversationId: string, k: SocialKeys = K()): 
   if (_socialUserId === k.userId) await save(msgKey, remote);
   return remote;
 }
-export async function sendMessage(conversationId: string, text: string, attachment?: MessageAttachment): Promise<Message> {
+export async function sendMessage(conversationId: string, text: string, attachment?: MessageAttachment, replyToId?: string): Promise<Message> {
   const k = K();
   const msgKey = k.messages(conversationId);
   const message = await serviceRequest<Message>(`/api/conversations/${encodeURIComponent(conversationId)}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ text, attachment }),
+    body: JSON.stringify({ text, attachment, replyToId }),
   });
   if (_socialUserId === k.userId) {
     const messages = await load<Message[]>(msgKey, []);
