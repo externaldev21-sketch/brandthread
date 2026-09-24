@@ -463,25 +463,29 @@ router.get("/feed", requireAuth, async (req, res) => {
 });
 
 // ─── POST /api/posts ─────────────────────────────────────────────────────────
+// Sellers publish to the Thread feed (GET /feed already restricts the feed
+// join to accountType='seller', so this is the only writer that can reach
+// it). Buyers may post PHOTO posts (single photo or a photo carousel, with a
+// caption) to their own profile only — the accountType='seller' join on the
+// feed means a buyer post can never surface there no matter what fields are
+// set on it, but we additionally hard-block video/product-tagging for buyers
+// below so the write path itself can't be used to fake a Thread post.
 router.post("/", requireAuth, async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
 
-  // ── Seller-only gate ────────────────────────────────────────────────────────
-  // Only seller accounts may publish to the Thread feed. This is enforced
-  // server-side so a buyer cannot bypass it by calling the API directly.
   const [poster] = await db
     .select({ accountType: users.accountType })
     .from(users)
     .where(eq(users.clerkId, clerkId))
     .limit(1);
 
-  if (!poster || poster.accountType !== "seller") {
+  if (!poster || (poster.accountType !== "seller" && poster.accountType !== "buyer")) {
     return res.status(403).json({
-      error: "Only seller accounts can post to the Thread feed.",
-      code:  "SELLER_ONLY",
+      error: "Only buyer and seller accounts can post.",
+      code:  "ACCOUNT_TYPE_REQUIRED",
     });
   }
-  // ───────────────────────────────────────────────────────────────────────────
+  const isBuyer = poster.accountType === "buyer";
 
   const {
     mediaUrl: requestedMediaUrl, thumbnailUrl: requestedThumbnailUrl, mediaPath, thumbnailPath,
@@ -510,6 +514,31 @@ router.post("/", requireAuth, async (req, res) => {
 
   const restriction = await publishingRestriction(clerkId);
   if (restriction) return res.status(restriction.status).json(restriction.body);
+
+  // ── Buyer posting rules ─────────────────────────────────────────────────────
+  // Buyers may only post photos (single or carousel) to their own profile —
+  // no video, no product tagging (they don't own products), no scheduling.
+  if (isBuyer) {
+    const requestedType = (mediaType as string | undefined) ?? "photo";
+    if (requestedType !== "photo" && requestedType !== "slideshow") {
+      return res.status(403).json({
+        error: "Buyer accounts can only post photos (single or carousel).",
+        code:  "BUYER_PHOTO_ONLY",
+      });
+    }
+    if (taggedProductIds && taggedProductIds.length > 0) {
+      return res.status(403).json({
+        error: "Buyer accounts cannot tag products.",
+        code:  "BUYER_NO_PRODUCT_TAGS",
+      });
+    }
+    if (scheduledAt) {
+      return res.status(403).json({
+        error: "Buyer posts cannot be scheduled.",
+        code:  "BUYER_NO_SCHEDULING",
+      });
+    }
+  }
 
   if (caption !== undefined && caption !== null && typeof caption !== "string") {
     return res.status(400).json({ error: "caption must be a string" });
