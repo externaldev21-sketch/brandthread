@@ -52,6 +52,10 @@ import { useCanUseMarketing } from '@/contexts/CookieConsentContext';
 import { setMarketingPixelConsent, trackMarketingPixelEvent } from '@/lib/marketingPixels';
 import { captureNotificationEvent, flushNotificationEvents } from '@/lib/notificationEventOutbox';
 import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
+import NotificationBanner from '@/components/notifications/NotificationBanner';
+import { showNotificationBanner } from '@/lib/notificationBannerBus';
+import { getNotifications as getFeedNotifications } from '@/services/socialService';
+import { syncNotificationBadge } from '@/lib/notificationBadge';
 import { SellerGlobalTabBar } from '@/components/SellerGlobalTabBar';
 import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 import AppLockGate from '@/components/security/AppLockGate';
@@ -227,11 +231,15 @@ function SellerBarGate() {
 // API warnings and gives users the impression that browser push is enabled.
 if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
+    // The system alert is suppressed while the app is foregrounded — the
+    // themed in-app banner (components/notifications/NotificationBanner)
+    // takes over that job instead. Background/killed-app notifications are
+    // unaffected: the OS always shows those regardless of this handler.
     handleNotification: async () =>
-      ({ shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: true }) as any,
+      ({ shouldShowAlert: false, shouldPlaySound: true, shouldSetBadge: true }) as any,
   });
 
-  // ─── Android notification channel ───────────────────────────────────────────
+  // ─── Android notification channels ──────────────────────────────────────────
   if (Platform.OS === 'android') {
     Notifications.setNotificationChannelAsync('default', {
       name:       'Brandthread',
@@ -245,6 +253,38 @@ if (Platform.OS !== 'web') {
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       sound: 'order_received.wav',
+      lightColor: '#F7F7FA',
+    });
+    Notifications.setNotificationChannelAsync('messages', {
+      name:       'Messages',
+      description: 'New chat messages.',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#F7F7FA',
+    });
+    Notifications.setNotificationChannelAsync('drops', {
+      name:       'Drops',
+      description: 'Drops going live from brands you follow.',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#F7F7FA',
+    });
+    Notifications.setNotificationChannelAsync('social', {
+      name:       'Social',
+      description: 'New followers and likes.',
+      importance: Notifications.AndroidImportance.DEFAULT,
+      lightColor: '#F7F7FA',
+    });
+    Notifications.setNotificationChannelAsync('stock', {
+      name:       'Stock & price alerts',
+      description: 'Back in stock and price drop alerts on items you saved.',
+      importance: Notifications.AndroidImportance.DEFAULT,
+      lightColor: '#F7F7FA',
+    });
+    Notifications.setNotificationChannelAsync('payout', {
+      name:       'Payouts',
+      description: 'Payout confirmations.',
+      importance: Notifications.AndroidImportance.DEFAULT,
       lightColor: '#F7F7FA',
     });
   }
@@ -729,6 +769,25 @@ function RootLayoutNav() {
     const receiptSubscription = Notifications.addNotificationReceivedListener(
       (notification) => {
         void trackNotificationEvent(notification, 'receipt').catch(() => {});
+
+        // The OS alert is suppressed while foregrounded (see the handler
+        // above) — this is the themed banner taking its place.
+        const content = notification.request.content;
+        const data = (content.data ?? {}) as Record<string, unknown>;
+        if (typeof content.title === 'string') {
+          showNotificationBanner({
+            id: notification.request.identifier,
+            title: content.title,
+            body: typeof content.body === 'string' ? content.body : '',
+            category: typeof data.category === 'string' ? data.category : undefined,
+            data,
+          });
+        }
+
+        // Refresh the in-app feed so the unread badge count picks up this
+        // notification immediately rather than waiting for the feed screen
+        // to be opened.
+        void getFeedNotifications().then(syncNotificationBadge).catch(() => {});
       },
     );
     void Notifications.getLastNotificationResponseAsync()
@@ -789,6 +848,7 @@ function RootLayoutNav() {
         style={{ position: 'absolute', width: 1, height: 1, opacity: 0.01 }}
       />
       <StoreContextBanner />
+      <NotificationBanner />
       <NetworkNoticeBanner />
       <Pressable onPress={Keyboard.dismiss} accessible={false} style={{ flex: 1 }}>
         <View style={{ flex: 1 }}>

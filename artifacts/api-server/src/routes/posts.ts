@@ -15,6 +15,7 @@ import {
 import { eq, and, inArray, count, sql, desc, lte, lt, gte, or } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
+import { enqueueBatchedNotification } from "../lib/push";
 import postVideoRouter, {
   mediaUrl as composedMediaUrl,
   setComposedMediaVisibility,
@@ -1153,7 +1154,7 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
   if (!["like", "repost", "view", "watch_time", "shop_click"].includes(type)) {
     return res.status(400).json({ error: "type must be like, repost, view, watch_time, or shop_click" });
   }
-  const [visiblePost] = await db.select({ id: posts.id, visibility: posts.visibility }).from(posts)
+  const [visiblePost] = await db.select({ id: posts.id, visibility: posts.visibility, ownerId: posts.userId }).from(posts)
     .where(and(eq(posts.id, id), visiblePostCondition()))
     .limit(1);
   if (!visiblePost) return res.status(404).json({ error: "Post not found" });
@@ -1192,6 +1193,23 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
       .select({ count: count() })
       .from(interactions)
       .where(and(eq(interactions.postId, id), eq(interactions.type, type)));
+
+    if (!removing && visiblePost.ownerId && visiblePost.ownerId !== clerkId) {
+      const [liker] = await db.select({
+        name: sql<string>`COALESCE(${users.brandName}, ${users.displayName}, 'Someone')`,
+      }).from(users).where(eq(users.clerkId, clerkId)).limit(1);
+      // Likes are bursty and low-priority: collapse them into one notification
+      // instead of pushing on every tap (see jobs/notificationBatchFlush.ts).
+      void enqueueBatchedNotification({
+        userId: visiblePost.ownerId,
+        category: "social",
+        type: "post_liked",
+        targetId: id,
+        targetType: "post",
+        actorName: liker?.name ?? "Someone",
+        cta: "View post",
+      });
+    }
 
     return res.json({ action: removing ? "removed" : "added", count: newCount });
   }
