@@ -669,9 +669,29 @@ router.patch("/:id/accept", async (req, res) => {
 // ─── POST /api/conversations/upload-media ────────────────────────────────────
 // Accept a base64-encoded image/video/audio and store it in object storage.
 // Returns { url } — a publicly-accessible URL for use in message attachments.
+//
+// mimeType and extension are attacker-controlled input: the extension is
+// never taken from the request (it previously allowed arbitrary characters,
+// including "/", into the generated object key) and the content-type is
+// restricted to a fixed allowlist of media types this feature supports.
+const UPLOAD_MEDIA_MIME_EXTENSIONS: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "video/mp4": "mp4",
+  "video/quicktime": "mov",
+  "video/webm": "webm",
+  "audio/mpeg": "mp3",
+  "audio/mp4": "m4a",
+  "audio/x-m4a": "m4a",
+  "audio/wav": "wav",
+};
+const UPLOAD_MEDIA_BASE64_RE = /^[A-Za-z0-9+/]+=*$/;
+
 router.post("/upload-media", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
-  const { data, mimeType = "image/jpeg", extension = "jpg" } = req.body ?? {};
+  const { data, mimeType = "image/jpeg" } = req.body ?? {};
 
   const BUCKET_ID = (process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "").trim();
   if (!BUCKET_ID) {
@@ -691,9 +711,19 @@ router.post("/upload-media", async (req, res) => {
   if (base64.length > 80 * 1024 * 1024) {
     return res.status(413).json({ error: "File too large (max ~60 MB)" });
   }
+  if (!UPLOAD_MEDIA_BASE64_RE.test(base64)) {
+    return res.status(400).json({ error: "data must be base64-encoded" });
+  }
+
+  const normalizedMimeType = typeof mimeType === "string" ? mimeType.toLowerCase() : "";
+  const ext = UPLOAD_MEDIA_MIME_EXTENSIONS[normalizedMimeType];
+  if (!ext) {
+    return res.status(400).json({
+      error: `mimeType must be one of: ${Object.keys(UPLOAD_MEDIA_MIME_EXTENSIONS).join(", ")}`,
+    });
+  }
 
   const { randomUUID } = await import("crypto");
-  const ext      = (extension as string).replace(/^\./, "").slice(0, 10);
   const filename = `messaging/${userId}/${randomUUID()}.${ext}`;
 
   try {
@@ -701,7 +731,7 @@ router.post("/upload-media", async (req, res) => {
     const buffer = Buffer.from(base64, "base64");
     const bucket = objectStorageClient.bucket(BUCKET_ID);
     const file   = bucket.file(filename);
-    await file.save(buffer, { contentType: mimeType as string, resumable: false });
+    await file.save(buffer, { contentType: normalizedMimeType, resumable: false });
     await file.makePublic();
     const url = `https://storage.googleapis.com/${BUCKET_ID}/${filename}`;
     return res.json({ url });
