@@ -32,6 +32,7 @@ import {
   BLUE, ORANGE, RED, FONT, FS, SP, RADIUS, ICON, ACCENT, GRID_MAX_WIDTH,
 } from '@/lib/theme';
 import { buildCanonicalProfileUrl } from '@/lib/shareProfile';
+import { BrandDropsCard } from '@/components/BrandDropsCard';
 import { confirmBlock, reportHref } from '@/lib/safety';
 import { GridSkeleton, ResponsiveContainer, useGridColumns, useBreakpoint } from '@/components/layout';
 
@@ -861,6 +862,9 @@ export default function SellerProfileScreen() {
             <Text style={styles.statLabel}>Products</Text>
           </View>
         </View>
+
+        {/* Drops entry point — small, additive; see BrandDropsCard */}
+        <BrandDropsCard sellerId={canonicalSellerId ?? profile.sellerId} sellerName={profile.brandName} />
 
         {/* 3 (buyer only): Shop Button */}
         {!isOwner && (
