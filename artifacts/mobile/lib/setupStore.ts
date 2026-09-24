@@ -38,6 +38,8 @@ export interface SetupState {
   tasks: SetupTask[];
   dismissedTips: string[];    // IDs of dismissed contextual tips
   openedFeatures: string[];   // IDs of features opened (clears "New" badge)
+  walkthroughShown: boolean;  // has the guided walkthrough sheet been shown at least once?
+  celebrated: boolean;        // has the 100% completion celebration already played?
   lastUpdated: number;
 }
 
@@ -123,6 +125,8 @@ function createDefaultState(): SetupState {
     tasks: DEFAULT_TASKS.map(t => ({ ...t, completed: false, skipped: false })),
     dismissedTips: [],
     openedFeatures: [],
+    walkthroughShown: false,
+    celebrated: false,
     lastUpdated: Date.now(),
   };
 }
@@ -176,6 +180,8 @@ function normalizeState(value: unknown): SetupState {
     openedFeatures: Array.isArray(parsed.openedFeatures)
       ? parsed.openedFeatures.filter((feature): feature is string => typeof feature === 'string')
       : [],
+    walkthroughShown: parsed.walkthroughShown === true,
+    celebrated: parsed.celebrated === true,
     lastUpdated: typeof parsed.lastUpdated === 'number' ? parsed.lastUpdated : Date.now(),
   };
 }
@@ -272,6 +278,22 @@ export async function markSetupStarted(userId?: string | null): Promise<SetupSta
 export async function dismissWelcome(userId?: string | null): Promise<SetupState> {
   const state = await getSetupState(userId);
   const next: SetupState = { ...state, dismissed: true };
+  await saveSetupState(next, userId);
+  return next;
+}
+
+export async function markWalkthroughShown(userId?: string | null): Promise<SetupState> {
+  const state = await getSetupState(userId);
+  if (state.walkthroughShown) return state;
+  const next: SetupState = { ...state, walkthroughShown: true };
+  await saveSetupState(next, userId);
+  return next;
+}
+
+export async function markCelebrated(userId?: string | null): Promise<SetupState> {
+  const state = await getSetupState(userId);
+  if (state.celebrated) return state;
+  const next: SetupState = { ...state, celebrated: true };
   await saveSetupState(next, userId);
   return next;
 }

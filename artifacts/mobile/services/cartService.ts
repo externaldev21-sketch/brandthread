@@ -17,7 +17,7 @@ import {
   BuyerReturnRequest, BuyerReturnReason, BuyerReturnResolution,
   BuyerRefundRequest, BuyerProblemReport, BuyerProblemType,
 } from './cartTypes';
-import { centsAtPercent, formatCents } from '@/lib/money';
+import { formatCents } from '@/lib/money';
 
 // ─── Storage keys (scoped by user ID so two accounts never share storage) ─────
 
@@ -691,33 +691,6 @@ export async function clearCheckoutSession(): Promise<void> {
 
 // ─── Discounts ────────────────────────────────────────────────────────────────
 
-const DEMO_DISCOUNT_CODES: Record<string, CheckoutDiscount> = {
-  'THREAD10': {
-    code: 'THREAD10',
-    type: 'percentage',
-    value: 10,
-    appliedAmountCents: 0,
-    description: '10% off your order',
-    isValid: true,
-  },
-  'FREESHIP': {
-    code: 'FREESHIP',
-    type: 'free_shipping',
-    value: 0,
-    appliedAmountCents: 0,
-    description: 'Free standard shipping',
-    isValid: true,
-  },
-  'FIRST20': {
-    code: 'FIRST20',
-    type: 'fixed',
-    value: 2000,
-    appliedAmountCents: 2000,
-    description: '$20 off your first order',
-    isValid: true,
-  },
-};
-
 export async function applyDiscount(
   code: string,
   subtotalCents: number,
@@ -731,20 +704,9 @@ export async function applyDiscount(
   const sess = await getCheckoutSession();
   const sellerId = (sess as any)?.items?.[0]?.sellerId ?? (sess as any)?.deliveryGroups?.[0]?.sellerId ?? '';
   if (!sellerId) {
-    // Fall back to demo codes if no seller context
-    const upper = trimmedCode;
-    if (existingDiscounts.some(d => d.code === upper)) {
-      return { code: upper, type: 'percentage' as any, value: 0, appliedAmountCents: 0, description: '', isValid: false, errorMessage: 'This code has already been applied.' };
-    }
-    const found = DEMO_DISCOUNT_CODES[upper];
-    if (!found) {
-      return { code: upper, type: 'percentage' as any, value: 0, appliedAmountCents: 0, description: '', isValid: false, errorMessage: 'Invalid discount code.' };
-    }
-    let appliedAmountCents = 0;
-    if (found.type === 'percentage') appliedAmountCents = centsAtPercent(subtotalCents, found.value);
-    else if (found.type === 'fixed') appliedAmountCents = Math.min(found.value, subtotalCents);
-    else if (found.type === 'free_shipping') appliedAmountCents = 1240;
-    return { ...found, appliedAmountCents };
+    // No seller context to validate a code against — fail closed rather than
+    // accepting an unvalidated code.
+    return { code: trimmedCode, type: 'percentage' as any, value: 0, appliedAmountCents: 0, description: '', isValid: false, errorMessage: 'Add items to your cart before applying a discount code.' };
   }
   try {
     const { api } = await import('@/lib/api');

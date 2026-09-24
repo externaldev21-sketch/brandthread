@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -24,8 +23,14 @@ import {
   sellerHomeAnalyticsKey,
   type SellerHomeAnalyticsSnapshot,
 } from '@/lib/sellerHomeAnalytics';
-import { skipTask, type SetupState, type SetupTask } from '@/lib/setupStore';
-import { withSellerSetupOrigin } from '@/lib/setupNavigation';
+import {
+  isSetupComplete, completionPercent, nextTask, completeTask,
+  markWalkthroughShown, markCelebrated,
+  type SetupState,
+} from '@/lib/setupStore';
+import SetupWalkthroughSheet from '@/components/SetupWalkthroughSheet';
+import SetupContinueBanner from '@/components/SetupContinueBanner';
+import SetupCelebration from '@/components/SetupCelebration';
 import { KpiRowSkeleton, ResponsiveContainer, SkeletonBlock as LayoutSkeletonBlock, useBreakpoint } from '@/components/layout';
 import ActivityBellButton from '@/components/ActivityBellButton';
 import { bucketLabel } from '@/lib/sellerHomeChartLabels';
@@ -188,6 +193,42 @@ export default function SellerHomeCommerceDashboard({
   const payoutAttemptKeyRef = useRef<string | null>(null);
   const data = selectSellerHomeAnalytics(snapshot, userId, range);
 
+  const [walkthroughVisible, setWalkthroughVisible] = useState(false);
+  const [celebrationVisible, setCelebrationVisible] = useState(false);
+  const autoOpenedRef = useRef(false);
+  const wasCompleteRef = useRef<boolean | null>(null);
+  const setupComplete = isSetupComplete(setupState);
+  const setupPercent = completionPercent(setupState);
+
+  // Show the guided walkthrough automatically the first time a seller lands
+  // on an incomplete dashboard (e.g. right after signup), then never again
+  // uninvited — the "Continue setup" banner takes over from there.
+  useEffect(() => {
+    if (autoOpenedRef.current) return;
+    if (!userId || setupComplete) return;
+    if (setupState.walkthroughShown) return;
+    autoOpenedRef.current = true;
+    setWalkthroughVisible(true);
+    void markWalkthroughShown(userId).then(onSetupStateChange);
+  }, [onSetupStateChange, setupComplete, setupState.walkthroughShown, userId]);
+
+  // One-time celebration the moment every required step becomes complete.
+  useEffect(() => {
+    if (wasCompleteRef.current === null) {
+      wasCompleteRef.current = setupComplete;
+      if (setupComplete && !setupState.celebrated && userId) {
+        setCelebrationVisible(true);
+        void markCelebrated(userId).then(onSetupStateChange);
+      }
+      return;
+    }
+    if (setupComplete && !wasCompleteRef.current && !setupState.celebrated && userId) {
+      setCelebrationVisible(true);
+      void markCelebrated(userId).then(onSetupStateChange);
+    }
+    wasCompleteRef.current = setupComplete;
+  }, [onSetupStateChange, setupComplete, setupState.celebrated, userId]);
+
   useEffect(() => {
     if (!userId) {
       setLoading(false);
@@ -244,6 +285,15 @@ export default function SellerHomeCommerceDashboard({
   useEffect(() => {
     void loadFinanceBalance();
   }, [loadFinanceBalance]);
+
+  // Auto-check "Set up payments" the moment real payout data confirms Stripe
+  // Connect is live — real data, not a manual tap, drives this step.
+  useEffect(() => {
+    if (!userId || !financeBalance?.connected) return;
+    const task = setupState.tasks.find((t) => t.id === 'connect_payments');
+    if (!task || task.completed) return;
+    void completeTask('connect_payments', userId).then(onSetupStateChange);
+  }, [financeBalance?.connected, onSetupStateChange, setupState.tasks, userId]);
 
   useEffect(() => subscribeStoreContext(() => {
     balanceGenerationRef.current += 1;
@@ -378,25 +428,6 @@ export default function SellerHomeCommerceDashboard({
     );
   }, [api, currentRole, financeBalance, loadFinanceBalance, nav, userId]);
 
-  const openTask = useCallback((task: SetupTask) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    router.push(withSellerSetupOrigin(task.route) as never);
-  }, [router]);
-
-  const dismissTask = useCallback(async (task: SetupTask) => {
-    const next = await skipTask(task.id, userId);
-    onSetupStateChange(next);
-  }, [onSetupStateChange, userId]);
-
-  const showTaskOptions = useCallback((task: SetupTask) => {
-    Alert.alert(task.label, undefined, [
-      { text: 'Open', onPress: () => openTask(task) },
-      { text: 'Dismiss', style: 'destructive', onPress: () => void dismissTask(task) },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  }, [dismissTask, openTask]);
-
-  const unfinishedTasks = setupState.tasks.filter((task) => !task.completed && !task.skipped);
   const maxBucket = Math.max(0, ...(data?.buckets.map((bucket) => bucket.totalCents) ?? []));
   const hasActivity = data?.buckets.some((bucket) => bucket.totalCents > 0) ?? false;
   const toFulfill = data?.toFulfill ?? 0;
@@ -673,56 +704,13 @@ export default function SellerHomeCommerceDashboard({
         </View>
 
         {/* ── Setup checklist ───────────────────────────────────────────── */}
-        {unfinishedTasks.length > 0 && (
+        {!setupComplete && setupState.walkthroughShown && (
           <View style={styles.setupSection}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionHeaderLabel}>Set up your business</Text>
-              <View style={styles.setupCountBadge}>
-                <Text style={styles.setupCountText}>{unfinishedTasks.length}</Text>
-              </View>
-            </View>
-
-            <View style={styles.setupList}>
-              {unfinishedTasks.map((task, index) => (
-                <TouchableOpacity
-                  key={task.id}
-                  style={[
-                    [styles.setupCard, { backgroundColor: palette.card ?? palette.surface ?? CARD_ELEVATED_GLASS, borderColor: palette.borderSubtle ?? BORDER_SUBTLE }],
-                    index < unfinishedTasks.length - 1 && styles.setupCardBordered,
-                  ]}
-                  activeOpacity={0.75}
-                  onPress={() => openTask(task)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Open setup task: ${task.label}`}
-                >
-                  <View style={[styles.setupIcon, { backgroundColor: theme.accentDim }]}>
-                    <Feather
-                      name={task.icon as keyof typeof Feather.glyphMap}
-                      size={18}
-                      color={theme.accentLight}
-                    />
-                  </View>
-                  <View style={styles.setupCopy}>
-                    <Text style={styles.setupTitle}>{task.label}</Text>
-                    <Text style={styles.setupDescription} numberOfLines={2}>
-                      {task.description}
-                    </Text>
-                  </View>
-                  <Pressable
-                    style={styles.optionsButton}
-                    hitSlop={10}
-                    onPress={(event) => {
-                      event.stopPropagation();
-                      showTaskOptions(task);
-                    }}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Options for ${task.label}`}
-                  >
-                    <Feather name="more-horizontal" size={18} color={MUTED} />
-                  </Pressable>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <SetupContinueBanner
+              percent={setupPercent}
+              nextLabel={nextTask(setupState)?.label ?? null}
+              onPress={() => setWalkthroughVisible(true)}
+            />
           </View>
         )}
         </ResponsiveContainer>
@@ -733,6 +721,17 @@ export default function SellerHomeCommerceDashboard({
         />
       </ScrollView>
 
+      <SetupWalkthroughSheet
+        visible={walkthroughVisible}
+        onClose={() => setWalkthroughVisible(false)}
+        userId={userId}
+        setupState={setupState}
+        onSetupStateChange={onSetupStateChange}
+      />
+      <SetupCelebration
+        visible={celebrationVisible}
+        onDismiss={() => setCelebrationVisible(false)}
+      />
     </View>
   );
 }
