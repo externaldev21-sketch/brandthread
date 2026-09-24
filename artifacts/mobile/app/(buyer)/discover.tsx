@@ -42,13 +42,14 @@ import {
   BG, SURFACE, CARD,
   BORDER,
   FG, MUTED, SUBTLE, ON_DARK,
-  FONT, FS, SP, RADIUS,
+  FONT, FS, SP, RADIUS, GUTTER, GRID_MAX_WIDTH,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useAuth } from '@clerk/expo';
 import { formatCents } from '@/lib/money';
 import { CachedImage } from '@/components/CachedImage';
+import { CardSkeleton, EmptyState, ListSkeleton, ResponsiveContainer } from '@/components/layout';
 import {
   CommerceSignalRow,
   ClaimedRemainingLabel,
@@ -545,65 +546,6 @@ const tr = StyleSheet.create({
   brand:    { fontSize: 11, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
 });
 
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
-
-function SkeletonRow() {
-  const opacity = useRef(new Animated.Value(0.35)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 0.7, duration: 700, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.35, duration: 700, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [opacity]);
-  return (
-    <Animated.View style={[skRow.row, { opacity }]}>
-      <View style={skRow.avatar} />
-      <View style={{ flex: 1, gap: 8 }}>
-        <View style={[skRow.line, { width: '65%' }]} />
-        <View style={[skRow.line, { width: '45%' }]} />
-      </View>
-      <View style={[skRow.line, { width: 44 }]} />
-    </Animated.View>
-  );
-}
-const skRow = StyleSheet.create({
-  row:    { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.xs, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
-  avatar: { width: 44, height: 44, borderRadius: RADIUS.xs, backgroundColor: SURFACE },
-  line:   { height: 10, borderRadius: 4, backgroundColor: SURFACE },
-});
-
-function SkeletonCard() {
-  const opacity = useRef(new Animated.Value(0.35)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 0.7, duration: 700, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.35, duration: 700, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [opacity]);
-  return (
-    <Animated.View style={[skCard.card, { opacity }]}>
-      <View style={skCard.visual} />
-      <View style={{ padding: 10, gap: 8 }}>
-        <View style={[skRow.line, { width: '60%' }]} />
-        <View style={[skRow.line, { width: '85%' }]} />
-        <View style={[skRow.line, { width: '40%' }]} />
-      </View>
-    </Animated.View>
-  );
-}
-const skCard = StyleSheet.create({
-  card:   { width: 158, borderRadius: RADIUS.xs, overflow: 'hidden', backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
-  visual: { height: 130, backgroundColor: SURFACE },
-});
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function DiscoverScreen() {
@@ -616,6 +558,8 @@ export default function DiscoverScreen() {
   const { isSignedIn } = useAuth();
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const { width: winWidth } = useWindowDimensions();
+  const showcaseSkeletonWidth = Math.min(Math.max(winWidth - 54 - GUTTER * 2, 1), 370);
 
   // ─ Each section has independent loading, error, and data ──────────
 
@@ -825,53 +769,50 @@ export default function DiscoverScreen() {
       }
     >
       {/* ─ Header ─ */}
-      <View style={[s.header, { paddingTop: topPad + 16, paddingHorizontal: 20 }]}>
-        <View>
-          <Text style={[s.greeting, { color: palette.muted ?? MUTED }]}>What's dropping</Text>
-          <Text style={[s.pageTitle, { color: palette.text ?? FG }]}>Discover</Text>
-        </View>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <TouchableOpacity
-            style={[s.headerBtn, { backgroundColor: palette.card ?? CARD, borderColor: palette.border ?? BORDER }]}
-            activeOpacity={0.75}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/search' as never); }}
-            accessibilityRole="button"
-            accessibilityLabel="Search products and brands"
-          >
-            <Feather name="search" size={18} color={MUTED} />
-          </TouchableOpacity>
-          {isSignedIn && (
+      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
+        <View style={[s.header, { paddingTop: topPad + 16 }]}>
+          <View>
+            <Text style={[s.greeting, { color: palette.muted ?? MUTED }]}>What's dropping</Text>
+            <Text style={[s.pageTitle, { color: palette.text ?? FG }]}>Discover</Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
             <TouchableOpacity
               style={[s.headerBtn, { backgroundColor: palette.card ?? CARD, borderColor: palette.border ?? BORDER }]}
               activeOpacity={0.75}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/inbox' as never); }}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/search' as never); }}
               accessibilityRole="button"
-              accessibilityLabel="Notifications"
+              accessibilityLabel="Search products and brands"
             >
-              <Feather name="bell" size={18} color={MUTED} />
+              <Feather name="search" size={18} color={MUTED} />
             </TouchableOpacity>
-          )}
+            {isSignedIn && (
+              <TouchableOpacity
+                style={[s.headerBtn, { backgroundColor: palette.card ?? CARD, borderColor: palette.border ?? BORDER }]}
+                activeOpacity={0.75}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/inbox' as never); }}
+                accessibilityRole="button"
+                accessibilityLabel="Notifications"
+              >
+                <Feather name="bell" size={18} color={MUTED} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-      </View>
+      </ResponsiveContainer>
 
       {/* ─ High Demand — publicProducts.highDemand(6) only, no trending posts ─ */}
-      <View style={{ paddingHorizontal: 20, marginBottom: 32 }}>
+      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
         <HighDemandSectionHead
           title="High Demand"
           subtitle="Products moving fast across the platform"
           style={{ marginBottom: 14 }}
         />
         {highDemandLoading ? (
-          <View style={{ gap: 10 }}>
-            {[0, 1, 2].map(i => <SkeletonRow key={i} />)}
-          </View>
+          <ListSkeleton rows={3} />
         ) : highDemandError ? (
           <SectionError message={highDemandError} onRetry={fetchHighDemand} />
         ) : highDemandItems.length === 0 ? (
-          <View style={s.emptyRow}>
-            <Feather name="trending-up" size={22} color={SUBTLE} />
-            <Text style={s.emptyText}>No high-demand products right now</Text>
-          </View>
+          <EmptyState icon="trending-up" message="No high-demand products right now" />
         ) : (
           <View style={{ gap: 10 }}>
             {highDemandItems.slice(0, 6).map(item => (
@@ -879,85 +820,78 @@ export default function DiscoverScreen() {
             ))}
           </View>
         )}
-      </View>
+      </ResponsiveContainer>
 
       {/* ─ For You ─ */}
-      <View style={{ paddingHorizontal: 20, marginBottom: 4 }}>
+      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: 4 }}>
         <SectionHead
           title="For You"
           sub="Products from across the platform"
           action="See all"
           onAction={() => router.push('/(buyer)/' as never)}
         />
-      </View>
+      </ResponsiveContainer>
       {forYouLoading ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 20, gap: 12, paddingBottom: 4 }}
-          style={{ marginBottom: 32 }}
-          scrollEnabled={false}
-        >
-          {[0, 1, 2].map(i => <SkeletonCard key={i} />)}
-        </ScrollView>
+        <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
+          <CardSkeleton width={showcaseSkeletonWidth} />
+        </ResponsiveContainer>
       ) : forYouError ? (
-        <View style={{ paddingHorizontal: 20, marginBottom: 32 }}>
+        <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
           <SectionError message={forYouError} onRetry={fetchProducts} />
-        </View>
+        </ResponsiveContainer>
       ) : forYouItems.length === 0 ? (
-        <View style={[s.emptyRow, { marginBottom: 32 }]}>
-          <Feather name="package" size={24} color={SUBTLE} />
-          <Text style={s.emptyText}>No products available right now</Text>
-        </View>
+        <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
+          <EmptyState icon="package" message="No products available right now" />
+        </ResponsiveContainer>
       ) : (
-        <ProductShowcase items={forYouItems} />
+        <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
+          <ProductShowcase items={forYouItems} />
+        </ResponsiveContainer>
       )}
 
       {/* ─ Drops ─ */}
-      <View style={{ paddingHorizontal: 20, marginBottom: 4 }}>
+      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: 4 }}>
         <SectionHead
           title="Drops"
           sub={dropsItems.some(d => d.isLive) ? 'Live now and coming up' : 'Coming up'}
           action="All drops"
           onAction={() => router.push('/(buyer)/' as never)}
         />
-      </View>
-      <View style={{ paddingHorizontal: 20, gap: 10, marginBottom: 32 }}>
-        {dropsLoading ? (
-          [0, 1, 2].map(i => <SkeletonRow key={i} />)
-        ) : dropsError ? (
-          <SectionError message={dropsError} onRetry={fetchDrops} />
-        ) : dropsItems.length === 0 ? (
-          <View style={s.emptyRow}>
-            <Feather name="calendar" size={22} color={SUBTLE} />
-            <Text style={s.emptyText}>No upcoming drops right now</Text>
-          </View>
-        ) : (
-          dropsItems.map(item => <DropRow key={item.id} item={item} />)
-        )}
-      </View>
+      </ResponsiveContainer>
+      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
+        <View style={{ gap: 10 }}>
+          {dropsLoading ? (
+            <ListSkeleton rows={3} />
+          ) : dropsError ? (
+            <SectionError message={dropsError} onRetry={fetchDrops} />
+          ) : dropsItems.length === 0 ? (
+            <EmptyState icon="calendar" message="No upcoming drops right now" />
+          ) : (
+            dropsItems.map(item => <DropRow key={item.id} item={item} />)
+          )}
+        </View>
+      </ResponsiveContainer>
 
       {/* ─ Trending — engagement-ranked posts, separate from High Demand ─ */}
-      <View style={{ paddingHorizontal: 20, marginBottom: 4 }}>
+      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: 4 }}>
         <SectionHead
           title="Trending"
           sub="Real-time engagement across the platform"
         />
-      </View>
-      <View style={{ paddingHorizontal: 20, gap: 10, marginBottom: 32 }}>
-        {trendingLoading ? (
-          [0, 1, 2].map(i => <SkeletonRow key={i} />)
-        ) : trendingError ? (
-          <SectionError message={trendingError} onRetry={fetchTrending} />
-        ) : trendingItems.length === 0 ? (
-          <View style={s.emptyRow}>
-            <Feather name="activity" size={22} color={SUBTLE} />
-            <Text style={s.emptyText}>No trending posts right now</Text>
-          </View>
-        ) : (
-          trendingItems.slice(0, 10).map(item => <TrendingRow key={item.id} item={item} />)
-        )}
-      </View>
+      </ResponsiveContainer>
+      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
+        <View style={{ gap: 10 }}>
+          {trendingLoading ? (
+            <ListSkeleton rows={3} />
+          ) : trendingError ? (
+            <SectionError message={trendingError} onRetry={fetchTrending} />
+          ) : trendingItems.length === 0 ? (
+            <EmptyState icon="activity" message="No trending posts right now" />
+          ) : (
+            trendingItems.slice(0, 10).map(item => <TrendingRow key={item.id} item={item} />)
+          )}
+        </View>
+      </ResponsiveContainer>
     </ScrollView>
   );
 }
@@ -969,6 +903,4 @@ const s = StyleSheet.create({
   greeting:  { fontSize: 12, fontFamily: FONT.medium, letterSpacing: 0.3 },
   pageTitle: { fontSize: 28, fontFamily: FONT.bold, letterSpacing: -0.6 },
   headerBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  emptyRow:  { paddingHorizontal: 20, paddingVertical: 24, alignItems: 'center', gap: 10 },
-  emptyText: { color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.sm },
 });

@@ -30,10 +30,11 @@ import {
   BORDER, BORDER_SUBTLE,
   FG, MUTED, SUBTLE, ON_DARK,
   SUCCESS, RED,
-  FONT, FS, SP, RADIUS, COMP, ICON, ANIM
+  FONT, FS, SP, RADIUS, COMP, ICON, ANIM, GRID_MAX_WIDTH,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FeedSkeleton } from '@/components/BrandthreadUI';
+import { EmptyState, ListSkeleton, ResponsiveContainer } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { formatCents } from '@/lib/money';
@@ -142,9 +143,10 @@ function BuyerHighDemandPage({ pageWidth, pageHeight, bottomClearance = 100 }: {
     <View style={{ width: pageWidth, height: pageHeight, backgroundColor: BG }}>
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: topPad, paddingHorizontal: 20, paddingBottom: bottomClearance }}
+        contentContainerStyle={{ paddingTop: topPad, paddingBottom: bottomClearance }}
         showsVerticalScrollIndicator={false}
       >
+        <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
         <HighDemandSectionHead
           title="High Demand"
           subtitle="Products moving fast across the platform"
@@ -152,25 +154,9 @@ function BuyerHighDemandPage({ pageWidth, pageHeight, bottomClearance = 100 }: {
         />
 
         {loading ? (
-          <View style={{ gap: 12 }}>
-            {[0, 1, 2].map(i => (
-              <View key={i} style={hdStyles.skelRow}>
-                <View style={hdStyles.skelAvatar} />
-                <View style={{ flex: 1, gap: 8 }}>
-                  <View style={[hdStyles.skelLine, { width: '65%' }]} />
-                  <View style={[hdStyles.skelLine, { width: '45%' }]} />
-                </View>
-                <View style={[hdStyles.skelLine, { width: 48 }]} />
-              </View>
-            ))}
-          </View>
+          <ListSkeleton rows={3} />
         ) : items.length === 0 ? (
-          <View style={{ alignItems: 'center', gap: 10, paddingTop: 40 }}>
-            <Feather name="trending-up" size={28} color={SUBTLE} />
-            <Text style={{ fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center' }}>
-              No high-demand products right now
-            </Text>
-          </View>
+          <EmptyState icon="trending-up" message="No high-demand products right now" />
         ) : (
           <View style={{ gap: 12 }}>
             {items.map(item => {
@@ -230,6 +216,7 @@ function BuyerHighDemandPage({ pageWidth, pageHeight, bottomClearance = 100 }: {
             })}
           </View>
         )}
+        </ResponsiveContainer>
       </ScrollView>
     </View>
   );

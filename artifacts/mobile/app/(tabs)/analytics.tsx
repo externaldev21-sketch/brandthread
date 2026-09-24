@@ -7,7 +7,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  RefreshControl, Platform, useWindowDimensions, ActivityIndicator,
+  RefreshControl, Platform, ActivityIndicator,
   Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -17,8 +17,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import {
   SCREEN_BG, CARD_GLASS, BORDER, FG, MUTED, SUBTLE, SUCCESS, RED,
-  FONT, FS, SURFACE,
+  FONT, FS, SURFACE, GRID_MAX_WIDTH,
 } from '@/lib/theme';
+import { ResponsiveContainer, useBreakpoint } from '@/components/layout';
 import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
@@ -111,8 +112,10 @@ function RevenueBarChart({
   colors: ReturnType<typeof useColors>;
   available: boolean;
 }) {
-  const { width: screenWidth } = useWindowDimensions();
-  const chartWidth = screenWidth - 64; // 16 padding * 2 + 16 inside card * 2
+  // Measured from the card's own content width (not the screen) so the chart
+  // fits correctly inside a centered/narrowed container on iPad.
+  const [cardWidth, setCardWidth] = useState(0);
+  const chartWidth = cardWidth > 0 ? cardWidth : 300;
   const chartHeight = 140;
   const labelHeight = 20;
   const gridHeight = chartHeight - labelHeight;
@@ -135,7 +138,7 @@ function RevenueBarChart({
   };
 
   return (
-    <View>
+    <View onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)}>
       <Svg width={chartWidth} height={chartHeight}>
         {/* Y-axis grid lines + labels */}
         {levels.map((cents, i) => {
@@ -341,6 +344,7 @@ export default function AnalyticsScreen() {
   const api = useApi();
   const { userId } = useAuth();
   const insets = useSafeAreaInsets();
+  const { isTablet } = useBreakpoint();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   const [segment, setSegment]   = useState<Segment>('7d');

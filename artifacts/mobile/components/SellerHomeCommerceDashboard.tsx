@@ -28,6 +28,7 @@ import {
 } from '@/lib/sellerHomeAnalytics';
 import { skipTask, type SetupState, type SetupTask } from '@/lib/setupStore';
 import { withSellerSetupOrigin } from '@/lib/setupNavigation';
+import { KpiRowSkeleton, ResponsiveContainer, useBreakpoint } from '@/components/layout';
 import {
   BG,
   BORDER,
@@ -36,6 +37,7 @@ import {
   FG,
   FONT,
   FS,
+  GRID_MAX_WIDTH,
   MUTED,
   RADIUS,
   SCREEN_BG,
@@ -105,20 +107,6 @@ function SkeletonBlock({ width, height, style }: { width?: number | string; heig
         style,
       ]}
     />
-  );
-}
-
-// ─── Loading skeleton for the summary area ───────────────────────────────────
-function SummarySkeleton() {
-  return (
-    <View style={styles.statGrid}>
-      {[0, 1, 2].map((index) => (
-        <View key={index} style={styles.statTile}>
-          <SkeletonBlock width={index === 0 ? 72 : 48} height={10} />
-          <SkeletonBlock width={index === 0 ? 92 : 38} height={28} style={{ marginTop: SP.sm }} />
-        </View>
-      ))}
-    </View>
   );
 }
 
@@ -198,6 +186,7 @@ export default function SellerHomeCommerceDashboard({
   const { theme } = useAppTheme();
   const palette = theme as typeof theme & Record<string, string>;
   const { currentRole, isLoadingRole } = useTeamRole();
+  const { isTablet } = useBreakpoint();
   const [range, setRange] = useState<TimeRange>('today');
   const [snapshot, setSnapshot] = useState<SellerHomeAnalyticsSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -439,6 +428,7 @@ export default function SellerHomeCommerceDashboard({
         removeClippedSubviews={false}
         keyboardShouldPersistTaps="handled"
       >
+        <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
         {/* ── Top bar ──────────────────────────────────────────────────── */}
         <View
           testID="seller-dashboard-scroll-position"
@@ -486,13 +476,15 @@ export default function SellerHomeCommerceDashboard({
           })}
         </ScrollView>
 
-        {/* ── Summary stats ─────────────────────────────────────────────── */}
+        {/* ── Summary stats (KPI tile row) ──────────────────────────────── */}
         <View style={[styles.statsCard, { backgroundColor: palette.glass ?? palette.surface ?? SELLER_DASHBOARD_GLASS, borderColor: palette.border ?? BORDER }]}>
           {!data ? (
-            <SummarySkeleton />
+            <View style={{ padding: SP.sm }}>
+              <KpiRowSkeleton count={4} />
+            </View>
           ) : (
             <View style={styles.statGrid}>
-              <View style={[styles.statTile, { backgroundColor: palette.cardElevated ?? palette.card ?? CARD_ELEVATED_GLASS, borderColor: palette.borderSubtle ?? BORDER_SUBTLE }]}>
+              <View style={[styles.statTile, isTablet && styles.statTileTablet, { backgroundColor: palette.cardElevated ?? palette.card ?? CARD_ELEVATED_GLASS, borderColor: palette.borderSubtle ?? BORDER_SUBTLE }]}>
                 <Text style={styles.statLabel}>Total sales</Text>
                 <Text
                   style={styles.statValue}
@@ -503,7 +495,7 @@ export default function SellerHomeCommerceDashboard({
                   {formatCents(totalSales)}
                 </Text>
               </View>
-              <View style={styles.statTile}>
+              <View style={[styles.statTile, isTablet && styles.statTileTablet]}>
                 <Text style={styles.statLabel}>Orders</Text>
                 <Text
                   style={styles.statValue}
@@ -514,7 +506,7 @@ export default function SellerHomeCommerceDashboard({
                   {orderCount}
                 </Text>
               </View>
-              <View style={styles.statTile}>
+              <View style={[styles.statTile, isTablet && styles.statTileTablet]}>
                 <Text style={styles.statLabel}>{range === 'live' ? 'Online now' : 'Visitors'}</Text>
                 <Text
                   style={styles.statValue}
@@ -525,6 +517,17 @@ export default function SellerHomeCommerceDashboard({
                   {visitorCount}
                 </Text>
               </View>
+              <View style={[styles.statTile, isTablet && styles.statTileTablet]}>
+                <Text style={styles.statLabel}>Available</Text>
+                <Text
+                  style={styles.statValue}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.65}
+                >
+                  {financeLoading ? '—' : financeBalance?.available.formatted ?? '$0.00'}
+                </Text>
+              </View>
             </View>
           )}
 
@@ -533,12 +536,6 @@ export default function SellerHomeCommerceDashboard({
               <Text style={styles.balanceLabel}>Pending Balance</Text>
               <Text style={styles.balanceValue}>
                 {financeLoading ? '—' : financeBalance?.pending.formatted ?? '$0.00'}
-              </Text>
-            </View>
-            <View style={styles.balanceLine}>
-              <Text style={styles.balanceLabel}>Available Balance</Text>
-              <Text style={styles.balanceValue}>
-                {financeLoading ? '—' : financeBalance?.available.formatted ?? '$0.00'}
               </Text>
             </View>
           </View>
@@ -571,8 +568,9 @@ export default function SellerHomeCommerceDashboard({
           )}
         </View>
 
-        {/* ── Sales activity chart ──────────────────────────────────────── */}
-        <View style={[styles.chartCard, { backgroundColor: palette.glass ?? palette.surface ?? SELLER_DASHBOARD_GLASS, borderColor: palette.border ?? BORDER }]}>
+        {/* ── Sales activity chart + needs-attention: side-by-side on iPad ── */}
+        <View style={isTablet ? styles.tabletRow : undefined}>
+        <View style={[isTablet && styles.tabletRowItem, styles.chartCard, { backgroundColor: palette.glass ?? palette.surface ?? SELLER_DASHBOARD_GLASS, borderColor: palette.border ?? BORDER }]}>
           <View style={styles.chartHeader}>
             <Text style={styles.sectionTitle}>Sales activity</Text>
             <View style={styles.chartBadge}>
@@ -613,7 +611,7 @@ export default function SellerHomeCommerceDashboard({
 
         {/* ── Action items (fulfill / capture) ─────────────────────────── */}
         {data && !loading && (
-          <View style={styles.actionSection}>
+          <View style={[isTablet && styles.tabletRowItem, styles.actionSection]}>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionHeaderLabel}>Needs attention</Text>
             </View>
@@ -678,6 +676,7 @@ export default function SellerHomeCommerceDashboard({
             </View>
           </View>
         )}
+        </View>
 
         {/* ── Setup checklist ───────────────────────────────────────────── */}
         {unfinishedTasks.length > 0 && (
@@ -732,6 +731,7 @@ export default function SellerHomeCommerceDashboard({
             </View>
           </View>
         )}
+        </ResponsiveContainer>
         <View
           testID="seller-dashboard-scroll-end"
           accessibilityLabel="Seller dashboard scroll end"
@@ -754,7 +754,6 @@ const styles = StyleSheet.create({
   // ── Top bar
   topBar: {
     minHeight: 52,
-    paddingHorizontal: SP.md,
     justifyContent: 'flex-end',
     paddingBottom: SP.xs,
   },
@@ -767,7 +766,6 @@ const styles = StyleSheet.create({
 
   // ── Range pills
   rangeRow: {
-    paddingHorizontal: SP.md,
     gap: SP.xs,
     paddingVertical: SP.sm,
   },
@@ -785,7 +783,6 @@ const styles = StyleSheet.create({
 
   // ── Stats card
   statsCard: {
-    marginHorizontal: SP.md,
     marginTop: SP.xs,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
@@ -794,12 +791,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   statGrid: {
-    flexDirection: 'column',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: SP.sm,
     padding: SP.sm,
   },
   statTile: {
-    width: '100%',
+    width: '48%',
     minHeight: 82,
     justifyContent: 'space-between',
     padding: SP.md,
@@ -807,6 +805,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BORDER_SUBTLE,
     backgroundColor: CARD_ELEVATED_GLASS,
+  },
+  statTileTablet: {
+    width: '23.5%',
   },
   statLabel: {
     color: MUTED,
@@ -863,7 +864,6 @@ const styles = StyleSheet.create({
 
   // ── Chart card
   chartCard: {
-    marginHorizontal: SP.md,
     marginTop: SP.sm,
     padding: SP.md,
     borderRadius: RADIUS.lg,
@@ -955,7 +955,6 @@ const styles = StyleSheet.create({
   // ── Action items section
   actionSection: {
     marginTop: SP.sm,
-    paddingHorizontal: SP.md,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -1045,7 +1044,15 @@ const styles = StyleSheet.create({
   // ── Setup section
   setupSection: {
     marginTop: SP.sm,
-    paddingHorizontal: SP.md,
+  },
+  tabletRow: {
+    flexDirection: 'row',
+    gap: SP.sm,
+    alignItems: 'flex-start',
+  },
+  tabletRowItem: {
+    flex: 1,
+    minWidth: 0,
   },
   setupCountBadge: {
     minWidth: 22,

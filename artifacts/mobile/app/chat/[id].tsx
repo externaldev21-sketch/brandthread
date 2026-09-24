@@ -10,6 +10,7 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import type { Conversation, Message } from '@/services/socialTypes';
 import { FS } from '@/lib/theme';
@@ -42,24 +43,43 @@ function formatDay(ts: number) {
   return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
 }
 
+// Consecutive messages from the same sender within this gap (and same day)
+// are grouped together: tighter spacing, one trailing timestamp for the run.
+const GROUP_GAP_MS = 5 * 60_000;
+
+function sameDay(a: number, b: number) {
+  return new Date(a).toDateString() === new Date(b).toDateString();
+}
+
+function isGroupedRun(msg: ChatMessage, other: ChatMessage | null) {
+  return !!other && msg.fromId === other.fromId && Math.abs(msg.ts - other.ts) < GROUP_GAP_MS && sameDay(msg.ts, other.ts);
+}
+
 // ─── Message bubble ───────────────────────────────────────────────────────────
 
-function Bubble({ msg, prevMsg, isDark, currentUserId, onLongPress }: {
+function Bubble({ msg, prevMsg, nextMsg, currentUserId, onLongPress }: {
   msg: ChatMessage;
   prevMsg: ChatMessage | null;
-  isDark: boolean;
+  nextMsg: ChatMessage | null;
   currentUserId: string | null | undefined;
   onLongPress?: (msg: ChatMessage) => void;
 }) {
+  const { theme } = useAppTheme();
   const colors = useColors();
-  const fg       = isDark ? '#F7F7FA' : '#0A0A0B';
-  const cardBg   = isDark ? '#1D1A15' : '#EDE7D9';
-  const mutedFg  = isDark ? '#8C8577' : '#8080A0';
+  const fg       = theme.text;
+  const cardBg   = theme.cardElevated;
+  const mutedFg  = theme.muted;
 
   // Show day divider if first message or >6 hour gap or different day
   const showDivider = !prevMsg
     || (msg.ts - prevMsg.ts > 6 * 3_600_000)
     || (new Date(msg.ts).toDateString() !== new Date(prevMsg.ts).toDateString());
+
+  // Grouped with the previous message: tighter spacing, no repeat of the divider look.
+  const groupedWithPrev = !showDivider && isGroupedRun(msg, prevMsg);
+  // Grouped with the next message: this bubble isn't the last in its run, so it
+  // skips its own timestamp — only the run's final bubble shows one.
+  const groupedWithNext = isGroupedRun(msg, nextMsg);
 
   // Show time under bubble if last in a run from same sender
   const isMe = msg.fromId === currentUserId;
@@ -68,14 +88,18 @@ function Bubble({ msg, prevMsg, isDark, currentUserId, onLongPress }: {
     <>
       {showDivider && (
         <View style={bub.dividerRow}>
-          <View style={[bub.dividerLine, { backgroundColor: isDark ? '#2A261E' : '#E8E1CF' }]} />
+          <View style={[bub.dividerLine, { backgroundColor: theme.border }]} />
           <Text style={[bub.dividerText, { color: mutedFg }]}>{formatDay(msg.ts)}</Text>
-          <View style={[bub.dividerLine, { backgroundColor: isDark ? '#2A261E' : '#E8E1CF' }]} />
+          <View style={[bub.dividerLine, { backgroundColor: theme.border }]} />
         </View>
       )}
 
       <TouchableOpacity
-        style={[bub.row, isMe ? bub.rowMe : bub.rowThem]}
+        style={[
+          bub.row,
+          isMe ? bub.rowMe : bub.rowThem,
+          groupedWithPrev ? bub.rowGrouped : bub.rowNewGroup,
+        ]}
         activeOpacity={0.9}
         disabled={isMe || msg.removedByModeration || !onLongPress}
         onLongPress={() => onLongPress?.(msg)}
@@ -102,21 +126,25 @@ function Bubble({ msg, prevMsg, isDark, currentUserId, onLongPress }: {
         )}
       </TouchableOpacity>
 
-      <Text style={[
-        bub.timestamp,
-        { color: mutedFg },
-        isMe ? { textAlign: 'right', paddingRight: 16 } : { textAlign: 'left', paddingLeft: 16 },
-      ]}>
-        {formatTime(msg.ts)}
-        {isMe && msg.status === 'delivered' && '  ✓'}
-        {isMe && msg.status === 'read'      && '  ✓✓'}
-      </Text>
+      {!groupedWithNext && (
+        <Text style={[
+          bub.timestamp,
+          { color: mutedFg },
+          isMe ? { textAlign: 'right', paddingRight: 16 } : { textAlign: 'left', paddingLeft: 16 },
+        ]}>
+          {formatTime(msg.ts)}
+          {isMe && msg.status === 'delivered' && '  ✓'}
+          {isMe && msg.status === 'read'      && '  ✓✓'}
+        </Text>
+      )}
     </>
   );
 }
 
 const bub = StyleSheet.create({
-  row:         { paddingHorizontal: 12, marginTop: 2 },
+  row:         { paddingHorizontal: 12 },
+  rowGrouped:  { marginTop: 2 },  // consecutive message from the same sender
+  rowNewGroup: { marginTop: 12 }, // starts a new run (different sender or time gap)
   rowMe:       { alignItems: 'flex-end' },
   rowThem:     { alignItems: 'flex-start' },
   bubble:      { maxWidth: '78%', paddingHorizontal: 14, paddingVertical: 10, marginBottom: 2 },
@@ -316,11 +344,12 @@ export default function ChatScreen() {
          }
         renderItem={({ item, index }) => {
            const prev = index > 0 ? messages[index - 1] : null;
+           const next = index < messages.length - 1 ? messages[index + 1] : null;
           return (
             <Bubble
               msg={item}
               prevMsg={prev}
-              isDark={isDark}
+              nextMsg={next}
                currentUserId={userId}
               onLongPress={(message) => openMessageOptions({
                 router,

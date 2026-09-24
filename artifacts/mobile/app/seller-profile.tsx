@@ -13,6 +13,7 @@ import {
   Alert,
   Image,
   Linking,
+  RefreshControl,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,13 +28,17 @@ import { formatCents } from '@/lib/money';
 import { getSellerFollowState, setSellerFollowing } from '@/services/socialService';
 import {
   BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE,
-  BLUE, ORANGE, RED, FONT, FS, SP, RADIUS, ICON, ACCENT,
+  BLUE, ORANGE, RED, FONT, FS, SP, RADIUS, ICON, ACCENT, GRID_MAX_WIDTH,
 } from '@/lib/theme';
 import { buildCanonicalProfileUrl } from '@/lib/shareProfile';
 import { confirmBlock, reportHref } from '@/lib/safety';
+import { GridSkeleton, ResponsiveContainer, useGridColumns, useBreakpoint } from '@/components/layout';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TILE_SIZE = Math.floor((SCREEN_WIDTH - 2) / 3);
+
+// Compact identity bar fades in once the profile header has scrolled past this offset.
+const COMPACT_THRESHOLD = 160;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -149,9 +154,10 @@ interface PostTileProps {
   index: number;
   isOwner: boolean;
   onPress: (post: SellerPost) => void;
+  size?: number;
 }
 
-function PostTile({ post, index, isOwner, onPress }: PostTileProps) {
+function PostTile({ post, index, isOwner, onPress, size = TILE_SIZE }: PostTileProps) {
   const colorsTheme = useColors();
   const GREEN = colorsTheme.primary;
   const icon = typeIcon(post.type);
@@ -159,7 +165,7 @@ function PostTile({ post, index, isOwner, onPress }: PostTileProps) {
 
   return (
     <TouchableOpacity
-      style={[tileStyles.postTile, { width: TILE_SIZE, height: TILE_SIZE }]}
+      style={[tileStyles.postTile, { width: size, height: size }]}
       onPress={() => onPress(post)}
       activeOpacity={0.85}
     >
@@ -205,12 +211,12 @@ const tileStyles = StyleSheet.create({
 
 // ─── Create Post Tile ──────────────────────────────────────────────────────────
 
-function CreatePostTile({ onPress }: { onPress: () => void }) {
+function CreatePostTile({ onPress, size = TILE_SIZE }: { onPress: () => void; size?: number }) {
   const colorsTheme = useColors();
   const GREEN = colorsTheme.primary;
   return (
     <TouchableOpacity
-      style={[tileStyles.postTile, createStyles.createTile, { width: TILE_SIZE, height: TILE_SIZE }]}
+      style={[tileStyles.postTile, createStyles.createTile, { width: size, height: size }]}
       onPress={onPress}
       activeOpacity={0.8}
     >
@@ -231,9 +237,10 @@ interface ProductCardProps {
   product: Product;
   index: number;
   onPress: (id: string) => void;
+  cardWidth?: number;
 }
 
-function ProductCard({ product, index, onPress }: ProductCardProps) {
+function ProductCard({ product, index, onPress, cardWidth }: ProductCardProps) {
   const colorsTheme = useColors();
   const GREEN = colorsTheme.primary;
   const GREEN_DIM = colorsTheme.accent;
@@ -254,7 +261,7 @@ function ProductCard({ product, index, onPress }: ProductCardProps) {
 
   return (
     <TouchableOpacity
-      style={productStyles.productCard}
+      style={[productStyles.productCard, cardWidth != null && { width: cardWidth }]}
       onPress={() => onPress(product.id)}
       activeOpacity={0.85}
     >
@@ -390,26 +397,55 @@ export default function SellerProfileScreen() {
   const tabs = ['Posts', 'Products'];
   const tabBarIndex = isOwner ? 3 : 4;
 
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const compactOpacity = scrollY.interpolate({
+    inputRange: [COMPACT_THRESHOLD - 24, COMPACT_THRESHOLD],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+  const [refreshing, setRefreshing] = useState(false);
+  // Bumped by pull-to-refresh to re-trigger the load effect without resetting
+  // already-loaded content to empty first (avoids a flash back to skeletons).
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  const postsColumns = useGridColumns({ phone: 3, tablet: 4, tabletLandscape: 5 });
+  const productsColumns = useGridColumns({ phone: 2, tablet: 3, tabletLandscape: 4 });
+  const { width: winWidth, isTablet } = useBreakpoint();
+  const gridAreaWidth = isTablet ? Math.min(winWidth, GRID_MAX_WIDTH) : winWidth;
+  const postTileSize = Math.floor((gridAreaWidth - (postsColumns - 1)) / postsColumns);
+  const productCardWidth = Math.floor((gridAreaWidth - SP.md * 2 - SP.sm * (productsColumns - 1)) / productsColumns);
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    setRefreshTick(t => t + 1);
+  }, []);
+
   // Load seller data
   useEffect(() => {
     const sellerId = routeSellerId as string | undefined;
+    const isRefresh = refreshTick > 0;
     let active = true;
-    setProfile(mapApiProfile({}));
-    setPosts([]);
-    setLiveProducts([]);
-    setProfileImageUrl(null);
-    setFollowers(0);
-    setIsFollowing(false);
-    setApiRating(null);
-    setCanonicalSellerId(null);
+    if (!isRefresh) {
+      setProfile(mapApiProfile({}));
+      setPosts([]);
+      setLiveProducts([]);
+      setProfileImageUrl(null);
+      setFollowers(0);
+      setIsFollowing(false);
+      setApiRating(null);
+      setCanonicalSellerId(null);
+    }
     if (isOwner && (!authLoaded || !userId)) {
       setProfileLoading(!authLoaded);
       setProductsLoading(!authLoaded);
+      setRefreshing(false);
       return () => { active = false; };
     }
     (async () => {
-      setProfileLoading(true);
-      setProductsLoading(true);
+      if (!isRefresh) {
+        setProfileLoading(true);
+        setProductsLoading(true);
+      }
       try {
         if (!sellerId && isOwner) {
           const [p, postRows] = await Promise.all([
@@ -465,11 +501,12 @@ export default function SellerProfileScreen() {
         if (active) {
           setProfileLoading(false);
           setProductsLoading(false);
+          setRefreshing(false);
         }
       }
     })();
     return () => { active = false; };
-  }, [api, authLoaded, isOwner, routeSellerId, userId]);
+  }, [api, authLoaded, isOwner, routeSellerId, userId, refreshTick]);
 
   // Load reviews — use canonical clerkId, not the raw route alias.
   useEffect(() => {
@@ -622,6 +659,19 @@ export default function SellerProfileScreen() {
         <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()}>
           <Feather name="arrow-left" size={20} color={FG} />
         </TouchableOpacity>
+
+        {/* Compact identity — avatar thumbnail + name, fades in once the profile header scrolls away */}
+        <Animated.View pointerEvents="none" style={[styles.compactIdentity, { opacity: compactOpacity }]}>
+          <View style={styles.compactAvatar}>
+            {profileImageUrl ? (
+              <Image source={{ uri: profileImageUrl }} style={styles.compactAvatarImage} />
+            ) : (
+              <Text style={styles.compactAvatarInitials}>{profile.initials}</Text>
+            )}
+          </View>
+          <Text style={styles.compactName} numberOfLines={1}>{profile.brandName}</Text>
+        </Animated.View>
+
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.headerBtn} onPress={handleOpenInbox} accessibilityRole="button" accessibilityLabel={isOwner ? 'Inbox' : 'Message seller'}>
             <Feather name="message-circle" size={20} color={FG} />
@@ -639,10 +689,13 @@ export default function SellerProfileScreen() {
         </View>
       </View>
 
-      <ScrollView
+      <Animated.ScrollView
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         stickyHeaderIndices={[tabBarIndex]}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
+        scrollEventThrottle={16}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={MUTED} />}
       >
         {/* 0: Spacer — replaces the old cover gradient */}
         <View style={{ height: insets.top + 56 }} />
@@ -842,51 +895,58 @@ export default function SellerProfileScreen() {
         <View style={styles.tabContent}>
           {/* POSTS TAB */}
           {activeTab === 0 && (
-            <View style={styles.postsGrid}>
-              {isOwner && (
-                <CreatePostTile onPress={() => router.push('/create-post' as never)} />
-              )}
-              {posts.map((post, i) => (
-                <PostTile
-                  key={post.id}
-                  post={post}
-                  index={i}
-                  isOwner={isOwner}
-                  onPress={handlePostPress}
-                />
-              ))}
-              {posts.length === 0 && !isOwner && (
+            <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ paddingHorizontal: 0 }}>
+              {posts.length === 0 && !isOwner ? (
                 <EmptyState icon="image" title="No posts yet" />
+              ) : (
+                <View style={styles.postsGrid}>
+                  {isOwner && (
+                    <CreatePostTile onPress={() => router.push('/create-post' as never)} size={postTileSize} />
+                  )}
+                  {posts.map((post, i) => (
+                    <PostTile
+                      key={post.id}
+                      post={post}
+                      index={i}
+                      isOwner={isOwner}
+                      onPress={handlePostPress}
+                      size={postTileSize}
+                    />
+                  ))}
+                </View>
               )}
-            </View>
+            </ResponsiveContainer>
           )}
 
           {/* PRODUCTS TAB */}
           {activeTab === 1 && (
-            <View>
+            <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ paddingHorizontal: 0 }}>
               <View style={styles.collectionHeader}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.collectionTitle}>{isOwner ? 'Your products' : 'Shop the collection'}</Text>
                 </View>
                 <Text style={styles.collectionCount}>{displayProducts.length} item{displayProducts.length === 1 ? '' : 's'}</Text>
               </View>
-              <View style={styles.productsGrid}>
-                {productsLoading ? (
-                  <ActivityIndicator color={colors.primary} style={{ marginTop: 40, alignSelf: 'center' }} />
-                ) : displayProducts.length === 0 ? (
-                  <EmptyState icon="shopping-bag" title="No products available" />
-                ) : (
-                  displayProducts.map((product, i) => (
+              {productsLoading ? (
+                <View style={{ paddingHorizontal: SP.md }}>
+                  <GridSkeleton columns={productsColumns} cardWidth={productCardWidth} rows={2} gap={SP.sm} />
+                </View>
+              ) : displayProducts.length === 0 ? (
+                <EmptyState icon="shopping-bag" title="No products available" />
+              ) : (
+                <View style={styles.productsGrid}>
+                  {displayProducts.map((product, i) => (
                     <ProductCard
                       key={product.id}
                       product={product as Product}
                       index={i}
+                      cardWidth={productCardWidth}
                       onPress={(id) => router.push((isOwner ? '/product-detail?id=' : '/buyer-product-detail?productId=') + id as never)}
                     />
-                  ))
-                )}
-              </View>
-            </View>
+                  ))}
+                </View>
+              )}
+            </ResponsiveContainer>
           )}
 
           {activeTab === 2 && (
@@ -899,7 +959,7 @@ export default function SellerProfileScreen() {
           {activeTab === 3 && <EmptyState icon="repeat" title="No reposts yet" />}
           {isOwner && activeTab === 4 && <EmptyState icon="bookmark" title="Nothing saved yet" />}
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* ── Post Action Sheet ── */}
       <Modal
@@ -957,7 +1017,7 @@ const styles = StyleSheet.create({
   // Absolute header
   absHeader: {
     position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100,
-    flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: SP.md,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md,
   },
   headerActions: { flexDirection: 'row', gap: SP.sm },
   headerBtn: {
@@ -965,6 +1025,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(10,10,11,0.72)', borderWidth: 1, borderColor: BORDER,
     alignItems: 'center', justifyContent: 'center',
   },
+  // Compact identity bar (avatar thumbnail + name), fades in once the hero header scrolls away
+  compactIdentity: {
+    position: 'absolute', left: 56, right: 100, top: 8, bottom: 0,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.xs,
+  },
+  compactAvatar: {
+    width: 26, height: 26, borderRadius: 13, overflow: 'hidden',
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  compactAvatarImage: { width: '100%', height: '100%' },
+  compactAvatarInitials: { color: FG, fontSize: 10, fontFamily: FONT.bold },
+  compactName: { color: FG, fontSize: FS.sm, fontFamily: FONT.semibold, maxWidth: '80%' },
 
   // Profile section — centered
   profileSection: {

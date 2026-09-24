@@ -38,6 +38,8 @@ import {
 } from '@/lib/theme';
 import { normalizeUsername } from '@/lib/shareProfile';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { ResponsiveContainer } from '@/components/layout';
+import { CONTENT_MAX_WIDTH } from '@/lib/theme';
 
 // ─── Public profile DTO (mirrors GET /api/v1/public/profiles/:username) ──────
 
@@ -127,6 +129,7 @@ function PublicProfileLanding({
       showsVerticalScrollIndicator={false}
       accessible
     >
+      <ResponsiveContainer maxWidth={CONTENT_MAX_WIDTH} style={{ paddingHorizontal: 0, alignItems: 'center' }}>
       {/* Brandthread wordmark */}
       <View style={styles.logoRow}>
         <BrandthreadLogo size={28} />
@@ -239,6 +242,7 @@ function PublicProfileLanding({
       <Text style={styles.finePrint} accessibilityRole="text">
         Brandthread · Fashion &amp; Commerce
       </Text>
+      </ResponsiveContainer>
     </ScrollView>
   );
 }

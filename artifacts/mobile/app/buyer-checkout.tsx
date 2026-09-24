@@ -37,7 +37,7 @@ import { useAuth } from '@clerk/expo';
 import {
   BG, BORDER, CARD, CARD_ELEVATED, FG, FONT, FS,
   MUTED, ON_DARK, RADIUS, RED, RED_DIM,
-  SP, SUCCESS, SUCCESS_DIM, SUBTLE, COMP, ICON, ORANGE, ORANGE_DIM,
+  SP, SUCCESS, SUCCESS_DIM, SUBTLE, COMP, ICON, ORANGE, ORANGE_DIM, TYPE,
 } from '@/lib/theme';
 
 type ThemeAliases = {
@@ -67,6 +67,7 @@ import {
 import { CheckoutSkeleton, HapticSwitch } from '@/components/BrandthreadUI';
 import { AddressAutocompleteInput } from '@/components/AddressAutocompleteInput';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { StickyFooter } from '@/components/layout';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -1806,7 +1807,7 @@ export default function BuyerCheckoutScreen() {
 
       {/* Persistent Pay securely CTA — hidden on confirmation */}
       {current.step !== 'confirmation' && (
-        <View style={[s.bottom, { paddingBottom: insets.bottom + SP.sm }]}>
+        <StickyFooter style={s.bottom}>
           <TouchableOpacity
             style={s.continue}
             disabled={placing}
@@ -1831,7 +1832,7 @@ export default function BuyerCheckoutScreen() {
                 )}
             </LinearGradient>
           </TouchableOpacity>
-        </View>
+        </StickyFooter>
       )}
 
       {/* Receipt bottom sheet */}
@@ -1926,13 +1927,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
       width: 56, height: 68, borderRadius: RADIUS.sm,
       overflow: 'hidden', borderWidth: 1, borderColor: BORDER,
     },
-    summaryItemName: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, lineHeight: 18 },
-    summaryItemVariant: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
-    summaryItemPrice: { fontFamily: FONT.bold, fontSize: FS.sm, color: FG },
+    summaryItemName: { ...TYPE.bodyMedium, fontFamily: FONT.semibold, color: FG },
+    summaryItemVariant: { ...TYPE.caption, color: MUTED, marginTop: 2 },
+    summaryItemPrice: { ...TYPE.bodyMedium, fontFamily: FONT.bold, color: FG },
     summaryTotalRow: {
       flexDirection: 'row', alignItems: 'center', paddingVertical: SP.sm,
     },
-    summaryTotalLabel: { fontFamily: FONT.bold, fontSize: FS.base, color: FG },
+    summaryTotalLabel: { ...TYPE.subheading, color: FG },
     freeShippingLabel: { fontFamily: FONT.medium, fontSize: FS.xs, color: SUCCESS, marginTop: 2 },
     summaryEditRow: {
       flexDirection: 'row', alignItems: 'center', gap: SP.sm,
@@ -1954,9 +1955,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     sheetTitle: { fontFamily: FONT.bold, fontSize: FS.md, color: FG },
     receiptItemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginBottom: SP.sm },
     receiptThumb: { width: 48, height: 60, borderRadius: RADIUS.sm, overflow: 'hidden', borderWidth: 1, borderColor: BORDER },
-    receiptItemName: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, lineHeight: 18 },
-    receiptItemVariant: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
-    receiptItemPrice: { fontFamily: FONT.bold, fontSize: FS.sm, color: FG },
+    receiptItemName: { ...TYPE.bodyMedium, fontFamily: FONT.semibold, color: FG },
+    receiptItemVariant: { ...TYPE.caption, color: MUTED, marginTop: 2 },
+    receiptItemPrice: { ...TYPE.bodyMedium, fontFamily: FONT.bold, color: FG },
 
     // Delivery methods
     method: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.sm, borderRadius: RADIUS.md, marginBottom: 6 },
@@ -1975,9 +1976,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     // Review
     address: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, marginBottom: SP.md },
     line: { flexDirection: 'row', justifyContent: 'space-between', gap: SP.sm, paddingVertical: 5 },
-    lineName: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
+    lineName: { ...TYPE.bodyMedium, fontFamily: FONT.semibold, color: FG },
     divider: { height: 1, backgroundColor: BORDER, marginVertical: SP.sm },
-    total: { color: FG, fontFamily: FONT.bold, fontSize: FS.lg },
+    total: { ...TYPE.subheading, color: FG },
     multiSeller: { flexDirection: 'row', gap: SP.sm, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md },
     multiSellerText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
     ack: { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', minHeight: COMP.minTouchTarget, marginBottom: SP.sm },
@@ -1985,10 +1986,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     ackText: { flex: 1, color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
 
     // Bottom CTA bar
-    bottom: {
-      position: 'absolute', left: 0, right: 0, bottom: 0,
-      padding: SP.md, backgroundColor: BG, borderTopWidth: 1, borderColor: BORDER,
-    },
+    bottom: {},
     continue: { overflow: 'hidden', borderRadius: RADIUS.lg, ...SHADOW_PURPLE },
     continueGradient: { height: COMP.buttonH, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
     continueText: { fontFamily: FONT.bold, fontSize: FS.base },
