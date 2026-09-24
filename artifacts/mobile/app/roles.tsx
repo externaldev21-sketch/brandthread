@@ -30,19 +30,7 @@ export default function RolesScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader
-        title="Roles"
-        rightElement={
-          <View style={styles.headerActions}>
-            <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Feather name="plus" size={17} color={colors.foreground} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Feather name="more-horizontal" size={17} color={colors.foreground} />
-            </TouchableOpacity>
-          </View>
-        }
-      />
+      <ScreenHeader title="Roles" />
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
         <View style={styles.toolbarRow}>
@@ -92,8 +80,6 @@ export default function RolesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  headerActions: { flexDirection: 'row', gap: 8 },
-  headerBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   toolbarRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 14 },
   allPill: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
   allPillText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
