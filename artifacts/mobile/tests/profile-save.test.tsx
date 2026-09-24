@@ -40,15 +40,38 @@ vi.mock("react-native", () => {
     return MockNativeComponent;
   };
 
+  class MockAnimatedValue {
+    _value: number;
+    constructor(value: number) { this._value = value; }
+    interpolate() { return this._value; }
+    setValue(value: number) { this._value = value; }
+  }
+
+  const AnimatedView = nativeComponent("Animated.View");
+  const AnimatedScrollView = nativeComponent("Animated.ScrollView");
+
   return {
     ActivityIndicator: nativeComponent("ActivityIndicator"),
     Alert: { alert: alertMock },
+    Animated: {
+      Value: MockAnimatedValue,
+      View: AnimatedView,
+      ScrollView: AnimatedScrollView,
+      event: () => () => {},
+      timing: () => ({ start: (cb?: () => void) => cb?.() }),
+    },
     Image: nativeComponent("Image"),
     KeyboardAvoidingView: nativeComponent("KeyboardAvoidingView"),
     Modal: nativeComponent("Modal"),
     Platform: { OS: "ios" },
+    RefreshControl: nativeComponent("RefreshControl"),
     ScrollView: nativeComponent("ScrollView"),
-    StyleSheet: { create: (styles: unknown) => styles },
+    StyleSheet: {
+      create: (styles: unknown) => styles,
+      absoluteFill: {},
+      absoluteFillObject: {},
+      hairlineWidth: 1,
+    },
     Text: nativeComponent("Text"),
     TextInput: nativeComponent("TextInput"),
     TouchableOpacity: nativeComponent("TouchableOpacity"),
@@ -60,6 +83,24 @@ vi.mock("react-native", () => {
 vi.mock("@/components/motion/SheetRise", () => ({
   SheetRise: ({ children, ...props }: { children?: React.ReactNode }) =>
     React.createElement("View", props, children),
+}));
+
+// BrandHero's gradient/collapse chrome is visual only; render its slots as
+// plain Views so the account-switcher, edit-details and settings testIDs
+// passed through its slots are still reachable by the test.
+vi.mock("@/components/profile/BrandHero", () => ({
+  BrandHero: ({ brandName, topBarLeft, topBarRight, actions, children }: any) =>
+    React.createElement(
+      "View",
+      null,
+      React.createElement("Text", { testID: "profile-hero-brand-name" }, brandName),
+      topBarLeft,
+      topBarRight,
+      actions,
+      children,
+    ),
+  useBrandHeroScrollY: () => ({ interpolate: () => 0 }),
+  HERO_COMPACT_THRESHOLD: 150,
 }));
 
 vi.mock("@clerk/expo", () => ({
@@ -114,11 +155,20 @@ vi.mock("@/hooks/useColors", () => ({
 vi.mock("@/contexts/AppThemeContext", () => ({
   useAppTheme: () => ({
     theme: {
+      background: "#09090B",
+      text: "#FAFAFA",
+      muted: "#D7D7DB",
+      border: "#FFFFFF22",
+      card: "#18181B",
       accent: "#C7CDD5",
       accentDim: "#34383E",
       accentLight: "#F8FAFC",
       secondary: "#172554",
       onAccent: "#FFFFFF",
+      warning: "#FFD580",
+      error: "#FFB4B4",
+      heroGradient: ["#09090B", "#18181B"],
+      glowGradient: ["#FFFFFF0F", "#FFFFFF03"],
     },
   }),
 }));
@@ -249,7 +299,7 @@ describe("seller Profile brand details save", () => {
     await openEditor(renderer);
     await enterProfileDetails(renderer);
 
-    expect(textContent(renderer.root.findByProps({ testID: "profile-edit-details" })))
+    expect(textContent(renderer.root.findByProps({ testID: "profile-hero-brand-name" })))
       .toContain("Original Brand");
 
     await save(renderer);
@@ -258,7 +308,7 @@ describe("seller Profile brand details save", () => {
       brandName: "Updated Brand",
       bio: "Updated bio",
     });
-    expect(textContent(renderer.root.findByProps({ testID: "profile-edit-details" })))
+    expect(textContent(renderer.root.findByProps({ testID: "profile-hero-brand-name" })))
       .toContain("Updated Brand");
     expect(renderer.root.findAllByProps({ visible: false })).not.toHaveLength(0);
   });
@@ -271,12 +321,60 @@ describe("seller Profile brand details save", () => {
 
     await save(renderer);
 
-    expect(textContent(renderer.root.findByProps({ testID: "profile-edit-details" })))
+    expect(textContent(renderer.root.findByProps({ testID: "profile-hero-brand-name" })))
       .toContain("Original Brand");
     expect(alertMock).toHaveBeenCalledWith(
       "Could not save changes",
       "Check your connection and try again.",
     );
     expect(renderer.root.findByProps({ testID: "profile-edit-save" })).toBeTruthy();
+  });
+});
+
+describe("seller Profile content-state tabs (Posts / Drafts / Scheduled)", () => {
+  let renderer!: ReactTestRenderer;
+
+  const posts = [
+    { id: "post-1", caption: "Published post", isDraft: false, isArchived: false, scheduledAt: null, contentType: "image", createdAt: "2026-01-01T00:00:00.000Z" },
+    { id: "post-2", caption: "Draft post", isDraft: true, isArchived: false, scheduledAt: null, contentType: "image", createdAt: "2026-01-02T00:00:00.000Z" },
+    { id: "post-3", caption: "Scheduled post", isDraft: false, isArchived: false, scheduledAt: "2026-02-01T00:00:00.000Z", contentType: "video", createdAt: "2026-01-03T00:00:00.000Z" },
+  ];
+
+  beforeEach(() => {
+    routerMock.push.mockReset();
+    getSellerPostsMock.mockReset().mockResolvedValue(posts);
+    subscribeSocialMock.mockReset().mockReturnValue(vi.fn());
+    apiMock.seller.getProfile.mockReset().mockResolvedValue(initialProfile());
+    apiMock.social.followers.mockReset().mockResolvedValue([]);
+    apiMock.social.following.mockReset().mockResolvedValue([]);
+    apiMock.social.myStories.mockReset().mockResolvedValue([]);
+  });
+
+  afterEach(async () => {
+    await act(async () => {
+      renderer?.unmount();
+    });
+  });
+
+  it("filters the grid by content state as each index-based tab is pressed", async () => {
+    renderer = await renderScreen();
+
+    // Defaults to the Posts tab (index 0): everything not a draft or archived
+    // shows here (published and scheduled alike — same filter as before the
+    // redesign), but drafts are excluded.
+    expect(textContent(renderer.toJSON())).toContain("Published post");
+    expect(textContent(renderer.toJSON())).not.toContain("Draft post");
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: "profile-tab-draft" }).props.onPress();
+    });
+    expect(textContent(renderer.toJSON())).toContain("Draft post");
+    expect(textContent(renderer.toJSON())).not.toContain("Published post");
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: "profile-tab-schedule" }).props.onPress();
+    });
+    expect(textContent(renderer.toJSON())).toContain("Scheduled post");
+    expect(textContent(renderer.toJSON())).not.toContain("Draft post");
   });
 });
