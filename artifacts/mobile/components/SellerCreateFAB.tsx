@@ -20,7 +20,6 @@ import { useRole } from '@/contexts/RoleContext';
 const ACTIONS = [
   { label: 'New post', description: 'Share content with your audience', icon: 'video' as const, route: '/create-post' },
   { label: 'New product', description: 'Add a piece to your catalog', icon: 'package' as const, route: '/add-product' },
-  { label: 'New drop', description: 'Build a scheduled product release', icon: 'zap' as const, route: '/seller-drop-create' },
   { label: 'Start a boost', description: 'Promote a product or post', icon: 'trending-up' as const, route: '/boost' },
 ];
 
