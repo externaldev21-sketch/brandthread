@@ -1,5 +1,22 @@
-import type { ErrorRequestHandler, RequestHandler } from "express";
+import type { ErrorRequestHandler, Request, RequestHandler } from "express";
+import { getAuth } from "@clerk/express";
 import { ApiError, requestIdFor, toApiErrorEnvelope } from "../lib/apiError";
+
+/**
+ * Best-effort caller id for error logs. Clerk's middleware isn't mounted on
+ * every path (e.g. the raw Stripe webhook routes), and requests can fail
+ * before auth ever runs, so this must never throw and may return undefined.
+ */
+function callerIdFor(req: Request): string | undefined {
+  try {
+    const fromClerk = getAuth(req)?.userId;
+    if (fromClerk) return fromClerk;
+  } catch {
+    // Clerk middleware not mounted on this path — fall through.
+  }
+  const fromRoute = (req as unknown as { clerkUserId?: string }).clerkUserId;
+  return typeof fromRoute === "string" ? fromRoute : undefined;
+}
 
 /**
  * Normalizes legacy explicit error responses at one boundary while routes are
@@ -46,6 +63,9 @@ export const apiErrorHandler: ErrorRequestHandler = (err, req, res, _next) => {
       err,
       errorCode,
       status,
+      route: `${req.method} ${req.originalUrl?.split("?")[0] ?? req.path}`,
+      userId: callerIdFor(req),
+      requestId: requestIdFor(req.id),
     },
     known ? "API request failed" : "Unhandled API request failure",
   );
