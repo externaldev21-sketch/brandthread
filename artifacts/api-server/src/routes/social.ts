@@ -13,6 +13,7 @@ import { Router } from "express";
 import { db, users, follows, stories, storyLikes, storyViews, blocks, posts, interactions } from "@workspace/db";
 import { eq, and, or, ilike, ne, inArray, sql, gt, desc, count, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { rateLimit } from "../middlewares/rateLimit";
 import { publishNotification } from "./notifications-feed";
 import { resolveToClerkId } from "./public";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
@@ -25,6 +26,7 @@ import {
   profilesById,
   publishingRestriction,
 } from "../lib/safety";
+import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 
 const router = Router();
 router.use(requireAuth);
@@ -62,12 +64,6 @@ function formatUser(u: UserRow) {
     color:       avatarColor(u.clerkId),
     handle:      u.username ? `@${u.username}` : `@${nm.toLowerCase().replace(/\s+/g, "")}`,
   };
-}
-
-function parsePagination(req: { query: any }, defaultLimit = 30, maxLimit = 50) {
-  const limit  = Math.min(parseInt(req.query.limit as string, 10) || defaultLimit, maxLimit);
-  const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);
-  return { limit, offset };
 }
 
 function countOne(arr: { n: number }[] | undefined) {
@@ -180,7 +176,7 @@ async function buildBuyerPosts(viewerId: string, authorIds: string[], limit: num
 }
 
 // ─── POST /api/social/follow ──────────────────────────────────────────────────
-router.post("/follow", async (req, res) => {
+router.post("/follow", rateLimit("follow"), async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const { userId } = req.body as { userId?: string };
   if (!userId || typeof userId !== "string") {
@@ -252,9 +248,9 @@ router.post("/follow", async (req, res) => {
 });
 
 // ─── DELETE /api/social/follow/:userId ───────────────────────────────────────
-router.delete("/follow/:userId", async (req, res) => {
+router.delete("/follow/:userId", rateLimit("follow"), async (req, res) => {
   const myId   = (req as any).clerkUserId as string;
-  const target = req.params.userId;
+  const target = req.params.userId as string;
   const followersCount = await db.transaction(async (tx) => {
     await tx.execute(sql`
       SELECT pg_advisory_xact_lock(
@@ -429,13 +425,18 @@ router.get("/friends/activity", async (req, res) => {
 });
 
 // ─── GET /api/social/following ────────────────────────────────────────────────
+// Query params: ?limit=&offset= (default 100, capped at MAX_PAGE_LIMIT).
 router.get("/following", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
-  const { limit, offset } = parsePagination(req);
+  const page = parsePagination(req.query, { limit: 100 });
+  if (!page.success) { res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" }); return; }
+  const { limit, offset } = page.data;
   const rows = await db
     .select({ followingId: follows.followingId, createdAt: follows.createdAt })
     .from(follows).where(eq(follows.followerId, myId))
-    .orderBy(desc(follows.createdAt)).limit(limit).offset(offset);
+    .orderBy(desc(follows.createdAt))
+    .limit(limit).offset(offset);
+  setPaginationHeaders(res, page.data, rows.length);
   if (!rows.length) { res.json([]); return; }
 
   const ids      = rows.map(r => r.followingId);
@@ -453,13 +454,18 @@ router.get("/following", async (req, res) => {
 });
 
 // ─── GET /api/social/followers ────────────────────────────────────────────────
+// Query params: ?limit=&offset= (default 100, capped at MAX_PAGE_LIMIT).
 router.get("/followers", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
-  const { limit, offset } = parsePagination(req);
+  const page = parsePagination(req.query, { limit: 100 });
+  if (!page.success) { res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" }); return; }
+  const { limit, offset } = page.data;
   const rows = await db
     .select({ followerId: follows.followerId, createdAt: follows.createdAt })
     .from(follows).where(eq(follows.followingId, myId))
-    .orderBy(desc(follows.createdAt)).limit(limit).offset(offset);
+    .orderBy(desc(follows.createdAt))
+    .limit(limit).offset(offset);
+  setPaginationHeaders(res, page.data, rows.length);
   if (!rows.length) { res.json([]); return; }
 
   const ids      = rows.map(r => r.followerId);
@@ -903,12 +909,15 @@ router.delete("/block/:userId", async (req, res) => {
 // GET /api/social/blocks — list users I have blocked
 router.get("/blocks", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
-  const { limit, offset } = parsePagination(req);
+  const page = parsePagination(req.query, { limit: 100 });
+  if (!page.success) { res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" }); return; }
+  const { limit, offset } = page.data;
   const rows = await db
     .select({ blockedId: blocks.blockedId, createdAt: blocks.createdAt })
     .from(blocks)
     .where(eq(blocks.blockerId, myId))
     .orderBy(desc(blocks.createdAt)).limit(limit).offset(offset);
+  setPaginationHeaders(res, page.data, rows.length);
 
   if (rows.length === 0) { res.json([]); return; }
 

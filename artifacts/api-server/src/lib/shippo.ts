@@ -1,4 +1,5 @@
 import { ReplitConnectors } from "@replit/connectors-sdk";
+import { withRetry } from "./retry";
 
 const connectors = new ReplitConnectors();
 
@@ -28,17 +29,26 @@ export type ShippoRate = {
   duration_terms?: string;
 };
 
+// Requesting a shipping quote doesn't spend money or create a label — it's
+// effectively a read, so it's safe to retry on transport failures.
 export async function createShipment(body: {
   address_from: Record<string, unknown>;
   address_to: Record<string, unknown>;
   parcels: Array<Record<string, unknown>>;
 }) {
-  return shippoRequest<{ object_id: string; rates: ShippoRate[] }>("/shipments", {
-    method: "POST",
-    body: { ...body, async: false },
-  });
+  return withRetry(
+    () => shippoRequest<{ object_id: string; rates: ShippoRate[] }>("/shipments", {
+      method: "POST",
+      body: { ...body, async: false },
+    }),
+    { label: "shippo.createShipment" },
+  );
 }
 
+// Purchasing a label spends the seller's Shippo balance and Shippo does not
+// document a client-supplied idempotency key for this endpoint, so it is NOT
+// retried automatically — see src/lib/retry.ts's doc comment. A failed
+// purchase must be resolved (or explicitly resubmitted) by the caller.
 export async function purchaseTransaction(rateId: string, reference: string) {
   return shippoRequest<{
     object_id: string;
@@ -54,21 +64,29 @@ export async function purchaseTransaction(rateId: string, reference: string) {
 }
 
 export async function getRate(rateId: string) {
-  return shippoRequest<ShippoRate>(`/rates/${encodeURIComponent(rateId)}`);
+  return withRetry(
+    () => shippoRequest<ShippoRate>(`/rates/${encodeURIComponent(rateId)}`),
+    { label: "shippo.getRate" },
+  );
 }
 
 export async function findTransaction(reference: string) {
-  const page = await shippoRequest<{ results?: Array<{
-    object_id: string;
-    status: string;
-    metadata?: string;
-    tracking_number?: string;
-    label_url?: string;
-    rate?: ShippoRate;
-  }> }>(`/transactions?metadata=${encodeURIComponent(reference)}`);
+  const page = await withRetry(
+    () => shippoRequest<{ results?: Array<{
+      object_id: string;
+      status: string;
+      metadata?: string;
+      tracking_number?: string;
+      label_url?: string;
+      rate?: ShippoRate;
+    }> }>(`/transactions?metadata=${encodeURIComponent(reference)}`),
+    { label: "shippo.findTransaction" },
+  );
   return (page.results ?? []).find((item) => item.metadata === reference) ?? null;
 }
 
+// A refund request is money-adjacent and not idempotent on Shippo's side, so
+// it is left unwrapped — see src/lib/retry.ts's doc comment.
 export async function refundTransaction(transactionId: string) {
   return shippoRequest<{ object_id: string; status: string }>("/refunds", {
     method: "POST",

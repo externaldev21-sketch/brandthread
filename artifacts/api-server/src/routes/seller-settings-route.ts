@@ -19,7 +19,7 @@ router.use(requireAuth);
 // ─── Settings (language, preferences) ────────────────────────────────────────
 
 router.get("/", async (req, res) => {
-  const ownerId = (req as any).userId as string;
+  const ownerId = (req as any).clerkUserId as string;
   try {
     const result = await db.execute(sql`
       SELECT settings FROM seller_settings WHERE owner_id = ${ownerId}
@@ -32,7 +32,7 @@ router.get("/", async (req, res) => {
 });
 
 router.patch("/", async (req, res) => {
-  const ownerId = (req as any).userId as string;
+  const ownerId = (req as any).clerkUserId as string;
   const updates = req.body; // e.g. { language: 'fr', ...}
 
   try {
@@ -55,7 +55,7 @@ router.patch("/", async (req, res) => {
 // ─── Policies ─────────────────────────────────────────────────────────────────
 
 router.get("/policies", async (req, res) => {
-  const ownerId = (req as any).userId as string;
+  const ownerId = (req as any).clerkUserId as string;
   try {
     const result = await db.execute(sql`
       SELECT policies FROM storefronts WHERE owner_id = ${ownerId}
@@ -68,7 +68,7 @@ router.get("/policies", async (req, res) => {
 });
 
 router.put("/policies", async (req, res) => {
-  const ownerId = (req as any).userId as string;
+  const ownerId = (req as any).clerkUserId as string;
   const { policies } = req.body;
   if (!Array.isArray(policies)) return res.status(400).json({ error: "policies must be an array" });
 
@@ -90,7 +90,7 @@ router.put("/policies", async (req, res) => {
 // ─── Integrations status ──────────────────────────────────────────────────────
 
 router.get("/integrations", async (req, res) => {
-  const ownerId = (req as any).userId as string;
+  const ownerId = (req as any).clerkUserId as string;
   try {
     const result = await db.execute(sql`
       SELECT key, connected_at, settings
@@ -104,7 +104,7 @@ router.get("/integrations", async (req, res) => {
 });
 
 router.post("/integrations/:key/connect", async (req, res) => {
-  const ownerId = (req as any).userId as string;
+  const ownerId = (req as any).clerkUserId as string;
   const { key } = req.params;
   const settings = req.body.settings ?? {};
   try {
@@ -122,7 +122,7 @@ router.post("/integrations/:key/connect", async (req, res) => {
 });
 
 router.delete("/integrations/:key", async (req, res) => {
-  const ownerId = (req as any).userId as string;
+  const ownerId = (req as any).clerkUserId as string;
   const { key } = req.params;
   try {
     await db.execute(sql`
