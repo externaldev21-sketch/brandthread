@@ -9,6 +9,7 @@ import { startScheduledDropBroadcastJob } from "./jobs/scheduledDropBroadcasts";
 import { startSellerTrialReminderJob } from "./jobs/sellerTrialReminder";
 import { startDesignStudioObjectCleanupJob } from "./jobs/designStudioObjectCleanup";
 import { startMoneySweepJob } from "./jobs/moneySweep";
+import { startTrackSavedItemChangesJob } from "./jobs/trackSavedItemChanges";
 import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
 
 const rawPort = process.env["PORT"];
@@ -48,4 +49,5 @@ app.listen(port, (err) => {
   startSellerTrialReminderJob();
   startDesignStudioObjectCleanupJob();
   startMoneySweepJob();
+  startTrackSavedItemChangesJob();
 });

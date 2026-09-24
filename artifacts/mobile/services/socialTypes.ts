@@ -359,6 +359,34 @@ export interface SavedItem {
   subtitle?: string;
   accentColor?: string;
   savedAt: string;
+  /** Board this item is filed into, if any. */
+  collectionId?: string;
+  notifyOnPriceDrop?: boolean;
+  // ── Live badge data (product items only) ────────────────────────────────
+  image?: string;
+  brand?: string;
+  /** Current lowest variant price, in cents. */
+  priceCents?: number;
+  /** The price this was saved at — shown struck through when priceDropped. */
+  oldPriceCents?: number;
+  priceDropped?: boolean;
+  inStock?: boolean;
+  lowStock?: boolean;
+  soldOut?: boolean;
+  backInStock?: boolean;
+}
+
+// ─── Saved Collections (boards) ────────────────────────────────────────────────
+
+export interface SavedCollection {
+  id: string;
+  name: string;
+  coverImageUrl?: string | null;
+  isPublic: boolean;
+  sortOrder: number;
+  itemCount: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ─── Privacy Settings ─────────────────────────────────────────────────────────

@@ -189,6 +189,8 @@ export interface EngagementButtonProps {
   accessibilityState?: { checked?: boolean; busy?: boolean };
   /** Full async action to call on press. EngagementButton handles in-flight guard. */
   onPress: EngagementButtonAction;
+  /** Optional long-press handler (e.g. open the "Save to…" collection sheet). Does not affect the tap animation/state. */
+  onLongPress?: () => void;
   /** Extra hitSlop beyond default */
   hitSlop?: { top: number; bottom: number; left: number; right: number };
   /** Scale the icon and count (1 = default rail size) */
@@ -219,6 +221,7 @@ export function EngagementButton({
   accessibilityLabel,
   accessibilityState,
   onPress,
+  onLongPress,
   hitSlop = { top: 6, bottom: 6, left: 10, right: 10 },
   iconSize = 27,
   style,
@@ -286,6 +289,7 @@ export function EngagementButton({
       activeOpacity={0.7}
       hitSlop={hitSlop}
       onPress={handlePress}
+      onLongPress={onLongPress}
       disabled={pending}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}

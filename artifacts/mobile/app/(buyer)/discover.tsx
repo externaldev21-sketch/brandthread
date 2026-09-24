@@ -51,6 +51,7 @@ import { formatCents } from '@/lib/money';
 import { CachedImage } from '@/components/CachedImage';
 import { CardSkeleton, EmptyState, ListSkeleton, ResponsiveContainer } from '@/components/layout';
 import { saveItem, removeSavedItem, getSavedItems } from '@/services/socialService';
+import { SaveToCollectionSheet, SaveToCollectionItem } from '@/components/SaveToCollectionSheet';
 import {
   CommerceSignalRow,
   ClaimedRemainingLabel,
@@ -236,6 +237,7 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
   const [listWidth, setListWidth] = useState(viewportWidth);
   const [activeIndex, setActiveIndex] = useState(0);
   const [savedIds, setSavedIds] = useState<Record<string, boolean>>({});
+  const [saveToSheetItem, setSaveToSheetItem] = useState<SaveToCollectionItem | null>(null);
   useEffect(() => {
     let cancelled = false;
     getSavedItems().then(saved => {
@@ -341,10 +343,22 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                       const targetId = item.productId ?? item.id;
                       const action = nextSaved
-                        ? saveItem({ type: 'product', targetId, title: item.name, subtitle: item.brand, accentColor: item.colorHex })
+                        ? saveItem({ type: 'product', targetId, title: item.name, subtitle: item.brand, accentColor: item.colorHex, priceCents: item.commerce.currentPriceCents ?? undefined })
                         : removeSavedItem(targetId);
                       action.catch(() => {
                         setSavedIds(current => ({ ...current, [item.id]: !nextSaved }));
+                      });
+                    }}
+                    onLongPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      setSavedIds(current => ({ ...current, [item.id]: true }));
+                      setSaveToSheetItem({
+                        type: 'product',
+                        targetId: item.productId ?? item.id,
+                        title: item.name,
+                        subtitle: item.brand,
+                        accentColor: item.colorHex,
+                        priceCents: item.commerce.currentPriceCents ?? undefined,
                       });
                     }}
                     accessibilityRole="button"
@@ -407,6 +421,11 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
           ))}
         </View>
       )}
+      <SaveToCollectionSheet
+        visible={!!saveToSheetItem}
+        item={saveToSheetItem}
+        onClose={() => setSaveToSheetItem(null)}
+      />
     </View>
   );
 }
