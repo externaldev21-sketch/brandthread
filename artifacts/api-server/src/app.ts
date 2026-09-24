@@ -10,6 +10,7 @@ import {
 } from "./middlewares/clerkProxyMiddleware";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { isAllowedWebOrigin } from "./lib/webOrigin";
 import {
   apiErrorHandler,
   jsonNotFound,
@@ -41,7 +42,37 @@ app.use(normalizeErrorResponses);
 // Clerk proxy must be mounted BEFORE body parsers (streams raw bytes)
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
-app.use(cors({ credentials: true, origin: true }));
+// Credentials (cookies) are only ever sent to a known first-party web
+// origin for this environment — reflecting an arbitrary Origin header with
+// credentials: true would let any site issue authenticated, cookie-bearing
+// requests on a signed-in user's behalf. Non-browser callers (native mobile,
+// server-to-server) send no Origin header and are unaffected by this check.
+app.use(
+  cors({
+    credentials: true,
+    origin(origin, callback) {
+      callback(null, isAllowedWebOrigin(origin));
+    },
+  }),
+);
+
+// Baseline security headers for every response. These are static values that
+// do not depend on request content, so setting them unconditionally here is
+// safe for both API JSON responses and any static/error fallbacks.
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Cross-Origin-Resource-Policy", "same-site");
+  res.setHeader("Permissions-Policy", "geolocation=(), camera=(), microphone=()");
+  if (process.env.NODE_ENV === "production") {
+    res.setHeader(
+      "Strict-Transport-Security",
+      "max-age=63072000; includeSubDomains; preload",
+    );
+  }
+  next();
+});
 
 // Stripe webhooks need the raw body for signature verification —
 // register a raw parser scoped to just that path BEFORE express.json().

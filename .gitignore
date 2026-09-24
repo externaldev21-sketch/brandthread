@@ -50,3 +50,6 @@ Thumbs.db
 
 # CI workflows are stored disabled under docs/ci because the Replit GitHub credential lacks workflow scope.
 .github/workflows/
+
+# Claude Code agent worktrees/scratch (not project content)
+.claude/

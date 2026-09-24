@@ -12,6 +12,7 @@ import {
 } from "@workspace/db";
 import { eq, desc, and, notExists, isNull, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { requireRole } from "../middlewares/requireRole";
 import { deliverDropBroadcast } from "../lib/dropBroadcast";
 import {
   defaultFulfillmentDeadline, failDrop, validateFulfillmentDeadline,
@@ -80,7 +81,7 @@ router.get("/", async (req, res) => {
 });
 
 // POST /api/drops
-router.post("/", async (req, res) => {
+router.post("/", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const {
     name, type, estimatedShipDate, estimatedPayoutDate, fulfillmentDeadlineAt,
@@ -188,7 +189,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // PATCH /api/drops/:id
-router.patch("/:id", async (req, res) => {
+router.patch("/:id", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
 
   // payoutStatus / stripePayoutId are derived from real money state and are
@@ -324,7 +325,7 @@ router.patch("/:id", async (req, res) => {
 // The seller cancels a preorder drop: every buyer whose order has not
 // shipped is refunded in full, automatically. Orders already shipped keep
 // their release. Requires { confirm: true } because it cannot be undone.
-router.post("/:id/cancel-preorders", async (req, res): Promise<void> => {
+router.post("/:id/cancel-preorders", requireRole("manager"), async (req, res): Promise<void> => {
   const sellerId = (req as any).clerkUserId as string;
   if (req.body?.confirm !== true) {
     res.status(400).json({ error: "Send { confirm: true } to refund every unshipped preorder", code: "CONFIRM_REQUIRED" });
@@ -353,7 +354,7 @@ router.post("/:id/cancel-preorders", async (req, res): Promise<void> => {
 // money already held route through the existing refund flow; everything else
 // (pre-made drops, or a preorder drop that hasn't collected a single order)
 // just closes the drop so it stops accepting purchases and drops off Discover.
-router.post("/:id/cancel", async (req, res): Promise<void> => {
+router.post("/:id/cancel", requireRole("manager"), async (req, res): Promise<void> => {
   const sellerId = (req as any).clerkUserId as string;
   const [drop] = await db.select({
     id: drops.id, type: drops.type, status: drops.status, escrowState: drops.escrowState,
@@ -409,7 +410,7 @@ router.get("/:id/broadcast-preview", async (req, res): Promise<void> => {
 // ─── POST /api/drops/:id/broadcast ───────────────────────────────────────────
 // Send a push notification to all followers announcing a live/active drop.
 // Idempotent: each drop can only be broadcast once (unique drop_id constraint).
-router.post("/:id/broadcast", async (req, res) => {
+router.post("/:id/broadcast", requireRole("manager"), async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
 
   // Verify the drop belongs to this seller

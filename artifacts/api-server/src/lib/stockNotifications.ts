@@ -81,6 +81,10 @@ export async function notifyBackInStock(input: {
 }): Promise<void> {
   if (!isRestock(input)) return;
   const likers = await likersOf(input.productId);
+  // Stamp the Saved screen's "Back in stock" badge window for everyone who saved this.
+  await db.update(savedItems)
+    .set({ backInStockAt: new Date() })
+    .where(and(eq(savedItems.itemType, "product"), eq(savedItems.targetId, input.productId)));
   await Promise.all(likers.map((userId) =>
     publishNotification({
       userId,

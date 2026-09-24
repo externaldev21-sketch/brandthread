@@ -9,8 +9,15 @@ import {
 } from "@workspace/db";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { runDesignStudioObjectCleanup } from "../jobs/designStudioObjectCleanup";
+import { rateLimit } from "../middlewares/rateLimit";
 
 const router = Router();
+// Design Studio asset uploads are already rate-limited at the app.ts admission
+// chain (policy "asset-upload"); this applies the "expensive" tier to the
+// remaining project read/write endpoints. middlewareForPolicy skips a request
+// that already carries an explicit rate-limit decision, so this is a no-op
+// for the asset upload route and does not double-count it.
+router.use(rateLimit("expensive"));
 const storage = new ObjectStorageService();
 const MAX_PROJECT_BYTES = 2 * 1024 * 1024;
 const MAX_PROJECT_ASSET_BYTES = 500 * 1024 * 1024;

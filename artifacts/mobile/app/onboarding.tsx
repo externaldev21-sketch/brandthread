@@ -1,10 +1,14 @@
 /**
  * Brandthread Onboarding — complete buyer + seller flows
  *
- * NEW STEP ORDER (v6):
- * BOTH:   0=AccountType (buyer/seller choice, before Clerk account creation)
- * BUYER:  1=Auth  2=Name  3=Style  4=Loading  5=Notifications  6=Success
- * SELLER: 1=Auth  2=Name  3=BrandName  4=BrandStage  5=Goals  6=Plan  7=Loading  8=Notifications  9=Success
+ * STEP ORDER (v7) — see lib/onboardingFlow.ts for the single source of truth:
+ * BOTH:   0=Welcome (cinematic opener)  1=AccountType  2=Auth  3=Name
+ * BUYER:  4=Style  5=Brands (follow)  6=Loading  7=Notifications  8=Success
+ * SELLER: 4=BrandName  5=BrandStage  6=Goals  7=Plan  8=Loading  9=Notifications  10=Success
+ *
+ * Step ordering, skip rules and draft-version migration now live in
+ * lib/onboardingFlow.ts (a plain, RN-free module) so they're independently
+ * unit-testable and are not duplicated as hand-maintained index objects here.
  */
 import { LegalConsent } from '@/components/legal/LegalConsent';
 import { rememberPendingConsent } from '@/lib/legalConsent';
@@ -69,6 +73,18 @@ import {
   makeBrandthreadRedirectUri,
   mapOAuthError,
 } from '@/lib/oauthFlow';
+import {
+  BUYER_STEP_INDEX,
+  SELLER_STEP_INDEX,
+  DRAFT_VERSION,
+  restoreDraftStep,
+  isStepSkippable,
+  canGoBack,
+  totalStepsFor,
+  type Flow,
+} from '@/lib/onboardingFlow';
+import { BrandsToFollowStep } from '@/components/onboarding/BrandsToFollowStep';
+import { WelcomeStep } from '@/components/onboarding/WelcomeStep';
 
 // ─── Palette ────────────────────────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
@@ -126,140 +142,15 @@ const SELLER_LOADING_STEPS = ['Mapping your brand workspace', 'Preparing your pr
 const LEGACY_DRAFT_KEY = 'onboarding_draft';
 const DRAFT_KEY_PREFIX = 'onboarding_draft:';
 const PENDING_FLOW_KEY = 'onboarding_pending_flow';
-const DRAFT_VERSION = 6;
-
-// ─── Step indices (v6 order: AccountType first, then path-specific auth) ──────
-const BUYER_STEP_INDEX = {
-  ACCOUNT_TYPE: 0,
-  AUTH: 1,
-  NAME: 2,
-  STYLE: 3,
-  LOADING: 4,
-  NOTIFICATIONS: 5,
-  SUCCESS: 6,
-} as const;
-
-const SELLER_STEP_INDEX = {
-  ACCOUNT_TYPE: 0,
-  AUTH: 1,
-  NAME: 2,
-  BRAND_NAME: 3,
-  BRAND_STAGE: 4,
-  GOALS: 5,
-  PLAN: 6,
-  LOADING: 7,
-  NOTIFICATIONS: 8,
-  SUCCESS: 9,
-} as const;
+// Draft version, step index objects and cross-version migration now live in
+// lib/onboardingFlow.ts (imported above) — this file only renders steps.
 
 function draftKeyForUser(userId?: string | null): string | null {
   return userId ? `${DRAFT_KEY_PREFIX}${userId}` : null;
 }
 
-type Flow = 'buyer' | 'seller';
-
 function isAppThemeId(value: unknown): value is AppThemeId {
   return typeof value === 'string' && APP_THEME_PRESETS.some((preset) => preset.id === value);
-}
-
-/**
- * Drafts from before v6 need a one-time translation.
- * v6: AccountType=0, Auth=1, then path-specific steps 2+
- * v5: Auth=0, AccountType=1, then path-specific steps 2+
- * v4: Same order as v5 but without PLAN step in seller
- * v1-v3: various older orders
- */
-function restoreDraftStep(flow: Flow, step: number, version?: number): number {
-  if (version === DRAFT_VERSION) return step;
-
-  // v5 → v6: AccountType moved from 1 to 0, Auth moved from 0 to 1; steps 2+ unchanged
-  if (version === 5) {
-    if (flow === 'buyer') {
-      // v5: 0=Auth, 1=AccountType, 2=Name, 3=Style, 4=Loading, 5=Notifications, 6=Success
-      // v6: 0=AccountType, 1=Auth, 2=Name, 3=Style, 4=Loading, 5=Notifications, 6=Success
-      const v5ToBuyer: Record<number, number> = {
-        0: BUYER_STEP_INDEX.AUTH,
-        1: BUYER_STEP_INDEX.ACCOUNT_TYPE,
-        2: BUYER_STEP_INDEX.NAME,
-        3: BUYER_STEP_INDEX.STYLE,
-        4: BUYER_STEP_INDEX.LOADING,
-        5: BUYER_STEP_INDEX.NOTIFICATIONS,
-        6: BUYER_STEP_INDEX.SUCCESS,
-      };
-      return v5ToBuyer[step] ?? BUYER_STEP_INDEX.ACCOUNT_TYPE;
-    }
-    // v5 seller: 0=Auth, 1=AccountType, 2=Name, 3=BrandName, 4=BrandStage, 5=Goals, 6=Plan, 7=Loading, 8=Notifications, 9=Success
-    const v5ToSeller: Record<number, number> = {
-      0: SELLER_STEP_INDEX.AUTH,
-      1: SELLER_STEP_INDEX.ACCOUNT_TYPE,
-      2: SELLER_STEP_INDEX.NAME,
-      3: SELLER_STEP_INDEX.BRAND_NAME,
-      4: SELLER_STEP_INDEX.BRAND_STAGE,
-      5: SELLER_STEP_INDEX.GOALS,
-      6: SELLER_STEP_INDEX.PLAN,
-      7: SELLER_STEP_INDEX.LOADING,
-      8: SELLER_STEP_INDEX.NOTIFICATIONS,
-      9: SELLER_STEP_INDEX.SUCCESS,
-    };
-    return v5ToSeller[step] ?? SELLER_STEP_INDEX.ACCOUNT_TYPE;
-  }
-
-  if (version === 4) {
-    const previousStep = flow === 'buyer'
-      ? [BUYER_STEP_INDEX.AUTH, BUYER_STEP_INDEX.ACCOUNT_TYPE, BUYER_STEP_INDEX.NAME, BUYER_STEP_INDEX.STYLE, BUYER_STEP_INDEX.LOADING, BUYER_STEP_INDEX.NOTIFICATIONS, BUYER_STEP_INDEX.SUCCESS]
-      : [SELLER_STEP_INDEX.AUTH, SELLER_STEP_INDEX.ACCOUNT_TYPE, SELLER_STEP_INDEX.NAME, SELLER_STEP_INDEX.BRAND_NAME, SELLER_STEP_INDEX.BRAND_STAGE, SELLER_STEP_INDEX.GOALS, SELLER_STEP_INDEX.LOADING, SELLER_STEP_INDEX.NOTIFICATIONS, SELLER_STEP_INDEX.SUCCESS];
-    return previousStep[step] ?? (flow === 'buyer' ? BUYER_STEP_INDEX.ACCOUNT_TYPE : SELLER_STEP_INDEX.ACCOUNT_TYPE);
-  }
-
-  if (version === 3) {
-    const previousStep = flow === 'buyer'
-      ? [BUYER_STEP_INDEX.AUTH, BUYER_STEP_INDEX.NAME, BUYER_STEP_INDEX.STYLE, BUYER_STEP_INDEX.LOADING, BUYER_STEP_INDEX.NOTIFICATIONS, BUYER_STEP_INDEX.SUCCESS]
-      : [SELLER_STEP_INDEX.AUTH, SELLER_STEP_INDEX.NAME, SELLER_STEP_INDEX.BRAND_NAME, SELLER_STEP_INDEX.BRAND_STAGE, SELLER_STEP_INDEX.GOALS, SELLER_STEP_INDEX.LOADING, SELLER_STEP_INDEX.NOTIFICATIONS, SELLER_STEP_INDEX.SUCCESS];
-    return previousStep[step] ?? (flow === 'buyer' ? BUYER_STEP_INDEX.ACCOUNT_TYPE : SELLER_STEP_INDEX.ACCOUNT_TYPE);
-  }
-
-  if (flow === 'buyer') {
-    // Previous buyer order: Name, Style, Auth, Loading, Notifications, Success.
-    const previousBuyerStep: Record<number, number> = {
-      0: BUYER_STEP_INDEX.NAME,
-      1: BUYER_STEP_INDEX.STYLE,
-      2: BUYER_STEP_INDEX.AUTH,
-      3: BUYER_STEP_INDEX.LOADING,
-      4: BUYER_STEP_INDEX.NOTIFICATIONS,
-      5: BUYER_STEP_INDEX.SUCCESS,
-    };
-    return previousBuyerStep[step] ?? BUYER_STEP_INDEX.ACCOUNT_TYPE;
-  }
-
-  if (version === 2) {
-    // Version 2 seller order: Name, BrandName, Auth, Stage, Goals, Loading,
-    // Notifications, Success.
-    const previousSellerStep: Record<number, number> = {
-      0: SELLER_STEP_INDEX.NAME,
-      1: SELLER_STEP_INDEX.BRAND_NAME,
-      2: SELLER_STEP_INDEX.AUTH,
-      3: SELLER_STEP_INDEX.BRAND_STAGE,
-      4: SELLER_STEP_INDEX.GOALS,
-      5: SELLER_STEP_INDEX.LOADING,
-      6: SELLER_STEP_INDEX.NOTIFICATIONS,
-      7: SELLER_STEP_INDEX.SUCCESS,
-    };
-    return previousSellerStep[step] ?? SELLER_STEP_INDEX.ACCOUNT_TYPE;
-  }
-
-  // Version 1 seller order included a product-model step and put Auth at 5.
-  const previousLegacySellerStep: Record<number, number> = {
-    0: SELLER_STEP_INDEX.NAME,
-    1: SELLER_STEP_INDEX.BRAND_NAME,
-    2: SELLER_STEP_INDEX.BRAND_STAGE,
-    3: SELLER_STEP_INDEX.GOALS,
-    4: SELLER_STEP_INDEX.GOALS,
-    5: SELLER_STEP_INDEX.AUTH,
-    6: SELLER_STEP_INDEX.LOADING,
-    7: SELLER_STEP_INDEX.NOTIFICATIONS,
-    8: SELLER_STEP_INDEX.SUCCESS,
-  };
-  return previousLegacySellerStep[step] ?? SELLER_STEP_INDEX.ACCOUNT_TYPE;
 }
 
 // ─── Clerk error mapper ──────────────────────────────────────────────────────
@@ -1097,6 +988,30 @@ function BuyerAuthStep({
 
         <LegalConsent checked={agreedToTerms} onChange={updateConsent} showError={consentError} style={{ marginBottom: 20 }} />
 
+        {/* Apple row — iOS only. Shown first: App Store guideline 4.8 requires Sign in
+            with Apple to be at least as prominent as other third-party social logins
+            whenever any are offered. */}
+        {Platform.OS === 'ios' && (
+          <TouchableOpacity
+            style={[sba.bigRow, sba.appleRow]}
+            onPress={() => handleOAuth(startAppleOAuth, 'Apple')}
+            activeOpacity={0.85}
+            disabled={!!oauthLoading || loading}
+          >
+            {oauthLoading === 'Apple' ? (
+              <ActivityIndicator color={FG} size="small" />
+            ) : (
+              <>
+                <View style={sba.bigRowIcon}>
+                  <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
+                </View>
+                <Text style={sba.bigRowText}>Continue with Apple</Text>
+                <Feather name="chevron-right" size={16} color={MUTED2} />
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+
         {/* Google row */}
         <TouchableOpacity
           style={sba.bigRow}
@@ -1118,28 +1033,6 @@ function BuyerAuthStep({
             </>
           )}
         </TouchableOpacity>
-
-        {/* Apple row — iOS only */}
-        {Platform.OS === 'ios' && (
-          <TouchableOpacity
-            style={[sba.bigRow, sba.appleRow]}
-            onPress={() => handleOAuth(startAppleOAuth, 'Apple')}
-            activeOpacity={0.85}
-            disabled={!!oauthLoading || loading}
-          >
-            {oauthLoading === 'Apple' ? (
-              <ActivityIndicator color={FG} size="small" />
-            ) : (
-              <>
-                <View style={sba.bigRowIcon}>
-                  <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
-                </View>
-                <Text style={sba.bigRowText}>Continue with Apple</Text>
-                <Feather name="chevron-right" size={16} color={MUTED2} />
-              </>
-            )}
-          </TouchableOpacity>
-        )}
 
         {/* Use email row */}
         <TouchableOpacity
@@ -1610,18 +1503,7 @@ function SharedAuthStep({
           <View style={ssa.divLine} />
         </View>
 
-        <TouchableOpacity
-          style={ssa.oauthBtn}
-          onPress={() => handleOAuth(startGoogleOAuth, 'Google')}
-          activeOpacity={0.85}
-          disabled={!!oauthLoading || loading}
-        >
-          {oauthLoading === 'Google' ? <ActivityIndicator color={theme.accentLight} size="small" /> : <>
-            <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: 'Inter_700Bold', fontSize: 11, color: FG, lineHeight: 13 }}>G</Text></View>
-            <Text style={ssa.oauthText}>Continue with Google</Text>
-          </>}
-        </TouchableOpacity>
-
+        {/* Apple first — App Store guideline 4.8 prominence requirement. */}
         {Platform.OS === 'ios' && (
           <TouchableOpacity
             style={[ssa.oauthBtn, ssa.appleBtn]}
@@ -1635,6 +1517,18 @@ function SharedAuthStep({
             </>}
           </TouchableOpacity>
         )}
+
+        <TouchableOpacity
+          style={ssa.oauthBtn}
+          onPress={() => handleOAuth(startGoogleOAuth, 'Google')}
+          activeOpacity={0.85}
+          disabled={!!oauthLoading || loading}
+        >
+          {oauthLoading === 'Google' ? <ActivityIndicator color={theme.accentLight} size="small" /> : <>
+            <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: 'Inter_700Bold', fontSize: 11, color: FG, lineHeight: 13 }}>G</Text></View>
+            <Text style={ssa.oauthText}>Continue with Google</Text>
+          </>}
+        </TouchableOpacity>
 
       </ScrollView>
     </KeyboardAvoidingView>
@@ -2218,7 +2112,7 @@ export default function OnboardingScreen() {
   }
 
   function goBack() {
-    if (step === 0) return;
+    if (!canGoBack(step)) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     transitionTo(step - 1, -1);
   }
@@ -2417,7 +2311,8 @@ export default function OnboardingScreen() {
 
   // ── Validation ──────────────────────────────────────────────────────────────
   function canContinue(): boolean {
-    // Step 0 = AccountType: handled by AccountTypeStep's own CTA
+    // Step 0 = Welcome, Step 1 = AccountType: both drive their own CTAs, not the footer.
+    if (step === BUYER_STEP_INDEX.WELCOME) return true;
     if (step === BUYER_STEP_INDEX.ACCOUNT_TYPE) return !!selectedFlow;
     // Auth step: user can always "continue" (auth has its own internal validation)
     if (flow === 'buyer' && step === BUYER_STEP_INDEX.AUTH) return true;
@@ -2426,6 +2321,7 @@ export default function OnboardingScreen() {
     if (flow === 'buyer') {
       if (step === BUYER_STEP_INDEX.NAME) return firstName.trim().length >= 2;
       if (step === BUYER_STEP_INDEX.STYLE) return true;
+      if (step === BUYER_STEP_INDEX.BRANDS) return true;
     }
     if (flow === 'seller') {
       if (step === SELLER_STEP_INDEX.NAME) return firstName.trim().length >= 2;
@@ -2439,18 +2335,27 @@ export default function OnboardingScreen() {
 
   // ── Step dots indicator ──────────────────────────────────────────────────────
   function showsProgressBar(): boolean {
-    return true;
+    // The cinematic Welcome opener has its own full-bleed visual — no dots yet.
+    return step !== BUYER_STEP_INDEX.WELCOME;
   }
 
   function progressSteps(): { current: number; total: number } {
     const progressFlow = flow ?? selectedFlow;
-    const total = progressFlow === 'buyer' ? 7 : 10;
+    const total = progressFlow ? totalStepsFor(progressFlow) : totalStepsFor('buyer');
     return { current: Math.min(step, total - 1), total };
   }
 
   // ── Step rendering ──────────────────────────────────────────────────────────
   function renderStep() {
-    // Step 0: AccountType (before any auth — buyer/seller choice)
+    // Step 0: Welcome — cinematic opener shown before any account-type choice.
+    if (step === BUYER_STEP_INDEX.WELCOME) return (
+      <WelcomeStep
+        onGetStarted={() => transitionTo(BUYER_STEP_INDEX.ACCOUNT_TYPE, 1)}
+        onSignIn={() => router.replace('/sign-in' as never)}
+      />
+    );
+
+    // Step 1: AccountType (before any auth — buyer/seller choice)
     if (step === BUYER_STEP_INDEX.ACCOUNT_TYPE && !flow) return (
       <AccountTypeStep
         selected={selectedFlow}
@@ -2460,8 +2365,8 @@ export default function OnboardingScreen() {
       />
     );
 
-    // If flow is already set (draft restore) and we're at step 0, still show AccountType
-    if (step === 0 && flow) {
+    // If flow is already set (draft restore) and we're at the AccountType step, still show it
+    if (step === BUYER_STEP_INDEX.ACCOUNT_TYPE && flow) {
       return (
         <AccountTypeStep
           selected={flow}
@@ -2548,7 +2453,12 @@ export default function OnboardingScreen() {
         </ScrollView>
       );
 
-      // Step 4: Loading
+      // Step 5: Brands to follow — personalizes the Thread before the buyer ever sees it
+      if (step === BUYER_STEP_INDEX.BRANDS) return (
+        <BrandsToFollowStep />
+      );
+
+      // Step 6: Loading
       if (step === BUYER_STEP_INDEX.LOADING) return (
         <LoadingAnimation steps={BUYER_LOADING_STEPS} onDone={() => transitionTo(BUYER_STEP_INDEX.NOTIFICATIONS, 1)} />
       );
@@ -2751,10 +2661,12 @@ export default function OnboardingScreen() {
     return null;
   }
 
-  const isFullScreen = (flow === 'buyer' && step >= BUYER_STEP_INDEX.LOADING)
+  const isWelcomeStep = step === BUYER_STEP_INDEX.WELCOME;
+  const isFullScreen = isWelcomeStep
+                     || (flow === 'buyer' && step >= BUYER_STEP_INDEX.LOADING)
                      || (flow === 'seller' && step >= SELLER_STEP_INDEX.LOADING);
 
-  const isAccountTypeStep = step === 0;
+  const isAccountTypeStep = step === BUYER_STEP_INDEX.ACCOUNT_TYPE;
   const isAuthStep = (flow === 'buyer' && step === BUYER_STEP_INDEX.AUTH)
                    || (flow === 'seller' && step === SELLER_STEP_INDEX.AUTH);
 
@@ -2765,8 +2677,13 @@ export default function OnboardingScreen() {
     && !(flow === 'seller' && (step === SELLER_STEP_INDEX.GOALS || step === SELLER_STEP_INDEX.PLAN));
 
   function footerButtonLabel(): string {
-    if (flow === 'buyer' && step === BUYER_STEP_INDEX.STYLE) {
-      return styleInterests.length > 0 ? 'Continue' : 'Skip for now';
+    if (flow && isStepSkippable(flow, step)) {
+      if (flow === 'buyer' && step === BUYER_STEP_INDEX.STYLE) {
+        return styleInterests.length > 0 ? 'Continue' : 'Skip for now';
+      }
+      if (flow === 'buyer' && step === BUYER_STEP_INDEX.BRANDS) {
+        return 'Continue';
+      }
     }
     return 'Continue';
   }
