@@ -4,6 +4,7 @@ export * from './freelancers';
 export * from './subscriptionEntitlements';
 export * from './security';
 export * from './money';
+export * from './threadCash';
 import { manufacturers } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
 

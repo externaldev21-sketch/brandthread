@@ -21,6 +21,8 @@ import {
   subscribeSocial,
 } from '@/services/socialService';
 import { useApi } from '@/lib/api';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+import { formatCents } from '@/lib/money';
 import { CachedImage } from '@/components/CachedImage';
 import { loadBuyerProfile } from '@/lib/buyerProfile';
 import { loadHighlights, type Highlight } from '@/lib/highlightsService';
@@ -241,6 +243,7 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [stickyTabsVisible, setStickyTabsVisible] = useState(false);
+  const [threadCashBalanceCents, setThreadCashBalanceCents] = useState(0);
 
   // Sheets
   const [menuOpen, setMenuOpen] = useState(false);
@@ -333,6 +336,16 @@ export default function ProfileScreen() {
   }, [loadData]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
+
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    if (user?.id) {
+      void api.threadCash.get()
+        .then(status => { if (active) setThreadCashBalanceCents(Math.max(0, status.balanceCents)); })
+        .catch(() => {});
+    }
+    return () => { active = false; };
+  }, [api, user?.id]));
 
   useEffect(() => {
     const unsub = subscribeSocial(() => { loadData(); });
@@ -531,6 +544,22 @@ export default function ProfileScreen() {
           <Text style={[styles.statLabel, { color: theme.muted }]}>Following</Text>
         </TouchableOpacity>
       </View>
+
+      {/* ── Thread Cash balance chip ── */}
+      {useFeatureFlag('threadCash') && (
+        <TouchableOpacity
+          style={[styles.threadCashChip, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}
+          onPress={() => { Haptics.selectionAsync(); router.push('/thread-cash' as never); }}
+          accessibilityRole="button"
+          accessibilityLabel="Thread Cash wallet"
+        >
+          <Feather name="dollar-sign" size={14} color={theme.accent} />
+          <Text style={[styles.threadCashChipText, { color: theme.accent }]}>
+            {formatCents(threadCashBalanceCents)} Thread Cash
+          </Text>
+          <Feather name="chevron-right" size={14} color={theme.accent} />
+        </TouchableOpacity>
+      )}
 
       {/* ── Action Buttons ── */}
       <View style={styles.actionRow}>
@@ -867,6 +896,14 @@ const styles = StyleSheet.create({
   statNum: { fontFamily: FONT.bold, fontSize: FS.md },
   statLabel: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
   statDivider: { width: 1, height: 22, marginHorizontal: SP.xs },
+
+  // Thread Cash chip
+  threadCashChip: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.xs,
+    alignSelf: 'center', marginTop: SP.md, paddingHorizontal: SP.md, paddingVertical: SP.xs,
+    borderRadius: RADIUS.pill, borderWidth: 1,
+  },
+  threadCashChipText: { fontFamily: FONT.semibold, fontSize: FS.xs },
 
   // Action buttons
   actionRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, marginTop: SP.md, gap: SP.sm },

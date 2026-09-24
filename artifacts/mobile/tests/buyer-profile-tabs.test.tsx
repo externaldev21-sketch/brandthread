@@ -26,7 +26,7 @@ const {
   loadBuyerProfileMock: vi.fn(),
   loadHighlightsMock: vi.fn(),
   routerMock: { push: vi.fn(), replace: vi.fn() },
-  apiMock: { social: { myStories: vi.fn() } },
+  apiMock: { social: { myStories: vi.fn() }, threadCash: { get: vi.fn() } },
   getBuyerOrdersWithStatusMock: vi.fn(),
 }));
 
@@ -241,6 +241,7 @@ describe('buyer profile tabs', () => {
     loadBuyerProfileMock.mockReset().mockResolvedValue({ avatarUri: null });
     loadHighlightsMock.mockReset().mockResolvedValue([]);
     apiMock.social.myStories.mockReset().mockResolvedValue([]);
+    apiMock.threadCash.get.mockReset().mockResolvedValue({ balanceCents: 0 });
     getBuyerOrdersWithStatusMock.mockReset().mockResolvedValue({ orders: [], fromCache: false });
     routerMock.push.mockReset();
   });

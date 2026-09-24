@@ -154,6 +154,14 @@ export interface CheckoutLoyaltyRedemption {
   discountCents: number;
 }
 
+/** THREAD CASH HOOK POINT: a redemption created by /api/thread-cash/redeem and
+ *  attached to one checkout. Mirrors CheckoutLoyaltyRedemption; not yet
+ *  applied server-side (see docs/payments/thread-cash-checkout-todo.md). */
+export interface CheckoutThreadCashRedemption {
+  token: string;
+  discountCents: number;
+}
+
 export interface CheckoutSession {
   id: string;
   cartId: string;
@@ -164,6 +172,7 @@ export interface CheckoutSession {
   deliveryGroups: CheckoutDeliveryGroup[];
   discounts: CheckoutDiscount[];
   loyaltyRedemption?: CheckoutLoyaltyRedemption;
+  threadCashRedemption?: CheckoutThreadCashRedemption;
   tax?: CheckoutTax;
   paymentMethod?: CheckoutPaymentMethod;
   summary: CheckoutSummary;

@@ -16,6 +16,7 @@ import {
   reportNetworkError,
 } from '@/lib/networkNotice';
 import type { FinanceSummary } from '@/lib/financeSummary';
+import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 
 const BASE =
   process.env.EXPO_PUBLIC_API_BASE_URL ??
@@ -997,6 +998,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             clientIdempotencyKey?: string;
             /** One-time rewards token created by /api/loyalty/redeem. */
             loyaltyToken?: string;
+            /** THREAD CASH HOOK POINT: one-time token from /api/thread-cash/redeem.
+             *  The server currently rejects any request that includes this (see
+             *  routes/buyer.ts) until the checkout money flow can fund it without
+             *  changing seller payout — see docs/payments/thread-cash-checkout-todo.md. */
+            threadCashToken?: string;
           },
         ) =>
           post<{ sessionId: string; url: string }>('/api/buyer/checkout/session', {
@@ -1008,6 +1014,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             ...(opts.shippingAddress       ? { shippingAddress:       opts.shippingAddress       } : {}),
             ...(opts.clientIdempotencyKey  ? { clientIdempotencyKey:  opts.clientIdempotencyKey  } : {}),
             ...(opts.loyaltyToken          ? { loyaltyToken:          opts.loyaltyToken          } : {}),
+            ...(opts.threadCashToken       ? { threadCashToken:       opts.threadCashToken       } : {}),
           }),
         /** Verify payment status after Stripe redirect.
          *  Returns { status, paymentStatus, amountTotal, orderId?, orderNumber?, declineReason? }. */
@@ -2094,6 +2101,21 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<any>('/api/loyalty/earn', body),
       redeem: (body: { points: number }) =>
         post<{ ok: boolean; pointsUsed: number; discountCents: number; token: string }>('/api/loyalty/redeem', body),
+    },
+    /** Thread Cash — platform-funded reward credit (daily check-in, streaks, wallet). */
+    threadCash: {
+      get: () =>
+        get<ThreadCashStatus>('/api/thread-cash'),
+      checkIn: (body: { timezone: string; deviceId?: string }) =>
+        post<ThreadCashCheckInResult>('/api/thread-cash/check-in', body),
+      history: (limit = 50) =>
+        get<{ history: ThreadCashEntry[] }>(`/api/thread-cash/history?limit=${limit}`),
+      redeem: (body: { amountCents: number }) =>
+        post<{ ok: boolean; discountCents: number; token: string }>('/api/thread-cash/redeem', body),
+      send: (body: { recipientId: string; conversationId?: string; amountCents: number }) =>
+        post<{ ok: boolean; transferId: string }>('/api/thread-cash/send', body),
+      claim: (body: { transferId: string }) =>
+        post<{ ok: boolean; amountCents: number }>('/api/thread-cash/claim', body),
     },
     /** Public trending feed — no auth required. */
     publicTrending: {

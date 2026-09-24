@@ -1504,6 +1504,14 @@ export default function BuyerCheckoutScreen() {
               ...(current.loyaltyRedemption && current.deliveryGroups.length === 1
                 ? { loyaltyToken: current.loyaltyRedemption.token }
                 : {}),
+              // THREAD CASH HOOK POINT: server currently rejects this token
+              // outright (see routes/buyer.ts) until checkout can fund the
+              // discount without changing seller payout — see
+              // docs/payments/thread-cash-checkout-todo.md. Wired here so the
+              // rest of the flow needs no changes once that lands.
+              ...(current.threadCashRedemption && current.deliveryGroups.length === 1
+                ? { threadCashToken: current.threadCashRedemption.token }
+                : {}),
             },
           );
         } else {

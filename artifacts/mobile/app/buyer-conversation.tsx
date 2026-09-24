@@ -38,6 +38,8 @@ import { SheetRise } from '@/components/motion/SheetRise';
 import ChatWallpaper from '@/components/chat/ChatWallpaper';
 import UploadRing from '@/components/chat/UploadRing';
 import MediaViewer from '@/components/chat/MediaViewer';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+import { ThreadCashAttachButton } from '@/components/thread-cash/ChatAttachThreadCash';
 import {
   ReactionChipsRow, ReactionGlyph, reactionAuthorId, reactionAuthorName, reactionKind,
 } from '@/components/chat/ReactionBar';
@@ -172,6 +174,8 @@ export default function BuyerConversationScreen() {
   const flatListRef = useRef<FlatList<ListRow>>(null);
   const api = useApi();
   const { userId } = useAuth();
+  // THREAD CASH HOOK POINT — see components/thread-cash/ChatAttachThreadCash.tsx.
+  const threadCashSendEnabled = useFeatureFlag('threadCashSend');
   /** The signed-in Clerk user; legacy local records used the literal 'me'. */
   const myId = userId ?? MY_USER_ID;
   const [messaging, setMessaging] = useState<DmMessagingState>({ blockedByMe: false, unavailable: false });
@@ -1226,6 +1230,18 @@ export default function BuyerConversationScreen() {
                 : <Feather name="plus" size={ICON.md} color={theme.muted} />
               }
             </TouchableOpacity>
+
+            {/* THREAD CASH HOOK POINT: minimal attach entry, OFF by default
+                behind the 'threadCashSend' flag. Rendering a sent Thread Cash
+                message in the thread above is left for this screen's own
+                renderAttachment/message-list logic to wire up. */}
+            {threadCashSendEnabled && sellerUserId ? (
+              <ThreadCashAttachButton
+                recipientId={sellerUserId}
+                conversationId={conv?.id ?? ''}
+                onSent={() => {}}
+              />
+            ) : null}
 
             {/* Text input */}
             <TextInput

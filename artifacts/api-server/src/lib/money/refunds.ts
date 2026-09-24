@@ -29,6 +29,7 @@ import { logger } from "../logger";
 import { platformFeeRefundCents } from "./fees";
 import { adjustDropWalletForRefund, maybeCompleteDrop } from "./escrow";
 import { orderHeldCents, postLedgerTransaction, type DbExecutor, type LedgerPosting } from "./ledger";
+import { refundThreadCashSpend } from "../threadCash/wallet";
 import {
   orderFundsMachine, orderStatusMachine, refundMachine, releaseMachine,
   type OrderFundsState, type OrderStatus,
@@ -91,6 +92,7 @@ export type LockedOrder = {
   refunded_cents: number;
   platform_fee_cents: number;
   platform_fee_refunded_cents: number;
+  thread_cash_applied_cents: number;
   stripe_payment_intent_id: string | null;
   stripe_application_fee_id: string | null;
   created_at: Date;
@@ -104,7 +106,8 @@ async function lockOrder(executor: DbExecutor, orderId: string): Promise<LockedO
   const [order] = rows<LockedOrder>(await executor.execute(sql`
     SELECT id, owner_id, buyer_id, order_number, status, drop_id, charge_model, funds_state,
            total_cents, gross_charged_cents, refunded_cents, platform_fee_cents,
-           platform_fee_refunded_cents, stripe_payment_intent_id, stripe_application_fee_id, created_at
+           platform_fee_refunded_cents, thread_cash_applied_cents,
+           stripe_payment_intent_id, stripe_application_fee_id, created_at
     FROM orders WHERE id = ${orderId}::uuid FOR UPDATE
   `));
   return order;
@@ -396,6 +399,14 @@ export async function refundOrder(options: RefundOptions): Promise<RefundResult>
       }
     }
     await options.onSucceeded?.(tx, { order: locked, amountCents: amount, refundId: refund.id });
+    // THREAD CASH HOOK POINT: a full refund/cancellation returns any Thread
+    // Cash the buyer spent on this order. Inert today — nothing yet sets
+    // orders.thread_cash_applied_cents above 0 — but wired here, once, for
+    // every refund path (buyer/seller cancellation, return, oversold, drop
+    // failure) so it needs no further changes once checkout redemption ships.
+    if (fullyRefunded && locked.buyer_id && locked.thread_cash_applied_cents > 0) {
+      await refundThreadCashSpend(tx, locked.buyer_id, locked.id, locked.thread_cash_applied_cents);
+    }
     if (locked.drop_id) await maybeCompleteDrop(tx, locked.drop_id);
 
     return {
