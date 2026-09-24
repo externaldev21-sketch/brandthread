@@ -9,7 +9,7 @@
  */
 import { Router } from "express";
 import {
-  db, posts, postTaggedProducts, products, users, interactions, follows, boosts, blocks,
+  db, posts, postTaggedProducts, products, productVariants, users, interactions, follows, boosts, blocks,
   savedItems, orders,
 } from "@workspace/db";
 import { eq, and, inArray, count, sql, desc, lte, lt, gte, or } from "drizzle-orm";
@@ -93,6 +93,22 @@ async function sellerExists(clerkId: string): Promise<boolean> {
     .where(eq(users.clerkId, clerkId))
     .limit(1);
   return seller?.accountType === "seller";
+}
+
+/**
+ * Lowest variant price per product — a product has no price of its own
+ * (that lives only on its variants), so this is what a tagged product's
+ * displayed price ("Shop · $X") must come from.
+ */
+async function productMinPrices(productIds: string[]): Promise<Record<string, number>> {
+  const ids = [...new Set(productIds)];
+  if (ids.length === 0) return {};
+  const rows = await db
+    .select({ productId: productVariants.productId, minPriceCents: sql<number>`min(${productVariants.priceCents})` })
+    .from(productVariants)
+    .where(inArray(productVariants.productId, ids))
+    .groupBy(productVariants.productId);
+  return Object.fromEntries(rows.map((r) => [r.productId, Number(r.minPriceCents)]));
 }
 
 router.use("/", postVideoRouter);
@@ -252,6 +268,7 @@ async function postDetails(postRows: typeof posts.$inferSelect[]) {
   const sellerById = new Map(sellerRows.map((seller) => [seller.clerkId, seller]));
   const tagsByPost: Record<string, typeof tagRows> = {};
   for (const tag of tagRows) (tagsByPost[tag.postId] ??= []).push(tag);
+  const minPriceByProduct = await productMinPrices(tagRows.map((tag) => tag.productId));
   const countByPost = (rows: Array<{ postId: string | null; cnt: number }>) =>
     Object.fromEntries(rows.filter((row) => row.postId).map((row) => [row.postId, Number(row.cnt)]));
   const likesByPost = countByPost(likeRows);
@@ -275,6 +292,7 @@ async function postDetails(postRows: typeof posts.$inferSelect[]) {
         position: tag.position,
         name: tag.name,
         images: tag.images,
+        priceCents: minPriceByProduct[tag.productId] ?? 0,
       })),
       likesCount: post.visibility?.showLikeCount === false ? null : likesByPost[post.id] ?? 0,
       repostsCount: repostsByPost[post.id] ?? 0,
@@ -389,6 +407,7 @@ router.get("/feed", requireAuth, async (req, res) => {
       if (!tagsByPost[t.postId]) tagsByPost[t.postId] = [];
       tagsByPost[t.postId].push(t);
     }
+    const minPriceByProduct = await productMinPrices(tagRows.map((t) => t.productId));
     const likesByPost: Record<string, number> = {};
     for (const r of likeRows) if (r.postId) likesByPost[r.postId] = Number(r.cnt);
     const repostsByPost: Record<string, number> = {};
@@ -443,6 +462,7 @@ router.get("/feed", requireAuth, async (req, res) => {
         position:  t.position,
         name:      t.name,
         images:    t.images,
+        priceCents: minPriceByProduct[t.productId] ?? 0,
       })),
       likesCount:    p.visibility?.showLikeCount === false ? null : likesByPost[p.id] ?? 0,
       repostsCount:  repostsByPost[p.id]  ?? 0,
@@ -1129,10 +1149,11 @@ router.get("/:id", async (req, res) => {
       .where(and(eq(interactions.postId, id), eq(interactions.type, "repost"))),
   ]);
 
+  const minPriceByProduct = await productMinPrices(tags.map((t) => t.productId));
   return res.json({
     ...post,
     seller:       sellerRows[0] ?? null,
-    taggedProducts: tags,
+    taggedProducts: tags.map((t) => ({ ...t, priceCents: minPriceByProduct[t.productId] ?? 0 })),
     likeCount:    post.visibility?.showLikeCount === false ? null : likeRows[0]?.count ?? 0,
     repostCount:  repostRows[0]?.count ?? 0,
   });

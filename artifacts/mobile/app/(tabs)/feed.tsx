@@ -20,6 +20,7 @@ import {
 import type { SellerThreadPost } from '@/services/socialService';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
 import { Asset } from 'expo-asset';
 import type { ViewToken } from 'react-native';
@@ -267,7 +268,7 @@ interface SpotlightItem {
   // Optional fields present on real seller posts
   productId?: string;
   sellerId?: string;
-  productTags?: { productId: string; productName: string; priceCents: number }[];
+  productTags?: { productId: string; productName: string; priceCents: number; imageUri?: string }[];
   /** Authoritative comment count from the server (preferred over local comments array length) */
   commentsCount?: number;
 }
@@ -955,6 +956,69 @@ function PhotoVisual({ uris, pageWidth, pageHeight }: { uris: string[]; pageWidt
   );
 }
 
+// ─── Shop pill — compact glass trigger above the creator name ────────────────
+
+function ShopPill({
+  tag, extraCount, onPress,
+}: {
+  tag: SpotlightProductTag;
+  extraCount: number;
+  onPress: () => void;
+}) {
+  const shimmer = useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.delay(1400),
+        Animated.timing(shimmer, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.timing(shimmer, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [shimmer]);
+
+  return (
+    <TouchableOpacity
+      style={styles.shopPill}
+      activeOpacity={0.82}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Shop ${tag.productName}, ${formatCents(tag.priceCents)}`}
+    >
+      <BlurView intensity={38} tint="dark" style={StyleSheet.absoluteFill} />
+      <View style={styles.shopPillThumb}>
+        {tag.imageUri ? (
+          <CachedImage source={{ uri: tag.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+        ) : (
+          <Feather name="shopping-bag" size={13} color="#111111" />
+        )}
+      </View>
+      <Text style={styles.shopPillPrice} numberOfLines={1}>
+        {formatCents(tag.priceCents)}{extraCount > 0 ? ` · +${extraCount}` : ''}
+      </Text>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.shopPillShimmer,
+          {
+            opacity: shimmer.interpolate({ inputRange: [0, 0.15, 0.85, 1], outputRange: [0, 0.55, 0.55, 0] }),
+            transform: [{ translateX: shimmer.interpolate({ inputRange: [0, 1], outputRange: [-90, 90] }) }],
+          },
+        ]}
+      >
+        <LinearGradient
+          colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.85)', 'rgba(255,255,255,0)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
+
 function SpotlightPage({
   item, isActive, pageWidth, pageHeight, bottomClearance, immersive = false, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag,
 }: {
@@ -972,7 +1036,7 @@ function SpotlightPage({
   onRepost: (id: string) => Promise<void>;
   onFollow: (id: string) => Promise<void>;
   onOpenComments: (id: string) => void;
-  onShopTag: (item: SpotlightItem, tag: { productId: string; productName: string; priceCents: number }) => void;
+  onShopTag: (item: SpotlightItem, tag: SpotlightProductTag) => void;
 }) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -1154,33 +1218,14 @@ function SpotlightPage({
         </>
       )}
 
-      {/* ─ Product tags live on the media surface ─ */}
+      {/* ─ Shop pill — compact, sits above the creator name ─ */}
       {!!item.productTags?.length && (
         <View style={[styles.mediaTags, { bottom: bottomClearance + (hasRepostIdentity ? 148 : 112) }]} pointerEvents="box-none">
-          {item.productTags.slice(0, 1).map(tag => (
-            <TouchableOpacity
-              key={tag.productId}
-              style={styles.mediaTag}
-              activeOpacity={0.82}
-              onPress={() => onShopTag(item, tag)}
-              accessibilityRole="button"
-              accessibilityLabel={`Shop ${tag.productName} for ${formatCents(tag.priceCents)}`}
-            >
-              <View style={styles.mediaTagIcon}>
-                <Feather name="shopping-bag" size={19} color="#111111" />
-              </View>
-              <View style={styles.mediaTagCopy}>
-                <Text style={styles.mediaTagName} numberOfLines={1}>
-                  Shop · {tag.productName}
-                </Text>
-                <Text style={styles.mediaTagMeta} numberOfLines={1}>
-                  {formatCents(tag.priceCents)} · Creator pick
-                  {item.productTags!.length > 1 ? `s (${item.productTags!.length})` : ''}
-                </Text>
-              </View>
-              <Feather name="chevron-right" size={18} color="#FFFFFFCC" />
-            </TouchableOpacity>
-          ))}
+          <ShopPill
+            tag={item.productTags[0]}
+            extraCount={Math.max(0, item.productTags.length - 1)}
+            onPress={() => onShopTag(item, item.productTags![0])}
+          />
         </View>
       )}
 
@@ -1956,7 +2001,7 @@ export default function FeedScreen({
     router.push(('/buyer-post-comments?' + qs) as never);
   }
 
-  function handleShopTag(item: SpotlightItem, tag: { productId: string; productName: string; priceCents: number }) {
+  function handleShopTag(item: SpotlightItem, tag: SpotlightProductTag) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const allTags = (item.productTags ?? []).length > 0
       ? (item.productTags as Array<{ productId: string; productName: string; priceCents: number }>)
@@ -2019,6 +2064,14 @@ export default function FeedScreen({
         viewabilityConfig={viewabilityConfig}
         onEndReached={loadMoreFeed}
         onEndReachedThreshold={0.5}
+        // Bounds how many video players ever exist at once: the active
+        // page plus roughly the next/previous 2 stay mounted (poster-first,
+        // so they start instantly the moment they become active) — the
+        // rest are unmounted rather than left decoding off-screen.
+        initialNumToRender={3}
+        maxToRenderPerBatch={2}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS !== 'web'}
         getItemLayout={(_, index) => ({ length: pageHeight, offset: pageHeight * index, index })}
         refreshControl={
           <RefreshControl
@@ -2382,20 +2435,19 @@ const styles = StyleSheet.create({
   mediaDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#FFFFFF80' },
   mediaDotActive: { width: 18, backgroundColor: '#FFFFFF' },
   mediaTags: { position: 'absolute', left: 16, right: 86, alignItems: 'flex-start' },
-  mediaTag: {
-    maxWidth: 270, minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', borderRadius: 11,
-    paddingVertical: 7, paddingHorizontal: 8, backgroundColor: 'rgba(12,12,14,0.72)',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.28,
-    shadowRadius: 8, elevation: 7,
+  shopPill: {
+    height: 34, flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderRadius: 17, paddingLeft: 4, paddingRight: 12, overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.24,
+    shadowRadius: 6, elevation: 5,
   },
-  mediaTagIcon: {
-    width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+  shopPillThumb: {
+    width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#FFFFFF', overflow: 'hidden',
   },
-  mediaTagCopy: { flex: 1, minWidth: 0 },
-  mediaTagName: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: 13, lineHeight: 16 },
-  mediaTagMeta: { color: '#FFFFFFB8', fontFamily: FONT.medium, fontSize: 11, lineHeight: 14 },
+  shopPillPrice: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 12.5 },
+  shopPillShimmer: { position: 'absolute', top: 0, bottom: 0, width: 40 },
 
   rail: {
     position: 'absolute', right: 8, width: 48, bottom: 116, alignItems: 'center', gap: 15,

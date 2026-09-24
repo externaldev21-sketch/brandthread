@@ -55,7 +55,7 @@ describe("single-item Buy out of a multi-item cart", () => {
     });
 
     expect(order.buyerId).toBe(buyer);
-    expect(order.sellerId).toBe(seller);
+    expect(order.ownerId).toBe(seller);
     // Correct amount: exactly the bought item's price × quantity, with no
     // trace of the second cart item's price.
     expect(order.grossChargedCents).toBe(boughtProduct.priceCents * 2);
