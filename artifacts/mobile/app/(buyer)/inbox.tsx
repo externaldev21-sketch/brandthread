@@ -21,14 +21,16 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   getConversations, markConversationRead, archiveConversation,
   subscribeSocial, getNotifications, markNotificationRead,
-  searchProfiles, createOrGetConversation,
+  searchProfiles, createOrGetConversation, muteUser, MY_USER_ID,
 } from '@/services/socialService';
 import type { Conversation, Notification, ProfileSearchResult } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
-import SwipeActionRow from '@/components/SwipeActionRow';
+import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
+import { ConversationPreview } from '@/components/inbox/ConversationPreview';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+/** Relative-then-absolute timestamp: "2m" / "3h" → weekday ("Tue") → date. */
 function timeAgo(ts: number): string {
   const diff = Date.now() - ts;
   const mins = Math.floor(diff / 60_000);
@@ -36,7 +38,9 @@ function timeAgo(ts: number): string {
   if (mins < 60) return `${mins}m`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h`;
-  return `${Math.floor(hrs / 24)}d`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return new Date(ts).toLocaleDateString(undefined, { weekday: 'short' });
+  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 function getParticipant(conv: Conversation) {
@@ -85,6 +89,7 @@ export default function InboxScreen() {
   const [composeLoading, setComposeLoading] = useState(false);
   const [composeStartingId, setComposeStartingId] = useState<string | null>(null);
   const composeSearchSeq = useRef(0);
+  const [messagesSearchQuery, setMessagesSearchQuery] = useState('');
 
   const loadData = useCallback(async () => {
     if (!userId) {
@@ -131,6 +136,8 @@ export default function InboxScreen() {
 
   // ── Filter logic ────────────────────────────────────────────────────────────
 
+  const messagesSearchLower = messagesSearchQuery.trim().toLowerCase();
+
   const filteredConvs = conversations.filter(conv => {
     // Tab filter
     let tabMatch = false;
@@ -140,6 +147,13 @@ export default function InboxScreen() {
       case 'Requests': tabMatch = conv.isRequest === true && !conv.isArchived; break;
     }
     if (!tabMatch) return false;
+    if (activeTab === 'Messages' && messagesSearchLower) {
+      const participant = getParticipant(conv);
+      const haystack = [
+        participant?.name, participant?.handle, conv.lastMessage,
+      ].filter(Boolean).join(' ').toLowerCase();
+      if (!haystack.includes(messagesSearchLower)) return false;
+    }
     return true;
   });
 
@@ -212,6 +226,43 @@ export default function InboxScreen() {
     setConversations(prev => prev.map(item =>
       item.id === conv.id ? { ...item, isArchived: true } : item
     ));
+  }
+
+  // Swipe actions on a Messages-tab row: delete removes it from the inbox
+  // (there is no true delete-conversation endpoint, so this archives it,
+  // matching the existing long-press "Archive" behavior), mute silences the
+  // other participant (reusing the existing user-mute feature), and mark
+  // read clears the unread badge without opening the thread.
+  async function swipeDeleteConversation(conv: Conversation) {
+    await swipeArchiveConversation(conv);
+  }
+
+  async function swipeMuteConversation(conv: Conversation) {
+    const participant = getParticipant(conv);
+    if (!participant) return;
+    try {
+      await muteUser({
+        userId: participant.userId,
+        name: participant.name,
+        handle: participant.handle,
+        initials: participant.initials,
+        color: participant.color,
+      });
+    } catch {
+      Alert.alert('Error', 'Could not mute. Try again.');
+    }
+  }
+
+  async function swipeMarkReadConversation(conv: Conversation) {
+    if (conv.unreadCount <= 0) return;
+    try {
+      await markConversationRead(conv.id);
+      setConversations(prev => prev.map(item =>
+        item.id === conv.id ? { ...item, unreadCount: 0 } : item
+      ));
+    } catch {
+      Alert.alert('Error', 'Could not mark as read. Try again.');
+    }
   }
 
   function openCompose() {
@@ -344,39 +395,70 @@ export default function InboxScreen() {
       );
     }
 
+    const swipeActions: InboxSwipeAction[] = [
+      {
+        key: 'read',
+        label: 'Read',
+        icon: 'check-circle',
+        color: theme.accentDim,
+        textColor: theme.accent,
+        onPress: () => swipeMarkReadConversation(conv),
+        accessibilityLabel: `Mark conversation with ${participant.name} as read`,
+      },
+      {
+        key: 'mute',
+        label: 'Mute',
+        icon: 'bell-off',
+        color: theme.cardElevated,
+        textColor: theme.muted,
+        onPress: () => swipeMuteConversation(conv),
+        accessibilityLabel: `Mute ${participant.name}`,
+      },
+      {
+        key: 'delete',
+        label: 'Delete',
+        icon: 'trash-2',
+        color: RED,
+        textColor: '#FFFFFF',
+        onPress: () => swipeDeleteConversation(conv),
+        accessibilityLabel: `Delete conversation with ${participant.name}`,
+      },
+    ];
+
     return (
-      <SwipeActionRow
-        label="Archive"
-        icon="archive"
-        color={RED}
-        onAction={() => swipeArchiveConversation(conv)}
-        accessibilityLabel={`Archive conversation with ${participant.name}`}
-      >
+      <InboxSwipeRow rowId={conv.id} actions={swipeActions}>
         <TouchableOpacity
           style={s.convRow}
           onPress={() => openConversation(conv)}
           onLongPress={() => longPressConversation(conv)}
           activeOpacity={0.75}
+          testID={`inbox-conversation-${conv.id}`}
         >
-        {/* Avatar with unread dot */}
+        {/* Avatar with unread + online dots */}
         <View style={s.avatarContainer}>
           <View style={[s.avatar48, { backgroundColor: participant.color }]}>
             <Text style={s.avatarInitials}>{participant.initials}</Text>
           </View>
-          {isUnread && <View style={[s.unreadDot, { backgroundColor: theme.accent }]} />}
+          {isUnread && <View style={[s.unreadDot, { backgroundColor: theme.accent, borderColor: theme.background }]} />}
+          {participant.isOnline && (
+            <View
+              style={[s.onlineDot, { backgroundColor: theme.success, borderColor: theme.background }]}
+              testID={`inbox-online-dot-${conv.id}`}
+            />
+          )}
         </View>
 
         {/* Center content */}
         <View style={s.convCenter}>
           <View style={s.convNameRow}>
             <Text
-              style={[s.convName, { fontFamily: isUnread ? FONT.bold : FONT.semibold }]}
+              style={[s.convName, { color: theme.text, fontFamily: isUnread ? FONT.bold : FONT.regular }]}
               numberOfLines={1}
             >
               {participant.name}
             </Text>
             {conv.lastMessageTs ? (
-              <Text style={s.convTime}>{timeAgo(conv.lastMessageTs)}</Text>
+              <Text style={[s.convTime, { color: theme.muted }]}>{timeAgo(conv.lastMessageTs)}</Text>
             ) : null}
           </View>
           {conv.contextOrderNumber ? (
@@ -384,24 +466,25 @@ export default function InboxScreen() {
                 <Text style={[s.orderPillText, { color: theme.accent }]}>{conv.contextOrderNumber}</Text>
             </View>
           ) : null}
-          <Text
-            style={[s.convPreview, isUnread && { color: FG }]}
-            numberOfLines={1}
-          >
-            {previewText(conv.lastMessage, 'No messages yet')}
-          </Text>
+          <ConversationPreview
+            text={previewText(conv.lastMessage, 'No messages yet')}
+            attachmentType={conv.lastMessageType}
+            isFromMe={!!conv.lastMessageSenderId && conv.lastMessageSenderId === MY_USER_ID}
+            bold={isUnread}
+            color={isUnread ? theme.text : theme.muted}
+          />
         </View>
 
-        {/* Trailing */}
-          {isUnread ? (
-          <View style={[s.unreadBadge, { backgroundColor: theme.accent }]}>
+        {/* Trailing: unread pill badge, hidden when there is nothing unread */}
+        {isUnread ? (
+          <View style={[s.unreadBadge, { backgroundColor: theme.accent }]} testID={`inbox-unread-badge-${conv.id}`}>
             <Text style={[s.unreadBadgeText, { color: theme.onAccent }]}>{conv.unreadCount > 99 ? '99+' : conv.unreadCount}</Text>
           </View>
         ) : (
-            <Feather name="chevron-right" size={ICON.sm} color="#8A8A8E" />
+            <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
         )}
         </TouchableOpacity>
-      </SwipeActionRow>
+      </InboxSwipeRow>
     );
   }
 
@@ -438,12 +521,23 @@ export default function InboxScreen() {
   }
 
   function renderEmptyState() {
+    if (activeTab === 'Messages' && messagesSearchLower && !loadError) {
+      return (
+        <EmptyState
+          icon="search"
+          message={`No conversations match "${messagesSearchQuery.trim()}"`}
+        />
+      );
+    }
     const { icon, title, subtitle } = EMPTY_MESSAGES[activeTab];
+    const isMessages = activeTab === 'Messages';
     return (
       <EmptyState
         icon={loadError ? 'alert-circle' : icon}
         message={loadError ? 'Could not load your inbox. Pull to refresh and try again.' : `${title} — ${subtitle}`}
         variant={loadError ? 'error' : 'empty'}
+        actionLabel={isMessages && !loadError ? 'New message' : undefined}
+        onAction={isMessages && !loadError ? openCompose : undefined}
       />
     );
   }
@@ -501,6 +595,33 @@ export default function InboxScreen() {
         })}
       </View>
 
+      {/* Search conversations (Messages tab only) */}
+      {activeTab === 'Messages' && !loading && (
+        <View style={[s.searchRow, { borderColor: theme.border, backgroundColor: theme.cardElevated }]}>
+          <Feather name="search" size={15} color={theme.muted} />
+          <TextInput
+            style={[s.searchInput, { color: theme.text }]}
+            value={messagesSearchQuery}
+            onChangeText={setMessagesSearchQuery}
+            placeholder="Search conversations"
+            placeholderTextColor={theme.muted}
+            autoCorrect={false}
+            testID="inbox-search-input"
+            accessibilityLabel="Search conversations"
+          />
+          {messagesSearchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setMessagesSearchQuery('')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+            >
+              <Feather name="x" size={15} color={theme.muted} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
       {/* Conversations list */}
       {loading ? (
         <View style={[s.listSurface, s.listContent, { paddingBottom: barInset + SP.md }]}>
@@ -549,6 +670,20 @@ export default function InboxScreen() {
             onRefresh={handleRefresh}
           />
         </View>
+      )}
+
+      {/* New message FAB */}
+      {activeTab === 'Messages' && !loading && (
+        <TouchableOpacity
+          style={[s.fab, { bottom: barInset + SP.md, backgroundColor: theme.accent, shadowColor: theme.shadowColor }]}
+          onPress={openCompose}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="New message"
+          testID="inbox-fab-new-message"
+        >
+          <Feather name="edit-3" size={22} color={theme.onAccent} />
+        </TouchableOpacity>
       )}
 
       <Modal
@@ -820,6 +955,46 @@ const s = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 2,
     borderColor: BG,
+  },
+  onlineDot: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+    borderWidth: 2,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: SP.md,
+    marginTop: SP.sm,
+    marginBottom: SP.xs,
+    paddingHorizontal: SP.sm,
+    height: 40,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    height: 40,
+  },
+  fab: {
+    position: 'absolute',
+    right: SP.md,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
   },
   convCenter: {
     flex: 1,

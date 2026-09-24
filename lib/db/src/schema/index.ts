@@ -745,6 +745,22 @@ export const messageReports = pgTable('message_reports', {
   messageIdx: index('message_reports_message_idx').on(table.messageId, table.createdAt),
 }));
 
+// ─── Message reactions ─────────────────────────────────────────────────────────
+// A small fixed reaction bar (no free-form emoji picker). One active reaction
+// per user per message — re-reacting replaces the previous one via the unique
+// constraint below.
+export const messageReactions = pgTable('message_reactions', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  messageId:    uuid('message_id').notNull().references(() => messages.id, { onDelete: 'cascade' }),
+  userId:       text('user_id').notNull(),
+  // 'like' | 'love' | 'haha' | 'wow' | 'sad' | 'fire'
+  reactionType: text('reaction_type').notNull(),
+  createdAt:    timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  messageUserUnique: unique('message_reactions_message_user_unique').on(table.messageId, table.userId),
+  messageIdx:        index('message_reactions_message_idx').on(table.messageId),
+}));
+
 // ─── Saved collections (buyer boards, à la Pinterest) ─────────────────────────
 
 export const savedCollections = pgTable('saved_collections', {
