@@ -43,8 +43,15 @@ import { useApi } from '@/lib/api';
 import { apiErrorCode, apiErrorMessage, reportHref, shortRelativeTime, BLOCK_EXPLAINER } from '@/lib/safety';
 import type { ThreadComment } from '@/lib/safetyTypes';
 
-const QUICK_EMOJIS = ['😁', '🥰', '😂', '😮', '😉', '😅', '🥺'] as const;
 const MAX_COMMENT_LENGTH = 1000;
+
+/**
+ * Matches the server's UUID check in post-comments.ts. Preview/demo posts
+ * (e.g. "preview-fashion-01") and any other non-UUID id would always 404 —
+ * that's not a deleted post, so we short-circuit before the network call
+ * instead of showing the scary "no longer available" error for them.
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** A flattened list row: roots followed by their replies. */
 type Row = ThreadComment & { isReply: boolean; parentAuthorName?: string };
@@ -197,6 +204,58 @@ function CommentRow({
   );
 }
 
+// ─── Animated send button ─────────────────────────────────────────────────────
+// Tight, crisp: scales down on press, pops on send, morphs the arrow to a
+// check for a beat once the comment lands.
+
+function AnimatedSendButton({
+  disabled, sending, justSent, onPress, accessibilityLabel, accentColor, onAccentColor,
+}: {
+  disabled: boolean;
+  sending: boolean;
+  justSent: boolean;
+  onPress: () => void;
+  accessibilityLabel: string;
+  accentColor: string;
+  onAccentColor: string;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!justSent) return;
+    Animated.sequence([
+      Animated.spring(scale, { toValue: 1.18, speed: 40, bounciness: 10, useNativeDriver: true }),
+      Animated.spring(scale, { toValue: 1, speed: 30, bounciness: 6, useNativeDriver: true }),
+    ]).start();
+  }, [justSent, scale]);
+
+  return (
+    <TouchableOpacity
+      style={[csndBtn.root, { backgroundColor: accentColor }, disabled && csndBtn.disabled]}
+      onPress={onPress}
+      onPressIn={() => Animated.spring(scale, { toValue: 0.86, speed: 50, useNativeDriver: true }).start()}
+      onPressOut={() => Animated.spring(scale, { toValue: 1, speed: 30, bounciness: 6, useNativeDriver: true }).start()}
+      disabled={disabled}
+      activeOpacity={0.9}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+    >
+      <Animated.View style={{ transform: [{ scale }] }}>
+        {sending
+          ? <InlineSpinner style={{ paddingVertical: 0 }} />
+          : justSent
+            ? <Feather name="check" size={17} color={onAccentColor} />
+            : <Feather name="arrow-up" size={18} color={onAccentColor} />}
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
+
+const csndBtn = StyleSheet.create({
+  root: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  disabled: { opacity: 0.28 },
+});
+
 // ─── Comment actions sheet ────────────────────────────────────────────────────
 
 type SheetStep = 'menu' | 'confirm-delete' | 'confirm-block';
@@ -325,6 +384,7 @@ export default function BuyerPostCommentsScreen() {
   }>();
 
   const postId = params.postId ?? '';
+  const isPreviewPost = postId.length > 0 && !UUID_RE.test(postId);
   const postAuthorId = params.postAuthorId ?? '';
   const mediaUri = params.postMediaUri ?? '';
   const posterUri = params.postPosterUri ?? '';
@@ -360,6 +420,7 @@ export default function BuyerPostCommentsScreen() {
   const [inputText, setInputText] = useState('');
   const [replyingTo, setReplyingTo] = useState<Row | null>(null);
   const [sending, setSending] = useState(false);
+  const [justSent, setJustSent] = useState(false);
   /** True only on the first load (no prior data) */
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -383,6 +444,17 @@ export default function BuyerPostCommentsScreen() {
 
   const load = useCallback(async () => {
     if (!postId) { setLoading(false); return; }
+    if (!UUID_RE.test(postId)) {
+      // Preview/demo content has no server-side post to fetch comments for.
+      // This is not a deletion, so it never shows the "no longer available"
+      // error — just a quiet, non-alarming empty state with a locked composer.
+      setComments([]);
+      setMeta({ hiddenByMutedWords: 0, commentsDisabled: true, canComment: false, nextCursor: null });
+      setFetchError(null);
+      hasLoadedOnce.current = true;
+      setLoading(false);
+      return;
+    }
     // Only show skeleton on the very first load; subsequent fetches are silent
     if (!hasLoadedOnce.current) setLoading(true);
     setFetchError(null);
@@ -532,6 +604,8 @@ export default function BuyerPostCommentsScreen() {
       setComments(prev => prev.filter(c => c.id !== optimistic.id));
       await load();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setJustSent(true);
+      setTimeout(() => setJustSent(false), 900);
     } catch (error) {
       // Remove optimistic item, keep the draft for editing, show inline error
       setComments(prev => prev.filter(c => c.id !== optimistic.id));
@@ -566,14 +640,14 @@ export default function BuyerPostCommentsScreen() {
               <CachedImage
                 source={{ uri: posterUri }}
                 style={s.mediaBackdrop}
-                contentFit="contain"
+                contentFit="cover"
                 testID="comments-video-poster"
               />
             ) : null}
             <VideoView
               player={mediaPlayer}
               style={[s.mediaBackdrop, posterUri && !videoPlaying && { opacity: 0 }]}
-              contentFit="contain"
+              contentFit="cover"
               nativeControls={false}
               testID="comments-video-preview"
             />
@@ -582,6 +656,7 @@ export default function BuyerPostCommentsScreen() {
           <CachedImage source={{ uri: mediaUri }} style={s.mediaBackdrop} contentFit="cover" />
         )
       ) : null}
+      <View style={s.mediaScrim} pointerEvents="none" />
       <TouchableOpacity
         style={s.backdrop}
         activeOpacity={1}
@@ -638,9 +713,13 @@ export default function BuyerPostCommentsScreen() {
             !loading && !fetchError
               ? (
                 <View style={s.emptyState}>
-                  <Text style={s.emptyTitle}>{meta.commentsDisabled ? 'Comments are off' : 'Start the conversation'}</Text>
+                  <Text style={s.emptyTitle}>
+                    {isPreviewPost ? 'Preview content' : meta.commentsDisabled ? 'Comments are off' : 'Start the conversation'}
+                  </Text>
                   <Text style={s.emptyText}>
-                    {meta.commentsDisabled ? 'The creator turned off comments for this post.' : 'Be the first to comment.'}
+                    {isPreviewPost
+                      ? 'Comments aren’t available on preview posts.'
+                      : meta.commentsDisabled ? 'The creator turned off comments for this post.' : 'Be the first to comment.'}
                   </Text>
                 </View>
               )
@@ -700,7 +779,9 @@ export default function BuyerPostCommentsScreen() {
 
           {composerLocked ? (
             <View style={s.lockedComposer}>
-              {meta.commentsDisabled ? (
+              {isPreviewPost ? (
+                <Text style={s.lockedText}>Comments aren’t available on preview posts.</Text>
+              ) : meta.commentsDisabled ? (
                 <Text style={s.lockedText}>Comments are turned off for this post.</Text>
               ) : (
                 <TouchableOpacity onPress={() => router.push('/sign-in' as never)} accessibilityRole="button">
@@ -712,23 +793,6 @@ export default function BuyerPostCommentsScreen() {
             </View>
           ) : (
             <>
-              <View style={s.emojiRow}>
-                {QUICK_EMOJIS.map(emoji => (
-                  <TouchableOpacity
-                    key={emoji}
-                    style={s.emojiBtn}
-                    onPress={() => {
-                      setInputText(value => `${value}${emoji}`);
-                      inputRef.current?.focus();
-                    }}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Add ${emoji}`}
-                  >
-                    <Text style={s.emoji}>{emoji}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
               <View style={s.inputRow}>
                 <Avatar uri={myAvatar} initials={myInitials} />
                 <View style={s.inputShell}>
@@ -755,20 +819,16 @@ export default function BuyerPostCommentsScreen() {
                     <Text style={s.mentionIcon}>@</Text>
                   </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  style={[s.sendBtn, { backgroundColor: theme.accent }, (!inputText.trim() || sending) && s.sendBtnDisabled]}
-                  onPress={handleSend}
+                <AnimatedSendButton
                   disabled={!inputText.trim() || sending}
-                  accessibilityRole="button"
+                  sending={sending}
+                  justSent={justSent}
+                  onPress={handleSend}
                   accessibilityLabel={sending ? 'Posting comment' : 'Send comment'}
-                >
-                  {sending ? <InlineSpinner style={{ paddingVertical: 0 }} /> : <Feather name="arrow-up" size={18} color={theme.onAccent} />}
-                </TouchableOpacity>
+                  accentColor={theme.accent}
+                  onAccentColor={theme.onAccent}
+                />
               </View>
-              <Text style={s.guidelinesHint}>
-                Keep it respectful — comments follow our{' '}
-                <Text style={s.guidelinesLink} onPress={() => router.push('/community-guidelines' as never)}>Community Guidelines</Text>.
-              </Text>
             </>
           )}
         </View>
@@ -792,12 +852,15 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.14)',
+    backgroundColor: 'transparent',
   },
   backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
-  mediaBackdrop: { position: 'absolute', top: 0, right: 0, left: 0, height: '50%' },
+  // Full-size, in its normal position — the sheet slides over it, it never
+  // shrinks or relocates into a corner.
+  mediaBackdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
+  mediaScrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.35)' },
   sheet: {
-    height: '52%',
+    height: '58%',
     overflow: 'hidden',
     backgroundColor: CARD,
     borderTopLeftRadius: 20,
@@ -886,10 +949,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   replyingName: { fontFamily: FONT.semibold },
   lockedComposer: { minHeight: 56, alignItems: 'center', justifyContent: 'center', paddingVertical: SP.sm },
   lockedText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center' },
-  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  emojiRow: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  emojiBtn: { width: 40, height: 38, alignItems: 'center', justifyContent: 'center' },
-  emoji: { fontSize: 23 },
+  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 6 },
   inputShell: {
     flex: 1, minHeight: 42, maxHeight: 96, flexDirection: 'row', alignItems: 'center',
     backgroundColor: CARD_ELEVATED, borderRadius: 21, paddingLeft: 12, paddingRight: 4,
@@ -900,10 +960,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   },
   inputTool: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   mentionIcon: { color: FG, fontFamily: FONT.bold, fontSize: 22, lineHeight: 24 },
-  sendBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  sendBtnDisabled: { opacity: 0.28 },
-  guidelinesHint: { color: SUBTLE, fontFamily: FONT.regular, fontSize: 11, textAlign: 'center', marginTop: 6 },
-  guidelinesLink: { color: MUTED, textDecorationLine: 'underline' },
 
   // Actions sheet
   sheetScrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.55)' },

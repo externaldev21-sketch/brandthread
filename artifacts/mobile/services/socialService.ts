@@ -430,6 +430,7 @@ export interface SellerPostProductTag {
   productId:   string;
   productName: string;
   priceCents:  number;
+  imageUri?:   string;
   variantId?:  string;
   slideIndex?: number;
   timestamp?:  number;
@@ -544,6 +545,7 @@ function mapOwnedApiPost(p: any, userId: string): SellerThreadPost {
       productId: tag.productId,
       productName: tag.productName ?? tag.name ?? 'Product',
       priceCents: typeof tag.priceCents === 'number' ? tag.priceCents : 0,
+      imageUri: Array.isArray(tag.images) ? tag.images[0] : tag.imageUri,
       variantId: tag.variantId,
       slideIndex: tag.slideIndex,
       timestamp: tag.timestamp,
@@ -766,6 +768,7 @@ function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
       productId:   t.productId,
       productName: t.name ?? '',
       priceCents: typeof t.priceCents === 'number' ? t.priceCents : 0,
+      imageUri: Array.isArray(t.images) ? t.images[0] : t.imageUri,
     })),
     visibility:    p.visibility ?? { allowComments: true, allowReposts: true, showLikeCount: true },
     scheduledAt:   null,
