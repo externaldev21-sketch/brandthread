@@ -48,6 +48,8 @@ import {
 } from '@/components/CommerceSignal';
 import { ShopProductSheet } from '@/components/ShopProductSheet';
 import type { ShopSheetSelection } from '@/components/ShopProductSheet';
+import { FeedGestureGuide } from '@/components/FeedGestureGuide';
+import { hasSeenFeedGestureGuide, markFeedGestureGuideSeen } from '@/lib/feedGestureGuideStorage';
 import type { BuyerProduct } from '@/services/cartTypes';
 import { getCart } from '@/services/cartService';
 import {
@@ -986,6 +988,8 @@ function SpotlightPage({
   const heartBurst = useRef(new Animated.Value(0)).current;
   const heartScale = useRef(new Animated.Value(1)).current;
   const speedPillOpacity = useRef(new Animated.Value(0)).current;
+  const repostSpin = useRef(new Animated.Value(0)).current;
+  const saveDrop = useRef(new Animated.Value(0)).current;
   const lastTap = useRef(0);
   const pauseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1015,6 +1019,18 @@ function SpotlightPage({
       Animated.spring(heartScale, { toValue: 1.35, useNativeDriver: true, speed: 40 }),
       Animated.spring(heartScale, { toValue: 1, useNativeDriver: true, speed: 40 }),
     ]).start();
+  }
+
+  /** Arrows spin/morph a full turn — repost toggled either way. */
+  function spinRepost() {
+    repostSpin.setValue(0);
+    Animated.timing(repostSpin, { toValue: 1, duration: 420, useNativeDriver: true }).start();
+  }
+
+  /** Bookmark lifts then drops/settles — save toggled either way. */
+  function dropSave() {
+    saveDrop.setValue(0);
+    Animated.timing(saveDrop, { toValue: 1, duration: 360, useNativeDriver: true }).start();
   }
 
   function handleQuickTap() {
@@ -1248,7 +1264,9 @@ function SpotlightPage({
           accessibilityLabel={`${engagement?.reposted ? 'Undo repost' : 'Repost'}, ${formatCount(engagement?.reposts ?? 0)} reposts`}
           accessibilityState={{ checked: engagement?.reposted ?? false }}
           style={styles.railActionContent}
+          rotateAnim={repostSpin}
           onPress={async () => {
+            spinRepost();
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             await onRepost(item.id);
           }}
@@ -1268,7 +1286,9 @@ function SpotlightPage({
           accessibilityLabel={`${engagement?.saved ? 'Unsave' : 'Save'}, ${formatCount(engagement?.saves ?? item.saves)} saves`}
           accessibilityState={{ checked: engagement?.saved ?? false }}
           style={styles.railActionContent}
+          translateYAnim={saveDrop}
           onPress={async () => {
+            dropSave();
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             await onSave(item.id);
           }}
@@ -1496,6 +1516,7 @@ export default function FeedScreen({
   const { showToast } = useFeedToast();
 
   const [engagements, setEngagements] = useState<Record<string, EngagementState>>({});
+  const [showGestureGuide, setShowGestureGuide] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const pageWidth = viewportSize.width || windowWidth;
@@ -1537,6 +1558,21 @@ export default function FeedScreen({
       subscription.remove();
     };
   }, []);
+
+  // First-time gesture coach — buyer home only, shown once per account.
+  useEffect(() => {
+    if (!isBuyerSurface) return;
+    let active = true;
+    void hasSeenFeedGestureGuide(userId).then(seen => {
+      if (active && !seen) setShowGestureGuide(true);
+    });
+    return () => { active = false; };
+  }, [isBuyerSurface, userId]);
+
+  const dismissGestureGuide = useCallback(() => {
+    setShowGestureGuide(false);
+    void markFeedGestureGuideSeen(userId);
+  }, [userId]);
 
   // Load published seller posts and subscribe to real-time changes
   const loadFeed = useCallback(async (initial = false) => {
@@ -2299,6 +2335,10 @@ export default function FeedScreen({
           cartTargetRef={cartTargetRef}
           reduceMotion={reduceMotion}
         />
+      )}
+
+      {isBuyerSurface && (
+        <FeedGestureGuide visible={showGestureGuide} onDismiss={dismissGestureGuide} />
       )}
 
     </View>

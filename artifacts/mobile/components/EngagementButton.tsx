@@ -197,6 +197,10 @@ export interface EngagementButtonProps {
   style?: object;
   /** Animated.Value from parent for the scale animation (e.g. heart bump) */
   scaleAnim?: Animated.Value;
+  /** Animated.Value (0→1) from parent, interpolated to a spin — e.g. repost's arrows morphing. */
+  rotateAnim?: Animated.Value;
+  /** Animated.Value from parent for a vertical drop/settle — e.g. save's bookmark. */
+  translateYAnim?: Animated.Value;
   /** testID for automated tests */
   testID?: string;
 }
@@ -223,6 +227,8 @@ export function EngagementButton({
   iconSize = 27,
   style,
   scaleAnim,
+  rotateAnim,
+  translateYAnim,
   testID,
 }: EngagementButtonProps) {
   const inflight = useRef(false);
@@ -265,10 +271,25 @@ export function EngagementButton({
     ? <FontAwesome name={solidIcon} size={iconSize} color={iconColor} />
     : <Feather name={displayIcon} size={iconSize} color={iconColor} />;
 
+  const iconTransform: (
+    | { scale: Animated.Value }
+    | { rotate: Animated.AnimatedInterpolation<string> }
+    | { translateY: Animated.AnimatedInterpolation<number> }
+  )[] = [];
+  if (scaleAnim) iconTransform.push({ scale: scaleAnim });
+  if (rotateAnim) {
+    iconTransform.push({ rotate: rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) });
+  }
+  if (translateYAnim) {
+    iconTransform.push({
+      translateY: translateYAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -6, 0] }),
+    });
+  }
+
   const innerContent = (
     <Animated.View style={[{ opacity: pulseAnim }, style]}>
-      {scaleAnim ? (
-        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+      {iconTransform.length > 0 ? (
+        <Animated.View style={{ transform: iconTransform }}>
           {iconNode}
         </Animated.View>
       ) : (
