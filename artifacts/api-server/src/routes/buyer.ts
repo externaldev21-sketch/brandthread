@@ -634,6 +634,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       chargePlan = await resolveChargePlan({
         productIds: items.map((item: { productId: string }) => item.productId),
         sellerId,
+        buyerId,
         clientDropId: typeof dropId === "string" && dropId.trim() ? dropId.trim() : null,
       });
     } catch (planError) {

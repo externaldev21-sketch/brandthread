@@ -877,6 +877,8 @@ export default function DiscoverScreen() {
         <SectionHead
           title="Drops"
           sub={dropsItems.some(d => d.isLive) ? 'Live now and coming up' : 'Coming up'}
+          action="See all"
+          onAction={() => router.push('/buyer-drops' as never)}
         />
       </ResponsiveContainer>
       <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
