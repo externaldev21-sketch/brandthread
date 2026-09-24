@@ -361,24 +361,9 @@ export default function SignInScreen() {
           </Text>
 
           {/* ── OAuth ─────────────────────────────────────────────────────────── */}
-          {/* Google — dark surface with Google logo, per Google brand guidelines */}
-          <TouchableOpacity
-            style={s.oauthBtn}
-            onPress={() => handleOAuth('oauth_google', 'Google')}
-            activeOpacity={0.85}
-            disabled={!!oauthLoading || isFetching}
-          >
-            {oauthLoading === 'Google' ? (
-              <ActivityIndicator color={theme.text} size="small" />
-            ) : (
-              <>
-                <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: 'Inter_700Bold', fontSize: 11, color: '#FFFFFF', lineHeight: 13 }}>G</Text></View>
-                <Text style={s.oauthText}>Continue with Google</Text>
-              </>
-            )}
-          </TouchableOpacity>
-
-          {/* Apple — solid black button per Apple HIG, iOS only */}
+          {/* Apple first — solid black button per Apple HIG, iOS only. Shown above
+              Google per App Store guideline 4.8: Sign in with Apple must be at
+              least as prominent as other third-party social login options. */}
           {Platform.OS === 'ios' && (
             <TouchableOpacity
               style={[s.oauthBtn, s.appleBtn]}
@@ -396,6 +381,23 @@ export default function SignInScreen() {
               )}
             </TouchableOpacity>
           )}
+
+          {/* Google — dark surface with Google logo, per Google brand guidelines */}
+          <TouchableOpacity
+            style={s.oauthBtn}
+            onPress={() => handleOAuth('oauth_google', 'Google')}
+            activeOpacity={0.85}
+            disabled={!!oauthLoading || isFetching}
+          >
+            {oauthLoading === 'Google' ? (
+              <ActivityIndicator color={theme.text} size="small" />
+            ) : (
+              <>
+                <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: 'Inter_700Bold', fontSize: 11, color: '#FFFFFF', lineHeight: 13 }}>G</Text></View>
+                <Text style={s.oauthText}>Continue with Google</Text>
+              </>
+            )}
+          </TouchableOpacity>
 
           {/* Divider */}
           <View style={s.divider}>

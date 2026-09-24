@@ -550,6 +550,74 @@ router.get("/search", async (req, res): Promise<void> => {
   }
 });
 
+// ─── GET /api/public/brands/discover — newest active sellers to follow ────────
+// Unauthenticated, lightweight "browse brands" list used by buyer onboarding's
+// Brands-to-follow step (there is no full search term at that point, so the
+// existing /search endpoint — which requires a query — doesn't fit). Returns
+// active, non-restricted sellers newest-first. No style/category column
+// exists on `users` today, so this intentionally returns a flat list; any
+// future style/category filter should extend this query, not add a second
+// endpoint.
+export function rankDiscoverBrands<T extends { createdAt: Date; clerkId: string }>(sellers: T[]): T[] {
+  return [...sellers].sort((a, b) =>
+    b.createdAt.getTime() - a.createdAt.getTime() || a.clerkId.localeCompare(b.clerkId));
+}
+
+router.get("/brands/discover", async (req, res) => {
+  try {
+    const parsedLimit = parseNonNegativeInteger(req.query.limit, "limit", 24);
+    if (typeof parsedLimit !== "number" || parsedLimit < 1) {
+      res.status(400).json({
+        error: typeof parsedLimit === "number" ? "limit must be at least 1" : parsedLimit.error,
+      });
+      return;
+    }
+    const lim = Math.min(parsedLimit, 50);
+    const viewerId = optionalViewerId(req);
+
+    const sellers = await db
+      .select({
+        clerkId:         users.clerkId,
+        displayName:     users.displayName,
+        brandName:       users.brandName,
+        brandType:       users.brandType,
+        profileImageUrl: users.profileImageUrl,
+        avatarUrl:       users.avatarUrl,
+        verified:        users.verified,
+        verificationStatus: users.verificationStatus,
+        activeStanding:  users.activeStanding,
+        policyRestricted: users.policyRestricted,
+        createdAt:       users.createdAt,
+      })
+      .from(users)
+      .where(and(
+        eq(users.accountType, "seller"),
+        isNull(users.suspendedAt),
+        isNull(users.deletedAt),
+        eq(users.policyRestricted, false),
+        notBlockedWith(viewerId, users.clerkId),
+      ))
+      .orderBy(desc(users.createdAt), asc(users.clerkId))
+      .limit(lim * 2); // small buffer before app-side ranking/limit
+
+    const ranked = rankDiscoverBrands(sellers).slice(0, lim);
+
+    res.json({
+      brands: ranked.map((s) => ({
+        id:          s.clerkId,
+        sellerId:    s.clerkId,
+        name:        s.brandName || s.displayName || "Brand",
+        brandType:   s.brandType ?? null,
+        logoUrl:     s.profileImageUrl ?? s.avatarUrl ?? null,
+        verified:    deriveSellerVerified(s),
+      })),
+    });
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch discover brands");
+    res.status(500).json({ error: "Failed to fetch brands" });
+  }
+});
+
 // ─── GET /api/public/sellers/:sellerId — public seller storefront ─────────────
 // Accepts either users.clerkId or users.id (UUID) for backward-/forward-compatibility.
 router.get("/sellers/:sellerId", async (req, res) => {
