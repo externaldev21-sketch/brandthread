@@ -9,6 +9,7 @@ import {
   ObjectPermission,
   setObjectAclPolicy,
 } from './objectAcl';
+import { withRetry } from './retry';
 
 const REPLIT_SIDECAR_ENDPOINT = 'http://127.0.0.1:1106';
 
@@ -306,16 +307,21 @@ async function signObjectURL({
     method,
     expires_at: new Date(Date.now() + ttlSec * 1000).toISOString(),
   };
-  const response = await fetch(
-    `${REPLIT_SIDECAR_ENDPOINT}/object-storage/signed-object-url`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+  // Signing a URL has no side effect (nothing is created/charged), so it's
+  // safe to retry on a transient sidecar/network failure.
+  const response = await withRetry(
+    () => fetch(
+      `${REPLIT_SIDECAR_ENDPOINT}/object-storage/signed-object-url`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+        signal: AbortSignal.timeout(30_000),
       },
-      body: JSON.stringify(request),
-      signal: AbortSignal.timeout(30_000),
-    },
+    ),
+    { label: 'objectStorage.signObjectURL', attempts: 3 },
   );
   if (!response.ok) {
     throw new Error(
