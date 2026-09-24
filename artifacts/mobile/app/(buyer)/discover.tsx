@@ -149,7 +149,7 @@ interface HighDemandRowItem {
   commerce: CommerceSignalData;
 }
 
-function HighDemandRow({ item }: { item: HighDemandRowItem }) {
+const HighDemandRow = React.memo(function HighDemandRow({ item }: { item: HighDemandRowItem }) {
   const { push } = useThreadPull();
   const { theme } = useAppTheme();
 
@@ -195,8 +195,7 @@ function HighDemandRow({ item }: { item: HighDemandRowItem }) {
         </Text>
       )}
     </TouchableOpacity>
-  );
-}
+  );});
 
 const hd = StyleSheet.create({
   row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.xs, borderWidth: 1, backgroundColor: CARD },
@@ -222,6 +221,12 @@ interface ProductCardItem {
 }
 
 const SHOWCASE_GAP = 12;
+
+// Declared once: an inline separator component would be a new component type
+// on every render, remounting every separator in the carousel.
+function ShowcaseGap() {
+  return <View style={{ width: SHOWCASE_GAP }} />;
+}
 
 function ProductShowcase({ items }: { items: ProductCardItem[] }) {
   const { push } = useThreadPull();
@@ -281,7 +286,7 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
         bounces={items.length > 1}
         ListHeaderComponent={<View style={{ width: sideInset }} />}
         ListFooterComponent={<View style={{ width: sideInset }} />}
-        ItemSeparatorComponent={() => <View style={{ width: SHOWCASE_GAP }} />}
+        ItemSeparatorComponent={ShowcaseGap}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { x: scrollX } } }],
           { useNativeDriver: true },
@@ -441,7 +446,7 @@ interface DropRowItem {
   commerce: CommerceSignalData;
 }
 
-function DropRow({ item }: { item: DropRowItem }) {
+const DropRow = React.memo(function DropRow({ item }: { item: DropRowItem }) {
   const router = useRouter();
   const { theme } = useAppTheme();
   const isUrgentUnits =
@@ -496,8 +501,7 @@ function DropRow({ item }: { item: DropRowItem }) {
         )}
       </View>
     </TouchableOpacity>
-  );
-}
+  );});
 
 const dr = StyleSheet.create({
   row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.xs, borderWidth: 1, backgroundColor: CARD },
@@ -525,7 +529,7 @@ interface TrendingRowItem {
   colorHex: string;
 }
 
-function TrendingRow({ item }: { item: TrendingRowItem }) {
+const TrendingRow = React.memo(function TrendingRow({ item }: { item: TrendingRowItem }) {
   const router = useRouter();
   const { theme } = useAppTheme();
 
@@ -555,8 +559,7 @@ function TrendingRow({ item }: { item: TrendingRowItem }) {
         {/* No commerce signals — trending posts have no product demand data */}
       </View>
     </TouchableOpacity>
-  );
-}
+  );});
 
 const tr = StyleSheet.create({
   row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.xs, borderWidth: 1, backgroundColor: CARD },

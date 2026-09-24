@@ -1,7 +1,10 @@
-const { getDefaultConfig } = require('expo/metro-config');
+const { getSentryExpoConfig } = require('@sentry/react-native/metro');
 const path = require('path');
 
-const config = getDefaultConfig(__dirname);
+// Expo's default Metro config plus Sentry's serializer, which stamps each
+// bundle and its source map with a matching Debug ID so crash stack traces
+// can be symbolicated. It has no runtime effect when Sentry is not configured.
+const config = getSentryExpoConfig(__dirname);
 
 // Block Metro from watching ephemeral _tmp_ dirs that @clerk/shared
 // creates during installation — they get removed immediately and cause

@@ -7,7 +7,19 @@ Windows Terminal.
 
 ```
  code on dev ──► eas build (cloud) ──► eas submit ──► TestFlight / Play internal testing ──► store review ──► live
+                                                                                                          │
+                          JavaScript-only fixes after launch:  pnpm run update:production ────────────────┘
 ```
+
+**Everyday commands** (run in `artifacts\mobile`):
+
+| I want to… | Command |
+| --- | --- |
+| Put a test build on testers' phones (no store review) | `pnpm run build:preview` |
+| Build for iPhone/iPad and send it to TestFlight | `pnpm run build:testflight` |
+| Ship a JavaScript fix to people who already have the app | `pnpm run update:production -- --message "Fix …"` |
+| Undo a bad over-the-air update | `pnpm run update:rollback` |
+| Regenerate App Store / Play screenshots | `pnpm run screenshots` |
 
 ---
 
@@ -49,6 +61,10 @@ This creates the **`brandthread`** project on expo.dev (the name comes from
 issue push tokens. If you previously made a project called `mobile` on
 expo.dev, it is no longer used and can be deleted.
 
+The over-the-air update address (`updates.url`) is worked out from that
+project ID by `app.config.js`, so there is nothing else to configure. You do
+**not** need to run `eas update:configure`.
+
 ### Production environment variables (once, then whenever a value changes)
 
 These values are compiled into the app. Set them in **expo.dev → Project →
@@ -66,8 +82,12 @@ eas env:create --environment production --name EXPO_PUBLIC_API_BASE_URL --value 
 | `EXPO_PUBLIC_CLERK_PROXY_URL` | Only if the Clerk production instance uses a proxy |
 | `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY` | RevenueCat App Store public key |
 | `EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY` | RevenueCat Play Store public key |
+| `EXPO_PUBLIC_SENTRY_DSN` | Optional. Sentry DSN for crash reports (same value as `SENTRY_DSN`, see [Crash reporting](#crash-and-error-reporting-sentry)) |
+| `SENTRY_ORG`, `SENTRY_PROJECT` | Optional. Sentry organisation and project slugs, used to upload source maps |
+| `SENTRY_AUTH_TOKEN` | Optional. Sentry auth token. Create it with visibility **secret** |
 
-Leave `EXPO_PUBLIC_ENABLE_TEST_SUBSCRIPTION_BYPASS`, `EXPO_PUBLIC_REVENUECAT_TEST_API_KEY`
+Set the same variables in the **preview** environment too, so test builds
+behave like the real app. Leave `EXPO_PUBLIC_ENABLE_TEST_SUBSCRIPTION_BYPASS`, `EXPO_PUBLIC_REVENUECAT_TEST_API_KEY`
 and `EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST` **unset** for production. The
 `production` build profile in `eas.json` reads the `production` environment
 automatically.
@@ -125,8 +145,43 @@ eas build --platform all --profile production
   `app.json` (e.g. `1.0.0` → `1.0.1`) when you want a new version number to
   appear in the stores.
 - Before installing dependencies, the build checks the bundle ID, Apple
-  sign-in setup and the Xcode image (`eas-build-pre-install` in
-  `package.json`).
+  sign-in setup and the Xcode image, and prints whether Sentry source maps
+  will be uploaded (`eas-build-pre-install` in `package.json`).
+- Every production build is tied to the **`production` update channel**, so
+  it can receive over-the-air fixes later ([details](#new-store-build-or-ota-update)).
+
+### TestFlight in one command
+
+Once the Apple Developer account exists and the three Apple values are
+filled in (see [App Store Connect (once)](#app-store-connect-once)):
+
+```powershell
+pnpm run build:testflight
+```
+
+It checks `eas.json`, the bundle ID, Apple sign-in and the Xcode image
+first, and stops with a plain explanation if anything is missing (for
+example, the Apple placeholders). Then it builds the iOS app in the cloud
+and submits it to App Store Connect. Apple emails you when it appears in
+TestFlight.
+
+### Preview builds for testers (no store review)
+
+```powershell
+pnpm run build:preview
+```
+
+This uses the `preview` profile: an **internal-distribution** build on the
+`preview` update channel, reading the `preview` environment variables.
+When it finishes, expo.dev shows a QR code and install link.
+
+- **Android:** the link installs an `.apk` directly on any phone.
+- **iPhone/iPad:** Apple only lets registered devices install internal
+  builds. Register each tester's device once with `eas device:create` (it
+  gives them a link to open on the device), then run the build. Anyone not
+  registered should use TestFlight instead.
+- Send JavaScript changes to preview testers without rebuilding:
+  `pnpm run update:preview -- --message "Try new discover layout"`.
 
 ## 3. Submit
 
@@ -178,31 +233,169 @@ Or build and submit in one go: `eas build --platform all --profile production --
 
 ## New store build or OTA update?
 
-> **Right now every change needs a new store build.** `expo-updates` is not
-> installed, so the app can't receive over-the-air (OTA) updates. To make
-> quick fixes possible after launch, add it **before the first store build**:
->
-> ```powershell
-> pnpm exec expo install expo-updates
-> eas update:configure        # sets the update URL, runtimeVersion and channels
-> ```
->
-> Commit the result and make a new store build. Only builds that include
-> `expo-updates` can receive OTA updates. After that, ship JavaScript-only
-> fixes with `eas update --channel production --message "Fix …"`.
+The app includes **EAS Update** (`expo-updates`). After a build is in the
+store, JavaScript-only fixes can be sent straight to phones in minutes,
+without store review.
 
-| Change | New store build | OTA update (once `expo-updates` is set up) |
+**How it reaches people.** Each time the app starts it quietly checks for an
+update in the background and downloads it. The app never waits for the
+download and never reloads while someone is using it: the new version is
+used **the next time the app is opened**. The app also checks again when it
+comes back to the foreground after 30 minutes or more, because people rarely
+fully close apps.
+
+**Channels.** Store builds listen on the `production` channel, preview
+builds on `preview`, development builds on `development`. An update sent to
+`preview` never reaches store users.
+
+**Only compatible phones get an update.** Every build is stamped with a
+*runtime version*: a fingerprint of all native code and configuration
+(`runtimeVersion.policy: "fingerprint"` in `app.json`). An update is only
+delivered to builds with the same fingerprint, so an update that needs new
+native code can never reach a phone that doesn't have it. Before publishing,
+`pnpm run update:production` also checks that at least one finished build on
+that channel has the matching fingerprint, and **refuses to publish if none
+does**, telling you to make a store build instead.
+
+### What can ship over the air
+
+| Change | Store build | Over the air |
 | --- | --- | --- |
 | Screen code, styling, text, navigation, bug fixes in TypeScript/JavaScript | — | ✅ |
-| Images, fonts and sounds that ship inside the JS bundle | — | ✅ |
-| `EXPO_PUBLIC_*` environment variable values | ✅ (baked in at build time) | ✅ (taken from the environment when you publish the update) |
+| Images, fonts and sounds imported by the JavaScript code | — | ✅ |
+| `EXPO_PUBLIC_*` environment variable values | ✅ (baked in at build time) | ✅ (read from the EAS environment when you publish) |
 | API / server / database changes | — (deploy the server) | — (deploy the server) |
 | Anything in `app.json`: name, icon, splash, `userInterfaceStyle`, `supportsTablet`, permissions and their wording, privacy manifest, plugins, URL scheme | ✅ | ❌ |
-| Adding, removing or upgrading a package with native code (`expo-*`, `react-native-*`), or an Expo SDK upgrade | ✅ | ❌ |
-| `eas.json` build settings, signing credentials, Xcode image | ✅ | ❌ |
+| Adding, removing or upgrading a package with native code (`expo-*`, `react-native-*`, `@sentry/react-native`, `@shopify/flash-list`), or an Expo SDK upgrade | ✅ | ❌ |
+| `eas.json` (any edit, including the submit values), signing credentials, Xcode image, files in `plugins/` | ✅ | ❌ |
 | New in-app purchase products | ✅ if the app code changes; otherwise configure them in App Store Connect / Play and RevenueCat | — |
 | Store listing, screenshots, privacy labels, pricing | Neither: edit in App Store Connect / Play Console | Neither |
+
+Not sure? Just run the update command: if the change needs a store build,
+the fingerprint check stops you before anything is published.
 
 Apple's rule for OTA updates: they may fix bugs and improve existing
 features, but must not change what the app is for or add major features that
 bypass review. Anything big goes through a store build.
+
+### Ship a fix over the air
+
+```powershell
+cd artifacts\mobile
+pnpm run typecheck
+pnpm test
+pnpm run update:production -- --message "Fix checkout total rounding"
+```
+
+Options: `--platform ios` or `--platform android` to update one platform
+only, and `--rollout 10` to send it to 10% of users first. Watch the crash
+rate in Sentry, then raise it with `eas update:edit --rollout-percentage 100`
+(or roll back).
+
+Updates appear on expo.dev → Project → **Updates**, with how many phones
+have downloaded each one.
+
+### Roll back a bad update
+
+```powershell
+cd artifacts\mobile
+pnpm run update:rollback
+```
+
+Pick the channel and the bad update from the list. EAS republishes the
+update that was live before it; if there wasn't one, phones go back to the
+JavaScript that shipped inside the store build. Phones switch on their next
+launch, exactly like a normal update. Nothing needs a store build.
+
+- **Fix forward instead:** if the fix is small, publishing a new update
+  with `pnpm run update:production` also replaces the bad one.
+- **Crashes on start-up:** if an update crashes before the app finishes
+  starting, `expo-updates` detects it and automatically falls back to the
+  previous working version on that phone. Roll back anyway so new
+  downloads stop.
+- **Partial rollout:** an update sent with `--rollout` can also be stopped
+  by rolling back; users outside the rollout never received it.
+
+---
+
+## Crash and error reporting (Sentry)
+
+Crash reporting is built in for iOS, Android, web and the API server, and
+**stays switched off until you add the Sentry values**. Without them the app
+and server run exactly as before and builds still succeed.
+
+**One-time setup:**
+
+1. Create a free account at [sentry.io](https://sentry.io) with two
+   projects: a **React Native** project (app and website) and a **Node.js**
+   project (API).
+2. Copy each project's **DSN** (Project settings → Client Keys).
+3. Create an **auth token** (Settings → Auth Tokens, scope
+   `project:releases` + `org:read`) so builds can upload source maps, which
+   turn minified stack traces back into real file names and line numbers.
+4. Set the values:
+
+| Where | Variable | Value |
+| --- | --- | --- |
+| expo.dev → Environment variables (production **and** preview) | `EXPO_PUBLIC_SENTRY_DSN` | React Native project DSN |
+| expo.dev (production and preview) | `SENTRY_ORG`, `SENTRY_PROJECT` | Organisation slug and React Native project slug |
+| expo.dev (production and preview), visibility **secret** | `SENTRY_AUTH_TOKEN` | The auth token |
+| API server secrets (Replit → Secrets) | `SENTRY_DSN` | Node.js project DSN |
+| Web deployment environment | `EXPO_PUBLIC_SENTRY_DSN` | React Native project DSN |
+| Your PowerShell session, for `update:*` commands | `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN` | Same as above (`$env:SENTRY_AUTH_TOKEN = "…"`), so OTA updates upload source maps too |
+
+The app reads `EXPO_PUBLIC_SENTRY_DSN` because only `EXPO_PUBLIC_*`
+variables are compiled into the app. A DSN is designed to be public; it only
+allows sending reports. The auth token is secret: never put it in
+`app.json` or commit it.
+
+**What gets reported:** crashes and unhandled errors, errors caught by the
+app's error screen, and on the server every 5xx error and failed background
+job. Reports contain the error, stack trace, device/OS/app version and the
+update that was running. They don't include names, emails, IP addresses,
+request bodies or URL query strings. Errors from each OTA update are tagged
+with its update ID, so a bad update is easy to spot. This is declared in the
+privacy manifest and in [privacy-labels.md](privacy-labels.md) (Crash Data
+and Performance Data, not linked to the user).
+
+Optional: `EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE` (default `0.1`) sets how
+many app sessions send performance timings; `SENTRY_ENVIRONMENT` and
+`SENTRY_RELEASE` label server events.
+
+---
+
+## Store screenshots
+
+```powershell
+cd artifacts\mobile
+pnpm exec playwright install chromium   # once
+pnpm run screenshots                    # about 10 minutes
+pnpm run screenshots -- --skip-build    # re-capture without rebuilding (about 5 minutes)
+pnpm run screenshots -- --only cart,checkout --devices iphone-6.9in
+```
+
+This builds the web version of the app and signs in a demo account. The
+screens are filled with polished demo data: the Northline Studio seller and a
+buyer shopping four labels, with product photos cut from Brandthread's own
+generated artwork. No real accounts, server or payments are involved. Every
+run is pinned to the same moment, Friday 4:30 pm, so countdowns, "2h ago"
+labels and the sales chart come out identical each time.
+
+Output goes to `artifacts/mobile/store-screenshots/`, one folder per store
+size:
+
+| Folder | Upload to | Pixels |
+| --- | --- | --- |
+| `iphone-6.9in/` | App Store Connect → iPhone 6.9" Display | 1320 × 2868 |
+| `ipad-13in/` | App Store Connect → iPad 13" Display | 2064 × 2752 |
+| `android-phone/` | Play Console → Phone screenshots | 1080 × 1920 |
+| `android-tablet-7in/` | Play Console → 7-inch tablet screenshots | 1200 × 1920 |
+| `android-tablet-10in/` | Play Console → 10-inch tablet screenshots | 1600 × 2560 |
+
+Screens, in order: buyer feed, shoppable product sheet, discover, cart,
+checkout, seller dashboard, manufacturer hub, theme picker. If a screen can't
+render (for example, while another branch rebuilds it), the run skips it and
+still saves the rest. `store-screenshots/README.md` lists what was skipped
+and why. Add `--strict` to make that an error instead. The demo data is in
+`scripts/store-screenshots/demo-data.mjs`; edit it to change products,
+prices or names.

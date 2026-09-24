@@ -149,7 +149,7 @@ vi.mock('@/services/orderService', () => ({
   sortOrders: (orders: unknown[]) => orders,
 }));
 
-import { apiRowToOrder, OrderCard } from '@/app/(tabs)/orders';
+import { apiRowToOrder, flattenOrderSections, OrderCard } from '@/app/(tabs)/orders';
 
 const sellerRowProps = {
   selected: false,
@@ -206,5 +206,18 @@ describe('seller cancelled order rows', () => {
     expect(textContent(renderer)).not.toContain('Cancelled · undefined');
     expect(textContent(renderer)).not.toContain('Cancelled · null');
     expect(textContent(renderer)).not.toContain('Cancelled · No reason provided');
+  });
+});
+describe('seller orders list rows', () => {
+  it('flattens date groups into header, order and gap rows that FlashList can recycle by type', () => {
+    const order = (id: string) => ({ id } as unknown as ReturnType<typeof apiRowToOrder>);
+    const rows = flattenOrderSections([
+      { title: 'Today', data: [order('a'), order('b')] },
+      { title: 'Yesterday', data: [order('c')] },
+    ]);
+    expect(rows.map((row) => row.type)).toEqual(['header', 'order', 'order', 'gap', 'header', 'order', 'gap']);
+    expect(rows[0]).toMatchObject({ title: 'Today', count: 2 });
+    expect(rows.filter((row) => row.type === 'order').map((row) => row.type === 'order' && row.isLast)).toEqual([false, true, true]);
+    expect(new Set(rows.map((row) => row.key)).size).toBe(rows.length);
   });
 });

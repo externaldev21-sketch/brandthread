@@ -355,6 +355,7 @@ const PRIVACY: LegalDocumentContent = {
       title: 'Information collected automatically',
       bullets: [
         'Device and log information: IP address, device and app version, operating system, request timestamps, pages and features used, crash and error reports, and security signals.',
+        'Crash and performance reports: when the app, website or our servers hit an error, the error, stack trace, device model, operating system, app version, recent in-app actions and performance timings go to our error-monitoring provider (Sentry). These reports are used only to find and fix problems, are not linked to your name, email or account, and are not used for advertising.',
         'Sign-in sessions: Clerk records the device type, browser or app, approximate location (city and country, derived from IP address) and last-active time for each session. You can see and sign out these sessions in Settings → Login activity.',
         'Notifications: your notification permission, push token and preferences.',
         'Location: we use the addresses you enter and carrier tracking locations. We don’t request precise GPS location. If that changes, we’ll ask first and update this policy.',
@@ -392,7 +393,7 @@ const PRIVACY: LegalDocumentContent = {
       bullets: [
         'With other members, as you choose: public profiles, posts, comments, stories, live streams and listings are visible to others and can be copied. Messages are shared with conversation participants.',
         'For transactions: buyers’ names and shipping details go to the seller who fulfills the order; sellers, manufacturers and freelancers share what’s needed to complete work.',
-        'With service providers who process data for us: Clerk, Stripe, cloud hosting and storage, email and push delivery, live video, AI providers, analytics and security tools, and carriers.',
+        'With service providers who process data for us: Clerk, Stripe, cloud hosting and storage, email and push delivery, live video, AI providers, analytics, error-monitoring (Sentry) and security tools, and carriers.',
         'For safety and legal reasons: to comply with law or valid legal requests, protect people, investigate fraud or abuse, or enforce our Terms.',
         'In a business transfer, such as a merger or acquisition, subject to this policy.',
         'We don’t sell your personal information or share it for cross-context behavioral advertising.',
