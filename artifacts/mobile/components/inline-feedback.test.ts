@@ -322,14 +322,14 @@ describe('discover.tsx — per-section error states', () => {
   });
 });
 
-// ─── search screen: existing SearchResultsSkeleton + EmptyState used ─────────
+// ─── search screen: skeleton and empty states already in place ──────────────
 
 describe('search screen — skeleton and empty already in place', () => {
-  it('uses SearchResultsSkeleton while searching', async () => {
+  it('uses GridSkeleton while searching', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const src = readFileSync(resolve(__dirname, '../app/(buyer)/search.tsx'), 'utf8');
-    expect(src).toContain('SearchResultsSkeleton');
+    expect(src).toContain('GridSkeleton');
     expect(src).toContain('searching');
   });
 
@@ -338,6 +338,6 @@ describe('search screen — skeleton and empty already in place', () => {
     const { resolve } = await import('node:path');
     const src = readFileSync(resolve(__dirname, '../app/(buyer)/search.tsx'), 'utf8');
     expect(src).toContain('EmptyState');
-    expect(src).toMatch(/No exact match/);
+    expect(src).toMatch(/No results/);
   });
 });

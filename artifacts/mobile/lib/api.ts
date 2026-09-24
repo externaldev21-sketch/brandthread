@@ -1162,7 +1162,24 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         if (opts.category) params.set('category', opts.category);
         if (opts.limit) params.set('limit', String(opts.limit));
         return get<{ results: any[] }>(`/api/public/search?${params.toString()}`);
-      }
+      },
+      /** Trending search terms (categories + brands) for the search empty state. */
+      trending: (limit = 8) =>
+        get<{ trending: Array<{ term: string; type: 'category' | 'brand' }> }>(
+          `/api/public/search/trending?limit=${encodeURIComponent(String(limit))}`
+        ),
+      /** Suggested brands + products for the search empty state. */
+      suggested: (limit = 6) =>
+        get<{
+          brands: Array<{
+            id: string; sellerId: string; name: string; handle: string;
+            color: string; initials: string; followerCount: number;
+          }>;
+          products: Array<{
+            id: string; productId: string; name: string; brand: string;
+            category: string; imageUri: string | null; color: string; initials: string;
+          }>;
+        }>(`/api/public/search/suggested?limit=${encodeURIComponent(String(limit))}`),
     },
     reviews: {
       /** List reviews for a product (public). Returns { reviews, avgRating, totalCount }. */

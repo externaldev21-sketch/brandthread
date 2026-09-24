@@ -145,6 +145,11 @@ export interface ConversationParticipant {
   initials: string;
   color: string;
   accountType: AccountType;
+  /** Optional live-presence flag. Not populated by the current backend —
+   *  UI reading this field must treat it as absent/false when undefined. */
+  isOnline?: boolean;
+  /** Optional last-seen timestamp (ISO), for future presence UI. */
+  lastSeenAt?: string;
 }
 
 export type MessageAttachmentType =
@@ -199,6 +204,11 @@ export interface Conversation {
   participants: ConversationParticipant[];
   lastMessage?: string;
   lastMessageTs?: number;
+  /** Optional id of who sent the last message ('me'/MY_USER_ID for the buyer).
+   *  Not populated by the current backend — UI must treat undefined as unknown. */
+  lastMessageSenderId?: string;
+  /** Optional attachment kind of the last message, for a non-text preview icon. */
+  lastMessageType?: MessageAttachmentType;
   unreadCount: number;
   isFriendshipActive: boolean;  // buyer_to_buyer: false = new messages disabled
   isArchived: boolean;
