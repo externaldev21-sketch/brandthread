@@ -150,20 +150,19 @@ function OptionChip({
       accessibilityState={{ selected, disabled: !available }}
       style={[
         chipS.chip,
-        selected && { borderColor: accentColor, backgroundColor: `${accentColor}1A` },
+        selected && { borderColor: accentColor, borderWidth: 2, backgroundColor: `${accentColor}1A` },
         !available && chipS.unavail,
       ]}
     >
       <Text
         style={[
           chipS.text,
-          selected && { color: accentColor },
+          selected && { color: accentColor, fontFamily: FONT.bold },
           !available && chipS.textUnavail,
         ]}
       >
         {label}
       </Text>
-      {!available && <View style={chipS.strikethrough} />}
     </TouchableOpacity>
   );
 }
@@ -181,16 +180,10 @@ const chipS = StyleSheet.create({
     overflow: 'hidden',
   },
   text: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
-  textUnavail: { textDecorationLine: 'line-through', color: SUBTLE },
-  unavail: { opacity: 0.5 },
-  strikethrough: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: '50%',
-    height: 1,
-    backgroundColor: RED,
-  },
+  textUnavail: { color: SUBTLE },
+  // Dashed = unavailable, per the shop sheet's variant-chip convention
+  // (bold solid border = selected).
+  unavail: { borderStyle: 'dashed', borderColor: SUBTLE, backgroundColor: 'transparent' },
 });
 
 // ─── Quantity control ─────────────────────────────────────────────────────────
@@ -678,6 +671,9 @@ export function ShopProductSheet({
             keyboardShouldPersistTaps="handled"
             bounces={false}
           >
+            {/* Swipeable image gallery */}
+            <ProductImageCarousel imageUris={product.imageUris} />
+
             {/* Product header row */}
             <ProductHeader
               product={product}
@@ -766,7 +762,19 @@ export function ShopProductSheet({
               <TrustCue icon="truck" label="Fast shipping" />
             </View>
 
-            {/* Action buttons */}
+            <TouchableOpacity onPress={handleViewDetail} style={ss.viewDetailBtn}>
+              <Text style={ss.viewDetailText}>View full product details</Text>
+              <Feather name="chevron-right" size={13} color={MUTED} />
+            </TouchableOpacity>
+
+            {/* Spacer so content never sits behind the sticky action bar below */}
+            <View style={{ height: 84 }} />
+          </ScrollView>
+        )}
+
+        {/* Sticky Add to Cart + Buy Now — always reachable, never scrolls away */}
+        {(phase === 'ready' || phase === 'adding' || phase === 'buying' || phase === 'added') && product && (
+          <View style={ss.stickyActionsWrap}>
             <View style={ss.actions}>
               <TouchableOpacity
                 onPress={phase === 'added' ? handleViewCart : handleAddToCart}
@@ -804,12 +812,7 @@ export function ShopProductSheet({
                 )}
               </TouchableOpacity>
             </View>
-
-            <TouchableOpacity onPress={handleViewDetail} style={ss.viewDetailBtn}>
-              <Text style={ss.viewDetailText}>View full product details</Text>
-              <Feather name="chevron-right" size={13} color={MUTED} />
-            </TouchableOpacity>
-          </ScrollView>
+          </View>
         )}
 
         {phase === 'sold_out' && product && (
@@ -957,6 +960,58 @@ function ProductHeader({
         <Feather name="chevron-right" size={16} color={SUBTLE} style={{ alignSelf: 'center' }} />
       )}
     </TouchableOpacity>
+  );
+}
+
+// ─── Product image carousel — swipeable, with a 1/N counter ─────────────────
+
+function ProductImageCarousel({ imageUris }: { imageUris: string[] }) {
+  const { width: windowWidth } = useWindowDimensions();
+  const pageWidth = Math.min(windowWidth, 520);
+  const [index, setIndex] = useState(0);
+  const images = imageUris.length > 0 ? imageUris : [''];
+
+  if (images.length === 1) {
+    return (
+      <View style={[ss.carouselWrap, { height: pageWidth }]}>
+        {images[0] ? (
+          <CachedImage source={{ uri: images[0] }} style={StyleSheet.absoluteFill} contentFit="cover" />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, ss.productImagePlaceholder]}>
+            <Feather name="image" size={28} color={SUBTLE} />
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  return (
+    <View style={[ss.carouselWrap, { height: pageWidth }]}>
+      <ScrollView
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={e => {
+          const next = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
+          setIndex(Math.max(0, Math.min(images.length - 1, next)));
+        }}
+      >
+        {images.map((uri, i) => (
+          <View key={`${uri}-${i}`} style={{ width: pageWidth, height: pageWidth }}>
+            {uri ? (
+              <CachedImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+            ) : (
+              <View style={[StyleSheet.absoluteFill, ss.productImagePlaceholder]}>
+                <Feather name="image" size={28} color={SUBTLE} />
+              </View>
+            )}
+          </View>
+        ))}
+      </ScrollView>
+      <View style={ss.carouselCounter} pointerEvents="none">
+        <Text style={ss.carouselCounterText}>{index + 1}/{images.length}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -1135,7 +1190,15 @@ const ss = StyleSheet.create({
   productImagePlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: CARD_ELEVATED,
   },
+  carouselWrap: { width: '100%', backgroundColor: CARD_ELEVATED },
+  carouselCounter: {
+    position: 'absolute', right: 10, bottom: 10,
+    paddingHorizontal: 9, paddingVertical: 4, borderRadius: RADIUS.pill,
+    backgroundColor: 'rgba(0,0,0,0.62)',
+  },
+  carouselCounterText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 11 },
   preOrderBadge: {
     position: 'absolute',
     bottom: 6,
@@ -1248,6 +1311,16 @@ const ss = StyleSheet.create({
   trustCueText: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
 
   // Action buttons
+  stickyActionsWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingTop: 10,
+    backgroundColor: CARD,
+    borderTopWidth: 1,
+    borderTopColor: BORDER_SUBTLE,
+  },
   actions: {
     flexDirection: 'row',
     gap: 10,
