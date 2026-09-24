@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -26,15 +26,34 @@ import {
 } from '@/lib/sellerHomeAnalytics';
 import { skipTask, type SetupState, type SetupTask } from '@/lib/setupStore';
 import { withSellerSetupOrigin } from '@/lib/setupNavigation';
-import { KpiRowSkeleton, ResponsiveContainer, SkeletonBlock as LayoutSkeletonBlock, useBreakpoint } from '@/components/layout';
+import { ResponsiveContainer, SkeletonBlock, useBreakpoint } from '@/components/layout';
 import ActivityBellButton from '@/components/ActivityBellButton';
-import { bucketLabel } from '@/lib/sellerHomeChartLabels';
-import { SellerMetricCarousel, type SellerMetricPage } from '@/components/SellerMetricCarousel';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { bucketLabel, type SellerHomeTimeRange } from '@/lib/sellerHomeChartLabels';
+import { formatCents } from '@/lib/money';
+import { formatCentsCompact, formatCompactCount } from '@/lib/compactFormat';
+import { computeMetricChange } from '@/lib/sellerMetricChange';
+import { useCountUp } from '@/lib/useCountUp';
+import {
+  countOrderReturns,
+  deriveHubStats,
+  deriveInventoryStats,
+  describeDashboardDelta,
+  isNewSeller,
+  mergeTopProductImages,
+  normalizeRecentOrder,
+  type DashboardActionCounts,
+  type RecentOrderSummary,
+  type TopProductSummary,
+} from '@/lib/sellerDashboardStats';
+import { DASHBOARD_RANGES, SellerDashboardChart, type SellerDashboardRange } from '@/components/SellerDashboardChart';
+import { SellerDashboardStatGrid, type SellerDashboardStatTileData } from '@/components/SellerDashboardStatGrid';
+import { SellerDashboardActionNeeded } from '@/components/SellerDashboardActionNeeded';
+import { SellerDashboardTopProducts } from '@/components/SellerDashboardTopProducts';
+import { SellerDashboardRecentOrders } from '@/components/SellerDashboardRecentOrders';
+import { SellerDashboardSetupCard } from '@/components/SellerDashboardSetupCard';
 import {
   BG,
-  BORDER,
-  BORDER_SUBTLE,
-  CARD_ELEVATED_GLASS,
   FG,
   FONT,
   FS,
@@ -42,15 +61,10 @@ import {
   MUTED,
   RADIUS,
   SCREEN_BG,
-  SELLER_DASHBOARD_GLASS,
-  SKELETON_GLASS,
   SP,
-  SUBTLE,
-  SUCCESS,
-  SUCCESS_DIM,
 } from '@/lib/theme';
 
-type TimeRange = 'live' | 'today' | 'yesterday' | 'week';
+type MetricKey = 'sales' | 'orders' | 'visitors' | 'conversion' | 'aov';
 
 interface FinanceBalance {
   available: { amount: number; currency: string; formatted: string };
@@ -76,88 +90,40 @@ function cashoutAttemptStorageKey(userId: string): string {
   return `bt:seller-cashout-attempt:${userId}`;
 }
 
-const RANGES: Array<{ id: TimeRange; label: string }> = [
-  { id: 'live', label: 'Live' },
-  { id: 'today', label: 'Today' },
-  { id: 'yesterday', label: 'Yesterday' },
-  { id: 'week', label: 'This week' },
-];
+const PERIOD_LABEL: Record<SellerDashboardRange, string> = {
+  today: 'yesterday',
+  week: 'last week',
+  month: 'last month',
+  year: 'last year',
+  all: '',
+};
 
-// ─── Skeleton shimmer row ────────────────────────────────────────────────────
-function SkeletonBlock({ width, height, style }: { width?: number | string; height: number; style?: object }) {
-  return (
-    <View
-      style={[
-        {
-          width: width ?? '100%',
-          height,
-          borderRadius: RADIUS.sm,
-          backgroundColor: SKELETON_GLASS,
-        },
-        style,
-      ]}
-    />
-  );
+function metricSeries(
+  metric: MetricKey,
+  buckets: Array<{ totalCents: number; orderCount: number; visitorCount: number }>,
+): number[] {
+  switch (metric) {
+    case 'sales': return buckets.map((b) => b.totalCents);
+    case 'orders': return buckets.map((b) => b.orderCount);
+    case 'visitors': return buckets.map((b) => b.visitorCount);
+    case 'conversion': return buckets.map((b) => (b.visitorCount > 0 ? (b.orderCount / b.visitorCount) * 100 : 0));
+    case 'aov': return buckets.map((b) => (b.orderCount > 0 ? Math.round(b.totalCents / b.orderCount) : 0));
+    default: return [];
+  }
 }
 
-// ─── Chart skeleton bars ─────────────────────────────────────────────────────
-function ChartSkeleton({ count = 10 }: { count?: number }) {
-  const heights = [45, 62, 30, 75, 52, 88, 38, 66, 44, 55];
-  return (
-    <View style={styles.chart}>
-      {Array.from({ length: count }).map((_, i) => (
-        <View key={i} style={styles.barColumn}>
-          <View style={styles.barTrack}>
-            <View
-              style={[
-                styles.bar,
-                {
-                  height: `${heights[i % heights.length]}%`,
-                  backgroundColor: SKELETON_GLASS,
-                },
-              ]}
-            />
-          </View>
-          <SkeletonBlock width={14} height={8} />
-        </View>
-      ))}
-    </View>
-  );
+function formatMetricValue(metric: MetricKey, value: number): string {
+  if (metric === 'sales' || metric === 'aov') return formatCentsCompact(Math.round(value));
+  if (metric === 'conversion') return `${value.toFixed(1)}%`;
+  return formatCompactCount(Math.round(value));
 }
 
-// ─── Empty chart state ────────────────────────────────────────────────────────
-function ChartEmptyState({ range, bucketCount }: { range: TimeRange; bucketCount: number }) {
-  const rangeLabel = RANGES.find((r) => r.id === range)?.label ?? range;
-  // A flat zero line, not fabricated bar heights — this state means "no sales yet",
-  // and the bars must not imply activity that didn't happen.
-  const columns = Math.max(bucketCount, 1);
-  return (
-    <View style={styles.chartEmptyWrap}>
-      <View style={[styles.chart, styles.chartGhost]}>
-        {Array.from({ length: columns }).map((_, i) => (
-          <View key={i} style={styles.barColumn}>
-            <View style={styles.barTrack}>
-              <View
-                style={[
-                  styles.bar,
-                  {
-                    height: 4,
-                    backgroundColor: BORDER_SUBTLE,
-                  },
-                ]}
-              />
-            </View>
-          </View>
-        ))}
-      </View>
-      {/* Overlay label */}
-      <View style={styles.chartEmptyOverlay} pointerEvents="none">
-        <Feather name="bar-chart-2" size={20} color={SUBTLE} />
-        <Text style={styles.chartEmptyTitle}>No sales {rangeLabel === 'Live' ? 'right now' : `for ${rangeLabel.toLowerCase()}`}</Text>
-        <Text style={styles.chartEmptySubtitle}>Sales will appear here as orders come in</Text>
-      </View>
-    </View>
-  );
+function compactDelta(current: number, previous: number): { direction: 'up' | 'down' | 'flat'; label: string } {
+  const change = computeMetricChange(current, previous);
+  if (change.direction === 'flat') return { direction: 'flat', label: '—' };
+  if (change.percent == null) return { direction: change.direction, label: 'New' };
+  const sign = change.percent > 0 ? '+' : '';
+  return { direction: change.direction, label: `${sign}${change.percent}%` };
 }
 
 export default function SellerHomeCommerceDashboard({
@@ -174,20 +140,33 @@ export default function SellerHomeCommerceDashboard({
   const router = useRouter();
   const api = useApi();
   const { theme } = useAppTheme();
-  const palette = theme as typeof theme & Record<string, string>;
   const { currentRole, isLoadingRole } = useTeamRole();
   const { isTablet } = useBreakpoint();
-  const [range, setRange] = useState<TimeRange>('today');
+
+  const [range, setRange] = useState<SellerDashboardRange>('week');
+  const [metric, setMetric] = useState<MetricKey>('sales');
+  const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const [snapshot, setSnapshot] = useState<SellerHomeAnalyticsSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyticsError, setAnalyticsError] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [retryTick, setRetryTick] = useState(0);
+
   const [financeBalance, setFinanceBalance] = useState<FinanceBalance | null>(null);
   const [financeLoading, setFinanceLoading] = useState(true);
   const [cashingOut, setCashingOut] = useState(false);
   const balanceGenerationRef = useRef(0);
   const payoutAttemptKeyRef = useRef<string | null>(null);
+
+  const [topProducts, setTopProducts] = useState<TopProductSummary[] | null>(null);
+  const [recentOrders, setRecentOrders] = useState<RecentOrderSummary[] | null>(null);
+  const [everSoldCount, setEverSoldCount] = useState<number | null>(null);
+  const [actionInputs, setActionInputs] = useState<{ unreadMessages: number; lowStockCount: number; returns: number } | null>(null);
+  const [secondaryError, setSecondaryError] = useState(false);
+
   const data = selectSellerHomeAnalytics(snapshot, userId, range);
 
+  // ── Range-scoped analytics (hero + chart + stat grid) ────────────────────
   useEffect(() => {
     if (!userId) {
       setLoading(false);
@@ -196,7 +175,7 @@ export default function SellerHomeCommerceDashboard({
     let active = true;
     const requestKey = sellerHomeAnalyticsKey(userId, range);
     setLoading(true);
-    api.analytics.home(range)
+    api.analytics.home(range as SellerHomeTimeRange)
       .then((next) => {
         if (!active) return;
         setAnalyticsError(false);
@@ -204,9 +183,7 @@ export default function SellerHomeCommerceDashboard({
       })
       .catch((requestError) => {
         if (!active) return;
-        if (__DEV__) {
-          console.warn('[seller-dashboard] analytics unavailable', requestError);
-        }
+        if (__DEV__) console.warn('[seller-dashboard] analytics unavailable', requestError);
         // Never fabricate a zero state — keep any stale snapshot and surface a real error banner instead.
         setAnalyticsError(true);
       })
@@ -214,7 +191,67 @@ export default function SellerHomeCommerceDashboard({
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [api, range, userId]);
+  }, [api, range, userId, retryTick]);
+
+  // ── Range-independent data (orders, inventory, hub, products) — fetched
+  // once per seller/refresh, not re-fetched on every chart range switch. ────
+  const loadSecondaryData = useCallback(async () => {
+    if (!userId) {
+      setTopProducts([]);
+      setRecentOrders([]);
+      setEverSoldCount(0);
+      setActionInputs({ unreadMessages: 0, lowStockCount: 0, returns: 0 });
+      return;
+    }
+    setSecondaryError(false);
+    try {
+      const [ordersRaw, inventoryRaw, [quotes, samples, threads], productAnalytics, catalog] = await Promise.all([
+        api.orders.list() as Promise<any[]>,
+        api.inventory.list() as Promise<any[]>,
+        Promise.all([
+          api.sellerHub.quoteRequests.list(),
+          api.manufacturers.sampleOrders.list(),
+          api.manufacturers.threads.list(),
+        ]) as Promise<[any[], any[], any[]]>,
+        api.analytics.products() as Promise<any[]>,
+        api.products.list() as Promise<any[]>,
+      ]);
+
+      const orders = Array.isArray(ordersRaw) ? ordersRaw : [];
+      const inventory = Array.isArray(inventoryRaw) ? inventoryRaw : [];
+      const hub = deriveHubStats(
+        Array.isArray(quotes) ? quotes : [],
+        Array.isArray(samples) ? samples : [],
+        Array.isArray(threads) ? threads : [],
+      );
+      const inv = deriveInventoryStats(inventory);
+
+      setEverSoldCount(orders.length);
+      setRecentOrders(orders.slice(0, 5).map(normalizeRecentOrder));
+      setActionInputs({
+        unreadMessages: hub.unreadMessages,
+        lowStockCount: inv.lowStockCount,
+        returns: countOrderReturns(orders),
+      });
+
+      const top = Array.isArray(productAnalytics)
+        ? productAnalytics
+          .filter((p) => Number(p?.revenueCents ?? 0) > 0)
+          .map((p) => ({
+            productId: String(p.productId),
+            name: String(p.name ?? 'Untitled product'),
+            unitsSold: Number(p.unitsSold ?? 0),
+            revenueCents: Number(p.revenueCents ?? 0),
+          }))
+        : [];
+      setTopProducts(mergeTopProductImages(top, Array.isArray(catalog) ? catalog : []));
+    } catch (error) {
+      if (__DEV__) console.warn('[seller-dashboard] secondary data unavailable', error);
+      setSecondaryError(true);
+    }
+  }, [api, userId]);
+
+  useEffect(() => { void loadSecondaryData(); }, [loadSecondaryData, retryTick]);
 
   const loadFinanceBalance = useCallback(async () => {
     const generation = ++balanceGenerationRef.current;
@@ -227,23 +264,15 @@ export default function SellerHomeCommerceDashboard({
     setFinanceLoading(true);
     try {
       const next = await api.finance.balance() as FinanceBalance;
-      if (balanceGenerationRef.current === generation) {
-        setFinanceBalance(next);
-      }
+      if (balanceGenerationRef.current === generation) setFinanceBalance(next);
     } catch {
-      if (balanceGenerationRef.current === generation) {
-        setFinanceBalance(null);
-      }
+      if (balanceGenerationRef.current === generation) setFinanceBalance(null);
     } finally {
-      if (balanceGenerationRef.current === generation) {
-        setFinanceLoading(false);
-      }
+      if (balanceGenerationRef.current === generation) setFinanceLoading(false);
     }
   }, [api, currentRole, isLoadingRole, userId]);
 
-  useEffect(() => {
-    void loadFinanceBalance();
-  }, [loadFinanceBalance]);
+  useEffect(() => { void loadFinanceBalance(); }, [loadFinanceBalance]);
 
   useEffect(() => subscribeStoreContext(() => {
     balanceGenerationRef.current += 1;
@@ -252,14 +281,19 @@ export default function SellerHomeCommerceDashboard({
     void loadFinanceBalance();
   }), [loadFinanceBalance]);
 
-  useEffect(() => {
-    payoutAttemptKeyRef.current = null;
-  }, [userId]);
+  useEffect(() => { payoutAttemptKeyRef.current = null; }, [userId]);
 
   const nav = useCallback((route: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     router.push(route as never);
   }, [router]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setRetryTick((n) => n + 1);
+    await loadSecondaryData();
+    setRefreshing(false);
+  }, [loadSecondaryData]);
 
   const requestCashOut = useCallback(() => {
     if (currentRole !== 'owner') {
@@ -380,7 +414,10 @@ export default function SellerHomeCommerceDashboard({
 
   const openTask = useCallback((task: SetupTask) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    router.push(withSellerSetupOrigin(task.route) as never);
+    // replace (not push): a setup task destination returns to the dashboard
+    // itself (see SELLER_HOME_ROUTE in each destination screen), so pushing
+    // would leave a dead, unreachable dashboard scene underneath it.
+    router.replace(withSellerSetupOrigin(task.route) as never);
   }, [router]);
 
   const dismissTask = useCallback(async (task: SetupTask) => {
@@ -396,346 +433,289 @@ export default function SellerHomeCommerceDashboard({
     ]);
   }, [dismissTask, openTask]);
 
-  const unfinishedTasks = setupState.tasks.filter((task) => !task.completed && !task.skipped);
-  const maxBucket = Math.max(0, ...(data?.buckets.map((bucket) => bucket.totalCents) ?? []));
-  const hasActivity = data?.buckets.some((bucket) => bucket.totalCents > 0) ?? false;
-  const toFulfill = data?.toFulfill ?? 0;
-  const toCapture = data?.toCapture ?? 0;
-  const totalSales = data?.totalCents ?? 0;
-  const orderCount = data?.orderCount ?? 0;
-  const visitorCount = data?.visitorCount ?? 0;
+  const addProductTask = setupState.tasks.find((task) => task.id === 'first_product') ?? null;
+  const newSeller = everSoldCount !== null && isNewSeller(everSoldCount);
+  const actionCounts: DashboardActionCounts | null = actionInputs && data ? {
+    toShip: data.toFulfill,
+    toAnswer: actionInputs.unreadMessages,
+    lowStock: actionInputs.lowStockCount,
+    returns: actionInputs.returns,
+  } : null;
 
-  // One swipeable page per metric, real data only. Balances have no
-  // "previous period" (they're a snapshot, not a period sum) and no
-  // real per-bucket time series, so they deliberately get no change
-  // indicator or sparkline rather than a fabricated one.
-  const metricPages: SellerMetricPage[] = data ? [
-    {
-      key: 'sales', label: 'Total sales', value: totalSales, isMoney: true,
-      previousValue: data.previous.totalCents,
-      spark: data.buckets.map((b) => b.totalCents),
-      route: '/analytics-sales',
-    },
-    {
-      key: 'orders', label: 'Orders', value: orderCount, isMoney: false,
-      previousValue: data.previous.orderCount,
-      spark: data.buckets.map((b) => b.orderCount),
-      route: '/(tabs)/orders',
-    },
-    {
-      key: 'visitors', label: range === 'live' ? 'Online now' : 'Visitors', value: visitorCount, isMoney: false,
-      previousValue: data.previous.visitorCount,
-      spark: data.buckets.map((b) => b.visitorCount),
-      route: '/(tabs)/analytics',
-    },
-    {
-      key: 'available', label: 'Available balance', value: financeBalance?.available.amount ?? 0, isMoney: true,
-      route: '/payouts',
-    },
-    {
-      key: 'pending', label: 'Pending balance', value: financeBalance?.pending.amount ?? 0, isMoney: true,
-      route: '/payouts',
-    },
-  ] : [];
+  // ── Metric aggregate + chart series for the currently focused metric ─────
+  const buckets = data?.buckets ?? [];
+  const series = useMemo(() => metricSeries(metric, buckets), [metric, buckets]);
+  const labels = useMemo(() => buckets.map((b) => bucketLabel(b.bucket, range as SellerHomeTimeRange)), [buckets, range]);
+
+  const metricAggregate = useMemo(() => {
+    if (!data) return { current: 0, previous: 0 };
+    switch (metric) {
+      case 'sales': return { current: data.totalCents, previous: data.previous.totalCents };
+      case 'orders': return { current: data.orderCount, previous: data.previous.orderCount };
+      case 'visitors': return { current: data.visitorCount, previous: data.previous.visitorCount };
+      case 'conversion': return {
+        current: data.visitorCount > 0 ? (data.orderCount / data.visitorCount) * 100 : 0,
+        previous: data.previous.visitorCount > 0 ? (data.previous.orderCount / data.previous.visitorCount) * 100 : 0,
+      };
+      case 'aov': return {
+        current: data.orderCount > 0 ? Math.round(data.totalCents / data.orderCount) : 0,
+        previous: data.previous.orderCount > 0 ? Math.round(data.previous.totalCents / data.previous.orderCount) : 0,
+      };
+      default: return { current: 0, previous: 0 };
+    }
+  }, [data, metric]);
+
+  const isEmptyChart = newSeller || buckets.every((b) => b.totalCents === 0 && b.orderCount === 0 && b.visitorCount === 0);
+  const activeValue = scrubIndex !== null && series[scrubIndex] != null ? series[scrubIndex] : metricAggregate.current;
+  const heroDisplay = useCountUp(Math.round(activeValue), scrubIndex === null);
+  const scrubLabel = scrubIndex !== null ? labels[scrubIndex] : null;
+
+  const periodLabel = PERIOD_LABEL[range];
+  const deltaFormatter = metric === 'sales' || metric === 'aov' ? formatCents
+    : metric === 'conversion' ? (n: number) => `${n.toFixed(1)}%`
+    : (n: number) => formatCompactCount(Math.round(n));
+  const deltaLine = data && range !== 'all' && periodLabel
+    ? describeDashboardDelta(metricAggregate.current, metricAggregate.previous, deltaFormatter, periodLabel)
+    : null;
+
+  const metricLabelText: Record<MetricKey, string> = {
+    sales: 'Total sales', orders: 'Orders', visitors: 'Visitors', conversion: 'Conversion rate', aov: 'Avg order value',
+  };
+
+  const tiles: SellerDashboardStatTileData[] = data ? (['orders', 'visitors', 'conversion', 'aov'] as MetricKey[]).map((key) => {
+    const agg = key === 'orders' ? { current: data.orderCount, previous: data.previous.orderCount }
+      : key === 'visitors' ? { current: data.visitorCount, previous: data.previous.visitorCount }
+      : key === 'conversion' ? {
+        current: data.visitorCount > 0 ? (data.orderCount / data.visitorCount) * 100 : 0,
+        previous: data.previous.visitorCount > 0 ? (data.previous.orderCount / data.previous.visitorCount) * 100 : 0,
+      }
+      : {
+        current: data.orderCount > 0 ? Math.round(data.totalCents / data.orderCount) : 0,
+        previous: data.previous.orderCount > 0 ? Math.round(data.previous.totalCents / data.previous.orderCount) : 0,
+      };
+    const delta = compactDelta(agg.current, agg.previous);
+    return {
+      key,
+      label: metricLabelText[key],
+      value: formatMetricValue(key, agg.current),
+      deltaLabel: delta.label,
+      deltaDirection: delta.direction,
+    };
+  }) : [];
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.background ?? palette.surface ?? BG }]}>
+    <View style={[styles.root, { backgroundColor: theme.background ?? SCREEN_BG }]}>
       <ScrollView
         testID="seller-dashboard-scroll"
         accessibilityLabel="Seller dashboard scroll"
         style={styles.scrollView}
         contentContainerStyle={[styles.scroll, { paddingTop: topInset + SP.sm }]}
         showsVerticalScrollIndicator={false}
-        alwaysBounceVertical
-        scrollEnabled
-        nestedScrollEnabled
-        directionalLockEnabled={false}
-        contentInsetAdjustmentBehavior="never"
-        removeClippedSubviews={false}
-        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} colors={[theme.accent]} />
+        }
       >
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
-        {/* ── Top bar ──────────────────────────────────────────────────── */}
-        <View style={styles.topBar}>
-          <View
-            testID="seller-dashboard-scroll-position"
-            accessibilityLabel="Seller dashboard scroll position"
-            accessible
-          >
-            <Text style={[styles.screenTitle, { color: palette.foreground ?? FG }]}>Dashboard</Text>
-          </View>
-          <ActivityBellButton
-            testID="seller-dashboard-activity"
-            color={palette.foreground ?? FG}
-            size={22}
-            style={styles.topBarAction}
-            badgeBorderColor={palette.background ?? palette.surface ?? BG}
-          />
-        </View>
-
-        {/* ── Time range pills ─────────────────────────────────────────── */}
-        <ScrollView
-          horizontal
-          nestedScrollEnabled
-          directionalLockEnabled
-          showsHorizontalScrollIndicator={false}
-          style={styles.rangeScroll}
-          contentContainerStyle={styles.rangeRow}
-        >
-          {RANGES.map((item) => {
-            const selected = item.id === range;
-            return (
-              <TouchableOpacity
-                key={item.id}
-                style={[
-                  styles.rangePill,
-                  { backgroundColor: palette.glass ?? palette.surface ?? SELLER_DASHBOARD_GLASS, borderColor: palette.border ?? BORDER },
-                  selected && { backgroundColor: theme.accentDim, borderColor: theme.accent },
-                ]}
-                onPress={() => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setRange(item.id);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={`Show ${item.label} sales`}
-                accessibilityState={{ selected }}
-              >
-                <Text style={[styles.rangeText, { color: selected ? theme.accentLight : (palette.muted ?? MUTED) }]}>
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        {/* ── Summary stats (swipeable metric carousel) ─────────────────── */}
-        <View style={[styles.statsCard, { backgroundColor: palette.glass ?? palette.surface ?? SELLER_DASHBOARD_GLASS, borderColor: palette.border ?? BORDER }]}>
-          {analyticsError && (
-            <View
-              style={[styles.errorBanner, { backgroundColor: palette.cardElevated ?? palette.card ?? CARD_ELEVATED_GLASS, borderColor: theme.error }]}
-              accessibilityRole="alert"
-            >
-              <Feather name="alert-circle" size={14} color={theme.error} />
-              <Text style={[styles.errorBannerText, { color: theme.error }]}>
-                {data ? 'Couldn’t refresh your sales. Pull to refresh.' : 'Couldn’t load your sales. Pull to refresh.'}
-              </Text>
+          {/* ── Top bar ─────────────────────────────────────────────────── */}
+          <View style={styles.topBar}>
+            <View testID="seller-dashboard-scroll-position" accessibilityLabel="Seller dashboard scroll position" accessible>
+              <Text style={[styles.screenTitle, { color: theme.text ?? FG }]}>Dashboard</Text>
             </View>
-          )}
-          {!data && !analyticsError ? (
-            <View style={{ padding: SP.md }}>
-              <LayoutSkeletonBlock width="100%" height={128} radius={RADIUS.lg} />
-            </View>
-          ) : (
-            <SellerMetricCarousel pages={metricPages} theme={theme} onOpenPage={nav} />
-          )}
-
-          {/* Cash-out CTA — flush to bottom of stats card */}
-          {data && !loading && (
-            <TouchableOpacity
-              testID="seller-dashboard-cash-out"
-              style={[
-                styles.dashboardButton,
-                { backgroundColor: FG },
-                (financeLoading || cashingOut) && styles.dashboardButtonDisabled,
-              ]}
-              activeOpacity={0.82}
-              disabled={financeLoading || cashingOut}
-              onPress={requestCashOut}
-              accessibilityRole="button"
-              accessibilityLabel="Withdraw available balance"
-              accessibilityState={{ disabled: financeLoading || cashingOut }}
-            >
-              {cashingOut ? (
-                <ActivityIndicator size="small" color={BG} />
-              ) : (
-                <Text style={[styles.dashboardButtonIcon, { color: BG }]}>$</Text>
-              )}
-              <Text style={[styles.dashboardButtonText, { color: BG }]}>
-                {cashingOut ? 'Withdrawing…' : 'Withdraw'}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* ── Sales activity chart + needs-attention: side-by-side on iPad ── */}
-        <View style={isTablet ? styles.tabletRow : undefined}>
-        <View style={[isTablet && styles.tabletRowItem, styles.chartCard, { backgroundColor: palette.glass ?? palette.surface ?? SELLER_DASHBOARD_GLASS, borderColor: palette.border ?? BORDER }]}>
-          <View style={styles.chartHeader}>
-            <Text style={styles.sectionTitle}>Sales activity</Text>
-            <View style={styles.chartBadge}>
-              <Text style={styles.chartRange}>
-                {RANGES.find((item) => item.id === range)?.label}
-              </Text>
-            </View>
+            <ActivityBellButton
+              testID="seller-dashboard-activity"
+              color={theme.text ?? FG}
+              size={22}
+              style={styles.topBarAction}
+              badgeBorderColor={theme.background ?? BG}
+            />
           </View>
 
           {!data && analyticsError ? (
-            <View style={styles.emptyActions}>
+            <View style={styles.errorBanner} testID="seller-dashboard-error">
               <Feather name="alert-circle" size={16} color={theme.error} />
-              <Text style={[styles.emptyActionsText, { color: theme.error }]}>Couldn{'’'}t load activity</Text>
+              <Text style={[styles.errorText, { color: theme.error }]}>Couldn’t load your dashboard.</Text>
+              <TouchableOpacity onPress={() => setRetryTick((n) => n + 1)} accessibilityRole="button" accessibilityLabel="Retry loading the dashboard">
+                <Text style={[styles.retryText, { color: theme.accent }]}>Retry</Text>
+              </TouchableOpacity>
             </View>
           ) : !data ? (
-            <ChartSkeleton />
-          ) : !hasActivity || maxBucket === 0 ? (
-            <ChartEmptyState range={range} bucketCount={data?.buckets.length ?? 0} />
+            <View style={styles.heroSkeleton}>
+              <SkeletonBlock width={180} height={16} radius={RADIUS.sm} />
+              <SkeletonBlock width={240} height={48} radius={RADIUS.md} style={{ marginTop: SP.sm }} />
+              <SkeletonBlock width="100%" height={168} radius={RADIUS.md} style={{ marginTop: SP.lg }} />
+            </View>
           ) : (
-            <View style={styles.chart}>
-              {(data?.buckets ?? []).map((bucket) => {
-                const ratio = maxBucket > 0 ? bucket.totalCents / maxBucket : 0;
-                return (
-                  <View key={bucket.bucket} style={styles.barColumn}>
-                    <View style={styles.barTrack}>
-                      <View
-                        style={[
-                          styles.bar,
-                          {
-                            height: maxBucket > 0 ? `${Math.max(4, ratio * 100)}%` : 0,
-                            backgroundColor: theme.accent,
-                          },
-                        ]}
-                      />
-                    </View>
-                    <Text style={styles.barLabel}>{bucketLabel(bucket.bucket, range)}</Text>
-                  </View>
-                );
-              })}
-            </View>
-          )}
-        </View>
-
-        {/* ── Action items (fulfill / capture) ─────────────────────────── */}
-        {data && !loading && (
-          <View style={[isTablet && styles.tabletRowItem, styles.actionSection]}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionHeaderLabel}>Needs attention</Text>
-            </View>
-
-            <View style={styles.actionCard}>
-              {toFulfill > 0 && (
-                <TouchableOpacity
-                  style={[styles.actionRow, toCapture > 0 && styles.actionRowBordered]}
-                  onPress={() => nav('/(tabs)/orders')}
-                  activeOpacity={0.75}
-                  accessibilityRole="button"
-                  accessibilityLabel={`View ${toFulfill} ${toFulfill === 1 ? 'order' : 'orders'} to fulfill`}
+            <>
+              {/* ── Hero + scrubbable chart ────────────────────────────── */}
+              <PressableScale onPress={() => setMetric('sales')} style={styles.heroWrap} accessibilityRole="button" accessibilityLabel="Show Total sales in the chart">
+                <Text style={[styles.heroLabel, { color: theme.muted }]}>
+                  {scrubLabel ?? metricLabelText[metric]}
+                </Text>
+                <Text
+                  style={[styles.heroValue, { color: theme.text }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.5}
+                  testID="seller-dashboard-hero-value"
                 >
-                  <View style={styles.actionIconWrap}>
-                    <Feather name="package" size={16} color={FG} />
-                  </View>
-                  <View style={styles.actionCopy}>
-                    <Text style={styles.actionTitle}>
-                      {toFulfill} {toFulfill === 1 ? 'order' : 'orders'} to fulfill
-                    </Text>
-                    <Text style={styles.actionSubtitle}>Paid orders awaiting shipment</Text>
-                  </View>
-                  <View style={styles.actionBadge}>
-                    <Text style={styles.actionBadgeText}>{toFulfill > 9 ? '9+' : toFulfill}</Text>
-                  </View>
-                  <Feather name="chevron-right" size={18} color={SUBTLE} />
-                </TouchableOpacity>
-              )}
+                  {formatMetricValue(metric, heroDisplay)}
+                </Text>
+                {deltaLine && scrubIndex === null ? (
+                  <Text
+                    style={[
+                      styles.heroDelta,
+                      { color: deltaLine.direction === 'up' ? theme.success : deltaLine.direction === 'down' ? theme.error : theme.muted },
+                    ]}
+                  >
+                    {deltaLine.label}
+                  </Text>
+                ) : (
+                  <Text style={[styles.heroDelta, { color: theme.muted }]}>
+                    {range === 'all' ? 'All-time' : ' '}
+                  </Text>
+                )}
+              </PressableScale>
 
-              {toCapture > 0 && (
-                <TouchableOpacity
-                  style={styles.actionRow}
-                  onPress={() => nav('/payments')}
-                  activeOpacity={0.75}
-                  accessibilityRole="button"
-                  accessibilityLabel={`View ${toCapture} ${toCapture === 1 ? 'payment' : 'payments'} to capture`}
-                >
-                  <View style={styles.actionIconWrap}>
-                    <Feather name="credit-card" size={16} color={FG} />
-                  </View>
-                  <View style={styles.actionCopy}>
-                    <Text style={styles.actionTitle}>
-                      {toCapture} {toCapture === 1 ? 'payment' : 'payments'} to capture
-                    </Text>
-                    <Text style={styles.actionSubtitle}>Authorized payments pending capture</Text>
-                  </View>
-                  <View style={styles.actionBadge}>
-                    <Text style={styles.actionBadgeText}>{toCapture > 9 ? '9+' : toCapture}</Text>
-                  </View>
-                  <Feather name="chevron-right" size={18} color={SUBTLE} />
-                </TouchableOpacity>
-              )}
+              <SellerDashboardChart
+                values={series}
+                labels={labels}
+                theme={theme}
+                range={range}
+                onRangeChange={(next) => { setRange(next); setScrubIndex(null); }}
+                onScrub={setScrubIndex}
+                isEmpty={isEmptyChart}
+              />
 
-              {toFulfill === 0 && toCapture === 0 && (
-                <View style={styles.emptyActions}>
-                  <View style={[styles.emptyActionsIcon, { backgroundColor: SUCCESS_DIM }]}>
-                    <Feather name="check" size={16} color="#41C72A" />
-                  </View>
-                  <Text style={styles.emptyActionsText}>All caught up</Text>
+              {/* ── Stat tile grid ───────────────────────────────────────── */}
+              {!newSeller && (
+                <View style={styles.section}>
+                  <SellerDashboardStatGrid tiles={tiles} activeKey={metric} onSelect={(key) => setMetric(key as MetricKey)} theme={theme} />
                 </View>
               )}
-            </View>
-          </View>
-        )}
-        </View>
 
-        {/* ── Setup checklist ───────────────────────────────────────────── */}
-        {unfinishedTasks.length > 0 && (
-          <View style={styles.setupSection}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionHeaderLabel}>Set up your business</Text>
-              <View style={styles.setupCountBadge}>
-                <Text style={styles.setupCountText}>{unfinishedTasks.length}</Text>
-              </View>
-            </View>
-
-            <View style={styles.setupList}>
-              {unfinishedTasks.map((task, index) => (
-                <TouchableOpacity
-                  key={task.id}
-                  style={[
-                    [styles.setupCard, { backgroundColor: palette.card ?? palette.surface ?? CARD_ELEVATED_GLASS, borderColor: palette.borderSubtle ?? BORDER_SUBTLE }],
-                    index < unfinishedTasks.length - 1 && styles.setupCardBordered,
-                  ]}
-                  activeOpacity={0.75}
-                  onPress={() => openTask(task)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Open setup task: ${task.label}`}
-                >
-                  <View style={[styles.setupIcon, { backgroundColor: theme.accentDim }]}>
-                    <Feather
-                      name={task.icon as keyof typeof Feather.glyphMap}
-                      size={18}
-                      color={theme.accentLight}
-                    />
-                  </View>
-                  <View style={styles.setupCopy}>
-                    <Text style={styles.setupTitle}>{task.label}</Text>
-                    <Text style={styles.setupDescription} numberOfLines={2}>
-                      {task.description}
+              {/* ── Balance / withdraw ───────────────────────────────────── */}
+              {currentRole === 'owner' && (
+                <View style={[styles.section, styles.balanceRow, { borderColor: theme.borderSubtle }]}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={[styles.balanceLabel, { color: theme.muted }]}>Available balance</Text>
+                    <Text style={[styles.balanceValue, { color: theme.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                      {financeLoading ? '···' : financeBalance?.available.formatted ?? '$0.00'}
                     </Text>
                   </View>
-                  <Pressable
-                    style={styles.optionsButton}
-                    hitSlop={10}
-                    onPress={(event) => {
-                      event.stopPropagation();
-                      showTaskOptions(task);
-                    }}
+                  <TouchableOpacity
+                    testID="seller-dashboard-cash-out"
+                    style={[styles.withdrawButton, { backgroundColor: theme.text }, (financeLoading || cashingOut) && styles.withdrawButtonDisabled]}
+                    activeOpacity={0.82}
+                    disabled={financeLoading || cashingOut}
+                    onPress={requestCashOut}
                     accessibilityRole="button"
-                    accessibilityLabel={`Options for ${task.label}`}
+                    accessibilityLabel="Withdraw available balance"
                   >
-                    <Feather name="more-horizontal" size={18} color={MUTED} />
-                  </Pressable>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        )}
-        </ResponsiveContainer>
-        <View
-          testID="seller-dashboard-scroll-end"
-          accessibilityLabel="Seller dashboard scroll end"
-          style={styles.scrollEndMarker}
-        />
-      </ScrollView>
+                    {cashingOut ? <ActivityIndicator size="small" color={theme.background} /> : (
+                      <Text style={[styles.withdrawButtonText, { color: theme.background }]}>Withdraw</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
 
+              {/* ── Action needed / top products / recent orders, or the new-seller setup card ── */}
+              <View style={isTablet ? styles.tabletRow : undefined}>
+                {newSeller ? (
+                  <View style={[isTablet && styles.tabletRowItem, styles.section]}>
+                    <SellerDashboardSetupCard
+                      theme={theme}
+                      hasSetupChecklist={Boolean(addProductTask)}
+                      onAddProduct={() => nav(withSellerSetupOrigin('/add-product'))}
+                      onOpenSetup={() => (addProductTask ? openTask(addProductTask) : nav(withSellerSetupOrigin('/add-product')))}
+                    />
+                  </View>
+                ) : actionCounts ? (
+                  <View style={[isTablet && styles.tabletRowItem, styles.section]}>
+                    <SellerDashboardActionNeeded counts={actionCounts} theme={theme} onNavigate={nav} />
+                  </View>
+                ) : null}
+
+                {!newSeller && secondaryError && (
+                  <View style={[isTablet && styles.tabletRowItem, styles.errorBanner]}>
+                    <Feather name="alert-circle" size={16} color={theme.error} />
+                    <Text style={[styles.errorText, { color: theme.error }]}>Some dashboard data couldn’t load.</Text>
+                    <TouchableOpacity onPress={() => setRetryTick((n) => n + 1)} accessibilityRole="button" accessibilityLabel="Retry loading dashboard data">
+                      <Text style={[styles.retryText, { color: theme.accent }]}>Retry</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+
+              {!newSeller && topProducts && topProducts.length > 0 && (
+                <View style={styles.section}>
+                  <SellerDashboardTopProducts
+                    products={topProducts}
+                    theme={theme}
+                    onOpenProduct={() => nav('/(tabs)/products')}
+                    onSeeAll={() => nav('/(tabs)/products')}
+                  />
+                </View>
+              )}
+
+              {!newSeller && recentOrders && recentOrders.length > 0 && (
+                <View style={styles.section}>
+                  <SellerDashboardRecentOrders
+                    orders={recentOrders}
+                    onOpenOrder={(id) => nav(`/order-detail?id=${id}`)}
+                    onSeeAll={() => nav('/(tabs)/orders')}
+                  />
+                </View>
+              )}
+            </>
+          )}
+
+          {/* ── Setup checklist ─────────────────────────────────────────── */}
+          {setupState.tasks.some((task) => !task.completed && !task.skipped) && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionHeaderLabel}>Set up your business</Text>
+              </View>
+              <View style={[styles.setupList, { backgroundColor: theme.card, borderColor: theme.borderSubtle }]}>
+                {setupState.tasks.filter((task) => !task.completed && !task.skipped).map((task, index, arr) => (
+                  <TouchableOpacity
+                    key={task.id}
+                    style={[styles.setupCard, index < arr.length - 1 && { borderBottomColor: theme.borderSubtle, borderBottomWidth: StyleSheet.hairlineWidth }]}
+                    activeOpacity={0.75}
+                    onPress={() => openTask(task)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open setup task: ${task.label}`}
+                  >
+                    <View style={[styles.setupIcon, { backgroundColor: theme.accentDim }]}>
+                      <Feather name={task.icon as keyof typeof Feather.glyphMap} size={18} color={theme.accent} />
+                    </View>
+                    <View style={styles.setupCopy}>
+                      <Text style={[styles.setupTitle, { color: theme.text }]}>{task.label}</Text>
+                      <Text style={[styles.setupDescription, { color: theme.muted }]} numberOfLines={2}>{task.description}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.optionsButton}
+                      hitSlop={10}
+                      onPress={(event) => { event.stopPropagation(); showTaskOptions(task); }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Options for ${task.label}`}
+                    >
+                      <Feather name="more-horizontal" size={18} color={MUTED} />
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+        </ResponsiveContainer>
+        <View testID="seller-dashboard-scroll-end" accessibilityLabel="Seller dashboard scroll end" style={styles.scrollEndMarker} />
+      </ScrollView>
     </View>
   );
 }
+
+// Re-exported so the range pills stay in one place for anything that needs
+// the canonical dashboard range list (e.g. tests).
+export { DASHBOARD_RANGES };
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: SCREEN_BG },
@@ -745,305 +725,82 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 1, paddingBottom: 160 },
   scrollEndMarker: { height: 1 },
 
-  // ── Top bar
   topBar: {
-    minHeight: 52,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
-    paddingBottom: SP.xs,
+    paddingBottom: SP.sm,
   },
-  topBarAction: {
-    width: 44,
-    height: 44,
-    marginRight: -SP.sm,
+  topBarAction: { width: 44, height: 44, marginRight: -SP.sm },
+  screenTitle: { fontFamily: FONT.bold, fontSize: FS.xl, letterSpacing: -0.4 },
+
+  heroSkeleton: { paddingTop: SP.md },
+
+  heroWrap: { paddingTop: SP.sm, paddingBottom: SP.sm, alignItems: 'flex-start' },
+  heroLabel: {
+    fontFamily: FONT.semibold,
+    fontSize: FS.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
-  screenTitle: {
-    color: FG,
+  heroValue: {
     fontFamily: FONT.bold,
-    fontSize: FS.xl,
-    letterSpacing: -0.4,
+    fontSize: 52,
+    letterSpacing: -1.2,
+    marginTop: 2,
+    fontVariant: ['tabular-nums'],
+    width: '100%',
+  },
+  heroDelta: {
+    fontFamily: FONT.medium,
+    fontSize: FS.sm,
+    marginTop: 4,
   },
 
-  // ── Range pills
-  // flexGrow: 0 stops this horizontal ScrollView from stretching vertically to
-  // fill its flex parent on wide/web viewports (iPad web was rendering the
-  // pill row at ~390px tall).
-  rangeScroll: {
-    flexGrow: 0,
-  },
-  rangeRow: {
-    gap: SP.xs,
-    paddingVertical: SP.sm,
-    alignItems: 'center',
-  },
-  rangePill: {
-     minHeight: 44,
-    paddingHorizontal: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: SELLER_DASHBOARD_GLASS,
-  },
-  rangeText: { color: MUTED, fontFamily: FONT.semibold, fontSize: FS.sm },
+  section: { marginTop: SP.xl },
 
-  // ── Stats card
-  statsCard: {
-    marginTop: SP.xs,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: SELLER_DASHBOARD_GLASS,
-    overflow: 'hidden',
-  },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.xs,
-    marginHorizontal: SP.sm,
-    marginTop: SP.sm,
+    marginTop: SP.md,
     padding: SP.sm,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
   },
-  errorBannerText: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '500',
-    flex: 1,
-  },
-  // ── Cash-out button
-  dashboardButton: {
-    marginHorizontal: SP.md,
-    marginBottom: SP.md,
-    minHeight: 44,
-    borderRadius: RADIUS.md,
+  errorText: { fontSize: 13, lineHeight: 18, fontFamily: FONT.medium, flex: 1 },
+  retryText: { fontSize: 13, fontFamily: FONT.bold },
+
+  balanceRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.md,
+    paddingTop: SP.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  balanceLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, textTransform: 'uppercase', letterSpacing: 0.6 },
+  balanceValue: { fontFamily: FONT.bold, fontSize: FS.lg, marginTop: 2, fontVariant: ['tabular-nums'] },
+  withdrawButton: {
+    minHeight: 40,
+    paddingHorizontal: SP.md,
+    borderRadius: RADIUS.md,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: SP.xs,
   },
-  dashboardButtonDisabled: { opacity: 0.55 },
-  dashboardButtonText: { fontFamily: FONT.bold, fontSize: FS.sm },
-  dashboardButtonIcon: { fontFamily: FONT.bold, fontSize: FS.sm, lineHeight: FS.sm },
+  withdrawButtonDisabled: { opacity: 0.5 },
+  withdrawButtonText: { fontFamily: FONT.bold, fontSize: FS.sm },
 
-  // ── Chart card
-  chartCard: {
-    marginTop: SP.sm,
-    padding: SP.md,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: SELLER_DASHBOARD_GLASS,
-  },
-  chartHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SP.md,
-  },
-  sectionTitle: {
-    color: FG,
-    fontFamily: FONT.bold,
-    fontSize: FS.md,
-    letterSpacing: -0.2,
-  },
-  chartBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: RADIUS.pill,
-    backgroundColor: SKELETON_GLASS,
-    borderWidth: 1,
-    borderColor: BORDER,
-  },
-  chartRange: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.xs },
-  chart: {
-    height: 144,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: SP.xs,
-  },
-  barColumn: {
-    flex: 1,
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: SP.xs,
-  },
-  barTrack: {
-    flex: 1,
-    width: '56%',
-    justifyContent: 'flex-end',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: BORDER,
-  },
-  bar: {
-    width: '100%',
-    borderTopLeftRadius: 3,
-    borderTopRightRadius: 3,
-  },
-  barLabel: { color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.xs },
+  tabletRow: { flexDirection: 'row', gap: SP.lg, alignItems: 'flex-start' },
+  tabletRowItem: { flex: 1, minWidth: 0 },
 
-  // ── Chart empty state
-  chartEmptyWrap: {
-    height: 144,
-    position: 'relative',
-  },
-  chartGhost: {
-    opacity: 1,
-  },
-  chartEmptyOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: CARD_ELEVATED_GLASS,
-    borderRadius: RADIUS.sm,
-  },
-  chartEmptyTitle: {
-    color: MUTED,
-    fontFamily: FONT.semibold,
-    fontSize: FS.sm,
-    textAlign: 'center',
-  },
-  chartEmptySubtitle: {
-    color: SUBTLE,
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    textAlign: 'center',
-  },
-
-  // ── Action items section
-  actionSection: {
-    marginTop: SP.sm,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
-    marginBottom: SP.sm,
-    paddingHorizontal: 2,
-  },
+  sectionHeaderRow: { marginBottom: SP.sm },
   sectionHeaderLabel: {
     color: MUTED,
     fontFamily: FONT.bold,
     fontSize: FS.xs,
     letterSpacing: 0.8,
     textTransform: 'uppercase',
-    flex: 1,
   },
-  actionCard: {
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: SELLER_DASHBOARD_GLASS,
-    overflow: 'hidden',
-  },
-  actionRow: {
-    minHeight: 66,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    gap: SP.sm,
-  },
-  actionRowBordered: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: BORDER,
-  },
-  actionIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: RADIUS.sm,
-    backgroundColor: SKELETON_GLASS,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  actionCopy: { flex: 1, minWidth: 0 },
-  actionTitle: {
-    color: FG,
-    fontFamily: FONT.semibold,
-    fontSize: FS.sm,
-    letterSpacing: -0.1,
-  },
-  actionSubtitle: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
-  actionBadge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: SELLER_DASHBOARD_GLASS,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 5,
-    flexShrink: 0,
-  },
-  actionBadgeText: {
-    color: FG,
-    fontFamily: FONT.bold,
-    fontSize: 11,
-  },
-  emptyActions: {
-    minHeight: 60,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SP.sm,
-  },
-  emptyActionsIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyActionsText: {
-    color: MUTED,
-    fontFamily: FONT.medium,
-    fontSize: FS.sm,
-  },
-
-  // ── Setup section
-  setupSection: {
-    marginTop: SP.sm,
-  },
-  tabletRow: {
-    flexDirection: 'row',
-    gap: SP.sm,
-    alignItems: 'flex-start',
-  },
-  tabletRowItem: {
-    flex: 1,
-    minWidth: 0,
-  },
-  setupCountBadge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: SELLER_DASHBOARD_GLASS,
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 6,
-  },
-  setupCountText: {
-    color: MUTED,
-    fontFamily: FONT.bold,
-    fontSize: 11,
-  },
-  setupList: {
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: SELLER_DASHBOARD_GLASS,
-    overflow: 'hidden',
-  },
+  setupList: { borderRadius: RADIUS.lg, borderWidth: 1, overflow: 'hidden' },
   setupCard: {
     minHeight: 80,
     paddingHorizontal: SP.md,
@@ -1052,37 +809,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: SP.sm,
   },
-  setupCardBordered: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: BORDER_SUBTLE,
-  },
-  setupIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: RADIUS.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
+  setupIcon: { width: 40, height: 40, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
   setupCopy: { flex: 1, minWidth: 0 },
-  setupTitle: {
-    color: FG,
-    fontFamily: FONT.semibold,
-    fontSize: FS.sm,
-    letterSpacing: -0.1,
-  },
-  setupDescription: {
-    color: MUTED,
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    lineHeight: 17,
-    marginTop: 3,
-  },
-  optionsButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
+  setupTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, letterSpacing: -0.1 },
+  setupDescription: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 17, marginTop: 3 },
+  optionsButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 });

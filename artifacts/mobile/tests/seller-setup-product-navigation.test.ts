@@ -33,11 +33,11 @@ describe('seller setup destination navigation', () => {
   });
 
   it('replaces transparent checklist scenes from both launch surfaces', () => {
-    const dashboard = read('app/(tabs)/index.tsx');
+    const dashboard = read('components/SellerHomeCommerceDashboard.tsx');
     const setup = read('app/setup.tsx');
 
     expect(dashboard).toContain('router.replace(withSellerSetupOrigin(task.route) as never)');
-    expect(dashboard).toContain('onPress={task.completed ? undefined : () => openSetupTask(task)}');
+    expect(dashboard).toContain('onPress={() => openTask(task)}');
     expect(setup).toContain('router.replace(withSellerSetupOrigin(task.route) as never)');
   });
 

@@ -3,7 +3,15 @@ import { db, orders, customers, productVariants, drops, products, orderItems, us
 import { sql, gte, lt, and, eq } from "drizzle-orm";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { buildCustomerAnalyticsResponse } from "./analyticsCustomers";
-import { DAY_MS, TEN_MIN_MS, floorToLocalStep, parseTzOffsetMinutes, previousPeriod } from "../lib/analyticsTime";
+import {
+  DAY_MS,
+  TEN_MIN_MS,
+  addLocalMonths,
+  floorToLocalMonth,
+  floorToLocalStep,
+  parseTzOffsetMinutes,
+  previousPeriod,
+} from "../lib/analyticsTime";
 
 const router = Router();
 router.use(requireAuth);
@@ -107,11 +115,14 @@ router.get("/dashboard", async (req, res) => {
   });
 });
 
-// GET /api/analytics/home?range=live|today|yesterday|week
+const HOME_RANGES = ["live", "today", "yesterday", "week", "month", "year", "all"] as const;
+type HomeRange = (typeof HOME_RANGES)[number];
+
+// GET /api/analytics/home?range=live|today|yesterday|week|month|year|all
 router.get("/home", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const range = ["live", "today", "yesterday", "week"].includes(String(req.query.range))
-    ? String(req.query.range)
+  const range: HomeRange = (HOME_RANGES as readonly string[]).includes(String(req.query.range))
+    ? (String(req.query.range) as HomeRange)
     : "today";
   const tzOffsetMinutes = parseTzOffsetMinutes(req.query.tz);
   const now = new Date();
@@ -122,19 +133,53 @@ router.get("/home", async (req, res) => {
   const tomorrow = new Date(today.getTime() + DAY_MS);
   const yesterday = new Date(today.getTime() - DAY_MS);
   const weekStart = new Date(today.getTime() - 6 * DAY_MS);
+  const monthWindowStart = new Date(today.getTime() - 29 * DAY_MS);
   // Rounded to a clean 10-minute mark so bucket boundaries (and their labels) never
   // land on an arbitrary minute like ":53" — the last live bucket covers up to the
   // most recent completed 10-minute window.
   const liveEnd = floorToLocalStep(now, TEN_MIN_MS, tzOffsetMinutes);
   const liveStart = new Date(liveEnd.getTime() - 60 * 60 * 1000);
+  // Year: the trailing 12 local calendar months, bucketed monthly.
+  const thisMonthStart = floorToLocalMonth(now, tzOffsetMinutes);
+  const nextMonthStart = addLocalMonths(thisMonthStart, 1, tzOffsetMinutes);
+  const yearWindowStart = addLocalMonths(thisMonthStart, -11, tzOffsetMinutes);
 
-  const start = range === "live" ? liveStart : range === "yesterday" ? yesterday : range === "week" ? weekStart : today;
-  const end = range === "live" ? liveEnd : range === "yesterday" ? today : range === "week" ? tomorrow : tomorrow;
-  const step = range === "live" ? "10 minutes" : range === "week" ? "1 day" : "4 hours";
+  // All: since the seller's first (non-cancelled) order, floored to a local
+  // month, capped at 36 months back so a very old store doesn't return an
+  // unbounded number of mostly-empty buckets. Falls back to the Year window
+  // when there is no order history yet.
+  let allWindowStart = yearWindowStart;
+  if (range === "all") {
+    const [firstOrderRow] = await db.select({ createdAt: sql<Date | null>`min(created_at)` }).from(orders)
+      .where(and(eq(orders.ownerId, ownerId), sql`status != 'cancelled'`));
+    const firstOrderAt = firstOrderRow?.createdAt ? new Date(firstOrderRow.createdAt) : null;
+    const cappedStart = addLocalMonths(thisMonthStart, -35, tzOffsetMinutes);
+    allWindowStart = firstOrderAt
+      ? new Date(Math.max(floorToLocalMonth(firstOrderAt, tzOffsetMinutes).getTime(), cappedStart.getTime()))
+      : yearWindowStart;
+  }
+
+  const start = range === "live" ? liveStart
+    : range === "yesterday" ? yesterday
+    : range === "week" ? weekStart
+    : range === "month" ? monthWindowStart
+    : range === "year" ? yearWindowStart
+    : range === "all" ? allWindowStart
+    : today;
+  const end = range === "live" ? liveEnd
+    : range === "yesterday" ? today
+    : range === "year" || range === "all" ? nextMonthStart
+    : tomorrow;
+  const step = range === "live" ? "10 minutes"
+    : range === "week" || range === "month" ? "1 day"
+    : range === "year" || range === "all" ? "1 month"
+    : "4 hours";
 
   // The immediately preceding period of the same length — e.g. yesterday for
   // "today", the prior week for "this week" — so the metric cards can show a
-  // real period-over-period change instead of a fabricated one.
+  // real period-over-period change instead of a fabricated one. For "all",
+  // there is by definition no meaningful prior period, so it is intentionally
+  // skipped below rather than compared against an empty/fabricated window.
   const { start: previousStart, end: previousEnd } = previousPeriod(start, end);
 
   const [salesRow, visitorRow, fulfillRow, captureRow, previousSalesRow, previousVisitorRow] = await Promise.all([
