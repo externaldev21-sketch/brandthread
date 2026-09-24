@@ -80,6 +80,15 @@ export const users = pgTable('users', {
     .notNull()
     .default({}),
   notificationDigest: text('notification_digest').notNull().default('realtime'),
+  // Master push kill switch. false suppresses push sends for every category
+  // while leaving the in-app notification feed and per-category prefs intact.
+  pushEnabled: boolean('push_enabled').notNull().default(true),
+  // Quiet hours: local wall-clock "HH:MM" strings evaluated in quietHoursTimezone.
+  // A push falling inside the window is suppressed (feed row still written);
+  // null start/end means quiet hours are off.
+  quietHoursStart:    text('quiet_hours_start'),
+  quietHoursEnd:       text('quiet_hours_end'),
+  quietHoursTimezone: text('quiet_hours_timezone').notNull().default('UTC'),
   // A tombstone is retained after an account erasure request.  Keeping the
   // Clerk subject prevents a delayed client sync from creating a fresh profile.
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
@@ -519,6 +528,13 @@ export const pushTokens = pgTable('push_tokens', {
   userId:    text('user_id').notNull(),
   token:     text('token').notNull().unique(),
   platform:  text('platform').notNull().default('unknown'), // 'ios' | 'android' | 'web'
+  // Set false when Expo's push receipt API reports DeviceNotRegistered (app
+  // uninstalled, token revoked). Inactive tokens are excluded from sends but
+  // kept for audit/debugging rather than deleted outright.
+  isActive:      boolean('is_active').notNull().default(true),
+  lastSeenAt:    timestamp('last_seen_at').defaultNow().notNull(),
+  deactivatedAt: timestamp('deactivated_at'),
+  deactivatedReason: text('deactivated_reason'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -778,6 +794,24 @@ export const notificationsFeed = pgTable('notifications_feed', {
   subscriptionTrialDayFourUnique: uniqueIndex('notifications_feed_subscription_trial_day_4_unique')
     .on(table.userId, table.type, table.targetId)
     .where(sql`${table.type} = 'subscription_trial_day_4' AND ${table.targetId} IS NOT NULL`),
+  dropLiveUnique: uniqueIndex('notifications_feed_drop_live_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} = 'drop_live' AND ${table.targetId} IS NOT NULL`),
+  priceDropUnique: uniqueIndex('notifications_feed_price_drop_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} = 'price_drop' AND ${table.targetId} IS NOT NULL`),
+  backInStockUnique: uniqueIndex('notifications_feed_back_in_stock_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} = 'back_in_stock' AND ${table.targetId} IS NOT NULL`),
+  lowStockUnique: uniqueIndex('notifications_feed_low_stock_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} = 'low_stock' AND ${table.targetId} IS NOT NULL`),
+  payoutSentUnique: uniqueIndex('notifications_feed_payout_sent_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} = 'payout_sent' AND ${table.targetId} IS NOT NULL`),
+  returnStatusUnique: uniqueIndex('notifications_feed_return_status_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} IN ('return_approved', 'return_denied', 'return_refunded', 'return_requested') AND ${table.targetId} IS NOT NULL`),
 }));
 
 export const notificationDeliveries = pgTable('notification_deliveries', {
@@ -793,6 +827,10 @@ export const notificationDeliveries = pgTable('notification_deliveries', {
   queuedAt:           timestamp('queued_at').defaultNow().notNull(),
   sentAt:             timestamp('sent_at'),
   providerResultAt:   timestamp('provider_result_at'),
+  // Set once the Expo push *receipt* (not just the send ticket) has been
+  // checked via /getReceipts. Distinguishes "ticket accepted" from
+  // "device actually reachable" — see reconcilePushReceipts().
+  receiptCheckedAt:   timestamp('receipt_checked_at'),
   createdAt:          timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   notificationTokenUnique: uniqueIndex('notification_deliveries_notification_token_idx')
@@ -1394,6 +1432,32 @@ export const notificationEvents = pgTable('notification_events', {
   userIdx: index('notification_events_user_idx').on(table.userId),
   ownerIdx: index('notification_events_owner_idx').on(table.ownerId),
   notificationIdx: index('notification_events_notification_idx').on(table.notificationId),
+}));
+
+// ─── Notification batch queue ──────────────────────────────────────────────
+// Collapses high-frequency, low-priority events (e.g. product likes) into a
+// single notification per (userId, category, type, targetId) window instead
+// of one push per event. A periodic job flushes rows older than the batch
+// window into one publishNotification() call, then deletes them.
+export const notificationBatchQueue = pgTable('notification_batch_queue', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  userId:     text('user_id').notNull(),
+  category:   text('category').notNull(),
+  type:       text('type').notNull(),
+  targetId:   text('target_id'),
+  targetType: text('target_type'),
+  // Running count of collapsed events and a rolling sample of actor names,
+  // used to compose the eventual "X and 4 others liked your item" copy.
+  count:        integer('count').notNull().default(1),
+  actorNames:   json('actor_names').notNull().default([]).$type<string[]>(),
+  cta:          text('cta'),
+  firstEventAt: timestamp('first_event_at').defaultNow().notNull(),
+  lastEventAt:  timestamp('last_event_at').defaultNow().notNull(),
+  createdAt:    timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  windowUnique: uniqueIndex('notification_batch_queue_window_unique')
+    .on(table.userId, table.category, table.type, table.targetId),
+  firstEventIdx: index('notification_batch_queue_first_event_idx').on(table.firstEventAt),
 }));
 
 export const shippingLabels = pgTable('shipping_labels', {

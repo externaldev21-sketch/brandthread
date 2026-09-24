@@ -8,6 +8,7 @@ import crypto from "crypto";
 import { canRestoreProduct, PRODUCT_DELETE_RECOVERY_WINDOW_MS } from "../lib/productRecovery";
 import { getVerifiedPlanAccess, sendPlanLimitReached, sendPlanLookupUnavailable } from "../lib/planAccess";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { notifyBackInStock, notifyPriceDrop, notifyStockLevelChanged } from "../lib/stockNotifications";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -436,7 +437,7 @@ router.post("/:id/variants", requireRole("manager"), async (req, res) => {
 router.patch("/:id/variants/:variantId", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   // Verify product ownership
-  const [product] = await db.select({ id: products.id }).from(products)
+  const [product] = await db.select({ id: products.id, name: products.name }).from(products)
     .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId)))
     .limit(1);
   if (!product) { res.status(404).json({ error: "Product not found" }); return; }
@@ -445,6 +446,11 @@ router.patch("/:id/variants/:variantId", requireRole("manager"), async (req, res
   if (stock !== undefined && (!Number.isInteger(stock) || stock < 0)) {
     res.status(400).json({ error: "stock must be a non-negative integer" }); return;
   }
+
+  const [before] = await db.select({ stock: productVariants.stock, priceCents: productVariants.priceCents })
+    .from(productVariants)
+    .where(and(eq(productVariants.id, req.params.variantId), eq(productVariants.productId, req.params.id)));
+
   const [updated] = await db.update(productVariants)
     .set({
       ...(stock             !== undefined && { stock }),
@@ -463,6 +469,21 @@ router.patch("/:id/variants/:variantId", requireRole("manager"), async (req, res
       `Updated variant ${updated.sku}`,
       "product", req.params.id, { variantId: updated.id },
     );
+  }
+
+  if (before) {
+    void notifyStockLevelChanged({
+      productId: req.params.id, ownerId, productName: product.name,
+      previousStock: before.stock, newStock: updated.stock, lowStockThreshold: updated.lowStockThreshold,
+    });
+    void notifyBackInStock({
+      productId: req.params.id, ownerId, productName: product.name,
+      previousStock: before.stock, newStock: updated.stock,
+    });
+    void notifyPriceDrop({
+      productId: req.params.id, ownerId, productName: product.name,
+      previousPriceCents: before.priceCents, newPriceCents: updated.priceCents,
+    });
   }
 
   res.json(updated);

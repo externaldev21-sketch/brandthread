@@ -850,12 +850,21 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<{
           digest: 'realtime' | 'daily';
           role: 'buyer' | 'seller';
+          pushEnabled: boolean;
+          quietHours: { start: string | null; end: string | null; timezone: string };
           categories: Record<string, boolean>;
         }>('/api/notification-prefs'),
-      update: (body: { digest?: 'realtime' | 'daily'; categories?: Record<string, boolean> }) =>
+      update: (body: {
+        digest?: 'realtime' | 'daily';
+        categories?: Record<string, boolean>;
+        pushEnabled?: boolean;
+        quietHours?: { start: string; end: string; timezone?: string } | null;
+      }) =>
         put<{
           digest: 'realtime' | 'daily';
           role: 'buyer' | 'seller';
+          pushEnabled: boolean;
+          quietHours: { start: string | null; end: string | null; timezone: string };
           categories: Record<string, boolean>;
         }>('/api/notification-prefs', body),
     },
