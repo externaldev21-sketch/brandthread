@@ -10,7 +10,6 @@ import { startScheduledDropBroadcastJob } from "./jobs/scheduledDropBroadcasts";
 import { startSellerTrialReminderJob } from "./jobs/sellerTrialReminder";
 import { startDesignStudioObjectCleanupJob } from "./jobs/designStudioObjectCleanup";
 import { startMoneySweepJob } from "./jobs/moneySweep";
-import { startTrackSavedItemChangesJob } from "./jobs/trackSavedItemChanges";
 import { startPushReceiptCleanupJob } from "./jobs/pushReceiptCleanup";
 import { startNotificationBatchFlushJob } from "./jobs/notificationBatchFlush";
 import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
@@ -53,7 +52,6 @@ app.listen(port, (err) => {
   startSellerTrialReminderJob();
   startDesignStudioObjectCleanupJob();
   startMoneySweepJob();
-  startTrackSavedItemChangesJob();
   startPushReceiptCleanupJob();
   startNotificationBatchFlushJob();
 });
