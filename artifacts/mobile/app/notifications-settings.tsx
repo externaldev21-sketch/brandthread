@@ -11,12 +11,8 @@ import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  SUCCESS,
-  FONT, FS, SP,
-} from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { FONT, FS, SP } from '@/lib/theme';
+import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 
 type DigestMode = 'realtime' | 'daily';
@@ -58,6 +54,7 @@ export default function NotificationsSettingsScreen() {
   const insets = useSafeAreaInsets();
   const api    = useApi();
   const { theme } = useAppTheme();
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
   const [role, setRole] = useState<Role>('seller');
   const [digest, setDigest] = useState<DigestMode>('realtime');
   const [pushEnabled, setPushEnabled] = useState(true);
@@ -141,19 +138,19 @@ export default function NotificationsSettingsScreen() {
 
         {/* ── Master switch ── */}
         <View style={s.section}>
-          <View style={[s.masterRow, { backgroundColor: CARD, borderColor: BORDER }]}>
-            <View style={[s.digestIconBox, { backgroundColor: pushEnabled ? theme.accentDim : SUBTLE + '60' }]}>
-              <Feather name={pushEnabled ? 'bell' : 'bell-off'} size={18} color={pushEnabled ? theme.accentLight : MUTED} />
+          <View style={[s.masterRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={[s.digestIconBox, { backgroundColor: pushEnabled ? theme.accentDim : theme.subtle + '60' }]}>
+              <Feather name={pushEnabled ? 'bell' : 'bell-off'} size={18} color={pushEnabled ? theme.accentLight : theme.muted} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[s.digestOptionLabel, { color: FG }]}>Push notifications</Text>
+              <Text style={[s.digestOptionLabel, { color: theme.text }]}>Push notifications</Text>
               <Text style={s.digestOptionDesc}>Turn all push notifications on or off for this device</Text>
             </View>
             <HapticSwitch
               value={pushEnabled}
               onValueChange={handleMasterToggle}
-              trackColor={{ false: SUBTLE, true: theme.accent }}
-              thumbColor={FG}
+              trackColor={{ false: theme.border, true: theme.accent }}
+              thumbColor={theme.background}
               accessibilityLabel="All push notifications"
             />
           </View>
@@ -167,22 +164,22 @@ export default function NotificationsSettingsScreen() {
           </Text>
           <View style={s.presetRow}>
             <TouchableOpacity
-              style={[s.presetChip, !quietHours.start && { backgroundColor: theme.accentDim, borderColor: theme.accent }, { borderColor: BORDER }]}
+              style={[s.presetChip, !quietHours.start && { backgroundColor: theme.accentDim, borderColor: theme.accent }, { borderColor: theme.border }]}
               onPress={() => handleQuietHoursPreset(null)}
               activeOpacity={0.8}
             >
-              <Text style={[s.presetChipLabel, { color: !quietHours.start ? FG : MUTED }]}>Off</Text>
+              <Text style={[s.presetChipLabel, { color: !quietHours.start ? theme.text : theme.muted }]}>Off</Text>
             </TouchableOpacity>
             {QUIET_HOURS_PRESETS.map((preset) => {
               const active = quietHours.start === preset.start && quietHours.end === preset.end;
               return (
                 <TouchableOpacity
                   key={preset.label}
-                  style={[s.presetChip, active && { backgroundColor: theme.accentDim, borderColor: theme.accent }, { borderColor: BORDER }]}
+                  style={[s.presetChip, active && { backgroundColor: theme.accentDim, borderColor: theme.accent }, { borderColor: theme.border }]}
                   onPress={() => handleQuietHoursPreset(preset)}
                   activeOpacity={0.8}
                 >
-                  <Text style={[s.presetChipLabel, { color: active ? FG : MUTED }]}>{preset.label}</Text>
+                  <Text style={[s.presetChipLabel, { color: active ? theme.text : theme.muted }]}>{preset.label}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -199,22 +196,22 @@ export default function NotificationsSettingsScreen() {
           </Text>
 
           {loading ? (
-            <View style={[s.digestCard, { backgroundColor: CARD, borderColor: BORDER }]}>
+            <View style={[s.digestCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
               <ActivityIndicator color={theme.accent} size="small" />
             </View>
           ) : (
-            <View style={[s.digestCard, { backgroundColor: CARD, borderColor: BORDER }]}>
+            <View style={[s.digestCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
               {/* Real-time option */}
               <TouchableOpacity
-                style={[s.digestOption, digest === 'realtime' && { backgroundColor: theme.accentDim }, { borderColor: digest === 'realtime' ? theme.accent : BORDER }]}
+                style={[s.digestOption, digest === 'realtime' && { backgroundColor: theme.accentDim }, { borderColor: digest === 'realtime' ? theme.accent : theme.border }]}
                 onPress={() => handleDigestToggle(false)}
                 activeOpacity={0.8}
               >
-                <View style={[s.digestIconBox, { backgroundColor: digest === 'realtime' ? theme.accentDim : SUBTLE + '60' }]}>
-                  <Feather name="bell" size={18} color={digest === 'realtime' ? theme.accentLight : MUTED} />
+                <View style={[s.digestIconBox, { backgroundColor: digest === 'realtime' ? theme.accentDim : theme.subtle + '60' }]}>
+                  <Feather name="bell" size={18} color={digest === 'realtime' ? theme.accentLight : theme.muted} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.digestOptionLabel, { color: digest === 'realtime' ? FG : MUTED }]}>Real-time</Text>
+                  <Text style={[s.digestOptionLabel, { color: digest === 'realtime' ? theme.text : theme.muted }]}>Real-time</Text>
                   <Text style={s.digestOptionDesc}>Get a push for every event as it happens</Text>
                 </View>
                 {digest === 'realtime' && (
@@ -222,19 +219,19 @@ export default function NotificationsSettingsScreen() {
                 )}
               </TouchableOpacity>
 
-              <View style={[s.optionDivider, { backgroundColor: BORDER }]} />
+              <View style={[s.optionDivider, { backgroundColor: theme.border }]} />
 
               {/* Daily digest option */}
               <TouchableOpacity
-                style={[s.digestOption, digest === 'daily' && { backgroundColor: theme.accentDim }, { borderColor: digest === 'daily' ? theme.accent : BORDER }]}
+                style={[s.digestOption, digest === 'daily' && { backgroundColor: theme.accentDim }, { borderColor: digest === 'daily' ? theme.accent : theme.border }]}
                 onPress={() => handleDigestToggle(true)}
                 activeOpacity={0.8}
               >
-                <View style={[s.digestIconBox, { backgroundColor: digest === 'daily' ? theme.accentDim : SUBTLE + '60' }]}>
-                  <Feather name="sun" size={18} color={digest === 'daily' ? theme.accentLight : MUTED} />
+                <View style={[s.digestIconBox, { backgroundColor: digest === 'daily' ? theme.accentDim : theme.subtle + '60' }]}>
+                  <Feather name="sun" size={18} color={digest === 'daily' ? theme.accentLight : theme.muted} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.digestOptionLabel, { color: digest === 'daily' ? FG : MUTED }]}>Daily digest</Text>
+                  <Text style={[s.digestOptionLabel, { color: digest === 'daily' ? theme.text : theme.muted }]}>Daily digest</Text>
                   <Text style={s.digestOptionDesc}>One morning summary of everything from the past 24 hours</Text>
                 </View>
                 {digest === 'daily' && (
@@ -256,22 +253,22 @@ export default function NotificationsSettingsScreen() {
 
         {/* ── Notification types ── */}
         <View style={s.section}>
-          <View style={[s.listCard, { backgroundColor: CARD, borderColor: BORDER }]}>
+          <View style={[s.listCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
             {rows.map((row, i) => (
               <View
                 key={row.key}
-                style={[s.row, i !== rows.length - 1 && { borderBottomWidth: 1, borderBottomColor: BORDER }]}
+                style={[s.row, i !== rows.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border }]}
               >
-                <Feather name={row.icon} size={17} color={FG} style={s.rowIcon} />
+                <Feather name={row.icon} size={17} color={theme.text} style={s.rowIcon} />
                 <View style={{ flex: 1, paddingRight: 10 }}>
-                  <Text style={[s.rowLabel, { color: FG }]}>{row.label}</Text>
-                  <Text style={[s.rowDescription, { color: MUTED }]}>{row.description}</Text>
+                  <Text style={[s.rowLabel, { color: theme.text }]}>{row.label}</Text>
+                  <Text style={[s.rowDescription, { color: theme.muted }]}>{row.description}</Text>
                 </View>
                 <HapticSwitch
                   value={categories[row.key] ?? true}
                   onValueChange={(value) => handleCategory(row.key, value)}
-                  trackColor={{ false: SUBTLE, true: theme.accent }}
-                  thumbColor={FG}
+                  trackColor={{ false: theme.border, true: theme.accent }}
+                  thumbColor={theme.background}
                   accessibilityLabel={`${row.label} push notifications`}
                 />
               </View>
@@ -284,30 +281,32 @@ export default function NotificationsSettingsScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  container:        { flex: 1 },
-  section:          { paddingHorizontal: 20, paddingVertical: 18 },
-  sectionTitle:     { fontSize: FS.sm + 1, fontFamily: FONT.semibold, color: FG, marginBottom: 6 },
-  sectionSubtitle:  { fontSize: 12, fontFamily: FONT.regular, color: MUTED, lineHeight: 17, marginBottom: 14 },
-  divider:          { height: 10 },
+function makeStyles(theme: AppThemePreset) {
+  return StyleSheet.create({
+    container:        { flex: 1 },
+    section:          { paddingHorizontal: 20, paddingVertical: 18 },
+    sectionTitle:     { fontSize: FS.sm + 1, lineHeight: 18, fontFamily: FONT.semibold, color: theme.text, marginBottom: 6 },
+    sectionSubtitle:  { fontSize: 12, fontFamily: FONT.regular, color: theme.muted, lineHeight: 17, marginBottom: 14 },
+    divider:          { height: 10 },
 
-  digestCard:        { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
-  digestOption:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
-  digestIconBox:     { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  digestOptionLabel: { fontSize: 14, fontFamily: FONT.semibold, marginBottom: 2 },
-  digestOptionDesc:  { fontSize: 12, fontFamily: FONT.regular, color: MUTED, lineHeight: 16 },
-  optionDivider:     { height: 1, marginHorizontal: 14 },
-  savingRow:         { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, paddingTop: 4 },
-  savingText:        { fontSize: 12, fontFamily: FONT.regular, color: MUTED },
+    digestCard:        { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
+    digestOption:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, minHeight: 52 },
+    digestIconBox:     { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+    digestOptionLabel: { fontSize: 14, lineHeight: 18, fontFamily: FONT.semibold, marginBottom: 2 },
+    digestOptionDesc:  { fontSize: 12, fontFamily: FONT.regular, color: theme.muted, lineHeight: 16 },
+    optionDivider:     { height: StyleSheet.hairlineWidth, marginHorizontal: 14 },
+    savingRow:         { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, paddingTop: 4 },
+    savingText:        { fontSize: 12, fontFamily: FONT.regular, color: theme.muted },
 
-  masterRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1 },
-  presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  presetChip: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1 },
-  presetChipLabel: { fontSize: 13, fontFamily: FONT.medium },
+    masterRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1, minHeight: 52 },
+    presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    presetChip: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1 },
+    presetChipLabel: { fontSize: 13, lineHeight: 17, fontFamily: FONT.medium },
 
-  listCard:    { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
-  row:         { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14 },
-  rowIcon:     { width: 20, marginTop: 2 },
-  rowLabel:    { fontSize: 14, fontFamily: FONT.semibold },
-  rowDescription: { fontSize: 12, fontFamily: FONT.regular, color: MUTED, marginTop: 3, lineHeight: 17 },
-});
+    listCard:    { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
+    row:         { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14, minHeight: 52 },
+    rowIcon:     { width: 20, marginTop: 2 },
+    rowLabel:    { fontSize: 14, lineHeight: 18, fontFamily: FONT.semibold },
+    rowDescription: { fontSize: 12, fontFamily: FONT.regular, color: theme.muted, marginTop: 3, lineHeight: 17 },
+  });
+}
