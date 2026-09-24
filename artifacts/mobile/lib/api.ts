@@ -2044,6 +2044,38 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           boosted: boolean; category: string; hype: string;
         }> }>(`/api/public/trending?limit=${limit}`),
     },
+    /**
+     * Public "For You" ranked Discover feed — no auth required (an Authorization
+     * header is sent when available but the server does not require it).
+     * Contract (matched exactly against the backend ranking endpoint):
+     *   GET /api/public/discover/feed?limit=&offset=
+     *   -> { items: DiscoverFeedItem[]; computedAt: string; source: 'cache'|'computed'|'empty'; nextOffset: number | null }
+     */
+    discover: {
+      feed: (opts: { limit?: number; offset?: number } = {}) => {
+        const params = new URLSearchParams();
+        params.set('limit', String(opts.limit ?? 20));
+        params.set('offset', String(opts.offset ?? 0));
+        return get<{
+          items: Array<{
+            rank: number;
+            productId: string;
+            brandId: string;
+            brandName: string;
+            brandVerified: boolean;
+            productName: string;
+            priceCents: number;
+            compareAtPriceCents: number | null;
+            images: string[];
+            category: string;
+            sellerScore: number;
+          }>;
+          computedAt: string;
+          source: 'cache' | 'computed' | 'empty';
+          nextOffset: number | null;
+        }>(`/api/public/discover/feed?${params.toString()}`);
+      },
+    },
     /** Stripe Connect Express onboarding for freelancer payouts. */
     freelancerConnect: {
       onboard: () => post<{ url: string; stripeAccountId: string }>('/api/freelancers/connect/onboard', {}),

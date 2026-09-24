@@ -4,6 +4,7 @@ import { logger } from "./lib/logger";
 import { flushMonitoring } from "./lib/monitoring";
 import { startAbandonedCartJob } from "./jobs/abandonedCartRecovery";
 import { startTrendingJob }       from "./jobs/computeTrending";
+import { startSellerRankingJob }  from "./jobs/computeSellerRanking";
 import { startTeamInviteReminderJob } from "./jobs/teamInviteReminder";
 import { startScheduledDropBroadcastJob } from "./jobs/scheduledDropBroadcasts";
 import { startSellerTrialReminderJob } from "./jobs/sellerTrialReminder";
@@ -43,6 +44,7 @@ app.listen(port, (err) => {
   // Background jobs
   startAbandonedCartJob();
   startTrendingJob();
+  startSellerRankingJob();
   startTeamInviteReminderJob();
   startScheduledDropBroadcastJob();
   startSellerTrialReminderJob();
