@@ -215,7 +215,7 @@ export function ThreadShareSheet({
       if ((error as Error)?.name === 'AbortError') {
         onFeedback('Video save cancelled.', 'info');
       } else {
-        onFeedback(error instanceof Error ? error.message : 'Could not save video.', 'error');
+        onFeedback("Couldn't save video. Try again.", 'error');
       }
     } finally {
       if (destination?.exists) {

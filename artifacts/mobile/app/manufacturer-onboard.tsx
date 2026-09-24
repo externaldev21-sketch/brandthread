@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, Platform, Image,
+  ScrollView, Alert, Platform, Linking, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -17,7 +17,7 @@ import { useColors } from '@/hooks/useColors';
 import { FS } from '@/lib/theme';
 
 
-const STEPS = ['Account', 'Company', 'Specialties', 'Photos & Pricing', 'Review'];
+const STEPS = ['Account', 'Company', 'Specialties', 'Pricing', 'Review'];
 
 const SPECIALTY_OPTIONS = [
   'T-Shirts', 'Hoodies', 'Sweatpants', 'Shorts', 'Jackets',
@@ -35,8 +35,6 @@ const PRODUCTION_MODES = [
 interface FormData {
   // Step 0 — Account
   email: string;
-  password: string;
-  confirmPassword: string;
   // Step 1 — Company
   companyName: string;
   country: string;
@@ -48,8 +46,7 @@ interface FormData {
   productionModes: string[];
   moq: string;
   leadTimeDays: string;
-  // Step 3 — Photos & Pricing
-  photos: string[];   // local URIs
+  // Step 3 — Pricing
   pricePerUnit: string;
   currency: string;
   sampleCost: string;
@@ -58,12 +55,20 @@ interface FormData {
 }
 
 const INITIAL: FormData = {
-  email: '', password: '', confirmPassword: '',
+  email: '',
   companyName: '', country: '', city: '', website: '', phone: '',
   specialties: [], productionModes: [], moq: '', leadTimeDays: '',
-  photos: [], pricePerUnit: '', currency: 'USD', sampleCost: '',
+  pricePerUnit: '', currency: 'USD', sampleCost: '',
   agreeTerms: false,
 };
+
+// Factory photos can only be attached once a manufacturer profile exists —
+// POST /api/manufacturers/me/photos requires an authenticated manufacturer
+// record, which only exists on the invite-token (Clerk-authenticated) path.
+// Anonymous public applications (no invite token) cannot attach photos at
+// application time; they upload photos later after their application is
+// claimed and approved.
+const MAX_PHOTOS = 8;
 
 export default function ManufacturerOnboardScreen() {
   const colors = useColors();
@@ -75,6 +80,29 @@ export default function ManufacturerOnboardScreen() {
   const [step, setStep]   = useState(0);
   const [form, setForm]   = useState<FormData>(INITIAL);
   const [submitting, setSubmitting] = useState(false);
+  // Only used on the invite-token path — see MAX_PHOTOS comment above.
+  const [photos, setPhotos] = useState<{ uri: string }[]>([]);
+
+  async function pickPhotos() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Permission required', 'Please allow access to your photo library in Settings.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.9,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      setPhotos((prev) => [...prev, ...result.assets.map((a) => ({ uri: a.uri }))].slice(0, MAX_PHOTOS));
+    }
+  }
+
+  function removePhoto(index: number) {
+    haptic('light');
+    setPhotos((prev) => prev.filter((_, i) => i !== index));
+  }
 
   function set<K extends keyof FormData>(key: K, val: FormData[K]) {
     setForm((f) => ({ ...f, [key]: val }));
@@ -92,20 +120,9 @@ export default function ManufacturerOnboardScreen() {
     Haptics.impactAsync(t === 'light' ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Medium);
   }
 
-  async function pickPhoto() {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo access to upload factory images.'); return; }
-    const res = await ImagePicker.launchImageLibraryAsync({ allowsMultipleSelection: true, quality: 0.8 });
-    if (!res.canceled) {
-      set('photos', [...form.photos, ...res.assets.map((a) => a.uri)].slice(0, 8));
-    }
-  }
-
   function validateStep(): string | null {
     if (step === 0) {
       if (!form.email.includes('@')) return 'Enter a valid email address.';
-      if (form.password.length < 8)   return 'Password must be at least 8 characters.';
-      if (form.password !== form.confirmPassword) return 'Passwords do not match.';
     }
     if (step === 1) {
       if (!form.companyName.trim()) return 'Company name is required.';
@@ -143,19 +160,32 @@ export default function ManufacturerOnboardScreen() {
         city:             form.city || undefined,
         specialty:        form.specialties[0] ?? 'Apparel',
         description:      form.specialties.join(', '),
+        productionModes:  form.productionModes.length > 0 ? form.productionModes : undefined,
         moq:              parseInt(form.moq) || 100,
         contactEmail:     form.email,
+        contactPhone:     form.phone || undefined,
         website:          form.website || undefined,
         priceRange:       form.pricePerUnit ? `$${form.pricePerUnit}/${form.currency}` : '',
-        sampleTurnaround: '2–4 weeks',
+        sampleCost:       form.sampleCost ? `$${form.sampleCost}` : undefined,
         bulkTurnaround:   `${form.leadTimeDays || '30'} days`,
       };
 
       if (inviteToken) {
         // Private invite path — user must be signed in to their Clerk account
         await api.manufacturers.registerViaInvite(inviteToken, payload);
+        // Factory photos can only be attached once the profile exists.
+        // Upload failures are non-fatal — the manufacturer can add photos
+        // later from their profile; don't block a successful registration.
+        for (const photo of photos) {
+          try {
+            await api.manufacturers.uploadPhoto(photo);
+          } catch (photoErr) {
+            console.warn('Factory photo upload failed', photoErr);
+          }
+        }
       } else {
-        // Public apply path — no Clerk account required
+        // Public apply path — no Clerk account required, so photos cannot
+        // be attached yet (see MAX_PHOTOS comment above).
         await api.manufacturers.public.apply(payload);
       }
 
@@ -202,11 +232,9 @@ export default function ManufacturerOnboardScreen() {
         {/* ── STEP 0: Account ── */}
         {step === 0 && (
           <View style={s.stepWrap}>
-            <Text style={s.stepTitle}>Create your manufacturer account</Text>
-            <Text style={s.stepSub}>Your login for receiving quote requests and messages from brand founders.</Text>
+            <Text style={s.stepTitle}>Your contact email</Text>
+            <Text style={s.stepSub}>Where you'll receive quote requests and messages from brand founders.</Text>
             <Field label="Business Email" value={form.email} onChange={(v) => set('email', v)} placeholder="production@nightshiftstudio.co" keyboardType="email-address" />
-            <Field label="Password" value={form.password} onChange={(v) => set('password', v)} placeholder="Min. 8 characters" secure />
-            <Field label="Confirm Password" value={form.confirmPassword} onChange={(v) => set('confirmPassword', v)} placeholder="Re-enter password" secure />
           </View>
         )}
 
@@ -220,6 +248,28 @@ export default function ManufacturerOnboardScreen() {
             <Field label="City" value={form.city} onChange={(v) => set('city', v)} placeholder="e.g. Guangzhou" />
             <Field label="Phone / WhatsApp" value={form.phone} onChange={(v) => set('phone', v)} placeholder="+1 234 567 890" keyboardType="phone-pad" />
             <Field label="Website (optional)" value={form.website} onChange={(v) => set('website', v)} placeholder="https://yourfactory.com" keyboardType="url" />
+
+            {!!inviteToken && (
+              <>
+                <Text style={[s.groupLabel, { marginTop: 4 }]}>Factory Photos (optional)</Text>
+                <View style={s.photoGrid}>
+                  {photos.map((photo, i) => (
+                    <View key={photo.uri + i} style={s.photoThumb}>
+                      <Image source={{ uri: photo.uri }} style={{ width: '100%', height: '100%' }} />
+                      <TouchableOpacity style={s.photoRemove} onPress={() => removePhoto(i)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Feather name="x" size={12} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                  {photos.length < MAX_PHOTOS && (
+                    <TouchableOpacity style={s.photoAdd} onPress={pickPhotos} activeOpacity={0.75}>
+                      <Feather name="camera" size={18} color={colors.primary} />
+                      <Text style={s.photoAddText}>Add</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </>
+            )}
           </View>
         )}
 
@@ -268,32 +318,11 @@ export default function ManufacturerOnboardScreen() {
           </View>
         )}
 
-        {/* ── STEP 3: Photos & Pricing ── */}
+        {/* ── STEP 3: Pricing ── */}
         {step === 3 && (
           <View style={s.stepWrap}>
-            <Text style={s.stepTitle}>Photos & pricing</Text>
-            <Text style={s.stepSub}>Upload up to 8 photos — factory floor, samples, or finished pieces. Brands browse these before reaching out.</Text>
-
-            {/* Photo upload grid */}
-            <View style={s.photoGrid}>
-              {form.photos.map((uri, i) => (
-                <View key={i} style={s.photoThumb}>
-                  <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                  <TouchableOpacity
-                    style={s.photoRemove}
-                    onPress={() => set('photos', form.photos.filter((_, idx) => idx !== i))}
-                  >
-                    <Feather name="x" size={12} color={colors.primaryForeground} />
-                  </TouchableOpacity>
-                </View>
-              ))}
-              {form.photos.length < 8 && (
-                <TouchableOpacity style={s.photoAdd} onPress={pickPhoto} activeOpacity={0.8}>
-                  <Feather name="plus" size={22} color={colors.primary} />
-                  <Text style={[s.photoAddText, { color: colors.primary }]}>Add Photo</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+            <Text style={s.stepTitle}>Pricing</Text>
+            <Text style={s.stepSub}>Give brand founders a starting point — exact pricing is worked out per quote.</Text>
 
             <View style={s.row}>
               <View style={{ flex: 2 }}>
@@ -331,27 +360,33 @@ export default function ManufacturerOnboardScreen() {
               <Row label="MOQ"        value={form.moq ? `${form.moq} pcs` : '—'} />
               <Row label="Lead Time"  value={form.leadTimeDays ? `${form.leadTimeDays} days` : '—'} />
               <Row label="Price from" value={form.pricePerUnit ? `${form.pricePerUnit} ${form.currency}` : '—'} />
-              <Row label="Specialties" value={form.specialties.join(', ') || '—'} last />
+              <Row label="Specialties" value={form.specialties.join(', ') || '—'} last={!inviteToken} />
+              {!!inviteToken && (
+                <Row label="Photos" value={photos.length > 0 ? `${photos.length} added` : '—'} last />
+              )}
             </View>
 
-            <View style={[s.reviewCard, { marginTop: 12 }]}>
-              <Text style={s.photoCount}>{form.photos.length} photo{form.photos.length !== 1 ? 's' : ''} uploaded</Text>
+            <View style={s.termsRow}>
+              <TouchableOpacity
+                onPress={() => { haptic('light'); set('agreeTerms', !form.agreeTerms); }}
+                activeOpacity={0.8}
+                style={{ flexDirection: 'row', flex: 1 }}
+              >
+                <View style={[s.checkbox, form.agreeTerms && [s.checkboxActive, { backgroundColor: colors.primary, borderColor: colors.primary }]]}>
+                  {form.agreeTerms && <Feather name="check" size={12} color={colors.primaryForeground} />}
+                </View>
+                <Text style={s.termsText}>
+                  I agree to the{' '}
+                  <Text
+                    style={{ color: colors.primary, textDecorationLine: 'underline' }}
+                    onPress={() => { haptic('light'); Linking.openURL('https://brandthread.app/terms'); }}
+                  >
+                    Brandthread Manufacturer Terms
+                  </Text>
+                  {' '}and understand payments are held in escrow until delivery is confirmed.
+                </Text>
+              </TouchableOpacity>
             </View>
-
-            <TouchableOpacity
-              style={s.termsRow}
-              onPress={() => { haptic('light'); set('agreeTerms', !form.agreeTerms); }}
-              activeOpacity={0.8}
-            >
-              <View style={[s.checkbox, form.agreeTerms && [s.checkboxActive, { backgroundColor: colors.primary, borderColor: colors.primary }]]}>
-                {form.agreeTerms && <Feather name="check" size={12} color={colors.primaryForeground} />}
-              </View>
-              <Text style={s.termsText}>
-                I agree to the{' '}
-                <Text style={{ color: colors.primary }}>Brandthread Manufacturer Terms</Text>
-                {' '}and understand payments are held in escrow until delivery is confirmed.
-              </Text>
-            </TouchableOpacity>
           </View>
         )}
       </ScrollView>
@@ -393,7 +428,7 @@ function Field({ label, value, onChange, placeholder, keyboardType, secure }: {
         value={value}
         onChangeText={onChange}
         placeholder={placeholder}
-        placeholderTextColor={colors.muted}
+        placeholderTextColor={colors.mutedForeground}
         keyboardType={keyboardType}
         secureTextEntry={secure}
         autoCapitalize={secure || keyboardType === 'email-address' ? 'none' : 'words'}
@@ -419,26 +454,26 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   header:      { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
   backBtn:     { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.text },
-  headerSub:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.muted, marginTop: 1 },
+  headerSub:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, marginTop: 1 },
   progressTrack: { height: 3, backgroundColor: colors.border },
   progressFill:  { height: 3, backgroundColor: colors.primary, borderRadius: 2 },
 
   stepWrap:  { gap: 0 },
   stepTitle: { fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.text, marginBottom: 6 },
-  stepSub:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.muted, lineHeight: 19, marginBottom: 24 },
+  stepSub:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, lineHeight: 19, marginBottom: 24 },
 
-  groupLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+  groupLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
   chipGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip:       { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
   chipActive: { backgroundColor: colors.accent, borderColor: colors.primary },
-  chipText:   { fontSize: 12, fontFamily: 'Inter_500Medium', color: colors.muted },
+  chipText:   { fontSize: 12, fontFamily: 'Inter_500Medium', color: colors.mutedForeground },
   chipTextActive: { color: colors.primary },
 
   row: { flexDirection: 'row', gap: 12 },
 
   // Field
   fieldWrap:  { marginBottom: 16 },
-  fieldLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', color: colors.muted, marginBottom: 6 },
+  fieldLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', color: colors.mutedForeground, marginBottom: 6 },
   fieldInput: {
     backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
     borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
@@ -460,15 +495,15 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   // Review
   reviewCard:  { backgroundColor: colors.card, borderRadius: 14, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   reviewRow:   { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, gap: 20 },
-  reviewLabel: { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.muted },
+  reviewLabel: { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.mutedForeground },
   reviewValue: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: colors.text, flex: 1, textAlign: 'right' },
-  photoCount:  { fontSize: 13, fontFamily: 'Inter_500Medium', color: colors.muted, textAlign: 'center', paddingVertical: 14 },
+  photoCount:  { fontSize: 13, fontFamily: 'Inter_500Medium', color: colors.mutedForeground, textAlign: 'center', paddingVertical: 14 },
 
   // Terms
   termsRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginTop: 20 },
   checkbox:     { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
   checkboxActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  termsText:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.muted, flex: 1, lineHeight: 19 },
+  termsText:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, flex: 1, lineHeight: 19 },
 
   // Bottom
   bottomBar: { paddingHorizontal: 20, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.background },

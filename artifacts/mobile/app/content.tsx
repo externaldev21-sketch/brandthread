@@ -18,16 +18,18 @@ import { FS } from '@/lib/theme';
 
 type FilterTab = 'all' | ContentStatus;
 
+// Only types that create-post.tsx actually supports today. See docs/polish/punch-list.md
+// ("Seller: create post, AI, analytics & finance" — content.tsx item) for why the rest were cut.
 const getContentTypes = (primary: string, secondary: string, colors: ReturnType<typeof useColors>): { type: ContentType; label: string; icon: keyof typeof Feather.glyphMap; color: string }[] => [
   { type: 'video',        label: 'Video Post',      icon: 'video',        color: primary },
   { type: 'image',        label: 'Image Post',      icon: 'image',        color: colors.subtle },
-  { type: 'slideshow',    label: 'Slideshow',       icon: 'layers',       color: secondary },
-  { type: 'story',        label: 'Story',           icon: 'circle',       color: colors.warning },
-  { type: 'announcement', label: 'Announcement',    icon: 'bell',         color: colors.success },
-  { type: 'countdown',    label: 'Drop Countdown',  icon: 'clock',        color: '#FBBF24' },
-  { type: 'behind_scenes',label: 'Behind Scenes',   icon: 'camera',       color: secondary },
-  { type: 'poll',         label: 'Poll',            icon: 'bar-chart-2',  color: colors.subtle },
 ];
+
+function formatScheduledDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
 
 function statusColor(s: ContentStatus, colors: ReturnType<typeof useColors>): string {
   switch (s) {
@@ -325,7 +327,7 @@ export default function ContentScreen() {
                     </View>
                   )}
                   {post.status === 'scheduled' && post.scheduledFor && (
-                    <Text style={s.scheduledText}>Scheduled: {post.scheduledFor}</Text>
+                    <Text style={s.scheduledText}>Goes live {formatScheduledDate(post.scheduledFor)}</Text>
                   )}
                 </View>
                 <TouchableOpacity

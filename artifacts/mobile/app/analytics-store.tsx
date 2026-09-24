@@ -16,6 +16,7 @@ import {
 } from '@/lib/theme';
 import { getStoreAnalytics, getFilterState } from '@/services/analyticsService';
 import { StoreAnalytics, StoreFunnelStep, StoreSectionAnalytics, AnalyticsMetric, AnalyticsFilterState } from '@/services/analyticsTypes';
+import { EmptyState } from '@/components/BrandthreadUI';
 
 function KpiCard({ m, icon, color }: { m: AnalyticsMetric; icon: keyof typeof Feather.glyphMap; color: string }) {
   const colors = useColors();
@@ -123,69 +124,80 @@ export default function AnalyticsStoreScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* KPI grid */}
-      <Text style={s.sectionTitle}>Traffic</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }} contentContainerStyle={{ gap: 10, flexDirection: 'row', paddingRight: 16 }}>
-        {data && [
-          { m: data.visitors,          icon: 'users'    as const, color: PURPLE },
-          { m: data.uniqueVisitors,     icon: 'user'     as const, color: BLUE   },
-          { m: data.sessions,           icon: 'activity' as const, color: CYAN },
-          { m: data.productPageViews,   icon: 'eye'      as const, color: GOLD   },
-          { m: data.returningVisitors,  icon: 'repeat'   as const, color: SUCCESS },
-          { m: data.mobileTrafficPct,   icon: 'smartphone' as const, color: ORANGE },
-        ].map(item => <KpiCard key={item.m.key} {...item} />)}
-      </ScrollView>
+      {!data ? (
+        <EmptyState
+          icon="bar-chart-2"
+          title="Store insights are on the way"
+          description="We'll show traffic and conversion once visitors start browsing your store."
+          style={{ marginTop: 24 }}
+        />
+      ) : (
+        <>
+          {/* KPI grid */}
+          <Text style={s.sectionTitle}>Traffic</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }} contentContainerStyle={{ gap: 10, flexDirection: 'row', paddingRight: 16 }}>
+            {[
+              { m: data.visitors,          icon: 'users'    as const, color: PURPLE },
+              { m: data.uniqueVisitors,     icon: 'user'     as const, color: BLUE   },
+              { m: data.sessions,           icon: 'activity' as const, color: CYAN },
+              { m: data.productPageViews,   icon: 'eye'      as const, color: GOLD   },
+              { m: data.returningVisitors,  icon: 'repeat'   as const, color: SUCCESS },
+              { m: data.mobileTrafficPct,   icon: 'smartphone' as const, color: ORANGE },
+            ].map(item => <KpiCard key={item.m.key} {...item} />)}
+          </ScrollView>
 
-      {/* Conversion KPIs */}
-      <Text style={s.sectionTitle}>Conversion</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }} contentContainerStyle={{ gap: 10, flexDirection: 'row', paddingRight: 16 }}>
-        {data && [
-          { m: data.addToCartRate,      icon: 'shopping-cart' as const, color: PURPLE },
-          { m: data.checkoutStartRate,  icon: 'credit-card'   as const, color: GOLD   },
-          { m: data.purchaseConversion, icon: 'check-circle'  as const, color: SUCCESS },
-          { m: data.avgSessionDuration, icon: 'clock'         as const, color: BLUE   },
-        ].map(item => <KpiCard key={item.m.key} {...item} />)}
-      </ScrollView>
+          {/* Conversion KPIs */}
+          <Text style={s.sectionTitle}>Conversion</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }} contentContainerStyle={{ gap: 10, flexDirection: 'row', paddingRight: 16 }}>
+            {[
+              { m: data.addToCartRate,      icon: 'shopping-cart' as const, color: PURPLE },
+              { m: data.checkoutStartRate,  icon: 'credit-card'   as const, color: GOLD   },
+              { m: data.purchaseConversion, icon: 'check-circle'  as const, color: SUCCESS },
+              { m: data.avgSessionDuration, icon: 'clock'         as const, color: BLUE   },
+            ].map(item => <KpiCard key={item.m.key} {...item} />)}
+          </ScrollView>
 
-      {/* Funnel */}
-      <Text style={s.sectionTitle}>Conversion Funnel</Text>
-      <View style={s.card}>
-        {data?.funnel.map((step, i) => (
-          <View key={step.label}>
-            {i > 0 && <View style={s.divider} />}
-            <FunnelStep step={step} isLast={i === (data.funnel.length - 1)} />
-          </View>
-        ))}
-      </View>
-
-      {/* Store sections */}
-      <Text style={s.sectionTitle}>Store Section Performance</Text>
-      <View style={s.card}>
-        {data?.sections.map((sec, i) => (
-          <TouchableOpacity
-            key={sec.sectionKey}
-            onPress={() => { Haptics.selectionAsync(); router.push('/store-sections' as never); }}
-            style={[s.secRow, i > 0 && s.divider]}
-            activeOpacity={0.8}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={s.secLabel}>{sec.label}</Text>
-              <View style={s.secMeta}>
-                <Text style={s.secStat}>{sec.views.toLocaleString()} views</Text>
-                <Text style={s.dotSep}>·</Text>
-                <Text style={s.secStat}>{sec.clicks.toLocaleString()} clicks</Text>
-                <Text style={s.dotSep}>·</Text>
-                <Text style={[s.secStat, { color: sec.ctr > 20 ? SUCCESS : sec.ctr > 10 ? ORANGE : RED }]}>{sec.ctr.toFixed(1)}% CTR</Text>
+          {/* Funnel */}
+          <Text style={s.sectionTitle}>Conversion Funnel</Text>
+          <View style={s.card}>
+            {data.funnel.map((step, i) => (
+              <View key={step.label}>
+                {i > 0 && <View style={s.divider} />}
+                <FunnelStep step={step} isLast={i === (data.funnel.length - 1)} />
               </View>
-            </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={s.secPurchases}>{sec.purchasesInfluenced}</Text>
-              <Text style={s.secPurchasesLabel}>purchases</Text>
-            </View>
-            <Feather name="chevron-right" size={14} color={SUBTLE} style={{ marginLeft: 8 }} />
-          </TouchableOpacity>
-        ))}
-      </View>
+            ))}
+          </View>
+
+          {/* Store sections */}
+          <Text style={s.sectionTitle}>Store Section Performance</Text>
+          <View style={s.card}>
+            {data.sections.map((sec, i) => (
+              <TouchableOpacity
+                key={sec.sectionKey}
+                onPress={() => { Haptics.selectionAsync(); router.push('/store-sections' as never); }}
+                style={[s.secRow, i > 0 && s.divider]}
+                activeOpacity={0.8}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={s.secLabel}>{sec.label}</Text>
+                  <View style={s.secMeta}>
+                    <Text style={s.secStat}>{sec.views.toLocaleString()} views</Text>
+                    <Text style={s.dotSep}>·</Text>
+                    <Text style={s.secStat}>{sec.clicks.toLocaleString()} clicks</Text>
+                    <Text style={s.dotSep}>·</Text>
+                    <Text style={[s.secStat, { color: sec.ctr > 20 ? SUCCESS : sec.ctr > 10 ? ORANGE : RED }]}>{sec.ctr.toFixed(1)}% CTR</Text>
+                  </View>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={s.secPurchases}>{sec.purchasesInfluenced}</Text>
+                  <Text style={s.secPurchasesLabel}>purchases</Text>
+                </View>
+                <Feather name="chevron-right" size={14} color={SUBTLE} style={{ marginLeft: 8 }} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      )}
 
       <View style={{ height: 120 }} />
     </ScrollView>

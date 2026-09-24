@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -53,14 +53,14 @@ export default function BuyerDownloadData() {
           dialogTitle: 'Download my Brandthread data',
         });
       } else {
-        Alert.alert('Export ready', `Your export was saved to ${file.uri}`);
+        Alert.alert('Export ready', 'Your data is ready. Save it or send it anywhere.');
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setRequestedAt(data.exportedAt);
       setRequested(true);
     } catch (err: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Export failed', err?.message ?? 'Could not generate your data export. Please try again.');
+      Alert.alert('Export failed', "Couldn't prepare your data. Try again.");
     } finally {
       setLoading(false);
     }
@@ -78,7 +78,7 @@ export default function BuyerDownloadData() {
         <TouchableOpacity style={s.iconBtn} onPress={() => router.back()}>
           <Feather name="arrow-left" size={21} color={FG} />
         </TouchableOpacity>
-        <Text style={s.title}>Download Your Data</Text>
+        <Text style={s.title}>Download your data</Text>
         <View style={s.iconBtn} />
       </View>
 
@@ -89,7 +89,7 @@ export default function BuyerDownloadData() {
             <Text style={s.successTitle}>Export ready</Text>
             {formattedDate && <Text style={s.successDate}>Generated {formattedDate}</Text>}
             <Text style={s.successDesc}>
-              Your JSON archive was generated from your authenticated Brandthread account and opened in your device's share sheet.
+              Your data is ready. Save it or send it anywhere.
             </Text>
             <TouchableOpacity onPress={() => setRequested(false)} style={s.againBtn}>
               <Text style={[s.againText, { color: PURPLE }]}>Generate another export</Text>
@@ -98,7 +98,7 @@ export default function BuyerDownloadData() {
         ) : (
           <>
             <Text style={s.intro}>
-              Select the categories to include. Brandthread will generate a JSON archive immediately and open your device's download/share options.
+              Select the categories to include. We'll bundle the selected info into one file and open your device's download/share options.
             </Text>
 
             <Text style={s.groupLabel}>Select what to include</Text>
@@ -115,7 +115,7 @@ export default function BuyerDownloadData() {
                       value={cat.selected}
                       onValueChange={() => toggleCat(cat.key)}
                       trackColor={{ false: CARD_ELEVATED, true: PURPLE }}
-                      thumbColor={ON_DARK}
+                      thumbColor={theme.onAccent}
                     />
                   </TouchableOpacity>
                   {i < categories.length - 1 && <View style={s.divider} />}
@@ -126,7 +126,7 @@ export default function BuyerDownloadData() {
             <View style={s.note}>
               <Feather name="info" size={14} color={MUTED} />
               <Text style={s.noteText}>
-                The server uses your signed-in identity and only exports records your account owns or can access.
+                Only records your account owns are included.
               </Text>
             </View>
           </>
@@ -138,13 +138,14 @@ export default function BuyerDownloadData() {
           <Text style={s.footerCount}>{selectedCount} of {categories.length} categories selected</Text>
           <TouchableOpacity
             onPress={handleRequest}
-            activeOpacity={selectedCount > 0 ? 0.85 : 1}
+            disabled={loading || selectedCount === 0}
+            activeOpacity={selectedCount > 0 && !loading ? 0.85 : 1}
             style={{ opacity: selectedCount > 0 ? 1 : 0.4 }}
           >
             <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.requestBtn}>
-              <Feather name="download" size={18} color={theme.onAccent} />
+              {loading ? <ActivityIndicator color={theme.onAccent} size="small" /> : <Feather name="download" size={18} color={theme.onAccent} />}
               <Text style={[s.requestBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
-                {loading ? 'Generating…' : 'Download My Data'}
+                {loading ? 'Generating…' : 'Download'}
               </Text>
             </LinearGradient>
           </TouchableOpacity>

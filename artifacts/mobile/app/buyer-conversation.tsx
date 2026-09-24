@@ -5,6 +5,7 @@ import {
   ListRenderItemInfo, Modal, ScrollView, ActivityIndicator, Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Clipboard from 'expo-clipboard';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
@@ -157,6 +158,7 @@ export default function BuyerConversationScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [copiedToast, setCopiedToast] = useState(false);
   const [isRecording, setIsRecording]         = useState(false);
   const [isUploading, setIsUploading]         = useState(false);
   const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
@@ -576,12 +578,13 @@ export default function BuyerConversationScreen() {
     if (!conv || !canSend) return;
     const t = text.trim();
     const att = selectedAttachment;
+    const replyingTo = replyTo;
     setText('');
     setSelectedAttachment(null);
     setReplyTo(null);
     setIsSending(true);
     try {
-      await sendMessage(conv.id, t, att ?? undefined);
+      await sendMessage(conv.id, t, att ?? undefined, replyingTo?.id);
       const msgs = await getMessages(conv.id);
       setMessages(msgs);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
@@ -589,6 +592,7 @@ export default function BuyerConversationScreen() {
       Alert.alert('Message not sent', apiErrorMessage(e, 'Please check your connection and try again.'));
       setText(t);
       setSelectedAttachment(att);
+      setReplyTo(replyingTo);
     } finally {
       setIsSending(false);
     }
@@ -667,7 +671,9 @@ export default function BuyerConversationScreen() {
       {
         text: 'Copy',
         onPress: () => {
-          // Clipboard handled gracefully — no import needed for display
+          Clipboard.setStringAsync(msg.text);
+          setCopiedToast(true);
+          setTimeout(() => setCopiedToast(false), 1600);
         },
       },
     ];
@@ -746,6 +752,15 @@ export default function BuyerConversationScreen() {
             },
           ]}
         >
+          {/* Quoted reply */}
+          {msg.replyToId ? (
+            <View style={s.replyQuote}>
+              <Text style={s.replyQuoteText} numberOfLines={1}>
+                {msg.replyPreview ?? messages.find(m => m.id === msg.replyToId)?.text ?? 'Message'}
+              </Text>
+            </View>
+          ) : null}
+
           {/* Attachment */}
           {msg.attachment && renderAttachment(msg.attachment)}
 
@@ -1237,6 +1252,12 @@ export default function BuyerConversationScreen() {
           </View>
         </View>
       </Modal>
+
+      {copiedToast && (
+        <View pointerEvents="none" style={s.copiedToast} accessibilityLiveRegion="polite">
+          <Text style={s.copiedToastText}>Copied</Text>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -1452,6 +1473,36 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: FS.base,
     fontFamily: FONT.regular,
     color: FG,
+  },
+
+  copiedToast: {
+    position: 'absolute',
+    alignSelf: 'center',
+    bottom: 96,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+    borderRadius: RADIUS.pill,
+    backgroundColor: CARD_ELEVATED,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  copiedToastText: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    color: FG,
+  },
+
+  // Quoted reply snippet
+  replyQuote: {
+    borderLeftWidth: 2,
+    borderLeftColor: BORDER_ACTIVE,
+    paddingLeft: 8,
+    marginBottom: 4,
+  },
+  replyQuoteText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: MUTED,
   },
 
   // Reactions

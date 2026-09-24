@@ -13,12 +13,13 @@ import {
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import {
-  BrandthreadCard, BrandthreadHeader, GradientCard, PrimaryButton,
-  SecondaryButton, StatusBadge, FormInput,
+  BrandthreadCard, BrandthreadHeader, PrimaryButton,
+  FormInput,
 } from '@/components/BrandthreadUI';
-import { getOrder, createRefund } from '@/services/orderService';
-import { Order, RefundType, Refund, RefundLineItem } from '@/services/orderTypes';
+import { Order, RefundType } from '@/services/orderTypes';
 import { formatCents } from '@/lib/money';
+import { useApi } from '@/lib/api';
+import { adaptApiOrder } from '@/app/order-detail';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -66,38 +67,51 @@ export default function RefundDetailScreen() {
   const { orderId, returnId } = useLocalSearchParams<{ orderId: string; returnId?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const api = useApi();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Record<string, number>>({});
   const [refundType, setRefundType] = useState<RefundType>('full');
   const [shippingAmount, setShippingAmount] = useState(0);
   const [includeShipping, setIncludeShipping] = useState(false);
   const [refundReason, setRefundReason] = useState('');
   const [restockInventory, setRestockInventory] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<Refund | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const o = await getOrder(orderId);
-    if (o) {
-      setOrder(o);
-      // Initialize selected items to max qty
-      const init: Record<string, number> = {};
-      o.lineItems.forEach(li => { init[li.id] = li.quantity; });
-      setSelectedItems(init);
-      setShippingAmount(o.payment.shippingTotalCents);
+    setLoadError(false);
+    try {
+      const raw = await api.orders.get(orderId);
+      const o = raw ? adaptApiOrder(raw) : null;
+      if (o) {
+        setOrder(o);
+        // Initialize selected items to max qty
+        const init: Record<string, number> = {};
+        o.lineItems.forEach(li => { init[li.id] = li.quantity; });
+        setSelectedItems(init);
+        setShippingAmount(o.payment.shippingTotalCents);
+      } else {
+        setOrder(null);
+      }
+    } catch (err) {
+      if (__DEV__) console.warn('[refund-detail] failed to load order', err);
+      setOrder(null);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [orderId]);
+  }, [api, orderId]);
 
   useEffect(() => { load(); }, [load]);
 
   if (loading || !order) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.loadingText}>{loading ? 'Loading…' : 'Order not found.'}</Text>
+        <Text style={styles.loadingText}>
+          {loading ? 'Loading…' : loadError ? 'Couldn’t load this order. Check your connection and try again.' : 'Order not found.'}
+        </Text>
       </View>
     );
   }
@@ -136,70 +150,30 @@ export default function RefundDetailScreen() {
 
   const overMax = computedTotal > maxRefundable;
 
-  const handleSubmit = async () => {
-    if (submitting) return;
-    setSubmitting(true);
-    try {
-      const lineItems: RefundLineItem[] = refundType === 'shipping'
-        ? []
-        : order.lineItems
-            .filter(li => (selectedItems[li.id] ?? 0) > 0 || refundType === 'full')
-            .map(li => ({
-              lineItemId: li.id,
-              productName: li.productName,
-              variant: li.variant,
-              quantity: refundType === 'full' ? li.quantity : (selectedItems[li.id] ?? 0),
-              amountCents: li.unitPriceCents * (refundType === 'full' ? li.quantity : (selectedItems[li.id] ?? 0)),
-            }));
-
-      const refund = await createRefund(order.id, {
-        type: refundType,
-        lineItems,
-        shippingAmountCents: refundType === 'full' || refundType === 'shipping'
-          ? order.payment.shippingTotalCents
-          : includeShipping ? order.payment.shippingTotalCents : 0,
-        taxAmountCents: 0,
-        reason: refundReason || undefined,
-        restockInventory,
-        returnId: returnId || undefined,
-      });
-      if (refund) {
-        setResult(refund);
-      } else {
-        Alert.alert('Error', 'Could not create refund. Please try again.');
-      }
-    } catch (e) {
-      Alert.alert('Error', 'An unexpected error occurred.');
-    }
-    setSubmitting(false);
-  };
-
-  // ── Success state ──
-  if (result) {
-    return (
-      <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: insets.top }}>
-        <BrandthreadHeader title="Refund Issued" onBack={() => router.back()} />
-        <View style={styles.successWrap}>
-          <GradientCard colors={['rgba(16,185,129,0.18)', 'rgba(16,185,129,0.06)']} glow style={styles.successCard}>
-            <View style={styles.successIcon}>
-              <Feather name="check-circle" size={ICON.xxl} color={SUCCESS} />
-            </View>
-            <Text style={styles.successTitle}>Refund Initiated</Text>
-            <Text style={styles.successSub}>
-              Refund of {formatCents(result.totalAmountCents)} submitted.{'\n'}
-              Processing time: 3–5 business days.
-            </Text>
-            <PrimaryButton
-              label="Done"
-              onPress={() => router.back()}
-              colors={[SUCCESS, '#34D399']}
-              style={{ marginTop: SP.md }}
-            />
-          </GradientCard>
-        </View>
-      </View>
+  // Issuing a refund isn't wired to a real payment API yet — showing a fake
+  // "Refund Initiated" success screen here would misrepresent that money
+  // moved. The submit action below is disabled until that's built; a seller
+  // that needs to refund this order today should do it from Stripe directly.
+  const confirmAndSubmit = () => {
+    if (computedTotal <= 0 || overMax) return;
+    Alert.alert(
+      `Refund ${formatCents(computedTotal)} to ${order.customer.name}?`,
+      'This can’t be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: `Refund ${formatCents(computedTotal)}`,
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Refunds aren’t available here yet',
+              'Issue this refund from your Stripe dashboard for now.',
+            );
+          },
+        },
+      ],
     );
-  }
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: insets.top }}>
@@ -214,7 +188,7 @@ export default function RefundDetailScreen() {
         <View style={styles.demoNotice}>
           <Feather name="alert-triangle" size={ICON.sm} color={ORANGE} />
           <Text style={styles.demoText}>
-            Refunds are processed via Stripe. Funds are returned to the original payment method.
+            Issuing a refund from the app isn{'’'}t available yet. Use this screen to prepare the amount, then complete the refund from your Stripe dashboard.
           </Text>
         </View>
 
@@ -370,12 +344,13 @@ export default function RefundDetailScreen() {
           )}
         </BrandthreadCard>
 
-        {/* 11. SUBMIT */}
+        {/* 11. SUBMIT — no real refund API is wired yet (see the notice above),
+              so this never fakes success; it only confirms the amount and
+              then tells the seller to finish the refund in Stripe. */}
         <PrimaryButton
           label="Issue Refund"
-          onPress={handleSubmit}
-          loading={submitting}
-          disabled={submitting || computedTotal <= 0 || overMax}
+          onPress={confirmAndSubmit}
+          disabled={computedTotal <= 0 || overMax}
           icon="dollar-sign"
         />
       </ScrollView>

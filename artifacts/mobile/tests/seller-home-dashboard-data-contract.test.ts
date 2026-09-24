@@ -15,10 +15,14 @@ describe('seller home dashboard data contract', () => {
     expect(source).toContain('setSnapshot({ key: requestKey');
   });
 
-  it('shows an honest zero state instead of a blocking retry error', () => {
-    expect(source).toContain('zeroSellerHomeAnalytics(range)');
-    expect(source).not.toContain('Could not load dashboard');
-    expect(source).not.toContain('Tap to retry');
+  it('shows a real error banner instead of a fabricated zero state on failure', () => {
+    // A fetch failure must never render as if it were real data (e.g. a
+    // false "$0.00 · All caught up") — see docs/polish/punch-list.md,
+    // SellerHomeCommerceDashboard. It shows an inline retry banner and
+    // keeps/clears the tiles honestly instead of substituting zeros.
+    expect(source).toContain('analyticsError');
+    expect(source).toContain("Couldn’t load your sales. Pull to refresh.");
+    expect(source).toContain("Couldn’t refresh your sales. Pull to refresh.");
   });
 
   it('uses the Dashboard title and an even KPI tile grid that scales large values', () => {

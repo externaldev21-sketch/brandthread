@@ -14,7 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { formatCents } from '@/lib/money';
 import { useColors } from '@/hooks/useColors';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import {
@@ -1223,7 +1223,7 @@ export default function BuyerProductDetailScreen() {
               style={s.actionGrad}
             >
               {buyingNow ? (
-                <ActivityIndicator color={ON_DARK} size="small" />
+                <ActivityIndicator color={allSelected && inStock && !paymentUnavailable ? theme.onAccent : ON_DARK} size="small" />
               ) : !inStock && allSelected ? (
                 // Sold-out cue: visible in the action bar when a variant is selected but OOS
                 <>
@@ -1231,8 +1231,15 @@ export default function BuyerProductDetailScreen() {
                   <Text style={[s.actionBtnText, { color: ORANGE }]}>Sold Out</Text>
                 </>
               ) : (
-                <Text style={[s.actionBtnText, (!allSelected || !inStock || paymentUnavailable) && { color: SUBTLE }]}>
-                  {paymentUnavailable ? 'Payments unavailable' : !allSelected ? 'Select Options' : 'Buy Now'}
+                <Text
+                  style={[
+                    s.actionBtnText,
+                    (!allSelected || !inStock || paymentUnavailable)
+                      ? { color: SUBTLE }
+                      : [{ color: theme.onAccent }, getOnAccentTextStyle(theme)],
+                  ]}
+                >
+                  {paymentUnavailable ? 'Payments unavailable' : !allSelected ? 'Select options' : 'Buy now'}
                 </Text>
               )}
             </LinearGradient>

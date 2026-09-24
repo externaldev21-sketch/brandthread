@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, TextInput, KeyboardAvoidingView, Platform, Switch, Image, LayoutAnimation, UIManager } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, TextInput, KeyboardAvoidingView, Platform, Switch, Image, LayoutAnimation, UIManager, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
@@ -199,6 +199,8 @@ export default function AddProductScreen() {
   const [featuredHome, setFeaturedHome] = useState(false);
   const [dismissedTips, setDismissedTips] = useState<string[]>([]);
   const [publishing, setPublishing] = useState(false);
+  const [mediaUpload, setMediaUpload] = useState<Record<string, { status: 'uploading' | 'done' | 'error'; remoteUri?: string }>>({});
+  const photosUploading = Object.values(mediaUpload).some(u => u.status === 'uploading');
   const [isEditMode, setIsEditMode] = useState(false);
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [collections, setCollections] = useState<ProductCollection[]>([]);
@@ -506,6 +508,10 @@ export default function AddProductScreen() {
 
   // ── Publish ──
   async function handlePublish() {
+    if (photosUploading) {
+      Alert.alert('Still uploading', 'Wait for your photos to finish uploading before publishing.');
+      return;
+    }
     const decimalFields: Array<[string, string]> = [
       ['Price', priceStr],
       ['Compare-at price', compareAtStr],
@@ -686,6 +692,20 @@ export default function AddProductScreen() {
   // Each is identical to the original step render, just without the outer
   // <View style={s.stepContent}> wrapper (sections provide their own padding).
 
+  // Uploads a locally-picked photo, tracking per-item status so the thumbnail
+  // can show a progress overlay and Publish can be blocked until it's done.
+  async function uploadMediaAsset(item: ProductMedia) {
+    setMediaUpload(prev => ({ ...prev, [item.id]: { status: 'uploading' } }));
+    try {
+      const uploaded = await api.products.uploadImage({ uri: item.uri });
+      const remoteUri = (uploaded as any)?.objectPath || (uploaded as any)?.url || item.uri;
+      setMediaUpload(prev => ({ ...prev, [item.id]: { status: 'done', remoteUri } }));
+      setDraftData(prev => ({ ...prev, media: (prev.media ?? []).map(m => m.id === item.id ? { ...m, uri: remoteUri } : m) }));
+    } catch {
+      setMediaUpload(prev => ({ ...prev, [item.id]: { status: 'error' } }));
+    }
+  }
+
   function renderPhotos() {
     const media = draftData.media ?? [];
     return (
@@ -713,6 +733,7 @@ export default function AddProductScreen() {
                 createdAt: new Date().toISOString(),
               }));
               patchDraft({ media: [...existingMedia, ...newItems] });
+              newItems.forEach(item => { void uploadMediaAsset(item); });
             }
           }}
           style={s.uploadZone}
@@ -726,23 +747,44 @@ export default function AddProductScreen() {
 
         {media.length > 0 && (
           <View style={s.mediaGrid}>
-            {media.map(m => (
+            {media.map(m => {
+              const upload = mediaUpload[m.id];
+              return (
               <View key={m.id} style={s.mediaThumbnail}>
-                {m.uri && (m.uri.startsWith('http') || m.uri.startsWith('file') || m.uri.startsWith('ph://') || m.uri.startsWith('asset-library://') || m.uri.startsWith('content://')) ? (
+                {m.uri && (m.uri.startsWith('http') || m.uri.startsWith('file') || m.uri.startsWith('ph://') || m.uri.startsWith('asset-library://') || m.uri.startsWith('content://') || m.uri.startsWith('/objects/')) ? (
                   <Image source={{ uri: m.uri }} style={s.mediaThumbImg} resizeMode="cover" />
                 ) : (
                   <View style={s.mediaThumbImg}>
                     <Feather name="image" size={24} color={PURPLE_LIGHT} />
                   </View>
                 )}
+                {upload?.status === 'uploading' && (
+                  <View style={s.mediaUploadOverlay}>
+                    <ActivityIndicator color={ON_DARK} />
+                  </View>
+                )}
+                {upload?.status === 'error' && (
+                  <TouchableOpacity style={s.mediaUploadOverlay} onPress={() => uploadMediaAsset(m)}>
+                    <Feather name="refresh-cw" size={16} color={ON_DARK} />
+                    <Text style={s.mediaRetryLabel}>Retry</Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   style={s.mediaDeleteBtn}
-                  onPress={() => patchDraft({ media: media.filter(x => x.id !== m.id) })}
+                  onPress={() => {
+                    patchDraft({ media: media.filter(x => x.id !== m.id) });
+                    setMediaUpload(prev => {
+                      const next = { ...prev };
+                      delete next[m.id];
+                      return next;
+                    });
+                  }}
                 >
                   <Feather name="x" size={12} color={ON_DARK} />
                 </TouchableOpacity>
               </View>
-            ))}
+              );
+            })}
           </View>
         )}
 
@@ -1401,8 +1443,8 @@ export default function AddProductScreen() {
           <View style={s.publishButtons}>
             <SecondaryButton label="Save draft" onPress={handleSaveDraftAndExit} style={{ flex: 1 }} />
             <PrimaryButton
-              label={publishing ? 'Publishing...' : 'Publish'}
-              disabled={publishing}
+              label={photosUploading ? 'Uploading photos…' : publishing ? 'Publishing...' : 'Publish'}
+              disabled={publishing || photosUploading}
               onPress={handlePublish}
               style={{ flex: 1 }}
             />
@@ -1570,6 +1612,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     backgroundColor: 'rgba(0,0,0,0.7)',
     alignItems: 'center', justifyContent: 'center',
   },
+  mediaUploadOverlay: {
+    // theme-exempt: scrim over media thumbnail, not a themed surface
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center', justifyContent: 'center', gap: 4,
+  },
+  mediaRetryLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: ON_DARK },
 
   // Pricing
   pricingCard: { gap: SP.sm },

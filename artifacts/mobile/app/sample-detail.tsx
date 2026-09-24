@@ -22,7 +22,7 @@ import { File as FSFile } from 'expo-file-system';
 import {
   BrandthreadScreen, BrandthreadHeader, BrandthreadCard, GradientCard,
   PrimaryButton, SecondaryButton, StatusBadge, SectionHeader, FormInput,
-  LoadingSkeleton,
+  LoadingSkeleton, EmptyState,
 } from '@/components/BrandthreadUI';
 
 import {
@@ -54,6 +54,7 @@ const SAMPLE_STATUSES: SampleStatus[] = [
 
 const STATUS_LABELS: Record<string, string> = {
   requested: 'Requested',
+  pending_payment: 'Awaiting payment',
   awaiting_payment: 'Awaiting Payment',
   paid: 'Paid',
   in_development: 'In Development',
@@ -392,30 +393,37 @@ export default function SampleDetailScreen() {
   const [paymentError, setPaymentError] = useState('');
   const loadGeneration = useRef(0);
 
-  const load = useCallback(async () => {
+  // isInitialLoad=false (the default, used by the 15s poll) refreshes silently
+  // in the background — it never toggles the loading flag, which previously
+  // wiped the whole screen to skeletons, reset scroll position and dropped
+  // keyboard focus on every poll tick, even mid-typing in the review form.
+  const load = useCallback(async (isInitialLoad = false) => {
     if (!id) return;
     const generation = ++loadGeneration.current;
-    setLoading(true);
+    if (isInitialLoad) setLoading(true);
     try {
       const s = await getSample(id);
       if (s && generation === loadGeneration.current) {
         setSample(s);
         setManufacturerName(s.manufacturerName ?? 'Manufacturer');
-      } else if (generation === loadGeneration.current) {
+      } else if (generation === loadGeneration.current && isInitialLoad) {
         setSample(null);
       }
     } catch {
-      if (generation === loadGeneration.current) setSample(null);
+      if (generation === loadGeneration.current && isInitialLoad) setSample(null);
     } finally {
       if (generation === loadGeneration.current) setLoading(false);
     }
   }, [id]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(true); }, [load]);
   useEffect(() => {
-    const timer = setInterval(load, 15_000);
+    // Skip polling entirely while the review form is open, so a background
+    // refresh can never wipe out an in-progress review the seller is typing.
+    if (reviewMode) return;
+    const timer = setInterval(() => load(false), 15_000);
     return () => clearInterval(timer);
-  }, [load]);
+  }, [load, reviewMode]);
 
   const confirmHostedPayment = useCallback(async () => {
     if (!sample || paying) return false;
@@ -467,7 +475,7 @@ export default function SampleDetailScreen() {
       const message = String(error?.message ?? '');
       setPaymentError(
         message.includes('Manufacturer cannot receive') || message.includes('payouts are not ready')
-          ? 'The manufacturer must finish Stripe payout setup before you can pay. Message them to complete verification, then refresh this order.'
+          ? 'The manufacturer needs to finish payout setup before you can pay. Message them, then refresh.'
           : message || 'Could not open secure checkout. Please try again.',
       );
     } finally {
@@ -638,7 +646,14 @@ export default function SampleDetailScreen() {
     return (
       <BrandthreadScreen>
         <BrandthreadHeader title="Sample Details" onBack={() => router.back()} />
-        <View style={s.centered} />
+        <View style={s.centered}>
+          <EmptyState
+            icon="package"
+            title="Sample not found"
+            description="It may have been withdrawn."
+            action={{ label: 'Back', onPress: () => router.back() }}
+          />
+        </View>
       </BrandthreadScreen>
     );
   }
@@ -688,8 +703,8 @@ export default function SampleDetailScreen() {
               <Text style={s.paymentTitle}>Payment required</Text>
               <Text style={s.paymentText}>
                 {sample.manufacturerPayoutReady !== true
-                  ? 'Payment is unavailable until the manufacturer connects and verifies their Stripe payout account. Message them, then refresh this order.'
-                  : 'Pay securely to send this sample into production. Funds are routed to the manufacturer through Stripe.'}
+                  ? 'The manufacturer needs to finish payout setup before you can pay. Message them, then refresh.'
+                  : 'Pay securely. Funds are held until your sample ships.'}
               </Text>
               {!!paymentError && <Text style={s.paymentError}>{paymentError}</Text>}
             </BrandthreadCard>

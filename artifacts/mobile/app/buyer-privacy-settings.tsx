@@ -68,18 +68,24 @@ export default function BuyerPrivacySettings() {
     setHasChanges(true);
   }
 
-  async function saveSettings() {
+  async function saveSettings(showConfirmation: boolean) {
     if (!settings) return;
-    // Save local settings (stored in AsyncStorage)
-    await updatePrivacySettings(settings);
-    // Save server-side DM privacy setting
-    await api.privacy.update({ dmPrivacy }).catch(() => {});
-    setHasChanges(false);
-    Alert.alert('Saved', 'Privacy settings updated.');
+    try {
+      // Save local settings (stored in AsyncStorage)
+      await updatePrivacySettings(settings);
+      // Save server-side DM privacy setting
+      await api.privacy.update({ dmPrivacy });
+      setHasChanges(false);
+      if (showConfirmation) Alert.alert('Saved', 'Privacy updated.');
+    } catch {
+      if (showConfirmation) Alert.alert('Error', "Couldn't save. Try again.");
+      // On silent (back-navigation) saves, leave hasChanges set so the user
+      // isn't told their change was saved when it wasn't.
+    }
   }
 
   async function handleBack() {
-    if (hasChanges) await saveSettings();
+    if (hasChanges) await saveSettings(false);
     router.back();
   }
 
@@ -142,7 +148,7 @@ export default function BuyerPrivacySettings() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Privacy</Text>
         {hasChanges ? (
-          <PrimaryButton label="Save" onPress={saveSettings} small />
+          <PrimaryButton label="Save" onPress={() => saveSettings(true)} small />
         ) : (
           <View style={styles.headerBtn} />
         )}

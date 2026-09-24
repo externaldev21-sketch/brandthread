@@ -12,7 +12,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
-  EFFECTIVE_DATE, IS_DRAFT, LEGAL_DOCUMENTS, LEGAL_DOCUMENT_ORDER, LEGAL_OPEN_ITEMS, LEGAL_VERSION,
+  EFFECTIVE_DATE, LEGAL_DOCUMENTS, LEGAL_DOCUMENT_ORDER, LEGAL_VERSION,
   type LegalDocId,
 } from '@/content/legal';
 
@@ -91,18 +91,6 @@ export default function LegalDocument({ docId }: LegalDocumentProps) {
           <Text style={styles.date}>Effective {EFFECTIVE_DATE} · Version {LEGAL_VERSION}</Text>
         </View>
 
-        {IS_DRAFT ? (
-          <View accessibilityRole="summary" style={styles.reviewNotice}>
-            <View style={styles.noticeIcon}>
-              <Feather name="alert-triangle" size={18} color={theme.warning} />
-            </View>
-            <View style={styles.noticeCopy}>
-              <Text style={styles.noticeTitle}>Draft — pending legal review</Text>
-              <Text style={styles.noticeText}>{doc.reviewNotice}</Text>
-            </View>
-          </View>
-        ) : null}
-
         <View style={styles.sections}>
           {doc.sections.map((section, sectionIndex) => (
             <View key={section.title} style={styles.section}>
@@ -127,21 +115,8 @@ export default function LegalDocument({ docId }: LegalDocumentProps) {
           ))}
         </View>
 
-        {IS_DRAFT ? (
-          <View style={styles.placeholderCard}>
-            <Text style={styles.placeholderLabel}>OWNER + COUNSEL ACTION REQUIRED</Text>
-            <Text style={styles.placeholderTitle}>Complete before launch</Text>
-            {LEGAL_OPEN_ITEMS.map((item) => (
-              <View key={item} style={styles.bulletRow}>
-                <View style={[styles.bullet, { backgroundColor: theme.warning }]} />
-                <Text style={styles.placeholderText}>{item}</Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
-
         <Text style={styles.footer}>
-          © {new Date().getFullYear()} Brandthread.{IS_DRAFT ? ' Draft document pending legal review.' : ''}
+          © 2026 Brandthread, Inc.
         </Text>
       </ScrollView>
     </View>
@@ -257,40 +232,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     fontSize: 13,
     marginTop: 18,
   },
-  reviewNotice: {
-    flexDirection: 'row',
-    gap: 14,
-    marginTop: 28,
-    marginBottom: 42,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: theme.warning + '66',
-    backgroundColor: theme.card,
-    borderRadius: 16,
-  },
-  noticeIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.card,
-  },
-  noticeCopy: {
-    flex: 1,
-  },
-  noticeTitle: {
-    color: theme.text,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 15,
-    marginBottom: 5,
-  },
-  noticeText: {
-    color: theme.muted,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 14,
-    lineHeight: 21,
-  },
   sections: {
     gap: 38,
   },
@@ -341,34 +282,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSh
     fontFamily: 'Inter_400Regular',
     fontSize: 15,
     lineHeight: 24,
-  },
-  placeholderCard: {
-    marginTop: 48,
-    borderWidth: 1,
-    borderColor: theme.warning,
-    borderRadius: 16,
-    padding: 20,
-    backgroundColor: theme.card,
-  },
-  placeholderLabel: {
-    color: theme.warning,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 11,
-    letterSpacing: 1.2,
-    marginBottom: 8,
-  },
-  placeholderTitle: {
-    color: theme.text,
-    fontFamily: 'Inter_700Bold',
-    fontSize: 17,
-    marginBottom: 8,
-  },
-  placeholderText: {
-    flex: 1,
-    color: theme.muted,
-    fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    lineHeight: 21,
   },
   footer: {
     color: theme.subtle,

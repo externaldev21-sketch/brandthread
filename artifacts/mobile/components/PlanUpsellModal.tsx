@@ -14,7 +14,7 @@
  */
 
 import React from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, StyleSheet, Pressable, ScrollView, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -23,6 +23,7 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { GROWTH_EXTRAS, GROWTH_STUDIO_TOOLS, getGrowthStudioTools } from '@/lib/growthTools';
 import { getSellerPlan } from '@/lib/sellerPlans';
+import { useRevenueCat } from '@/lib/revenueCat';
 
 interface Props {
   visible: boolean;
@@ -31,13 +32,6 @@ interface Props {
   featureName: string;
   requiredPlan?: 'growth' | 'pro';
 }
-const PRO_FEATURES = [
-  'Everything in Growth',
-  'Advanced analytics',
-  'Priority support',
-  'Dedicated account manager',
-  'Custom integrations',
-];
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -53,7 +47,16 @@ export default function PlanUpsellModal({
   const s = React.useMemo(() => makeStyles(theme), [theme]);
   const plan = getSellerPlan(requiredPlan)!;
   const planLabel = plan.name;
-  const planPrice = plan.priceLabel;
+  // Apple requires the localized store price on native, not the web catalogue
+  // label. Resolve it from the matching RevenueCat package and hide the price
+  // entirely until that package has loaded, rather than showing the wrong
+  // (web) figure.
+  const { packages } = useRevenueCat();
+  const nativePackage = React.useMemo(
+    () => packages.find((pkg) => pkg.identifier === `$bt_${requiredPlan}`),
+    [packages, requiredPlan],
+  );
+  const planPrice = Platform.OS === 'web' ? plan.priceLabel : nativePackage?.product.priceString;
 
   function handleUpgrade() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -94,7 +97,7 @@ export default function PlanUpsellModal({
           >
             {/* Close button */}
             <TouchableOpacity style={s.closeBtn} onPress={handleClose} hitSlop={8}>
-              <Feather name="x" size={18} color="rgba(255,255,255,0.6)" />
+              <Feather name="x" size={18} color={theme.onAccent} style={{ opacity: 0.8 }} />
             </TouchableOpacity>
 
             {/* Lock icon */}
@@ -105,7 +108,7 @@ export default function PlanUpsellModal({
             <Text style={[s.headerTitle, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Upgrade to {planLabel}</Text>
             <Text style={s.headerSubtitle}>
               <Text style={s.featureNameText}>{featureName}</Text>
-              {' '}and {isGrowth ? (GROWTH_STUDIO_TOOLS.length - 1) + ' more tools are' : 'more features are'} available on the {planLabel} plan ({planPrice}/mo).
+              {' '}and {isGrowth ? (GROWTH_STUDIO_TOOLS.length - 1) + ' more tools are' : 'more features are'} available on the {planLabel} plan{planPrice ? ` (${planPrice}/mo)` : ''}.
             </Text>
           </LinearGradient>
 
@@ -167,7 +170,7 @@ export default function PlanUpsellModal({
             ) : (
               <>
                 <Text style={s.sectionLabel}>What you'll unlock</Text>
-                {PRO_FEATURES.map((f) => (
+                {plan.features.map((f) => (
                   <View key={f} style={s.perkRow}>
                     <View style={s.checkCircle}>
                       <Feather name="check" size={12} color={theme.success} />
@@ -181,7 +184,7 @@ export default function PlanUpsellModal({
             {/* ── CTA ── */}
             <TouchableOpacity style={[s.upgradeBtn, { backgroundColor: theme.accent }]} onPress={handleUpgrade} activeOpacity={0.85}>
               <Feather name="zap" size={16} color={theme.onAccent} />
-              <Text style={[s.upgradeBtnText, { color: theme.onAccent }]}>Upgrade to {planLabel} — {planPrice}/mo</Text>
+              <Text style={[s.upgradeBtnText, { color: theme.onAccent }]}>Upgrade to {planLabel}{planPrice ? ` — ${planPrice}/mo` : ''}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={s.laterBtn} onPress={handleClose} activeOpacity={0.7}>
@@ -242,7 +245,8 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     textAlign: 'center',
   },
   headerSubtitle: {
-    color: theme.muted,
+    color: theme.onAccent,
+    opacity: 0.8,
     fontSize: FS.sm,
     fontFamily: FONT.regular,
     textAlign: 'center',
@@ -250,7 +254,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   featureNameText: {
     fontFamily: FONT.semibold,
-    color: theme.text,
+    color: theme.onAccent,
   },
 
   // ── Scrollable body ──

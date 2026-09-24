@@ -18,6 +18,7 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, StatusBadge, FilterChip, SectionHeader } from '@/components/BrandthreadUI';
 import { getProduct } from '@/services/productService';
 import { Product, ProductVariant, OptionValue } from '@/services/productTypes';
+import { useApi } from '@/lib/api';
 import { calcPricing } from '@/lib/productUtils';
 import { formatCents, integerPercent } from '@/lib/money';
 
@@ -95,9 +96,17 @@ export default function ProductStoreScreen() {
   const { id, variantId } = useLocalSearchParams<{ id: string; variantId?: string }>();
   const insets = useSafeAreaInsets();
 
+  const api = useApi();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [mediaIndex, setMediaIndex] = useState(0);
+  const [sellerVerified, setSellerVerified] = useState(false);
+
+  useEffect(() => {
+    (api as any).seller?.getProfile?.()
+      ?.then((p: any) => setSellerVerified(!!p?.verified))
+      ?.catch(() => {});
+  }, []);
 
   // Selected option values: { [optionId]: valueId }
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
@@ -344,9 +353,9 @@ export default function ProductStoreScreen() {
               <View style={s.sellerInfo}>
                 <View style={s.sellerNameRow}>
                   <Text style={s.sellerName}>{sellerName}</Text>
-                  <Feather name="check-circle" size={ICON.xs} color={BLUE} />
+                  {sellerVerified && <Feather name="check-circle" size={ICON.xs} color={BLUE} />}
                 </View>
-                <Text style={s.sellerSub}>Verified Brand</Text>
+                {sellerVerified && <Text style={s.sellerSub}>Verified Brand</Text>}
               </View>
               <SecondaryButton
                 label="Follow"

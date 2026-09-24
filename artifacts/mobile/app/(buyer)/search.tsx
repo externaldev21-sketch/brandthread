@@ -627,7 +627,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   masonryInitials: { color: theme.onAccent, fontSize: 36, fontFamily: 'Inter_700Bold', opacity: 0.9 },
   masonryFallbackLine: { width: 42, height: 2, borderRadius: 1, backgroundColor: `${theme.onAccent}8A`, marginTop: 10 },
   masonryPrice: { alignSelf: 'flex-start', backgroundColor: `${theme.background}C7`, borderRadius: 12, paddingHorizontal: 9, paddingVertical: 6, margin: 9 },
-  masonryPriceText: { color: theme.onAccent, fontSize: 12, fontFamily: 'Inter_700Bold' },
+  masonryPriceText: { color: theme.text, fontSize: 12, fontFamily: 'Inter_700Bold' },
   // Fixed height accommodates two lines so cards never shift height whether
   // the product name wraps or not (numberOfLines={2} below).
   masonryName: { color: theme.text, fontSize: 14, lineHeight: 18, height: 36, fontFamily: 'Inter_700Bold', marginTop: 8 },

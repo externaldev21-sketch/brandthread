@@ -799,10 +799,10 @@ export default function CreatePostScreen() {
           localSlides = updateSlideUploadState(localSlides, localSlides[i].id, 'uploaded', result.objectPath);
           setEditableSlides([...localSlides]);
         } catch (uploadErr) {
-          const msg = uploadErr instanceof Error ? uploadErr.message : 'Upload failed';
+          const msg = `Couldn't upload slide ${i + 1}. Tap Retry.`;
           localSlides = updateSlideUploadState(localSlides, localSlides[i].id, 'error', undefined, msg);
           setEditableSlides([...localSlides]);
-          throw new Error(`Slide ${i + 1}: ${msg}`);
+          throw new Error(msg);
         }
       }
       // Phase 2: Compose slideshow with overlays
@@ -813,7 +813,7 @@ export default function CreatePostScreen() {
       setSlideProcessingPhase('ready');
     } catch (err) {
       setSlideProcessingPhase('error');
-      setSlideProcessingError(err instanceof Error ? err.message : 'Slideshow processing failed. Tap retry to keep working.');
+      setSlideProcessingError(err instanceof Error && err.message.startsWith("Couldn't upload slide") ? err.message : "Couldn't upload slide. Tap Retry.");
     }
   }
 
@@ -866,7 +866,7 @@ export default function CreatePostScreen() {
     } catch (error) {
       setVideoClips([...uploaded]);
       setProcessingPhase('error');
-      setProcessingError(error instanceof Error ? error.message : 'Video processing failed. Tap retry to keep working with these clips.');
+      setProcessingError("Couldn't process your video. Tap Retry.");
     }
   }
 
@@ -909,48 +909,15 @@ export default function CreatePostScreen() {
             <Feather name="x" size={26} color={FG} />
           </TouchableOpacity>
 
-          {/* Sound pill */}
-          <TouchableOpacity
-            style={ts.mpSoundPill}
-            onPress={() => setShowSoundModal(true)}
-            activeOpacity={0.8}
-          >
-            <Feather name="music" size={13} color={FG} style={{ marginRight: 6 }} />
-            <Text style={ts.mpSoundPillText} numberOfLines={1}>
-              {selectedSound ? selectedSound.soundTitle : 'Add sound'}
-            </Text>
-            {selectedSound && (
-              <TouchableOpacity
-                onPress={() => setSelectedSound(null)}
-                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-                style={{ marginLeft: 6 }}
-              >
-                <Feather name="x" size={12} color={MUTED} />
-              </TouchableOpacity>
-            )}
-          </TouchableOpacity>
-
-          {/* Right-top placeholder (keeps pill centered) */}
+          {/* Right-top placeholder (keeps close button balanced) */}
+          <View style={ts.mpTopBtn} />
           <View style={ts.mpTopBtn} />
         </View>
 
         {/* ── RIGHT-EDGE TOOL COLUMN ───────────────────────────── */}
         <View style={[ts.mpRightTools, { top: topPad + 60 }]}>
-          <TouchableOpacity style={ts.mpToolBtn} activeOpacity={0.7}>
-            <Feather name="refresh-cw" size={22} color={FG} />
-          </TouchableOpacity>
-          <View style={ts.mpToolDivider} />
-          <TouchableOpacity style={ts.mpToolBtn} activeOpacity={0.7}>
+          <TouchableOpacity style={ts.mpToolBtn} activeOpacity={0.7} onPress={() => openTextEditor()}>
             <Text style={ts.mpTextTool}>Aa</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={ts.mpToolBtn} activeOpacity={0.7}>
-            <Feather name="clock" size={22} color={FG} />
-          </TouchableOpacity>
-          <TouchableOpacity style={ts.mpToolBtn} activeOpacity={0.7}>
-            <Feather name="minimize-2" size={22} color={FG} />
-          </TouchableOpacity>
-          <TouchableOpacity style={ts.mpToolBtn} activeOpacity={0.7}>
-            <Feather name="sun" size={22} color={FG} />
           </TouchableOpacity>
         </View>
 
@@ -1435,37 +1402,13 @@ export default function CreatePostScreen() {
             <Feather name="arrow-left" size={24} color={busy ? MUTED : FG} />
           </TouchableOpacity>
 
-          {/* Sound pill */}
-          {selectedSound ? (
-            <TouchableOpacity
-              style={ts.soundPill}
-              onPress={() => setShowSoundModal(true)}
-              activeOpacity={0.85}
-            >
-              <Feather name="music" size={13} color={FG} style={{ marginRight: 6 }} />
-              <Text style={ts.soundPillText} numberOfLines={1}>
-                {selectedSound.soundTitle}
-              </Text>
-              <TouchableOpacity onPress={() => setSelectedSound(null)} style={{ marginLeft: 8 }}>
-                <Feather name="x" size={13} color={MUTED} />
-              </TouchableOpacity>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity style={ts.soundPill} onPress={() => setShowSoundModal(true)} activeOpacity={0.85}>
-              <Feather name="music" size={13} color={FG} style={{ marginRight: 6 }} />
-              <Text style={ts.soundPillText}>Add sound</Text>
-            </TouchableOpacity>
-          )}
+          <View style={{ width: 44 }} />
 
           <View style={{ width: 44 }} />
         </View>
 
         {/* Right floating toolbar */}
         <View style={[ts.rightToolbar, { paddingTop: topPad + 56 }]}>
-          <ToolBtn icon="settings" onPress={() => {}} />
-          <View style={ts.toolDivider} />
-          <ToolBtn icon="sliders" />
-          <ToolBtn icon="film" />
           <ToolBtn
             icon="type"
             label="Text"
@@ -1772,26 +1715,6 @@ export default function CreatePostScreen() {
               </View>
             )}
 
-            {/* Sound */}
-            {!isBuyer && (
-              <View style={ts.settingsSeparator} />
-            )}
-            {!isBuyer && (
-              selectedSound ? (
-                <View style={ts.soundRow}>
-                  <Feather name="music" size={16} color={PURPLE} />
-                  <Text style={ts.soundRowText} numberOfLines={1}>
-                    {selectedSound.soundTitle} — {selectedSound.artist}
-                  </Text>
-                  <TouchableOpacity onPress={() => setSelectedSound(null)}>
-                    <Feather name="x" size={16} color={MUTED} />
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <SettingsRow label="Add sound" onPress={() => setShowSoundModal(true)} />
-              )
-            )}
-
             {/* Divider */}
             <View style={ts.settingsSeparator} />
 
@@ -1913,7 +1836,7 @@ export default function CreatePostScreen() {
                 } catch (error) {
                   Alert.alert(
                     'Draft not saved',
-                    error instanceof Error ? error.message : 'Could not save draft. Please try again.',
+                    "Couldn't save your draft. Check your connection and try again.",
                   );
                 } finally {
                   setIsSavingDraft(false);
@@ -1952,7 +1875,7 @@ export default function CreatePostScreen() {
                   setStep('done');
                 } catch (error) {
                   setStep('post-details');
-                  Alert.alert('Publish failed', error instanceof Error ? error.message : 'Something went wrong.');
+                  Alert.alert('Publish failed', "Couldn't post. Your edits are safe — try again.");
                 } finally {
                   setIsPublishing(false);
                 }

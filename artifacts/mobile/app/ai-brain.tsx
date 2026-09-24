@@ -72,6 +72,22 @@ import {
   RADIUS,
 } from '@/lib/theme';
 
+// ─── Error copy ────────────────────────────────────────────────────────────────
+
+/** Maps raw errors from services/aiService.ts to human copy. Never show server/vendor text. */
+function humanizeAiError(rawMessage?: string): string {
+  const msg = rawMessage ?? '';
+  if (/sign in to use brandthread ai|authentication error/i.test(msg)) {
+    return 'Sign in to use Brandthread AI.';
+  }
+  if (/rate limit reached/i.test(msg)) {
+    return "You're sending fast — try again in a minute.";
+  }
+  // Covers "AI service is not configured…", "AI request failed (…)." and any other
+  // network / provider / unavailable error.
+  return "Couldn't reach Brandthread AI. Tap Retry.";
+}
+
 // ─── Streaming Dots ────────────────────────────────────────────────────────────
 
 function StreamingDots() {
@@ -411,8 +427,7 @@ export default function AiBrainScreen() {
       } catch (err: unknown) {
         const isAbort = (err as Error)?.name === 'AbortError';
         if (!isAbort) {
-          const msg = (err as Error)?.message ?? 'Something went wrong. Please try again.';
-          setErrorMsg(msg);
+          setErrorMsg(humanizeAiError((err as Error)?.message));
           // Restore user text so they can retry without retyping.
           setInputText(text);
         }

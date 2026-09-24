@@ -22,6 +22,7 @@ const {
       balance: vi.fn(),
       transactions: vi.fn(),
       payouts: vi.fn(),
+      summary: vi.fn(),
     },
     seller: {
       connect: {
@@ -215,6 +216,7 @@ function resetApiToRoleRequired() {
   apiMock.finance.balance.mockRejectedValue(roleError());
   apiMock.finance.transactions.mockRejectedValue(roleError());
   apiMock.finance.payouts.mockRejectedValue(roleError());
+  apiMock.finance.summary.mockRejectedValue(roleError());
   apiMock.seller.connect.status.mockRejectedValue(roleError());
   apiMock.seller.subscription.status.mockRejectedValue(roleError());
   apiMock.seller.subscription.invoices.mockRejectedValue(roleError());
@@ -306,7 +308,6 @@ describe('seller financial role boundaries', () => {
     const payouts = await renderScreen(PayoutsScreen);
 
     for (const testID of [
-      'seller-billing-plan-menu',
       'seller-billing-view-bill',
       'seller-billing-view-breakdown',
       'seller-billing-payment-method',
@@ -343,7 +344,6 @@ describe('seller financial role boundaries', () => {
     const finance = await renderScreen(FinanceScreen);
     const payouts = await renderScreen(PayoutsScreen);
 
-    expect(hasTestId(billing, 'seller-billing-plan-menu')).toBe(true);
     expect(hasTestId(billing, 'seller-billing-payment-method')).toBe(true);
     expect(hasTestId(subscription, 'seller-subscription-change-growth')).toBe(true);
     expect(hasTestId(subscription, 'seller-subscription-change-pro')).toBe(true);

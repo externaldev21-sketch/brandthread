@@ -54,7 +54,8 @@ export default function BuyerOtherProfileScreen() {
   const name     = params.name    || 'Unknown';
   const handle   = params.handle  || '@unknown';
   const initials = params.initials || '?';
-  const color    = params.color   || ACCENT;
+  const hasRealColor = !!params.color;
+  const color    = params.color   || theme.cardElevated;
 
   // ── Remote profile state ────────────────────────────────────────────────────
   const [profile, setProfile]           = useState<RemoteProfile | null>(null);
@@ -81,8 +82,14 @@ export default function BuyerOtherProfileScreen() {
   const gridWidth = isTablet ? Math.min(winWidth, GRID_MAX_WIDTH) : winWidth;
   const gridCellSize = (gridWidth - GRID_GAP * (gridColumns - 1)) / gridColumns;
 
-  // Derived display values
+  // Derived display values — once the real profile has loaded, it always
+  // overrides the route-param placeholders (which may be stale or "@unknown"
+  // when this screen was opened with only a userId, e.g. from Inbox → Follows).
   const displayName = profile ? (profile.displayName || profile.name || name) : name;
+  const displayHandle = profile?.username ? `@${profile.username}` : handle;
+  const displayInitials = profile
+    ? (displayName.trim()[0]?.toUpperCase() || initials)
+    : initials;
   const displayBio  = profile?.bio ?? null;
   const isFollowing   = profile?.isFollowing  ?? false;
   const isFollowedBy  = profile?.isFollowedBy ?? false;
@@ -266,7 +273,7 @@ export default function BuyerOtherProfileScreen() {
           >
             {/* No gradient ring — just a plain border when stories active */}
             <View style={[styles.avatar, { backgroundColor: color }, storyIds.length > 0 && styles.avatarActive]}>
-              <Text style={styles.avatarText}>{initials}</Text>
+              <Text style={[styles.avatarText, !hasRealColor && { color: theme.text }]}>{displayInitials}</Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -274,7 +281,7 @@ export default function BuyerOtherProfileScreen() {
         {/* ── Name / Handle / Bio ── */}
         <View style={styles.infoSection}>
           <Text style={styles.nameText}>{displayName}</Text>
-          <Text style={styles.handleText}>{handle}</Text>
+          <Text style={styles.handleText}>{displayHandle}</Text>
           {displayBio
             ? <Text style={styles.bioText}>{displayBio}</Text>
             : <Text style={styles.bioText}>No bio yet.</Text>
@@ -352,14 +359,33 @@ export default function BuyerOtherProfileScreen() {
             <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ paddingHorizontal: 0 }}>
               <View style={styles.grid}>
                 {posts.map(post => (
-                  <View key={post.id} style={[styles.gridCell, { width: gridCellSize, height: gridCellSize }]}>
+                  <TouchableOpacity
+                    key={post.id}
+                    style={[styles.gridCell, { width: gridCellSize, height: gridCellSize }]}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityLabel="Open post"
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      const qs = new URLSearchParams({
+                        postId: post.id,
+                        postAuthorName: displayName,
+                        postAuthorInitials: displayInitials,
+                        postAuthorColor: hasRealColor ? color : theme.cardElevated,
+                        postMediaColor1: post.mediaColors?.[0] ?? '#1a1a2e',
+                        postMediaColor2: post.mediaColors?.[1] ?? '#0d0d1a',
+                        postType: post.type,
+                      });
+                      router.push(`/buyer-post-viewer?${qs.toString()}` as never);
+                    }}
+                  >
                     {post.mediaUrl
                       ? <Image source={{ uri: post.mediaUrl }} style={styles.gridCellInner} resizeMode="cover" />
                       : <View style={[styles.gridCellInner, { backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' }]}>
                           <Feather name={postTypeIcon(post.type) as any} size={ICON.md} color={MUTED} />
                         </View>
                     }
-                  </View>
+                  </TouchableOpacity>
                 ))}
               </View>
             </ResponsiveContainer>

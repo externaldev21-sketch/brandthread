@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Switch, Alert, TextInput, ActivityIndicator, Modal, Share, RefreshControl } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, TextInput, ActivityIndicator, Modal, Share, RefreshControl } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
@@ -53,8 +53,6 @@ export default function TeamScreen() {
   const router  = useRouter();
   const api     = useApi();
   const { currentRole } = useTeamRole();
-  const [twoFactor, setTwoFactor] = useState(true);
-  const [fraud, setFraud]         = useState(true);
   const [members,  setMembers]    = useState<any[]>([]);
   const [activity, setActivity]   = useState<any[]>([]);
   const [hasMoreActivity, setHasMoreActivity] = useState(false);
@@ -371,30 +369,6 @@ export default function TeamScreen() {
         )}
       </View>
 
-      {/* Security Toggles */}
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Security</Text>
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {[
-          { label: 'Two-Factor Authentication', sub: 'Required for all staff', value: twoFactor, setter: setTwoFactor },
-          { label: 'Fraud Monitoring', sub: 'AI-powered transaction alerts', value: fraud, setter: setFraud },
-        ].map((s, i) => (
-          <View key={s.label} style={[styles.secRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.secLabel, { color: colors.foreground }]}>{s.label}</Text>
-              <Text style={[styles.secSub, { color: colors.mutedForeground }]}>{s.sub}</Text>
-            </View>
-            <Switch
-              value={s.value}
-              onValueChange={(v) => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                s.setter(v);
-              }}
-              trackColor={{ false: colors.secondary, true: colors.primary }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-        ))}
-      </View>
     </ScrollView>
 
     {/* Invite modal — email + shareable link options */}

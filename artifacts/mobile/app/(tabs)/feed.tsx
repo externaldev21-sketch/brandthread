@@ -96,11 +96,10 @@ interface HighDemandProduct {
   commerce: CommerceSignalData;
 }
 
-function BuyerHighDemandPage({ pageWidth, pageHeight, bottomClearance = 100 }: { pageWidth: number; pageHeight: number; bottomClearance?: number }) {
+function BuyerHighDemandPage({ pageWidth, pageHeight, bottomClearance = 100, topInset }: { pageWidth: number; pageHeight: number; bottomClearance?: number; topInset: number }) {
   const { theme } = useAppTheme();
   const { push } = useThreadPull();
   const api = useApi();
-  const insets = useSafeAreaInsets();
 
   const [items, setItems]       = useState<HighDemandProduct[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -137,7 +136,9 @@ function BuyerHighDemandPage({ pageWidth, pageHeight, bottomClearance = 100 }: {
 
   useEffect(() => { fetchDemand(); }, [fetchDemand]);
 
-  const topPad = insets.top + 20;
+  // Clear the floating top overlay (Friends/Following/For You/Cart row) plus
+  // breathing room, so the "High Demand" header never renders behind it.
+  const topPad = topInset + 16;
 
   return (
     <View style={{ width: pageWidth, height: pageHeight, backgroundColor: BG }}>
@@ -1339,6 +1340,11 @@ export default function FeedScreen({
   const previewTopInset = Platform.OS === 'web' ? 67 : insets.top;
   const previewBottomInset = insets.bottom;
   const isBuyerSurface = buyerMode || showFashionPreview;
+  // Height of the floating top overlay (Friends/Following/For You/Cart row):
+  // topBar's own paddingTop + paddingBottom, plus the buyerTopRow's height.
+  // Single source of truth so BuyerHighDemandPage's content never renders
+  // underneath it (see styles.topBar / styles.buyerTopRow below).
+  const buyerHeaderHeight = previewTopInset + 2 + 44 + 4;
   const buyerBarInset = useBuyerTabBarInset();
   const router = useRouter();
   const { userId } = useAuth();
@@ -1359,7 +1365,7 @@ export default function FeedScreen({
   const [shopSelection, setShopSelection] = useState<ShopSheetSelection | null>(null);
   const [cartCount, setCartCount] = useState(0);
   const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
-  const [hasUnread, setHasUnread] = useState(true);
+  const [hasUnread, setHasUnread] = useState(false);
   const [sellerFeedPosts, setSellerFeedPosts] = useState<SpotlightItem[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
   const [feedRefreshing, setFeedRefreshing] = useState(false);
@@ -1876,7 +1882,7 @@ export default function FeedScreen({
         renderItem={({ item, index }) => {
           // Buyer demand page — full-screen at index 0 in buyer mode
           if (isDemandPageItem(item as FeedItem)) {
-            return <BuyerHighDemandPage pageWidth={pageWidth} pageHeight={pageHeight} bottomClearance={bottomClearance} />;
+            return <BuyerHighDemandPage pageWidth={pageWidth} pageHeight={pageHeight} bottomClearance={bottomClearance} topInset={buyerHeaderHeight} />;
           }
           if ((item as any)._isLive) {
             const live = item as unknown as LiveStreamFeedItem;
@@ -2008,7 +2014,7 @@ export default function FeedScreen({
               style={styles.topAvatarBtn}
               activeOpacity={0.75}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-              onPress={() => { setShowNotifs(true); setHasUnread(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+              onPress={() => { setHasUnread(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/buyer-notifications' as never); }}
             >
               <View style={[styles.topAvatar, { backgroundColor: SURFACE }]}>
                 <Feather name="user" size={16} color={ON_DARK} />
@@ -2077,23 +2083,8 @@ export default function FeedScreen({
       </View>
       )}
 
-      {/* ─ Notifications sheet ─ */}
-      <Modal visible={showNotifs} animationType="fade" transparent onRequestClose={() => setShowNotifs(false)}>
-        <View style={styles.modalBackdrop}>
-          <TouchableWithoutFeedback onPress={() => setShowNotifs(false)}>
-            <View style={StyleSheet.absoluteFill} />
-          </TouchableWithoutFeedback>
-          <SheetRise style={[styles.commentsSheet, { paddingBottom: Math.max(previewBottomInset, 16) }]}>
-            <View style={styles.commentsHandle} />
-            <Text style={styles.commentsTitle}>Notifications</Text>
-            <View style={{ gap: 14, paddingTop: 4 }}>
-              <Text style={styles.notifRow}>NXGEN liked your comment on Ripstop Cargo Trousers</Text>
-              <Text style={styles.notifRow}>Meridian Co. started following you</Text>
-              <Text style={styles.notifRow}>@street.era replied to your comment</Text>
-            </View>
-          </SheetRise>
-        </View>
-      </Modal>
+      {/* Notifications now open the real /buyer-notifications screen instead of
+          this hardcoded fake sheet — see the bell button's onPress above. */}
       <Modal
         visible={showRepostEducation}
         animationType="fade"

@@ -50,6 +50,7 @@ import { useAuth } from '@clerk/expo';
 import { formatCents } from '@/lib/money';
 import { CachedImage } from '@/components/CachedImage';
 import { CardSkeleton, EmptyState, ListSkeleton, ResponsiveContainer } from '@/components/layout';
+import { saveItem, removeSavedItem, getSavedItems } from '@/services/socialService';
 import {
   CommerceSignalRow,
   ClaimedRemainingLabel,
@@ -173,8 +174,8 @@ const HighDemandRow = React.memo(function HighDemandRow({ item }: { item: HighDe
       {item.imageUri ? (
         <CachedImage source={{ uri: item.imageUri }} style={hd.avatar} contentFit="cover" />
       ) : (
-        <View style={[hd.avatar, { backgroundColor: item.colorHex, alignItems: 'center', justifyContent: 'center' }]}>
-          <Text style={hd.initials}>{item.initials}</Text>
+        <View style={[hd.avatar, { backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' }]}>
+          <Text style={[hd.initials, { color: theme.text }]}>{item.initials}</Text>
         </View>
       )}
       <View style={{ flex: 1 }}>
@@ -235,6 +236,22 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
   const [listWidth, setListWidth] = useState(viewportWidth);
   const [activeIndex, setActiveIndex] = useState(0);
   const [savedIds, setSavedIds] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    let cancelled = false;
+    getSavedItems().then(saved => {
+      if (cancelled) return;
+      const savedTargetIds = new Set(saved.map(item => item.targetId));
+      setSavedIds(current => {
+        const next = { ...current };
+        for (const item of items) {
+          if (savedTargetIds.has(item.productId ?? item.id)) next[item.id] = true;
+        }
+        return next;
+      });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
   const scrollX = useRef(new Animated.Value(0)).current;
   const measuredWidth = Math.max(1, listWidth);
   const cardWidth = Math.min(Math.max(measuredWidth - 54, 1), 370);
@@ -319,8 +336,16 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
                   <TouchableOpacity
                     style={showcase.save}
                     onPress={() => {
-                      setSavedIds(current => ({ ...current, [item.id]: !current[item.id] }));
+                      const nextSaved = !saved;
+                      setSavedIds(current => ({ ...current, [item.id]: nextSaved }));
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      const targetId = item.productId ?? item.id;
+                      const action = nextSaved
+                        ? saveItem({ type: 'product', targetId, title: item.name, subtitle: item.brand, accentColor: item.colorHex })
+                        : removeSavedItem(targetId);
+                      action.catch(() => {
+                        setSavedIds(current => ({ ...current, [item.id]: !nextSaved }));
+                      });
                     }}
                     accessibilityRole="button"
                     accessibilityLabel={saved ? 'Remove from saved' : 'Save product'}
@@ -333,8 +358,8 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
                   {item.imageUri ? (
                     <CachedImage source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} contentFit="contain" />
                   ) : (
-                    <View style={[StyleSheet.absoluteFill, showcase.visualFallback, { backgroundColor: item.colorHex }]}>
-                      <Text style={showcase.initials}>{item.initials}</Text>
+                    <View style={[StyleSheet.absoluteFill, showcase.visualFallback, { backgroundColor: theme.cardElevated }]}>
+                      <Text style={[showcase.initials, { color: theme.text }]}>{item.initials}</Text>
                     </View>
                   )}
                   {item.tag && (
@@ -445,8 +470,8 @@ const DropRow = React.memo(function DropRow({ item }: { item: DropRowItem }) {
       {item.imageUri ? (
         <CachedImage source={{ uri: item.imageUri }} style={dr.avatar} contentFit="cover" />
       ) : (
-        <View style={[dr.avatar, { backgroundColor: item.colorHex, alignItems: 'center', justifyContent: 'center' }]}>
-          <Text style={dr.initials}>{item.initials}</Text>
+        <View style={[dr.avatar, { backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' }]}>
+          <Text style={[dr.initials, { color: theme.text }]}>{item.initials}</Text>
         </View>
       )}
       <View style={{ flex: 1 }}>
@@ -526,8 +551,8 @@ const TrendingRow = React.memo(function TrendingRow({ item }: { item: TrendingRo
       accessibilityLabel={`#${item.rank}, ${item.name} by ${item.brand}`}
     >
       <Text style={[tr.rank, { color: theme.accent }]}>#{item.rank}</Text>
-      <View style={[tr.avatar, { backgroundColor: item.colorHex, alignItems: 'center', justifyContent: 'center' }]}>
-        <Text style={tr.initials}>{item.initials}</Text>
+      <View style={[tr.avatar, { backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' }]}>
+        <Text style={[tr.initials, { color: theme.text }]}>{item.initials}</Text>
       </View>
       <View style={{ flex: 1 }}>
         <Text style={tr.name} numberOfLines={1}>{item.name}</Text>
@@ -827,8 +852,6 @@ export default function DiscoverScreen() {
         <SectionHead
           title="For You"
           sub="Products from across the platform"
-          action="See all"
-          onAction={() => router.push('/(buyer)/' as never)}
         />
       </ResponsiveContainer>
       {forYouLoading ? (
@@ -854,8 +877,6 @@ export default function DiscoverScreen() {
         <SectionHead
           title="Drops"
           sub={dropsItems.some(d => d.isLive) ? 'Live now and coming up' : 'Coming up'}
-          action="All drops"
-          onAction={() => router.push('/(buyer)/' as never)}
         />
       </ResponsiveContainer>
       <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>

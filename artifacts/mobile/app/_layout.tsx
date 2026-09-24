@@ -22,6 +22,7 @@ import { flushPendingBuyerOnboardingSync } from '@/lib/buyerOnboardingSync';
 import { RoleProvider } from '@/contexts/RoleContext';
 import { ThreadPullProvider } from '@/contexts/ThreadPullTransitionContext';
 import { AppThemeProvider, useAppTheme } from '@/contexts/AppThemeContext';
+import { PrimaryButton } from '@/components/BrandthreadUI';
 import { AppIconProvider } from '@/contexts/AppIconContext';
 import BootScreen from '@/components/BootScreen';
 import * as Notifications from 'expo-notifications';
@@ -114,23 +115,30 @@ function RuntimeThemeShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── Seller tab bar exclusion list ───────────────────────────────────────────
-// The bar shows on EVERY authenticated seller screen by default.
-// Only exclude routes where the seller identity/shell does not exist at all:
-//   • Boot/auth/onboarding (no session yet)
-//   • Legal public pages (reachable without auth)
-//   • The Expo Router root index (BootScreen redirect — no segment)
-//   • The navigation isolation test probe (CI only)
-//   • The buyer app group — buyer accounts never see the seller shell
-//     (role gating already prevents this; explicit exclusion avoids any flash)
+// ─── Seller tab bar full-screen deny-list ────────────────────────────────────
+// The bar is `position: absolute` (SellerGlobalTabBar.tsx) so it physically
+// overlays whatever is underneath it — it is NOT a harmless flex sibling.
+// It should show on every normal seller screen by default — the seller
+// `(tabs)` shell AND every pushed management screen (Settings, Billing, Team,
+// Customers, Payments, order/return/dispute detail, Manufacturer hub, and
+// dozens more) — and be hidden ONLY on the small, explicit set of genuine
+// full-screen creation/camera/checkout flows below, where the bar would
+// visually collide with the screen's own bottom-anchored controls (see
+// docs/polish/punch-list.md, "floating tab bar" / Top 20 item #16, and the
+// web-screenshot visual pass).
 //
-// Full-screen seller routes (create-post, camera-capture, seller-go-live,
-// seller-live, buyer-live, buyer-story-*, plans, team-invite, seller-profile,
-// buyer-product-detail, buyer-checkout, buyer-post-comments, buyer-report, etc.)
-// are intentionally NOT excluded — the bar is a normal flex sibling and does
-// not physically overlay these screens. Role gating prevents buyer accounts
-// from seeing it on buyer-facing screens.
-const SELLER_TAB_BAR_EXCLUDED_SEGMENTS = new Set([
+// This is a DENY-list (not an allow-list) on purpose: an allow-list defaults
+// new pushed routes to "hidden", which silently regresses every ordinary
+// seller screen (Settings, Billing, Customers, etc.) the moment it's added —
+// that was the regression this comment used to defend as intentional. A
+// short, curated deny-list of the few screens that are actually full-bleed
+// keeps the default correct (bar shows) for everything else, present and
+// future.
+//
+// This affects the SELLER tab bar only. The buyer tab bar is a separate
+// component/gate entirely (see the buyer `(buyer)` group layout) and is not
+// touched here.
+const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // Boot: "/" renders BootScreen with no segment; AuthGate redirects immediately
   'index',
   // Auth flow — no seller session
@@ -149,6 +157,28 @@ const SELLER_TAB_BAR_EXCLUDED_SEGMENTS = new Set([
   'navigation-isolation-probe',
   // Buyer app group — buyer sessions only; seller role gating prevents cross-exposure
   '(buyer)',
+
+  // ── Genuine full-screen creation / camera / checkout flows ──
+  // Registered as a full-screen modal presentation below — real camera UI
+  // with its own shutter/mode controls anchored to the bottom of the screen.
+  'camera-capture',
+  'create-post',
+  // Full-page form with its own bottom "Publish"/"Uploading photos…" CTA.
+  'add-product',
+  // Paywall — screenshots showed the bar literally overlapping it.
+  'plans',
+  // Full-bleed canvas editor with its own bottom toolbar (layers, crop, etc.);
+  // the other design-studio screens (template/asset pickers, AI tool forms)
+  // are normal scrollable screens and keep the bar.
+  'design-canvas',
+  // Storefront-from-AI wizard and its full-screen generating/progress screen.
+  'store-generate',
+  'store-generating',
+  // Multi-step quote wizard with its own step header/footer.
+  'quote-request',
+  // Seller livestream — real full-screen camera/broadcast controls.
+  'seller-go-live',
+  'seller-live',
 ]);
 
 // ─── SellerBarGate ────────────────────────────────────────────────────────────
@@ -160,9 +190,9 @@ const SELLER_TAB_BAR_EXCLUDED_SEGMENTS = new Set([
 // AuthGate is the single authority that reads AsyncStorage and the server
 // profile. SellerBarGate consumes SellerShellContext — no parallel read.
 //
-// The exclusion list is intentionally minimal (boot/auth/onboarding/legal/buyer
-// group only). Every normal seller screen — including full-screen modals that
-// are flex siblings of the bar — shows the tab bar.
+// It is gated by a DENY-list (SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS): the bar
+// shows by default on every seller route, and is hidden only on the small,
+// explicit set of genuine full-screen flows — see the deny-list comment above.
 
 function SellerBarGate() {
   const { isActiveSeller } = useSellerShell();
@@ -176,11 +206,13 @@ function SellerBarGate() {
 
   const showBar = isActiveSeller || isPreviewSeller;
 
-  // Check exclusion list: first segment determines the route
+  // Deny-list: first segment determines the route. The bar renders on every
+  // seller route except the curated full-screen set (see
+  // SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS).
   const firstSegment = (segments[0] as string | undefined) ?? '';
-  const isExcluded = SELLER_TAB_BAR_EXCLUDED_SEGMENTS.has(firstSegment);
+  const isFullScreenRoute = SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS.has(firstSegment);
 
-  if (!showBar || isExcluded) return null;
+  if (!showBar || isFullScreenRoute) return null;
 
   return (
     <>
@@ -731,12 +763,18 @@ function RootLayoutNav() {
         <Text style={{ color: '#9898A6', fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 21, textAlign: 'center' }}>
           This feature is paused while we make improvements. Your existing work is still safe.
         </Text>
-        <Pressable
-          onPress={() => router.back()}
-          style={{ marginTop: 8, minHeight: 44, paddingHorizontal: 22, borderRadius: 10, backgroundColor: '#F5F5F7', alignItems: 'center', justifyContent: 'center' }}
-        >
-          <Text style={{ color: '#FFFFFF', fontFamily: 'Inter_600SemiBold', fontSize: 14 }}>Go back</Text>
-        </Pressable>
+        <PrimaryButton
+          label="Go back"
+          small
+          style={{ marginTop: 8 }}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/');
+            }
+          }}
+        />
       </View>
     );
   }

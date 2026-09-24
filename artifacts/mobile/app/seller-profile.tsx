@@ -16,6 +16,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -637,6 +638,17 @@ export default function SellerProfileScreen() {
     setSelectedPost(null);
   }, []);
 
+  const handleCopyPostLink = useCallback(async (post: SellerPost) => {
+    const profileUrl = buildCanonicalProfileUrl(profile.username);
+    const url = profileUrl ? `${profileUrl}?post=${encodeURIComponent(post.id)}` : null;
+    if (!url) {
+      Alert.alert('Couldn’t copy link', 'Try again.');
+      return;
+    }
+    await Clipboard.setStringAsync(url);
+    Alert.alert('Link copied');
+  }, [profile.username]);
+
   const truncatedBio = profile.bio.length > 120 && !bioExpanded
     ? profile.bio.slice(0, 120) + '…'
     : profile.bio;
@@ -989,15 +1001,15 @@ export default function SellerProfileScreen() {
                 </View>
               </View>
             </View>
-            <ActionRow icon="eye" label="Open post" onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); handleActionSheetClose(); }} />
+            {/* "Open post", "Pin post", "Archive post", "Save post" and "Delete
+                post" are hidden here: there's no real post-management API for
+                pin/archive/save/delete yet, and shipping fake actions for them
+                (especially a "Delete post" that doesn't delete) would be
+                actively misleading. "Edit post", "View analytics" and "Copy
+                link" below are all real. */}
             <ActionRow icon="edit-2" label="Edit post" onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); handleActionSheetClose(); router.push(('/create-post?editId=' + selectedPost.id) as never); }} />
             <ActionRow icon="bar-chart-2" label="View analytics" onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); handleActionSheetClose(); router.push(('/post-analytics?id=' + selectedPost.id) as never); }} />
-            <ActionRow icon="map-pin" label={selectedPost.isPinned ? 'Unpin post' : 'Pin post'} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); handleActionSheetClose(); }} />
-            <ActionRow icon="archive" label="Archive post" onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); handleActionSheetClose(); }} />
-            <ActionRow icon="copy" label="Copy link" onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); handleActionSheetClose(); Alert.alert('Link copied'); }} />
-            <ActionRow icon="bookmark" label="Save post" onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); handleActionSheetClose(); }} />
-            <View style={styles.sheetSeparator} />
-            <ActionRow icon="trash-2" label="Delete post" color={RED} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); handleActionSheetClose(); }} />
+            <ActionRow icon="copy" label="Copy link" onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); const post = selectedPost; handleActionSheetClose(); void handleCopyPostLink(post); }} />
             <TouchableOpacity style={styles.sheetCancel} onPress={handleActionSheetClose}>
               <Text style={styles.sheetCancelText}>Cancel</Text>
             </TouchableOpacity>

@@ -85,7 +85,7 @@ export default function FinanceScreen() {
   const overviewCards = [
     { label: 'Available', value: formatCents(availAmt), color: colors.success, icon: 'trending-up' as const },
     { label: 'Pending',   value: formatCents(pendAmt),  color: colors.primary, icon: 'activity' as const },
-    { label: 'Net (30d)', value: formatCents(Math.abs(totalNet)), color: colors.info, icon: 'percent' as const },
+    { label: 'Net (recent)', value: formatCents(totalNet), color: colors.info, icon: 'percent' as const },
   ];
 
   // Build expenses list from real transactions
@@ -101,14 +101,12 @@ export default function FinanceScreen() {
   const PL_DATA_FALLBACK = [
      { label: 'Gross Revenue', value: formatCents(transactions.filter(t => t.net > 0).reduce((a, t) => a + t.amount, 0)), positive: true },
      { label: 'Fees',          value: '-' + formatCents(transactions.reduce((a, t) => a + Math.abs(t.fee ?? 0), 0)),        positive: false },
-     { label: 'Net Total',     value: formatCents(Math.abs(totalNet)), positive: totalNet >= 0, highlight: true },
+     { label: 'Net (recent)',  value: formatCents(totalNet), positive: totalNet >= 0, highlight: true },
   ];
 
   const documents = [
     ...(!isReadOnly ? [{ label: 'Download Statement (CSV)', icon: 'file-text' as const, onPress: handleDownloadStatement }] : []),
     { label: 'Tax Report / 1099-K', icon: 'percent' as const, onPress: () => router.push('/taxes-duties' as any) },
-    { label: 'Manufacturer PO', icon: 'shopping-cart' as const, onPress: undefined },
-    { label: 'Inventory Valuation', icon: 'package' as const, onPress: undefined },
   ];
 
   if (isLoadingRole) {

@@ -103,7 +103,9 @@ export default function ShareStoreScreen() {
               value={storeUrl}
               size={200}
               backgroundColor="#FFFFFF"
-              color="#FFFFFF"
+              // theme-exempt: QR foreground must be a physically dark, high-contrast
+              // color to stay scannable — it isn't a themed surface.
+              color="#0A0A0B"
             />
           </View>
 
@@ -113,12 +115,12 @@ export default function ShareStoreScreen() {
 
         {/* Copy link button */}
         <TouchableOpacity
-          style={[s.copyBtn, { backgroundColor: copied ? '#22C55E' : colors.primary }]}
+          style={[s.copyBtn, { backgroundColor: copied ? colors.success : colors.primary }]}
           activeOpacity={0.85}
           onPress={copyLink}
         >
-          <Feather name={copied ? 'check' : 'copy'} size={17} color="#FFFFFF" />
-          <Text style={s.copyBtnText}>{copied ? 'Link Copied!' : 'Copy Link'}</Text>
+          <Feather name={copied ? 'check' : 'copy'} size={17} color={colors.primaryForeground} />
+          <Text style={[s.copyBtnText, { color: colors.primaryForeground }]}>{copied ? 'Link copied' : 'Copy link'}</Text>
         </TouchableOpacity>
 
         {/* Share button */}
@@ -156,7 +158,7 @@ const s = StyleSheet.create({
 
   copyBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', borderRadius: 16, paddingVertical: 16, marginBottom: 12 },
   copyBtnDone: {},
-  copyBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  copyBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold' },
 
   shareBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', borderRadius: 16, borderWidth: 1, paddingVertical: 16, marginBottom: 24 },
   shareBtnText:{ fontSize: 15, fontFamily: 'Inter_600SemiBold' },

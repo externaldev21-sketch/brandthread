@@ -17,6 +17,8 @@ import {
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as Haptics from 'expo-haptics';
+import { File, Paths } from 'expo-file-system';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   BrandthreadScreen, BrandthreadHeader,
@@ -74,6 +76,43 @@ export default function MockupToModelScreen() {
   // Keep original inputs for retry
   const mockupUriRef = useRef<string | null>(null);
   const refUrisRef = useRef<string[]>([]);
+
+  // Track per-slot saving state for the Save icon
+  const [savingIndex, setSavingIndex] = useState<number | null>(null);
+
+  async function saveImageToMediaLibrary(imageUri: string): Promise<boolean> {
+    try {
+      const MediaLibrary = await import('expo-media-library');
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission required', 'Allow photo library access to save this image.');
+        return false;
+      }
+      let fileUri = imageUri;
+      if (imageUri.startsWith('data:')) {
+        const b64 = imageUri.replace(/^data:image\/[a-z]+;base64,/, '');
+        const file = new File(Paths.cache, `mockup-to-model-${Date.now()}.png`);
+        file.write(b64, { encoding: 'base64' });
+        fileUri = file.uri;
+      }
+      await MediaLibrary.saveToLibraryAsync(fileUri);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function handleSaveSlot(refIndex: number, imageUri: string) {
+    setSavingIndex(refIndex);
+    const ok = await saveImageToMediaLibrary(imageUri);
+    setSavingIndex(null);
+    if (ok) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Saved', 'Saved to Photos.');
+    } else {
+      Alert.alert('Save failed', 'Could not save this image. Please try again.');
+    }
+  }
 
   // ─── Pickers ───────────────────────────────────────────────────────────────
 
@@ -263,6 +302,8 @@ export default function MockupToModelScreen() {
                 slot={slot}
                 refIndex={idx}
                 onRetry={handleRetry}
+                onSave={handleSaveSlot}
+                saving={savingIndex === idx}
                 styles={s}
                 PURPLE={PURPLE}
               />
@@ -433,11 +474,13 @@ interface ResultCardProps {
   slot: RefSlot;
   refIndex: number;
   onRetry: (refIndex: number) => void;
+  onSave: (refIndex: number, imageUri: string) => void;
+  saving: boolean;
   styles: ReturnType<typeof createStyles>;
   PURPLE: string;
 }
 
-function ResultCard({ slot, refIndex, onRetry, styles: s, PURPLE }: ResultCardProps) {
+function ResultCard({ slot, refIndex, onRetry, onSave, saving, styles: s, PURPLE }: ResultCardProps) {
   if (slot.status === 'generating') {
     return (
       <View style={s.resultCard}>
@@ -487,10 +530,15 @@ function ResultCard({ slot, refIndex, onRetry, styles: s, PURPLE }: ResultCardPr
         <View style={s.resultActions}>
           <TouchableOpacity
             style={s.actionBtn}
-            onPress={() => Alert.alert('Saved', 'Image saved to your library.')}
+            onPress={() => onSave(refIndex, slot.imageUri!)}
             accessibilityLabel="Save image"
+            disabled={saving}
           >
-            <Feather name="bookmark" size={ICON.sm} color={PURPLE} />
+            {saving ? (
+              <ActivityIndicator size="small" color={PURPLE} />
+            ) : (
+              <Feather name="bookmark" size={ICON.sm} color={PURPLE} />
+            )}
           </TouchableOpacity>
           <TouchableOpacity
             style={s.actionBtn}

@@ -66,6 +66,24 @@ export default function PlansScreen() {
   const [currentPlanId,     setCurrentPlanId]     = useState<string | null>(null);
   /** 'none' means no paid subscription yet — Starter must remain selectable. */
   const [currentPlanStatus, setCurrentPlanStatus] = useState<string | null>(null);
+  const [pricesTimedOut,    setPricesTimedOut]    = useState(false);
+
+  // Native pricing comes from RevenueCat asynchronously. If packages never
+  // arrive, treat it as a real failure rather than leaving the CTA active
+  // against a null price forever.
+  useEffect(() => {
+    if (Platform.OS === 'web' || packages.length > 0) return;
+    const timer = setTimeout(() => setPricesTimedOut(true), 6000);
+    return () => clearTimeout(timer);
+  }, [packages.length]);
+
+  const pricesLoading = Platform.OS !== 'web' && packages.length === 0 && revenueCatAvailable && !pricesTimedOut;
+  const pricesFailed   = Platform.OS !== 'web' && packages.length === 0 && (!revenueCatAvailable || pricesTimedOut);
+  // Whether the store actually returned a free-trial intro offer for this user
+  // on ANY plan — used to avoid promising a trial that isn't really there.
+  const hasRealTrialOffer = Platform.OS === 'web'
+    ? true
+    : packages.some((pkg) => !!pkg.product.introPrice);
 
   // AppState ref to detect return from Stripe Checkout browser tab
   const checkoutOpenedRef = useRef(false);
@@ -227,7 +245,7 @@ export default function PlansScreen() {
         <LinearGradient colors={theme.heroGradient as any} style={StyleSheet.absoluteFill} />
         <ActivityIndicator color={theme.accent} size="large" />
         <Text style={styles.awaitTitle}>Confirming your trial…</Text>
-        <Text style={styles.awaitSub}>Syncing with Stripe — this takes a moment.</Text>
+        <Text style={styles.awaitSub}>Confirming your plan — this takes a moment.</Text>
       </View>
     );
   }
@@ -258,7 +276,7 @@ export default function PlansScreen() {
             {isOnboarding ? 'Choose your plan' : 'Subscription plans'}
           </Text>
           <Text style={styles.headerSub}>
-            5-day free trial · cancel anytime
+            {hasRealTrialOffer ? '5-day free trial · cancel anytime' : 'Pick the plan that fits your brand'}
           </Text>
         </View>
         <View style={{ width: 40 }} />
@@ -292,22 +310,26 @@ export default function PlansScreen() {
           </Text>
         </View>
 
-        {/* Trial callout */}
-        <View style={styles.trialCallout}>
-          <LinearGradient
-            colors={theme.glowGradient as any}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={styles.trialCalloutInner}
-          >
-                 <Feather name="shield" size={16} color={theme.accent} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.trialCalloutTitle}>5-day free trial on every plan</Text>
-              <Text style={styles.trialCalloutSub}>
-                Enter your card now — you won't be charged until day 6. Cancel before then for free.
-              </Text>
-            </View>
-          </LinearGradient>
-        </View>
+        {/* Trial callout — only claim a trial when the store actually has one to offer */}
+        {hasRealTrialOffer && (
+          <View style={styles.trialCallout}>
+            <LinearGradient
+              colors={theme.glowGradient as any}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={styles.trialCalloutInner}
+            >
+                   <Feather name="shield" size={16} color={theme.accent} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.trialCalloutTitle}>5-day free trial on every plan</Text>
+                <Text style={styles.trialCalloutSub}>
+                  {Platform.OS === 'web'
+                    ? "Enter your card now — you won't be charged until day 6. Cancel before then for free."
+                    : "You won't be charged until your trial ends. Cancel anytime in your App Store settings."}
+                </Text>
+              </View>
+            </LinearGradient>
+          </View>
+        )}
 
         {/* Plan cards */}
         {SELLER_PLANS.map((plan) => {
@@ -317,8 +339,10 @@ export default function PlansScreen() {
           const revenueCatPackage = packages.find((pkg) => pkg.identifier === SELLER_PACKAGE_IDS[plan.id]);
           const priceLabel = Platform.OS === 'web'
             ? plan.priceLabel
-            : revenueCatPackage?.product.priceString ?? '—';
+            : revenueCatPackage?.product.priceString ?? null;
           const trial = revenueCatPackage?.product.introPrice;
+          const cardPriceLoading = Platform.OS !== 'web' && !priceLabel && !pricesFailed;
+          const cardPriceFailed  = Platform.OS !== 'web' && !priceLabel && pricesFailed;
 
           return (
             <View
@@ -358,16 +382,29 @@ export default function PlansScreen() {
                   <Text style={styles.planTagline}>{plan.tagline}</Text>
                 </View>
                 <View style={styles.priceCol}>
-                  <Text style={[styles.priceLabel, plan.id === 'growth' && { color: theme.accent }]}>
-                     {priceLabel}
-                  </Text>
+                  {cardPriceLoading ? (
+                    <View style={styles.priceSkeleton} />
+                  ) : (
+                    <Text style={[styles.priceLabel, plan.id === 'growth' && { color: theme.accent }]}>
+                       {cardPriceFailed ? '—' : priceLabel}
+                    </Text>
+                  )}
                    <Text style={styles.pricePeriod}>{Platform.OS === 'web' ? '/mo' : 'per month'}</Text>
                 </View>
               </View>
-               {Platform.OS !== 'web' && trial && (
-                 <Text style={styles.nativeTrial}>
-                   Intro offer: {trial.priceString} for {trial.periodNumberOfUnits} {trial.periodUnit.toLowerCase()} {trial.periodNumberOfUnits === 1 ? '' : 's'}
-                 </Text>
+               {Platform.OS !== 'web' && trial && priceLabel && (() => {
+                 const isFree = /^\$?0(\.00?)?$/.test(trial.priceString.trim());
+                 const unitLabel = `${trial.periodNumberOfUnits} ${trial.periodUnit.toLowerCase()}${trial.periodNumberOfUnits === 1 ? '' : 's'}`;
+                 return (
+                   <Text style={styles.nativeTrial}>
+                     {isFree
+                       ? `Free for ${unitLabel}, then ${priceLabel}/month`
+                       : `${trial.priceString} for ${unitLabel}, then ${priceLabel}/month`}
+                   </Text>
+                 );
+               })()}
+               {cardPriceFailed && (
+                 <Text style={styles.nativeTrial}>Prices unavailable. Pull to retry.</Text>
                )}
 
               {/* Included features */}
@@ -389,13 +426,13 @@ export default function PlansScreen() {
               {/* CTA */}
               <TouchableOpacity
                 activeOpacity={0.85}
-                disabled={isCurrent || loadingId !== null}
+                disabled={isCurrent || loadingId !== null || cardPriceFailed || cardPriceLoading}
                 onPress={() => handleSelect(plan)}
                 style={[
                   styles.ctaBtn,
                    plan.id === 'growth' ? styles.ctaBtnHighlight : styles.ctaBtnDefault,
                   isCurrent         && styles.ctaBtnCurrent,
-                  (isCurrent || loadingId !== null) && { opacity: 0.5 },
+                  (isCurrent || loadingId !== null || cardPriceFailed || cardPriceLoading) && { opacity: 0.5 },
                 ]}
               >
                 {isLoading ? (
@@ -404,9 +441,11 @@ export default function PlansScreen() {
                   <Text style={[styles.ctaText, isCurrent && { color: theme.accent }]}>
                     {isCurrent
                       ? 'Current plan'
-                      : isOnboarding
-                        ? 'Start free trial'
-                        : `Switch to ${plan.name}`}
+                      : cardPriceFailed
+                        ? 'Prices unavailable'
+                        : isOnboarding
+                          ? (hasRealTrialOffer ? 'Start free trial' : `Choose ${plan.name}`)
+                          : `Switch to ${plan.name}`}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -414,7 +453,7 @@ export default function PlansScreen() {
           );
         })}
 
-        {/* Skip during onboarding */}
+        {/* Skip during onboarding — Starter is a paid plan, so this must not read as "free" */}
         {isOnboarding && (
           <TouchableOpacity
             style={styles.skipRow}
@@ -422,7 +461,7 @@ export default function PlansScreen() {
             disabled={loadingId !== null}
             activeOpacity={0.7}
           >
-            <Text style={styles.skipText}>Skip for now — start with Starter</Text>
+            <Text style={styles.skipText}>Not now</Text>
              <Feather name="arrow-right" size={14} color={theme.muted} />
           </TouchableOpacity>
         )}
@@ -436,6 +475,28 @@ export default function PlansScreen() {
              {loadingId === 'restore' ? <ActivityIndicator color={theme.muted} size="small" /> : <Text style={styles.skipText}>Restore purchases</Text>}
           </TouchableOpacity>
         )}
+
+        {/* Apple guideline 3.1.2 — auto-renew disclosure + Terms/Privacy links */}
+        <View style={styles.legalFooter}>
+          <Text style={styles.legalFooterText}>
+            Subscriptions renew automatically at the price shown unless you cancel at least 24 hours before the period ends. Manage or cancel in your App Store account settings.
+          </Text>
+          <View style={styles.legalLinksRow}>
+            <Text
+              style={styles.legalLink}
+              onPress={() => { haptic(); router.push('/terms' as never); }}
+            >
+              Terms of Use
+            </Text>
+            <Text style={styles.legalLinkDivider}>·</Text>
+            <Text
+              style={styles.legalLink}
+              onPress={() => { haptic(); router.push('/privacy' as never); }}
+            >
+              Privacy Policy
+            </Text>
+          </View>
+        </View>
 
       </ScrollView>
     </View>
@@ -555,6 +616,14 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   skipText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
    restoreRow: { alignItems: 'center', paddingVertical: SP.sm },
    nativeTrial: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.secondary, marginTop: -SP.xs },
+   priceSkeleton: { width: 64, height: 28, borderRadius: RADIUS.xs, backgroundColor: theme.border },
+
+  // Legal footer (Apple 3.1.2 — auto-renew disclosure + Terms/Privacy)
+  legalFooter: { paddingTop: SP.sm, paddingHorizontal: SP.xs, gap: 10 },
+  legalFooterText: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 16, textAlign: 'center' },
+  legalLinksRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  legalLink: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.text, textDecorationLine: 'underline' },
+  legalLinkDivider: { fontSize: FS.xs, color: theme.muted },
 
   // Awaiting Stripe overlay
   awaitRoot: { flex: 1, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center', gap: 20, padding: 40 },

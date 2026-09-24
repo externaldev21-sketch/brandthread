@@ -314,7 +314,7 @@ export default function StoreFromMoodboardScreen() {
           <View style={mb.bannerRow}>
             <Feather name="zap" size={ICON.sm} color={PURPLE_LIGHT} />
             <Text style={[mb.bannerText, { color: PURPLE_LIGHT }]}>
-              Powered by GPT-4 — AI reads your mood board and extracts a brand direction: palette, layout style, image treatment, and recommended sections.
+              We'll pull your colors, type and vibe from your mood board.
             </Text>
           </View>
         </BrandthreadCard>

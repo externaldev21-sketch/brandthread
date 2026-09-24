@@ -2,9 +2,8 @@
  * Manufacturer Hub — 6-tab main screen
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useColors } from '@/hooks/useColors';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Alert, Modal, Switch, RefreshControl, ActionSheetIOS, Platform, ActivityIndicator, Image,
@@ -21,12 +20,7 @@ import { formatCents } from '@/lib/money';
 import { getEntitlementRejection } from '@/lib/entitlementError';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter, completeSetupTaskWhen } from '@/lib/setupCompletion';
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED, CARD_GLASS, CARD_ELEVATED_GLASS, SURFACE_GLASS, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, SUCCESS, BLUE, ORANGE, RED, GOLD, ON_DARK,
-  GRAD_PRIMARY, FONT, FS, SP, RADIUS, COMP, ICON,
-} from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState,
@@ -149,7 +143,8 @@ function showManufacturerUpgrade(error: unknown, router: ReturnType<typeof useRo
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function ManufacturerHub() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { theme } = useAppTheme();
+  const s = useMemo(() => makeS(theme), [theme]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { tab, from } = useLocalSearchParams<{ tab?: string; from?: string }>();
@@ -210,7 +205,7 @@ export default function ManufacturerHub() {
                 <Feather
                   name={tab.icon}
                   size={ICON.sm}
-                  color={activeTab === tab.key ? PURPLE_LIGHT : MUTED}
+                  color={activeTab === tab.key ? theme.accentLight : theme.muted}
                 />
                 <Text style={[s.tabLabel, activeTab === tab.key && s.tabLabelActive]}>
                   {tab.label}
@@ -257,6 +252,8 @@ function HubHeader({ activeTab, router, onLeave }: {
   router: ReturnType<typeof useRouter>;
   onLeave: () => void;
 }) {
+  const { theme } = useAppTheme();
+  const s = useMemo(() => makeS(theme), [theme]);
   return (
     <View style={s.header}>
       {/* Back button — always visible */}
@@ -266,11 +263,13 @@ function HubHeader({ activeTab, router, onLeave }: {
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         activeOpacity={0.75}
       >
-        <Feather name="arrow-left" size={ICON.sm} color={FG} />
+        <Feather name="arrow-left" size={ICON.sm} color={theme.text} />
       </TouchableOpacity>
 
       <Text style={[s.headerTitle, { flex: 1, marginHorizontal: SP.sm }]}>Manufacturer Hub</Text>
 
+      {/* Search/filter icons removed here — Discover already has its own working
+          search + filter controls; these were dead (no onPress). */}
       <View style={s.headerActions}>
         {/* Invite button shown on Discover tab — add your own off-platform manufacturer */}
         {activeTab === 'discover' && (
@@ -279,15 +278,9 @@ function HubHeader({ activeTab, router, onLeave }: {
             onPress={() => router.push('/invite-manufacturer' as never)}
             activeOpacity={0.75}
           >
-            <Feather name="user-plus" size={ICON.sm} color={PURPLE_LIGHT} />
+            <Feather name="user-plus" size={ICON.sm} color={theme.accentLight} />
           </TouchableOpacity>
         )}
-        <TouchableOpacity style={s.headerBtn} onPress={() => {}}>
-          <Feather name="search" size={ICON.sm} color={FG} />
-        </TouchableOpacity>
-        <TouchableOpacity style={s.headerBtn} onPress={() => {}}>
-          <Feather name="sliders" size={ICON.sm} color={FG} />
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -318,6 +311,8 @@ const DEFAULT_FILTERS: Filters = {
 };
 
 function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
+  const { theme } = useAppTheme();
+  const s = useMemo(() => makeS(theme), [theme]);
   const [manufacturers, setManufacturers] = useState<Manufacturer[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -426,7 +421,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
           onPress={() => setSearchActive(v => !v)}
           activeOpacity={0.8}
         >
-          <Feather name="search" size={ICON.sm} color={MUTED} />
+          <Feather name="search" size={ICON.sm} color={theme.muted} />
         </TouchableOpacity>
         {searchActive && (
           <TextInput
@@ -434,7 +429,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
             value={searchQuery}
             onChangeText={onSearch}
             placeholder="Search manufacturers…"
-            placeholderTextColor={SUBTLE}
+            placeholderTextColor={theme.subtle}
             autoFocus
           />
         )}
@@ -443,7 +438,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
           onPress={() => setFilterModalVisible(true)}
           activeOpacity={0.8}
         >
-          <Feather name="sliders" size={ICON.sm} color={PURPLE_LIGHT} />
+          <Feather name="sliders" size={ICON.sm} color={theme.accentLight} />
         </TouchableOpacity>
       </View>
 
@@ -458,7 +453,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
           onPress={() => setMutationError('')}
           accessibilityRole="alert"
         >
-          <Feather name="alert-circle" size={ICON.sm} color={ORANGE} />
+          <Feather name="alert-circle" size={ICON.sm} color={theme.warning} />
           <Text style={s.inlineErrorText}>{mutationError}</Text>
         </TouchableOpacity>
       )}
@@ -481,9 +476,16 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
         )}
         contentContainerStyle={[s.listContent, s.gridContent]}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={PURPLE} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={theme.accent} />}
         ListEmptyComponent={
-            loading || loadError ? null : (
+            loading ? null : loadError ? (
+            <EmptyState
+              icon="wifi-off"
+              title="Couldn't load manufacturers"
+              description="Check your connection and try again."
+              action={{ label: 'Retry', onPress: () => { setLoading(true); load(); } }}
+            />
+          ) : (
             <EmptyState
               icon={favoritesOnly ? 'heart' : 'search'}
               title={favoritesOnly ? 'No favorite manufacturers yet' : 'No manufacturers found'}
@@ -520,6 +522,7 @@ interface ManufacturerCardProps {
 
 function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, onQuote }: ManufacturerCardProps) {
   const { theme } = useAppTheme();
+  const card = useMemo(() => makeCard(theme), [theme]);
   return (
     <View style={card.root}>
       {/* Compact directory tile: image first, then the key sourcing details. */}
@@ -540,7 +543,7 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
             accessibilityRole="button"
             accessibilityLabel={saved ? `Remove ${mfg.name} from favorites` : `Add ${mfg.name} to favorites`}
           >
-            <Feather name="heart" size={15} color={saved ? RED : FG} />
+            <Feather name="heart" size={15} color={saved ? theme.error : theme.text} />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -557,7 +560,7 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
           </View>
           <Text style={card.location} numberOfLines={1}>{mfg.city}, {mfg.country}</Text>
           <View style={card.ratingRow}>
-            <Feather name="star" size={12} color={GOLD} />
+            <Feather name="star" size={12} color={theme.warning} />
             <Text style={card.ratingText}>{mfg.reviewCount > 0 ? mfg.rating.toFixed(1) : 'Not rated'}</Text>
             {mfg.reviewCount > 0 && <Text style={card.reviewCount}>({mfg.reviewCount})</Text>}
           </View>
@@ -592,31 +595,31 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
   );
 }
 
-const card = StyleSheet.create({
-  root:          { flex: 1, minWidth: 0, backgroundColor: CARD_GLASS, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginBottom: SP.sm, padding: SP.sm },
-  cover:         { height: 112, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: PURPLE_DIM, position: 'relative', marginBottom: SP.sm },
+const makeCard = (theme: AppThemePreset) => StyleSheet.create({
+  root:          { flex: 1, minWidth: 0, backgroundColor: theme.cardGlass, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, marginBottom: SP.sm, padding: SP.sm },
+  cover:         { height: 112, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: theme.accentDim, position: 'relative', marginBottom: SP.sm },
   coverImage:    { width: '100%', height: '100%' },
   coverFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  coverFallbackText: { fontSize: 34, fontFamily: FONT.bold, color: PURPLE_LIGHT },
-  saveOverlay:   { position: 'absolute', top: 7, right: 7, width: 28, height: 28, borderRadius: 14, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
+  coverFallbackText: { fontSize: 34, fontFamily: FONT.bold, color: theme.accentLight },
+  saveOverlay:   { position: 'absolute', top: 7, right: 7, width: 28, height: 28, borderRadius: 14, backgroundColor: theme.card, alignItems: 'center', justifyContent: 'center' },
   topRow:        { marginBottom: SP.xs },
   nameCol:       { flex: 1 },
   nameRow:       { flexDirection: 'row', alignItems: 'center', gap: SP.xs, flexWrap: 'wrap' },
-  name:          { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, flex: 1 },
+  name:          { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, flex: 1 },
   verifiedBadge: { width: 17, height: 17, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  verifiedText:  { fontSize: FS.xs, fontFamily: FONT.semibold, color: CYAN },
-  location:      { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  verifiedText:  { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.secondary },
+  location:      { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
   ratingRow:     { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
-  ratingText:    { fontSize: FS.xs, fontFamily: FONT.semibold, color: GOLD },
-  reviewCount:   { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  specialties:   { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: SP.xs, minHeight: 28 },
+  ratingText:    { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.warning },
+  reviewCount:   { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
+  specialties:   { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted, marginBottom: SP.xs, minHeight: 28 },
   detailStack:   { minHeight: 36, marginBottom: SP.sm },
-  stats:         { fontSize: FS.xs, fontFamily: FONT.regular, color: FG, marginBottom: 3 },
-  response:      { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  stats:         { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.text, marginBottom: 3 },
+  response:      { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
   actionRow:     { flexDirection: 'row', gap: SP.xs, alignItems: 'center' },
-  iconAction:    { width: 32, height: 32, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  iconAction:    { width: 32, height: 32, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   profileBtn:    { flex: 1, minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, borderRadius: RADIUS.sm, borderWidth: 1 },
-  profileBtnText:{ fontSize: FS.xs, fontFamily: FONT.semibold, color: ON_DARK },
+  profileBtnText:{ fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.onAccent },
 });
 
 // ─── Filter Modal ─────────────────────────────────────────────────────────────
@@ -627,6 +630,8 @@ function FilterModal({ visible, filters, onApply, onClose }: {
   onApply: (f: Filters) => void;
   onClose: () => void;
 }) {
+  const { theme } = useAppTheme();
+  const fm = useMemo(() => makeFm(theme), [theme]);
   const [local, setLocal] = useState<Filters>(filters);
   const insets = useSafeAreaInsets();
 
@@ -645,7 +650,7 @@ function FilterModal({ visible, filters, onApply, onClose }: {
         <View style={fm.header}>
           <Text style={fm.title}>Filter Manufacturers</Text>
           <TouchableOpacity onPress={onClose}>
-            <Feather name="x" size={ICON.md} color={MUTED} />
+            <Feather name="x" size={ICON.md} color={theme.muted} />
           </TouchableOpacity>
         </View>
 
@@ -698,8 +703,8 @@ function FilterModal({ visible, filters, onApply, onClose }: {
             <Switch
               value={local.verifiedOnly}
               onValueChange={v => set('verifiedOnly', v)}
-              trackColor={{ true: PURPLE, false: BORDER }}
-              thumbColor={ON_DARK}
+              trackColor={{ true: theme.accent, false: theme.border }}
+              thumbColor={theme.onAccent}
             />
           </View>
 
@@ -714,17 +719,17 @@ function FilterModal({ visible, filters, onApply, onClose }: {
   );
 }
 
-const fm = StyleSheet.create({
-  root:        { flex: 1, backgroundColor: SURFACE_GLASS },
-  handle:      { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginTop: SP.sm },
+const makeFm = (theme: AppThemePreset) => StyleSheet.create({
+  root:        { flex: 1, backgroundColor: theme.surfaceGlass },
+  handle:      { width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: 'center', marginTop: SP.sm },
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.md },
-  title:       { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
+  title:       { fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text },
   scroll:      { paddingHorizontal: SP.md, paddingBottom: SP.lg },
-  sectionLabel:{ fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, marginTop: SP.md, marginBottom: SP.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionLabel:{ fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.muted, marginTop: SP.md, marginBottom: SP.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
   chipRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   switchRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.lg, paddingVertical: SP.sm },
-  switchLabel: { fontSize: FS.base, fontFamily: FONT.medium, color: FG },
-  footer:      { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.md, borderTopWidth: 1, borderTopColor: BORDER },
+  switchLabel: { fontSize: FS.base, fontFamily: FONT.medium, color: theme.text },
+  footer:      { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.md, borderTopWidth: 1, borderTopColor: theme.border },
   resetBtn:    { flex: 1 },
   applyBtn:    { flex: 2 },
 });
@@ -734,6 +739,9 @@ const fm = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }) {
+  const { theme } = useAppTheme();
+  const s = useMemo(() => makeS(theme), [theme]);
+  const relCard = useMemo(() => makeRelCard(theme), [theme]);
   const [relationships, setRelationships] = useState<ManufacturerRelationship[]>([]);
   const [mfgMap, setMfgMap] = useState<Record<string, Manufacturer>>({});
   const [loading, setLoading] = useState(true);
@@ -788,7 +796,17 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
     }
   };
 
-  if (error) return <View style={s.flex} />;
+  if (error) {
+    return (
+      <EmptyState
+        icon="wifi-off"
+        title="Couldn't load manufacturers"
+        description="Check your connection and try again."
+        action={{ label: 'Retry', onPress: () => { setLoading(true); load(); } }}
+        style={s.emptyState}
+      />
+    );
+  }
 
   if (!loading && relationships.length === 0) {
     return (
@@ -822,7 +840,7 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
                 </View>
                 <Text style={relCard.location}>{mfg.city}, {mfg.country}</Text>
                 <Text style={relCard.counts}>
-                  Products: {rel.activeProductIds.length} · Quotes: 0 · Samples: 0
+                  {rel.activeProductIds.length} product{rel.activeProductIds.length === 1 ? '' : 's'}
                 </Text>
                 {rel.lastMessagePreview && (
                   <Text style={relCard.lastMsg} numberOfLines={1}>
@@ -834,19 +852,19 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
             <View style={relCard.divider} />
             <View style={relCard.actionRow}>
               <TouchableOpacity style={relCard.btn} onPress={() => getOrCreateConversation(mfg.id).then(conv => router.push((`/manufacturer-messages?threadId=${conv.id}`) as never))}>
-                <Feather name="message-circle" size={ICON.sm} color={CYAN} />
-                <Text style={[relCard.btnText, { color: CYAN }]}>Message</Text>
+                <Feather name="message-circle" size={ICON.sm} color={theme.secondary} />
+                <Text style={[relCard.btnText, { color: theme.secondary }]}>Message</Text>
               </TouchableOpacity>
               <TouchableOpacity style={relCard.btn} onPress={() => router.push((`/quote-request?manufacturerId=${mfg.id}`) as never)}>
-                <Feather name="file-text" size={ICON.sm} color={PURPLE_LIGHT} />
-                <Text style={[relCard.btnText, { color: PURPLE_LIGHT }]}>Quote</Text>
+                <Feather name="file-text" size={ICON.sm} color={theme.accentLight} />
+                <Text style={[relCard.btnText, { color: theme.accentLight }]}>Quote</Text>
               </TouchableOpacity>
               <TouchableOpacity style={relCard.btn} onPress={() => router.push((`/manufacturer-profile?id=${mfg.id}`) as never)}>
-                <Feather name="user" size={ICON.sm} color={MUTED} />
+                <Feather name="user" size={ICON.sm} color={theme.muted} />
                 <Text style={relCard.btnText}>Profile</Text>
               </TouchableOpacity>
               <TouchableOpacity style={relCard.btn} onPress={() => showMore(rel, mfg)}>
-                <Feather name="more-horizontal" size={ICON.sm} color={MUTED} />
+                <Feather name="more-horizontal" size={ICON.sm} color={theme.muted} />
                 <Text style={relCard.btnText}>More</Text>
               </TouchableOpacity>
             </View>
@@ -855,26 +873,26 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
       }}
       contentContainerStyle={s.listContent}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={PURPLE} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={theme.accent} />}
     />
   );
 }
 
-const relCard = StyleSheet.create({
-  root:     { backgroundColor: CARD_GLASS, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginHorizontal: SP.md, marginBottom: SP.md, padding: SP.md },
+const makeRelCard = (theme: AppThemePreset) => StyleSheet.create({
+  root:     { backgroundColor: theme.cardGlass, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, marginHorizontal: SP.md, marginBottom: SP.md, padding: SP.md },
   topRow:   { flexDirection: 'row', gap: SP.md },
-  avatar:   { width: 44, height: 44, borderRadius: 22, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER_ACTIVE },
-  avatarText:{ fontSize: FS.md, fontFamily: FONT.bold, color: PURPLE_LIGHT },
+  avatar:   { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.accentDim, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.border },
+  avatarText:{ fontSize: FS.md, fontFamily: FONT.bold, color: theme.accentLight },
   info:     { flex: 1 },
   nameRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.xs },
-  name:     { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, flex: 1 },
-  location: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
-  counts:   { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
-  lastMsg:  { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginTop: 3 },
-  divider:  { height: 1, backgroundColor: BORDER, marginVertical: SP.sm },
+  name:     { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text, flex: 1 },
+  location: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
+  counts:   { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
+  lastMsg:  { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginTop: 3 },
+  divider:  { height: 1, backgroundColor: theme.border, marginVertical: SP.sm },
   actionRow:{ flexDirection: 'row', gap: SP.xs },
-  btn:      { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: SP.sm, borderRadius: RADIUS.sm, backgroundColor: CARD_ELEVATED },
-  btnText:  { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
+  btn:      { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: SP.sm, borderRadius: RADIUS.sm, backgroundColor: theme.cardElevated },
+  btnText:  { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted },
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -882,6 +900,8 @@ const relCard = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
+  const { theme } = useAppTheme();
+  const s = useMemo(() => makeS(theme), [theme]);
   const [quoteRequests, setQuoteRequests] = useState<QuoteRequest[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
@@ -928,9 +948,20 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
     ]);
   };
 
+  if (error) {
+    return (
+      <EmptyState
+        icon="wifi-off"
+        title="Couldn't load quotes"
+        description="Check your connection and try again."
+        action={{ label: 'Retry', onPress: () => { setLoading(true); load(); } }}
+        style={s.emptyState}
+      />
+    );
+  }
+
   // Group quotes by requestId for compare detection
   const quotesByRequest: Record<string, Quote[]> = {};
-  if (error) return <View style={s.flex} />;
   quotes.forEach(q => {
     if (!quotesByRequest[q.quoteRequestId]) quotesByRequest[q.quoteRequestId] = [];
     quotesByRequest[q.quoteRequestId].push(q);
@@ -956,7 +987,7 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.listContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={PURPLE} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={theme.accent} />}
       >
         {quoteRequests.length > 0 && (
           <>
@@ -998,6 +1029,7 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
 
 function QuotesFAB({ router }: { router: ReturnType<typeof useRouter> }) {
   const { theme } = useAppTheme();
+  const fab = useMemo(() => makeFab(theme), [theme]);
   return (
     <TouchableOpacity
       style={fab.root}
@@ -1012,13 +1044,15 @@ function QuotesFAB({ router }: { router: ReturnType<typeof useRouter> }) {
   );
 }
 
-const fab = StyleSheet.create({
+const makeFab = (theme: AppThemePreset) => StyleSheet.create({
   root: { position: 'absolute', bottom: SP.lg, right: SP.md, borderRadius: RADIUS.pill, overflow: 'hidden', elevation: 8 },
   grad: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm + 2 },
-  label:{ fontSize: FS.sm, fontFamily: FONT.bold, color: ON_DARK },
+  label:{ fontSize: FS.sm, fontFamily: FONT.bold, color: theme.onAccent },
 });
 
 function QuoteRequestCard({ req, manufacturerName, onView, onWithdraw }: { req: QuoteRequest; manufacturerName?: string; onView: () => void; onWithdraw: () => void }) {
+  const { theme } = useAppTheme();
+  const qc = useMemo(() => makeQc(theme), [theme]);
   return (
     <View style={qc.root}>
       <View style={qc.topRow}>
@@ -1033,7 +1067,7 @@ function QuoteRequestCard({ req, manufacturerName, onView, onWithdraw }: { req: 
           <Text style={qc.btnText}>View</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[qc.btn, qc.dangerBtn]} onPress={onWithdraw}>
-          <Text style={[qc.btnText, { color: RED }]}>Withdraw</Text>
+          <Text style={[qc.btnText, { color: theme.error }]}>Withdraw</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -1046,6 +1080,8 @@ function QuoteReceivedCard({ quote, manufacturerName, canCompare, onAccept, onDe
   onAccept: () => void; onDecline: () => void;
   onCounter: () => void; onCompare: () => void; onDetails: () => void;
 }) {
+  const { theme } = useAppTheme();
+  const qc = useMemo(() => makeQc(theme), [theme]);
   return (
     <View style={qc.root}>
       <View style={qc.topRow}>
@@ -1057,10 +1093,10 @@ function QuoteReceivedCard({ quote, manufacturerName, canCompare, onAccept, onDe
       {quote.validUntil && <Text style={qc.date}>Expires: {fmtDate(quote.validUntil)}</Text>}
       <View style={[qc.actionRow, { flexWrap: 'wrap' }]}>
         <TouchableOpacity style={[qc.btn, qc.successBtn]} onPress={onAccept}>
-          <Text style={[qc.btnText, { color: SUCCESS }]}>Accept</Text>
+          <Text style={[qc.btnText, { color: theme.success }]}>Accept</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[qc.btn, qc.dangerBtn]} onPress={onDecline}>
-          <Text style={[qc.btnText, { color: RED }]}>Decline</Text>
+          <Text style={[qc.btnText, { color: theme.error }]}>Decline</Text>
         </TouchableOpacity>
         <TouchableOpacity style={qc.btn} onPress={onCounter}>
           <Text style={qc.btnText}>Counter</Text>
@@ -1078,18 +1114,18 @@ function QuoteReceivedCard({ quote, manufacturerName, canCompare, onAccept, onDe
   );
 }
 
-const qc = StyleSheet.create({
-  root:       { backgroundColor: CARD_GLASS, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginHorizontal: SP.md, marginBottom: SP.md, padding: SP.md },
+const makeQc = (theme: AppThemePreset) => StyleSheet.create({
+  root:       { backgroundColor: theme.cardGlass, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, marginHorizontal: SP.md, marginBottom: SP.md, padding: SP.md },
   topRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.xs },
-  productName:{ fontSize: FS.base, fontFamily: FONT.semibold, color: FG, flex: 1, marginRight: SP.sm },
-  mfgName:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginBottom: SP.xs },
-  details:    { fontSize: FS.sm, fontFamily: FONT.medium, color: FG, marginBottom: SP.xs },
-  date:       { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginBottom: SP.sm },
+  productName:{ fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text, flex: 1, marginRight: SP.sm },
+  mfgName:    { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, marginBottom: SP.xs },
+  details:    { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text, marginBottom: SP.xs },
+  date:       { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginBottom: SP.sm },
   actionRow:  { flexDirection: 'row', gap: SP.sm, marginTop: SP.xs },
-  btn:        { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD_ELEVATED },
+  btn:        { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.cardElevated },
   dangerBtn:  { borderColor: 'rgba(248,113,113,0.3)', backgroundColor: 'rgba(248,113,113,0.08)' },
   successBtn: { borderColor: 'rgba(16,185,129,0.3)', backgroundColor: 'rgba(16,185,129,0.08)' },
-  btnText:    { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
+  btnText:    { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1097,6 +1133,9 @@ const qc = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
+  const { theme } = useAppTheme();
+  const s = useMemo(() => makeS(theme), [theme]);
+  const smpCard = useMemo(() => makeSmpCard(theme), [theme]);
   const [samples, setSamples] = useState<Sample[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -1122,8 +1161,18 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
     return () => clearInterval(timer);
   }, [load]);
 
-  if (loading) return <View style={s.centered}><ActivityIndicator color={PURPLE} /></View>;
-  if (error) return <View style={s.flex} />;
+  if (loading) return <View style={s.centered}><ActivityIndicator color={theme.accent} /></View>;
+  if (error) {
+    return (
+      <EmptyState
+        icon="wifi-off"
+        title="Couldn't load samples"
+        description="Check your connection and try again."
+        action={{ label: 'Retry', onPress: () => { setLoading(true); load(); } }}
+        style={s.emptyState}
+      />
+    );
+  }
   if (samples.length === 0) {
     return (
       <EmptyState
@@ -1160,10 +1209,10 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
               {canReview && (
                 <>
                   <TouchableOpacity style={[smpCard.btn, smpCard.successBtn]} onPress={() => router.push((`/sample-detail?id=${item.id}&action=approve`) as never)}>
-                    <Text style={[smpCard.btnText, { color: SUCCESS }]}>Approve</Text>
+                    <Text style={[smpCard.btnText, { color: theme.success }]}>Approve</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={[smpCard.btn, smpCard.warnBtn]} onPress={() => router.push((`/sample-detail?id=${item.id}&action=revision`) as never)}>
-                    <Text style={[smpCard.btnText, { color: ORANGE }]}>Revision</Text>
+                    <Text style={[smpCard.btnText, { color: theme.warning }]}>Revision</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -1173,23 +1222,23 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
       }}
       contentContainerStyle={s.listContent}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={PURPLE} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={theme.accent} />}
     />
   );
 }
 
-const smpCard = StyleSheet.create({
-  root:       { backgroundColor: CARD_GLASS, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginHorizontal: SP.md, marginBottom: SP.md, padding: SP.md },
+const makeSmpCard = (theme: AppThemePreset) => StyleSheet.create({
+  root:       { backgroundColor: theme.cardGlass, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, marginHorizontal: SP.md, marginBottom: SP.md, padding: SP.md },
   topRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.xs },
-  productName:{ fontSize: FS.base, fontFamily: FONT.semibold, color: FG, flex: 1, marginRight: SP.sm },
-  mfgName:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginBottom: SP.xs },
-  date:       { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginBottom: SP.xs },
-  details:    { fontSize: FS.sm, fontFamily: FONT.medium, color: FG, marginBottom: SP.sm },
+  productName:{ fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text, flex: 1, marginRight: SP.sm },
+  mfgName:    { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, marginBottom: SP.xs },
+  date:       { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginBottom: SP.xs },
+  details:    { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text, marginBottom: SP.sm },
   actionRow:  { flexDirection: 'row', gap: SP.sm },
-  btn:        { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD_ELEVATED },
+  btn:        { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.cardElevated },
   successBtn: { borderColor: 'rgba(16,185,129,0.3)', backgroundColor: 'rgba(16,185,129,0.08)' },
   warnBtn:    { borderColor: 'rgba(249,115,22,0.3)', backgroundColor: 'rgba(249,115,22,0.08)' },
-  btnText:    { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
+  btnText:    { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1197,6 +1246,9 @@ const smpCard = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function ProductionTab({ router }: { router: ReturnType<typeof useRouter> }) {
+  const { theme } = useAppTheme();
+  const s = useMemo(() => makeS(theme), [theme]);
+  const prodCard = useMemo(() => makeProdCard(theme), [theme]);
   const [productionOrders, setProductionOrders] = useState<ProductionOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -1222,8 +1274,18 @@ function ProductionTab({ router }: { router: ReturnType<typeof useRouter> }) {
     return () => clearInterval(timer);
   }, [load]);
 
-  if (loading) return <View style={s.centered}><ActivityIndicator color={PURPLE} /></View>;
-  if (error) return <View style={s.flex} />;
+  if (loading) return <View style={s.centered}><ActivityIndicator color={theme.accent} /></View>;
+  if (error) {
+    return (
+      <EmptyState
+        icon="wifi-off"
+        title="Couldn't load production orders"
+        description="Check your connection and try again."
+        action={{ label: 'Retry', onPress: () => { setLoading(true); load(); } }}
+        style={s.emptyState}
+      />
+    );
+  }
   if (productionOrders.length === 0) {
     return (
       <EmptyState
@@ -1286,26 +1348,26 @@ function ProductionTab({ router }: { router: ReturnType<typeof useRouter> }) {
       }}
       contentContainerStyle={s.listContent}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={PURPLE} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={theme.accent} />}
     />
   );
 }
 
-const prodCard = StyleSheet.create({
-  root:       { backgroundColor: CARD_GLASS, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginHorizontal: SP.md, marginBottom: SP.md, padding: SP.md },
+const makeProdCard = (theme: AppThemePreset) => StyleSheet.create({
+  root:       { backgroundColor: theme.cardGlass, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, marginHorizontal: SP.md, marginBottom: SP.md, padding: SP.md },
   topRow:     { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: SP.sm },
   nameCol:    { flex: 1, marginRight: SP.sm },
-  productName:{ fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  mfgLine:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
-  stage:      { fontSize: FS.sm, fontFamily: FONT.medium, color: FG, marginBottom: SP.xs },
-  costs:      { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginBottom: SP.sm },
+  productName:{ fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
+  mfgLine:    { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
+  stage:      { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text, marginBottom: SP.xs },
+  costs:      { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginBottom: SP.sm },
   track:      { height: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: RADIUS.pill, overflow: 'hidden', marginBottom: SP.xs },
-  fill:       { height: '100%', borderRadius: RADIUS.pill, backgroundColor: PURPLE },
-  pct:        { fontSize: FS.xs, fontFamily: FONT.semibold, color: PURPLE_LIGHT, marginBottom: SP.sm },
+  fill:       { height: '100%', borderRadius: RADIUS.pill, backgroundColor: theme.accent },
+  pct:        { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.accentLight, marginBottom: SP.sm },
   actionRow:  { flexDirection: 'row', gap: SP.sm, flexWrap: 'wrap' },
-  btn:        { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD_ELEVATED },
-  advanceBtn: { borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM },
-  btnText:    { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
+  btn:        { paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.cardElevated },
+  advanceBtn: { borderColor: theme.border, backgroundColor: theme.accentDim },
+  btnText:    { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1313,6 +1375,9 @@ const prodCard = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function MessagesTab({ router }: { router: ReturnType<typeof useRouter> }) {
+  const { theme } = useAppTheme();
+  const s = useMemo(() => makeS(theme), [theme]);
+  const msgCard = useMemo(() => makeMsgCard(theme), [theme]);
   const [conversations, setConversations] = useState<ManufacturerConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -1338,8 +1403,18 @@ function MessagesTab({ router }: { router: ReturnType<typeof useRouter> }) {
     return () => clearInterval(timer);
   }, [load]);
 
-  if (loading) return <View style={s.centered}><ActivityIndicator color={PURPLE} /></View>;
-  if (error) return <View style={s.flex} />;
+  if (loading) return <View style={s.centered}><ActivityIndicator color={theme.accent} /></View>;
+  if (error) {
+    return (
+      <EmptyState
+        icon="wifi-off"
+        title="Couldn't load messages"
+        description="Check your connection and try again."
+        action={{ label: 'Retry', onPress: () => { setLoading(true); load(); } }}
+        style={s.emptyState}
+      />
+    );
+  }
   if (conversations.length === 0) {
     return (
       <EmptyState
@@ -1385,54 +1460,54 @@ function MessagesTab({ router }: { router: ReturnType<typeof useRouter> }) {
       )}
       contentContainerStyle={s.listContent}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={PURPLE} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={theme.accent} />}
     />
   );
 }
 
-const msgCard = StyleSheet.create({
-  root:      { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: CARD_GLASS, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginHorizontal: SP.md, marginBottom: SP.sm, padding: SP.md },
-  avatar:    { width: 44, height: 44, borderRadius: 22, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER_ACTIVE },
-  avatarText:{ fontSize: FS.md, fontFamily: FONT.bold, color: PURPLE_LIGHT },
+const makeMsgCard = (theme: AppThemePreset) => StyleSheet.create({
+  root:      { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: theme.cardGlass, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, marginHorizontal: SP.md, marginBottom: SP.sm, padding: SP.md },
+  avatar:    { width: 44, height: 44, borderRadius: 22, backgroundColor: theme.accentDim, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.border },
+  avatarText:{ fontSize: FS.md, fontFamily: FONT.bold, color: theme.accentLight },
   body:      { flex: 1 },
   topRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
-  name:      { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, flex: 1 },
-  time:      { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginLeft: SP.sm },
-  context:   { fontSize: FS.xs, fontFamily: FONT.medium, color: PURPLE_LIGHT, marginBottom: 2 },
-  preview:   { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  badge:     { minWidth: 22, height: 22, borderRadius: 11, backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  badgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
+  name:      { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text, flex: 1 },
+  time:      { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginLeft: SP.sm },
+  context:   { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.accentLight, marginBottom: 2 },
+  preview:   { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
+  badge:     { minWidth: 22, height: 22, borderRadius: 11, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  badgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: theme.onAccent },
 });
 
 // ─── Root styles ─────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
+const makeS = (theme: AppThemePreset) => StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
   flex:         { flex: 1 },
   centered:     { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm, minHeight: COMP.headerH },
-  headerTitle:  { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, letterSpacing: -0.3 },
+  headerTitle:  { fontSize: FS.xl, fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.3 },
   headerActions:{ flexDirection: 'row', gap: SP.sm },
-  headerBtn:    { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  tabBarWrapper:{ borderBottomWidth: 1, borderBottomColor: BORDER, backgroundColor: SURFACE_GLASS },
+  headerBtn:    { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
+  tabBarWrapper:{ borderBottomWidth: 1, borderBottomColor: theme.border, backgroundColor: theme.surfaceGlass },
   tabBarContent:{ paddingHorizontal: SP.md },
   tabItem:      { marginRight: SP.sm, alignItems: 'center' },
   tabInner:     { flexDirection: 'row', alignItems: 'center', gap: SP.xs, paddingVertical: SP.sm, paddingHorizontal: SP.sm },
-  tabLabel:     { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-  tabLabelActive:{ color: PURPLE_LIGHT, fontFamily: FONT.semibold },
-  tabUnderline: { height: 2, width: '100%', backgroundColor: PURPLE, borderRadius: RADIUS.pill },
+  tabLabel:     { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
+  tabLabelActive:{ color: theme.accentLight, fontFamily: FONT.semibold },
+  tabUnderline: { height: 2, width: '100%', backgroundColor: theme.accent, borderRadius: RADIUS.pill },
   content:      { flex: 1 },
   listContent:  { paddingTop: SP.md, paddingBottom: SP.xxl + COMP.tabBarH },
   gridContent:  { paddingHorizontal: SP.md },
   gridRow:      { gap: SP.sm, alignItems: 'stretch' },
   sectionHeader:{ marginBottom: SP.xs },
   searchRow:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  searchToggle: { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  searchInput:  { flex: 1, height: 36, backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER_ACTIVE, paddingHorizontal: SP.md, fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
-  filterBtn:    { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  filterBtnActive:{ borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM },
+  searchToggle: { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
+  searchInput:  { flex: 1, height: 36, backgroundColor: theme.card, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, paddingHorizontal: SP.md, fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text },
+  filterBtn:    { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
+  filterBtnActive:{ borderColor: theme.border, backgroundColor: theme.accentDim },
   discoverModeRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
-  inlineError: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginHorizontal: SP.md, marginBottom: SP.sm, padding: SP.sm, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: ORANGE, backgroundColor: '#2B1E0F' },
-  inlineErrorText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: ORANGE },
+  inlineError: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginHorizontal: SP.md, marginBottom: SP.sm, padding: SP.sm, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.warning, backgroundColor: `${theme.warning}1F` },
+  inlineErrorText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: theme.warning },
   emptyState:   { flex: 1, justifyContent: 'center' },
 });
