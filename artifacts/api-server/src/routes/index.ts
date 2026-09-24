@@ -80,6 +80,7 @@ import boostsRouter    from "./boosts";
 import adCampaignsRouter from "./ad-campaigns";
 import vacationRouter  from "./vacation";
 import loyaltyRouter   from "./loyalty";
+import threadCashRouter from "./thread-cash";
 import callRouter      from "./call";
 import featureFlagsRouter from "./feature-flags";
 import ipCasesRouter from "./ip-cases";
@@ -201,5 +202,6 @@ router.use("/ad-campaigns",              tc, adCampaignsRouter);
 router.use("/seller/vacation",          tc, vacationRouter);
 router.use("/seller/notification-prefs", tc, notificationPrefsRouter);
 router.use("/loyalty",             loyaltyRouter); // buyer-scoped; no tc
+router.use("/thread-cash",         threadCashRouter); // buyer-scoped; no tc
 
 export default router;

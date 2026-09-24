@@ -26,8 +26,10 @@ import {
   groupCartBySeller, calculateCartSummary, createCheckoutSession, getCheckoutSession, validateCart,
 } from '@/services/cartService';
 import {
-  Cart, CartItem, SavedCartItem, CartSellerGroup, CheckoutLoyaltyRedemption,
+  Cart, CartItem, SavedCartItem, CartSellerGroup, CheckoutLoyaltyRedemption, CheckoutThreadCashRedemption,
 } from '@/services/cartTypes';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
 import { useApi } from '@/hooks/useApi';
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import {
@@ -495,6 +497,9 @@ export default function CartScreen() {
   const [redeemingPoints, setRedeemingPoints] = useState(false);
   const [loyaltyRedemption, setLoyaltyRedemption] = useState<CheckoutLoyaltyRedemption | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // THREAD CASH HOOK POINT — see components/thread-cash/UseThreadCashCard.tsx.
+  const threadCashCheckoutEnabled = useFeatureFlag('threadCashCheckoutDiscount');
+  const [threadCashRedemption, setThreadCashRedemption] = useState<CheckoutThreadCashRedemption | null>(null);
 
   // Per-row pending actions: itemId → action
   const [pendingByItemId, setPendingByItemId] = useState<Record<string, RowPendingAction>>({});
@@ -556,8 +561,9 @@ export default function CartScreen() {
   const loyaltyPreviewCents = Number.isFinite(requestedPoints) && requestedPoints >= 100
     ? Math.min(requestedPoints, maxRedeemablePoints)
     : 0;
-  const displayedDiscount = summary.discountTotalCents + (loyaltyRedemption?.discountCents ?? 0);
-  const displayedTotal = Math.max(0, summary.totalCents - (loyaltyRedemption?.discountCents ?? 0));
+  const rewardsAppliedCents = (loyaltyRedemption?.discountCents ?? 0) + (threadCashRedemption?.discountCents ?? 0);
+  const displayedDiscount = summary.discountTotalCents + rewardsAppliedCents;
+  const displayedTotal = Math.max(0, summary.totalCents - rewardsAppliedCents);
 
   async function handleQtyDec(itemId: string) {
     if (pendingByItemId[itemId]) return;
@@ -704,7 +710,7 @@ export default function CartScreen() {
 
       // Check each seller's payment account before entering checkout
       const currentGroups = groupCartBySeller(cart.items);
-      if (loyaltyRedemption && currentGroups.length !== 1) {
+      if ((loyaltyRedemption || threadCashRedemption) && currentGroups.length !== 1) {
         Alert.alert('Rewards need one store', 'Remove items from other sellers before continuing with this rewards discount.');
         setValidating(false);
         return;
@@ -737,6 +743,7 @@ export default function CartScreen() {
         false,
         undefined,
         loyaltyRedemption ?? undefined,
+        threadCashRedemption ?? undefined,
       );
       push(('/thread-checkout?source=cart') as never);
     } catch {
@@ -880,6 +887,18 @@ export default function CartScreen() {
                   </>
                 )}
               </View>
+              )}
+              {/* THREAD CASH HOOK POINT: self-contained card, only visible behind
+                  the 'threadCashCheckoutDiscount' flag (default OFF). See
+                  components/thread-cash/UseThreadCashCard.tsx and
+                  docs/payments/thread-cash-checkout-todo.md. */}
+              {isSignedIn && groups.length === 1 && threadCashCheckoutEnabled && (
+                <UseThreadCashCard
+                  maxDiscountCents={Math.max(0, summary.subtotalCents + summary.shippingTotalCents - 1)}
+                  redemption={threadCashRedemption}
+                  onApply={setThreadCashRedemption}
+                  onRemove={() => setThreadCashRedemption(null)}
+                />
               )}
               <SummaryCard
                 subtotal={summary.subtotalCents}

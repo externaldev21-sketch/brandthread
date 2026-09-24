@@ -19,6 +19,8 @@ import {
   BlockedComposer, openConversationOptions, openMessageOptions, REMOVED_MESSAGE_TEXT,
   type DmMessagingState,
 } from '@/components/safety/DmSafety';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+import { ThreadCashAttachButton } from '@/components/thread-cash/ChatAttachThreadCash';
 
 type ChatMessage = Omit<Message, 'status'> & {
   status: 'sent' | 'delivered' | 'read' | 'failed';
@@ -162,6 +164,7 @@ const bub = StyleSheet.create({
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const threadCashSendEnabled = useFeatureFlag('threadCashSend');
   // Brandthread is dark-only (app.json userInterfaceStyle: "dark"); web must
   // not fall back to the light palette when the browser prefers light.
   const isDark  = true;
@@ -377,6 +380,17 @@ export default function ChatScreen() {
         />
       ) : (
       <View style={[s.inputRow, { backgroundColor: headerBg, borderTopColor: border, paddingBottom: Math.max(insets.bottom, 12) }]}>
+        {/* THREAD CASH HOOK POINT: minimal attach entry, OFF by default behind
+            the 'threadCashSend' flag. See components/thread-cash/ChatAttachThreadCash.tsx —
+            rendering a sent Thread Cash message in the thread above is left
+            for the messaging session's message-list renderer to wire up. */}
+        {threadCashSendEnabled && (
+          <ThreadCashAttachButton
+            recipientId={participant.userId}
+            conversationId={id ?? ''}
+            onSent={() => {}}
+          />
+        )}
         <View style={[s.inputWrap, { backgroundColor: inputBg, borderColor: border }]}>
           <TextInput
             style={[s.input, { color: fg }]}

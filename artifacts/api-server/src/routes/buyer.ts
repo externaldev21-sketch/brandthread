@@ -63,6 +63,7 @@ const checkoutBodySchema = z.object({
   clientIdempotencyKey: z.string().trim().min(8).max(160).optional(),
   dropId: requestPrimitives.uuid.nullable().optional(),
   loyaltyToken: z.string().trim().min(1).max(512).optional(),
+  threadCashToken: z.string().trim().min(1).max(512).optional(),
 }).passthrough();
 const addressSuggestionQuerySchema = z.object({
   q: z.string().trim().min(3).max(160),
@@ -461,8 +462,28 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     const buyerId = (req as any).clerkUserId as string;
     const {
       items, successUrl, cancelUrl, contactEmail, contactPhone, shippingAddress,
-      clientIdempotencyKey, dropId, loyaltyToken,
+      clientIdempotencyKey, dropId, loyaltyToken, threadCashToken,
     } = req.body;
+
+    // ── THREAD CASH HOOK POINT ────────────────────────────────────────────
+    // Thread Cash (platform-funded reward credit) is not yet wired into the
+    // Stripe money flow here. Doing so without changing seller payout
+    // requires (a) feeding paymentIntentMoney the PRE-Thread-Cash amount so
+    // the destination transfer/application fee are computed as if the buyer
+    // paid full price, and (b) a supplemental Stripe Transfer to the seller
+    // for the discounted gap, funded from the platform's balance and posted
+    // as its own ledger entry — see docs/payments/thread-cash-checkout-todo.md
+    // for the exact plan. Until that lands (and the 'threadCashCheckoutDiscount'
+    // feature flag is reviewed and turned on), reject any redeem attempt here
+    // rather than silently ignoring it or reusing the loyalty-coupon path,
+    // which would reduce the seller's payout.
+    if (typeof threadCashToken === "string" && threadCashToken.trim()) {
+      res.status(400).json({
+        error: "Using Thread Cash at checkout isn't available yet.",
+        code: "THREAD_CASH_CHECKOUT_NOT_IMPLEMENTED",
+      });
+      return;
+    }
 
     if (!Array.isArray(items) || items.length === 0) {
       res.status(400).json({ error: "items required" });
