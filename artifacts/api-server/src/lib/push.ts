@@ -6,6 +6,7 @@
 import { db, notificationBatchQueue, notificationDeliveries, notificationEvents, pushTokens, users } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
 import { logger } from "./logger";
+import { withRetry } from "./retry";
 import crypto from "node:crypto";
 
 export interface PushPayload {
@@ -287,14 +288,23 @@ export async function sendPushToUser(
 
         let response: Response;
         try {
-          response = await fetch("https://exp.host/--/api/v2/push/send", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Accept-Encoding": "gzip, deflate",
-            },
-            body: JSON.stringify(sendableMessages),
-          });
+          // Delivery rows were already claimed as "queued" above (per-token,
+          // excluding anything already "sent"), so retrying this request on a
+          // transient network failure cannot double-deliver a push that
+          // already succeeded — at worst it resends to a device that never
+          // got a response back the first time, which Expo's push channel is
+          // already at-least-once for.
+          response = await withRetry(
+            () => fetch("https://exp.host/--/api/v2/push/send", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Accept-Encoding": "gzip, deflate",
+              },
+              body: JSON.stringify(sendableMessages),
+            }),
+            { label: "push.expoSend" },
+          );
         } catch (err) {
           await Promise.all(sendableRows.map((row) =>
             db.update(notificationDeliveries).set({

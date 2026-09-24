@@ -17,6 +17,8 @@ import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { ApplyAsManufacturerBody } from "@workspace/api-zod";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { requireAuth } from "../middlewares/requireAuth";
+import { setPublicCacheHeaders } from "../lib/httpCache";
+import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -173,6 +175,7 @@ router.get("/facets", async (req, res) => {
 
 router.get("/", async (req, res) => {
   try {
+    setPublicCacheHeaders(res);
     const { q, country, specialty, verified, hasPhotos, sort } = req.query as Record<string, string>;
     const searchTerm = normalizeSearchTerm(q);
     const countryTerm = normalizeSearchTerm(country, 80);
@@ -209,12 +212,18 @@ router.get("/", async (req, res) => {
       conditions.push(ilike(manufacturers.specialty, containsSearchPattern(specialtyTerm)));
     }
 
+    const page = parsePagination(req.query, { limit: 100 });
+    if (!page.success) return void res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" });
+    const { limit, offset } = page.data;
+
     const rows = await db
       .select(publicManufacturerFields)
       .from(manufacturers)
       .where(and(...conditions))
       .orderBy(DIRECTORY_SORTS[sort] ?? DIRECTORY_SORTS.recommended)
-      .limit(200);
+      .limit(limit)
+      .offset(offset);
+    setPaginationHeaders(res, page.data, rows.length);
 
     const summaries = await getReviewSummaries(rows.map((row) => row.id));
     const serialized = await Promise.all(rows.map((row) =>
@@ -233,6 +242,7 @@ router.get("/:id/reviews", async (req, res) => {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(manufacturerId)) {
     res.status(400).json({ error: "A canonical manufacturer UUID is required" }); return;
   }
+  setPublicCacheHeaders(res);
   const [manufacturer] = await db.select({ id: manufacturers.id }).from(manufacturers).where(and(
     eq(manufacturers.id, manufacturerId),
     eq(manufacturers.status, "active"),
@@ -381,6 +391,7 @@ router.get("/:id", async (req, res) => {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.params.id)) {
       res.status(400).json({ error: "A canonical manufacturer UUID is required" }); return;
     }
+    setPublicCacheHeaders(res);
     const [mfr] = await db
       .select(publicManufacturerFields)
       .from(manufacturers)

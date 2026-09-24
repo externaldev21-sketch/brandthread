@@ -26,8 +26,8 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import {
-  applyDiscount, clearCart, clearCheckoutSession, createCheckoutSession,
-  getCart, getCheckoutSession, removeDiscount, saveCheckoutProgress, validateCart,
+  applyDiscount, clearCheckoutSession, createCheckoutSession,
+  getCart, getCheckoutSession, removeCartItems, removeDiscount, saveCheckoutProgress, validateCart,
 } from '@/services/cartService';
 import {
   CheckoutAddress, CheckoutContact, CheckoutDiscount, CheckoutSession, CheckoutStep,
@@ -1592,7 +1592,12 @@ export default function BuyerCheckoutScreen() {
 
       setVerifiedOrders(confirmed);
       setPendingSessionIds(unresolved);
-      if (!unresolved.length) await clearCart();
+      // Remove only the items that were actually part of this checkout
+      // session — a single-item Buy Now (or a partial "checkout selected")
+      // must never wipe unrelated items still sitting in the buyer's cart.
+      if (!unresolved.length) {
+        await removeCartItems(current.deliveryGroups.flatMap(group => group.items.map(item => item.id)));
+      }
 
       // Save address if requested
       if (isSignedIn && address.saveAddress !== false && !address.id) {
@@ -1674,7 +1679,7 @@ export default function BuyerCheckoutScreen() {
     await persist({ ...current, paidGroups, step: 'confirmation' });
     if (!remaining.length) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      await clearCart();
+      await removeCartItems(current.deliveryGroups.flatMap(group => group.items.map(item => item.id)));
     }
     setPlacing(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps

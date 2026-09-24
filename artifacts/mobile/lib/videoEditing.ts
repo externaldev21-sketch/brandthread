@@ -189,6 +189,25 @@ export function removePhotoSlide(slides: EditablePhotoSlide[], id: string): Edit
   return slides.filter((s) => s.id !== id);
 }
 
+/** Reorder a slide from one index to another (drag-to-reorder in the carousel strip) */
+export function moveSlide(
+  slides: EditablePhotoSlide[],
+  fromIndex: number,
+  toIndex: number,
+): EditablePhotoSlide[] {
+  if (
+    fromIndex === toIndex ||
+    fromIndex < 0 || fromIndex >= slides.length ||
+    toIndex < 0 || toIndex >= slides.length
+  ) {
+    return slides;
+  }
+  const next = slides.slice();
+  const [moved] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, moved);
+  return next;
+}
+
 /** Convert slides to the API payload for compose-slideshow */
 export function slidesToComposePayload(
   slides: EditablePhotoSlide[],

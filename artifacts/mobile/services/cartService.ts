@@ -169,7 +169,7 @@ async function syncToDb(items: any[], savedItems: any[], expectedUserId: string)
 
 // ─── Cart storage ─────────────────────────────────────────────────────────────
 
-async function loadCart(k: CartKeys = keys()): Promise<Cart> {
+async function loadCartWithStatus(k: CartKeys = keys()): Promise<{ cart: Cart; remoteConfirmed: boolean }> {
   let cart: Cart;
   try {
     const raw = await AsyncStorage.getItem(k.cart);
@@ -182,10 +182,12 @@ async function loadCart(k: CartKeys = keys()): Promise<Cart> {
     cart = { id: uid(), items: [], savedItems: [], updatedAt: now() };
   }
 
-  // Background: attempt to load from DB and merge if DB has data.
+  // Attempt to load from DB and merge if DB has data.
   // Uses the already-captured k so the continuation can't pick up a changed userId.
+  let remoteConfirmed = false;
   try {
     const { items, savedItems } = await serviceRequest<{ items: any[]; savedItems: any[] }>('/api/buyer/cart', {});
+    remoteConfirmed = true;
     if (items.length > 0 || savedItems.length > 0) {
       // DB has data — use it and update local cache.
       // Guard: skip cache write if account switched while the request was in-flight.
@@ -195,9 +197,30 @@ async function loadCart(k: CartKeys = keys()): Promise<Cart> {
         await AsyncStorage.setItem(k.cart, JSON.stringify(cart));
       }
     }
-  } catch { /* ignore */ }
+  } catch { /* remoteConfirmed stays false — see getCartForScreen() */ }
 
-  return cart;
+  return { cart, remoteConfirmed };
+}
+
+async function loadCart(k: CartKeys = keys()): Promise<Cart> {
+  return (await loadCartWithStatus(k)).cart;
+}
+
+/**
+ * Cart-screen-only read: on top of the cart, reports whether we could
+ * actually confirm its contents against the server this time.
+ *
+ * Root-cause note: a plain empty local cache can mean either "the buyer's
+ * cart is genuinely empty" or "we couldn't reach /api/buyer/cart to confirm
+ * it" (a signed-out token race, a network blip). Silently treating both the
+ * same way is what made the cart page look empty even when the buyer really
+ * did have items pending sync — the screen should only ever show the real
+ * empty state when it's actually confirmed empty, not merely unconfirmed.
+ */
+export async function getCartForScreen(): Promise<{ cart: Cart; loadError: boolean }> {
+  const { cart, remoteConfirmed } = await loadCartWithStatus();
+  const loadError = !remoteConfirmed && cart.items.length === 0 && cart.savedItems.length === 0;
+  return { cart, loadError };
 }
 
 async function saveCart(cart: Cart, k: CartKeys = keys()): Promise<void> {
@@ -342,6 +365,25 @@ export async function removeCartItem(itemId: string): Promise<Cart> {
   const k = keys();
   const cart = await loadCart(k);
   cart.items = cart.items.filter(i => i.id !== itemId);
+  await saveCart(cart, k);
+  return cart;
+}
+
+/**
+ * Remove exactly these line IDs, leaving every other cart line untouched.
+ * Used after a checkout completes (whole-cart, selected, or single-item Buy)
+ * so only the item(s) that were actually paid for ever leave the cart —
+ * a Buy Now purchase on one item must never wipe unrelated items sitting in
+ * the buyer's cart alongside it. IDs with no matching line (e.g. a Buy Now
+ * from the product sheet, which never touches the persisted cart) are
+ * harmlessly ignored.
+ */
+export async function removeCartItems(itemIds: string[]): Promise<Cart> {
+  if (itemIds.length === 0) return getCart();
+  const k = keys();
+  const cart = await loadCart(k);
+  const idSet = new Set(itemIds);
+  cart.items = cart.items.filter(i => !idSet.has(i.id));
   await saveCart(cart, k);
   return cart;
 }

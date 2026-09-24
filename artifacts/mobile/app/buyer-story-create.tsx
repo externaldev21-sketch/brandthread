@@ -1,7 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Dimensions, Alert, Switch, Image, FlatList,
+  Animated, View, Text, ScrollView, TouchableOpacity, TextInput,
+  StyleSheet, Dimensions, Alert, Switch, Image, FlatList, Modal, PanResponder,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,9 +17,65 @@ import {
 } from '@/lib/theme';
 import { createStory, MY_COLOR } from '@/services/socialService';
 import { useApi } from '@/lib/api';
-import type { StoryMedia, StoryPrivacySettings } from '@/services/socialTypes';
+import type { StoryMedia, StoryOverlay, StoryPrivacySettings } from '@/services/socialTypes';
 import { useColors } from '@/hooks/useColors';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { getTaggableProducts } from '@/services/productService';
+import type { Product } from '@/services/productTypes';
+
+const STICKER_EMOJI = ['🔥', '✨', '❤️', '😂', '🎉', '👀', '💯', '⭐️'];
+
+/** A single draggable overlay (text or sticker) placed on the story canvas. */
+function DraggableOverlay({ overlay, canvasSize, onMove, onRemove }: {
+  overlay: StoryOverlay;
+  canvasSize: { width: number; height: number };
+  onMove: (id: string, x: number, y: number) => void;
+  onRemove: (id: string) => void;
+}) {
+  const pan = useRef(new Animated.ValueXY({ x: overlay.x, y: overlay.y })).current;
+  const lastPos = useRef({ x: overlay.x, y: overlay.y });
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 3 || Math.abs(g.dy) > 3,
+      onPanResponderGrant: () => {
+        pan.setOffset({ x: lastPos.current.x, y: lastPos.current.y });
+        pan.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
+      onPanResponderRelease: () => {
+        pan.flattenOffset();
+        // @ts-ignore — _value is internal but stable, same pattern as TextOverlayEditor's OverlayChip
+        const rawX = (pan.x as any)._value as number;
+        // @ts-ignore
+        const rawY = (pan.y as any)._value as number;
+        const x = Math.max(0, Math.min(canvasSize.width - 20, rawX));
+        const y = Math.max(0, Math.min(canvasSize.height - 20, rawY));
+        pan.setValue({ x, y });
+        lastPos.current = { x, y };
+        onMove(overlay.id, x, y);
+      },
+    }),
+  ).current;
+
+  return (
+    <Animated.View
+      {...panResponder.panHandlers}
+      testID={`story-overlay-${overlay.id}`}
+      style={[storyOverlayStyles.chip, { transform: pan.getTranslateTransform() }]}
+    >
+      <TouchableOpacity onLongPress={() => onRemove(overlay.id)} activeOpacity={0.85}>
+        <Text style={{ color: overlay.color ?? '#FFF', fontSize: overlay.size ?? 28, fontFamily: FONT.bold }}>
+          {overlay.text}
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+const storyOverlayStyles = StyleSheet.create({
+  chip: { position: 'absolute', top: 0, left: 0 },
+});
 
 const { width: W } = Dimensions.get('window');
 const CANVAS_H = Math.min(W * 1.4, 400);
@@ -63,6 +119,72 @@ export default function BuyerStoryCreate() {
   // Video — single clip, capped at 15s
   const [videoUri, setVideoUri] = useState<string | null>(null);
   const [videoDuration, setVideoDuration] = useState(0);
+
+  // Text overlay + stickers, applied to the first (or only) slide.
+  const [overlays, setOverlays] = useState<StoryOverlay[]>([]);
+  const [textModalVisible, setTextModalVisible] = useState(false);
+  const [textDraft, setTextDraft] = useState('');
+  const [textDraftColor, setTextDraftColor] = useState('#FFFFFF');
+  const [stickerPickerOpen, setStickerPickerOpen] = useState(false);
+
+  // Product tag — sellers only.
+  const isSeller = params.accountType === 'seller';
+  const [taggedProduct, setTaggedProduct] = useState<{ id: string; name: string } | null>(null);
+  const [productPickerOpen, setProductPickerOpen] = useState(false);
+  const [taggableProducts, setTaggableProducts] = useState<Product[]>([]);
+
+  const canvasSize = { width: W - SP.md * 2, height: CANVAS_H };
+
+  const addTextOverlay = () => {
+    setTextDraft('');
+    setTextDraftColor('#FFFFFF');
+    setTextModalVisible(true);
+  };
+
+  const commitTextOverlay = () => {
+    const text = textDraft.trim();
+    if (text) {
+      setOverlays(prev => [...prev, {
+        id: `ov_${Date.now()}`,
+        type: 'text',
+        x: canvasSize.width / 2 - 40,
+        y: canvasSize.height / 2 - 20,
+        text,
+        color: textDraftColor,
+        size: 28,
+      }]);
+    }
+    setTextModalVisible(false);
+  };
+
+  const addSticker = (emoji: string) => {
+    setOverlays(prev => [...prev, {
+      id: `ov_${Date.now()}`,
+      type: 'text',
+      x: canvasSize.width / 2 - 24,
+      y: canvasSize.height / 2 - 24,
+      text: emoji,
+      size: 44,
+    }]);
+    setStickerPickerOpen(false);
+  };
+
+  const moveOverlay = useCallback((id: string, x: number, y: number) => {
+    setOverlays(prev => prev.map(o => (o.id === id ? { ...o, x, y } : o)));
+  }, []);
+  const removeOverlay = useCallback((id: string) => {
+    setOverlays(prev => prev.filter(o => o.id !== id));
+  }, []);
+
+  const openProductPicker = async () => {
+    try {
+      const products = await getTaggableProducts();
+      setTaggableProducts(products);
+    } catch {
+      setTaggableProducts([]);
+    }
+    setProductPickerOpen(true);
+  };
 
   const hasMedia =
     type === 'photo' ? photoUris.length > 0 :
@@ -117,13 +239,19 @@ export default function BuyerStoryCreate() {
       let media: StoryMedia[];
 
       if (type === 'photo') {
-        // Each selected photo becomes one slide in a story reel
+        // Each selected photo becomes one slide in a story reel; overlays
+        // and a product tag are authored on the first slide only.
         media = photoUris.map((uri, i) => ({
           id:              `sm_${Date.now()}_${i}`,
           type:            'photo' as const,
           backgroundColor: '#000',
           imageUri:        uri,
           duration:        5,
+          ...(i === 0 ? {
+            overlays: overlays.length ? overlays : undefined,
+            productTagId: taggedProduct?.id,
+            productTagName: taggedProduct?.name,
+          } : {}),
         }));
       } else if (type === 'video') {
         media = [{
@@ -132,6 +260,9 @@ export default function BuyerStoryCreate() {
           backgroundColor: '#000',
           imageUri:        videoUri!,
           duration:        Math.max(videoDuration, 3),
+          overlays:        overlays.length ? overlays : undefined,
+          productTagId:    taggedProduct?.id,
+          productTagName:  taggedProduct?.name,
         }];
       } else {
         media = [{
@@ -141,6 +272,7 @@ export default function BuyerStoryCreate() {
           textContent,
           textColor,
           duration:        5,
+          overlays:        overlays.length ? overlays : undefined,
         }];
       }
 
@@ -173,7 +305,7 @@ export default function BuyerStoryCreate() {
       setIsPosting(false);
     }
   }, [isShareDisabled, type, bgColor, textContent, textColor, privacyVis, allowReplies,
-      photoUris, videoUri, videoDuration, params.accountType]);
+      photoUris, videoUri, videoDuration, params.accountType, overlays, taggedProduct]);
 
   // ── UI ────────────────────────────────────────────────────────────────────
 
@@ -300,8 +432,56 @@ export default function BuyerStoryCreate() {
                 </TouchableOpacity>
               )
             )}
+
+            {/* ── TEXT OVERLAYS + STICKERS ── */}
+            {overlays.map(overlay => (
+              <DraggableOverlay
+                key={overlay.id}
+                overlay={overlay}
+                canvasSize={canvasSize}
+                onMove={moveOverlay}
+                onRemove={removeOverlay}
+              />
+            ))}
           </View>
         </View>
+
+        {/* OVERLAY TOOLBAR — text, stickers, product tag (sellers) */}
+        <View style={styles.overlayToolbar}>
+          <TouchableOpacity style={styles.toolbarBtn} onPress={addTextOverlay} testID="story-add-text">
+            <Feather name="type" size={ICON.sm} color={ON_DARK} />
+            <Text style={styles.toolbarBtnText}>Text</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.toolbarBtn}
+            onPress={() => setStickerPickerOpen(v => !v)}
+            testID="story-add-sticker"
+          >
+            <Feather name="smile" size={ICON.sm} color={ON_DARK} />
+            <Text style={styles.toolbarBtnText}>Sticker</Text>
+          </TouchableOpacity>
+          {isSeller && (
+            <TouchableOpacity style={styles.toolbarBtn} onPress={openProductPicker} testID="story-tag-product">
+              <Feather name="shopping-bag" size={ICON.sm} color={ON_DARK} />
+              <Text style={styles.toolbarBtnText}>{taggedProduct ? taggedProduct.name : 'Tag product'}</Text>
+              {taggedProduct && (
+                <TouchableOpacity onPress={() => setTaggedProduct(null)} hitSlop={8}>
+                  <Feather name="x" size={ICON.xs} color={ON_DARK} />
+                </TouchableOpacity>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {stickerPickerOpen && (
+          <View style={styles.stickerRow}>
+            {STICKER_EMOJI.map(emoji => (
+              <TouchableOpacity key={emoji} style={styles.stickerBtn} onPress={() => addSticker(emoji)}>
+                <Text style={styles.stickerEmoji}>{emoji}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {/* PHOTO STRIP — thumbnail row when multi-photo selected */}
         {type === 'photo' && photoUris.length > 1 && (
@@ -405,6 +585,67 @@ export default function BuyerStoryCreate() {
           </View>
         </View>
       </ScrollView>
+
+      {/* TEXT OVERLAY MODAL */}
+      <Modal visible={textModalVisible} transparent animationType="fade" onRequestClose={() => setTextModalVisible(false)}>
+        <View style={styles.overlayModalBackdrop}>
+          <View style={styles.overlayModalCard}>
+            <Text style={styles.controlLabel}>Add text</Text>
+            <TextInput
+              style={styles.overlayTextInput}
+              value={textDraft}
+              onChangeText={setTextDraft}
+              placeholder="Say something…"
+              placeholderTextColor="rgba(255,255,255,0.35)"
+              autoFocus
+            />
+            <View style={[styles.colorRow, { marginTop: SP.sm }]}>
+              {TEXT_COLORS.map(c => (
+                <TouchableOpacity
+                  key={c}
+                  style={[
+                    styles.colorCircle,
+                    { backgroundColor: c },
+                    textDraftColor === c && styles.colorCircleActive,
+                    c === '#000000' && { borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+                  ]}
+                  onPress={() => setTextDraftColor(c)}
+                />
+              ))}
+            </View>
+            <View style={styles.overlayModalActions}>
+              <TouchableOpacity onPress={() => setTextModalVisible(false)} style={styles.overlayModalCancel}>
+                <Text style={styles.overlayModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={commitTextOverlay} style={[styles.overlayModalDone, { backgroundColor: PURPLE }]}>
+                <Text style={styles.overlayModalDoneText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* PRODUCT TAG PICKER (sellers) */}
+      <Modal visible={productPickerOpen} transparent animationType="slide" onRequestClose={() => setProductPickerOpen(false)}>
+        <TouchableOpacity style={styles.overlayModalBackdrop} activeOpacity={1} onPress={() => setProductPickerOpen(false)} />
+        <View style={[styles.productSheet, { paddingBottom: insets.bottom + SP.md }]}>
+          <Text style={styles.controlLabel}>Tag a product</Text>
+          <FlatList
+            data={taggableProducts}
+            keyExtractor={p => p.id}
+            ListEmptyComponent={<Text style={styles.placeholderSub}>No products to tag yet.</Text>}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.productRow}
+                onPress={() => { setTaggedProduct({ id: item.id, name: item.name }); setProductPickerOpen(false); }}
+              >
+                <Text style={styles.privacyLabel}>{item.name}</Text>
+                <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -662,6 +903,112 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   privacyDivider: {
     height: 1,
     backgroundColor: BORDER,
+  },
+  overlayToolbar: {
+    flexDirection: 'row',
+    gap: SP.sm,
+    paddingHorizontal: SP.md,
+    marginTop: SP.sm,
+  },
+  toolbarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.xs,
+  },
+  toolbarBtnText: {
+    color: ON_DARK,
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+  },
+  stickerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SP.sm,
+    paddingHorizontal: SP.md,
+    marginTop: SP.sm,
+  },
+  stickerBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.md,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stickerEmoji: {
+    fontSize: FS.xl,
+  },
+  overlayModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  overlayModalCard: {
+    width: W - SP.xl * 2,
+    backgroundColor: CARD,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: SP.md,
+  },
+  overlayTextInput: {
+    color: ON_DARK,
+    fontSize: FS.md,
+    fontFamily: FONT.medium,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+    paddingVertical: SP.sm,
+  },
+  overlayModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: SP.sm,
+    marginTop: SP.md,
+  },
+  overlayModalCancel: {
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+  },
+  overlayModalCancelText: {
+    color: MUTED,
+    fontFamily: FONT.medium,
+    fontSize: FS.sm,
+  },
+  overlayModalDone: {
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.lg,
+    paddingVertical: SP.sm,
+  },
+  overlayModalDoneText: {
+    color: ON_DARK,
+    fontFamily: FONT.semibold,
+    fontSize: FS.sm,
+  },
+  productSheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: CARD,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    maxHeight: '60%',
+    padding: SP.md,
+  },
+  productRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: SP.md,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
   },
   });
 };
