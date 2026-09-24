@@ -19,6 +19,7 @@ import {
   FONT, FS, SP, RADIUS, SUCCESS, SUCCESS_DIM, CARD_ELEVATED, RED, RED_DIM,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
+import { Header } from '@/components/layout';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -272,15 +273,8 @@ export default function LoginMethods() {
   }
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Feather name="arrow-left" size={22} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.title}>Login Methods</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <View style={s.root}>
+      <Header title="Login Methods" />
 
       {!isLoaded ? (
         <View style={s.loading}>

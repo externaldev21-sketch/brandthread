@@ -53,6 +53,7 @@ import {
   buildBoostReturnUrl,
 } from '@/services/boostService';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { Header } from '@/components/layout';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -748,27 +749,11 @@ export default function BoostScreen() {
 
   function renderHeader(title: string) {
     return (
-      <View style={[s.header, { paddingTop: topPad + 8 }]}>
-        <TouchableOpacity
-          onPress={goBack}
-          style={s.headerBtn}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Feather name="arrow-left" size={20} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>{title}</Text>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={s.headerBtn}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          accessibilityLabel="Close"
-          accessibilityRole="button"
-        >
-          <Feather name="x" size={20} color={MUTED} />
-        </TouchableOpacity>
-      </View>
+      <Header
+        title={title}
+        onBack={goBack}
+        actions={[{ icon: 'x', onPress: () => router.back(), accessibilityLabel: 'Close' }]}
+      />
     );
   }
 

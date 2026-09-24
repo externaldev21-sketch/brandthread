@@ -19,6 +19,7 @@ import {
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
+import { Header } from '@/components/layout';
 
 type PointEntry = {
   id: string;
@@ -93,15 +94,8 @@ export default function LoyaltyScreen() {
   }
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.headerBack} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-          <Feather name="arrow-left" size={20} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Rewards</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <View style={s.root}>
+      <Header title="Rewards" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
 

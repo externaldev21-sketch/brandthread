@@ -13,6 +13,7 @@ import {
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { getMyProfile } from '@/services/socialService';
 import type { BuyerSocialProfile } from '@/services/socialTypes';
+import { Header } from '@/components/layout';
 
 export default function BuyerQRCode() {
   const { theme } = useAppTheme();
@@ -46,16 +47,11 @@ export default function BuyerQRCode() {
   }
 
   return (
-    <View style={[s.page, { paddingTop: insets.top }]}>
-      <View style={s.header}>
-        <TouchableOpacity style={s.iconBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={21} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.title}>QR Code</Text>
-        <TouchableOpacity style={s.iconBtn} onPress={handleShare}>
-          <Feather name="share-2" size={21} color={FG} />
-        </TouchableOpacity>
-      </View>
+    <View style={s.page}>
+      <Header
+        title="QR Code"
+        actions={[{ icon: 'share-2', onPress: handleShare, accessibilityLabel: 'Share' }]}
+      />
 
       <View style={s.body}>
         {/* Card */}

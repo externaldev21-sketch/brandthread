@@ -20,6 +20,7 @@ import {
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { Header } from '@/components/layout';
 
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
@@ -139,14 +140,8 @@ export default function InviteManufacturerScreen() {
 
   if (submitted) {
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
-        <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Feather name="arrow-left" size={ICON.md} color={FG} />
-          </TouchableOpacity>
-          <Text style={s.headerTitle}>Invite Manufacturer</Text>
-          <View style={{ width: 36 }} />
-        </View>
+      <View style={s.root}>
+        <Header title="Invite Manufacturer" />
 
         <ScrollView
           contentContainerStyle={[s.successContainer, { paddingBottom: insets.bottom + SP.xl }]}
@@ -208,17 +203,10 @@ export default function InviteManufacturerScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[s.root, { paddingTop: insets.top }]}
+      style={s.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Invite Manufacturer</Text>
-        <View style={{ width: 36 }} />
-      </View>
+      <Header title="Invite Manufacturer" />
 
       <ScrollView
         showsVerticalScrollIndicator={false}

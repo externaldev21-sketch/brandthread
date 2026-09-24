@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, Platform, TextInput } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, TextInput } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Header } from '@/components/layout';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
@@ -125,28 +126,7 @@ export default function ShippingScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <View style={[
-        styles.header,
-        {
-          paddingTop: Platform.OS === 'web' ? 67 : insets.top + 8,
-          borderBottomColor: colors.border,
-        },
-      ]}>
-        <TouchableOpacity
-          onPress={leaveSetupDestination}
-          style={[styles.headerBack, { backgroundColor: colors.card, borderColor: colors.border }]}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          accessibilityHint="Returns from Shipping & Fulfillment"
-        >
-          <Feather name="arrow-left" size={20} color={colors.foreground} />
-        </TouchableOpacity>
-        <View style={styles.headerTitleBlock}>
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>Shipping & Fulfillment</Text>
-          <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]}>Labels, carriers & returns</Text>
-        </View>
-        <View style={styles.headerRightSlot} />
-      </View>
+      <Header title="Shipping & Fulfillment" onBack={leaveSetupDestination} />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
@@ -355,27 +335,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sheetBtnText: { fontSize: FS.md, fontWeight: '600' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    minHeight: 88,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    gap: 8,
-  },
-  headerBack: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  headerTitleBlock: { flex: 1 },
-  headerTitle: { fontSize: 20, fontFamily: 'Inter_700Bold', letterSpacing: -0.3 },
-  headerSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 4 },
-  headerRightSlot: { width: 40 },
   back: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
   backText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
   pageTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 4 },

@@ -72,6 +72,7 @@ import type {
   AdMediaKind,
 } from '@/lib/api';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { Header } from '@/components/layout';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -676,15 +677,11 @@ export default function CreateAdScreen() {
 
   function renderHeader() {
     return (
-      <View style={[styles.header, { paddingTop: topPad + 8 }]}>
-        <TouchableOpacity onPress={goBack} style={styles.headerBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} accessibilityRole="button" accessibilityLabel="Go back">
-          <Feather name="arrow-left" size={20} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Create Ad</Text>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} accessibilityRole="button" accessibilityLabel="Close">
-          <Feather name="x" size={20} color={MUTED} />
-        </TouchableOpacity>
-      </View>
+      <Header
+        title="Create Ad"
+        onBack={goBack}
+        actions={[{ icon: 'x', onPress: () => router.back(), accessibilityLabel: 'Close' }]}
+      />
     );
   }
 

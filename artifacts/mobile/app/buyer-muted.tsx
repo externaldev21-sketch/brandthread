@@ -16,6 +16,7 @@ import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getMutedUsers, unmuteUser } from '@/services/socialService';
 import type { MuteRecord } from '@/services/socialTypes';
+import { Header } from '@/components/layout';
 
 export default function MutedAccountsScreen() {
   const { theme } = useAppTheme();
@@ -53,14 +54,8 @@ export default function MutedAccountsScreen() {
   );
 
   return (
-    <View style={[styles.page, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={21} color={theme.text} />
-        </TouchableOpacity>
-        <Text style={styles.title}>Muted accounts</Text>
-        <View style={styles.iconBtn} />
-      </View>
+    <View style={styles.page}>
+      <Header title="Muted accounts" />
 
       <View style={styles.intro}>
         <Text style={styles.introText}>
@@ -116,13 +111,6 @@ export default function MutedAccountsScreen() {
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   page: { flex: 1, backgroundColor: theme.background },
-  header: {
-    height: 58, flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', paddingHorizontal: SP.md,
-    borderBottomWidth: 1, borderBottomColor: theme.border,
-  },
-  iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.md },
   intro: { padding: SP.md },
   introText: { color: theme.muted, fontFamily: FONT.regular, fontSize: 13, lineHeight: 19 },
   search: {

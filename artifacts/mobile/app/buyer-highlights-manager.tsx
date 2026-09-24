@@ -21,6 +21,7 @@ import {
   loadHighlights, createHighlight, updateHighlight, deleteHighlight,
   reorderHighlights, type Highlight,
 } from '@/lib/highlightsService';
+import { Header } from '@/components/layout';
 
 function EmojiPicker({ visible, onSelect, onClose }: {
   visible: boolean;
@@ -222,16 +223,11 @@ export default function BuyerHighlightsManager() {
   );
 
   return (
-    <View style={[s.page, { paddingTop: insets.top }]}>
-      <View style={s.header}>
-        <TouchableOpacity style={s.iconBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={21} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.title}>Story Highlights</Text>
-        <TouchableOpacity style={s.iconBtn} onPress={openCreate}>
-          <Feather name="plus" size={22} color={PURPLE} />
-        </TouchableOpacity>
-      </View>
+    <View style={s.page}>
+      <Header
+        title="Story Highlights"
+        actions={[{ icon: 'plus', onPress: openCreate, accessibilityLabel: 'New highlight' }]}
+      />
 
       <FlatList
         data={highlights}
@@ -293,9 +289,6 @@ export default function BuyerHighlightsManager() {
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
-  header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
-  iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: 14, gap: 10 },
   reorderBtns: { flexDirection: 'column', alignItems: 'center' },
   reorderArrow: { width: 24, height: 22, alignItems: 'center', justifyContent: 'center' },

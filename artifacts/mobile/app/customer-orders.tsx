@@ -4,13 +4,12 @@
  */
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Platform,
+  View, Text, ScrollView, StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   BG, CARD, SURFACE, BORDER, FG, MUTED, SUBTLE,
   SUCCESS,
@@ -21,6 +20,7 @@ import { StatusBadge } from '@/components/BrandthreadUI';
 import { useColors } from '@/hooks/useColors';
 import { formatCents } from '@/lib/money';
 import { useUser } from '@clerk/expo';
+import { Header } from '@/components/layout';
 
 type Customer = {
   id: string;
@@ -59,8 +59,6 @@ function cents(c: number) {
 
 export default function CustomerOrdersScreen() {
   const colors = useColors();
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
   const api = useApi();
   const { user, isLoaded: clerkLoaded } = useUser();
   const { customerId } = useLocalSearchParams<{ customerId: string }>();
@@ -111,17 +109,8 @@ export default function CustomerOrdersScreen() {
   }, [load, clerkLoaded, user?.id, customerId]));
 
   return (
-    <View style={[s.root, { paddingTop: Platform.OS === 'web' ? 20 : insets.top }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Feather name="arrow-left" size={22} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle} numberOfLines={1}>
-          {customer?.name ?? 'Customer Orders'}
-        </Text>
-        <View style={{ width: 22 }} />
-      </View>
+    <View style={s.root}>
+      <Header title={customer?.name ?? 'Customer Orders'} />
 
       {loading ? (
         <View style={s.center}>
@@ -235,8 +224,6 @@ export default function CustomerOrdersScreen() {
 
 const s = StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
-  headerTitle:  { fontSize: 17, fontFamily: 'Inter_700Bold', color: FG, flex: 1, textAlign: 'center', marginHorizontal: 8 },
   scroll:       { padding: 16, paddingBottom: 100, gap: 16 },
   center:       { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   errorText:    { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center' },

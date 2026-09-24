@@ -12,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader } from '@/components/BrandthreadUI';
+import { Header } from '@/components/layout';
 import { getShippingRates, purchaseShippingLabel, voidShippingLabel } from '@/services/orderService';
 import { Order, ShippingRate, ShippingLabel } from '@/services/orderTypes';
 import { formatCents } from '@/lib/money';
@@ -171,13 +172,8 @@ export default function ShippingLabelScreen() {
 
   if (!order) {
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
-        <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-            <Feather name="arrow-left" size={ICON.md} color={FG} />
-          </TouchableOpacity>
-          <Text style={s.headerTitle}>Shipping Label</Text>
-        </View>
+      <View style={s.root}>
+        <Header title="Shipping Label" />
         <View style={s.centered}>
           <Text style={s.errorText}>
             {loadError ? 'Couldn’t load this order. Check your connection and try again.' : 'Order not found.'}
@@ -194,13 +190,8 @@ export default function ShippingLabelScreen() {
 
   if (bought && label) {
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
-        <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-            <Feather name="arrow-left" size={ICON.md} color={FG} />
-          </TouchableOpacity>
-          <Text style={s.headerTitle}>Label Purchased</Text>
-        </View>
+      <View style={s.root}>
+        <Header title="Label Purchased" />
 
         <ScrollView
           style={s.content}
@@ -295,15 +286,8 @@ export default function ShippingLabelScreen() {
   // ── Main Buy Flow ─────────────────────────────────────────────────────────
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Shipping Label</Text>
-        <Text style={s.headerSub}>{order.orderNumber}</Text>
-      </View>
+    <View style={s.root}>
+      <Header title="Shipping Label" />
 
       <ScrollView
         style={s.content}
@@ -576,12 +560,6 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
   root:               { flex: 1, backgroundColor: 'transparent' },
   centered:           { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   errorText:          { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED },
-
-  // Header
-  header:             { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, gap: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
-  backBtn:            { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:        { fontSize: FS.md, fontFamily: FONT.bold, color: FG, flex: 1 },
-  headerSub:          { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
 
   // Content
   content:            { flex: 1 },

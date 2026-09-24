@@ -16,6 +16,7 @@ import {
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@clerk/expo';
+import { Header } from '@/components/layout';
 
 type AccountType = 'seller' | 'buyer';
 
@@ -99,15 +100,8 @@ export default function AccountTypeSettingsScreen() {
   }
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Feather name="arrow-left" size={22} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Account Type</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <View style={s.root}>
+      <Header title="Account Type" />
 
       {loading ? (
         <View style={s.loadingWrap}>
@@ -193,9 +187,6 @@ export default function AccountTypeSettingsScreen() {
 
 const s = StyleSheet.create({
   root:        { flex: 1, backgroundColor: 'transparent' },
-  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  headerTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
-  backBtn:     { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   currentBadge:    { flexDirection: 'row', alignItems: 'center', gap: SP.xs, backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, paddingHorizontal: SP.sm, paddingVertical: SP.xs, alignSelf: 'flex-start', marginBottom: SP.md },
