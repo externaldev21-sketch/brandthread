@@ -82,6 +82,7 @@ describe('safety entry points', () => {
     }
     expect(items.find((item) => item.action === 'delete-account')).toBeTruthy();
     expect(items.find((item) => item.route === '/admin-reports')?.requiresModerator).toBe(true);
-    expect(read('app/settings.tsx')).toContain("router.push('/delete-account' as never)");
+    expect(read('app/buyer-settings.tsx')).toContain("router.push('/delete-account' as never)");
+    expect(read('app/seller-settings.tsx')).toContain("router.push('/delete-account' as never)");
   });
 });

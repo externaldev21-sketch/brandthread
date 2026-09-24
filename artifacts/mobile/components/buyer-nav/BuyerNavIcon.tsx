@@ -100,10 +100,10 @@ export function BuyerNavIcon({
     case 'dashboard':
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24">
-          <Rect x={3.8} y={3.8} width={7} height={8.4} rx={2} fill={focused ? color : 'none'} {...common} />
-          <Rect x={13.2} y={3.8} width={7} height={5} rx={2} fill="none" {...common} />
-          <Rect x={3.8} y={14.6} width={7} height={5.6} rx={2} fill="none" {...common} />
-          <Rect x={13.2} y={11.2} width={7} height={9} rx={2} fill={focused ? color : 'none'} {...common} />
+          <Rect x={4.2} y={12.4} width={3.8} height={7.4} rx={1.2} fill={focused ? color : 'none'} {...common} />
+          <Rect x={10.1} y={7.6} width={3.8} height={12.2} rx={1.2} fill={focused ? color : 'none'} {...common} />
+          <Rect x={16} y={3.8} width={3.8} height={16} rx={1.2} fill={focused ? color : 'none'} {...common} />
+          <Line x1={3.4} y1={20.6} x2={20.6} y2={20.6} {...common} />
         </Svg>
       );
     case 'products':
@@ -128,13 +128,10 @@ export function BuyerNavIcon({
     case 'studio':
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24">
-          <Path
-            d="M11 4.6c.6 3.9 2.6 5.9 6.5 6.5-3.9.6-5.9 2.6-6.5 6.5-.6-3.9-2.6-5.9-6.5-6.5 3.9-.6 5.9-2.6 6.5-6.5Z"
-            fill={focused ? color : 'none'}
-            {...common}
-          />
-          <Path d="M18.4 3.4v3.4M16.7 5.1h3.4" fill="none" {...common} />
-          <Path d="M18 17.6v2.4M16.8 18.8h2.4" fill="none" {...common} />
+          <Rect x={3.8} y={3.8} width={7} height={8.4} rx={2} fill={focused ? color : 'none'} {...common} />
+          <Rect x={13.2} y={3.8} width={7} height={5} rx={2} fill="none" {...common} />
+          <Rect x={3.8} y={14.6} width={7} height={5.6} rx={2} fill="none" {...common} />
+          <Rect x={13.2} y={11.2} width={7} height={9} rx={2} fill={focused ? color : 'none'} {...common} />
         </Svg>
       );
     case 'close':

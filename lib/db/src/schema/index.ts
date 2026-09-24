@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp, date, json, boolean, primaryKey, index, numeric, unique, uniqueIndex, foreignKey } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, timestamp, date, json, jsonb, boolean, primaryKey, index, numeric, unique, uniqueIndex, foreignKey } from 'drizzle-orm/pg-core';
 export * from './manufacturers';
 export * from './freelancers';
 export * from './subscriptionEntitlements';
@@ -81,6 +81,15 @@ export const users = pgTable('users', {
     .notNull()
     .default({}),
   notificationDigest: text('notification_digest').notNull().default('realtime'),
+  // Master push kill switch. false suppresses push sends for every category
+  // while leaving the in-app notification feed and per-category prefs intact.
+  pushEnabled: boolean('push_enabled').notNull().default(true),
+  // Quiet hours: local wall-clock "HH:MM" strings evaluated in quietHoursTimezone.
+  // A push falling inside the window is suppressed (feed row still written);
+  // null start/end means quiet hours are off.
+  quietHoursStart:    text('quiet_hours_start'),
+  quietHoursEnd:       text('quiet_hours_end'),
+  quietHoursTimezone: text('quiet_hours_timezone').notNull().default('UTC'),
   // A tombstone is retained after an account erasure request.  Keeping the
   // Clerk subject prevents a delayed client sync from creating a fresh profile.
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
@@ -299,6 +308,10 @@ export const orders = pgTable('orders', {
   // Fulfillment timestamps
   packedAt:  timestamp('packed_at'),
   shippedAt: timestamp('shipped_at'),
+  // Seller packing-checklist state for the fulfillment wizard (mobile
+  // Fulfillment.isPicked/isPacked). Not a money-path field.
+  fulfillmentPicked: boolean('fulfillment_picked').notNull().default(false),
+  fulfillmentPacked: boolean('fulfillment_packed').notNull().default(false),
   // Discount code applied at checkout
   discountCode:        text('discount_code'),
   discountAmountCents: integer('discount_amount_cents').notNull().default(0),
@@ -371,9 +384,9 @@ export const posts = pgTable('posts', {
   thumbnailUrl: text('thumbnail_url'),
   mediaUrls: json('media_urls').$type<string[]>().notNull().default([]),
   /** Ordered object storage paths for each composed slideshow slide (empty for video/photo) */
-  mediaPaths: json('media_paths').$type<string[]>().notNull().default([]),
+  mediaPaths: jsonb('media_paths').$type<string[]>().notNull().default([]),
   /** Per-slide overlay metadata. Each entry: { slideIndex, overlays: TextOverlay[] } */
-  slideOverlays: json('slide_overlays').$type<Array<{
+  slideOverlays: jsonb('slide_overlays').$type<Array<{
     slideIndex: number;
     overlays: Array<{
       id: string; text: string; x: number; y: number;
@@ -520,6 +533,13 @@ export const pushTokens = pgTable('push_tokens', {
   userId:    text('user_id').notNull(),
   token:     text('token').notNull().unique(),
   platform:  text('platform').notNull().default('unknown'), // 'ios' | 'android' | 'web'
+  // Set false when Expo's push receipt API reports DeviceNotRegistered (app
+  // uninstalled, token revoked). Inactive tokens are excluded from sends but
+  // kept for audit/debugging rather than deleted outright.
+  isActive:      boolean('is_active').notNull().default(true),
+  lastSeenAt:    timestamp('last_seen_at').defaultNow().notNull(),
+  deactivatedAt: timestamp('deactivated_at'),
+  deactivatedReason: text('deactivated_reason'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -779,6 +799,24 @@ export const notificationsFeed = pgTable('notifications_feed', {
   subscriptionTrialDayFourUnique: uniqueIndex('notifications_feed_subscription_trial_day_4_unique')
     .on(table.userId, table.type, table.targetId)
     .where(sql`${table.type} = 'subscription_trial_day_4' AND ${table.targetId} IS NOT NULL`),
+  dropLiveUnique: uniqueIndex('notifications_feed_drop_live_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} = 'drop_live' AND ${table.targetId} IS NOT NULL`),
+  priceDropUnique: uniqueIndex('notifications_feed_price_drop_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} = 'price_drop' AND ${table.targetId} IS NOT NULL`),
+  backInStockUnique: uniqueIndex('notifications_feed_back_in_stock_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} = 'back_in_stock' AND ${table.targetId} IS NOT NULL`),
+  lowStockUnique: uniqueIndex('notifications_feed_low_stock_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} = 'low_stock' AND ${table.targetId} IS NOT NULL`),
+  payoutSentUnique: uniqueIndex('notifications_feed_payout_sent_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} = 'payout_sent' AND ${table.targetId} IS NOT NULL`),
+  returnStatusUnique: uniqueIndex('notifications_feed_return_status_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} IN ('return_approved', 'return_denied', 'return_refunded', 'return_requested') AND ${table.targetId} IS NOT NULL`),
 }));
 
 export const notificationDeliveries = pgTable('notification_deliveries', {
@@ -794,6 +832,10 @@ export const notificationDeliveries = pgTable('notification_deliveries', {
   queuedAt:           timestamp('queued_at').defaultNow().notNull(),
   sentAt:             timestamp('sent_at'),
   providerResultAt:   timestamp('provider_result_at'),
+  // Set once the Expo push *receipt* (not just the send ticket) has been
+  // checked via /getReceipts. Distinguishes "ticket accepted" from
+  // "device actually reachable" — see reconcilePushReceipts().
+  receiptCheckedAt:   timestamp('receipt_checked_at'),
   createdAt:          timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   notificationTokenUnique: uniqueIndex('notification_deliveries_notification_token_idx')
@@ -1117,7 +1159,7 @@ export const designStudioProjects = pgTable('design_studio_projects', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   ownerIdx: index('design_studio_projects_owner_id_idx').on(table.ownerId),
-  idOwnerUnique: uniqueIndex('design_studio_projects_id_owner_unique').on(table.id, table.ownerId),
+  idOwnerUnique: unique('design_studio_projects_id_owner_unique').on(table.id, table.ownerId),
 }));
 
 export const designStudioAssets = pgTable('design_studio_assets', {
@@ -1303,6 +1345,19 @@ export const trendingCache = pgTable('trending_cache', {
   itemCount:   integer('item_count').notNull().default(0),
 });
 
+// ─── Seller Ranking Cache (Discover feed) ─────────────────────────────────────
+// Stores the pre-computed daily seller ranking so GET /api/public/discover/feed
+// is a simple cache read rather than an expensive live aggregation. One row
+// per calendar day (UTC). Upserted by the computeSellerRanking job. Shape
+// mirrors trending_cache exactly.
+export const sellerRankingCache = pgTable('seller_ranking_cache', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  computedAt:  timestamp('computed_at').defaultNow().notNull(),
+  cacheDate:   text('cache_date').notNull().unique(),   // 'YYYY-MM-DD' UTC
+  results:     json('results').$type<any[]>().notNull().default([]),
+  itemCount:   integer('item_count').notNull().default(0),
+});
+
 // ─── Seller Tax Configuration ─────────────────────────────────────────────────
 export const sellerTaxConfig = pgTable('seller_tax_config', {
   id:                  uuid('id').primaryKey().defaultRandom(),
@@ -1384,6 +1439,32 @@ export const notificationEvents = pgTable('notification_events', {
   notificationIdx: index('notification_events_notification_idx').on(table.notificationId),
 }));
 
+// ─── Notification batch queue ──────────────────────────────────────────────
+// Collapses high-frequency, low-priority events (e.g. product likes) into a
+// single notification per (userId, category, type, targetId) window instead
+// of one push per event. A periodic job flushes rows older than the batch
+// window into one publishNotification() call, then deletes them.
+export const notificationBatchQueue = pgTable('notification_batch_queue', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  userId:     text('user_id').notNull(),
+  category:   text('category').notNull(),
+  type:       text('type').notNull(),
+  targetId:   text('target_id'),
+  targetType: text('target_type'),
+  // Running count of collapsed events and a rolling sample of actor names,
+  // used to compose the eventual "X and 4 others liked your item" copy.
+  count:        integer('count').notNull().default(1),
+  actorNames:   json('actor_names').notNull().default([]).$type<string[]>(),
+  cta:          text('cta'),
+  firstEventAt: timestamp('first_event_at').defaultNow().notNull(),
+  lastEventAt:  timestamp('last_event_at').defaultNow().notNull(),
+  createdAt:    timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  windowUnique: uniqueIndex('notification_batch_queue_window_unique')
+    .on(table.userId, table.category, table.type, table.targetId),
+  firstEventIdx: index('notification_batch_queue_first_event_idx').on(table.firstEventAt),
+}));
+
 export const shippingLabels = pgTable('shipping_labels', {
   id: uuid('id').primaryKey().defaultRandom(),
   orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
@@ -1426,6 +1507,34 @@ export const orderFundReservations = pgTable('order_fund_reservations', {
   labelUnique: uniqueIndex('order_fund_reservations_label_unique').on(table.shippingLabelId),
 }));
 
+// Saved box/parcel presets a seller can reuse across the fulfillment wizard.
+// Units: ounces for weight, inches for dimensions — kept consistent with the
+// shipping-label rate request body (`weight` in lb string, but presets store
+// the finer-grained oz here and the fulfillment screen converts to lb before
+// calling /rates, matching shipping-label.tsx's existing lb-based inputs).
+export const sellerPackagePresets = pgTable('seller_package_presets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerId: text('owner_id').notNull(),
+  name: text('name').notNull(),
+  weightOz: integer('weight_oz').notNull(),
+  lengthIn: numeric('length_in', { precision: 6, scale: 2 }).notNull(),
+  widthIn: numeric('width_in', { precision: 6, scale: 2 }).notNull(),
+  heightIn: numeric('height_in', { precision: 6, scale: 2 }).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  ownerIdx: index('seller_package_presets_owner_idx').on(table.ownerId),
+}));
+
+// Dedup ledger for Shippo tracking webhook deliveries — a delivery's
+// (transaction id + tracking status) pair is claimed once so a retried or
+// duplicate delivery from the carrier is a no-op.
+export const shippoWebhookEvents = pgTable('shippo_webhook_events', {
+  id: text('id').primaryKey(), // `${transactionId}:${status}`
+  orderId: uuid('order_id'),
+  receivedAt: timestamp('received_at').defaultNow().notNull(),
+});
+
 export const sellerCashoutAttempts = pgTable('seller_cashout_attempts', {
   id: uuid('id').primaryKey().defaultRandom(),
   ownerId: text('owner_id').notNull(),
@@ -1461,9 +1570,9 @@ export const adCampaigns = pgTable('ad_campaigns', {
   /** 'video' | 'photos' — never mixed */
   mediaKind:              text('media_kind').notNull().default('photos'),
   /** Ordered object-storage paths (1 video or 1–5 photos) */
-  mediaObjectPaths:       json('media_object_paths').$type<string[]>().notNull().default([]),
+  mediaObjectPaths:       jsonb('media_object_paths').$type<string[]>().notNull().default([]),
   /** Parallel MIME type array aligned with mediaObjectPaths */
-  mediaMimeTypes:         json('media_mime_types').$type<string[]>().notNull().default([]),
+  mediaMimeTypes:         jsonb('media_mime_types').$type<string[]>().notNull().default([]),
 
   // ── Details ───────────────────────────────────────────────────────────────
   headline:               text('headline'),
@@ -1477,7 +1586,7 @@ export const adCampaigns = pgTable('ad_campaigns', {
 
   // ── Formats ────────────────────────────────────────────────────────────────
   /** JSON array of format keys: 'story_9x16' | 'square_1x1' | 'portrait_4x5' | 'landscape_16x9' */
-  formats:                json('formats').$type<string[]>().notNull().default([]),
+  formats:                jsonb('formats').$type<string[]>().notNull().default([]),
 
   // ── Budget / Duration / Reach ─────────────────────────────────────────────
   /** Integer cents: $5 (500) – $1000 (100000) */

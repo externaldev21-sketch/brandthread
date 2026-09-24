@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ManufacturerConnectStatusAccountType } from './manufacturerConnectStatusAccountType';
 import type { ManufacturerConnectStatusStatus } from './manufacturerConnectStatusStatus';
 
 export interface ManufacturerConnectStatus {
@@ -20,4 +21,10 @@ export interface ManufacturerConnectStatus {
   disabledReason?: string | null;
   /** @nullable */
   recovery?: string | null;
+  /** @nullable */
+  country?: string | null;
+  /** @nullable */
+  payoutCurrency?: string | null;
+  /** @nullable */
+  accountType?: ManufacturerConnectStatusAccountType;
 }
