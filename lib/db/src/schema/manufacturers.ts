@@ -23,6 +23,9 @@ export const manufacturers = pgTable('manufacturers', {
   website:            text('website'),
   contactEmail:       text('contact_email'),
   contactPhone:       text('contact_phone'),
+  // IANA zone (e.g. "Asia/Ho_Chi_Minh") so sellers see the factory's local
+  // time and both sides read tracker timestamps against the same clock.
+  timeZone:           text('time_zone'),
   // 'pending' | 'active' | 'suspended'
   status:             text('status').notNull().default('pending'),
   // true  = appears in the public Discover directory
@@ -242,6 +245,9 @@ export const sampleOrders = pgTable('sample_orders', {
   clientRequestId:         text('client_request_id'),
   threadId:                uuid('thread_id').references(() => manufacturerThreads.id, { onDelete: 'set null' }),
   orderType:               text('order_type').notNull().default('sample'),  // 'sample' | 'bulk'
+  // Who issued the order: sellers can request one, manufacturers send priced
+  // order cards in chat. 'seller' | 'manufacturer'
+  issuedBy:                text('issued_by').notNull().default('seller'),
   title:                   text('title').notNull(),
   description:             text('description'),
   quantity:                integer('quantity').notNull().default(1),
@@ -279,6 +285,28 @@ export const sampleOrders = pgTable('sample_orders', {
   walletIdx: index('sample_orders_wallet_id_idx').on(t.walletId),
   sellerRequestUnique: uniqueIndex('sample_orders_seller_request_unique')
     .on(t.sellerId, t.clientRequestId),
+}));
+
+// ─── Order stage events (tracker timeline) ────────────────────────────────────
+// Append-only record of every card and production-stage change so the seller
+// sees when each stage happened. Payment itself is reconciled by the payments
+// service (manufacturer_activity_events); this table records who moved the
+// order forward afterwards.
+export const manufacturerOrderEvents = pgTable('manufacturer_order_events', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  sampleOrderId:  uuid('sample_order_id').notNull().references(() => sampleOrders.id, { onDelete: 'cascade' }),
+  manufacturerId: uuid('manufacturer_id').notNull().references(() => manufacturers.id, { onDelete: 'cascade' }),
+  actorClerkId:   text('actor_clerk_id'),
+  actorRole:      text('actor_role').notNull(), // 'seller' | 'manufacturer' | 'payment_system'
+  fromStatus:     text('from_status'),
+  toStatus:       text('to_status').notNull(),
+  carrier:        text('carrier'),
+  trackingNumber: text('tracking_number'),
+  note:           text('note'),
+  createdAt:      timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  orderCreatedIdx: index('manufacturer_order_events_order_created_idx').on(t.sampleOrderId, t.createdAt),
+  manufacturerIdx: index('manufacturer_order_events_manufacturer_idx').on(t.manufacturerId),
 }));
 
 // ─── Drop Wallets ─────────────────────────────────────────────────────────────

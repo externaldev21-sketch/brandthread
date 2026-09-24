@@ -17,6 +17,7 @@ import techpackRouter from "./techpack";
 import manufacturersRouter from "./manufacturers";
 import manufacturerPublicRouter from "./manufacturer-public";
 import manufacturerConnectRouter from "./manufacturer-connect";
+import manufacturerFlowRouter from "./manufacturer-flow";
 import sampleOrdersRouter from "./sample-orders";
 import dropWalletRouter from "./drop-wallet";
 import inventoryRouter from "./inventory";
@@ -129,6 +130,8 @@ router.use("/techpack",        tc, requirePlan("growth"), techpackRouter);
 router.use("/manufacturers/public",          manufacturerPublicRouter);
 router.use("/manufacturers/connect",         tc, manufacturerConnectRouter);
 // Growth-plan-gated Manufacturer Hub
+// Order cards + tracker (auth handled per route; falls through otherwise)
+router.use("/manufacturers",   tc, manufacturerFlowRouter);
 router.use("/manufacturers",   tc, manufacturersRouter);
 router.use("/inventory",       tc, inventoryRouter);
 router.use("/seller-hub",      tc, sellerHubRouter);

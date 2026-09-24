@@ -196,6 +196,9 @@ importers:
       '@workspace/integrations-openai-ai-server':
         specifier: workspace:*
         version: link:../../lib/integrations-openai-ai-server
+      '@workspace/manufacturer-flow':
+        specifier: workspace:*
+        version: link:../../lib/manufacturer-flow
       agora-access-token:
         specifier: ^2.0.4
         version: 2.0.4
@@ -622,6 +625,9 @@ importers:
       '@workspace/api-client-react':
         specifier: workspace:*
         version: link:../../lib/api-client-react
+      '@workspace/manufacturer-flow':
+        specifier: workspace:*
+        version: link:../../lib/manufacturer-flow
       class-variance-authority:
         specifier: 'catalog:'
         version: 0.7.1
@@ -821,6 +827,9 @@ importers:
       '@workspace/api-client-react':
         specifier: workspace:*
         version: link:../../lib/api-client-react
+      '@workspace/manufacturer-flow':
+        specifier: workspace:*
+        version: link:../../lib/manufacturer-flow
       babel-plugin-react-compiler:
         specifier: ^19.0.0-beta-e993439-20250117
         version: 19.0.0-beta-ebf51a3-20250411
@@ -1170,6 +1179,12 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 25.9.4
+
+  lib/manufacturer-flow:
+    devDependencies:
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@25.9.4)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
 
   scripts:
     dependencies:

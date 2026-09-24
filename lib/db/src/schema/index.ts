@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp, date, json, boolean, primaryKey, index, numeric, unique, uniqueIndex, foreignKey } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, timestamp, date, json, jsonb, boolean, primaryKey, index, numeric, unique, uniqueIndex, foreignKey } from 'drizzle-orm/pg-core';
 export * from './manufacturers';
 export * from './freelancers';
 export * from './subscriptionEntitlements';
@@ -383,9 +383,9 @@ export const posts = pgTable('posts', {
   thumbnailUrl: text('thumbnail_url'),
   mediaUrls: json('media_urls').$type<string[]>().notNull().default([]),
   /** Ordered object storage paths for each composed slideshow slide (empty for video/photo) */
-  mediaPaths: json('media_paths').$type<string[]>().notNull().default([]),
+  mediaPaths: jsonb('media_paths').$type<string[]>().notNull().default([]),
   /** Per-slide overlay metadata. Each entry: { slideIndex, overlays: TextOverlay[] } */
-  slideOverlays: json('slide_overlays').$type<Array<{
+  slideOverlays: jsonb('slide_overlays').$type<Array<{
     slideIndex: number;
     overlays: Array<{
       id: string; text: string; x: number; y: number;
@@ -1158,7 +1158,7 @@ export const designStudioProjects = pgTable('design_studio_projects', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   ownerIdx: index('design_studio_projects_owner_id_idx').on(table.ownerId),
-  idOwnerUnique: uniqueIndex('design_studio_projects_id_owner_unique').on(table.id, table.ownerId),
+  idOwnerUnique: unique('design_studio_projects_id_owner_unique').on(table.id, table.ownerId),
 }));
 
 export const designStudioAssets = pgTable('design_studio_assets', {
@@ -1569,9 +1569,9 @@ export const adCampaigns = pgTable('ad_campaigns', {
   /** 'video' | 'photos' — never mixed */
   mediaKind:              text('media_kind').notNull().default('photos'),
   /** Ordered object-storage paths (1 video or 1–5 photos) */
-  mediaObjectPaths:       json('media_object_paths').$type<string[]>().notNull().default([]),
+  mediaObjectPaths:       jsonb('media_object_paths').$type<string[]>().notNull().default([]),
   /** Parallel MIME type array aligned with mediaObjectPaths */
-  mediaMimeTypes:         json('media_mime_types').$type<string[]>().notNull().default([]),
+  mediaMimeTypes:         jsonb('media_mime_types').$type<string[]>().notNull().default([]),
 
   // ── Details ───────────────────────────────────────────────────────────────
   headline:               text('headline'),
@@ -1585,7 +1585,7 @@ export const adCampaigns = pgTable('ad_campaigns', {
 
   // ── Formats ────────────────────────────────────────────────────────────────
   /** JSON array of format keys: 'story_9x16' | 'square_1x1' | 'portrait_4x5' | 'landscape_16x9' */
-  formats:                json('formats').$type<string[]>().notNull().default([]),
+  formats:                jsonb('formats').$type<string[]>().notNull().default([]),
 
   // ── Budget / Duration / Reach ─────────────────────────────────────────────
   /** Integer cents: $5 (500) – $1000 (100000) */
