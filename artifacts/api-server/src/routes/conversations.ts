@@ -383,7 +383,7 @@ router.get("/:id/messages", async (req, res) => {
 // ─── POST /api/conversations/:id/messages ────────────────────────────────────
 router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
-  const { id } = req.params;
+  const { id } = req.params as { id: string };
   const { text, attachment, attachments, replyToId } = req.body as {
     text: string;
     attachment?: any;

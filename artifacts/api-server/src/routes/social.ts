@@ -250,7 +250,7 @@ router.post("/follow", rateLimit("follow"), async (req, res) => {
 // ─── DELETE /api/social/follow/:userId ───────────────────────────────────────
 router.delete("/follow/:userId", rateLimit("follow"), async (req, res) => {
   const myId   = (req as any).clerkUserId as string;
-  const target = req.params.userId;
+  const target = req.params.userId as string;
   const followersCount = await db.transaction(async (tx) => {
     await tx.execute(sql`
       SELECT pg_advisory_xact_lock(
