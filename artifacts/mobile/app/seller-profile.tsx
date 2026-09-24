@@ -318,13 +318,30 @@ const productStyles = StyleSheet.create({
 
 // ─── Empty State ───────────────────────────────────────────────────────────────
 
-function EmptyState({ icon, title, subtitle }: { icon: keyof typeof Feather.glyphMap; title: string; subtitle?: string }) {
+function EmptyState({
+  icon, title, subtitle, actionLabel, onAction,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  title: string;
+  subtitle?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
   const { theme } = useAppTheme();
   return (
     <View style={emptyStyles.emptyState}>
       <Feather name={icon} size={48} color={theme.muted} />
       <Text style={[emptyStyles.emptyTitle, { color: theme.text }]}>{title}</Text>
       {subtitle && <Text style={[emptyStyles.emptySubtitle, { color: theme.muted }]}>{subtitle}</Text>}
+      {actionLabel && onAction && (
+        <TouchableOpacity
+          accessibilityRole="button"
+          onPress={onAction}
+          style={[emptyStyles.actionBtn, { backgroundColor: theme.accent }]}
+        >
+          <Text style={[emptyStyles.actionLabel, { color: theme.onAccent }]}>{actionLabel}</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -333,6 +350,8 @@ const emptyStyles = StyleSheet.create({
   emptyState: { alignItems: 'center', justifyContent: 'center', paddingTop: 80, paddingHorizontal: 40, gap: 12 },
   emptyTitle: { fontSize: FS.base, fontFamily: FONT.semibold, textAlign: 'center' },
   emptySubtitle: { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 20 },
+  actionBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 999, marginTop: 4 },
+  actionLabel: { fontSize: FS.sm, fontFamily: FONT.semibold },
 });
 
 // ─── Action Row (sheet) ────────────────────────────────────────────────────────
@@ -887,7 +906,13 @@ export default function SellerProfileScreen() {
                   <GridSkeleton columns={productsColumns} cardWidth={productCardWidth} rows={2} gap={SP.sm} />
                 </View>
               ) : displayProducts.length === 0 ? (
-                <EmptyState icon="shopping-bag" title="No products available" />
+                <EmptyState
+                  icon="shopping-bag"
+                  title={isOwner ? 'No products yet' : 'No products available'}
+                  subtitle={isOwner ? 'Add your first product to start selling.' : undefined}
+                  actionLabel={isOwner ? 'Add product' : undefined}
+                  onAction={isOwner ? () => router.push('/add-product' as never) : undefined}
+                />
               ) : (
                 <View style={styles.productsGrid}>
                   {displayProducts.map((product, i) => (
