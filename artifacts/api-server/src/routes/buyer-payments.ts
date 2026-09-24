@@ -9,6 +9,7 @@ import Stripe from "stripe";
 import { db, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { rateLimit } from "../middlewares/rateLimit";
 
 const router = Router();
 router.use(requireAuth);
@@ -65,7 +66,7 @@ router.get("/", async (req, res) => {
 });
 
 // ─── POST /api/buyer/payment-methods/:pmId/default ───────────────────────────
-router.post("/:pmId/default", async (req, res) => {
+router.post("/:pmId/default", rateLimit("checkout"), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   const { pmId } = req.params;
 
@@ -96,7 +97,7 @@ router.post("/:pmId/default", async (req, res) => {
 });
 
 // ─── DELETE /api/buyer/payment-methods/:pmId ─────────────────────────────────
-router.delete("/:pmId", async (req, res) => {
+router.delete("/:pmId", rateLimit("checkout"), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   const { pmId } = req.params;
 

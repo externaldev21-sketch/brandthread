@@ -21,6 +21,7 @@ import {
 } from "@workspace/db";
 import { eq, and, desc, inArray, sql, or } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { rateLimit } from "../middlewares/rateLimit";
 import { moderateMessage } from "../lib/contentModerator";
 import { blockRelation, publishingRestriction } from "../lib/safety";
 import { publishNotification } from "./notifications-feed";
@@ -168,7 +169,7 @@ router.get("/", async (req, res) => {
 });
 
 // ─── POST /api/conversations ──────────────────────────────────────────────────
-router.post("/", async (req, res) => {
+router.post("/", rateLimit("messaging"), async (req, res) => {
   const myUserId = (req as any).clerkUserId as string;
   const {
     type,
@@ -367,7 +368,7 @@ router.get("/:id/messages", async (req, res) => {
 });
 
 // ─── POST /api/conversations/:id/messages ────────────────────────────────────
-router.post("/:id/messages", async (req, res) => {
+router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { id } = req.params;
   const { text, attachment, attachments, replyToId } = req.body as {
