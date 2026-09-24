@@ -1,44 +1,32 @@
 /**
- * Brandthread — Seller Products Tab
- * Shopify-pattern layout: persistent search row, status pills, divider-separated rows.
+ * Brandthread — Seller Products Tab: "The Rack"
+ *
+ * An editorial, lookbook-style catalog: a 2-column (phone) / 3-4 column
+ * (iPad) grid of image-forward cards replaces the old plain admin row list.
+ * Every action, route and confirmation flow from the previous version is
+ * preserved — only the presentation changed.
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet, Alert, Share, Modal, Pressable, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert, Share, Modal, Pressable, TouchableOpacity, LayoutAnimation, UIManager, Platform } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { AnimatedEntrance, BrandthreadCard, PrimaryButton, IconButton, SearchBar, FilterChip, StatusBadge, EmptyState, ProductGridSkeleton, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
-import { CachedImage } from '@/components/CachedImage';
+import { PrimaryButton, SearchBar, FilterChip, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
+import { EmptyState, GridSkeleton, useGridColumns, useBreakpoint, useCenteredGridPadding } from '@/components/layout';
+import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { ProductCard } from '@/components/products/ProductCard';
 import { getProducts, getProductStats, archiveProduct, unarchiveProduct, deleteProduct, restoreProduct, duplicateProduct } from '@/services/productService';
 import { Product, ProductFilter } from '@/services/productTypes';
-import { formatCents, integerPercent } from '@/lib/money';
+import { formatCents } from '@/lib/money';
 import { SheetRise } from '@/components/motion/SheetRise';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function getCategoryColors(category: string, theme: any): readonly [string, string] {
-  if (category === 'T-shirt' || category === 'Sweatshirt') return [theme.accent, theme.secondary];
-  if (category === 'Hoodie' || category === 'Sweatpants') return [theme.secondary, theme.accentLight];
-  if (category === 'Jacket' || category === 'Shorts') return [theme.accentLight, theme.secondaryDim];
-  if (category === 'Denim' || category === 'Dress' || category === 'Skirt') return [theme.accentDim, theme.accent];
-  return [theme.accent, theme.secondary];
-}
-
-function statusVariant(status: string): 'success' | 'warning' | 'purple' | 'neutral' {
-  if (status === 'active') return 'success';
-  if (status === 'draft') return 'warning';
-  if (status === 'scheduled') return 'purple';
-  return 'neutral';
-}
-
-function statusLabel(status: string): string {
-  return status.charAt(0).toUpperCase() + status.slice(1);
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -52,94 +40,6 @@ interface Stats {
   preOrder: number;
   totalInventoryValueCents: number;
 }
-
-// ─── Product Row ─────────────────────────────────────────────────────────────
-
-interface ProductRowProps {
-  product: Product;
-  onPress: (product: Product) => void;
-  onMore: (product: Product) => void;
-  isLast: boolean;
-}
-
-// Memoized with stable handlers so a recycled row only re-renders when its own
-// product changes, not on every search keystroke or stats refresh.
-const ProductRow = React.memo(function ProductRow({ product, onPress, onMore, isLast }: ProductRowProps) {
-  const { theme } = useAppTheme();
-  const s = React.useMemo(() => createStyles(theme), [theme]);
-  const { error: RED, warning: ORANGE, success: SUCCESS, card: CARD, border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE } = theme;
-  const palette = theme as typeof theme & Record<string, string>;
-  const coverUri = product.media.find(m => m.isCover)?.uri ?? product.media[0]?.uri;
-  const gradColors = getCategoryColors(product.category, theme);
-
-  const stock = product.inventory.totalStock;
-  const threshold = product.inventory.lowStockThreshold;
-  const stockColor = stock === 0 ? theme.error : stock <= threshold ? theme.warning : theme.success;
-  const stockLabel = stock === 0 ? 'Out of stock' : `${stock} in stock`;
-
-  const price = product.pricing.priceCents;
-  const compare = product.pricing.compareAtPriceCents;
-  const discountPct = compare && compare > price
-    ? integerPercent(compare - price, compare)
-    : null;
-
-  return (
-    <>
-      <TouchableOpacity
-        activeOpacity={0.82}
-        onPress={() => onPress(product)}
-        style={[s.productRow, { backgroundColor: palette.card ?? CARD, borderColor: palette.border ?? BORDER }]}
-        accessibilityLabel={`${product.name}, ${statusLabel(product.status)}, ${formatCents(price)}`}
-      >
-        {/* Square thumbnail */}
-        <View style={s.rowThumb}>
-          {coverUri ? (
-            <CachedImage source={{ uri: coverUri }} style={s.rowThumbImg} contentFit="cover" recyclingKey={product.id} />
-          ) : (
-            <LinearGradient colors={gradColors} style={s.rowThumbImg} />
-          )}
-        </View>
-
-        {/* Content */}
-        <View style={s.rowContent}>
-          <View style={s.rowTopLine}>
-            <Text style={[s.rowName, { color: palette.foreground ?? FG }]} numberOfLines={1}>{product.name}</Text>
-            <StatusBadge label={statusLabel(product.status)} variant={statusVariant(product.status)} small />
-          </View>
-
-          <View style={s.rowMeta}>
-            <Text style={[s.rowMetaText, { color: palette.muted ?? MUTED }]} numberOfLines={1}>
-              {product.category}
-              {product.variants.length > 0 ? ` · ${product.variants.length} variant${product.variants.length !== 1 ? 's' : ''}` : ''}
-            </Text>
-          </View>
-
-          <View style={s.rowPriceLine}>
-            <Text style={[s.rowPrice, { color: palette.foreground ?? FG }]}>{formatCents(price)}</Text>
-            {compare && compare > price && (
-              <Text style={s.rowCompare}>{formatCents(compare)}</Text>
-            )}
-            {discountPct !== null && (
-              <Text style={s.rowDiscount}>-{discountPct}%</Text>
-            )}
-            <Text style={[s.rowStock, { color: stockColor }]}>{stockLabel}</Text>
-          </View>
-        </View>
-
-        {/* More button */}
-        <TouchableOpacity
-          style={s.rowMoreBtn}
-          onPress={e => { e.stopPropagation(); onMore(product); }}
-          hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-          accessibilityLabel={`More actions for ${product.name}`}
-        >
-          <Feather name="more-horizontal" size={ICON.sm} color={palette.subtle ?? SUBTLE} />
-        </TouchableOpacity>
-      </TouchableOpacity>
-      {!isLast && <View style={s.rowDivider} />}
-    </>
-  );
-});
 
 // ─── Action Sheet ─────────────────────────────────────────────────────────────
 
@@ -365,6 +265,13 @@ export default function ProductsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { showUndo } = useUndoToast();
+  const tabBar = useTabBarMetrics();
+  const { width: screenWidth } = useBreakpoint();
+  const gridColumns = useGridColumns({ phone: 2, tablet: 3, tabletLandscape: 4 });
+  const gridGutter = useCenteredGridPadding();
+  const gridGap = SP.sm;
+  const contentWidth = Math.min(screenWidth, 1080) - gridGutter * 2;
+  const cardWidth = (contentWidth - gridGap * (gridColumns - 1)) / gridColumns;
 
   const [products, setProducts] = useState<Product[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -376,6 +283,7 @@ export default function ProductsScreen() {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [sortModalVisible, setSortModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadStats = useCallback(async () => {
     try {
@@ -456,6 +364,28 @@ export default function ProductsScreen() {
     );
   }
 
+  // Swipe quick-action: archives (or unarchives) without opening the sheet.
+  async function handleQuickArchive(product: Product) {
+    const wasArchived = product.status === 'archived';
+    setProducts(prev => prev.map(p => (p.id === product.id ? { ...p, status: wasArchived ? 'active' : 'archived' } : p)));
+    try {
+      if (wasArchived) await unarchiveProduct(product.id);
+      else await archiveProduct(product.id);
+      await loadStats();
+    } catch {
+      await loadProducts();
+    }
+  }
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    try {
+      await loadProducts();
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   async function handleExportProducts() {
     const escapeCsv = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
     const rows = products.map(product => [
@@ -507,39 +437,53 @@ export default function ProductsScreen() {
     setActionSheetVisible(true);
   }, []);
 
-  const renderProduct = useCallback(({ item, index }: { item: Product; index: number }) => (
-    <ProductRow
-      product={item}
-      onPress={openProduct}
-      onMore={openActionSheet}
-      isLast={index === sortedProducts.length - 1}
-    />
-  ), [openProduct, openActionSheet, sortedProducts.length]);
+  const renderProduct = useCallback(({ item }: { item: Product }) => (
+    <View style={{ paddingHorizontal: gridGap / 2 }}>
+      <ProductCard
+        product={item}
+        width={cardWidth}
+        onPress={openProduct}
+        onMore={openActionSheet}
+        onQuickArchive={handleQuickArchive}
+        onQuickDelete={handleDelete}
+      />
+    </View>
+  ), [openProduct, openActionSheet, cardWidth, gridGap]);
 
   const keyExtractor = useCallback((item: Product) => item.id, []);
 
   const ListHeader = useMemo(() => (
-    <View>
-      {/* Products group container */}
-      <View style={s.groupContainer}>
-        {/* Group header */}
-        <View style={s.groupHeader}>
-          <Text style={s.groupCount}>{sortedProducts.length} {sortedProducts.length === 1 ? 'product' : 'products'}</Text>
-        </View>
-      </View>
+    <View style={s.groupHeaderRow}>
+      <Text style={s.groupCount}>{sortedProducts.length} {sortedProducts.length === 1 ? 'product' : 'products'}</Text>
     </View>
   ), [sortedProducts.length]);
 
-  const ListEmpty = useMemo(() => (
-    <View style={s.groupContainer}>
-      <EmptyState
-        icon="package"
-        title="Your first product starts here."
-        description="Add product details, media, pricing, variants and inventory."
-        action={{ label: 'Create product', icon: 'plus', onPress: () => router.push('/add-product' as never) }}
-      />
-    </View>
-  ), [router]);
+  // Rich, per-filter empty states instead of one generic message.
+  const emptyCopy: Record<ProductFilter, { icon: keyof typeof Feather.glyphMap; message: string }> = {
+    'all': { icon: 'package', message: 'Your first product starts here. Add media, pricing, variants and inventory.' },
+    'active': { icon: 'check-circle', message: 'No active products yet. Publish a draft to see it here.' },
+    'draft': { icon: 'edit-2', message: 'No draft products yet. Start one and finish it later.' },
+    'scheduled': { icon: 'clock', message: 'Nothing scheduled. Set a publish date on a draft to line it up.' },
+    'archived': { icon: 'archive', message: 'No archived products. Archived items are hidden from your storefront.' },
+    'pre-order': { icon: 'calendar', message: 'No pre-order products yet.' },
+    'pre-made': { icon: 'box', message: 'No pre-made products yet.' },
+    'low-stock': { icon: 'alert-triangle', message: 'Nothing running low. You\'re fully stocked.' },
+    'out-of-stock': { icon: 'x-circle', message: 'Nothing is out of stock right now.' },
+  };
+
+  const ListEmpty = useMemo(() => {
+    const copy = emptyCopy[filter] ?? emptyCopy.all;
+    return (
+      <View style={s.emptyWrap}>
+        <EmptyState
+          icon={copy.icon}
+          message={copy.message}
+          actionLabel={filter === 'all' ? 'Create product' : undefined}
+          onAction={filter === 'all' ? () => router.push('/add-product' as never) : undefined}
+        />
+      </View>
+    );
+  }, [router, filter]);
 
   return (
     <View style={[s.root, { backgroundColor: palette.background ?? palette.surface ?? SCREEN_BG }]}>
@@ -618,7 +562,10 @@ export default function ProductsScreen() {
               key={pill.value}
               label={pill.label}
               active={filter === pill.value}
-              onPress={() => setFilter(pill.value)}
+              onPress={() => {
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                setFilter(pill.value);
+              }}
               count={
                 pill.value === 'active' ? stats?.active ?? 0 :
                 pill.value === 'draft' ? stats?.draft ?? 0 :
@@ -630,16 +577,26 @@ export default function ProductsScreen() {
         </ScrollView>
       </View>
 
-      {/* ── Product list ── */}
-      <FlashList
-        data={sortedProducts}
-        keyExtractor={keyExtractor}
-        renderItem={renderProduct}
-        ListHeaderComponent={ListHeader}
-        ListEmptyComponent={loading ? null : ListEmpty}
-        contentContainerStyle={s.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+      {/* ── Product grid ── */}
+      {loading && sortedProducts.length === 0 ? (
+        <View style={[s.listContent, { paddingHorizontal: gridGutter }]}>
+          <GridSkeleton columns={gridColumns} cardWidth={cardWidth} rows={3} gap={gridGap} />
+        </View>
+      ) : (
+        <FlashList
+          data={sortedProducts}
+          keyExtractor={keyExtractor}
+          renderItem={renderProduct}
+          numColumns={gridColumns}
+          key={`cols-${gridColumns}`}
+          ListHeaderComponent={ListHeader}
+          ListEmptyComponent={ListEmpty}
+          contentContainerStyle={{ paddingHorizontal: gridGutter - gridGap / 2, paddingBottom: tabBar.occupiedHeight + SP.xl }}
+          showsVerticalScrollIndicator={false}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+        />
+      )}
 
       {/* Action sheet */}
       <ActionSheet
@@ -654,7 +611,10 @@ export default function ProductsScreen() {
       <FilterModal
         visible={filterModalVisible}
         current={filter}
-        onApply={(f) => setFilter(f)}
+        onApply={(f) => {
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+          setFilter(f);
+        }}
         onClose={() => setFilterModalVisible(false)}
       />
 
@@ -662,16 +622,12 @@ export default function ProductsScreen() {
       <SortModal
         visible={sortModalVisible}
         current={sort}
-        onSelect={k => setSort(k)}
+        onSelect={k => {
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+          setSort(k);
+        }}
         onClose={() => setSortModalVisible(false)}
       />
-
-
-      {loading && (
-        <View style={s.loadingOverlay} pointerEvents="none">
-          <ProductGridSkeleton />
-        </View>
-      )}
     </View>
   );
 }
@@ -775,21 +731,11 @@ const createStyles = (theme: any) => {
     gap: SP.xs,
   },
 
-  // Group container (card background for list)
-  groupContainer: {
-    marginHorizontal: SP.md,
-    backgroundColor: CARD,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: BORDER,
-    overflow: 'hidden',
-    marginBottom: SP.sm,
-  },
-  groupHeader: {
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
+  // Grid section header ("N products")
+  groupHeaderRow: {
+    paddingHorizontal: SP.xs,
+    paddingBottom: SP.sm,
+    paddingTop: SP.sm,
   },
   groupCount: {
     fontSize: FS.xs,
@@ -797,102 +743,13 @@ const createStyles = (theme: any) => {
     color: SUBTLE,
   },
 
-  // Product row
-  productRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  emptyWrap: {
     paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-    minHeight: 72,
-    backgroundColor: CARD,
-  },
-  rowThumb: {
-    width: 52,
-    height: 52,
-    borderRadius: RADIUS.xs,
-    overflow: 'hidden',
-    flexShrink: 0,
-  },
-  rowThumbImg: {
-    width: 52,
-    height: 52,
-  },
-  rowContent: {
-    flex: 1,
-    paddingHorizontal: SP.sm,
-    gap: 2,
-  },
-  rowTopLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: SP.xs,
-  },
-  rowName: {
-    flex: 1,
-    fontSize: FS.sm,
-    fontFamily: FONT.semibold,
-    color: FG,
-    letterSpacing: -0.1,
-  },
-  rowMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  rowMetaText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: MUTED,
-  },
-  rowPriceLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.xs,
-    flexWrap: 'wrap',
-  },
-  rowPrice: {
-    fontSize: FS.xs,
-    fontFamily: FONT.bold,
-    color: FG,
-  },
-  rowCompare: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: SUBTLE,
-    textDecorationLine: 'line-through',
-  },
-  rowDiscount: {
-    fontSize: FS.xs,
-    fontFamily: FONT.bold,
-    color: RED,
-  },
-  rowStock: {
-    fontSize: FS.xs,
-    fontFamily: FONT.medium,
-  },
-  rowMoreBtn: {
-    width: COMP.minTouchTarget,
-    height: COMP.minTouchTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  rowDivider: {
-    height: 1,
-    backgroundColor: BORDER,
-    marginLeft: 52 + SP.md + SP.md, // align with content start after thumb
   },
 
-  // List
+  // List / grid
   listContent: {
-    paddingBottom: COMP.tabBarH + SP.xl,
-  },
-
-  loadingOverlay: {
-    ...StyleSheet.absoluteFill,
-    top: 120,
-    backgroundColor: SCREEN_BG,
-    zIndex: 10,
+    paddingBottom: SP.xl,
   },
   });
 };

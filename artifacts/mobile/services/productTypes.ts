@@ -5,7 +5,7 @@
  * Do not import types from services/types.ts for product entities — use this file.
  */
 
-// ─── Enums / Union Types ──────────────────────────────────────────────────────
+// ─── Enums / Union Types ────────────────────────────────────────────────────
 
 export type ProductStatus = 'active' | 'draft' | 'scheduled' | 'archived' | 'hidden';
 
@@ -44,7 +44,7 @@ export const COLOR_PRESETS: { name: string; hex: string }[] = [
   { name: 'Cobalt',   hex: '#0047AB' },
 ];
 
-// ─── Media ────────────────────────────────────────────────────────────────────
+// ─── Media ────────────────────────────────────────────────────────────
 
 export interface ProductMedia {
   id: string;
@@ -58,9 +58,17 @@ export interface ProductMedia {
   uploadFailed?: boolean;
   variantId?: string;  // linked to a specific variant
   createdAt: string;
+
+  // ── Background removal (hero/cutout) ─────────────────────────────────────────────
+  /** Local (then remote) URI of the background-removed PNG cutout, once generated. */
+  cutoutUri?: string;
+  /** Whether the cutout (vs. the original) should be used as the display image. */
+  useCutout?: boolean;
+  /** Background-removal processing state for this image. */
+  bgRemovalStatus?: 'none' | 'processing' | 'done' | 'failed';
 }
 
-// ─── Options & Variants ───────────────────────────────────────────────────────
+// ─── Options & Variants ─────────────────────────────────────────────────────
 
 export interface ProductOption {
   id: string;
@@ -99,7 +107,7 @@ export interface ProductVariant {
   updatedAt: string;
 }
 
-// ─── Inventory ────────────────────────────────────────────────────────────────
+// ─── Inventory ───────────────────────────────────────────────────────
 
 export interface InventoryLocation {
   id: string;
@@ -135,7 +143,7 @@ export interface InventoryAdjustment {
   createdAt: string;
 }
 
-// ─── Pricing ──────────────────────────────────────────────────────────────────
+// ─── Pricing ─────────────────────────────────────────────────────────────
 
 export interface ProductPricing {
   priceCents: number;
@@ -146,7 +154,7 @@ export interface ProductPricing {
   currency: string;     // "USD"
 }
 
-// ─── Pre-order Settings ───────────────────────────────────────────────────────
+// ─── Pre-order Settings ──────────────────────────────────────────────────────────
 
 export interface ProductPreorderSettings {
   openDate?: string;         // ISO date
@@ -163,7 +171,7 @@ export interface ProductPreorderSettings {
   isFunded: boolean;
 }
 
-// ─── Fulfillment ─────────────────────────────────────────────────────────────
+// ─── Fulfillment ────────────────────────────────────────────────────────
 
 export interface ProductFulfillment {
   type: FulfillmentType;
@@ -178,7 +186,7 @@ export interface ProductFulfillment {
   customsDescription?: string;
 }
 
-// ─── Manufacturing ────────────────────────────────────────────────────────────
+// ─── Manufacturing ──────────────────────────────────────────────────────────
 
 export type ManufacturingStage =
   | 'none' | 'quote_requested' | 'quote_received' | 'sample_pending'
@@ -202,7 +210,7 @@ export interface ProductManufacturing {
   shipmentTracking?: string;
 }
 
-// ─── Storefront / SEO ─────────────────────────────────────────────────────────
+// ─── Storefront / SEO ────────────────────────────────────────────────────────
 
 export interface ProductSEO {
   title?: string;
@@ -221,7 +229,7 @@ export interface ProductStoreSettings {
   seo: ProductSEO;
 }
 
-// ─── Analytics ────────────────────────────────────────────────────────────────
+// ─── Analytics ─────────────────────────────────────────────────────────────
 
 export interface ProductAnalytics {
   productId: string;
@@ -240,7 +248,7 @@ export interface ProductAnalytics {
   revenueByDay: { date: string; revenueCents: number }[];
 }
 
-// ─── Collections ─────────────────────────────────────────────────────────────
+// ─── Collections ─────────────────────────────────────────────────────────
 
 export interface ProductCollection {
   id: string;
@@ -252,7 +260,7 @@ export interface ProductCollection {
   createdAt: string;
 }
 
-// ─── Top-level Product ────────────────────────────────────────────────────────
+// ─── Top-level Product ──────────────────────────────────────────────────────────
 
 export interface Product {
   id: string;
@@ -303,7 +311,7 @@ export interface Product {
   publishedAt?: string;
 }
 
-// ─── Product Tag (for content system) ────────────────────────────────────────
+// ─── Product Tag (for content system) ───────────────────────────────────────────────
 
 export interface ProductTag {
   productId: string;
@@ -312,7 +320,7 @@ export interface ProductTag {
   position?: { x: number; y: number };
 }
 
-// ─── Draft (incomplete product being created) ─────────────────────────────────
+// ─── Draft (incomplete product being created) ────────────────────────────────────────────
 
 export type ProductDraft = Partial<Product> & {
   id: string;
@@ -321,7 +329,7 @@ export type ProductDraft = Partial<Product> & {
   lastSavedAt: string;
 };
 
-// ─── Filter / Search ──────────────────────────────────────────────────────────
+// ─── Filter / Search ─────────────────────────────────────────────────────────────
 
 export type ProductFilter =
   | 'all' | 'active' | 'draft' | 'scheduled' | 'archived'

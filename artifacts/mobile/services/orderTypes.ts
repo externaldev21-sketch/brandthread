@@ -462,6 +462,8 @@ export interface BuyerOrderView {
   trackingCarrier?: string;
   trackingStatus?: TrackingStatus;
   estimatedDelivery?: string;
+  /** When the order was actually marked shipped (server timestamp), if known. */
+  shippedAt?: string;
   isPreOrder: boolean;
   preOrderEstShipDate?: string;
   hasReturnRequest: boolean;

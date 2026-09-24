@@ -166,6 +166,11 @@ describe('seller bar full-screen deny-list', () => {
     'quote-request',
     'seller-go-live',
     'seller-live',
+    // Brandthread AI screen: immersive full-screen chat with its own
+    // floating composer pinned to the safe-area bottom inset — the bar must
+    // never render underneath it (it previously did, and the AI composer
+    // rendered behind it).
+    'ai-brain',
   ];
 
   for (const route of mustHideBar) {

@@ -16,62 +16,78 @@ const DEVICES = {
   ipadSplitNarrow: { width: 320, height: 1180, bottomInset: 20 },
 } as const;
 
-const totalWidth = (m: ReturnType<typeof getBuyerTabBarMetrics>) => m.capsuleWidth + m.gap + m.circleSize;
-// Seller: Studio circle · capsule · AI circle, from the same metrics.
-const sellerWidth = (m: ReturnType<typeof getBuyerTabBarMetrics>) => m.capsuleWidth + (m.gap + m.circleSize) * 2;
+// Buyer: capsule + Profile circle. Seller: Studio circle + capsule + AI circle.
+const buyerRowWidth = (m: ReturnType<typeof getBuyerTabBarMetrics>) => m.capsuleWidth + m.gap + m.circleSize;
+const sellerRowWidth = (m: ReturnType<typeof getBuyerTabBarMetrics>) => m.capsuleWidth + (m.gap + m.circleSize) * 2;
 
 describe('buyer tab bar metrics', () => {
-  it('sizes the phone bar to its content instead of stretching edge to edge', () => {
+  it('spans nearly the full screen width on phones, like a wide Instagram-style capsule', () => {
     for (const device of [DEVICES.iphoneSE, DEVICES.iphone15, DEVICES.iphoneProMax, DEVICES.androidGesture, DEVICES.androidButtons]) {
-      const m = getBuyerTabBarMetrics(device);
-      const ratio = totalWidth(m) / device.width;
-      expect(m.isTablet).toBe(false);
-      expect(ratio).toBeLessThanOrEqual(0.9);
-      expect(ratio).toBeGreaterThanOrEqual(0.6);
-      expect(m.capsuleWidth).toBe(m.itemWidth * 4 + m.capsulePadding * 2);
+      const buyer = getBuyerTabBarMetrics({ ...device, sideCircleCount: 1 });
+      const seller = getBuyerTabBarMetrics({ ...device, sideCircleCount: 2 });
+      expect(buyer.isTablet).toBe(false);
+      // ~16pt margin each side means the bar occupies most of the screen.
+      expect(buyerRowWidth(buyer) / device.width).toBeGreaterThanOrEqual(0.85);
+      expect(sellerRowWidth(seller) / device.width).toBeGreaterThanOrEqual(0.85);
+      // Never touches or overflows the screen edges.
+      expect((device.width - buyerRowWidth(buyer)) / 2).toBeGreaterThanOrEqual(12);
+      expect((device.width - sellerRowWidth(seller)) / 2).toBeGreaterThanOrEqual(12);
     }
   });
 
-  it('fits the wider seller bar on every phone with at least 12pt side margins', () => {
-    for (const device of [DEVICES.iphoneSE, DEVICES.iphone15, DEVICES.iphoneProMax, DEVICES.androidGesture, DEVICES.androidButtons, DEVICES.ipadSplitNarrow]) {
-      const m = getBuyerTabBarMetrics(device);
-      expect((device.width - sellerWidth(m)) / 2).toBeGreaterThanOrEqual(12);
+  it('spreads the four slots evenly across the capsule for both bars', () => {
+    for (const device of [DEVICES.iphoneSE, DEVICES.iphone15, DEVICES.iphoneProMax, DEVICES.androidGesture, DEVICES.androidButtons]) {
+      for (const sideCircleCount of [1, 2]) {
+        const m = getBuyerTabBarMetrics({ ...device, sideCircleCount });
+        expect(m.capsuleWidth).toBeCloseTo(m.itemWidth * 4 + m.capsulePadding * 2, 5);
+      }
+    }
+  });
+
+  it('gives the seller bar a narrower capsule than the buyer bar (one more side circle)', () => {
+    for (const device of [DEVICES.iphoneSE, DEVICES.iphone15, DEVICES.iphoneProMax]) {
+      const buyer = getBuyerTabBarMetrics({ ...device, sideCircleCount: 1 });
+      const seller = getBuyerTabBarMetrics({ ...device, sideCircleCount: 2 });
+      expect(seller.capsuleWidth).toBeLessThan(buyer.capsuleWidth);
+      // Both bars still reach the same outer screen margins.
+      expect((device.width - buyerRowWidth(buyer)) / 2).toBeCloseTo((device.width - sellerRowWidth(seller)) / 2, 0);
     }
   });
 
   it('keeps every control at least 44pt and the circle as tall as the capsule', () => {
     for (const device of Object.values(DEVICES)) {
-      const m = getBuyerTabBarMetrics(device);
-      expect(m.itemWidth).toBeGreaterThanOrEqual(44);
-      expect(m.capsuleHeight).toBeGreaterThanOrEqual(44);
-      expect(m.fieldHeight).toBeGreaterThanOrEqual(40);
-      expect(m.circleSize).toBe(m.capsuleHeight);
-      expect(m.indicatorHeight).toBeGreaterThanOrEqual(36);
-      expect(m.indicatorWidth).toBeLessThanOrEqual(m.itemWidth);
+      for (const sideCircleCount of [1, 2]) {
+        const m = getBuyerTabBarMetrics({ ...device, sideCircleCount });
+        expect(m.itemWidth).toBeGreaterThanOrEqual(44);
+        expect(m.capsuleHeight).toBeGreaterThanOrEqual(44);
+        expect(m.fieldHeight).toBeGreaterThanOrEqual(40);
+        expect(m.circleSize).toBe(m.capsuleHeight);
+        expect(m.indicatorHeight).toBeGreaterThanOrEqual(36);
+        expect(m.indicatorWidth).toBeLessThanOrEqual(m.itemWidth);
+      }
     }
   });
 
-  it('widens the capsule for search on phones without leaving the screen margins', () => {
+  it('gives the search field ample room inside the already-wide capsule', () => {
     for (const device of [DEVICES.iphoneSE, DEVICES.iphoneProMax, DEVICES.androidButtons, DEVICES.ipadSplitNarrow]) {
-      const m = getBuyerTabBarMetrics(device);
-      expect(m.searchCapsuleWidth).toBeGreaterThan(m.capsuleWidth);
-      expect(m.searchCapsuleWidth + m.gap + m.circleSize).toBeLessThanOrEqual(device.width - 24);
+      const m = getBuyerTabBarMetrics({ ...device, sideCircleCount: 1 });
+      // The capsule no longer needs to grow for search — it's already wide.
+      expect(m.searchCapsuleWidth).toBe(m.capsuleWidth);
       // The field (everything right of Home) stays roomy enough to type in.
       expect(m.searchCapsuleWidth - m.capsulePadding * 2 - m.itemWidth).toBeGreaterThanOrEqual(180);
     }
   });
 
-  it('gives iPad its own larger, centred proportions and a wider search field in both orientations', () => {
+  it('gives iPad its own larger, centred, capped-width proportions in both orientations', () => {
     for (const device of [DEVICES.ipadPortrait, DEVICES.ipadLandscape]) {
-      const m = getBuyerTabBarMetrics(device);
-      const phone = getBuyerTabBarMetrics(DEVICES.iphoneProMax);
+      const m = getBuyerTabBarMetrics({ ...device, sideCircleCount: 1 });
+      const phone = getBuyerTabBarMetrics({ ...DEVICES.iphoneProMax, sideCircleCount: 1 });
       expect(m.isTablet).toBe(true);
       expect(m.itemWidth).toBeGreaterThan(phone.itemWidth);
       expect(m.capsuleHeight).toBeGreaterThan(phone.capsuleHeight);
-      expect(totalWidth(m) / device.width).toBeLessThan(0.6);
-      expect(m.searchCapsuleWidth).toBeGreaterThan(m.capsuleWidth);
-      expect(m.searchCapsuleWidth).toBeLessThanOrEqual(560);
-      expect(m.searchCapsuleWidth + m.gap + m.circleSize).toBeLessThanOrEqual(device.width - 96);
+      // Capped well short of the huge iPad width — centred, not edge to edge.
+      expect(buyerRowWidth(m) / device.width).toBeLessThan(0.75);
+      expect(buyerRowWidth(m)).toBeLessThanOrEqual(560);
     }
   });
 

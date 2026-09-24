@@ -24,6 +24,7 @@ import { BrandedLoadingState, EmptyState, ThreadDivider } from '@/components/Bra
 import SwipeActionRow from '@/components/SwipeActionRow';
 import { useApi } from '@/lib/api';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
+import { syncNotificationBadge } from '@/lib/notificationBadge';
 import { useUser } from '@clerk/expo';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -233,6 +234,7 @@ export default function BuyerNotifications() {
     try {
       const data = await getNotifications();
       setNotifs(data);
+      void syncNotificationBadge(data);
     } catch (_) {
     } finally {
       setNotifLoading(false);
