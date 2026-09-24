@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
+import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, ReturnStatus, RETURN_REASONS, OrderStatus, TrackingStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent, PaymentSummary } from '@/services/orderTypes';
@@ -904,6 +905,11 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
         )}
       </GradientCard>
 
+      {/* Live status tracker — the visual centerpiece: where this order stands right now */}
+      <BrandthreadCard style={s.timelineCard}>
+        <OrderStatusTimeline status={order.status} />
+      </BrandthreadCard>
+
       {/* Cancellation reason card */}
       {order.status === 'cancelled' && order.cancellation && (
         <View style={s.section}>
@@ -1702,10 +1708,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   headerSub:        { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
 
   // Tab bar
-  tabBar:           { borderBottomWidth: 1, borderBottomColor: BORDER, maxHeight: 44, backgroundColor: SURFACE },
-  tabBarContent:    { paddingHorizontal: SP.md, gap: SP.xs },
-  tabItem:          { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabItemActive:    { borderBottomColor: PURPLE },
+  tabBar:           { borderBottomWidth: 1, borderBottomColor: BORDER, maxHeight: 52, backgroundColor: SURFACE },
+  tabBarContent:    { paddingHorizontal: SP.md, paddingVertical: SP.xs, gap: SP.xs, alignItems: 'center' },
+  tabItem:          { paddingHorizontal: SP.md, paddingVertical: SP.xs + 2, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: 'transparent', backgroundColor: 'transparent' },
+  tabItemActive:    { borderColor: PURPLE_DIM, backgroundColor: PURPLE_DIM },
   tabLabel:         { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   tabLabelActive:   { color: FG, fontFamily: FONT.semibold },
 
@@ -1717,6 +1723,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // Hero / Overview
   heroCard:         { marginBottom: SP.sm },
   heroRow:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  timelineCard:     { marginBottom: SP.md, paddingVertical: SP.md },
   heroOrderNum:     { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
   badgeRow:         { flexDirection: 'row', gap: SP.sm, flexWrap: 'wrap' },
   heroDate:         { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: SP.xs },

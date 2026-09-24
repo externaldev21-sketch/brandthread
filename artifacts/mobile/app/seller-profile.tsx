@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -25,21 +25,17 @@ import type { SellerPost } from '@/services/types';
 import type { Product } from '@/services/productTypes';
 import { useApi } from '@/hooks/useApi';
 import { useColors } from '@/hooks/useColors';
+import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { getSellerFollowState, setSellerFollowing } from '@/services/socialService';
-import {
-  BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE,
-  BLUE, ORANGE, RED, FONT, FS, SP, RADIUS, ICON, ACCENT, GRID_MAX_WIDTH,
-} from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, GRID_MAX_WIDTH } from '@/lib/theme';
 import { buildCanonicalProfileUrl } from '@/lib/shareProfile';
 import { confirmBlock, reportHref } from '@/lib/safety';
 import { GridSkeleton, ResponsiveContainer, useGridColumns, useBreakpoint } from '@/components/layout';
+import { BrandHero, useBrandHeroScrollY, type BrandHeroStat } from '@/components/profile/BrandHero';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TILE_SIZE = Math.floor((SCREEN_WIDTH - 2) / 3);
-
-// Compact identity bar fades in once the profile header has scrolled past this offset.
-const COMPACT_THRESHOLD = 160;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -67,11 +63,11 @@ function tabIcon(tab: string): keyof typeof Feather.glyphMap {
   }
 }
 
-function statusBadgeColor(status: string): string {
-  if (status === 'draft') return ORANGE;
-  if (status === 'scheduled') return BLUE;
-  if (status === 'failed') return RED;
-  return MUTED;
+function statusBadgeColor(status: string, theme: AppThemePreset): string {
+  if (status === 'draft') return theme.warning;
+  if (status === 'scheduled') return theme.secondary;
+  if (status === 'failed') return theme.error;
+  return theme.muted;
 }
 
 function mapApiPost(post: any): SellerPost {
@@ -159,10 +155,10 @@ interface PostTileProps {
 }
 
 function PostTile({ post, index, isOwner, onPress, size = TILE_SIZE }: PostTileProps) {
-  const colorsTheme = useColors();
-  const GREEN = colorsTheme.primary;
+  const { theme } = useAppTheme();
   const icon = typeIcon(post.type);
   const views = post.analytics?.views;
+  const badgeColor = statusBadgeColor(post.status, theme);
 
   return (
     <TouchableOpacity
@@ -170,28 +166,28 @@ function PostTile({ post, index, isOwner, onPress, size = TILE_SIZE }: PostTileP
       onPress={() => onPress(post)}
       activeOpacity={0.85}
     >
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: CARD }]} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.card }]} />
       {/* Pinned indicator */}
       {post.isPinned && (
         <View style={tileStyles.tilePinned}>
-          <Feather name="map-pin" size={10} color={GREEN} />
+          <Feather name="map-pin" size={10} color={theme.accent} />
         </View>
       )}
       {/* Type icon top-right */}
       <View style={tileStyles.tileTypeIcon}>
-        <Feather name={icon} size={11} color={MUTED} />
+        <Feather name={icon} size={11} color={theme.muted} />
       </View>
       {/* Views bottom-left */}
       {views != null && !(post as any).__analyticsUnavailable && (
         <View style={tileStyles.tileViews}>
-          <Feather name="eye" size={8} color={MUTED} />
-          <Text style={tileStyles.tileViewsText}>{formatCount(views)}</Text>
+          <Feather name="eye" size={8} color={theme.muted} />
+          <Text style={[tileStyles.tileViewsText, { color: theme.muted }]}>{formatCount(views)}</Text>
         </View>
       )}
       {/* Status badge for owner non-published */}
       {isOwner && post.status !== 'published' && (
-        <View style={[tileStyles.tileStatusBadge, { backgroundColor: statusBadgeColor(post.status) + '33', borderColor: statusBadgeColor(post.status) }]}>
-          <Text style={[tileStyles.tileStatusText, { color: statusBadgeColor(post.status) }]}>
+        <View style={[tileStyles.tileStatusBadge, { backgroundColor: badgeColor + '33', borderColor: badgeColor }]}>
+          <Text style={[tileStyles.tileStatusText, { color: badgeColor }]}>
             {post.status}
           </Text>
         </View>
@@ -205,7 +201,7 @@ const tileStyles = StyleSheet.create({
   tilePinned: { position: 'absolute', top: 5, left: 5 },
   tileTypeIcon: { position: 'absolute', top: 5, right: 5 },
   tileViews: { position: 'absolute', bottom: 5, left: 5, flexDirection: 'row', alignItems: 'center', gap: 2 },
-  tileViewsText: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.semibold },
+  tileViewsText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   tileStatusBadge: { position: 'absolute', bottom: 5, right: 5, borderWidth: 1, borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 },
   tileStatusText: { fontSize: FS.xs, fontFamily: FONT.semibold, textTransform: 'capitalize' },
 });
@@ -213,23 +209,22 @@ const tileStyles = StyleSheet.create({
 // ─── Create Post Tile ──────────────────────────────────────────────────────────
 
 function CreatePostTile({ onPress, size = TILE_SIZE }: { onPress: () => void; size?: number }) {
-  const colorsTheme = useColors();
-  const GREEN = colorsTheme.primary;
+  const { theme } = useAppTheme();
   return (
     <TouchableOpacity
-      style={[tileStyles.postTile, createStyles.createTile, { width: size, height: size }]}
+      style={[tileStyles.postTile, createStyles.createTile, { width: size, height: size, backgroundColor: theme.card, borderColor: theme.border }]}
       onPress={onPress}
       activeOpacity={0.8}
     >
-      <Feather name="plus" size={24} color={GREEN} />
-      <Text style={createStyles.createTileLabel}>New post</Text>
+      <Feather name="plus" size={24} color={theme.accent} />
+      <Text style={[createStyles.createTileLabel, { color: theme.muted }]}>New post</Text>
     </TouchableOpacity>
   );
 }
 
 const createStyles = StyleSheet.create({
-  createTile: { backgroundColor: CARD, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER },
-  createTileLabel: { color: MUTED, fontSize: 11, fontFamily: FONT.medium, marginTop: 4 },
+  createTile: { alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  createTileLabel: { fontSize: 11, fontFamily: FONT.medium, marginTop: 4 },
 });
 
 // ─── Product Card ──────────────────────────────────────────────────────────────
@@ -242,19 +237,17 @@ interface ProductCardProps {
 }
 
 function ProductCard({ product, index, onPress, cardWidth }: ProductCardProps) {
-  const colorsTheme = useColors();
-  const GREEN = colorsTheme.primary;
-  const GREEN_DIM = colorsTheme.accent;
+  const { theme } = useAppTheme();
   const totalInventory = product.inventory.totalStock;
   const lowStockThreshold = product.inventory.lowStockThreshold;
   const isLowStock = totalInventory > 0 && totalInventory <= lowStockThreshold;
   const isOutOfStock = totalInventory === 0 && product.salesModel !== 'pre-order';
 
   let stockLabel = 'In stock';
-  let stockColor = GREEN;
-  if (product.salesModel === 'pre-order') { stockLabel = 'Pre-order'; stockColor = ACCENT; }
-  else if (isOutOfStock) { stockLabel = 'Out of stock'; stockColor = MUTED; }
-  else if (isLowStock) { stockLabel = 'Low stock'; stockColor = ORANGE; }
+  let stockColor = theme.accent;
+  if (product.salesModel === 'pre-order') { stockLabel = 'Pre-order'; stockColor = theme.accent; }
+  else if (isOutOfStock) { stockLabel = 'Out of stock'; stockColor = theme.muted; }
+  else if (isLowStock) { stockLabel = 'Low stock'; stockColor = theme.warning; }
 
   const coverMedia = product.media && product.media[0];
   const hasCoverImage = coverMedia && coverMedia.uri && coverMedia.uri.startsWith('http');
@@ -262,7 +255,7 @@ function ProductCard({ product, index, onPress, cardWidth }: ProductCardProps) {
 
   return (
     <TouchableOpacity
-      style={[productStyles.productCard, cardWidth != null && { width: cardWidth }]}
+      style={[productStyles.productCard, { backgroundColor: theme.background }, cardWidth != null && { width: cardWidth }]}
       onPress={() => onPress(product.id)}
       activeOpacity={0.85}
     >
@@ -274,27 +267,27 @@ function ProductCard({ product, index, onPress, cardWidth }: ProductCardProps) {
             resizeMode="cover"
           />
         ) : (
-          <View style={[productStyles.productImage, { backgroundColor: CARD }]} />
+          <View style={[productStyles.productImage, { backgroundColor: theme.card }]} />
         )}
         {isDraftOrArchived && (
-          <View style={productStyles.productStatusBadge}>
-            <Text style={productStyles.productStatusBadgeText}>
+          <View style={[productStyles.productStatusBadge, { borderColor: theme.warning }]}>
+            <Text style={[productStyles.productStatusBadgeText, { color: theme.warning }]}>
               {product.status === 'draft' ? 'Draft' : 'Archived'}
             </Text>
           </View>
         )}
       </View>
       <View style={productStyles.productInfo}>
-        <Text style={productStyles.productName} numberOfLines={2}>{product.name}</Text>
+        <Text style={[productStyles.productName, { color: theme.text }]} numberOfLines={2}>{product.name}</Text>
         <View style={productStyles.productPriceRow}>
-          <Text style={productStyles.productPrice}>{formatCents(product.pricing.priceCents)}</Text>
+          <Text style={[productStyles.productPrice, { color: theme.text }]}>{formatCents(product.pricing.priceCents)}</Text>
           {product.pricing.compareAtPriceCents != null && (
-            <Text style={productStyles.productCompare}>{formatCents(product.pricing.compareAtPriceCents)}</Text>
+            <Text style={[productStyles.productCompare, { color: theme.muted }]}>{formatCents(product.pricing.compareAtPriceCents)}</Text>
           )}
         </View>
         <View style={productStyles.productBadgeRow}>
-          <View style={[productStyles.productBadge, { borderColor: product.salesModel === 'pre-order' ? ACCENT : BORDER }]}>
-            <Text style={[productStyles.productBadgeText, { color: product.salesModel === 'pre-order' ? ACCENT : MUTED }]}>
+          <View style={[productStyles.productBadge, { borderColor: product.salesModel === 'pre-order' ? theme.accent : theme.border }]}>
+            <Text style={[productStyles.productBadgeText, { color: product.salesModel === 'pre-order' ? theme.accent : theme.muted }]}>
               {product.salesModel === 'pre-order' ? 'Pre-order' : 'Pre-made'}
             </Text>
           </View>
@@ -306,16 +299,16 @@ function ProductCard({ product, index, onPress, cardWidth }: ProductCardProps) {
 }
 
 const productStyles = StyleSheet.create({
-  productCard: { width: (SCREEN_WIDTH - 40) / 2, backgroundColor: BG, borderRadius: RADIUS.sm, overflow: 'hidden' },
-  productImageContainer: { position: 'relative', height: 176, width: '100%', borderRadius: RADIUS.sm, overflow: 'hidden', backgroundColor: CARD },
+  productCard: { width: (SCREEN_WIDTH - 40) / 2, borderRadius: RADIUS.sm, overflow: 'hidden' },
+  productImageContainer: { position: 'relative', height: 176, width: '100%', borderRadius: RADIUS.sm, overflow: 'hidden' },
   productImage: { height: 176, width: '100%' },
-  productStatusBadge: { position: 'absolute', top: 6, left: 6, backgroundColor: 'rgba(0,0,0,0.65)', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: ORANGE },
-  productStatusBadgeText: { color: ORANGE, fontSize: FS.xs, fontFamily: FONT.semibold, textTransform: 'capitalize' },
+  productStatusBadge: { position: 'absolute', top: 6, left: 6, backgroundColor: 'rgba(0,0,0,0.65)', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1 },
+  productStatusBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold, textTransform: 'capitalize' },
   productInfo: { paddingHorizontal: 2, paddingTop: 10, paddingBottom: SP.md },
-  productName: { color: FG, fontSize: FS.sm, lineHeight: 18, fontFamily: FONT.semibold, marginBottom: 4 },
+  productName: { fontSize: FS.sm, lineHeight: 18, fontFamily: FONT.semibold, marginBottom: 4 },
   productPriceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
-  productPrice: { color: FG, fontSize: FS.sm, fontFamily: FONT.bold },
-  productCompare: { color: MUTED, fontSize: 12, textDecorationLine: 'line-through' },
+  productPrice: { fontSize: FS.sm, fontFamily: FONT.bold },
+  productCompare: { fontSize: 12, textDecorationLine: 'line-through' },
   productBadgeRow: { flexDirection: 'row', marginBottom: 4 },
   productBadge: { borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 2 },
   productBadgeText: { fontSize: 11, fontFamily: FONT.medium },
@@ -325,19 +318,20 @@ const productStyles = StyleSheet.create({
 // ─── Empty State ───────────────────────────────────────────────────────────────
 
 function EmptyState({ icon, title, subtitle }: { icon: keyof typeof Feather.glyphMap; title: string; subtitle?: string }) {
+  const { theme } = useAppTheme();
   return (
     <View style={emptyStyles.emptyState}>
-      <Feather name={icon} size={48} color={MUTED} />
-      <Text style={emptyStyles.emptyTitle}>{title}</Text>
-      {subtitle && <Text style={emptyStyles.emptySubtitle}>{subtitle}</Text>}
+      <Feather name={icon} size={48} color={theme.muted} />
+      <Text style={[emptyStyles.emptyTitle, { color: theme.text }]}>{title}</Text>
+      {subtitle && <Text style={[emptyStyles.emptySubtitle, { color: theme.muted }]}>{subtitle}</Text>}
     </View>
   );
 }
 
 const emptyStyles = StyleSheet.create({
   emptyState: { alignItems: 'center', justifyContent: 'center', paddingTop: 80, paddingHorizontal: 40, gap: 12 },
-  emptyTitle: { color: FG, fontSize: FS.base, fontFamily: FONT.semibold, textAlign: 'center' },
-  emptySubtitle: { color: MUTED, fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 20 },
+  emptyTitle: { fontSize: FS.base, fontFamily: FONT.semibold, textAlign: 'center' },
+  emptySubtitle: { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 20 },
 });
 
 // ─── Action Row (sheet) ────────────────────────────────────────────────────────
@@ -349,12 +343,14 @@ interface ActionRowProps {
   onPress: () => void;
 }
 
-function ActionRow({ icon, label, color = FG, onPress }: ActionRowProps) {
+function ActionRow({ icon, label, color, onPress }: ActionRowProps) {
+  const { theme } = useAppTheme();
+  const tint = color ?? theme.text;
   return (
     <TouchableOpacity style={sheetStyles.actionRow} onPress={onPress} activeOpacity={0.7}>
-      <Feather name={icon} size={18} color={color} />
-      <Text style={[sheetStyles.actionRowLabel, { color }]}>{label}</Text>
-      <Feather name="chevron-right" size={16} color={MUTED} />
+      <Feather name={icon} size={18} color={tint} />
+      <Text style={[sheetStyles.actionRowLabel, { color: tint }]}>{label}</Text>
+      <Feather name="chevron-right" size={16} color={theme.muted} />
     </TouchableOpacity>
   );
 }
@@ -368,6 +364,7 @@ const sheetStyles = StyleSheet.create({
 
 export default function SellerProfileScreen() {
   const colors = useColors();
+  const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string; sellerId?: string; isOwner?: string }>();
@@ -396,14 +393,10 @@ export default function SellerProfileScreen() {
   const [canonicalSellerId, setCanonicalSellerId] = useState<string | null>(null);
 
   const tabs = ['Posts', 'Products'];
-  const tabBarIndex = isOwner ? 3 : 4;
+  // ScrollView children: 0 = BrandHero, 1 = Shop button (non-owner only), then the sticky tab bar.
+  const tabBarIndex = isOwner ? 1 : 2;
 
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const compactOpacity = scrollY.interpolate({
-    inputRange: [COMPACT_THRESHOLD - 24, COMPACT_THRESHOLD],
-    outputRange: [0, 1],
-    extrapolate: 'clamp',
-  });
+  const scrollY = useBrandHeroScrollY();
   const [refreshing, setRefreshing] = useState(false);
   // Bumped by pull-to-refresh to re-trigger the load effect without resetting
   // already-loaded content to empty first (avoids a flash back to skeletons).
@@ -545,7 +538,7 @@ export default function SellerProfileScreen() {
     } catch {
       setIsFollowing(previousFollowing);
       setFollowers(previousFollowers);
-      Alert.alert("Couldn\u2019t update follow", 'Check your connection and try again.');
+      Alert.alert("Couldn’t update follow", 'Check your connection and try again.');
     } finally {
       setFollowPending(false);
     }
@@ -653,105 +646,108 @@ export default function SellerProfileScreen() {
     ? profile.bio.slice(0, 120) + '…'
     : profile.bio;
 
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   if (profileLoading) {
     return (
       <View style={[styles.root, { alignItems: 'center', justifyContent: 'center', gap: 12 }]}>
         <ActivityIndicator color={colors.primary} />
-        <Text style={{ color: MUTED, fontFamily: FONT.medium, fontSize: FS.sm }}>Loading seller profile…</Text>
+        <Text style={{ color: theme.muted, fontFamily: FONT.medium, fontSize: FS.sm }}>Loading seller profile…</Text>
       </View>
     );
   }
 
   const displayProducts = liveProducts;
 
+  const heroStats: BrandHeroStat[] = [
+    { key: 'followers', label: 'Followers', value: formatCount(followers), onPress: () => router.push('/connections?type=followers' as never) },
+    { key: 'rating', label: 'Rating', value: apiRating && apiRating.totalCount > 0 ? apiRating.avgRating.toFixed(1) : '—' },
+    { key: 'products', label: 'Products', value: formatCount(profile.productCount) },
+  ];
+
   return (
     <View style={styles.root}>
-      {/* ── Absolute header bar ── */}
-      <View style={[styles.absHeader, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={20} color={FG} />
-        </TouchableOpacity>
-
-        {/* Compact identity — avatar thumbnail + name, fades in once the profile header scrolls away */}
-        <Animated.View pointerEvents="none" style={[styles.compactIdentity, { opacity: compactOpacity }]}>
-          <View style={styles.compactAvatar}>
-            {profileImageUrl ? (
-              <Image source={{ uri: profileImageUrl }} style={styles.compactAvatarImage} />
-            ) : (
-              <Text style={styles.compactAvatarInitials}>{profile.initials}</Text>
-            )}
-          </View>
-          <Text style={styles.compactName} numberOfLines={1}>{profile.brandName}</Text>
-        </Animated.View>
-
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerBtn} onPress={handleOpenInbox} accessibilityRole="button" accessibilityLabel={isOwner ? 'Inbox' : 'Message seller'}>
-            <Feather name="message-circle" size={20} color={FG} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerBtn}
-            onPress={handleShare}
-            accessibilityRole="button"
-            accessibilityLabel={isOwner ? 'Share profile' : 'Share seller profile'}
-            accessibilityHint={isOwner ? 'Opens your shareable profile link and QR code' : 'Share this seller profile'}
-            testID={isOwner ? 'seller-profile-share-btn' : undefined}
-          >
-            <Feather name="share-2" size={20} color={FG} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
       <Animated.ScrollView
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
         stickyHeaderIndices={[tabBarIndex]}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
         scrollEventThrottle={16}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={MUTED} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.muted} />}
       >
-        {/* 0: Spacer — replaces the old cover gradient */}
-        <View style={{ height: insets.top + 56 }} />
-
-        {/* 1: Profile Info */}
-        <View style={styles.profileSection}>
-          {/* Centered avatar */}
-          <View style={styles.avatarCenter}>
-            {profile.verified ? (
-              <View style={styles.verifiedRing}>
-                <View style={styles.avatar}>
-                  {profileImageUrl ? (
-                    <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} accessibilityLabel={`${profile.brandName} avatar`} />
-                  ) : (
-                    <Text style={styles.avatarInitials}>{profile.initials}</Text>
-                  )}
-                </View>
-              </View>
+        {/* 0: Hero — gradient brand world, avatar, name, stats */}
+        <BrandHero
+          scrollY={scrollY}
+          brandName={profile.brandName}
+          username={profile.username}
+          initials={profile.initials}
+          avatarImageUrl={profileImageUrl}
+          verified={profile.verified}
+          stats={heroStats}
+          testID="seller-profile-hero"
+          topBarLeft={
+            <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()}>
+              <Feather name="arrow-left" size={20} color={theme.text} />
+            </TouchableOpacity>
+          }
+          topBarRight={
+            <View style={styles.headerActions}>
+              <TouchableOpacity style={styles.headerBtn} onPress={handleOpenInbox} accessibilityRole="button" accessibilityLabel={isOwner ? 'Inbox' : 'Message seller'}>
+                <Feather name="message-circle" size={20} color={theme.text} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.headerBtn}
+                onPress={handleShare}
+                accessibilityRole="button"
+                accessibilityLabel={isOwner ? 'Share profile' : 'Share seller profile'}
+                accessibilityHint={isOwner ? 'Opens your shareable profile link and QR code' : 'Share this seller profile'}
+                testID={isOwner ? 'seller-profile-share-btn' : undefined}
+              >
+                <Feather name="share-2" size={20} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+          }
+          actions={
+            isOwner ? (
+              <>
+                <TouchableOpacity style={[styles.outlineBtn, styles.outlineBtnPrimary]} onPress={() => router.push('/edit-profile' as never)}>
+                  <Text style={[styles.outlineBtnText, { color: theme.accent }]}>Edit Profile</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.outlineBtn} onPress={handleOpenInbox}>
+                  <Text style={styles.outlineBtnText}>Messages</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.outlineBtn} onPress={() => router.push('/create-post' as never)}>
+                  <Text style={styles.outlineBtnText}>Create Post</Text>
+                </TouchableOpacity>
+              </>
             ) : (
-              <View style={styles.avatar}>
-                {profileImageUrl ? (
-                  <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} accessibilityLabel={`${profile.brandName} avatar`} />
-                ) : (
-                  <Text style={styles.avatarInitials}>{profile.initials}</Text>
-                )}
-              </View>
-            )}
-          </View>
-
-          {/* Brand name + verified */}
-          <View style={styles.brandNameRow}>
-            <Text style={styles.brandName}>{profile.brandName}</Text>
-            {profile.verified && (
-              <Feather name="check-circle" size={14} color={colors.primary} style={{ marginLeft: 6 }} accessibilityLabel="Verified seller" accessibilityRole="image" />
-            )}
-          </View>
-
-          {/* Username */}
-          <Text style={styles.username}>@{profile.username}</Text>
-
+              <>
+                <TouchableOpacity
+                  style={[styles.outlineBtn, isFollowing && styles.outlineBtnPrimary]}
+                  onPress={handleFollow}
+                  disabled={followPending}
+                  accessibilityState={{ disabled: followPending, selected: isFollowing }}
+                  testID="seller-profile-follow-btn"
+                >
+                  <Text style={[styles.outlineBtnText, isFollowing && { color: theme.accent }]}>
+                    {followPending ? 'Updating…' : isFollowing ? 'Following' : 'Follow'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.outlineBtn} onPress={handleMessageSeller}>
+                  <Feather name="message-circle" size={14} color={theme.text} style={{ marginRight: 4 }} />
+                  <Text style={styles.outlineBtnText}>Message</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.iconBtn} onPress={handleMoreOptions}>
+                  <Feather name="more-horizontal" size={16} color={theme.text} />
+                </TouchableOpacity>
+              </>
+            )
+          }
+        >
           {/* Vacation banner */}
           {!isOwner && (profile as any).vacationMode && (
             <View style={styles.vacationBanner}>
-              <Feather name="sun" size={16} color={ORANGE} />
+              <Feather name="sun" size={16} color={theme.warning} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.vacationTitle}>This seller is away</Text>
                 <Text style={styles.vacationText}>
@@ -783,15 +779,15 @@ export default function SellerProfileScreen() {
               }}
               activeOpacity={0.7}
             >
-              <Feather name="link" size={12} color={colors.primary} />
-              <Text style={[styles.metaText, { color: colors.primary }]}>{profile.website}</Text>
+              <Feather name="link" size={12} color={theme.accent} />
+              <Text style={[styles.metaText, { color: theme.accent }]}>{profile.website}</Text>
             </TouchableOpacity>
           )}
 
           {/* Location */}
           {profile.location && (
             <View style={styles.metaRow}>
-              <Feather name="map-pin" size={12} color={MUTED} />
+              <Feather name="map-pin" size={12} color={theme.muted} />
               <Text style={styles.metaText}>{profile.location}</Text>
             </View>
           )}
@@ -802,76 +798,18 @@ export default function SellerProfileScreen() {
               <Text style={styles.categoryBadgeText}>{profile.category}</Text>
             </View>
           )}
+        </BrandHero>
 
-          {/* Action buttons row */}
-          <View style={styles.actionButtons}>
-            {isOwner ? (
-              <>
-                <TouchableOpacity style={[styles.outlineBtn, styles.outlineBtnPrimary]} onPress={() => router.push('/edit-profile' as never)}>
-                  <Text style={[styles.outlineBtnText, { color: ACCENT }]}>Edit Profile</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.outlineBtn} onPress={handleOpenInbox}>
-                  <Text style={styles.outlineBtnText}>Messages</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.outlineBtn} onPress={() => router.push('/create-post' as never)}>
-                  <Text style={styles.outlineBtnText}>Create Post</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <TouchableOpacity
-                  style={[styles.outlineBtn, isFollowing && styles.outlineBtnPrimary]}
-                  onPress={handleFollow}
-                  disabled={followPending}
-                  accessibilityState={{ disabled: followPending, selected: isFollowing }}
-                >
-                  <Text style={[styles.outlineBtnText, isFollowing && { color: ACCENT }]}>
-                    {followPending ? 'Updating…' : isFollowing ? 'Following' : 'Follow'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.outlineBtn} onPress={handleMessageSeller}>
-                  <Feather name="message-circle" size={14} color={FG} style={{ marginRight: 4 }} />
-                  <Text style={styles.outlineBtnText}>Message</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconBtn} onPress={handleMoreOptions}>
-                  <Feather name="more-horizontal" size={16} color={FG} />
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-        </View>
-
-        {/* 2: Stats Row */}
-        <View style={styles.statsRow}>
-          <TouchableOpacity
-            style={styles.statItem}
-            onPress={() => router.push('/connections?type=followers' as never)}
-          >
-            <Text style={styles.statNumber}>{formatCount(followers)}</Text>
-            <Text style={styles.statLabel}>Followers</Text>
-          </TouchableOpacity>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{apiRating && apiRating.totalCount > 0 ? apiRating.avgRating.toFixed(1) : '—'}</Text>
-            <Text style={styles.statLabel}>Rating</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{formatCount(profile.productCount)}</Text>
-            <Text style={styles.statLabel}>Products</Text>
-          </View>
-        </View>
-
-        {/* 3 (buyer only): Shop Button */}
+        {/* Shop button (buyer only) */}
         {!isOwner && (
           <View style={styles.shopBtnWrapper}>
             <TouchableOpacity
-              style={[styles.shopBtn, { borderColor: ACCENT }]}
+              style={[styles.shopBtn, { borderColor: theme.accent }]}
               activeOpacity={0.85}
               onPress={() => setActiveTab(1)}
             >
-              <Feather name="shopping-bag" size={16} color={ACCENT} />
-              <Text style={[styles.shopBtnText, { color: ACCENT }]}>Shop {profile.brandName}</Text>
+              <Feather name="shopping-bag" size={16} color={theme.accent} />
+              <Text style={[styles.shopBtnText, { color: theme.accent }]}>Shop {profile.brandName}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -887,17 +825,18 @@ export default function SellerProfileScreen() {
               <TouchableOpacity
                 key={tab}
                 style={[styles.tabItem, activeTab === i && styles.tabItemActive]}
-                onPress={() => setActiveTab(i)}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setActiveTab(i); }}
+                testID={`seller-profile-tab-${tab.toLowerCase()}`}
               >
                 <Feather
                   name={tabIcon(tab)}
                   size={14}
-                  color={activeTab === i ? FG : MUTED}
+                  color={activeTab === i ? theme.text : theme.muted}
                 />
                 <Text style={[styles.tabText, activeTab === i && styles.tabTextActive]}>
                   {tab}
                 </Text>
-                {activeTab === i && <View style={[styles.tabUnderline, { backgroundColor: colors.primary }]} />}
+                {activeTab === i && <View style={[styles.tabUnderline, { backgroundColor: theme.accent }]} />}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -989,13 +928,13 @@ export default function SellerProfileScreen() {
           <View style={[styles.actionSheet, { paddingBottom: insets.bottom + SP.md }]}>
             <View style={styles.sheetHandle} />
             <View style={styles.sheetPostInfo}>
-              <View style={[styles.sheetThumb, { backgroundColor: CARD }]} />
+              <View style={[styles.sheetThumb, { backgroundColor: theme.card }]} />
               <View style={styles.sheetPostMeta}>
                 <Text style={styles.sheetCaption} numberOfLines={1}>
                   {selectedPost.caption}
                 </Text>
-                <View style={[styles.sheetStatusBadge, { backgroundColor: statusBadgeColor(selectedPost.status) + '33' }]}>
-                  <Text style={[styles.sheetStatusText, { color: statusBadgeColor(selectedPost.status) }]}>
+                <View style={[styles.sheetStatusBadge, { backgroundColor: statusBadgeColor(selectedPost.status, theme) + '33' }]}>
+                  <Text style={[styles.sheetStatusText, { color: statusBadgeColor(selectedPost.status, theme) }]}>
                     {selectedPost.status}
                   </Text>
                 </View>
@@ -1022,160 +961,106 @@ export default function SellerProfileScreen() {
 
 // ─── Styles ────────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: 'transparent' },
-  scroll: { flex: 1, backgroundColor: 'transparent' },
+function makeStyles(theme: AppThemePreset) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: theme.background },
+    scroll: { flex: 1, backgroundColor: 'transparent' },
 
-  // Absolute header
-  absHeader: {
-    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md,
-  },
-  headerActions: { flexDirection: 'row', gap: SP.sm },
-  headerBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(10,10,11,0.72)', borderWidth: 1, borderColor: BORDER,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  // Compact identity bar (avatar thumbnail + name), fades in once the hero header scrolls away
-  compactIdentity: {
-    position: 'absolute', left: 56, right: 100, top: 8, bottom: 0,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.xs,
-  },
-  compactAvatar: {
-    width: 26, height: 26, borderRadius: 13, overflow: 'hidden',
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  compactAvatarImage: { width: '100%', height: '100%' },
-  compactAvatarInitials: { color: FG, fontSize: 10, fontFamily: FONT.bold },
-  compactName: { color: FG, fontSize: FS.sm, fontFamily: FONT.semibold, maxWidth: '80%' },
+    headerActions: { flexDirection: 'row', gap: SP.sm },
+    headerBtn: {
+      width: 40, height: 40, borderRadius: 20,
+      backgroundColor: theme.cardGlass, borderWidth: 1, borderColor: theme.border,
+      alignItems: 'center', justifyContent: 'center',
+    },
 
-  // Profile section — centered
-  profileSection: {
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.lg,
-  },
-  avatarCenter: { marginBottom: SP.md },
-  verifiedRing: {
-    borderWidth: 1.5, borderColor: ACCENT,
-    borderRadius: RADIUS.pill, padding: 2,
-  },
-  avatar: {
-    width: 96, height: 96, borderRadius: 48,
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  avatarImage: { width: '100%', height: '100%', borderRadius: 48 },
-  avatarInitials: { color: FG, fontSize: FS.xl, fontFamily: FONT.bold },
+    vacationBanner: {
+      flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm,
+      marginVertical: SP.sm, borderWidth: 1, borderColor: `${theme.warning}55`,
+      borderRadius: RADIUS.md, padding: SP.sm, alignSelf: 'stretch',
+    },
+    vacationTitle: { color: theme.warning, fontFamily: FONT.bold, fontSize: FS.sm, marginBottom: 3 },
+    vacationText: { color: theme.text, fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 18 },
 
-  brandNameRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 3 },
-  brandName: { color: FG, fontSize: FS.lg, fontFamily: FONT.bold, letterSpacing: -0.3 },
-  username: { color: MUTED, fontSize: FS.sm, fontFamily: FONT.medium, marginBottom: SP.sm },
+    bio: { color: theme.muted, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 21, textAlign: 'center', marginBottom: SP.sm, maxWidth: 320 },
+    bioMore: { color: theme.muted, fontSize: FS.sm },
 
-  vacationBanner: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm,
-    marginVertical: SP.sm, borderWidth: 1, borderColor: `${ORANGE}55`,
-    borderRadius: RADIUS.md, padding: SP.sm, alignSelf: 'stretch',
-  },
-  vacationTitle: { color: ORANGE, fontFamily: FONT.bold, fontSize: FS.sm, marginBottom: 3 },
-  vacationText: { color: FG, fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 18 },
+    metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: SP.xs },
+    metaText: { color: theme.muted, fontSize: FS.xs, fontFamily: FONT.regular },
 
-  bio: { color: MUTED, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 21, textAlign: 'center', marginBottom: SP.sm, maxWidth: 320 },
-  bioMore: { color: MUTED, fontSize: FS.sm },
+    categoryBadge: {
+      alignSelf: 'center', backgroundColor: theme.surface,
+      borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.border,
+      paddingHorizontal: 11, paddingVertical: 5, marginTop: SP.xs, marginBottom: SP.sm,
+    },
+    categoryBadgeText: { color: theme.text, fontSize: FS.xs, fontFamily: FONT.semibold, letterSpacing: 0.5, textTransform: 'uppercase' },
 
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: SP.xs },
-  metaText: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular },
+    // Action buttons
+    outlineBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+      borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.md,
+      paddingHorizontal: SP.md, paddingVertical: 9, minWidth: 88,
+    },
+    outlineBtnPrimary: { borderColor: theme.accent },
+    outlineBtnText: { color: theme.text, fontSize: FS.sm, fontFamily: FONT.semibold },
+    iconBtn: {
+      width: 38, height: 38, borderRadius: RADIUS.md,
+      borderWidth: 1, borderColor: theme.border,
+      alignItems: 'center', justifyContent: 'center',
+    },
 
-  categoryBadge: {
-    alignSelf: 'center', backgroundColor: SURFACE,
-    borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER,
-    paddingHorizontal: 11, paddingVertical: 5, marginTop: SP.xs, marginBottom: SP.sm,
-  },
-  categoryBadgeText: { color: FG, fontSize: FS.xs, fontFamily: FONT.semibold, letterSpacing: 0.5, textTransform: 'uppercase' },
+    // Shop button (buyer view only) — outline only, no gradient fill
+    shopBtnWrapper: { marginHorizontal: SP.md, marginBottom: SP.sm, marginTop: SP.sm },
+    shopBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+      gap: SP.sm, paddingVertical: 12, borderWidth: 1, borderRadius: RADIUS.md,
+    },
+    shopBtnText: { fontSize: FS.base, fontFamily: FONT.semibold },
 
-  // Action buttons
-  actionButtons: {
-    flexDirection: 'row', gap: SP.sm, marginTop: SP.md, alignSelf: 'stretch', justifyContent: 'center',
-  },
-  outlineBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md,
-    paddingHorizontal: SP.md, paddingVertical: 9, minWidth: 88,
-  },
-  outlineBtnPrimary: { borderColor: ACCENT },
-  outlineBtnText: { color: FG, fontSize: FS.sm, fontFamily: FONT.semibold },
-  iconBtn: {
-    width: 38, height: 38, borderRadius: RADIUS.md,
-    borderWidth: 1, borderColor: BORDER,
-    alignItems: 'center', justifyContent: 'center',
-  },
+    // Tab bar
+    tabBar: {
+      backgroundColor: theme.surface,
+      borderTopWidth: 1, borderTopColor: theme.border,
+      borderBottomWidth: 1, borderBottomColor: theme.border,
+    },
+    tabBarContent: { paddingHorizontal: SP.md },
+    tabItem: {
+      flexDirection: 'row', gap: 6, paddingVertical: 13,
+      marginRight: SP.lg, position: 'relative', alignItems: 'center',
+    },
+    tabItemActive: {},
+    tabText: { color: theme.muted, fontSize: FS.sm, fontFamily: FONT.medium },
+    tabTextActive: { color: theme.text, fontFamily: FONT.semibold },
+    tabUnderline: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, borderRadius: 1 },
 
-  // Stats
-  statsRow: {
-    flexDirection: 'row',
-    borderTopWidth: 1, borderBottomWidth: 1, borderColor: BORDER,
-    marginBottom: SP.md, paddingVertical: SP.md, paddingHorizontal: SP.sm,
-  },
-  statItem: { flex: 1, alignItems: 'center' },
-  statNumber: { color: FG, fontSize: FS.md, fontFamily: FONT.bold },
-  statLabel: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium, marginTop: 2 },
-  statDivider: { width: 1, backgroundColor: BORDER, marginVertical: 4 },
+    // Tab content
+    tabContent: { paddingBottom: 120, minHeight: 300 },
 
-  // Shop button (buyer view only) — outline only, no gradient fill
-  shopBtnWrapper: { marginHorizontal: SP.md, marginBottom: SP.sm },
-  shopBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: SP.sm, paddingVertical: 12, borderWidth: 1, borderRadius: RADIUS.md,
-  },
-  shopBtnText: { fontSize: FS.base, fontFamily: FONT.semibold },
+    // Posts grid
+    postsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 1 },
 
-  // Tab bar
-  tabBar: {
-    backgroundColor: SURFACE,
-    borderTopWidth: 1, borderTopColor: BORDER,
-    borderBottomWidth: 1, borderBottomColor: BORDER,
-  },
-  tabBarContent: { paddingHorizontal: SP.md },
-  tabItem: {
-    flexDirection: 'row', gap: 6, paddingVertical: 13,
-    marginRight: SP.lg, position: 'relative', alignItems: 'center',
-  },
-  tabItemActive: {},
-  tabText: { color: MUTED, fontSize: FS.sm, fontFamily: FONT.medium },
-  tabTextActive: { color: FG, fontFamily: FONT.semibold },
-  tabUnderline: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, borderRadius: 1 },
+    // Products grid
+    productsGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: SP.md, paddingBottom: SP.lg, gap: SP.sm },
+    collectionHeader: {
+      flexDirection: 'row', alignItems: 'flex-end',
+      paddingHorizontal: SP.md, paddingTop: SP.lg, paddingBottom: SP.md,
+    },
+    collectionTitle: { color: theme.text, fontSize: FS.md, fontFamily: FONT.bold },
+    collectionCount: { color: theme.muted, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: 3 },
 
-  // Tab content
-  tabContent: { paddingBottom: 120, minHeight: 300 },
-
-  // Posts grid
-  postsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 1 },
-
-  // Products grid
-  productsGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: SP.md, paddingBottom: SP.lg, gap: SP.sm },
-  collectionHeader: {
-    flexDirection: 'row', alignItems: 'flex-end',
-    paddingHorizontal: SP.md, paddingTop: SP.lg, paddingBottom: SP.md,
-  },
-  collectionTitle: { color: FG, fontSize: FS.md, fontFamily: FONT.bold },
-  collectionCount: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: 3 },
-
-  // Action sheet
-  modalOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.55)' },
-  actionSheet: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
-  },
-  sheetHandle: { width: 36, height: 4, backgroundColor: BORDER, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: SP.md },
-  sheetPostInfo: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingBottom: SP.md, gap: 12, borderBottomWidth: 1, borderBottomColor: BORDER, marginBottom: 4 },
-  sheetThumb: { width: 40, height: 40, borderRadius: RADIUS.sm },
-  sheetPostMeta: { flex: 1 },
-  sheetCaption: { color: FG, fontSize: FS.sm, fontFamily: FONT.medium, marginBottom: 4 },
-  sheetStatusBadge: { alignSelf: 'flex-start', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
-  sheetStatusText: { fontSize: 11, fontFamily: FONT.semibold, textTransform: 'capitalize' },
-  sheetSeparator: { height: 1, backgroundColor: BORDER, marginHorizontal: SP.md, marginVertical: 4 },
-  sheetCancel: { paddingVertical: SP.md, alignItems: 'center', borderTopWidth: 1, borderTopColor: BORDER, marginTop: 4 },
-  sheetCancelText: { color: FG, fontSize: FS.base, fontFamily: FONT.bold },
-});
+    // Action sheet
+    modalOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.55)' },
+    actionSheet: {
+      position: 'absolute', bottom: 0, left: 0, right: 0,
+      backgroundColor: theme.card, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
+    },
+    sheetHandle: { width: 36, height: 4, backgroundColor: theme.border, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: SP.md },
+    sheetPostInfo: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingBottom: SP.md, gap: 12, borderBottomWidth: 1, borderBottomColor: theme.border, marginBottom: 4 },
+    sheetThumb: { width: 40, height: 40, borderRadius: RADIUS.sm },
+    sheetPostMeta: { flex: 1 },
+    sheetCaption: { color: theme.text, fontSize: FS.sm, fontFamily: FONT.medium, marginBottom: 4 },
+    sheetStatusBadge: { alignSelf: 'flex-start', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+    sheetStatusText: { fontSize: 11, fontFamily: FONT.semibold, textTransform: 'capitalize' },
+    sheetCancel: { paddingVertical: SP.md, alignItems: 'center', borderTopWidth: 1, borderTopColor: theme.border, marginTop: 4 },
+    sheetCancelText: { color: theme.text, fontSize: FS.base, fontFamily: FONT.bold },
+  });
+}
