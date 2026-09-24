@@ -1911,7 +1911,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         chargeVat: boolean;
       }>('/api/taxes/status'),
       enable:    () => post<any>('/api/taxes/enable', {}),
-      config:    (data: { collectDuties?: boolean; chargeShippingTax?: boolean; chargeVat?: boolean }) =>
+      config:    (data: { stripeTaxEnabled?: boolean; collectDuties?: boolean; chargeShippingTax?: boolean; chargeVat?: boolean; taxCalculationMode?: string }) =>
         patch<any>('/api/taxes/config', data),
       forms1099: (year?: number) => get<any>(`/api/taxes/1099${year ? `?year=${year}` : ''}`),
       calculate: (data: { lineItems: any[]; shippingAddress: any; currency?: string; shippingCents?: number }) =>
