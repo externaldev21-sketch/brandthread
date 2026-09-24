@@ -130,7 +130,11 @@ router.get("/", async (req, res) => {
 // POST /api/products (manager+)
 router.post("/", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const { name, description, category = "apparel", status = "draft", images = [], tags = [], styleTags = [], variant, variants } = req.body;
+  const {
+    name, description, category = "apparel", status = "draft", images = [], tags = [], styleTags = [], variant, variants,
+    // Pre-order fields — mirrors PUT /:id so a listing can be created directly as a pre-order.
+    isPreOrder, preOrderClosingDate, preOrderEstShipDate, dropId,
+  } = req.body;
   if (!name || typeof name !== "string" || name.trim() === "") {
     res.status(400).json({ error: "name required" }); return;
   }
@@ -184,7 +188,13 @@ router.post("/", requireRole("manager"), async (req, res) => {
     if (!await hasProductCapacity(tx, ownerId, access.limits.products, status === "archived" ? 0 : 1)) return null;
     const [prod] = await tx
       .insert(products)
-      .values({ ownerId, name: name.trim(), description, category, status, images, tags, styleTags })
+      .values({
+        ownerId, name: name.trim(), description, category, status, images, tags, styleTags,
+        ...(isPreOrder !== undefined && { isPreOrder }),
+        ...(preOrderClosingDate ? { preOrderClosingDate: new Date(preOrderClosingDate) } : {}),
+        ...(preOrderEstShipDate ? { preOrderEstShipDate: new Date(preOrderEstShipDate) } : {}),
+        ...(dropId !== undefined && { dropId: dropId ?? null }),
+      })
       .returning();
 
     if (validatedVariants.length > 0) {
