@@ -17,7 +17,7 @@
 - [expo-file-system v19 API](expo-file-system-v19.md) — legacy API (readAsStringAsync/writeAsStringAsync/EncodingType/cacheDirectory) removed; use File+Paths classes; for reading images before API call, request base64:true in ImagePicker instead.
 - [Dev API routing](expo-public-api-base-url.md) — base URL must be domain ROOT; proxy forwards /api/* verbatim; /api-server/* returns SPA HTML with 200 (silent fallback trap); verify via Metro's /proc environ, not shell env.
 - [Expo web boot & root route](expo-web-boot.md) — boot never blank; dev web preview defaults to seller and bypasses auth; ?bt_preview=buyer overrides for captures; static screenshots catch FOIT.
-- [Expo dependency repair](expo-dependency-repair.md) — never interrupt pnpm’s forced mobile relink; run long repairs in background and restart Metro only after package links return.
+- [Expo dependency repair](expo-dependency-repair.md) — avoid interrupted pnpm relinks; newly published SDK patches may be blocked by registry release age before online Expo checks advance.
 - [Expo Go native module boundary](expo-go-native-module-boundary.md) — Expo Go startup must not statically import custom native modules absent from its client; keep those behind compatible fallbacks.
 - [Expo root navigation readiness](expo-root-navigation-readiness.md) — defer preview redirects until Expo Router registers the root Stack or web preview crashes before first paint.
 - [Expo proxied device startup](expo-tunnel-fallback.md) — use direct proxied LAN startup; an Ngrok-first handoff can leave Expo Go white even when Metro later recovers.
