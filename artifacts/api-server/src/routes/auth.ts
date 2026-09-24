@@ -157,6 +157,8 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
           ? user.accountType
           : null,
         idempotencyKey: `welcome/${clerkUserId}`,
+      }).then((sent) => {
+        if (!sent) req.log.warn({ clerkUserId }, "Welcome email delivery failed");
       }).catch((err) => {
         req.log.warn({ err, clerkUserId }, "Welcome email delivery failed");
       });

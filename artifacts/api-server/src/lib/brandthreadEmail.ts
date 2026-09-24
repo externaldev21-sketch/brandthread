@@ -1,9 +1,13 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { ReplitConnectors } from "@replit/connectors-sdk";
 import { logger } from "./logger";
 
-const DEFAULT_FROM = "Brandthread <onboarding@resend.dev>";
+const DEFAULT_FROM = "Brandthread <hello@brandthread.app>";
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
+const RESEND_CONNECTOR_NAME = "resend";
+
+const connectors = new ReplitConnectors();
 
 export type EmailLineItem = {
   productName: string;
@@ -134,6 +138,61 @@ export function renderBrandthreadEmail(options: {
 </html>`;
 }
 
+type ResendCredentials =
+  | { mode: "connector"; fromEmail?: string }
+  | { mode: "env"; apiKey: string }
+  | { mode: "none" };
+
+/**
+ * Best-effort extraction of a default sender configured on the Replit
+ * connector. The connector's metadata shape isn't part of the SDK's typed
+ * surface, so this probes the field names Replit connectors commonly use
+ * instead of assuming one.
+ */
+function connectionFromEmail(connection: Record<string, unknown>): string | undefined {
+  const metadata = (connection.metadata ?? {}) as Record<string, unknown>;
+  const integration = (connection.integration ?? {}) as Record<string, unknown>;
+  const settings = (integration.settings ?? {}) as Record<string, unknown>;
+  const candidates = [
+    metadata.from_email,
+    metadata.fromEmail,
+    integration.from_email,
+    integration.fromEmail,
+    settings.from_email,
+    settings.fromEmail,
+  ];
+  const found = candidates.find(
+    (value): value is string => typeof value === "string" && value.trim().length > 0,
+  );
+  return found?.trim();
+}
+
+/**
+ * Resolved fresh on every send (not cached at module load) so a connector
+ * added, removed, or reconfigured in Replit's Integrations takes effect
+ * immediately, without an app restart.
+ */
+async function resolveResendCredentials(): Promise<ResendCredentials> {
+  try {
+    const connections = await connectors.listConnections({ connector_names: RESEND_CONNECTOR_NAME });
+    const connection = connections.find((c) => c.connector_name === RESEND_CONNECTOR_NAME) ?? connections[0];
+    if (connection) {
+      return { mode: "connector", fromEmail: connectionFromEmail(connection) };
+    }
+  } catch (err) {
+    logger.warn({ err }, "Unable to check the Resend connector; falling back to RESEND_API_KEY");
+  }
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (apiKey) return { mode: "env", apiKey };
+  return { mode: "none" };
+}
+
+/** True when Resend can be reached, either via the connector or RESEND_API_KEY. */
+export async function isBrandthreadEmailConfigured(): Promise<boolean> {
+  return (await resolveResendCredentials()).mode !== "none";
+}
+
 export async function sendBrandthreadEmail({
   to,
   subject,
@@ -146,36 +205,48 @@ export async function sendBrandthreadEmail({
     return false;
   }
 
-  const key = process.env.RESEND_API_KEY;
-  if (!key) {
+  const credentials = await resolveResendCredentials();
+  if (credentials.mode === "none") {
     logger.warn({ subject }, "Brandthread email skipped because Resend is not configured");
     return false;
   }
 
+  const from = process.env.RESEND_FROM_EMAIL
+    ?? (credentials.mode === "connector" ? credentials.fromEmail : undefined)
+    ?? DEFAULT_FROM;
+
+  const payload = {
+    from,
+    to: [recipient],
+    subject,
+    html,
+    ...(LOGO_CONTENT && html.includes("cid:brandthread-logo")
+      ? {
+          attachments: [{
+            filename: "brandthread-logo.png",
+            content: LOGO_CONTENT,
+            content_id: "brandthread-logo",
+          }],
+        }
+      : {}),
+  };
+
   try {
-    const response = await fetch(RESEND_ENDPOINT, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-        ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
-      },
-      body: JSON.stringify({
-        from: process.env.RESEND_FROM_EMAIL ?? DEFAULT_FROM,
-        to: [recipient],
-        subject,
-        html,
-        ...(LOGO_CONTENT && html.includes("cid:brandthread-logo")
-          ? {
-              attachments: [{
-                filename: "brandthread-logo.png",
-                content: LOGO_CONTENT,
-                content_id: "brandthread-logo",
-              }],
-            }
-          : {}),
-      }),
-    });
+    const response = credentials.mode === "connector"
+      ? await connectors.proxy(RESEND_CONNECTOR_NAME, "/emails", {
+          method: "POST",
+          body: payload,
+          ...(idempotencyKey ? { headers: { "Idempotency-Key": idempotencyKey } } : {}),
+        })
+      : await fetch(RESEND_ENDPOINT, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${credentials.apiKey}`,
+            "Content-Type": "application/json",
+            ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
+          },
+          body: JSON.stringify(payload),
+        });
 
     if (!response.ok) {
       logger.error({ statusCode: response.status, subject }, "Brandthread email provider request failed");
