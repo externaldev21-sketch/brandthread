@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DAY_MS, TEN_MIN_MS, floorToLocalStep, parseTzOffsetMinutes } from "../analyticsTime";
+import { DAY_MS, TEN_MIN_MS, floorToLocalStep, parseTzOffsetMinutes, previousPeriod } from "../analyticsTime";
 
 describe("parseTzOffsetMinutes", () => {
   it("passes through a valid offset", () => {
@@ -49,5 +49,31 @@ describe("floorToLocalStep", () => {
   it("is a no-op at UTC on an exact boundary", () => {
     const date = new Date("2026-01-15T00:00:00Z");
     expect(floorToLocalStep(date, DAY_MS, 0).getTime()).toBe(date.getTime());
+  });
+});
+
+describe("previousPeriod", () => {
+  it("gives yesterday for today's [midnight, tomorrow) window", () => {
+    const start = new Date("2026-01-15T00:00:00Z");
+    const end = new Date("2026-01-16T00:00:00Z");
+    const previous = previousPeriod(start, end);
+    expect(previous.start.toISOString()).toBe("2026-01-14T00:00:00.000Z");
+    expect(previous.end.toISOString()).toBe("2026-01-15T00:00:00.000Z");
+  });
+
+  it("gives the prior 7-day window for a week-long period", () => {
+    const start = new Date("2026-01-09T00:00:00Z");
+    const end = new Date("2026-01-16T00:00:00Z");
+    const previous = previousPeriod(start, end);
+    expect(previous.end.getTime() - previous.start.getTime()).toBe(end.getTime() - start.getTime());
+    expect(previous.end.toISOString()).toBe(start.toISOString());
+  });
+
+  it("gives the prior hour for Live's rolling 1-hour window", () => {
+    const start = new Date("2026-01-15T15:00:00Z");
+    const end = new Date("2026-01-15T16:00:00Z");
+    const previous = previousPeriod(start, end);
+    expect(previous.start.toISOString()).toBe("2026-01-15T14:00:00.000Z");
+    expect(previous.end.toISOString()).toBe("2026-01-15T15:00:00.000Z");
   });
 });

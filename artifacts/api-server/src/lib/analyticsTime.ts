@@ -23,3 +23,13 @@ export function floorToLocalStep(date: Date, stepMs: number, tzOffsetMinutes: nu
   const flooredLocalMs = Math.floor(localMs / stepMs) * stepMs;
   return new Date(flooredLocalMs - tzOffsetMinutes * 60_000);
 }
+
+/**
+ * The immediately preceding period of the same length as [start, end) — e.g.
+ * yesterday for "today", the prior week for "this week" — used for a real
+ * period-over-period comparison instead of a fabricated one.
+ */
+export function previousPeriod(start: Date, end: Date): { start: Date; end: Date } {
+  const periodMs = end.getTime() - start.getTime();
+  return { start: new Date(start.getTime() - periodMs), end: start };
+}

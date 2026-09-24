@@ -16,7 +16,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { formatCents } from '@/lib/money';
 import { ApiError } from '@/lib/networkNotice';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { subscribeStoreContext } from '@/lib/api';
@@ -27,8 +26,9 @@ import {
 } from '@/lib/sellerHomeAnalytics';
 import { skipTask, type SetupState, type SetupTask } from '@/lib/setupStore';
 import { withSellerSetupOrigin } from '@/lib/setupNavigation';
-import { KpiRowSkeleton, ResponsiveContainer, useBreakpoint } from '@/components/layout';
+import { ResponsiveContainer, SkeletonBlock as LayoutSkeletonBlock, useBreakpoint } from '@/components/layout';
 import { bucketLabel } from '@/lib/sellerHomeChartLabels';
+import { SellerMetricCarousel, type SellerMetricPage } from '@/components/SellerMetricCarousel';
 import {
   BG,
   BORDER,
@@ -404,6 +404,39 @@ export default function SellerHomeCommerceDashboard({
   const orderCount = data?.orderCount ?? 0;
   const visitorCount = data?.visitorCount ?? 0;
 
+  // One swipeable page per metric, real data only. Balances have no
+  // "previous period" (they're a snapshot, not a period sum) and no
+  // real per-bucket time series, so they deliberately get no change
+  // indicator or sparkline rather than a fabricated one.
+  const metricPages: SellerMetricPage[] = data ? [
+    {
+      key: 'sales', label: 'Total sales', value: totalSales, isMoney: true,
+      previousValue: data.previous.totalCents,
+      spark: data.buckets.map((b) => b.totalCents),
+      route: '/analytics-sales',
+    },
+    {
+      key: 'orders', label: 'Orders', value: orderCount, isMoney: false,
+      previousValue: data.previous.orderCount,
+      spark: data.buckets.map((b) => b.orderCount),
+      route: '/(tabs)/orders',
+    },
+    {
+      key: 'visitors', label: range === 'live' ? 'Online now' : 'Visitors', value: visitorCount, isMoney: false,
+      previousValue: data.previous.visitorCount,
+      spark: data.buckets.map((b) => b.visitorCount),
+      route: '/(tabs)/analytics',
+    },
+    {
+      key: 'available', label: 'Available balance', value: financeBalance?.available.amount ?? 0, isMoney: true,
+      route: '/payouts',
+    },
+    {
+      key: 'pending', label: 'Pending balance', value: financeBalance?.pending.amount ?? 0, isMoney: true,
+      route: '/payouts',
+    },
+  ] : [];
+
   return (
     <View style={[styles.root, { backgroundColor: palette.background ?? palette.surface ?? BG }]}>
       <ScrollView
@@ -466,7 +499,7 @@ export default function SellerHomeCommerceDashboard({
           })}
         </ScrollView>
 
-        {/* ── Summary stats (KPI tile row) ──────────────────────────────── */}
+        {/* ── Summary stats (swipeable metric carousel) ─────────────────── */}
         <View style={[styles.statsCard, { backgroundColor: palette.glass ?? palette.surface ?? SELLER_DASHBOARD_GLASS, borderColor: palette.border ?? BORDER }]}>
           {analyticsError && (
             <View
@@ -480,66 +513,12 @@ export default function SellerHomeCommerceDashboard({
             </View>
           )}
           {!data && !analyticsError ? (
-            <View style={{ padding: SP.sm }}>
-              <KpiRowSkeleton count={4} />
+            <View style={{ padding: SP.md }}>
+              <LayoutSkeletonBlock width="100%" height={128} radius={RADIUS.lg} />
             </View>
           ) : (
-            <View style={styles.statGrid}>
-              <View style={[styles.statTile, isTablet && styles.statTileTablet, { backgroundColor: palette.cardElevated ?? palette.card ?? CARD_ELEVATED_GLASS, borderColor: palette.borderSubtle ?? BORDER_SUBTLE }]}>
-                <Text style={styles.statLabel}>Total sales</Text>
-                <Text
-                  style={styles.statValue}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.65}
-                >
-                  {data ? formatCents(totalSales) : '—'}
-                </Text>
-              </View>
-              <View style={[styles.statTile, isTablet && styles.statTileTablet]}>
-                <Text style={styles.statLabel}>Orders</Text>
-                <Text
-                  style={styles.statValue}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.65}
-                >
-                  {data ? orderCount : '—'}
-                </Text>
-              </View>
-              <View style={[styles.statTile, isTablet && styles.statTileTablet]}>
-                <Text style={styles.statLabel}>{range === 'live' ? 'Online now' : 'Visitors'}</Text>
-                <Text
-                  style={styles.statValue}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.65}
-                >
-                  {data ? visitorCount : '—'}
-                </Text>
-              </View>
-              <View style={[styles.statTile, isTablet && styles.statTileTablet]}>
-                <Text style={styles.statLabel}>Available</Text>
-                <Text
-                  style={styles.statValue}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.65}
-                >
-                  {financeLoading ? '—' : financeBalance?.available.formatted ?? '$0.00'}
-                </Text>
-              </View>
-            </View>
+            <SellerMetricCarousel pages={metricPages} theme={theme} onOpenPage={nav} />
           )}
-
-          <View style={styles.balanceSummary}>
-            <View style={styles.balanceLine}>
-              <Text style={styles.balanceLabel}>Pending Balance</Text>
-              <Text style={styles.balanceValue}>
-                {financeLoading ? '—' : financeBalance?.pending.formatted ?? '$0.00'}
-              </Text>
-            </View>
-          </View>
 
           {/* Cash-out CTA — flush to bottom of stats card */}
           {data && !loading && (
@@ -803,12 +782,6 @@ const styles = StyleSheet.create({
     backgroundColor: SELLER_DASHBOARD_GLASS,
     overflow: 'hidden',
   },
-  statGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SP.sm,
-    padding: SP.sm,
-  },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -825,57 +798,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     flex: 1,
   },
-  statTile: {
-    width: '48%',
-    minHeight: 82,
-    justifyContent: 'space-between',
-    padding: SP.md,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: BORDER_SUBTLE,
-    backgroundColor: CARD_ELEVATED_GLASS,
-  },
-  statTileTablet: {
-    width: '23.5%',
-  },
-  statLabel: {
-    color: MUTED,
-    fontFamily: FONT.medium,
-    fontSize: FS.xs,
-    letterSpacing: 0.2,
-  },
-  statValue: {
-    color: FG,
-    fontFamily: FONT.bold,
-    fontSize: FS.xxl,
-    letterSpacing: -0.5,
-    marginTop: SP.sm,
-    width: '100%',
-  },
-
-  balanceSummary: {
-    paddingHorizontal: SP.md,
-    paddingTop: SP.xs,
-    paddingBottom: SP.md,
-    gap: SP.sm,
-  },
-  balanceLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: SP.md,
-  },
-  balanceLabel: {
-    color: MUTED,
-    fontFamily: FONT.medium,
-    fontSize: FS.sm,
-  },
-  balanceValue: {
-    color: FG,
-    fontFamily: FONT.semibold,
-    fontSize: FS.sm,
-  },
-
   // ── Cash-out button
   dashboardButton: {
     marginHorizontal: SP.md,

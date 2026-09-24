@@ -25,19 +25,25 @@ describe('seller home dashboard data contract', () => {
     expect(source).toContain("Couldn’t refresh your sales. Pull to refresh.");
   });
 
-  it('uses the Dashboard title and an even KPI tile grid that scales large values', () => {
+  it('uses the Dashboard title and a swipeable metric carousel instead of a KPI grid', () => {
     expect(source).toMatch(/<Text style=\{\[styles\.screenTitle,[\s\S]*?\}>Dashboard<\/Text>/);
-    expect(source).toContain("flexWrap: 'wrap'");
-    expect(source).toContain("width: '48%'");
-    expect(source.match(/adjustsFontSizeToFit/g)?.length).toBeGreaterThanOrEqual(4);
-    expect(source.match(/numberOfLines=\{1\}/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(source).toContain('<SellerMetricCarousel');
+    expect(source).not.toContain('styles.statGrid');
+    expect(source).not.toContain("width: '48%'");
   });
 
-  it('shows pending and cash-outable balances as inline rows under Visitors', () => {
-    expect(source).toContain('Pending Balance');
-    expect(source).toContain('Available Balance');
-    expect(source).toContain('styles.balanceLine');
-    expect(source).not.toContain('View full analytics');
+  it('gives every metric page real data: a value, and (except balances) a real previous-period comparison and sparkline', () => {
+    expect(source).toContain("label: 'Total sales'");
+    expect(source).toContain('previousValue: data.previous.totalCents');
+    expect(source).toContain('spark: data.buckets.map((b) => b.totalCents)');
+    expect(source).toContain("label: 'Orders'");
+    expect(source).toContain('previousValue: data.previous.orderCount');
+    expect(source).toContain("label: 'Available balance'");
+    expect(source).toContain("label: 'Pending balance'");
+    // Balances are a snapshot, not a period sum — no fabricated comparison or sparkline.
+    const availablePage = source.slice(source.indexOf("key: 'available'"), source.indexOf("key: 'pending'"));
+    expect(availablePage).not.toContain('previousValue');
+    expect(availablePage).not.toContain('spark:');
   });
 
   it('confirms and idempotently requests a real owner-only cash out', () => {

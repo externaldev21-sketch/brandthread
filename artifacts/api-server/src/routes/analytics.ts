@@ -3,7 +3,7 @@ import { db, orders, customers, productVariants, drops, products, orderItems, us
 import { sql, gte, lt, and, eq } from "drizzle-orm";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { buildCustomerAnalyticsResponse } from "./analyticsCustomers";
-import { DAY_MS, TEN_MIN_MS, floorToLocalStep, parseTzOffsetMinutes } from "../lib/analyticsTime";
+import { DAY_MS, TEN_MIN_MS, floorToLocalStep, parseTzOffsetMinutes, previousPeriod } from "../lib/analyticsTime";
 
 const router = Router();
 router.use(requireAuth);
@@ -132,7 +132,12 @@ router.get("/home", async (req, res) => {
   const end = range === "live" ? liveEnd : range === "yesterday" ? today : range === "week" ? tomorrow : tomorrow;
   const step = range === "live" ? "10 minutes" : range === "week" ? "1 day" : "4 hours";
 
-  const [salesRow, visitorRow, fulfillRow, captureRow] = await Promise.all([
+  // The immediately preceding period of the same length — e.g. yesterday for
+  // "today", the prior week for "this week" — so the metric cards can show a
+  // real period-over-period change instead of a fabricated one.
+  const { start: previousStart, end: previousEnd } = previousPeriod(start, end);
+
+  const [salesRow, visitorRow, fulfillRow, captureRow, previousSalesRow, previousVisitorRow] = await Promise.all([
     db.select({
       totalCents: sql<number>`coalesce(sum(${orders.totalCents}), 0)::int`,
       orderCount: sql<number>`count(*)::int`,
@@ -159,26 +164,63 @@ router.get("/home", async (req, res) => {
       sql`${orders.stripePaymentIntentId} IS NOT NULL`,
       sql`${orders.paidAt} IS NULL`,
     )),
+    db.select({
+      totalCents: sql<number>`coalesce(sum(${orders.totalCents}), 0)::int`,
+      orderCount: sql<number>`count(*)::int`,
+    }).from(orders).where(and(
+      eq(orders.ownerId, ownerId),
+      gte(orders.createdAt, previousStart),
+      lt(orders.createdAt, previousEnd),
+      sql`${orders.status} != 'cancelled'`,
+      sql`${orders.paidAt} IS NOT NULL`,
+    )),
+    db.select({ count: sql<number>`count(*)::int` }).from(storefrontVisits).where(and(
+      eq(storefrontVisits.sellerId, ownerId),
+      gte(storefrontVisits.createdAt, previousStart),
+      lt(storefrontVisits.createdAt, previousEnd),
+    )),
   ]);
 
-  const bucketRows = await db.execute(sql`
-    SELECT series.bucket,
-           coalesce(sum(o.total_cents), 0)::int AS total_cents,
-           count(o.id)::int AS order_count
-    FROM generate_series(
-      ${start}::timestamp,
-      ${end}::timestamp - ${sql.raw(`interval '${step}'`)},
-      ${sql.raw(`interval '${step}'`)}
-    ) AS series(bucket)
-    LEFT JOIN orders o
-      ON o.owner_id = ${ownerId}
-      AND o.created_at >= series.bucket
-      AND o.created_at < series.bucket + ${sql.raw(`interval '${step}'`)}
-      AND o.status != 'cancelled'
-      AND o.paid_at IS NOT NULL
-    GROUP BY series.bucket
-    ORDER BY series.bucket
-  `);
+  const [bucketRows, visitorBucketRows] = await Promise.all([
+    db.execute(sql`
+      SELECT series.bucket,
+             coalesce(sum(o.total_cents), 0)::int AS total_cents,
+             count(o.id)::int AS order_count
+      FROM generate_series(
+        ${start}::timestamp,
+        ${end}::timestamp - ${sql.raw(`interval '${step}'`)},
+        ${sql.raw(`interval '${step}'`)}
+      ) AS series(bucket)
+      LEFT JOIN orders o
+        ON o.owner_id = ${ownerId}
+        AND o.created_at >= series.bucket
+        AND o.created_at < series.bucket + ${sql.raw(`interval '${step}'`)}
+        AND o.status != 'cancelled'
+        AND o.paid_at IS NOT NULL
+      GROUP BY series.bucket
+      ORDER BY series.bucket
+    `),
+    db.execute(sql`
+      SELECT series.bucket,
+             count(v.id)::int AS visitor_count
+      FROM generate_series(
+        ${start}::timestamp,
+        ${end}::timestamp - ${sql.raw(`interval '${step}'`)},
+        ${sql.raw(`interval '${step}'`)}
+      ) AS series(bucket)
+      LEFT JOIN storefront_visits v
+        ON v.seller_id = ${ownerId}
+        AND v.created_at >= series.bucket
+        AND v.created_at < series.bucket + ${sql.raw(`interval '${step}'`)}
+      GROUP BY series.bucket
+      ORDER BY series.bucket
+    `),
+  ]);
+
+  const visitorCountByBucket = new Map<string, number>();
+  for (const row of (visitorBucketRows as any).rows ?? []) {
+    visitorCountByBucket.set(String(row.bucket), Number(row.visitor_count ?? 0));
+  }
 
   res.json({
     range,
@@ -187,10 +229,20 @@ router.get("/home", async (req, res) => {
     visitorCount: visitorRow[0]?.count ?? 0,
     toFulfill: fulfillRow[0]?.count ?? 0,
     toCapture: captureRow[0]?.count ?? 0,
+    // Real period-over-period comparison (e.g. today vs yesterday). Balances
+    // have no equivalent — they're a point-in-time snapshot, not a period sum
+    // — so there is deliberately no "previous" figure for them anywhere in
+    // this response.
+    previous: {
+      totalCents: previousSalesRow[0]?.totalCents ?? 0,
+      orderCount: previousSalesRow[0]?.orderCount ?? 0,
+      visitorCount: previousVisitorRow[0]?.count ?? 0,
+    },
     buckets: ((bucketRows as any).rows ?? []).map((row: any) => ({
       bucket: row.bucket,
       totalCents: Number(row.total_cents ?? 0),
       orderCount: Number(row.order_count ?? 0),
+      visitorCount: visitorCountByBucket.get(String(row.bucket)) ?? 0,
     })),
   });
 });

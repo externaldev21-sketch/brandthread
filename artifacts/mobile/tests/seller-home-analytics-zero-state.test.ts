@@ -15,6 +15,7 @@ describe('zeroSellerHomeAnalytics', () => {
       visitorCount: 0,
       toFulfill: 0,
       toCapture: 0,
+      previous: { totalCents: 0, orderCount: 0, visitorCount: 0 },
       buckets: [],
     });
   });
@@ -31,7 +32,10 @@ describe('selectSellerHomeAnalytics', () => {
   });
 
   it('returns the snapshot only when its key matches the current seller and range exactly', () => {
-    const data = { range: 'today', totalCents: 500, orderCount: 2, visitorCount: 10, toFulfill: 1, toCapture: 0, buckets: [] };
+    const data = {
+      range: 'today', totalCents: 500, orderCount: 2, visitorCount: 10, toFulfill: 1, toCapture: 0,
+      previous: { totalCents: 300, orderCount: 1, visitorCount: 8 }, buckets: [],
+    };
     const snapshot = { key: sellerHomeAnalyticsKey('seller_1', 'today'), data };
     expect(selectSellerHomeAnalytics(snapshot, 'seller_1', 'today')).toEqual(data);
     // Stale snapshot for a different range must not leak into the new range's view.

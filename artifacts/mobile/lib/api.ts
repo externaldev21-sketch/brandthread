@@ -665,7 +665,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           visitorCount: number;
           toFulfill: number;
           toCapture: number;
-          buckets: Array<{ bucket: string; totalCents: number; orderCount: number }>;
+          // The immediately preceding period of the same length (e.g. yesterday
+          // for "today"). No equivalent exists for balances — those are a
+          // point-in-time snapshot, not a period sum.
+          previous: { totalCents: number; orderCount: number; visitorCount: number };
+          buckets: Array<{ bucket: string; totalCents: number; orderCount: number; visitorCount: number }>;
           // `tz` is minutes east of UTC (-Date#getTimezoneOffset()) so day/hour
           // buckets land on the seller's local calendar day, not the server's.
         }>(`/api/analytics/home?range=${range}&tz=${-new Date().getTimezoneOffset()}`),
