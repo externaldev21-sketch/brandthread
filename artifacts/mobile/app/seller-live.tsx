@@ -52,7 +52,7 @@ function SellerLiveNativeScreen() {
   const s = React.useMemo(() => makeStyles(theme), [theme]);
   const params = useLocalSearchParams<{
     streamId: string; channelName: string; agoraUid: string;
-    agoraAppId: string; token: string; title: string;
+    agoraAppId: string; token: string; title: string; facing?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -94,6 +94,11 @@ function SellerLiveNativeScreen() {
       engine.setChannelProfile(ChannelProfileType.ChannelProfileLiveBroadcasting);
       engine.setClientRole(ClientRoleType.ClientRoleBroadcaster);
       engine.enableVideo();
+      // Agora's local preview starts on the rear camera; match whichever
+      // camera the go-live setup screen was already previewing on.
+      if (params.facing === 'front') {
+        try { engine.switchCamera(); } catch {}
+      }
       engine.startPreview();
       engine.registerEventHandler({
         onJoinChannelSuccess: () => setAgoraReady(true),
