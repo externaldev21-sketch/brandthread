@@ -11,6 +11,7 @@ import {
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -391,14 +392,14 @@ export default function DateRangePicker({ visible, current, onApply, onClose }: 
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType="fade"
       onRequestClose={onClose}
     >
       {/* Backdrop */}
       <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
 
       {/* Sheet */}
-      <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <SheetRise style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {/* Handle */}
         <View style={[styles.handle, { backgroundColor: colors.border }]} />
 
@@ -497,7 +498,7 @@ export default function DateRangePicker({ visible, current, onApply, onClose }: 
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </SheetRise>
     </Modal>
   );
 }

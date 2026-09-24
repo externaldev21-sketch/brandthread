@@ -24,6 +24,7 @@ import {
 } from '@/components/BrandthreadUI';
 import { getMenus, updateMenu } from '@/services/storeService';
 import { StoreMenu, StoreMenuItem, MenuType, MenuItemTarget } from '@/services/storeTypes';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 const MENU_TABS: { type: MenuType; label: string }[] = [
   { type: 'main', label: 'Main Menu' },
@@ -387,12 +388,12 @@ export default function StoreNavScreen() {
       {/* Item Editor Modal */}
       <Modal
         visible={modalVisible}
-        animationType="slide"
+        animationType="fade"
         transparent
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + SP.md }]}>
+          <SheetRise style={[styles.modalSheet, { paddingBottom: insets.bottom + SP.md }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Menu Item</Text>
               <TouchableOpacity
@@ -501,7 +502,7 @@ export default function StoreNavScreen() {
                 style={{ marginTop: SP.md }}
               />
             </ScrollView>
-          </View>
+          </SheetRise>
         </View>
       </Modal>
     </View>

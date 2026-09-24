@@ -59,6 +59,7 @@ import { ThreadShareSheet } from '@/components/ThreadShareSheet';
 import { shouldAnimateCartSuccess } from '@/lib/cartFlight';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { BuyerNavIcon } from '@/components/buyer-nav/BuyerNavIcon';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 const THREAD_PAGE_SIZE = 30;
 
@@ -2099,7 +2100,7 @@ export default function FeedScreen({
           this hardcoded fake sheet — see the bell button's onPress above. */}
       <Modal
         visible={showRepostEducation}
-        animationType="slide"
+        animationType="fade"
         transparent
         statusBarTranslucent
         onRequestClose={() => setShowRepostEducation(false)}
@@ -2108,7 +2109,7 @@ export default function FeedScreen({
           <TouchableWithoutFeedback onPress={() => setShowRepostEducation(false)}>
             <View style={StyleSheet.absoluteFill} />
           </TouchableWithoutFeedback>
-          <View style={[styles.repostEducationSheet, { paddingBottom: Math.max(previewBottomInset, 16) }]}>
+          <SheetRise style={[styles.repostEducationSheet, { paddingBottom: Math.max(previewBottomInset, 16) }]}>
             <TouchableOpacity
               style={styles.repostEducationClose}
               onPress={() => setShowRepostEducation(false)}
@@ -2156,7 +2157,7 @@ export default function FeedScreen({
             >
               <Text style={[styles.repostEducationOkayText, { color: theme.onAccent }]}>OK</Text>
             </TouchableOpacity>
-          </View>
+          </SheetRise>
         </View>
       </Modal>
       {shopSelection && (

@@ -9,6 +9,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
 import { getLocations, getInventoryItems, getTransfer, getTransfers, createTransfer, shipTransfer, receiveTransfer } from '@/services/inventoryService';
 import { InventoryLocation, InventoryItem, InventoryTransfer, TransferStatus } from '@/services/inventoryTypes';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -687,9 +688,9 @@ export default function InventoryTransferScreen() {
       </ScrollView>
 
       {/* SOURCE LOCATION PICKER MODAL */}
-      <Modal visible={showSourcePicker} transparent animationType="slide">
+      <Modal visible={showSourcePicker} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
+          <SheetRise style={styles.modalSheet}>
             <View style={styles.modalTitleRow}>
               <Text style={styles.modalTitle}>Select Source</Text>
               <TouchableOpacity onPress={() => setShowSourcePicker(false)}>
@@ -712,14 +713,14 @@ export default function InventoryTransferScreen() {
               )}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
             />
-          </View>
+          </SheetRise>
         </View>
       </Modal>
 
       {/* DEST LOCATION PICKER MODAL */}
-      <Modal visible={showDestPicker} transparent animationType="slide">
+      <Modal visible={showDestPicker} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
+          <SheetRise style={styles.modalSheet}>
             <View style={styles.modalTitleRow}>
               <Text style={styles.modalTitle}>Select Destination</Text>
               <TouchableOpacity onPress={() => setShowDestPicker(false)}>
@@ -742,14 +743,14 @@ export default function InventoryTransferScreen() {
               )}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
             />
-          </View>
+          </SheetRise>
         </View>
       </Modal>
 
       {/* ITEM PICKER MODAL */}
-      <Modal visible={showItemPicker} transparent animationType="slide">
+      <Modal visible={showItemPicker} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
+          <SheetRise style={styles.modalSheet}>
             <View style={styles.modalTitleRow}>
               <Text style={styles.modalTitle}>Add Item</Text>
               <TouchableOpacity onPress={() => setShowItemPicker(false)}>
@@ -796,7 +797,7 @@ export default function InventoryTransferScreen() {
               }}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
             />
-          </View>
+          </SheetRise>
         </View>
       </Modal>
     </KeyboardAvoidingView>

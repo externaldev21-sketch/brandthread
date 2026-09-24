@@ -41,6 +41,7 @@ import type { TextOverlay } from '@/lib/videoEditing';
 import { TextOverlayEditor, OverlayChip } from '@/components/TextOverlayEditor';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
@@ -253,13 +254,13 @@ function DatePickerModal({ visible, initial, onConfirm, onClose, insets }: DateP
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="fade"
       transparent
       onRequestClose={onClose}
     >
       <View style={dps.overlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={[dps.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <SheetRise style={[dps.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           {/* Handle */}
           <View style={dps.handle} />
 
@@ -401,7 +402,7 @@ function DatePickerModal({ visible, initial, onConfirm, onClose, insets }: DateP
           >
             <Text style={dps.confirmText}>Confirm</Text>
           </TouchableOpacity>
-        </View>
+        </SheetRise>
       </View>
     </Modal>
   );

@@ -82,6 +82,7 @@ import {
 } from '@/lib/checkoutReadiness';
 import { CheckoutSkeleton, HapticSwitch } from '@/components/BrandthreadUI';
 import { AddressAutocompleteInput } from '@/components/AddressAutocompleteInput';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -198,9 +199,9 @@ function ReceiptSheet({
   const insets = useSafeAreaInsets();
   if (!visible) return null;
   return (
-    <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
       <TouchableOpacity style={s.sheetBackdrop} activeOpacity={1} onPress={onClose} accessibilityLabel="Close receipt" />
-      <View style={[s.sheetContainer, { paddingBottom: insets.bottom + SP.md }]}>
+      <SheetRise style={[s.sheetContainer, { paddingBottom: insets.bottom + SP.md }]}>
         <View style={s.sheetHandle} />
         <View style={s.sheetHeaderRow}>
           <Text style={s.sheetTitle}>Order summary</Text>
@@ -260,7 +261,7 @@ function ReceiptSheet({
             Final amount confirmed by Stripe Checkout. Tax calculated at payment.
           </Text>
         </ScrollView>
-      </View>
+      </SheetRise>
     </Modal>
   );
 }

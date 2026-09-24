@@ -39,6 +39,7 @@ import { apiErrorMessage, confirmBlock, confirmUnblock, reportHref } from '@/lib
 import { BlockedComposer, type DmMessagingState } from '@/components/safety/DmSafety';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1089,11 +1090,11 @@ export default function BuyerConversationScreen() {
       <Modal
         visible={showMediaSheet}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowMediaSheet(false)}
       >
         <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowMediaSheet(false)} />
-        <View style={s.mediaSheet}>
+        <SheetRise style={s.mediaSheet}>
           <View style={s.mediaSheetHandle} />
           <Text style={s.mediaSheetTitle}>Add to message</Text>
           <TouchableOpacity style={s.mediaSheetOption} onPress={handlePickPhoto}>
@@ -1111,7 +1112,7 @@ export default function BuyerConversationScreen() {
             </View>
           </TouchableOpacity>
           <View style={{ height: 20 }} />
-        </View>
+        </SheetRise>
       </Modal>
 
       <Modal

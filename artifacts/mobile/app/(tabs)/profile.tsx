@@ -17,6 +17,7 @@ import {
   BG, SCREEN_BG, CARD, BORDER, FG, MUTED, SUBTLE,
   FONT, FS, SP, RADIUS, ICON, SURFACE, ACCENT, ACCENT_LIGHT,
 } from '@/lib/theme';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 // ─── Profile data shape ──────────────────────────────────────────────────────
 
@@ -467,7 +468,7 @@ export default function ProfileScreen() {
       <Modal
         visible={profileEditorVisible}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={closeProfileEditor}
       >
         <KeyboardAvoidingView
@@ -480,7 +481,7 @@ export default function ProfileScreen() {
             onPress={closeProfileEditor}
             accessibilityLabel="Close profile editor"
           />
-          <View style={s.sheet}>
+          <SheetRise style={s.sheet}>
             <View style={s.sheetHandle} />
             <View style={s.sheetHeader}>
               <View>
@@ -548,7 +549,7 @@ export default function ProfileScreen() {
                 <Text style={[s.saveButtonText, { color: theme.accent }]}>{savingProfile ? 'Saving…' : 'Save changes'}</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </SheetRise>
         </KeyboardAvoidingView>
       </Modal>
     </>

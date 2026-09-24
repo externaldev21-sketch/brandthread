@@ -57,6 +57,7 @@ import DesignLayerCompositor from '@/components/DesignLayerCompositor';
 import { makeDurableUri } from '@/lib/imageUri';
 import { validateBtJson } from '@/lib/btLayerValidator';
 import { validateJsonByteLength } from '@/lib/fileValidator';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -559,9 +560,9 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
   const sheetBottom = Platform.OS === 'web' ? 34 : insets.bottom;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} testID="new-canvas-sheet">
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} testID="new-canvas-sheet">
       <Pressable style={sh.overlay} onPress={onClose} accessibilityLabel="Close new canvas sheet" />
-      <View style={[sh.sheet, { paddingBottom: sheetBottom + SP.lg }]}>
+      <SheetRise style={[sh.sheet, { paddingBottom: sheetBottom + SP.lg }]}>
         <View style={sh.handle} />
         <View style={sh.header}>
           <TouchableOpacity
@@ -778,7 +779,7 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
             </View>
           )}
         />
-      </View>
+      </SheetRise>
     </Modal>
   );
 }

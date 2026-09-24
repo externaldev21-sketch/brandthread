@@ -10,6 +10,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { FS } from '@/lib/theme';
 import { getProjects } from '@/services/designService';
 import { DesignProject } from '@/services/designTypes';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 const STUDIO_TOOLS = [
   { label: 'AI Clothing Mockups', icon: 'image' as const, desc: 'Generate photorealistic product mockups', badge: 'Popular' },
@@ -248,12 +249,12 @@ export default function AIStudioScreen() {
       {/* New canvas sheet */}
       <Modal
         visible={newCanvasVisible}
-        animationType="slide"
+        animationType="fade"
         transparent
         onRequestClose={() => setNewCanvasVisible(false)}
       >
         <View style={styles.sheetOverlay}>
-          <View style={styles.sheetCard}>
+          <SheetRise style={styles.sheetCard}>
             <TouchableOpacity style={styles.sheetCancel} activeOpacity={0.7} onPress={() => setNewCanvasVisible(false)}>
               <Text style={styles.sheetCancelText}>Cancel</Text>
             </TouchableOpacity>
@@ -289,7 +290,7 @@ export default function AIStudioScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
+          </SheetRise>
         </View>
       </Modal>
     </View>
