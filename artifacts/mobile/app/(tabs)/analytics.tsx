@@ -555,6 +555,7 @@ export default function AnalyticsScreen() {
           />
         }
       >
+        <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <Text style={styles.pageTitle}>Analytics</Text>
 
@@ -581,25 +582,29 @@ export default function AnalyticsScreen() {
           <Text style={styles.rangeNotice}>Detailed analytics for this range aren&apos;t available yet.</Text>
         )}
 
-        {/* ── Summary stats ──────────────────────────────────────────────── */}
+        {/* ── Summary stats (KPI tile row) ──────────────────────────────── */}
         <View style={styles.statsRow}>
           <StatCard label="Visits" value={rangeAvailable ? summary.visits.toLocaleString() : '—'} changePct={summary.visitsChangePct} colors={colors} />
           <StatCard label="Revenue" value={rangeAvailable ? displayRevenue : '—'} changePct={summary.revenueChangePct} featured colors={colors} />
           <StatCard label="Leads" value={summary.leads.toLocaleString()} changePct={summary.leadsChangePct} colors={colors} />
         </View>
 
-        {/* ── Daily revenue bar chart ────────────────────────────────────── */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Daily Revenue</Text>
-          <View style={{ marginTop: 12 }}>
-            <RevenueBarChart bars={bars} colors={colors} available={rangeAvailable} />
+        {/* ── Chart + traffic sources: side-by-side on iPad ──────────────── */}
+        <View style={isTablet ? styles.tabletRow : undefined}>
+          <View style={[styles.card, isTablet && styles.tabletRowItem]}>
+            <Text style={styles.cardTitle}>Daily Revenue</Text>
+            <View style={{ marginTop: 12 }}>
+              <RevenueBarChart bars={bars} colors={colors} available={rangeAvailable} />
+            </View>
+          </View>
+
+          <View style={isTablet && styles.tabletRowItem}>
+            <SourceCard sources={sources} colors={colors} />
           </View>
         </View>
 
-        {/* ── Traffic sources ────────────────────────────────────────────── */}
-        <SourceCard sources={sources} colors={colors} />
-
         <View style={{ height: 120 }} />
+        </ResponsiveContainer>
       </ScrollView>
 
     </View>
@@ -610,11 +615,15 @@ export default function AnalyticsScreen() {
 
 const styles = StyleSheet.create({
   scroll:       { flex: 1, backgroundColor: SCREEN_BG },
-  content:      { paddingHorizontal: 16 },
+  content:      {},
   loadWrap:     { flex: 1, backgroundColor: SCREEN_BG, alignItems: 'center', justifyContent: 'center', gap: 16 },
   loadText:     { color: MUTED, fontFamily: FONT.medium, fontSize: FS.sm },
 
   pageTitle:    { fontSize: 28, fontFamily: FONT.bold, color: FG, marginBottom: 16 },
+
+  // iPad 2-column layout (chart + traffic sources side by side)
+  tabletRow:     { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+  tabletRowItem: { flex: 1, minWidth: 0 },
 
   // Segmented
   segmented:    { flexDirection: 'row', backgroundColor: SURFACE, borderRadius: 12, borderWidth: 1, borderColor: BORDER, padding: 3, marginBottom: 14 },
