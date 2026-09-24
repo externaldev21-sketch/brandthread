@@ -6,6 +6,7 @@ import { Router } from "express";
 import { db, manufacturers, sellerQuoteRequests } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 
 const router = Router();
 router.use(requireAuth);
@@ -36,7 +37,10 @@ function serializeQuoteRequest(row: typeof sellerQuoteRequests.$inferSelect) {
 
 // GET /api/seller-hub/manufacturers
 // Public directory of active/verified manufacturers sellers can request quotes from.
-router.get("/manufacturers", async (_req, res) => {
+router.get("/manufacturers", async (req, res) => {
+  const page = parsePagination(req.query, { limit: 100 });
+  if (!page.success) return res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" });
+  const { limit, offset } = page.data;
   const rows = await db
     .select({
       id:               manufacturers.id,
@@ -53,9 +57,13 @@ router.get("/manufacturers", async (_req, res) => {
       verifiedAt:       manufacturers.verifiedAt,
     })
     .from(manufacturers)
-    .where(eq(manufacturers.status, "active"));
+    .where(eq(manufacturers.status, "active"))
+    .orderBy(desc(manufacturers.verifiedAt), manufacturers.id)
+    .limit(limit)
+    .offset(offset);
 
-  res.json(rows);
+  setPaginationHeaders(res, page.data, rows.length);
+  return res.json(rows);
 });
 
 // ─── Quote & Sample Requests ───────────────────────────────────────────────────
@@ -64,13 +72,19 @@ router.get("/manufacturers", async (_req, res) => {
 // List all quote/sample requests made by this seller.
 router.get("/quote-requests", async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
+  const page = parsePagination(req.query, { limit: 100 });
+  if (!page.success) return res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" });
+  const { limit, offset } = page.data;
   const rows = await db
     .select()
     .from(sellerQuoteRequests)
     .where(eq(sellerQuoteRequests.sellerId, sellerId))
-    .orderBy(desc(sellerQuoteRequests.createdAt));
+    .orderBy(desc(sellerQuoteRequests.createdAt))
+    .limit(limit)
+    .offset(offset);
 
-  res.json(rows.map(serializeQuoteRequest));
+  setPaginationHeaders(res, page.data, rows.length);
+  return res.json(rows.map(serializeQuoteRequest));
 });
 
 // POST /api/seller-hub/quote-requests
