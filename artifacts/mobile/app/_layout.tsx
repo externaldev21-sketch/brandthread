@@ -1124,15 +1124,17 @@ export default function RootLayout() {
   const [fontGateExpired, setFontGateExpired] = useState(false);
 
   useEffect(() => {
-    // Web previews can occasionally leave expo-font pending forever after a
-    // hot reload or a stale font cache. Never keep the entire application on
-    // the boot screen for a cosmetic resource; React Native will fall back to
-    // the system font until the Inter faces become available.
-    const timeout = setTimeout(() => setFontGateExpired(true), 2500);
+    // Last-resort safety net only: expo-font can occasionally hang (a stale
+    // font cache after a hot reload, a broken preview). Everywhere else, the
+    // app waits for the real Inter faces so text never renders in a system
+    // fallback font — a swap that reads as "blurry" since the fallback's
+    // metrics and hinting don't match the app's type scale. This should
+    // essentially never fire in normal use.
+    const timeout = setTimeout(() => setFontGateExpired(true), 8000);
     return () => clearTimeout(timeout);
   }, []);
 
-  const appReady = Platform.OS === 'web' || fontsLoaded || !!fontError || fontGateExpired;
+  const appReady = fontsLoaded || !!fontError || fontGateExpired;
 
   const appTree = (
     <SafeAreaProvider>

@@ -61,7 +61,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   card: {},
   media: { borderRadius: 18, overflow: 'hidden', justifyContent: 'flex-end' },
   fallback: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: `${theme.background}24` },
-  fallbackInitials: { color: theme.onAccent, fontSize: 36, fontFamily: 'Inter_700Bold', opacity: 0.9 },
+  fallbackInitials: { color: theme.onAccent, fontSize: 36, fontFamily: 'Inter_700Bold' },
   fallbackLine: { width: 42, height: 2, borderRadius: 1, backgroundColor: `${theme.onAccent}8A`, marginTop: 10 },
   priceChip: { alignSelf: 'flex-start', backgroundColor: `${theme.background}C7`, borderRadius: 12, paddingHorizontal: 9, paddingVertical: 6, margin: 9 },
   priceText: { color: theme.text, fontSize: 12, fontFamily: 'Inter_700Bold' },
