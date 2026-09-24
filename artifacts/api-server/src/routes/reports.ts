@@ -15,6 +15,7 @@ import { Router } from "express";
 import { conversationParticipants, conversations, db, messageReports, reports } from "@workspace/db";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { requireAuth, requireModerator } from "../middlewares/requireAuth";
+import { rateLimit } from "../middlewares/rateLimit";
 import {
   REPORT_REASONS,
   REPORT_TARGET_TYPES,
@@ -34,7 +35,7 @@ function serializeReportForClient(report: typeof reports.$inferSelect) {
 }
 
 // POST /api/reports
-router.post("/", async (req, res) => {
+router.post("/", rateLimit("report"), async (req, res) => {
   const reporterId = (req as any).clerkUserId as string;
   const body = (req.body ?? {}) as {
     targetType?: unknown; targetId?: unknown; reason?: unknown;

@@ -1590,9 +1590,24 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       }) => post<any>('/api/social/stories', body),
       /** My active stories */
       myStories: () => get<any[]>('/api/social/stories/me'),
-      /** Another user's active stories — visible to all viewers */
+      /** Another user's active stories — visible to that author's followers only */
       storiesForUser: (userId: string) =>
         get<any[]>(`/api/social/stories/user/${encodeURIComponent(userId)}`),
+      /** Stories tray: one entry per followed author (+ me), grouped, with a seen flag */
+      storiesFollowing: () =>
+        get<Array<{
+          authorId: string; authorName: string; authorHandle: string;
+          authorInitials: string; authorColor: string; authorAccountType: string;
+          isMe: boolean; storyIds: string[]; seen: boolean; latestCreatedAt: number;
+        }>>('/api/social/stories/following'),
+      /** Who has viewed my story (author only) */
+      storyViewers: (storyId: string) =>
+        get<Array<{ userId: string; name: string; handle: string; initials: string; avatarUrl: string | null; viewedAt: string }>>(
+          `/api/social/stories/${encodeURIComponent(storyId)}/viewers`,
+        ),
+      /** Delete my own story before it expires */
+      deleteStory: (storyId: string) =>
+        del<{ id: string; deleted: boolean }>(`/api/social/stories/${encodeURIComponent(storyId)}`),
       /** Toggle like on a story */
       likeStory: (storyId: string) =>
         post<{ liked: boolean; likesCount: number }>(`/api/social/stories/${encodeURIComponent(storyId)}/like`, {}),

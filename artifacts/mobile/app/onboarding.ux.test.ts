@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { BUYER_STEP_INDEX, SELLER_STEP_INDEX, DRAFT_VERSION } from "../lib/onboardingFlow";
 
 const source = readFileSync(path.resolve(__dirname, "./onboarding.tsx"), "utf8");
 
@@ -33,12 +34,27 @@ describe("seller pre-plan experience", () => {
   });
 });
 
-describe("v6 step order: AccountType first, then path-specific auth", () => {
-  it("ACCOUNT_TYPE is step 0 for both flows", () => {
-    // Buyer
-    expect(source).toContain("ACCOUNT_TYPE: 0,");
-    // AUTH is step 1 (not 0)
-    expect(source).toContain("AUTH: 1,");
+describe("v7 step order: Welcome opener, then AccountType, then path-specific auth", () => {
+  it("Welcome is step 0, AccountType step 1, Auth step 2 for both flows", () => {
+    expect(BUYER_STEP_INDEX.WELCOME).toBe(0);
+    expect(BUYER_STEP_INDEX.ACCOUNT_TYPE).toBe(1);
+    expect(BUYER_STEP_INDEX.AUTH).toBe(2);
+    expect(SELLER_STEP_INDEX.WELCOME).toBe(0);
+    expect(SELLER_STEP_INDEX.ACCOUNT_TYPE).toBe(1);
+    expect(SELLER_STEP_INDEX.AUTH).toBe(2);
+  });
+
+  it("renders the cinematic Welcome opener before AccountType", () => {
+    expect(source).toContain("import { WelcomeStep } from '@/components/onboarding/WelcomeStep'");
+    expect(source).toContain("step === BUYER_STEP_INDEX.WELCOME");
+    expect(source).toContain("onGetStarted={() => transitionTo(BUYER_STEP_INDEX.ACCOUNT_TYPE, 1)}");
+  });
+
+  it("buyer flow inserts a Brands-to-follow step after Style, before Loading", () => {
+    expect(BUYER_STEP_INDEX.STYLE).toBeLessThan(BUYER_STEP_INDEX.BRANDS);
+    expect(BUYER_STEP_INDEX.BRANDS).toBeLessThan(BUYER_STEP_INDEX.LOADING);
+    expect(source).toContain("step === BUYER_STEP_INDEX.BRANDS");
+    expect(source).toContain("<BrandsToFollowStep");
   });
 
   it("buyer flows through AccountType → BuyerAuth → Name → Style", () => {
@@ -60,9 +76,10 @@ describe("v6 step order: AccountType first, then path-specific auth", () => {
     expect(source).toContain("step === SELLER_STEP_INDEX.BRAND_NAME");
   });
 
-  it("draft version is 6 and migrates v5 drafts correctly", () => {
-    expect(source).toContain("DRAFT_VERSION = 6");
-    expect(source).toContain("version === 5");
+  it("draft version is 7 and onboarding.tsx defers migration to lib/onboardingFlow.ts", () => {
+    expect(DRAFT_VERSION).toBe(7);
+    expect(source).toContain("restoreDraftStep(draft.flow, draft.step ?? 0, draft.version)");
+    expect(source).toContain("from '@/lib/onboardingFlow'");
   });
 
   it("seller auth has confirm password validation", () => {

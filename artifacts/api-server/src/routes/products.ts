@@ -9,6 +9,7 @@ import { canRestoreProduct, PRODUCT_DELETE_RECOVERY_WINDOW_MS } from "../lib/pro
 import { getVerifiedPlanAccess, sendPlanLimitReached, sendPlanLookupUnavailable } from "../lib/planAccess";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { notifyNewProduct } from "../lib/activityEvents";
+import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import { notifyBackInStock, notifyPriceDrop, notifyStockLevelChanged } from "../lib/stockNotifications";
 
 const router = Router();
@@ -104,8 +105,14 @@ router.post(
 );
 
 // GET /api/products — scoped to the authenticated user's brand
+// Query params: ?limit=&offset= (default 100, capped at MAX_PAGE_LIMIT) — a
+// long-lived seller's full catalog was previously loaded unbounded on every
+// dashboard visit.
 router.get("/", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
+  const page = parsePagination(req.query, { limit: 100 });
+  if (!page.success) return res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" });
+  const { limit, offset } = page.data;
   const rows = await db
     .select({
       id: products.id,
@@ -124,8 +131,11 @@ router.get("/", async (req, res) => {
     .leftJoin(productVariants, eq(productVariants.productId, products.id))
     .where(and(eq(products.ownerId, ownerId), isNull(products.deletedAt)))
     .groupBy(products.id)
-    .orderBy(desc(products.createdAt));
-  res.json(rows);
+    .orderBy(desc(products.createdAt))
+    .limit(limit)
+    .offset(offset);
+  setPaginationHeaders(res, page.data, rows.length);
+  return res.json(rows);
 });
 
 // POST /api/products (manager+)

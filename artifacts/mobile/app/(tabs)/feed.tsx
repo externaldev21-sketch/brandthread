@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
-  Animated, TextInput, Modal,
+  Animated, TextInput, Modal, Pressable, PanResponder,
   AccessibilityInfo, Platform, ScrollView, RefreshControl, ActivityIndicator, KeyboardAvoidingView, Image,
   useWindowDimensions,
 } from 'react-native';
@@ -49,6 +49,8 @@ import {
 } from '@/components/CommerceSignal';
 import { ShopProductSheet } from '@/components/ShopProductSheet';
 import type { ShopSheetSelection } from '@/components/ShopProductSheet';
+import { FeedGestureGuide } from '@/components/FeedGestureGuide';
+import { hasSeenFeedGestureGuide, markFeedGestureGuideSeen } from '@/lib/feedGestureGuideStorage';
 import type { BuyerProduct } from '@/services/cartTypes';
 import { getCart } from '@/services/cartService';
 import {
@@ -267,7 +269,7 @@ interface SpotlightItem {
   // Optional fields present on real seller posts
   productId?: string;
   sellerId?: string;
-  productTags?: { productId: string; productName: string; priceCents: number }[];
+  productTags?: { productId: string; productName: string; priceCents: number; imageUri?: string }[];
   /** Authoritative comment count from the server (preferred over local comments array length) */
   commentsCount?: number;
 }
@@ -737,6 +739,92 @@ const DEFAULT_ENGAGEMENT: EngagementState = {
 
 // ─── Full-screen media page ───────────────────────────────────────────────────
 
+/** mm:ss (or h:mm:ss past an hour) for the scrub bubble. */
+function formatPlaybackTime(totalSeconds: number): string {
+  const s = Math.max(0, Math.round(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const mm = h > 0 ? String(m).padStart(2, '0') : String(m);
+  return h > 0 ? `${h}:${mm}:${String(sec).padStart(2, '0')}` : `${mm}:${String(sec).padStart(2, '0')}`;
+}
+
+/** Scrubbable playback bar: tap/drag to seek, thickens while dragging, shows
+ * a time bubble, and gives haptic feedback on grab and release. */
+function ScrubProgressBar({
+  player, progress, bottom,
+}: {
+  player: ReturnType<typeof useVideoPlayer>;
+  progress: number;
+  bottom: number;
+}) {
+  const [dragging, setDragging] = useState(false);
+  const [dragProgress, setDragProgress] = useState(progress);
+  const [trackWidth, setTrackWidth] = useState(0);
+  const thickness = useRef(new Animated.Value(2)).current;
+  const trackWidthRef = useRef(0);
+
+  useEffect(() => { trackWidthRef.current = trackWidth; }, [trackWidth]);
+  useEffect(() => { if (!dragging) setDragProgress(progress); }, [progress, dragging]);
+
+  const seekToLocationX = useRef((x: number) => {
+    const width = trackWidthRef.current;
+    if (width <= 0) return;
+    const fraction = Math.min(1, Math.max(0, x / width));
+    setDragProgress(fraction);
+    const duration = player.duration;
+    if (duration > 0) player.currentTime = fraction * duration;
+  }).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        setDragging(true);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        Animated.timing(thickness, { toValue: 6, duration: 120, useNativeDriver: false }).start();
+        seekToLocationX(evt.nativeEvent.locationX);
+      },
+      onPanResponderMove: (evt) => {
+        seekToLocationX(evt.nativeEvent.locationX);
+      },
+      onPanResponderRelease: () => {
+        setDragging(false);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        Animated.timing(thickness, { toValue: 2, duration: 150, useNativeDriver: false }).start();
+      },
+      onPanResponderTerminate: () => {
+        setDragging(false);
+        Animated.timing(thickness, { toValue: 2, duration: 150, useNativeDriver: false }).start();
+      },
+    }),
+  ).current;
+
+  const shown = dragging ? dragProgress : progress;
+  const bubbleLeft = trackWidth > 0 ? Math.min(Math.max(shown * trackWidth - 20, 0), Math.max(trackWidth - 40, 0)) : 0;
+
+  return (
+    <View
+      style={[styles.progressHitArea, { bottom: bottom - 13 }]}
+      onLayout={e => setTrackWidth(e.nativeEvent.layout.width)}
+      {...panResponder.panHandlers}
+      accessibilityRole="adjustable"
+      accessibilityLabel="Video progress"
+      accessibilityValue={{ min: 0, max: 100, now: Math.round(shown * 100) }}
+    >
+      {dragging && (
+        <View style={[styles.scrubBubble, { left: bubbleLeft }]} pointerEvents="none">
+          <Text style={styles.scrubBubbleText}>{formatPlaybackTime(shown * (player.duration || 0))}</Text>
+        </View>
+      )}
+      <Animated.View style={[styles.progressTrack, { height: thickness }]}>
+        <View style={[styles.progressFill, { width: `${shown * 100}%` }]} />
+      </Animated.View>
+    </View>
+  );
+}
+
 function VideoVisual({
   source,
   isActive,
@@ -747,6 +835,7 @@ function VideoVisual({
   immersive = false,
   progressBottom,
   pageAspect = 9 / 16,
+  rate = 1,
   pageWidth,
   pageHeight,
   bottomStripHeight = 0,
@@ -763,6 +852,8 @@ function VideoVisual({
   progressBottom?: number;
   /** Width / height of the page the clip is shown in. */
   pageAspect?: number;
+  /** Playback rate — 2 while the right side of the video is pressed and held. */
+  rate?: number;
   /** Page pixel size — needed to clip the sharp frame above the tab bar. */
   pageWidth?: number;
   pageHeight?: number;
@@ -811,6 +902,9 @@ function VideoVisual({
     if (isActive && !paused) player.play();
     else player.pause();
   }, [isActive, paused, player]);
+  React.useEffect(() => {
+    player.playbackRate = rate;
+  }, [player, rate]);
 
   // The playable frame stops just above the floating tab bar instead of
   // playing sharp underneath it. A second mirror of the same player (cheap —
@@ -879,14 +973,7 @@ function VideoVisual({
         </View>
       )}
       {progressBottom != null && isActive && (
-        <View
-          style={[styles.progressTrack, { bottom: progressBottom }]}
-          accessibilityRole="progressbar"
-          accessibilityLabel="Video progress"
-          accessibilityValue={{ min: 0, max: 100, now: Math.round(progress * 100) }}
-        >
-          <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
-        </View>
+        <ScrubProgressBar player={player} progress={progress} bottom={progressBottom} />
       )}
     </>
   );
@@ -918,6 +1005,69 @@ function PhotoVisual({ uris, pageWidth, pageHeight }: { uris: string[]; pageWidt
   );
 }
 
+// ─── Shop pill — compact glass trigger above the creator name ────────────────
+
+function ShopPill({
+  tag, extraCount, onPress,
+}: {
+  tag: SpotlightProductTag;
+  extraCount: number;
+  onPress: () => void;
+}) {
+  const shimmer = useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.delay(1400),
+        Animated.timing(shimmer, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.timing(shimmer, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [shimmer]);
+
+  return (
+    <TouchableOpacity
+      style={styles.shopPill}
+      activeOpacity={0.82}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Shop ${tag.productName}, ${formatCents(tag.priceCents)}`}
+    >
+      <BlurView intensity={38} tint="dark" style={StyleSheet.absoluteFill} />
+      <View style={styles.shopPillThumb}>
+        {tag.imageUri ? (
+          <CachedImage source={{ uri: tag.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+        ) : (
+          <Feather name="shopping-bag" size={13} color="#111111" />
+        )}
+      </View>
+      <Text style={styles.shopPillPrice} numberOfLines={1}>
+        {formatCents(tag.priceCents)}{extraCount > 0 ? ` · +${extraCount}` : ''}
+      </Text>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.shopPillShimmer,
+          {
+            opacity: shimmer.interpolate({ inputRange: [0, 0.15, 0.85, 1], outputRange: [0, 0.55, 0.55, 0] }),
+            transform: [{ translateX: shimmer.interpolate({ inputRange: [0, 1], outputRange: [-90, 90] }) }],
+          },
+        ]}
+      >
+        <LinearGradient
+          colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.85)', 'rgba(255,255,255,0)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
+
 function SpotlightPage({
   item, isActive, pageWidth, pageHeight, bottomClearance, immersive = false, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag,
 }: {
@@ -935,19 +1085,28 @@ function SpotlightPage({
   onRepost: (id: string) => Promise<void>;
   onFollow: (id: string) => Promise<void>;
   onOpenComments: (id: string) => void;
-  onShopTag: (item: SpotlightItem, tag: { productId: string; productName: string; priceCents: number }) => void;
+  onShopTag: (item: SpotlightItem, tag: SpotlightProductTag) => void;
 }) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { push } = useThreadPull();
   const [paused, setPaused] = useState(false);
+  /** Pause while the buyer is holding down on the left/center of the video — distinct from the tap-to-toggle `paused` above, so releasing always resumes rather than fighting a manual pause. */
+  const [holdPaused, setHoldPaused] = useState(false);
+  /** 2x while holding the right side of the video. */
+  const [speedActive, setSpeedActive] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const { showToast } = useFeedToast();
   const heartBurst = useRef(new Animated.Value(0)).current;
   const heartScale = useRef(new Animated.Value(1)).current;
+  const speedPillOpacity = useRef(new Animated.Value(0)).current;
+  const repostSpin = useRef(new Animated.Value(0)).current;
+  const saveDrop = useRef(new Animated.Value(0)).current;
   const lastTap = useRef(0);
   const pauseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdTriggered = useRef(false);
   const friendReposts = item.friendReposts ?? [];
   const hasRepostIdentity = engagement?.reposted === true || friendReposts.length > 0;
   const repostLabel = engagement?.reposted
@@ -958,7 +1117,10 @@ function SpotlightPage({
       ? `${friendReposts[0].displayName} and ${friendReposts.length - 1} friend${friendReposts.length === 2 ? '' : 's'} reposted`
       : `${friendReposts[0]?.displayName ?? 'A friend'} reposted`;
 
-  React.useEffect(() => () => { if (pauseTimer.current) clearTimeout(pauseTimer.current); }, []);
+  React.useEffect(() => () => {
+    if (pauseTimer.current) clearTimeout(pauseTimer.current);
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+  }, []);
 
   function burstHeart() {
     heartBurst.setValue(1);
@@ -972,7 +1134,19 @@ function SpotlightPage({
     ]).start();
   }
 
-  function handlePress() {
+  /** Arrows spin/morph a full turn — repost toggled either way. */
+  function spinRepost() {
+    repostSpin.setValue(0);
+    Animated.timing(repostSpin, { toValue: 1, duration: 420, useNativeDriver: true }).start();
+  }
+
+  /** Bookmark lifts then drops/settles — save toggled either way. */
+  function dropSave() {
+    saveDrop.setValue(0);
+    Animated.timing(saveDrop, { toValue: 1, duration: 360, useNativeDriver: true }).start();
+  }
+
+  function handleQuickTap() {
     const now = Date.now();
     if (now - lastTap.current < 280) {
       lastTap.current = 0;
@@ -991,16 +1165,54 @@ function SpotlightPage({
     }
   }
 
+  /** Press and hold the right ~40% of the video = 2x speed with a small
+   * "2x" pill; holding anywhere else pauses. Releasing restores 1x / plays.
+   * A quick tap (release before the hold threshold) falls through to the
+   * existing single/double-tap handling above. */
+  function handlePressIn(evt: { nativeEvent: { locationX: number } }) {
+    holdTriggered.current = false;
+    const x = evt.nativeEvent.locationX;
+    holdTimer.current = setTimeout(() => {
+      holdTriggered.current = true;
+      // A tap already queued for "toggle pause" must not also fire once the hold resolves.
+      if (pauseTimer.current) { clearTimeout(pauseTimer.current); pauseTimer.current = null; }
+      lastTap.current = 0;
+      if (x > pageWidth * 0.6) {
+        setSpeedActive(true);
+        Animated.timing(speedPillOpacity, { toValue: 1, duration: 120, useNativeDriver: true }).start();
+      } else {
+        setHoldPaused(true);
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }, 250);
+  }
+
+  function handlePressOut() {
+    if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; }
+    if (holdTriggered.current) {
+      holdTriggered.current = false;
+      if (speedActive) {
+        setSpeedActive(false);
+        Animated.timing(speedPillOpacity, { toValue: 0, duration: 120, useNativeDriver: true }).start();
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+      if (holdPaused) setHoldPaused(false);
+      return;
+    }
+    handleQuickTap();
+  }
+
   return (
     <View style={{ width: pageWidth, height: pageHeight, backgroundColor: '#000' }}>
-      <TouchableWithoutFeedback onPress={handlePress}>
+      <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut}>
         <View style={StyleSheet.absoluteFill}>
           {item.contentType === 'video'
             ? (
               <VideoVisual
                 source={item.videoSource ?? item.mediaUris[0]}
                 isActive={isActive}
-                paused={paused}
+                paused={paused || holdPaused}
+                rate={speedActive ? 2 : 1}
                 muted={item.videoSource != null}
                 posterUri={item.videoPosterUri}
                 posterSource={item.videoPosterSource}
@@ -1027,8 +1239,19 @@ function SpotlightPage({
           >
             <Feather name="heart" size={110} color="#FFFFFF" />
           </Animated.View>
+          {item.contentType === 'video' && (
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.speedPill, { opacity: speedPillOpacity, transform: [{ scale: speedPillOpacity.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] }]}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            >
+              <Feather name="fast-forward" size={12} color="#FFFFFF" />
+              <Text style={styles.speedPillText}>2x</Text>
+            </Animated.View>
+          )}
         </View>
-      </TouchableWithoutFeedback>
+      </Pressable>
 
       {/* ─ Legibility scrims: header and bottom overlays stay readable over bright footage ─ */}
       {immersive && (
@@ -1047,33 +1270,14 @@ function SpotlightPage({
         </>
       )}
 
-      {/* ─ Product tags live on the media surface ─ */}
+      {/* ─ Shop pill — compact, sits above the creator name ─ */}
       {!!item.productTags?.length && (
         <View style={[styles.mediaTags, { bottom: bottomClearance + (hasRepostIdentity ? 148 : 112) }]} pointerEvents="box-none">
-          {item.productTags.slice(0, 1).map(tag => (
-            <TouchableOpacity
-              key={tag.productId}
-              style={styles.mediaTag}
-              activeOpacity={0.82}
-              onPress={() => onShopTag(item, tag)}
-              accessibilityRole="button"
-              accessibilityLabel={`Shop ${tag.productName} for ${formatCents(tag.priceCents)}`}
-            >
-              <View style={styles.mediaTagIcon}>
-                <Feather name="shopping-bag" size={19} color="#111111" />
-              </View>
-              <View style={styles.mediaTagCopy}>
-                <Text style={styles.mediaTagName} numberOfLines={1}>
-                  Shop · {tag.productName}
-                </Text>
-                <Text style={styles.mediaTagMeta} numberOfLines={1}>
-                  {formatCents(tag.priceCents)} · Creator pick
-                  {item.productTags!.length > 1 ? `s (${item.productTags!.length})` : ''}
-                </Text>
-              </View>
-              <Feather name="chevron-right" size={18} color="#FFFFFFCC" />
-            </TouchableOpacity>
-          ))}
+          <ShopPill
+            tag={item.productTags[0]}
+            extraCount={Math.max(0, item.productTags.length - 1)}
+            onPress={() => onShopTag(item, item.productTags![0])}
+          />
         </View>
       )}
 
@@ -1157,7 +1361,9 @@ function SpotlightPage({
           accessibilityLabel={`${engagement?.reposted ? 'Undo repost' : 'Repost'}, ${formatCount(engagement?.reposts ?? 0)} reposts`}
           accessibilityState={{ checked: engagement?.reposted ?? false }}
           style={styles.railActionContent}
+          rotateAnim={repostSpin}
           onPress={async () => {
+            spinRepost();
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             await onRepost(item.id);
           }}
@@ -1177,7 +1383,9 @@ function SpotlightPage({
           accessibilityLabel={`${engagement?.saved ? 'Unsave' : 'Save'}, ${formatCount(engagement?.saves ?? item.saves)} saves`}
           accessibilityState={{ checked: engagement?.saved ?? false }}
           style={styles.railActionContent}
+          translateYAnim={saveDrop}
           onPress={async () => {
+            dropSave();
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             await onSave(item.id);
           }}
@@ -1397,7 +1605,7 @@ export default function FeedScreen({
   // topBar's own paddingTop + paddingBottom, plus the buyerTopRow's height.
   // Single source of truth so BuyerHighDemandPage's content never renders
   // underneath it (see styles.topBar / styles.buyerTopRow below).
-  const buyerHeaderHeight = previewTopInset + 2 + 44 + 4;
+  const buyerHeaderHeight = Math.max(0, previewTopInset - 4) + 44 + 4;
   const buyerBarInset = useBuyerTabBarInset();
   const router = useRouter();
   const { userId } = useAuth();
@@ -1405,6 +1613,7 @@ export default function FeedScreen({
   const { showToast } = useFeedToast();
 
   const [engagements, setEngagements] = useState<Record<string, EngagementState>>({});
+  const [showGestureGuide, setShowGestureGuide] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const pageWidth = viewportSize.width || windowWidth;
@@ -1446,6 +1655,21 @@ export default function FeedScreen({
       subscription.remove();
     };
   }, []);
+
+  // First-time gesture coach — buyer home only, shown once per account.
+  useEffect(() => {
+    if (!isBuyerSurface) return;
+    let active = true;
+    void hasSeenFeedGestureGuide(userId).then(seen => {
+      if (active && !seen) setShowGestureGuide(true);
+    });
+    return () => { active = false; };
+  }, [isBuyerSurface, userId]);
+
+  const dismissGestureGuide = useCallback(() => {
+    setShowGestureGuide(false);
+    void markFeedGestureGuideSeen(userId);
+  }, [userId]);
 
   // Load published seller posts and subscribe to real-time changes
   const loadFeed = useCallback(async (initial = false) => {
@@ -1829,7 +2053,7 @@ export default function FeedScreen({
     router.push(('/buyer-post-comments?' + qs) as never);
   }
 
-  function handleShopTag(item: SpotlightItem, tag: { productId: string; productName: string; priceCents: number }) {
+  function handleShopTag(item: SpotlightItem, tag: SpotlightProductTag) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const allTags = (item.productTags ?? []).length > 0
       ? (item.productTags as Array<{ productId: string; productName: string; priceCents: number }>)
@@ -1892,6 +2116,14 @@ export default function FeedScreen({
         viewabilityConfig={viewabilityConfig}
         onEndReached={loadMoreFeed}
         onEndReachedThreshold={0.5}
+        // Bounds how many video players ever exist at once: the active
+        // page plus roughly the next/previous 2 stay mounted (poster-first,
+        // so they start instantly the moment they become active) — the
+        // rest are unmounted rather than left decoding off-screen.
+        initialNumToRender={3}
+        maxToRenderPerBatch={2}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS !== 'web'}
         getItemLayout={(_, index) => ({ length: pageHeight, offset: pageHeight * index, index })}
         refreshControl={
           <RefreshControl
@@ -1980,7 +2212,7 @@ export default function FeedScreen({
 
       {/* ─ Top bar overlay ─ */}
       {isBuyerSurface ? (
-        <View style={[styles.topBar, { paddingTop: previewTopInset + 2 }]} pointerEvents="box-none">
+        <View style={[styles.topBar, { paddingTop: Math.max(0, previewTopInset - 4) }]} pointerEvents="box-none">
           {/* Buyer Home: Friends · Following | For You · Cart. Search lives in the tab bar. */}
           <View style={styles.buyerTopRow}>
             <TouchableOpacity
@@ -1999,7 +2231,7 @@ export default function FeedScreen({
             <View style={styles.buyerFeedTabs}>
                 {([
                   ['following', 'Following'],
-                  ['for-you', 'For You'],
+                  ['for-you', 'Threads'],
                 ] as const).map(([key, label]) => (
                   <TouchableOpacity
                     key={key}
@@ -2118,7 +2350,7 @@ export default function FeedScreen({
           <View style={styles.feedTabs}>
             {([
               ['following', 'Following'],
-              ['for-you', 'For You'],
+              ['for-you', 'Threads'],
             ] as const).map(([key, label]) => (
               <TouchableOpacity
                 key={key}
@@ -2213,6 +2445,10 @@ export default function FeedScreen({
         />
       )}
 
+      {isBuyerSurface && (
+        <FeedGestureGuide visible={showGestureGuide} onDismiss={dismissGestureGuide} />
+      )}
+
     </View>
     </FeedToastProvider>
   );
@@ -2232,28 +2468,42 @@ const styles = StyleSheet.create({
   bottomBlurStrip: { position: 'absolute', left: 0, right: 0, bottom: 0, overflow: 'hidden' },
   topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0 },
-  progressTrack: {
-    position: 'absolute', left: 16, right: 16, height: 2, borderRadius: 1,
-    backgroundColor: 'rgba(255,255,255,0.22)', overflow: 'hidden',
+  progressHitArea: {
+    position: 'absolute', left: 16, right: 16, height: 28, justifyContent: 'center',
   },
-  progressFill: { height: 2, borderRadius: 1, backgroundColor: 'rgba(255,255,255,0.92)' },
+  progressTrack: {
+    borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.22)', overflow: 'hidden',
+  },
+  progressFill: { height: '100%', borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.92)' },
+  scrubBubble: {
+    position: 'absolute', bottom: 22, minWidth: 40, alignItems: 'center',
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.sm,
+    backgroundColor: 'rgba(0,0,0,0.78)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)',
+  },
+  scrubBubbleText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 11 },
+  speedPill: {
+    position: 'absolute', top: '42%', alignSelf: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: RADIUS.pill,
+    backgroundColor: 'rgba(0,0,0,0.62)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
+  },
+  speedPillText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 13 },
   mediaDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#FFFFFF80' },
   mediaDotActive: { width: 18, backgroundColor: '#FFFFFF' },
   mediaTags: { position: 'absolute', left: 16, right: 86, alignItems: 'flex-start' },
-  mediaTag: {
-    maxWidth: 270, minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', borderRadius: 11,
-    paddingVertical: 7, paddingHorizontal: 8, backgroundColor: 'rgba(12,12,14,0.72)',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.28,
-    shadowRadius: 8, elevation: 7,
+  shopPill: {
+    height: 34, flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderRadius: 17, paddingLeft: 4, paddingRight: 12, overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.24,
+    shadowRadius: 6, elevation: 5,
   },
-  mediaTagIcon: {
-    width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+  shopPillThumb: {
+    width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#FFFFFF', overflow: 'hidden',
   },
-  mediaTagCopy: { flex: 1, minWidth: 0 },
-  mediaTagName: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: 13, lineHeight: 16 },
-  mediaTagMeta: { color: '#FFFFFFB8', fontFamily: FONT.medium, fontSize: 11, lineHeight: 14 },
+  shopPillPrice: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 12.5 },
+  shopPillShimmer: { position: 'absolute', top: 0, bottom: 0, width: 40 },
 
   rail: {
     position: 'absolute', right: 8, width: 48, bottom: 116, alignItems: 'center', gap: 15,

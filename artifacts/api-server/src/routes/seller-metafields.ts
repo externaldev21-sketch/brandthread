@@ -21,7 +21,7 @@ const ALLOWED_RESOURCES = [
 
 // Counts per resource
 router.get("/", async (req, res) => {
-  const ownerId = (req as any).userId as string;
+  const ownerId = (req as any).clerkUserId as string;
   try {
     const rows = await db.execute(sql`
       SELECT owner_resource, count(*)::int AS count
@@ -41,7 +41,7 @@ router.get("/", async (req, res) => {
 
 // List definitions for one resource type
 router.get("/:resource", async (req, res) => {
-  const ownerId = (req as any).userId as string;
+  const ownerId = (req as any).clerkUserId as string;
   const { resource } = req.params;
   if (!ALLOWED_RESOURCES.includes(resource)) {
     return res.status(400).json({ error: "Invalid resource type" });
@@ -61,7 +61,7 @@ router.get("/:resource", async (req, res) => {
 
 // Create a definition
 router.post("/", async (req, res) => {
-  const ownerId = (req as any).userId as string;
+  const ownerId = (req as any).clerkUserId as string;
   const {
     ownerResource,
     namespace = "custom",
@@ -99,7 +99,7 @@ router.post("/", async (req, res) => {
 
 // Delete a definition
 router.delete("/:id", async (req, res) => {
-  const ownerId = (req as any).userId as string;
+  const ownerId = (req as any).clerkUserId as string;
   try {
     const result = await db.execute(sql`
       DELETE FROM metafield_definitions

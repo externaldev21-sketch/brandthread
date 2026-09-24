@@ -18,6 +18,19 @@ import {
   rateLimitPolicyFor,
 } from "./rateLimit";
 
+// Rate limit buckets are persisted in the shared Postgres database, not an
+// in-process Map, so any two test runs (different files in parallel vitest
+// workers, or the same file re-run) that pick the same client identity
+// contend for the same bucket row. A small hand-rolled random range (e.g.
+// "198.51.100.<1-200>") collides often enough under parallel test execution
+// to make assertions like "the first request is under the limit" flaky.
+// crypto.randomUUID() has a collision probability low enough to treat as
+// zero for a test run, and normalizeClientIp does no format validation, so
+// a UUID-based synthetic address works as a client identity here.
+function uniqueClientAddress(): string {
+  return `test-${crypto.randomUUID()}`;
+}
+
 async function withServer(app: ReturnType<typeof express>, run: (baseUrl: string) => Promise<void>) {
   const server: Server = app.listen(0);
   await new Promise<void>((resolve) => server.once("listening", resolve));
@@ -39,7 +52,7 @@ describe("appRateLimiter", () => {
 
     await withServer(app, async (baseUrl) => {
       const response = await fetch(`${baseUrl}/api/v1/public/products`, {
-        headers: { "x-forwarded-for": `198.51.100.${Math.floor(Math.random() * 200) + 1}` },
+        headers: { "x-forwarded-for": uniqueClientAddress() },
       });
       expect(response.status).toBe(200);
       expect(response.headers.get("ratelimit-limit")).toBe("240");
@@ -135,7 +148,7 @@ describe("appRateLimiter", () => {
       app.get("/api/config/features", (_req, res) => res.json({ ok: true }));
       return app;
     };
-    const headers = { "x-forwarded-for": `198.51.100.${Math.floor(Math.random() * 100) + 1}` };
+    const headers = { "x-forwarded-for": uniqueClientAddress() };
     try {
       await withServer(createApp(), async (baseUrl) => {
         const first = await fetch(`${baseUrl}/api/config/features`, { headers });
