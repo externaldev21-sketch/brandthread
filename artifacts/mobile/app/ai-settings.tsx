@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE,
   FONT, FS, SP, RADIUS,
@@ -194,6 +195,7 @@ const rowStyles = StyleSheet.create({
 
 export default function AiSettingsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [settings, setSettings] = useState<AISettings | null>(null);
 
   useEffect(() => {
@@ -248,7 +250,7 @@ export default function AiSettingsScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.headerBack}>
           <Feather name="chevron-left" size={24} color={FG} />
         </TouchableOpacity>
@@ -396,24 +398,6 @@ export default function AiSettingsScreen() {
           />
         </SettingSection>
 
-        {/* Section: Status */}
-        <SettingSection title="Status">
-          <InfoRow
-            label="AI Provider"
-            value="Brandthread OpenAI · Secure server"
-          />
-          <RowDivider />
-          <InfoRow
-            label="Mode"
-            value="Live — connected to your store"
-          />
-          <RowDivider />
-          <InfoRow
-            label="Version"
-            value="AI Brain 1.0"
-          />
-        </SettingSection>
-
         {/* Privacy card */}
         <View style={styles.privacyCard}>
           <Text style={styles.privacyText}>
@@ -436,7 +420,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SP.md,
-    paddingTop: 56,
     paddingBottom: SP.md,
     borderBottomWidth: 1,
     borderBottomColor: BORDER_COLOR,

@@ -3,7 +3,7 @@ import { useColors } from '@/hooks/useColors';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Alert, ActivityIndicator,
+  StyleSheet, Alert, ActivityIndicator, Linking,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -213,7 +213,7 @@ export default function StorePublishScreen() {
               <Text style={pub.successTitle}>Your store is live!</Text>
               <Text style={pub.successUrl}>https://{storeUrl}.brandthread.app</Text>
               <View style={pub.successActions}>
-                <SecondaryButton label="View Store" onPress={() => Alert.alert('View Store', `Open https://${storeUrl}.brandthread.app in browser.`)} icon="external-link" style={{ flex: 1 }} />
+                <SecondaryButton label="View store" onPress={() => Linking.openURL(`https://${storeUrl}.brandthread.app`).catch(() => Alert.alert("Couldn't open your store", 'Try again.'))} icon="external-link" style={{ flex: 1 }} />
                 <PrimaryButton
                   label={isSellerSetupOrigin(params.from) ? 'Done' : 'Continue Editing'}
                   onPress={leaveSetupDestination}

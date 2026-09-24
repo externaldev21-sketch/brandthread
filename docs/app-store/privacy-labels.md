@@ -6,14 +6,14 @@ iOS privacy manifest in `artifacts/mobile/app.json`
 (`scripts/legal-privacy.test.ts`) fail if this table, the manifest and
 `scripts/verify-ios-privacy-manifest.js` ever disagree.
 
-Last audited: 2026-09-22, against the mobile app source on `dev`.
+Last audited: 2026-09-22, against the mobile app source on `dev` (updated for Sentry crash reporting).
 
 ## Answers that apply to every row
 
 | Question in App Store Connect | Answer |
 | --- | --- |
 | Do you or your third-party partners collect data from this app? | **Yes** |
-| Is this data linked to the user's identity? | **Yes**, for every type below (all of it is tied to the signed-in Clerk account) |
+| Is this data linked to the user's identity? | **Yes** for every type below **except Crash Data and Performance Data**. Everything else is tied to the signed-in Clerk account. Crash and performance reports go to Sentry without a user ID, name, email or IP address (`sendDefaultPii: false` in `lib/monitoring.ts`), so answer **No** for those two. |
 | Is this data used to track the user? | **No**, for every type. The native app has no advertising SDK, no IDFA and no App Tracking Transparency prompt. The Meta/TikTok pixels in `lib/marketingPixels.ts` load **only on the website**, after cookie consent. |
 
 ## Data collected
@@ -36,6 +36,8 @@ Last audited: 2026-09-22, against the mobile app source on `dev`.
 | Identifiers → Device ID | `NSPrivacyCollectedDataTypeDeviceID` | Expo push token registered to the account (`lib/contextualPushPermission.ts`) | App Functionality |
 | Usage Data → Product Interaction | `NSPrivacyCollectedDataTypeProductInteraction` | Notification received/opened/tapped events (`lib/notificationEventOutbox.ts`); story views; storefront visits (`/api/public/sellers/:id/visit`) and post analytics shown to sellers; shopping preferences for "Personalized recommendations" (`app/shopping-preferences.tsx`) | App Functionality, Analytics, Product Personalization |
 | Diagnostics → Other Diagnostic Data | `NSPrivacyCollectedDataTypeOtherDiagnosticData` | Call lifecycle events including failures (`/api/call/events`); request IDs and error logs kept by the API to troubleshoot and secure the service | App Functionality |
+| Diagnostics → Crash Data | `NSPrivacyCollectedDataTypeCrashData` | Crash and error reports sent to Sentry when `EXPO_PUBLIC_SENTRY_DSN` is set (`lib/monitoring.ts`, `components/ErrorBoundary.tsx`): the error, stack trace, device model, OS and app version, and recent in-app actions with URL query strings removed. **Not linked** to the user | App Functionality |
+| Diagnostics → Performance Data | `NSPrivacyCollectedDataTypePerformanceData` | App start and network timing samples sent to Sentry (10% of sessions by default, `EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE`). **Not linked** to the user | App Functionality |
 
 ## Checked and **not** collected
 
@@ -50,7 +52,6 @@ update the manifest, this page and the verifier together.
 | Search History | Search queries are sent only to return results and are not stored on the server. Recent searches are kept only on the device (`app/(buyer)/search.tsx`). |
 | Browsing History | The app does not see what people view outside it. |
 | Health & Fitness, Credit Info, Gameplay Content, Advertising Data, Other Usage Data | No feature collects these. |
-| Crash Data, Performance Data | The app has no crash-reporting or performance SDK. |
 | Other User Contact Info, Other Data Types | Nothing else is collected. Birthday is shown as "managed by Clerk" and is never sent to Brandthread. |
 
 ## Required-reason APIs (not part of the questionnaire)

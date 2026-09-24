@@ -96,7 +96,13 @@ interface PressableScaleProps extends Omit<PressableProps, 'style'> {
   activeOpacity?: number;
 }
 
-export function PressableScale({ children, onPress, style, disabled, hitSlop, activeScale = 0.97, activeOpacity = 0.85, ...rest }: PressableScaleProps) {
+// Press feel shared by every button and card: a quick, firm squish on touch,
+// then a springy release with a small rebound so taps feel physical.
+const NATIVE_DRIVER = Platform.OS !== 'web';
+const PRESS_IN_SPRING = { speed: 48, bounciness: 0, useNativeDriver: NATIVE_DRIVER } as const;
+const PRESS_OUT_SPRING = { speed: 14, bounciness: 11, useNativeDriver: NATIVE_DRIVER } as const;
+
+export function PressableScale({ children, onPress, style, disabled, hitSlop, activeScale = 0.96, activeOpacity = 0.88, ...rest }: PressableScaleProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(1)).current;
 
@@ -109,15 +115,15 @@ export function PressableScale({ children, onPress, style, disabled, hitSlop, ac
       hitSlop={hitSlop}
       onPressIn={(e) => {
         Animated.parallel([
-          Animated.spring(scale, { toValue: activeScale, useNativeDriver: true, tension: 100, friction: 15 }),
-          Animated.timing(opacity, { toValue: activeOpacity, duration: 50, useNativeDriver: true }),
+          Animated.spring(scale, { toValue: activeScale, ...PRESS_IN_SPRING }),
+          Animated.timing(opacity, { toValue: activeOpacity, duration: 60, useNativeDriver: NATIVE_DRIVER }),
         ]).start();
         rest.onPressIn?.(e);
       }}
       onPressOut={(e) => {
         Animated.parallel([
-          Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 100, friction: 15 }),
-          Animated.timing(opacity, { toValue: 1, duration: 150, useNativeDriver: true }),
+          Animated.spring(scale, { toValue: 1, ...PRESS_OUT_SPRING }),
+          Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: NATIVE_DRIVER }),
         ]).start();
         rest.onPressOut?.(e);
       }}
@@ -154,11 +160,13 @@ export function AnimatedEntrance({
       progress.setValue(1);
       return;
     }
-    Animated.timing(progress, {
+    // A soft spring rather than a linear fade: content glides up and settles.
+    Animated.spring(progress, {
       toValue: 1,
       delay,
-      duration: ANIM.normal,
-      useNativeDriver: Platform.OS !== 'web',
+      speed: 11,
+      bounciness: 4,
+      useNativeDriver: NATIVE_DRIVER,
     }).start();
   }, [delay, disabled, progress]);
 
@@ -591,10 +599,10 @@ export function FilterChip({ label, active, onPress, count }: FilterChipProps) {
       accessibilityState={{ selected: active }}
       style={[fcS.chip, { backgroundColor: palette.card, borderColor: palette.border }, active && [fcS.active, { backgroundColor: theme.accentDim, borderColor: theme.accent + '88' }]]}
     >
-      <Text style={[fcS.label, { color: palette.mutedForeground }, active && [fcS.activeLabel, { color: theme.onAccent }]]}>{label}</Text>
+      <Text style={[fcS.label, { color: palette.mutedForeground }, active && [fcS.activeLabel, { color: theme.accentLight }]]}>{label}</Text>
       {count !== undefined && (
         <View style={[fcS.count, active && [fcS.activeCount, { backgroundColor: theme.accentDim }]]}>
-          <Text style={[fcS.countText, { color: palette.mutedForeground }, active && [fcS.activeCountText, { color: theme.onAccent }]]}>{count}</Text>
+          <Text style={[fcS.countText, { color: palette.mutedForeground }, active && [fcS.activeCountText, { color: theme.accentLight }]]}>{count}</Text>
         </View>
       )}
     </PressableScale>

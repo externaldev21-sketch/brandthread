@@ -4,7 +4,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import {
-  ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
+  ScrollView, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/hooks/useApi';
@@ -41,7 +41,6 @@ export default function NotificationsSettingsScreen() {
   const insets = useSafeAreaInsets();
   const api    = useApi();
   const { theme } = useAppTheme();
-  const [email, setEmail]   = useState('store@brandthread.com');
   const [digest, setDigest] = useState<DigestMode>('realtime');
   const [loading, setLoading] = useState(true);
   const [saving,  setSaving]  = useState(false);
@@ -90,33 +89,6 @@ export default function NotificationsSettingsScreen() {
     <View style={[s.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Notifications" />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
-
-        {/* ── Sender email ── */}
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Sender email</Text>
-          <Text style={s.sectionSubtitle}>
-            The email your store uses to send and receive emails from customers
-          </Text>
-          <View style={[s.infoBox, { backgroundColor: theme.accentDim }]}>
-            <Feather name="info" size={15} color={theme.accentLight} style={{ marginTop: 2 }} />
-            <Text style={[s.infoText, { color: FG }]}>
-              Public domains like Gmail don't support custom sending. Customers will see your email as{' '}
-              <Text style={{ fontFamily: FONT.bold }}>store+70327206006@brandthreademail.com</Text>.{' '}
-              For better brand recognition, use a custom domain.
-            </Text>
-          </View>
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            placeholder="mila@nightshiftstudio.co"
-            placeholderTextColor={MUTED}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            style={[s.emailInput, { borderColor: BORDER, color: FG, backgroundColor: CARD }]}
-          />
-        </View>
-
-        <View style={[s.divider, { backgroundColor: SUBTLE }]} />
 
         {/* ── Push frequency ── */}
         <View style={s.section}>
@@ -179,7 +151,7 @@ export default function NotificationsSettingsScreen() {
           )}
         </View>
 
-        <View style={[s.divider, { backgroundColor: SUBTLE }]} />
+        <View style={[s.divider, { backgroundColor: theme.borderSubtle }]} />
 
         {/* ── Notification types ── */}
         <View style={s.section}>
@@ -217,10 +189,6 @@ const s = StyleSheet.create({
   sectionTitle:     { fontSize: FS.sm + 1, fontFamily: FONT.semibold, color: FG, marginBottom: 6 },
   sectionSubtitle:  { fontSize: 12, fontFamily: FONT.regular, color: MUTED, lineHeight: 17, marginBottom: 14 },
   divider:          { height: 10 },
-
-  infoBox:   { flexDirection: 'row', gap: 10, borderRadius: 12, padding: 14, marginBottom: 14 },
-  infoText:  { fontSize: 12, fontFamily: FONT.regular, lineHeight: 17, flex: 1 },
-  emailInput:{ borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, fontFamily: FONT.regular },
 
   digestCard:        { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
   digestOption:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },

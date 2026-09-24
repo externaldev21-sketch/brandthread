@@ -25,12 +25,10 @@ import { localTimeLabel } from '@workspace/manufacturer-flow';
 import { BrandthreadHeader, EmptyState, SecondaryButton } from '@/components/BrandthreadUI';
 import OrderCardBubble from '@/components/manufacturer/OrderCardBubble';
 import { useOrderCardPayment } from '@/components/manufacturer/useOrderCardPayment';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { getEntitlementRejection } from '@/lib/entitlementError';
-import {
-  BG, BORDER, CARD, CARD_ELEVATED, FG, FONT, FS, ICON, MUTED, RADIUS, RED, SP, SUBTLE,
-} from '@/lib/theme';
+import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { PendingManufacturerOperations } from '@/services/manufacturerIdempotency';
 import { getCallAvailability, type OrderCardSnapshot } from '@/services/manufacturerOrderFlow';
 
@@ -88,10 +86,12 @@ function buildRows(newestFirst: ApiMessage[]): Row[] {
 // ─── Bubbles ──────────────────────────────────────────────────────────────────
 
 function SystemLine({ msg }: { msg: ApiMessage }) {
+  const { theme } = useAppTheme();
+  const bub = useMemo(() => makeBub(theme), [theme]);
   return (
     <View style={bub.systemWrap} testID={`system-message-${msg.id}`}>
       <View style={bub.systemPill}>
-        <Feather name="info" size={12} color={SUBTLE} />
+        <Feather name="info" size={12} color={theme.subtle} />
         <Text style={bub.systemText}>{msg.content}</Text>
       </View>
       <Text style={bub.systemTime}>{fmtTime(msg.sentAt)}</Text>
@@ -100,6 +100,8 @@ function SystemLine({ msg }: { msg: ApiMessage }) {
 }
 
 function MessageBubble({ msg, accent, onAccent, onOpenImage }: { msg: ApiMessage; accent: string; onAccent: string; onOpenImage: (uri: string) => void }) {
+  const { theme } = useAppTheme();
+  const bub = useMemo(() => makeBub(theme), [theme]);
   const mine = msg.senderRole === 'seller';
   const images = msg.messageType === 'image' ? msg.mediaUrls : [];
   const files = msg.messageType === 'image' ? [] : msg.mediaUrls;
@@ -119,7 +121,7 @@ function MessageBubble({ msg, accent, onAccent, onOpenImage }: { msg: ApiMessage
         )}
         {files.map((uri) => (
           <View key={uri} style={[bub.file, mine && { alignSelf: 'flex-end' }]}>
-            <Feather name="file-text" size={14} color={FG} />
+            <Feather name="file-text" size={14} color={theme.text} />
             <Text style={bub.fileText}>Attachment</Text>
           </View>
         ))}
@@ -138,6 +140,7 @@ function MessageBubble({ msg, accent, onAccent, onOpenImage }: { msg: ApiMessage
 
 export default function ManufacturerMessagesScreen() {
   const { theme } = useAppTheme();
+  const s = useMemo(() => makeS(theme), [theme]);
   const params = useLocalSearchParams<{ threadId?: string; mfrName?: string; mfrId?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -315,7 +318,7 @@ export default function ManufacturerMessagesScreen() {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   const header = (
-    <View style={{ paddingTop: insets.top, backgroundColor: BG, borderBottomWidth: 1, borderBottomColor: BORDER }}>
+    <View style={{ paddingTop: insets.top, backgroundColor: theme.background, borderBottomWidth: 1, borderBottomColor: theme.border }}>
       <BrandthreadHeader
         title={mfrName}
         subtitle={localTime ? `${localTime} for them` : 'Manufacturer conversation'}
@@ -324,14 +327,14 @@ export default function ManufacturerMessagesScreen() {
           <View style={{ flexDirection: 'row', gap: SP.xs, alignItems: 'center' }}>
             {manufacturerId ? (
               <TouchableOpacity onPress={() => router.push({ pathname: '/manufacturer-profile', params: { id: manufacturerId } } as never)} style={s.headerBtn} accessibilityLabel="View manufacturer profile">
-                <Feather name="info" size={16} color={FG} />
+                <Feather name="info" size={16} color={theme.text} />
               </TouchableOpacity>
             ) : null}
             <TouchableOpacity onPress={() => startCall('voice')} accessibilityRole="button" accessibilityLabel={callingEnabled ? 'Start voice call' : 'Calls coming soon'} testID="manufacturer-voice-call" style={[s.headerBtn, !callingEnabled && { opacity: 0.55 }]}>
-              <Feather name="phone" size={16} color={FG} />
+              <Feather name="phone" size={16} color={theme.text} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => startCall('video')} accessibilityRole="button" accessibilityLabel={callingEnabled ? 'Start video call' : 'Calls coming soon'} testID="manufacturer-video-call" style={[s.headerBtn, !callingEnabled && { opacity: 0.55 }]}>
-              <Feather name="video" size={16} color={FG} />
+              <Feather name="video" size={16} color={theme.text} />
             </TouchableOpacity>
           </View>
         }
@@ -343,7 +346,7 @@ export default function ManufacturerMessagesScreen() {
     return (
       <View style={{ flex: 1 }}>
         {header}
-        <View style={s.center} testID="thread-loading"><ActivityIndicator color={FG} /><Text style={s.centerText}>Loading conversation…</Text></View>
+        <View style={s.center} testID="thread-loading"><ActivityIndicator color={theme.text} /><Text style={s.centerText}>Loading conversation…</Text></View>
       </View>
     );
   }
@@ -399,10 +402,10 @@ export default function ManufacturerMessagesScreen() {
         }}
         contentContainerStyle={{ paddingVertical: SP.md, flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} tintColor={FG} onRefresh={() => { if (!threadId) return; setRefreshing(true); void loadMessages(threadId); }} />}
+        refreshControl={<RefreshControl refreshing={refreshing} tintColor={theme.text} onRefresh={() => { if (!threadId) return; setRefreshing(true); void loadMessages(threadId); }} />}
         ListEmptyComponent={
           <View style={[s.emptyWrap, INVERTED && { transform: [{ scaleY: -1 }] }]} testID="thread-empty">
-            <Feather name="message-circle" size={28} color={SUBTLE} />
+            <Feather name="message-circle" size={28} color={theme.subtle} />
             <Text style={s.emptyTitle}>Start the conversation</Text>
             <Text style={s.emptyText}>Share your designs, references and target price. When {mfrName} is ready, they'll send a sample card you can pay right here.</Text>
           </View>
@@ -418,7 +421,7 @@ export default function ManufacturerMessagesScreen() {
               <View key={`${asset.uri}-${index}`} style={s.previewTile}>
                 <Image source={{ uri: asset.uri }} style={s.previewImage} />
                 <TouchableOpacity style={s.previewRemove} onPress={() => setPending((current) => current.filter((_, i) => i !== index))} accessibilityLabel="Remove photo">
-                  <Feather name="x" size={12} color={FG} />
+                  <Feather name="x" size={12} color={theme.text} />
                 </TouchableOpacity>
               </View>
             ))}
@@ -426,14 +429,14 @@ export default function ManufacturerMessagesScreen() {
         )}
         <View style={s.inputRow}>
           <TouchableOpacity onPress={() => setAttachOpen(true)} style={s.iconBtn} accessibilityLabel="Add photos" testID="button-attach">
-            <Feather name="image" size={ICON.sm} color={FG} />
+            <Feather name="image" size={ICON.sm} color={theme.text} />
           </TouchableOpacity>
           <TextInput
             style={s.input}
             value={draft}
             onChangeText={setDraft}
             placeholder={`Message ${mfrName}…`}
-            placeholderTextColor={SUBTLE}
+            placeholderTextColor={theme.subtle}
             multiline
             testID="input-message"
           />
@@ -460,9 +463,9 @@ export default function ManufacturerMessagesScreen() {
               { key: 'library', icon: 'image', label: 'Choose from camera roll', hint: `Up to ${MAX_PHOTOS} at once` },
             ] as const).map((option) => (
               <TouchableOpacity key={option.key} style={s.sheetRow} onPress={() => void pickPhotos(option.key)} testID={`attach-${option.key}`}>
-                <View style={s.sheetIcon}><Feather name={option.icon} size={18} color={FG} /></View>
+                <View style={s.sheetIcon}><Feather name={option.icon} size={18} color={theme.text} /></View>
                 <View style={{ flex: 1 }}><Text style={s.sheetLabel}>{option.label}</Text><Text style={s.sheetHint}>{option.hint}</Text></View>
-                <Feather name="chevron-right" size={16} color={SUBTLE} />
+                <Feather name="chevron-right" size={16} color={theme.subtle} />
               </TouchableOpacity>
             ))}
           </Pressable>
@@ -473,7 +476,7 @@ export default function ManufacturerMessagesScreen() {
       <Modal visible={callsInfoOpen} transparent animationType="fade" onRequestClose={() => setCallsInfoOpen(false)}>
         <Pressable style={[s.backdrop, { justifyContent: 'center', padding: SP.lg }]} onPress={() => setCallsInfoOpen(false)}>
           <Pressable style={s.dialog} testID="calls-coming-soon">
-            <View style={s.dialogIcon}><Feather name="video" size={22} color={FG} /></View>
+            <View style={s.dialogIcon}><Feather name="video" size={22} color={theme.text} /></View>
             <Text style={s.dialogTitle}>Voice & video calls are coming soon</Text>
             <Text style={s.dialogText}>
               Until then, keep everything in this conversation. Photos, order cards and production updates stay in one place for you and {mfrName}.
@@ -499,61 +502,61 @@ export default function ManufacturerMessagesScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const bub = StyleSheet.create({
+const makeBub = (theme: AppThemePreset) => StyleSheet.create({
   row: { marginVertical: 3, paddingHorizontal: SP.md },
   right: { flexDirection: 'row', justifyContent: 'flex-end' },
   left: { flexDirection: 'row', justifyContent: 'flex-start' },
   bubble: { borderRadius: RADIUS.lg, paddingHorizontal: SP.md, paddingVertical: SP.sm },
   mine: { borderBottomRightRadius: 4 },
-  theirs: { backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, borderBottomLeftRadius: 4 },
-  text: { fontSize: FS.base, fontFamily: FONT.regular, color: FG, lineHeight: 21 },
-  time: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginTop: 3 },
+  theirs: { backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border, borderBottomLeftRadius: 4 },
+  text: { fontSize: FS.base, fontFamily: FONT.regular, color: theme.text, lineHeight: 21 },
+  time: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginTop: 3 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, width: 226, borderRadius: RADIUS.md, overflow: 'hidden' },
   imageSingle: { width: 220, height: 240, borderRadius: RADIUS.md },
   imageTile: { width: 111, height: 111 },
-  file: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.md, backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, marginBottom: 4 },
-  fileText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
+  file: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.md, backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border, marginBottom: 4 },
+  fileText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
   systemWrap: { alignItems: 'center', marginVertical: SP.sm, paddingHorizontal: SP.lg },
-  systemPill: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, maxWidth: 320 },
-  systemText: { flexShrink: 1, fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, lineHeight: 16 },
-  systemTime: { fontSize: 10, fontFamily: FONT.regular, color: SUBTLE, marginTop: 3 },
+  systemPill: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, maxWidth: 320 },
+  systemText: { flexShrink: 1, fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted, lineHeight: 16 },
+  systemTime: { fontSize: 10, fontFamily: FONT.regular, color: theme.subtle, marginTop: 3 },
 });
 
-const s = StyleSheet.create({
+const makeS = (theme: AppThemePreset) => StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.md, padding: SP.lg },
-  centerText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  headerBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: CARD_ELEVATED, alignItems: 'center', justifyContent: 'center' },
+  centerText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
+  headerBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' },
   dayRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.lg, marginVertical: SP.sm },
-  dayLine: { flex: 1, height: 1, backgroundColor: BORDER },
-  dayText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: SUBTLE },
+  dayLine: { flex: 1, height: 1, backgroundColor: theme.border },
+  dayText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.subtle },
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl, gap: SP.sm, paddingVertical: SP.xl },
-  emptyTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
-  emptyText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 19 },
-  inlineError: { fontSize: FS.xs, fontFamily: FONT.medium, color: RED, textAlign: 'center', paddingVertical: 4 },
-  composer: { backgroundColor: CARD, borderTopWidth: 1, borderTopColor: BORDER, paddingTop: SP.sm },
+  emptyTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: theme.text },
+  emptyText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 19 },
+  inlineError: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.error, textAlign: 'center', paddingVertical: 4 },
+  composer: { backgroundColor: theme.card, borderTopWidth: 1, borderTopColor: theme.border, paddingTop: SP.sm },
   previewRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
   previewTile: { width: 56, height: 56, borderRadius: RADIUS.sm, overflow: 'hidden' },
   previewImage: { width: '100%', height: '100%' },
   previewRemove: { position: 'absolute', top: 3, right: 3, width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center' },
   inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: SP.sm, paddingHorizontal: SP.md },
-  iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: CARD_ELEVATED },
+  iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.cardElevated },
   input: {
-    flex: 1, minHeight: 40, maxHeight: 120, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
-    paddingHorizontal: SP.md, paddingTop: 10, paddingBottom: 10, fontSize: FS.base, fontFamily: FONT.regular, color: FG,
+    flex: 1, minHeight: 40, maxHeight: 120, backgroundColor: theme.cardElevated, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border,
+    paddingHorizontal: SP.md, paddingTop: 10, paddingBottom: 10, fontSize: FS.base, fontFamily: FONT.regular, color: theme.text,
   },
   sendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SP.lg, gap: SP.sm },
-  grabber: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, marginBottom: SP.sm },
-  sheetTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG, marginBottom: 4 },
+  sheet: { backgroundColor: theme.card, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SP.lg, gap: SP.sm },
+  grabber: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, marginBottom: SP.sm },
+  sheetTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: theme.text, marginBottom: 4 },
   sheetRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: SP.sm + 2 },
-  sheetIcon: { width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: CARD_ELEVATED, alignItems: 'center', justifyContent: 'center' },
-  sheetLabel: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  sheetHint: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  dialog: { backgroundColor: CARD, borderRadius: RADIUS.xl, padding: SP.lg, borderWidth: 1, borderColor: BORDER, alignItems: 'center', gap: SP.sm },
-  dialogIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: CARD_ELEVATED, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  dialogTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG, textAlign: 'center' },
-  dialogText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 19 },
+  sheetIcon: { width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' },
+  sheetLabel: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
+  sheetHint: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
+  dialog: { backgroundColor: theme.card, borderRadius: RADIUS.xl, padding: SP.lg, borderWidth: 1, borderColor: theme.border, alignItems: 'center', gap: SP.sm },
+  dialogIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  dialogTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: theme.text, textAlign: 'center' },
+  dialogText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 19 },
   dialogBtn: { marginTop: SP.sm, alignSelf: 'stretch', height: 46, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
   dialogBtnText: { fontSize: FS.base, fontFamily: FONT.bold },
   viewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center' },

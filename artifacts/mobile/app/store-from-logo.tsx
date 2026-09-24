@@ -283,7 +283,7 @@ export default function StoreFromLogoScreen() {
           <View style={fl.bannerRow}>
             <Feather name="zap" size={ICON.sm} color={PURPLE_LIGHT} />
             <Text style={[fl.bannerText, { color: PURPLE_LIGHT }]}>
-              Powered by GPT-4 — AI analyzes your brand identity and generates a custom color palette, typography recommendation, and theme match.
+              We'll pull your colors, type and vibe from your logo.
             </Text>
           </View>
         </BrandthreadCard>

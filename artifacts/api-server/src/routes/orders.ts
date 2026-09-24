@@ -58,7 +58,7 @@ async function notifyOrderShipped(
     return;
   }
 
-  await sendOrderShippingEmail({
+  const sent = await sendOrderShippingEmail({
     to: recipient,
     orderNumber: order.orderNumber,
     carrier: order.carrier,
@@ -66,6 +66,9 @@ async function notifyOrderShipped(
     trackingUpdate,
     idempotencyKey,
   });
+  if (!sent) {
+    logger.warn({ orderId: order.id }, "Shipping email delivery failed");
+  }
 }
 
 // GET /api/orders

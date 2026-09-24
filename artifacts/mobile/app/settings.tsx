@@ -69,7 +69,6 @@ const STATIC_GROUPS: SettingsGroup[] = [
       { label: 'Integrations',              icon: 'link',          route: '/integrations' },
       { label: 'Customer events',            icon: 'activity',      route: '/customer-events' },
       { label: 'Notifications',             icon: 'bell',          route: '/notifications-settings' },
-      { label: 'Metafields and metaobjects', icon: 'database',      route: '/metafields' },
       { label: 'Languages',                  icon: 'message-square', route: '/languages' },
       { label: 'Customer privacy',           icon: 'lock',          route: '/customer-privacy' },
       { label: 'Policies',                   icon: 'file' },

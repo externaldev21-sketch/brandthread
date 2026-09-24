@@ -21,12 +21,15 @@ import { BORDER, CARD, CARD_ELEVATED, FG, FONT, FS, MUTED, ORANGE, RADIUS, RED, 
 import { formatCents } from '@/lib/money';
 import { getBulkWalletOptions, getOrCreateConversation, getProductionOrder, payBulkOrderFromWallet, BulkWalletOption } from '@/services/manufacturerService';
 import { confirmOrderDelivery, declineOrderCard, getOrderTimeline, type OrderTimeline } from '@/services/manufacturerOrderFlow';
+import { useApi } from '@/lib/api';
 
 export default function ProductionDetailScreen() {
   const { theme } = useAppTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const api = useApi();
+  const [dropNames, setDropNames] = useState<Record<string, string>>({});
   const [data, setData] = useState<OrderTimeline | null>(null);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [walletState, setWalletState] = useState<string | null>(null);
@@ -69,11 +72,15 @@ export default function ProductionDetailScreen() {
   const isBulkAwaiting = order?.orderType === 'bulk' && order.status === 'pending_payment' && order.manufacturerPayoutReady;
   useEffect(() => {
     if (!isBulkAwaiting || !id) return;
-    getBulkWalletOptions(id).then((options) => {
+    getBulkWalletOptions(id).then(async (options) => {
       setWallets(options.wallets);
       setSelectedWalletId((current) => current ?? options.wallets.find((wallet) => wallet.eligible)?.id ?? null);
+      // Wallets only carry the raw drop id; show the drop's name instead.
+      const dropIds = [...new Set(options.wallets.map((wallet) => wallet.dropId))];
+      const drops = await Promise.all(dropIds.map((dropId) => (api.drops.get(dropId) as Promise<any>).catch(() => null)));
+      setDropNames(Object.fromEntries(dropIds.map((dropId, i) => [dropId, drops[i]?.name ?? drops[i]?.title ?? 'Drop'])));
     }).catch(() => setWallets([]));
-  }, [isBulkAwaiting, id]);
+  }, [isBulkAwaiting, id, api]);
 
   const payFromWallet = async () => {
     if (!id || !selectedWalletId || walletPaying) return;
@@ -187,7 +194,7 @@ export default function ProductionDetailScreen() {
                 {walletState === 'processing' ? <Text style={styles.muted}>Wallet payment is processing…</Text> : wallets.map((wallet) => (
                   <TouchableOpacity key={wallet.id} disabled={!wallet.eligible || walletPaying} onPress={() => setSelectedWalletId(wallet.id)}
                     style={[styles.wallet, selectedWalletId === wallet.id && { borderColor: FG }, !wallet.eligible && { opacity: 0.45 }]}>
-                    <Text style={styles.walletLabel}>Drop wallet</Text>
+                    <Text style={styles.walletLabel}>{dropNames[wallet.dropId] ?? 'Drop'} wallet</Text>
                     <Text style={styles.walletLabel}>{formatCents(wallet.availableCents)} available</Text>
                   </TouchableOpacity>
                 ))}

@@ -23,7 +23,6 @@ import { subscribeStoreContext } from '@/lib/api';
 import {
   selectSellerHomeAnalytics,
   sellerHomeAnalyticsKey,
-  zeroSellerHomeAnalytics,
   type SellerHomeAnalyticsSnapshot,
 } from '@/lib/sellerHomeAnalytics';
 import { skipTask, type SetupState, type SetupTask } from '@/lib/setupStore';
@@ -201,6 +200,7 @@ export default function SellerHomeCommerceDashboard({
   const [range, setRange] = useState<TimeRange>('today');
   const [snapshot, setSnapshot] = useState<SellerHomeAnalyticsSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
+  const [analyticsError, setAnalyticsError] = useState(false);
   const [financeBalance, setFinanceBalance] = useState<FinanceBalance | null>(null);
   const [financeLoading, setFinanceLoading] = useState(true);
   const [cashingOut, setCashingOut] = useState(false);
@@ -219,14 +219,16 @@ export default function SellerHomeCommerceDashboard({
     api.analytics.home(range)
       .then((next) => {
         if (!active) return;
+        setAnalyticsError(false);
         setSnapshot({ key: requestKey, data: next });
       })
       .catch((requestError) => {
         if (!active) return;
         if (__DEV__) {
-          console.warn('[seller-dashboard] analytics unavailable; showing zero state', requestError);
+          console.warn('[seller-dashboard] analytics unavailable', requestError);
         }
-        setSnapshot({ key: requestKey, data: zeroSellerHomeAnalytics(range) });
+        // Never fabricate a zero state — keep any stale snapshot and surface a real error banner instead.
+        setAnalyticsError(true);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -455,6 +457,7 @@ export default function SellerHomeCommerceDashboard({
           nestedScrollEnabled
           directionalLockEnabled
           showsHorizontalScrollIndicator={false}
+          style={styles.rangeScroll}
           contentContainerStyle={styles.rangeRow}
         >
           {RANGES.map((item) => {
@@ -485,7 +488,18 @@ export default function SellerHomeCommerceDashboard({
 
         {/* ── Summary stats ─────────────────────────────────────────────── */}
         <View style={[styles.statsCard, { backgroundColor: palette.glass ?? palette.surface ?? SELLER_DASHBOARD_GLASS, borderColor: palette.border ?? BORDER }]}>
-          {!data ? (
+          {analyticsError && (
+            <View
+              style={[styles.errorBanner, { backgroundColor: palette.cardElevated ?? palette.card ?? CARD_ELEVATED_GLASS, borderColor: theme.error }]}
+              accessibilityRole="alert"
+            >
+              <Feather name="alert-circle" size={14} color={theme.error} />
+              <Text style={[styles.errorBannerText, { color: theme.error }]}>
+                {data ? 'Couldn’t refresh your sales. Pull to refresh.' : 'Couldn’t load your sales. Pull to refresh.'}
+              </Text>
+            </View>
+          )}
+          {!data && !analyticsError ? (
             <SummarySkeleton />
           ) : (
             <View style={styles.statGrid}>
@@ -497,7 +511,7 @@ export default function SellerHomeCommerceDashboard({
                   adjustsFontSizeToFit
                   minimumFontScale={0.65}
                 >
-                  {formatCents(totalSales)}
+                  {data ? formatCents(totalSales) : '—'}
                 </Text>
               </View>
               <View style={styles.statTile}>
@@ -508,7 +522,7 @@ export default function SellerHomeCommerceDashboard({
                   adjustsFontSizeToFit
                   minimumFontScale={0.65}
                 >
-                  {orderCount}
+                  {data ? orderCount : '—'}
                 </Text>
               </View>
               <View style={styles.statTile}>
@@ -519,7 +533,7 @@ export default function SellerHomeCommerceDashboard({
                   adjustsFontSizeToFit
                   minimumFontScale={0.65}
                 >
-                  {visitorCount}
+                  {data ? visitorCount : '—'}
                 </Text>
               </View>
             </View>
@@ -579,7 +593,12 @@ export default function SellerHomeCommerceDashboard({
             </View>
           </View>
 
-          {!data ? (
+          {!data && analyticsError ? (
+            <View style={styles.emptyActions}>
+              <Feather name="alert-circle" size={16} color={theme.error} />
+              <Text style={[styles.emptyActionsText, { color: theme.error }]}>Couldn{'’'}t load activity</Text>
+            </View>
+          ) : !data ? (
             <ChartSkeleton />
           ) : !hasActivity || maxBucket === 0 ? (
             <ChartEmptyState range={range} />
@@ -763,10 +782,17 @@ const styles = StyleSheet.create({
   },
 
   // ── Range pills
+  // flexGrow: 0 stops this horizontal ScrollView from stretching vertically to
+  // fill its flex parent on wide/web viewports (iPad web was rendering the
+  // pill row at ~390px tall).
+  rangeScroll: {
+    flexGrow: 0,
+  },
   rangeRow: {
     paddingHorizontal: SP.md,
     gap: SP.xs,
     paddingVertical: SP.sm,
+    alignItems: 'center',
   },
   rangePill: {
      minHeight: 44,
@@ -794,6 +820,22 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     gap: SP.sm,
     padding: SP.sm,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
+    marginHorizontal: SP.sm,
+    marginTop: SP.sm,
+    padding: SP.sm,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+  },
+  errorBannerText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '500',
+    flex: 1,
   },
   statTile: {
     width: '100%',

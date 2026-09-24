@@ -28,18 +28,20 @@ import {
 } from '@/components/BrandthreadUI';
 
 import {
-  getManufacturer, saveQuoteRequestDraft, submitQuoteRequest, getQuoteRequest,
+  getManufacturer, getRelationships, saveQuoteRequestDraft, submitQuoteRequest, getQuoteRequest,
 } from '@/services/manufacturerService';
 
 import { QuoteRequest, Manufacturer } from '@/services/manufacturerTypes';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
+// Note: the "Files" step was removed — there is no real file-upload API for
+// quote-request attachments in this codebase, and the step previously marked
+// files as "Added" without ever uploading them (§11a: never fake success).
 const STEP_TITLES = [
   'Select Product',
   'Production Details',
   'Materials & Variants',
-  'Files',
   'Review & Submit',
 ];
 
@@ -50,19 +52,11 @@ const SIZE_PRESETS = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 const PRINT_METHODS = ['Screen Print', 'DTG', 'DTF', 'Embroidery', 'Heat Transfer', 'None'];
 const PRODUCTION_TYPES = ['Standard', 'Rush', 'Custom'];
 
-const FILE_TYPES = [
-  { key: 'tech_pack', label: 'Tech Pack', icon: 'file-text' as const },
-  { key: 'design', label: 'Design Files', icon: 'pen-tool' as const },
-  { key: 'measurement', label: 'Measurements', icon: 'maximize' as const },
-  { key: 'mockup', label: 'Mockups', icon: 'image' as const },
-  { key: 'reference', label: 'Reference Images', icon: 'camera' as const },
-];
-
 function uid() { return Math.random().toString(36).slice(2, 11); }
 
 // ─── Progress Bar ─────────────────────────────────────────────────────────────
 
-function ProgressBar({ step, total }: { step: number; total: number }) {
+function ProgressBar({ step, total, titles }: { step: number; total: number; titles: string[] }) {
   const colors = useColors();
   const pct = ((step - 1) / (total - 1)) * 100;
   return (
@@ -74,7 +68,7 @@ function ProgressBar({ step, total }: { step: number; total: number }) {
           style={[pb.fill, { width: `${pct}%` }]}
         />
       </View>
-      <Text style={pb.label}>Step {step} of {total}: {STEP_TITLES[step - 1]}</Text>
+      <Text style={pb.label}>Step {step} of {total}: {titles[step - 1]}</Text>
     </View>
   );
 }
@@ -125,6 +119,15 @@ export default function QuoteRequestScreen() {
   const [manufacturer, setManufacturer] = useState<Manufacturer | null>(null);
   const draftId = useRef<string>('qr_' + uid());
 
+  // No manufacturerId in the route means the hub's FAB / empty state sent us
+  // here directly — add a manufacturer-picker as the real first step instead
+  // of letting the seller fill out all 5 steps and fail only at submit.
+  const [needsPicker, setNeedsPicker] = useState(!manufacturerId);
+  const [pickedManufacturerId, setPickedManufacturerId] = useState<string | undefined>(undefined);
+  const [pickerOptions, setPickerOptions] = useState<Manufacturer[]>([]);
+  const [pickerLoading, setPickerLoading] = useState(needsPicker);
+  const effectiveManufacturerId = manufacturerId ?? pickedManufacturerId;
+
   // Step 1
   const [productSource, setProductSource] = useState<'existing' | 'draft' | 'new'>('existing');
   const [productName, setProductName] = useState('');
@@ -150,22 +153,38 @@ export default function QuoteRequestScreen() {
   const [hasLabels, setHasLabels] = useState(false);
   const [customPackaging, setCustomPackaging] = useState(false);
 
-  // Step 4
-  const [addedFiles, setAddedFiles] = useState<string[]>([]);
-
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load manufacturer
+  // Load manufacturer (either the one passed in, or the one picked in step 1)
   useEffect(() => {
     let active = true;
-    if (manufacturerId) {
-      getManufacturer(manufacturerId).then(m => {
+    if (effectiveManufacturerId) {
+      getManufacturer(effectiveManufacturerId).then(m => {
         if (!active) return;
         setManufacturer(m ?? null);
       }).catch(() => { if (active) setManufacturer(null); });
+    } else {
+      setManufacturer(null);
     }
     return () => { active = false; };
-  }, [manufacturerId]);
+  }, [effectiveManufacturerId]);
+
+  // Load the seller's saved manufacturers for the picker step
+  useEffect(() => {
+    if (!needsPicker) return;
+    let active = true;
+    setPickerLoading(true);
+    getRelationships()
+      .then(async (rels) => {
+        const profiles = await Promise.all(rels.map(rel => getManufacturer(rel.manufacturerId)));
+        if (!active) return;
+        setPickerOptions(profiles.filter((m): m is Manufacturer => !!m));
+      })
+      .catch(() => { if (active) setPickerOptions([]); })
+      .finally(() => { if (active) setPickerLoading(false); });
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsPicker]);
 
   // Resume draft
   useEffect(() => {
@@ -175,6 +194,10 @@ export default function QuoteRequestScreen() {
         if (!active) return;
         if (!qr) return;
         draftId.current = qr.id;
+        if (qr.manufacturerId) {
+          setPickedManufacturerId(qr.manufacturerId);
+          setNeedsPicker(false);
+        }
         setProductName(qr.productName);
         setQuantity(qr.quantity.toString());
         setTargetUnitPrice(qr.targetUnitPriceCents === undefined ? '' : formatCents(qr.targetUnitPriceCents).slice(1));
@@ -198,40 +221,46 @@ export default function QuoteRequestScreen() {
     }
   }, [requestId]);
 
+  // Builds the complete quote-request payload — used by BOTH autosave and the
+  // final Submit, so Submit can never silently drop fields autosave already
+  // captured (that was the item-45 bug: two payloads that had drifted apart).
+  function buildQuoteRequestPayload(mfgId: string, currentStep: number) {
+    return {
+      id: draftId.current,
+      manufacturerId: mfgId,
+      productName: productName.trim() || 'Untitled Product',
+      productId,
+      quantity: parseInt(quantity) || 100,
+      targetUnitPriceCents: targetUnitPrice ? parseDecimalToCents(targetUnitPrice) ?? undefined : undefined,
+      neededByDate: neededByDate || undefined,
+      productionType,
+      sampleRequired,
+      packagingRequirements: packagingRequirements || undefined,
+      shippingDestination: shippingDestination || undefined,
+      materials: selectedMaterials,
+      colorways,
+      sizes: selectedSizes,
+      printMethod,
+      hasEmbroidery,
+      hasWash,
+      hasHardware,
+      hasLabels,
+      customPackaging,
+      currentStep,
+    };
+  }
+
   // Auto-save draft every 2s
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      if (!manufacturerId) return;
-      const mfgId = manufacturerId;
-      const name = productName.trim() || 'Untitled Product';
-      saveQuoteRequestDraft({
-        id: draftId.current,
-        manufacturerId: mfgId,
-        productName: name,
-        productId,
-        quantity: parseInt(quantity) || 100,
-        targetUnitPriceCents: targetUnitPrice ? parseDecimalToCents(targetUnitPrice) ?? undefined : undefined,
-        neededByDate: neededByDate || undefined,
-        productionType,
-        sampleRequired,
-        packagingRequirements: packagingRequirements || undefined,
-        shippingDestination: shippingDestination || undefined,
-        materials: selectedMaterials,
-        colorways,
-        sizes: selectedSizes,
-        printMethod,
-        hasEmbroidery,
-        hasWash,
-        hasHardware,
-        hasLabels,
-        customPackaging,
-        currentStep: step,
-      }).then(qr => { draftId.current = qr.id; }).catch(() => {});
+      if (!effectiveManufacturerId) return;
+      saveQuoteRequestDraft(buildQuoteRequestPayload(effectiveManufacturerId, step))
+        .then(qr => { draftId.current = qr.id; }).catch(() => {});
     }, 2000);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [
-    productName, quantity, targetUnitPrice, neededByDate, productionType,
+    effectiveManufacturerId, productName, quantity, targetUnitPrice, neededByDate, productionType,
     sampleRequired, packagingRequirements, shippingDestination,
     selectedMaterials, colorways, selectedSizes, printMethod,
     hasEmbroidery, hasWash, hasHardware, hasLabels, customPackaging, step,
@@ -250,9 +279,17 @@ export default function QuoteRequestScreen() {
     router.back();
   }
 
+  const stepTitles = needsPicker ? ['Choose Manufacturer', ...STEP_TITLES] : STEP_TITLES;
+  const totalSteps = stepTitles.length;
+  const pickerStepIndex = needsPicker ? 1 : 0; // 1-based step number of the picker, if present
+
   function goNext() {
+    if (needsPicker && step === pickerStepIndex && !pickedManufacturerId) {
+      Alert.alert('Choose a manufacturer', 'Pick who you want to send this quote request to.');
+      return;
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (step < TOTAL_STEPS) setStep(s => s + 1);
+    if (step < totalSteps) setStep(s => s + 1);
   }
 
   function goBack() {
@@ -294,27 +331,13 @@ export default function QuoteRequestScreen() {
     }
     setSubmitting(true);
     try {
-      if (!manufacturerId || !manufacturer) {
+      if (!effectiveManufacturerId || !manufacturer) {
         Alert.alert('Review required', 'Choose a manufacturer before submitting.');
         return;
       }
-      // Ensure draft exists first
-      const mfgId = manufacturerId;
-      const qr = await saveQuoteRequestDraft({
-        id: draftId.current,
-        manufacturerId: mfgId,
-        productName: productName.trim(),
-        quantity: parseInt(quantity) || 100,
-        materials: selectedMaterials,
-        colorways,
-        sizes: selectedSizes,
-        hasEmbroidery,
-        hasWash,
-        hasHardware,
-        hasLabels,
-        customPackaging,
-        currentStep: 5,
-      });
+      // Ensure draft exists first — same complete payload autosave builds, so
+      // Submit never silently drops fields the seller actually filled in.
+      const qr = await saveQuoteRequestDraft(buildQuoteRequestPayload(effectiveManufacturerId, TOTAL_STEPS));
       await submitQuoteRequest(qr.id);
       Alert.alert(
         'Quote Request Sent! 🎉',
@@ -329,6 +352,46 @@ export default function QuoteRequestScreen() {
   }
 
   // ── Step renderers ────────────────────────────────────────────────────────
+
+  function renderPickerStep() {
+    return (
+      <View style={sc.stepContent}>
+        <Text style={sc.stepHeadline}>Who is this quote for?</Text>
+        <Text style={sc.stepSubheadline}>Choose one of your saved manufacturers to send this request to.</Text>
+
+        {pickerLoading ? (
+          <Text style={sc.stepSubheadline}>Loading your manufacturers…</Text>
+        ) : pickerOptions.length === 0 ? (
+          <EmptyState
+            icon="users"
+            title="No saved manufacturers yet"
+            description="Save a manufacturer from Discover, then come back to request a quote."
+            action={{ label: 'Find manufacturers', onPress: () => router.replace('/manufacturer-hub' as never) }}
+          />
+        ) : (
+          pickerOptions.map((mfg) => {
+            const active = pickedManufacturerId === mfg.id;
+            return (
+              <TouchableOpacity
+                key={mfg.id}
+                onPress={() => { setPickedManufacturerId(mfg.id); Haptics.selectionAsync(); }}
+                style={[sc.radioCard, active && sc.radioCardActive]}
+                activeOpacity={0.8}
+              >
+                <View style={[sc.radioCircle, active && sc.radioCircleActive]}>
+                  {active && <View style={sc.radioDot} />}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[sc.radioTitle, active && { color: PURPLE_LIGHT }]}>{mfg.name}</Text>
+                  <Text style={sc.radioDesc}>{mfg.city}, {mfg.country}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })
+        )}
+      </View>
+    );
+  }
 
   function renderStep1() {
     return (
@@ -440,8 +503,8 @@ export default function QuoteRequestScreen() {
               placeholder="e.g. Black, Navy Blue..."
               style={{ flex: 1 }}
             />
-            <TouchableOpacity onPress={addColorway} style={sc.addBtn}>
-              <Feather name="plus" size={ICON.sm} color={ON_DARK} />
+            <TouchableOpacity onPress={addColorway} style={[sc.addBtn, { backgroundColor: colors.primary }]}>
+              <Feather name="plus" size={ICON.sm} color={colors.primaryForeground} />
             </TouchableOpacity>
           </View>
           {colorways.length > 0 && (
@@ -487,56 +550,6 @@ export default function QuoteRequestScreen() {
   }
 
   function renderStep4() {
-    return (
-      <View style={sc.stepContent}>
-        <Text style={sc.stepHeadline}>Attach files</Text>
-        <Text style={sc.stepSubheadline}>Attach design files, tech packs, or reference images for your manufacturer.</Text>
-
-        <View style={sc.fileGrid}>
-          {FILE_TYPES.map(ft => {
-            const added = addedFiles.includes(ft.key);
-            return (
-              <BrandthreadCard key={ft.key} style={sc.fileCard}>
-                <View style={[sc.fileIconWrap, added && { backgroundColor: colors.accent }]}>
-                  <Feather name={ft.icon} size={ICON.lg} color={added ? PURPLE_LIGHT : MUTED} />
-                </View>
-                <Text style={sc.fileLabel}>{ft.label}</Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    if (added) return;
-                    Alert.alert('Add File', 'File upload will be available in the next release.');
-                    setAddedFiles(prev => [...prev, ft.key]);
-                  }}
-                  style={[sc.addFileBtn, added && sc.addFileBtnDone]}
-                >
-                  <Text style={[sc.addFileBtnText, added && { color: SUCCESS }]}>
-                    {added ? 'Added ✓' : 'Add'}
-                  </Text>
-                </TouchableOpacity>
-              </BrandthreadCard>
-            );
-          })}
-        </View>
-
-        {addedFiles.length > 0 && (
-          <BrandthreadCard style={sc.addedFilesCard}>
-            <Text style={sc.addedFilesTitle}>Files added ({addedFiles.length})</Text>
-            {addedFiles.map(key => {
-              const ft = FILE_TYPES.find(f => f.key === key);
-              return (
-                <View key={key} style={sc.addedFileRow}>
-                  <Feather name="file" size={ICON.sm} color={SUCCESS} />
-                  <Text style={sc.addedFileName}>{ft?.label ?? key}</Text>
-                </View>
-              );
-            })}
-          </BrandthreadCard>
-        )}
-      </View>
-    );
-  }
-
-  function renderStep5() {
     const warnings: string[] = [];
     if (!productName.trim()) warnings.push('Product name is required');
     if (!parseInt(quantity)) warnings.push('Quantity must be greater than 0');
@@ -624,21 +637,6 @@ export default function QuoteRequestScreen() {
           </View>
         </BrandthreadCard>
 
-        {addedFiles.length > 0 && (
-          <BrandthreadCard style={sc.summaryCard}>
-            <Text style={sc.summarySection}>Files ({addedFiles.length} attached)</Text>
-            {addedFiles.map(key => {
-              const ft = FILE_TYPES.find(f => f.key === key);
-              return (
-                <View key={key} style={sc.summaryRow}>
-                  <Feather name="file" size={12} color={SUCCESS} />
-                  <Text style={sc.summaryValue}>{ft?.label ?? key}</Text>
-                </View>
-              );
-            })}
-          </BrandthreadCard>
-        )}
-
         <View style={sc.submitBtns}>
           <SecondaryButton label="Save Draft" onPress={handleSaveDraft} style={{ flex: 1 }} />
           <PrimaryButton
@@ -653,7 +651,10 @@ export default function QuoteRequestScreen() {
     );
   }
 
-  const stepContent = [renderStep1, renderStep2, renderStep3, renderStep4, renderStep5][step - 1];
+  const steps = needsPicker
+    ? [renderPickerStep, renderStep1, renderStep2, renderStep3, renderStep4]
+    : [renderStep1, renderStep2, renderStep3, renderStep4];
+  const stepContent = steps[step - 1];
 
   return (
     <KeyboardAvoidingView
@@ -671,7 +672,7 @@ export default function QuoteRequestScreen() {
         </TouchableOpacity>
       </View>
 
-      <ProgressBar step={step} total={TOTAL_STEPS} />
+      <ProgressBar step={step} total={totalSteps} titles={stepTitles} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -689,7 +690,7 @@ export default function QuoteRequestScreen() {
           disabled={step === 1}
           style={{ flex: 1 }}
         />
-        {step < TOTAL_STEPS ? (
+        {step < totalSteps ? (
           <PrimaryButton label="Next" onPress={goNext} style={{ flex: 2 }} />
         ) : null}
       </View>
@@ -784,7 +785,7 @@ const sc = StyleSheet.create({
   },
   addBtn: {
     width: COMP.buttonHSm, height: COMP.buttonHSm,
-    borderRadius: RADIUS.md, backgroundColor: PURPLE,
+    borderRadius: RADIUS.md,
     alignItems: 'center', justifyContent: 'center',
   },
   tagChip: {

@@ -221,7 +221,6 @@ export default function PayoutsScreen() {
         <View style={[styles.balanceCard, { flex: 1 }]}>
           <Text style={styles.balanceLabel}>Pending</Text>
           <Text style={[styles.balanceAmount, { color: MUTED }]}>{pendFmt}</Text>
-          <Text style={styles.balanceSub}>Processing 2–3 days</Text>
         </View>
       </View>
 
@@ -315,20 +314,6 @@ export default function PayoutsScreen() {
                  </Text>
                </View>
              )}
-          </View>
-
-          <View style={styles.settingsSection}>
-            <Text style={styles.sectionTitle}>Payout schedule</Text>
-            {[
-              { label: 'Frequency',     value: 'Weekly' },
-              { label: 'Minimum',       value: '$1.00' },
-              { label: 'Currency',      value: 'USD' },
-            ].map((r) => (
-              <View key={r.label} style={styles.settingsRow}>
-                <Text style={styles.settingsLabel}>{r.label}</Text>
-                <Text style={styles.settingsValue}>{r.value}</Text>
-              </View>
-            ))}
           </View>
 
            {!isReadOnly && (

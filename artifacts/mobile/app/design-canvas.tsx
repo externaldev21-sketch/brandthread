@@ -86,6 +86,7 @@ import {
 import {
   getProject, createProject, autosaveProject, updateProject,
   createVersion, duplicateProject, syncVerifiedDesignAsset,
+  getBrandAssets,
 } from '@/services/designService';
 import {
   resolveMasterDescriptor, MasterDescriptor, MasterExportAsset,
@@ -99,6 +100,7 @@ import type {
   DesignTextLayer, DesignImageLayer, DesignShapeLayer, DesignDrawingLayer,
   DrawPath, BlendModeKind,
 } from '@/services/designTypes';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -176,7 +178,7 @@ type ActiveSheet =
   | 'layerOptions' | 'canvasResize' | 'selection' | 'transformTool' | 'adjustments' | null;
 
 // Wrench tab type — now includes 'prefs' as sixth tab
-type WrenchTab = 'add' | 'canvas' | 'guides' | 'share' | 'video' | 'prefs';
+type WrenchTab = 'add' | 'canvas' | 'guides' | 'share' | 'prefs';
 
 // Transform handle kind (legacy 4-corner system, kept for compat)
 type HandleKind =
@@ -242,8 +244,9 @@ export default function DesignCanvasScreen() {
 
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{ id?: string; addAssetId?: string }>();
   const projectId = params.id ?? '';
+  const addAssetId = params.addAssetId ?? '';
 
   // ── Project state ──────────────────────────────────────────────────────────
   const [project, setProject]         = useState<DesignProject | null>(null);
@@ -515,7 +518,37 @@ export default function DesignCanvasScreen() {
       }
       setProject(proj);
       setProjectName(proj.name);
-      setLayers(proj.layers);
+      let initialLayers = proj.layers;
+      // Handle ?addAssetId= from design-brand-assets.tsx "Add to Project":
+      // insert the chosen brand asset as a new image layer, the same way
+      // handleAddImage() adds a picked photo.
+      if (addAssetId) {
+        try {
+          const assets = await getBrandAssets();
+          const asset = assets.find(a => a.id === addAssetId);
+          if (asset?.uri) {
+            const lw = proj.canvas.width  || 1080;
+            const lh = proj.canvas.height || 1080;
+            const maxOrder = initialLayers.reduce((m, l) => Math.max(m, l.order), 0);
+            const tw = Math.round(lw * 0.6);
+            const assetLayer: DesignLayer = {
+              id: uid(), name: asset.name || 'Asset', type: 'image',
+              visible: true, locked: false, order: maxOrder + 1,
+              transform: {
+                x: Math.round((lw - tw) / 2), y: 60,
+                width: tw, height: tw, rotation: 0, scaleX: 1, scaleY: 1,
+              },
+              data: { kind: 'image', uri: asset.uri, opacity: 1, fit: 'contain', blendMode: 'normal' } as DesignImageLayer,
+              opacity: 1,
+              createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+            };
+            initialLayers = [...initialLayers, assetLayer];
+          }
+        } catch {
+          // Non-fatal: project still opens without the asset pre-added.
+        }
+      }
+      setLayers(initialLayers);
       setResizeW(String(proj.canvas?.width ?? 1080));
       setResizeH(String(proj.canvas?.height ?? 1080));
       // Restore persisted crop from canvas
@@ -1833,7 +1866,7 @@ export default function DesignCanvasScreen() {
           `${incoming.length} layer${incoming.length === 1 ? '' : 's'} added from "${asset.name}".`,
         );
       } catch (e) {
-        Alert.alert('Import error', e instanceof Error ? e.message : 'Could not read the file.');
+        Alert.alert('Import error', "That file couldn't be opened. Try a PNG, JPG or Brandthread file.");
       }
       return;
     }
@@ -1880,7 +1913,7 @@ export default function DesignCanvasScreen() {
       markDirty();
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (e) {
-      Alert.alert('Import error', e instanceof Error ? e.message : 'Could not import image.');
+      Alert.alert('Import error', "That file couldn't be opened. Try a PNG, JPG or Brandthread file.");
     }
   }
 
@@ -2001,11 +2034,8 @@ export default function DesignCanvasScreen() {
       );
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
-      if (err instanceof ExportDimensionError || err instanceof ExportVerificationError) {
-        Alert.alert('Export failed', err.message);
-      } else {
-        Alert.alert('Error', err instanceof Error ? err.message : 'Could not export.');
-      }
+      console.error('[design-canvas] export failed', err);
+      Alert.alert('Export failed', "Couldn't save your design. Try again.");
     } finally {
       setExporting(false);
     }
@@ -2056,11 +2086,8 @@ export default function DesignCanvasScreen() {
       );
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
-      if (err instanceof ExportDimensionError || err instanceof ExportVerificationError) {
-        Alert.alert('Export failed', err.message);
-      } else {
-        Alert.alert('Error', err instanceof Error ? err.message : 'Could not export.');
-      }
+      console.error('[design-canvas] export failed', err);
+      Alert.alert('Export failed', "Couldn't save your design. Try again.");
     } finally {
       setExporting(false);
     }
@@ -2314,11 +2341,8 @@ export default function DesignCanvasScreen() {
       try { new File(asset.uri).delete(); } catch { /* best-effort */ }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: unknown) {
-      if (err instanceof ExportDimensionError || err instanceof ExportVerificationError) {
-        Alert.alert('Export failed', err.message, [{ text: 'OK' }]);
-      } else {
-        Alert.alert('Export failed', err instanceof Error ? err.message : 'Unknown error.', [{ text: 'OK' }]);
-      }
+      console.error('[design-canvas] export failed', err);
+      Alert.alert('Export failed', "Couldn't save your design. Try again.", [{ text: 'OK' }]);
     } finally {
       setExporting(false);
     }
@@ -2375,11 +2399,8 @@ export default function DesignCanvasScreen() {
       await syncVerifiedDesignAsset(project!.id, asset, 'master').catch(() => {});
       try { new File(asset.uri).delete(); } catch { /* best-effort */ }
     } catch (err: unknown) {
-      if (err instanceof ExportDimensionError || err instanceof ExportVerificationError) {
-        Alert.alert('Share failed', err.message, [{ text: 'OK' }]);
-      } else {
-        Alert.alert('Share failed', err instanceof Error ? err.message : 'Unknown error.', [{ text: 'OK' }]);
-      }
+      console.error('[design-canvas] share failed', err);
+      Alert.alert('Share failed', "Couldn't open sharing. Try again.", [{ text: 'OK' }]);
     } finally {
       setExporting(false);
     }
@@ -2719,7 +2740,12 @@ export default function DesignCanvasScreen() {
       </View>
 
       {/* ── TOOL ROW ── */}
-      <View style={styles.toolRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.toolRow}
+        contentContainerStyle={styles.toolRowContent}
+      >
         <TouchableOpacity
           style={[styles.toolChip, activeTopTool === 'brush' && styles.toolChipActive]}
           onPress={() => { selectTool('brush'); openSheet('brushLib'); }}
@@ -2805,7 +2831,7 @@ export default function DesignCanvasScreen() {
         >
           <View style={[styles.colorSwatchInner, { backgroundColor: drawColor }]} />
         </TouchableOpacity>
-      </View>
+      </ScrollView>
 
       {/* ── CANVAS AREA ── */}
       <View style={styles.canvasOuter}>
@@ -3024,15 +3050,9 @@ export default function DesignCanvasScreen() {
                     />
                     <Line x1={cx2} y1={y - 4} x2={cx2} y2={y - 22}
                       stroke={PURPLE_LIGHT} strokeWidth={1.5} />
-                    {handlePositions.map(({ hx, hy, kind }) => (
-                      <Rect
-                        key={kind}
-                        x={hx - VS / 2} y={hy - VS / 2}
-                        width={VS} height={VS}
-                        rx={kind === 'rotate' ? VS / 2 : 2}
-                        fill={CARD_ELEVATED} stroke={PURPLE_LIGHT} strokeWidth={1.5}
-                      />
-                    ))}
+                    {/* Resize/rotate handles are intentionally not drawn here: the
+                        pan responder that would make them draggable only lives on the
+                        Transform tool. Use the Transform tool to resize or rotate. */}
                   </G>
                 );
               })()}
@@ -3142,24 +3162,10 @@ export default function DesignCanvasScreen() {
             ));
           })()}
 
-          {/* ── LEGACY SELECT TRANSFORM HANDLE PRESSABLE OVERLAYS ── */}
-          {selectedLayer && activeTopTool === 'select' && !selectionRegion && handlePositions.map(({ hx, hy, kind }) => (
-            <Pressable
-              key={kind}
-              style={[
-                styles.handlePressable,
-                {
-                  left:  hx - HS / 2,
-                  top:   hy - HS / 2,
-                  width:  HS,
-                  height: HS,
-                },
-              ]}
-              onPressIn={(e) => {
-                startHandle(kind, e.nativeEvent.pageX, e.nativeEvent.pageY);
-              }}
-            />
-          ))}
+          {/* Select mode intentionally has no handle Pressables: transformPanResponder
+              (the responder that would make them draggable) is only attached for the
+              Transform tool, so drawing interactive-looking handles here would be fake
+              UI. Resize/rotate lives on the Transform tool. */}
 
           {/* ── EXPORT SVG (off-screen, logical dimensions, for toDataURL) ──
               Uses logical dimensions and scale=1.
@@ -3560,9 +3566,9 @@ export default function DesignCanvasScreen() {
       />
 
       {/* ── BRUSH LIBRARY ── */}
-      <Modal visible={activeSheet === 'brushLib'} transparent animationType="slide" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'brushLib'} transparent animationType="fade" onRequestClose={closeSheet}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <View style={[styles.sheet, { maxHeight: '72%' }]}>
+          <SheetRise style={[styles.sheet, { maxHeight: '72%' }]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>
@@ -3655,14 +3661,14 @@ export default function DesignCanvasScreen() {
                 </ScrollView>
               </>
             )}
-          </View>
+          </SheetRise>
         </TouchableOpacity>
       </Modal>
 
       {/* ── COLOR PICKER ── */}
-      <Modal visible={activeSheet === 'color'} transparent animationType="slide" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'color'} transparent animationType="fade" onRequestClose={closeSheet}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <View style={[styles.sheet, { maxHeight: '70%' }]}>
+          <SheetRise style={[styles.sheet, { maxHeight: '70%' }]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>Color</Text>
@@ -3788,14 +3794,14 @@ export default function DesignCanvasScreen() {
                 })}
               </View>
             )}
-          </View>
+          </SheetRise>
         </TouchableOpacity>
       </Modal>
 
       {/* ── LAYER MANAGER ── */}
-      <Modal visible={activeSheet === 'layers'} transparent animationType="slide" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'layers'} transparent animationType="fade" onRequestClose={closeSheet}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <View style={[styles.sheet, { maxHeight: '70%' }]}>
+          <SheetRise style={[styles.sheet, { maxHeight: '70%' }]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>Layers</Text>
@@ -3862,14 +3868,14 @@ export default function DesignCanvasScreen() {
                 </View>
               ))}
             </ScrollView>
-          </View>
+          </SheetRise>
         </TouchableOpacity>
       </Modal>
 
       {/* ── LAYER OPTIONS ── */}
-      <Modal visible={activeSheet === 'layerOptions'} transparent animationType="slide" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'layerOptions'} transparent animationType="fade" onRequestClose={closeSheet}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <View style={styles.sheet}>
+          <SheetRise style={styles.sheet}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>{layerOptionsLayer?.name ?? 'Layer'}</Text>
@@ -3948,7 +3954,7 @@ export default function DesignCanvasScreen() {
                 <Text style={[styles.layerActionPillText, { color: RED }]}>Delete</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </SheetRise>
         </TouchableOpacity>
       </Modal>
 
@@ -3963,9 +3969,9 @@ export default function DesignCanvasScreen() {
       />
 
       {/* ── CANVAS RESIZE / CROP SHEET ── */}
-      <Modal visible={activeSheet === 'canvasResize'} transparent animationType="slide" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'canvasResize'} transparent animationType="fade" onRequestClose={closeSheet}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <View style={styles.sheet}>
+          <SheetRise style={styles.sheet}>
             <SheetHandle />
             <Text style={styles.sheetTitle}>Canvas Size & Crop</Text>
 
@@ -4031,14 +4037,14 @@ export default function DesignCanvasScreen() {
                 </TouchableOpacity>
               )}
             </View>
-          </View>
+          </SheetRise>
         </TouchableOpacity>
       </Modal>
 
       {/* ── EXPORT SHEET ── */}
-      <Modal visible={activeSheet === 'export'} transparent animationType="slide" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'export'} transparent animationType="fade" onRequestClose={closeSheet}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <View style={styles.sheet}>
+          <SheetRise style={styles.sheet}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>Export</Text>
@@ -4079,19 +4085,13 @@ export default function DesignCanvasScreen() {
                   icon: 'eye' as const, disabled: false,
                   action: () => { closeSheet(); router.push((`/design-mockup-preview?projectId=${project?.id ?? ''}`) as never); },
                 },
-                {
-                  label: 'Time-lapse',
-                  sub: 'Not available — requires native video generation',
-                  icon: 'video' as const, disabled: true,
-                  action: () => Alert.alert('Time-lapse unavailable', 'Time-lapse requires native video generation.'),
-                },
               ];
               return items.map(item => (
                 <TouchableOpacity
                   key={item.label}
                   style={[styles.exportRow, item.disabled && styles.exportRowDisabled]}
                   onPress={item.action}
-                  disabled={item.disabled && !['Time-lapse', 'JPEG — unavailable'].includes(item.label)}
+                  disabled={item.disabled && !['JPEG — unavailable'].includes(item.label)}
                   activeOpacity={item.disabled ? 1 : 0.7}
                 >
                   <View style={[styles.exportIcon, item.disabled && { opacity: 0.4 }]}>
@@ -4105,14 +4105,14 @@ export default function DesignCanvasScreen() {
                 </TouchableOpacity>
               ));
             })()}
-          </View>
+          </SheetRise>
         </TouchableOpacity>
       </Modal>
 
       {/* ── CANVAS INFO ── */}
-      <Modal visible={activeSheet === 'canvasInfo'} transparent animationType="slide" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'canvasInfo'} transparent animationType="fade" onRequestClose={closeSheet}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <View style={styles.sheet}>
+          <SheetRise style={styles.sheet}>
             <SheetHandle />
             <Text style={styles.sheetTitle}>Canvas Info</Text>
             {[
@@ -4135,7 +4135,7 @@ export default function DesignCanvasScreen() {
             <TouchableOpacity style={styles.addBtn} onPress={closeSheet}>
               <Text style={styles.addBtnText}>Close</Text>
             </TouchableOpacity>
-          </View>
+          </SheetRise>
         </TouchableOpacity>
       </Modal>
 
@@ -4199,9 +4199,9 @@ export default function DesignCanvasScreen() {
       </Modal>
 
       {/* ── SELECTION SETTINGS MODAL ── */}
-      <Modal visible={activeSheet === 'selection'} transparent animationType="slide" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'selection'} transparent animationType="fade" onRequestClose={closeSheet}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <View style={styles.sheet}>
+          <SheetRise style={styles.sheet}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>Selection Settings</Text>
@@ -4235,14 +4235,14 @@ export default function DesignCanvasScreen() {
                 <Text style={styles.fontChipText}>Clear</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </SheetRise>
         </TouchableOpacity>
       </Modal>
 
       {/* ── TRANSFORM SETTINGS MODAL ── */}
-      <Modal visible={activeSheet === 'transformTool'} transparent animationType="slide" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'transformTool'} transparent animationType="fade" onRequestClose={closeSheet}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <View style={styles.sheet}>
+          <SheetRise style={styles.sheet}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>Transform Settings</Text>
@@ -4285,14 +4285,14 @@ export default function DesignCanvasScreen() {
               <Feather name="refresh-cw" size={12} color={MUTED} />
               <Text style={styles.fontChipText}>Reset Transform</Text>
             </TouchableOpacity>
-          </View>
+          </SheetRise>
         </TouchableOpacity>
       </Modal>
 
       {/* ── ADJUSTMENTS (CURVES) PANEL ── */}
-      <Modal visible={activeSheet === 'adjustments'} transparent animationType="slide" onRequestClose={closeSheet}>
+      <Modal visible={activeSheet === 'adjustments'} transparent animationType="fade" onRequestClose={closeSheet}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <View style={[styles.sheet, { maxHeight: '70%' }]}>
+          <SheetRise style={[styles.sheet, { maxHeight: '70%' }]}>
             <SheetHandle />
             <View style={styles.sheetHeaderRow}>
               <Text style={styles.sheetTitle}>Curves</Text>
@@ -4426,7 +4426,7 @@ export default function DesignCanvasScreen() {
                 })()}
               </>
             )}
-          </View>
+          </SheetRise>
         </TouchableOpacity>
       </Modal>
 
@@ -4495,7 +4495,6 @@ const WRENCH_TABS: { key: WrenchTab; label: string }[] = [
   { key: 'canvas', label: 'Canvas' },
   { key: 'guides', label: 'Guides' },
   { key: 'share',  label: 'Share' },
-  { key: 'video',  label: 'Video' },
   { key: 'prefs',  label: 'Prefs' },
 ];
 
@@ -4583,9 +4582,9 @@ function WrenchActionsSheet({
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose} />
-      <View style={[styles.wrenchSheet, { paddingBottom: insets.bottom + SP.md }]}>
+      <SheetRise style={[styles.wrenchSheet, { paddingBottom: insets.bottom + SP.md }]}>
         <SheetHandle />
 
         {/* Tab row */}
@@ -4829,25 +4828,6 @@ function WrenchActionsSheet({
             </View>
           )}
 
-          {/* ── VIDEO TAB ── */}
-          {wrenchTab === 'video' && (
-            <View style={styles.videoPlaceholder}>
-              <Feather name="video" size={ICON.xxl} color={SUBTLE} />
-              <Text style={styles.videoPlaceholderTitle}>Export Process Video</Text>
-              <Text style={styles.videoPlaceholderSub}>
-                Time-lapse video export — which records your drawing strokes as a shareable video — is
-                being built separately and is not yet available in this release. Check back for updates.
-              </Text>
-              <TouchableOpacity
-                style={[styles.addBtn, { opacity: 0.4, marginTop: SP.sm, alignSelf: 'stretch' }]}
-                disabled
-                activeOpacity={1}
-              >
-                <Text style={styles.addBtnText}>Coming soon</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
           {/* ── PREFS TAB ── */}
           {wrenchTab === 'prefs' && (
             <View style={{ padding: SP.md, gap: SP.md }}>
@@ -4990,7 +4970,7 @@ function WrenchActionsSheet({
           )}
 
         </ScrollView>
-      </View>
+      </SheetRise>
     </Modal>
   );
 }
@@ -5024,9 +5004,9 @@ function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGH
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
-        <View style={[styles.sheet, { maxHeight: '85%' }]}>
+        <SheetRise style={[styles.sheet, { maxHeight: '85%' }]}>
           <SheetHandle />
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.sheetHeaderRow}>
@@ -5103,7 +5083,7 @@ function TextSheet({ visible, onClose, onAdd, drawColor, PURPLE_DIM, PURPLE_LIGH
               <Text style={styles.addBtnText}>Add to Canvas</Text>
             </TouchableOpacity>
           </ScrollView>
-        </View>
+        </SheetRise>
       </TouchableOpacity>
     </Modal>
   );
@@ -5141,9 +5121,12 @@ const styles = StyleSheet.create({
   nameInput:   { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, borderBottomWidth: 1, borderBottomColor: BORDER_ACTIVE, textAlign: 'center', minWidth: 80 },
 
   toolRow: {
-    flexDirection: 'row', alignItems: 'center',
+    flexGrow: 0,
     backgroundColor: SURFACE,
     borderBottomWidth: 1, borderBottomColor: BORDER,
+  },
+  toolRowContent: {
+    flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: SP.sm, paddingVertical: 6, gap: 4,
   },
   toolChip:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: SP.sm, paddingVertical: 7, borderRadius: RADIUS.sm },

@@ -13,7 +13,7 @@ import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
 import type { Conversation, Message } from '@/services/socialTypes';
 import { FS } from '@/lib/theme';
-import { apiErrorMessage, confirmUnblock } from '@/lib/safety';
+import { confirmUnblock } from '@/lib/safety';
 import {
   BlockedComposer, openConversationOptions, openMessageOptions, REMOVED_MESSAGE_TEXT,
   type DmMessagingState,
@@ -93,7 +93,7 @@ function Bubble({ msg, prevMsg, isDark, currentUserId, onLongPress }: {
             end={{ x: 1, y: 1 }}
             style={[bub.bubble, bub.bubbleMe]}
           >
-            <Text style={bub.textMe}>{msg.text}</Text>
+            <Text style={[bub.textMe, { color: colors.primaryForeground }]}>{msg.text}</Text>
           </LinearGradient>
         ) : (
           <View style={[bub.bubble, bub.bubbleThem, { backgroundColor: cardBg }]}>
@@ -122,7 +122,7 @@ const bub = StyleSheet.create({
   bubble:      { maxWidth: '78%', paddingHorizontal: 14, paddingVertical: 10, marginBottom: 2 },
   bubbleMe:    { borderRadius: 20, borderBottomRightRadius: 5 },
   bubbleThem:  { borderRadius: 20, borderBottomLeftRadius: 5 },
-  textMe:      { fontSize: 15, fontFamily: 'Inter_400Regular', color: '#FFFFFF', lineHeight: 21 },
+  textMe:      { fontSize: 15, fontFamily: 'Inter_400Regular', lineHeight: 21 },
   textThem:    { fontSize: 15, fontFamily: 'Inter_400Regular', lineHeight: 21 },
   timestamp:   { fontSize: FS.xs, fontFamily: 'Inter_400Regular', marginBottom: 6, paddingHorizontal: 4 },
   dividerRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 16, paddingHorizontal: 20 },
@@ -193,7 +193,8 @@ export default function ChatScreen() {
         try {
           await api.conversations.markRead(id);
         } catch (error) {
-          if (active) setSendError(error instanceof Error ? `Could not mark messages as read: ${error.message}` : 'Could not mark messages as read.');
+          // Mark-read failures are not user-facing; log only.
+          if (__DEV__) console.warn('Could not mark messages as read', error);
         }
       } catch (error) {
         if (active) {
@@ -230,7 +231,7 @@ export default function ChatScreen() {
       ]);
     } catch (error) {
       setText(trimmed);
-      setSendError(`Message was not sent. ${apiErrorMessage(error, 'Please try again.')}`);
+      setSendError('Message not sent. Tap send to retry.');
     } finally {
       setIsSending(false);
     }
@@ -368,7 +369,7 @@ export default function ChatScreen() {
             colors={text.trim() ? [colors.accent, colors.primary] : [isDark ? '#2A261E' : '#E8E1CF', isDark ? '#2A261E' : '#E8E1CF']}
             style={s.sendBtn}
           >
-            <Feather name="send" size={17} color={text.trim() ? '#FFFFFF' : muted} />
+            <Feather name="send" size={17} color={text.trim() ? colors.primaryForeground : muted} />
           </LinearGradient>
         </TouchableOpacity>
       </View>

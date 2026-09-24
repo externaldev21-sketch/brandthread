@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
-import { View, Text, ScrollView, StyleSheet, Alert, Animated, Image, FlatList } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert, Animated, Image, FlatList, Share, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -19,7 +19,8 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 
 import { AnimatedEntrance, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SectionHeader, StatusBadge, StatCard, NavigationCard, LoadingSkeleton, EmptyState, FilterChip, PressableScale } from '@/components/BrandthreadUI';
 
-import { getProduct, updateProduct, getProductAnalytics, archiveProduct, publishProduct, adjustInventory } from '@/services/productService';
+import { getProduct, updateProduct, getProductAnalytics, archiveProduct, publishProduct, adjustInventory, duplicateProduct, deleteProduct } from '@/services/productService';
+import { useApi } from '@/lib/api';
 import { Product, ProductVariant, ProductStatus } from '@/services/productTypes';
 import { getItemsByProduct, adjustStock } from '@/services/inventoryService';
 import { InventoryItem } from '@/services/inventoryTypes';
@@ -139,6 +140,24 @@ export default function ProductDetailScreen() {
   if (!product) {
     return (
       <View style={[s.root, { paddingTop: insets.top }]}>
+        <View style={s.header}>
+          <PressableScale
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
+            style={s.backBtn}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel="Back"
+          >
+            <Feather name="arrow-left" size={ICON.md} color={FG} />
+          </PressableScale>
+          <Text style={s.headerTitle} numberOfLines={1}>Product</Text>
+          <View style={s.headerRight} />
+        </View>
+        <EmptyState
+          icon="alert-circle"
+          title="Couldn't load this product"
+          description="Check your connection and try again."
+          action={{ label: 'Try again', onPress: () => { void loadProduct(); }, icon: 'refresh-cw' }}
+        />
       </View>
     );
   }
@@ -192,8 +211,23 @@ export default function ProductDetailScreen() {
                     });
                   }
                 }},
-                { text: 'Duplicate', onPress: () => Alert.alert('Duplicating…') },
-                { text: 'Share', onPress: () => Alert.alert('Share link copied') },
+                { text: 'Duplicate', onPress: () => {
+                  duplicateProduct(product.id).then(copy => {
+                    if (copy) {
+                      Alert.alert('Product duplicated', `${copy.name} was added as a draft.`, [
+                        { text: 'View copy', onPress: () => router.replace(('/product-detail?id=' + copy.id) as never) },
+                        { text: 'OK' },
+                      ]);
+                    }
+                  }).catch(error => {
+                    reportNetworkError(error);
+                    Alert.alert('Could not duplicate product', 'Check your connection and try again.');
+                  });
+                }},
+                { text: 'Share', onPress: () => {
+                  const link = `https://brandthread.app/store/product/${product.id}`;
+                  Share.share({ message: `${product.name} — ${link}`, url: link }).catch(() => {});
+                }},
                 { text: 'Cancel', style: 'cancel' },
               ]);
             }}
@@ -432,6 +466,31 @@ const makeOvStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 function VariantsTab({ product, setProduct, id }: { product: Product; setProduct: (p: Product) => void; id: string }) {
   const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN } = useThemeAliases();
   const vt = React.useMemo(() => makeVtStyles(theme), [theme]);
+  const router = useRouter();
+  const api = useApi();
+
+  const goToVariantEditor = () => {
+    router.push((`/add-product?editId=${id}&section=variants`) as never);
+  };
+
+  const removeVariant = (variant: ProductVariant) => {
+    Alert.alert('Remove variant?', `${variant.title} will no longer be sold.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: () => {
+        (api as any).products?.updateVariant?.(product.id, variant.id, { status: 'inactive' })
+          .then(() => {
+            setProduct({
+              ...product,
+              variants: product.variants.map(v => v.id === variant.id ? { ...v, status: 'inactive' as const } : v),
+            });
+          })
+          .catch((error: unknown) => {
+            reportNetworkError(error);
+            Alert.alert('Could not remove variant', 'Check your connection and try again.');
+          });
+      }},
+    ]);
+  };
   // Fix 2: bulk edit price handler
   const handleBulkPrice = () => {
     const currentPrice = product.pricing.priceCents;
@@ -504,7 +563,7 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
     <View style={{ gap: SP.md, paddingTop: SP.md }}>
       <SectionHeader
         title="Variants"
-        action={{ label: 'Add variant', onPress: () => Alert.alert('Add Variant', 'Select sizes, colors, and other options for this product.') }}
+        action={{ label: 'Add variant', onPress: goToVariantEditor }}
       />
 
       {/* Bulk edit */}
@@ -519,10 +578,6 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
             <Feather name="layers" size={ICON.sm} color={theme.secondary} />
             <Text style={vt.bulkBtnText}>Inventory</Text>
           </PressableScale>
-          <PressableScale style={vt.bulkBtn} onPress={() => Alert.alert('Bulk Status Edit', 'Set status for all variants.')}>
-            <Feather name="toggle-right" size={ICON.sm} color={SUCCESS} />
-            <Text style={vt.bulkBtnText}>Status</Text>
-          </PressableScale>
         </View>
       </BrandthreadCard>
 
@@ -531,7 +586,7 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
           icon="sliders"
           title="No variants"
           description="Add sizes, colors, or other options to create variants."
-          action={{ label: 'Add variant', onPress: () => Alert.alert('Add Variant'), icon: 'plus' }}
+          action={{ label: 'Add variant', onPress: goToVariantEditor, icon: 'plus' }}
         />
       ) : (
         <View style={{ paddingHorizontal: SP.md, gap: SP.sm }}>
@@ -567,17 +622,14 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
                 <View style={vt.variantActions}>
                   <PressableScale
                     style={vt.actionBtn}
-                    onPress={() => Alert.alert('Edit Variant', `Edit ${variant.title}`)}
+                    onPress={goToVariantEditor}
                   >
                     <Feather name="edit-2" size={12} color={theme.accentLight} />
                     <Text style={vt.actionBtnText}>Edit</Text>
                   </PressableScale>
                   <PressableScale
                     style={[vt.actionBtn, { borderColor: RED_DIM }]}
-                    onPress={() => Alert.alert('Delete Variant', `Delete ${variant.title}?`, [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Delete', style: 'destructive', onPress: () => Alert.alert('Deleted') },
-                    ])}
+                    onPress={() => removeVariant(variant)}
                   >
                     <Feather name="trash-2" size={12} color={RED} />
                     <Text style={[vt.actionBtnText, { color: RED }]}>Delete</Text>
@@ -910,7 +962,7 @@ function ProductionTab({ product, router }: { product: Product; router: ReturnTy
           <SecondaryButton
             label="Request Quote"
             icon="send"
-            onPress={() => Alert.alert('Request Quote', 'Send quote request to manufacturer.')}
+            onPress={() => router.push('/manufacturer-hub' as never)}
           />
         </View>
       )}
@@ -920,7 +972,13 @@ function ProductionTab({ product, router }: { product: Product; router: ReturnTy
           icon="tool"
           label="View Manufacturer"
           description={mfg.manufacturerName ?? 'Find a manufacturer'}
-          onPress={() => Alert.alert('Manufacturer', 'Navigate to manufacturer profile.')}
+          onPress={() => {
+            if (mfg.manufacturerId) {
+              router.push(('/manufacturer-profile?id=' + mfg.manufacturerId) as never);
+            } else {
+              router.push('/manufacturer-hub' as never);
+            }
+          }}
           accent={theme.accent}
         />
       </View>
@@ -931,7 +989,12 @@ function ProductionTab({ product, router }: { product: Product; router: ReturnTy
             icon="file-text"
             label="Tech Pack"
             description="View uploaded tech pack document"
-            onPress={() => Alert.alert('Tech Pack', 'Open tech pack viewer.')}
+            onPress={() => {
+              if (mfg.techPackUri) {
+                Linking.openURL(mfg.techPackUri).catch(() =>
+                  Alert.alert("Couldn't open tech pack", 'Try again.'));
+              }
+            }}
             accent={BLUE}
           />
         </View>
@@ -1241,21 +1304,25 @@ function StoreTab({
             </GradientCard>
           )}
 
-          {/* CTA buttons */}
+          {/* CTA buttons — this is a seller preview of the buyer-facing store page,
+              so these don't actually add to a bag or check out here. */}
           <View style={st.ctaRow}>
             <SecondaryButton
               label="Add to Cart"
               icon="shopping-cart"
-              onPress={() => Alert.alert('Add to Cart', 'Item added to cart.')}
+              onPress={() => {}}
+              disabled
               style={{ flex: 1 }}
             />
             <PrimaryButton
               label="Buy Now"
               icon="zap"
-              onPress={() => Alert.alert('Buy Now', 'Proceeding to checkout.')}
+              onPress={() => {}}
+              disabled
               style={{ flex: 1 }}
             />
           </View>
+          <Text style={st.previewCaption}>Buttons are live on your store</Text>
 
           {/* Description accordion */}
           <PressableScale
@@ -1276,7 +1343,7 @@ function StoreTab({
             icon="user"
             label="Seller"
             description={product.vendor ?? 'View seller profile'}
-            onPress={() => Alert.alert('Seller', 'Navigate to seller profile.')}
+            onPress={() => router.push(('/product-store?id=' + product.id) as never)}
             accent={theme.accent}
           />
         </View>
@@ -1312,6 +1379,7 @@ const makeStStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   preorderText:    { fontSize: FS.sm, fontFamily: FONT.medium, color: BLUE, flex: 1 },
   preorderSub:     { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   ctaRow:          { flexDirection: 'row', gap: SP.sm },
+  previewCaption:  { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' },
   descHeader:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                      paddingVertical: SP.sm, borderTopWidth: 1, borderTopColor: BORDER },
   descTitle:       { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },

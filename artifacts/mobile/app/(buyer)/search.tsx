@@ -20,6 +20,7 @@ import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useBuyerSearch } from '@/contexts/BuyerSearchContext';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { FONT, FS } from '@/lib/theme';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 type PersonResult = {
   userId: string; name: string; username: string | null;
@@ -291,7 +292,7 @@ export default function SearchScreen() {
       <Modal
         visible={showFilters}
         transparent
-        animationType="slide"
+        animationType="fade"
         statusBarTranslucent
         onRequestClose={() => setShowFilters(false)}
       >
@@ -302,7 +303,7 @@ export default function SearchScreen() {
             accessibilityRole="button"
             accessibilityLabel="Dismiss search filters"
           />
-          <View style={[styles.filterSheet, { backgroundColor: card, borderColor: border, paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <SheetRise style={[styles.filterSheet, { backgroundColor: card, borderColor: border, paddingBottom: Math.max(insets.bottom, 16) }]}>
             <View style={styles.sheetHandle} />
             <View style={styles.sheetTitleRow}>
               <View>
@@ -334,7 +335,7 @@ export default function SearchScreen() {
                 <Text style={[styles.applyText, { color: theme.onAccent }]}>Apply</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </SheetRise>
         </KeyboardAvoidingView>
       </Modal>
 
@@ -597,7 +598,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   masonryInitials: { color: theme.onAccent, fontSize: 36, fontFamily: 'Inter_700Bold', opacity: 0.9 },
   masonryFallbackLine: { width: 42, height: 2, borderRadius: 1, backgroundColor: `${theme.onAccent}8A`, marginTop: 10 },
   masonryPrice: { alignSelf: 'flex-start', backgroundColor: `${theme.background}C7`, borderRadius: 12, paddingHorizontal: 9, paddingVertical: 6, margin: 9 },
-  masonryPriceText: { color: theme.onAccent, fontSize: 12, fontFamily: 'Inter_700Bold' },
+  masonryPriceText: { color: theme.text, fontSize: 12, fontFamily: 'Inter_700Bold' },
   masonryName: { color: theme.text, fontSize: 14, lineHeight: 18, fontFamily: 'Inter_700Bold', marginTop: 8 },
   masonryBrandRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5 },
   masonryBrandDot: { width: 15, height: 15, borderRadius: 8 },

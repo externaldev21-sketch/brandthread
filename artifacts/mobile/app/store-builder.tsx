@@ -28,6 +28,7 @@ import {
 } from '@/services/storeTypes';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 function getStatusVariant(status: StorePublishStatus): 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple' {
   switch (status) {
@@ -475,9 +476,9 @@ export default function StoreBuilderScreen() {
         </View>
       </ScrollView>
 
-      <Modal visible={transferOpen} transparent animationType="slide" onRequestClose={() => setTransferOpen(false)}>
+      <Modal visible={transferOpen} transparent animationType="fade" onRequestClose={() => setTransferOpen(false)}>
         <KeyboardAvoidingView style={s.modalBackdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={[s.transferSheet, { paddingBottom: insets.bottom + SP.lg }]}>
+          <SheetRise style={[s.transferSheet, { paddingBottom: insets.bottom + SP.lg }]}>
             <View style={s.transferHeader}>
               <View style={s.shopifyLogo}><Text style={s.shopifyLogoText}>S</Text></View>
               <View style={{ flex: 1 }}>
@@ -543,7 +544,7 @@ export default function StoreBuilderScreen() {
                 {!!importError && <Text style={s.importError}>{importError}</Text>}
               </View>
             )}
-          </View>
+          </SheetRise>
         </KeyboardAvoidingView>
       </Modal>
     </View>

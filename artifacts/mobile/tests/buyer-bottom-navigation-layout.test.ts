@@ -6,6 +6,8 @@ const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8'
 
 const layout = read('app/(buyer)/_layout.tsx');
 const bar = read('components/buyer-nav/BuyerTabBar.tsx');
+const parts = read('components/tab-bar/TabBarParts.tsx');
+const sellerBar = read('components/SellerGlobalTabBar.tsx');
 const searchContext = read('contexts/BuyerSearchContext.tsx');
 const search = read('app/(buyer)/search.tsx');
 const profile = read('app/(buyer)/profile.tsx');
@@ -48,32 +50,41 @@ describe('buyer navigation contract', () => {
   });
 
   it('uses real frosted glass with theme tokens, a hairline border and an unclipped shadow', () => {
-    expect(bar).toContain("from 'expo-blur'");
-    expect(bar).toContain('<BlurView');
+    expect(parts).toContain("from 'expo-blur'");
+    expect(parts).toContain('<BlurView');
     expect(bar).toContain('useAppTheme');
-    expect(bar).toContain('`${theme.background}8C`');
-    expect(bar).toContain('StyleSheet.hairlineWidth');
-    expect(bar).toContain('boxShadow:');
+    expect(bar).toContain('<TabBarGlass');
+    expect(parts).toContain('`${theme.background}8C`');
+    expect(parts).toContain('StyleSheet.hairlineWidth');
+    expect(parts).toContain('boxShadow:');
     // The shadow wrapper must not clip, or iOS drops the shadow.
-    const shadowBlock = bar.slice(bar.indexOf('  shadow: {'), bar.indexOf('  slotRow: {'));
+    const shadowBlock = parts.slice(parts.indexOf('export const TAB_BAR_SHADOW'), parts.indexOf('const styles'));
     expect(shadowBlock).not.toContain('overflow');
+    expect(bar).toContain('shadow: TAB_BAR_SHADOW');
+  });
+
+  it('is icon-only: no visible labels, but every control keeps a spoken label', () => {
+    // <TextInput> is the search field; no <Text> labels are rendered.
+    expect(bar).not.toMatch(/<Text[\s>]/);
+    expect(bar).toContain('accessibilityLabel={label}');
+    expect(bar).toContain('`${item.label} tab`');
   });
 
   it('shows a clear active state, an unread Inbox badge, haptics and tab accessibility', () => {
-    expect(bar).toContain('styles.indicator');
-    expect(bar).toContain('withSpring(x, INDICATOR_SPRING)');
-    expect(bar).toContain('<UnreadBadge count={badgeCount} theme={theme} />');
+    expect(bar).toContain('<TabBarIndicator');
+    expect(parts).toContain('withSpring(restingX, INDICATOR_SPRING)');
+    expect(bar).toContain('<TabBarBadge count={badge} theme={theme} />');
     expect(bar).toContain("unread ${badge === 1 ? 'item' : 'items'}");
     expect(bar).toContain('hapticSelection()');
-    expect(bar).toContain('accessibilityRole="tab"');
-    expect(bar).toContain('accessibilityState={{ selected: focused }}');
+    expect(parts).toContain('accessibilityRole="tab"');
+    expect(parts).toContain('accessibilityState={{ selected: focused }}');
     expect(bar).toContain('accessibilityRole="tablist"');
     expect(bar).toContain("navigation.emit({ type: 'tabPress'");
   });
 
   it('keeps every control at a 44pt touch target', () => {
-    expect(bar).toContain('minWidth: 44');
-    expect(bar).toContain('minHeight: 44');
+    expect(parts).toContain('minWidth: 44');
+    expect(parts).toContain('minHeight: 44');
     // 36pt field buttons + 4pt hitSlop on every side = 44pt.
     expect(bar).toContain('width: 36');
     expect(bar).toContain('hitSlop={4}');
@@ -139,5 +150,29 @@ describe('buyer search morph', () => {
   it('keeps search results clear of the bar and the keyboard', () => {
     expect(search).toContain('height: barInset + keyboardHeight.value + 16');
     expect(search).toContain('keyboardDismissMode="on-drag"');
+  });
+});
+
+describe('buyer and seller bars look like one app', () => {
+  it('both bars are built from the same shared parts and sized by the same metrics', () => {
+    for (const source of [bar, sellerBar]) {
+      expect(source).toContain("from '@/components/tab-bar/TabBarParts'");
+      expect(source).toContain('<TabBarGlass');
+      expect(source).toContain('<TabBarIndicator');
+      expect(source).toContain('<TabBarSlot');
+      expect(source).toContain('<TabBarCircle');
+      expect(source).toContain('width={metrics.itemWidth}');
+      expect(source).toContain('height={metrics.capsuleHeight}');
+      expect(source).toContain('size={metrics.circleSize}');
+      expect(source).toContain('size={metrics.iconSize}');
+      expect(source).toContain('bottom: metrics.bottomOffset');
+    }
+    expect(bar).toContain('useBuyerTabBarMetrics()');
+    expect(sellerBar).toContain('useTabBarMetrics()');
+  });
+
+  it('the seller bar is icon-only too, with spoken labels', () => {
+    expect(sellerBar).not.toMatch(/<Text[\s>]/);
+    expect(sellerBar).toContain('`${tabDef.label} tab`');
   });
 });

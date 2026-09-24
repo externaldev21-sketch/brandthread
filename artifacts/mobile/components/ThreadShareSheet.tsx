@@ -26,6 +26,7 @@ import {
 import type { Friendship } from '@/services/socialTypes';
 import { FONT, FS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 interface ThreadShareSheetProps {
   visible: boolean;
@@ -214,7 +215,7 @@ export function ThreadShareSheet({
       if ((error as Error)?.name === 'AbortError') {
         onFeedback('Video save cancelled.', 'info');
       } else {
-        onFeedback(error instanceof Error ? error.message : 'Could not save video.', 'error');
+        onFeedback("Couldn't save video. Try again.", 'error');
       }
     } finally {
       if (destination?.exists) {
@@ -231,9 +232,9 @@ export function ThreadShareSheet({
 
   return (
     <>
-      <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
         <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+        <SheetRise style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 12) }]}>
           <View style={styles.header}>
             <View style={styles.headerSpacer} />
             <Text style={styles.title}>Share to</Text>
@@ -288,7 +289,7 @@ export function ThreadShareSheet({
               ) : null}
             </View>
           </View>
-        </View>
+        </SheetRise>
       </Modal>
 
       {savingProgress != null && (

@@ -7,11 +7,12 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, TextInput, Modal, Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '@clerk/expo';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
+import QRCode from 'react-native-qrcode-svg';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE,
@@ -89,7 +90,7 @@ export default function LoginMethods() {
       sublabel: hasApple
         ? (appleAccount?.emailAddress ?? 'Connected')
         : 'Not connected',
-      icon: <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 20, color: '#FFFFFF', lineHeight: 22 }}></Text>,
+      icon: <Ionicons name="logo-apple" size={20} color={colors.text} />,
       connected: hasApple,
     },
   ];
@@ -132,9 +133,7 @@ export default function LoginMethods() {
       setConfirmPassword('');
       Alert.alert('Password added', 'You can now remove a connected account while keeping your password as a sign-in method.');
     } catch (e: any) {
-      setPasswordSetupError(
-        e?.errors?.[0]?.message ?? e?.message ?? 'Could not add your password. Please try again.',
-      );
+      setPasswordSetupError("Couldn't add your password. Try again.");
     } finally {
       setPasswordSetupSaving(false);
     }
@@ -153,7 +152,7 @@ export default function LoginMethods() {
       const verificationUrl =
         (externalAccount as any).verification?.externalVerificationRedirectURL?.href;
       if (!verificationUrl) {
-        Alert.alert('Could not start linking', 'No redirect URL returned from Clerk. Please try again.');
+        Alert.alert('Connection failed', `Couldn't connect ${provider}. Try again.`);
         return;
       }
       const result = await WebBrowser.openAuthSessionAsync(verificationUrl, redirectUrl);
@@ -163,11 +162,10 @@ export default function LoginMethods() {
       } else if (result.type === 'cancel' || result.type === 'dismiss') {
         // User closed the browser — do nothing
       } else {
-        Alert.alert(`${provider} linking failed`, 'The browser session did not complete. Please try again.');
+        Alert.alert('Connection failed', `Couldn't connect ${provider}. Try again.`);
       }
     } catch (e: any) {
-      const msg = e?.errors?.[0]?.message ?? e?.message ?? 'Please try again.';
-      Alert.alert(`Could not link ${provider}`, msg);
+      Alert.alert('Connection failed', `Couldn't connect ${provider}. Try again.`);
     } finally {
       setLinkingProvider(null);
     }
@@ -204,10 +202,7 @@ export default function LoginMethods() {
               await externalAccount.destroy();
               await user.reload();
             } catch (e: any) {
-              Alert.alert(
-                `Could not remove ${providerLabel}`,
-                e?.errors?.[0]?.message ?? e?.message ?? 'Please try again.',
-              );
+              Alert.alert('Removal failed', `Couldn't remove ${providerLabel}. Try again.`);
             } finally {
               setRemovingProvider(null);
             }
@@ -229,7 +224,7 @@ export default function LoginMethods() {
         backupCodes: totp.backupCodes ?? [],
       });
     } catch (e: any) {
-      Alert.alert('Could not start 2FA setup', e?.errors?.[0]?.message ?? 'Please try again.');
+      Alert.alert("Couldn't start 2FA setup", 'Try again.');
     } finally {
       setTwoFaLoading(false);
     }
@@ -244,7 +239,7 @@ export default function LoginMethods() {
       setVerifyCode('');
       Alert.alert('Two-factor authentication enabled', 'Your account is now protected with 2FA.');
     } catch (e: any) {
-      Alert.alert('Invalid code', e?.errors?.[0]?.message ?? 'The code was incorrect. Try again.');
+      Alert.alert("That code isn't right", 'Try again.');
     } finally {
       setVerifying(false);
     }
@@ -266,7 +261,7 @@ export default function LoginMethods() {
               await (user as any).disableTOTP();
               Alert.alert('Two-factor authentication disabled');
             } catch (e: any) {
-              Alert.alert('Error', e?.errors?.[0]?.message ?? 'Could not disable 2FA.');
+              Alert.alert("Couldn't turn off 2FA", 'Try again.');
             } finally {
               setTwoFaLoading(false);
             }
@@ -552,16 +547,18 @@ export default function LoginMethods() {
 
           <ScrollView contentContainerStyle={s.modalBody}>
             <Text style={s.modalStep}>1. Open your authenticator app (Google Authenticator, Authy, 1Password, etc.)</Text>
-            <Text style={s.modalStep}>2. Add a new account and enter this secret key manually:</Text>
+            <Text style={s.modalStep}>2. Scan this code with your authenticator app, or enter the key below.</Text>
+
+            {totpModal?.uri ? (
+              // theme-exempt: QR codes need black modules on a white background to scan reliably
+              <View style={s.qrWrap}>
+                <QRCode value={totpModal.uri} size={180} backgroundColor="#FFFFFF" color="#000000" />
+              </View>
+            ) : null}
 
             <View style={s.secretBox}>
               <Text style={[s.secretText, { color: colors.primary }]} selectable>{totpModal?.secret}</Text>
             </View>
-
-            <Text style={s.modalNote}>
-              Or scan the QR code using your authenticator's camera feature. The URI is:{'\n'}
-              <Text style={{ fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED }}>{totpModal?.uri}</Text>
-            </Text>
 
             <Text style={s.modalStep}>3. Enter the 6-digit code shown in your app:</Text>
 
@@ -717,6 +714,11 @@ const s = StyleSheet.create({
   modalNote: {
     fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED,
     lineHeight: 18, marginBottom: SP.lg,
+  },
+  qrWrap: {
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#FFFFFF', borderRadius: RADIUS.sm,
+    padding: SP.md, marginBottom: SP.md, alignSelf: 'center',
   },
   secretBox: {
     backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER,

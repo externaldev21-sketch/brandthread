@@ -16,6 +16,7 @@ import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButt
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, ReturnStatus, RETURN_REASONS, OrderStatus, TrackingStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent, PaymentSummary } from '@/services/orderTypes';
+import { dbStatusToOrderStatus, dbStatusToPaymentStatus, type DbPaymentStatus } from '@/lib/orderStatusAdapter';
 
 function useThemeAliases() {
   const { theme } = useAppTheme();
@@ -69,34 +70,12 @@ export function adaptApiOrder(raw: any): Order {
   };
   const items: any[] = Array.isArray(raw.items) ? raw.items : [];
 
-  // DB status → UI order status
-  const statusMap: Record<string, OrderStatus> = {
-    pending:        'new',
-    processing:     'processing',
-    fulfilled:      'ready_to_ship',
-    shipped:        'shipped',
-    delivered:      'delivered',
-    cancelled:      'cancelled',
-    refunded:       'refunded',
-    refund_pending: 'cancelled',  // order was cancelled; refund may need manual resolution
-    disputed:       'disputed',
-  };
-  const uiStatus: OrderStatus = statusMap[raw.status] ?? 'cancelled';
+  // DB status → UI order status (shared with app/(tabs)/orders.tsx)
+  const uiStatus: OrderStatus = dbStatusToOrderStatus(raw.status);
 
-  // Derive payment status from DB order status
-  type PaymentStatus = 'pending' | 'authorized' | 'paid' | 'partially_refunded' | 'refunded' | 'voided' | 'failed';
-  const paymentStatusMap: Record<string, PaymentStatus> = {
-    pending:        'pending',
-    processing:     'paid',
-    fulfilled:      'paid',
-    shipped:        'paid',
-    delivered:      'paid',
-    cancelled:      'voided',
-    refunded:       'refunded',
-    refund_pending: 'authorized',  // payment received but refund not yet confirmed — shows WARNING
-    disputed:       'partially_refunded',
-  };
-  const uiPaymentStatus: PaymentStatus = paymentStatusMap[raw.status] ?? 'pending';
+  // Derive payment status from DB order status (shared with app/(tabs)/orders.tsx)
+  type PaymentStatus = DbPaymentStatus;
+  const uiPaymentStatus: PaymentStatus = dbStatusToPaymentStatus(raw.status);
   const isRefundPending = raw.status === 'refund_pending';
 
   // Parse shipping address (stored as JSON in DB)
@@ -321,7 +300,10 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'timeline',    label: 'Timeline' },
   { key: 'returns',     label: 'Returns' },
   { key: 'disputes',    label: 'Disputes' },
-  { key: 'notes',       label: 'Notes' },
+  // The Notes tab is hidden: notes aren't persisted by any API, and the
+  // 15-second order poll overwrites local edits, silently discarding
+  // anything a seller types. Bring this back once notes are backed by
+  // a real endpoint.
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -538,25 +520,25 @@ export default function OrderDetailScreen() {
 
   async function handleMarkProcessing() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try { await api.orders.updateStatus(id, 'processing'); } catch (e: any) { Alert.alert('Error', e.message); return; }
+    try { await api.orders.updateStatus(id, 'processing'); } catch (e: any) { Alert.alert('Couldn’t update this order', 'Check your connection and try again.'); return; }
     load(generationRef.current);
   }
 
   async function handleMarkReadyToShip() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try { await api.orders.updateStatus(id, 'fulfilled'); } catch (e: any) { Alert.alert('Error', e.message); return; }
+    try { await api.orders.updateStatus(id, 'fulfilled'); } catch (e: any) { Alert.alert('Couldn’t update this order', 'Check your connection and try again.'); return; }
     load(generationRef.current);
   }
 
   async function handleMarkShipped() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try { await api.orders.updateStatus(id, 'shipped'); } catch (e: any) { Alert.alert('Error', e.message); return; }
+    try { await api.orders.updateStatus(id, 'shipped'); } catch (e: any) { Alert.alert('Couldn’t update this order', 'Check your connection and try again.'); return; }
     load(generationRef.current);
   }
 
   async function handleMarkDelivered() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try { await api.orders.updateStatus(id, 'delivered'); } catch (e: any) { Alert.alert('Error', e.message); return; }
+    try { await api.orders.updateStatus(id, 'delivered'); } catch (e: any) { Alert.alert('Couldn’t update this order', 'Check your connection and try again.'); return; }
     load(generationRef.current);
   }
 
@@ -576,7 +558,7 @@ export default function OrderDetailScreen() {
       // Auto-dismiss the banner after 6 seconds
       setTimeout(() => setCancelConfirmed(false), 6000);
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      Alert.alert('Couldn’t cancel this order', 'Check your connection and try again.');
     } finally {
       setCancelling(false);
     }
@@ -616,7 +598,7 @@ export default function OrderDetailScreen() {
         carrier:        form.carrier.trim(),
       });
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      Alert.alert('Couldn’t add tracking', 'Check your connection and try again.');
       return;
     }
     setTrackingForms(prev => ({ ...prev, [groupId]: { ...prev[groupId], visible: false } }));
@@ -628,7 +610,7 @@ export default function OrderDetailScreen() {
       await api.orders.addTracking(id, { trackingNumber, carrier });
       load(generationRef.current);
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      Alert.alert('Couldn’t add tracking', 'Check your connection and try again.');
     }
   }
 
@@ -641,7 +623,7 @@ export default function OrderDetailScreen() {
       });
       await load(generationRef.current);
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      Alert.alert('Couldn’t update tracking', 'Check your connection and try again.');
       throw e;
     } finally {
       setUpdatingTracking(false);
@@ -1047,6 +1029,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
 function CustomerTab({ order }: { order: Order }) {
   const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
+  const router = useRouter();
   const c = order.customer;
   return (
     <View style={s.tabContent}>
@@ -1082,10 +1065,16 @@ function CustomerTab({ order }: { order: Order }) {
         <AddressCard title="Billing Address" addr={c.billingAddress} />
       </View>
 
-      <View style={[s.actionRow, { marginHorizontal: SP.md }]}>
-        <SecondaryButton label="Message Customer" onPress={() => Alert.alert('Message Customer', 'Open the inbox to message this customer directly.')} icon="message-circle" style={{ flex: 1 }} />
-        <SecondaryButton label="View Profile" onPress={() => Alert.alert('Customer Profile', 'Customer profile details will appear here.')} icon="user" style={{ flex: 1 }} />
-      </View>
+      {!!c.id && (
+        <View style={[s.actionRow, { marginHorizontal: SP.md }]}>
+          <SecondaryButton
+            label="View customer"
+            onPress={() => router.push(`/customer-orders?customerId=${encodeURIComponent(c.id)}` as never)}
+            icon="user"
+            style={{ flex: 1 }}
+          />
+        </View>
+      )}
     </View>
   );
 }
@@ -1445,6 +1434,8 @@ function ReturnsTab({ order, onAction, router }: {
 }) {
   const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
+  const [denyingReturnId, setDenyingReturnId] = useState<string | null>(null);
+  const [denyReason, setDenyReason] = useState('');
   if (order.returns.length === 0) {
     return (
       <View style={s.tabContent}>
@@ -1475,15 +1466,48 @@ function ReturnsTab({ order, onAction, router }: {
 
           {/* Actions */}
           <View style={s.returnActions}>
-            {ret.status === 'requested' && (
+            {ret.status === 'requested' && denyingReturnId !== ret.id && (
               <>
                 <SecondaryButton label="Approve" onPress={() => onAction(ret.id, 'approved')} icon="check" small accent={SUCCESS} style={{ flex: 1 }} />
-                <SecondaryButton label="Deny" onPress={() => Alert.prompt('Deny Reason', 'Reason for denial:', (text) => { if (text) onAction(ret.id, 'denied', text); })} icon="x" small accent={RED} style={{ flex: 1 }} />
+                <SecondaryButton label="Deny" onPress={() => { setDenyReason(''); setDenyingReturnId(ret.id); }} icon="x" small accent={RED} style={{ flex: 1 }} />
               </>
             )}
-            {(ret.status === 'approved') && (
-              <SecondaryButton label="Issue Label" onPress={() => Alert.alert('Label', 'Return label issuance available in production build.')} icon="tag" small style={{ flex: 1 }} />
-            )}
+          </View>
+          {ret.status === 'requested' && denyingReturnId === ret.id && (
+            <View style={s.denyForm}>
+              <Text style={s.denyLabel}>Denial reason (required)</Text>
+              <TextInput
+                style={s.denyInput}
+                value={denyReason}
+                onChangeText={setDenyReason}
+                placeholder="Explain why the return is denied…"
+                placeholderTextColor={SUBTLE}
+                multiline
+                autoFocus
+              />
+              <View style={s.returnActions}>
+                <SecondaryButton
+                  label="Cancel"
+                  onPress={() => { setDenyingReturnId(null); setDenyReason(''); }}
+                  small
+                  style={{ flex: 1 }}
+                />
+                <PrimaryButton
+                  label="Submit denial"
+                  onPress={() => {
+                    if (!denyReason.trim()) return;
+                    onAction(ret.id, 'denied', denyReason.trim());
+                    setDenyingReturnId(null);
+                    setDenyReason('');
+                  }}
+                  disabled={!denyReason.trim()}
+                  small
+                  style={{ flex: 1 }}
+                />
+              </View>
+            </View>
+          )}
+          <View style={s.returnActions}>
             {(ret.status === 'label_issued' || ret.status === 'in_transit') && (
               <SecondaryButton label="Mark Received" onPress={() => onAction(ret.id, 'received')} icon="inbox" small style={{ flex: 1 }} />
             )}
@@ -1545,8 +1569,9 @@ function DisputesTab({ order, router }: { order: Order; router: ReturnType<typeo
             <Text style={s.disputeEvCount}>Evidence: {d.evidence.length} item{d.evidence.length !== 1 ? 's' : ''}</Text>
 
             <View style={s.disputeActions}>
-              <SecondaryButton label="Add Evidence" onPress={() => router.push(`/dispute-detail?orderId=${order.id}&disputeId=${d.id}`)} icon="plus" small style={{ flex: 1 }} />
-              <SecondaryButton label="Accept Dispute" onPress={() => Alert.alert('Accept Dispute', 'Are you sure? This will refund the customer.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Accept', style: 'destructive', onPress: () => Alert.alert('Dispute Accepted', 'The dispute has been accepted and the customer will be refunded.') }])} icon="check" small accent={RED} style={{ flex: 1 }} />
+              {/* "Accept Dispute" is hidden here until it calls a real disputes API —
+                  see dispute-detail.tsx, which owns evidence and concede actions. */}
+              <SecondaryButton label="Review Dispute" onPress={() => router.push(`/dispute-detail?orderId=${order.id}&disputeId=${d.id}`)} icon="plus" small style={{ flex: 1 }} />
             </View>
             {d.status === 'evidence_needed' && (
               <PrimaryButton label="Submit Evidence" onPress={() => router.push(`/dispute-detail?orderId=${order.id}&disputeId=${d.id}`)} icon="upload" small style={{ marginTop: SP.sm }} />
@@ -1834,6 +1859,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   returnItemText:   { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, flex: 1 },
   returnItemReason: { fontSize: FS.xs, fontFamily: FONT.regular, color: ORANGE },
   returnActions:    { flexDirection: 'row', gap: SP.sm, flexWrap: 'wrap', marginTop: SP.xs },
+  denyForm:         { gap: SP.sm, marginTop: SP.xs },
+  denyLabel:        { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
+  denyInput:        { minHeight: 72, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, color: FG, padding: SP.sm, fontSize: FS.sm, fontFamily: FONT.regular, textAlignVertical: 'top' },
 
   // Disputes
   disputeCard:      { gap: SP.sm, marginBottom: SP.sm },

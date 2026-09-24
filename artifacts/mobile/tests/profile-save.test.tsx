@@ -56,6 +56,12 @@ vi.mock("react-native", () => {
   };
 });
 
+// Sheet entrance motion is visual only; render the sheet as a plain View.
+vi.mock("@/components/motion/SheetRise", () => ({
+  SheetRise: ({ children, ...props }: { children?: React.ReactNode }) =>
+    React.createElement("View", props, children),
+}));
+
 vi.mock("@clerk/expo", () => ({
   useAuth: () => ({ isLoaded: true, userId: "seller-1" }),
 }));

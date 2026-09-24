@@ -9,6 +9,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
 import { getLocations, getInventoryItems, getTransfer, getTransfers, createTransfer, shipTransfer, receiveTransfer } from '@/services/inventoryService';
 import { InventoryLocation, InventoryItem, InventoryTransfer, TransferStatus } from '@/services/inventoryTypes';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -197,15 +198,6 @@ export default function InventoryTransferScreen() {
   }
 
   // ── View transfer actions ─────────────────────────────────────────────────
-
-  async function handleMarkReady() {
-    if (!transfer) return;
-    // Mark ready = ship with no tracking (status -> ready)
-    // There's no direct markReady in service, so we update status manually via shipTransfer
-    // Actually there's no markReady, use a workaround: set transfer status to ready
-    // The service only has shipTransfer (in_transit). We'll treat "Mark Ready" as an Alert stub.
-    Alert.alert('Mark Ready', 'Transfer marked as ready to ship.');
-  }
 
   async function handleShip() {
     if (!transfer) return;
@@ -406,11 +398,7 @@ export default function InventoryTransferScreen() {
 
           {transfer.status === 'draft' && (
             <View style={styles.actionsWrap}>
-              <PrimaryButton
-                label="Mark Ready"
-                onPress={handleMarkReady}
-                icon="check-circle"
-              />
+              <Text style={styles.actionLabel}>Marking transfers ready isn't available yet.</Text>
             </View>
           )}
 
@@ -498,13 +486,6 @@ export default function InventoryTransferScreen() {
                   </View>
                 ))}
               </BrandthreadCard>
-              <View style={styles.actionsWrap}>
-                <SecondaryButton
-                  label="Mark Resolved"
-                  onPress={() => Alert.alert('Resolved', 'Discrepancy marked as resolved.')}
-                  accent={ORANGE}
-                />
-              </View>
             </>
           )}
 
@@ -707,9 +688,9 @@ export default function InventoryTransferScreen() {
       </ScrollView>
 
       {/* SOURCE LOCATION PICKER MODAL */}
-      <Modal visible={showSourcePicker} transparent animationType="slide">
+      <Modal visible={showSourcePicker} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
+          <SheetRise style={styles.modalSheet}>
             <View style={styles.modalTitleRow}>
               <Text style={styles.modalTitle}>Select Source</Text>
               <TouchableOpacity onPress={() => setShowSourcePicker(false)}>
@@ -732,14 +713,14 @@ export default function InventoryTransferScreen() {
               )}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
             />
-          </View>
+          </SheetRise>
         </View>
       </Modal>
 
       {/* DEST LOCATION PICKER MODAL */}
-      <Modal visible={showDestPicker} transparent animationType="slide">
+      <Modal visible={showDestPicker} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
+          <SheetRise style={styles.modalSheet}>
             <View style={styles.modalTitleRow}>
               <Text style={styles.modalTitle}>Select Destination</Text>
               <TouchableOpacity onPress={() => setShowDestPicker(false)}>
@@ -762,14 +743,14 @@ export default function InventoryTransferScreen() {
               )}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
             />
-          </View>
+          </SheetRise>
         </View>
       </Modal>
 
       {/* ITEM PICKER MODAL */}
-      <Modal visible={showItemPicker} transparent animationType="slide">
+      <Modal visible={showItemPicker} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
+          <SheetRise style={styles.modalSheet}>
             <View style={styles.modalTitleRow}>
               <Text style={styles.modalTitle}>Add Item</Text>
               <TouchableOpacity onPress={() => setShowItemPicker(false)}>
@@ -816,7 +797,7 @@ export default function InventoryTransferScreen() {
               }}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
             />
-          </View>
+          </SheetRise>
         </View>
       </Modal>
     </KeyboardAvoidingView>

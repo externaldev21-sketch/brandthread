@@ -17,6 +17,7 @@ import {
 import { getMarketingAnalytics, getFilterState } from '@/services/analyticsService';
 import { MarketingAnalytics, CampaignAnalytics, InfluencerAnalytics, AnalyticsMetric, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { formatCents } from '@/lib/money';
+import { EmptyState } from '@/components/BrandthreadUI';
 
 function RevenueBar({ label, valueCents, totalCents, color }: { label: string; valueCents: number; totalCents: number; color: string }) {
   const colors = useColors();
@@ -149,12 +150,12 @@ export default function AnalyticsMarketingScreen() {
       <View style={s.heroCard}>
         <Text style={s.heroLabel}>Marketing Revenue</Text>
         <Text style={s.heroValue}>{data?.marketingRevenue.formatted ?? '—'}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-          <Feather name="trending-up" size={12} color={SUCCESS} />
-          {typeof data?.marketingRevenue.changePct === 'number' ? (
+        {typeof data?.marketingRevenue.changePct === 'number' && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+            <Feather name="trending-up" size={12} color={SUCCESS} />
             <Text style={s.heroChange}>+{data.marketingRevenue.changePct.toFixed(1)}% vs prev period</Text>
-          ) : null}
-        </View>
+          </View>
+        )}
       </View>
 
       {/* Revenue by channel */}
@@ -178,11 +179,11 @@ export default function AnalyticsMarketingScreen() {
       {/* Campaigns */}
       <Text style={s.sectionTitle}>Campaign Performance</Text>
       {data?.campaigns.length === 0 ? (
-        <View style={s.emptyState}>
-          <Feather name="mail" size={36} color={MUTED} />
-          <Text style={s.emptyTitle}>No campaigns yet</Text>
-          <Text style={s.emptyBody}>Campaign performance will appear after campaigns are sent.</Text>
-        </View>
+        <EmptyState
+          icon="mail"
+          title="No campaigns yet"
+          description="Campaign performance will appear after campaigns are sent."
+        />
       ) : (
         <View style={s.card}>
           {data?.campaigns.map((c, i) => (
@@ -196,14 +197,22 @@ export default function AnalyticsMarketingScreen() {
 
       {/* Influencers */}
       <Text style={s.sectionTitle}>Influencer Performance</Text>
-      <View style={s.card}>
-        {data?.influencers.map((inf, i) => (
-          <View key={inf.influencerId}>
-            {i > 0 && <View style={s.divider} />}
-            <InfluencerRow inf={inf} />
-          </View>
-        ))}
-      </View>
+      {!data || data.influencers.length === 0 ? (
+        <EmptyState
+          icon="users"
+          title="No influencer activity yet"
+          description="Influencer performance will appear once a partnership drives sales."
+        />
+      ) : (
+        <View style={s.card}>
+          {data.influencers.map((inf, i) => (
+            <View key={inf.influencerId}>
+              {i > 0 && <View style={s.divider} />}
+              <InfluencerRow inf={inf} />
+            </View>
+          ))}
+        </View>
+      )}
 
       {/* Referral */}
       <Text style={s.sectionTitle}>Referral Program</Text>

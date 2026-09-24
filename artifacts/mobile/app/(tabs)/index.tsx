@@ -25,6 +25,7 @@ import { withSellerSetupOrigin } from '@/lib/setupNavigation';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 import { SellerDashboardActionRow, SellerDashboardListGroup, SellerDashboardListItem, SellerDashboardSectionHeader, SellerDashboardTrendHeader } from '@/components/SellerDashboardSections';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -878,10 +879,10 @@ export default function SellerHomeScreen() {
       </Animated.ScrollView>
 
 
-      <Modal visible={commandModal} animationType="slide" transparent>
+      <Modal visible={commandModal} animationType="fade" transparent>
         <View style={s.modalOverlay}>
           <Pressable style={s.modalOverlay} onPress={() => setCommandModal(false)} accessibilityRole="button" accessibilityLabel="Close create and manage menu" />
-          <View style={[s.bottomSheet, { paddingBottom: Math.max(insets.bottom, SP.lg) }]}>
+          <SheetRise style={[s.bottomSheet, { paddingBottom: Math.max(insets.bottom, SP.lg) }]}>
             <View style={s.sheetHandle} />
             <Text style={s.commandTitle}>Create & manage</Text>
             <View style={s.commandGrid}>
@@ -900,7 +901,7 @@ export default function SellerHomeScreen() {
                 </PressableScale>
               ))}
             </View>
-          </View>
+          </SheetRise>
         </View>
       </Modal>
 

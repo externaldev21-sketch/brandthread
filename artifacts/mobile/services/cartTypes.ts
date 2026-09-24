@@ -341,8 +341,8 @@ export type BuyerProblemType =
 
 export interface BuyerProblemReport {
   id: string;
-  orderId: string;
-  orderNumber: string;
+  orderId?: string;
+  orderNumber?: string;
   type: BuyerProblemType;
   description: string;
   evidenceUris: string[];

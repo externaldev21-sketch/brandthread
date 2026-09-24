@@ -13,8 +13,10 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useColors } from '@/hooks/useColors';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
+import { CachedImage } from '@/components/CachedImage';
 import {
   BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK,
   FONT, FS, SP, RADIUS, ICON, OVERLAY, RED,
@@ -27,6 +29,51 @@ import type { BuyerPost, Comment } from '@/services/socialTypes';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
+
+function PostVideo({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; });
+  useEffect(() => {
+    player.play();
+    return () => { player.pause(); };
+  }, [player]);
+  return (
+    <VideoView
+      player={player}
+      style={StyleSheet.absoluteFill}
+      contentFit="contain"
+      nativeControls
+    />
+  );
+}
+
+function PostMedia({
+  mediaUrl, type, mediaColor1, mediaColor2, typeIcon,
+}: {
+  mediaUrl?: string; type: BuyerPost['type'];
+  mediaColor1: string; mediaColor2: string; typeIcon: keyof typeof Feather.glyphMap;
+}) {
+  if (mediaUrl && type === 'video') {
+    return <PostVideo uri={mediaUrl} />;
+  }
+  if (mediaUrl) {
+    return (
+      <CachedImage
+        source={{ uri: mediaUrl }}
+        style={StyleSheet.absoluteFill}
+        contentFit="contain"
+        cachePolicy="memory-disk"
+        transition={150}
+      />
+    );
+  }
+  return (
+    <LinearGradient colors={[mediaColor1, mediaColor2] as [string, string]} style={StyleSheet.absoluteFill}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <Feather name={typeIcon} size={ICON.xl} color={MUTED} />
+      </View>
+    </LinearGradient>
+  );
+}
 
 export default function BuyerPostViewer() {
   const { userId } = useAuth();
@@ -143,12 +190,15 @@ export default function BuyerPostViewer() {
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
         {/* Media display */}
-        <LinearGradient
-          colors={[mediaColor1, mediaColor2] as [string, string]}
-          style={s.media}
-        >
-          <Feather name={typeIcon} size={ICON.xl} color={MUTED} />
-        </LinearGradient>
+        <View style={s.media}>
+          <PostMedia
+            mediaUrl={post?.mediaUrl}
+            type={postType}
+            mediaColor1={mediaColor1}
+            mediaColor2={mediaColor2}
+            typeIcon={typeIcon}
+          />
+        </View>
 
         {/* Author row */}
         <View style={s.authorRow}>
@@ -302,7 +352,7 @@ export default function BuyerPostViewer() {
                 <Text style={s.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.modalSave} onPress={handleSaveCaption}>
-                <Text style={s.modalSaveText}>Save</Text>
+                <Text style={[s.modalSaveText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Save</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>

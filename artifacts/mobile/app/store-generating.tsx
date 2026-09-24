@@ -26,30 +26,6 @@ const GEN_STEPS = [
   { icon: 'check-circle', label: 'Finalizing your storefront',    duration: 800 },
 ] as const;
 
-const DEFAULT_ANSWERS: StoreGenerationAnswers = {
-  primaryStyle: 'contemporary',
-  secondaryStyles: [],
-  moods: ['clean'],
-  colors: {
-    primary: '#0f766e',
-    secondary: '#0c4a6e',
-    accent: '#38bdf8',
-    background: '#0f0f1a',
-    text: '#f4f4ff',
-    buttonText: '#0f0f1a',
-  },
-  typography: 'modern',
-  homepagePriority: 'hero_image',
-  additionalSections: [],
-  brandStory: '',
-  targetCustomers: ['unisex'],
-  ageRange: { min: 18, max: 40 },
-  audienceDescription: '',
-  existingContent: [],
-  features: ['product_reviews', 'email_signup'],
-  moodBoardUris: [],
-};
-
 export default function StoreGeneratingScreen() {
   const { theme } = useAppTheme();
   const gen = makeStyles(theme);
@@ -112,15 +88,18 @@ export default function StoreGeneratingScreen() {
     setCurrentStep(0);
     setCompletedSteps([]);
 
-    // Load answers
-    let answers: StoreGenerationAnswers;
+    // Load answers — if the wizard's answers are missing, don't silently
+    // substitute made-up defaults. Send the seller back to pick a style.
+    let answers: StoreGenerationAnswers | null = null;
     try {
       const draft = await loadDraftAnswers();
-      answers = (draft && draft.primaryStyle)
-        ? (draft as StoreGenerationAnswers)
-        : DEFAULT_ANSWERS;
+      if (draft && draft.primaryStyle) answers = draft as StoreGenerationAnswers;
     } catch {
-      answers = DEFAULT_ANSWERS;
+      answers = null;
+    }
+    if (!answers) {
+      router.replace(('/store-generate?toast=' + encodeURIComponent("Let's pick your style first")) as never);
+      return;
     }
 
     // Run service generation in parallel with animation

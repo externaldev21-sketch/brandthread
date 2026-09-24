@@ -10,13 +10,20 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import { File, Paths } from 'expo-file-system';
 import { useApi } from '@/hooks/useApi';
+import { saveImageToMediaLibrary } from '@/lib/mediaLibraryAdapter';
+import { getProducts, updateProduct } from '@/services/productService';
+import { Product, ProductMedia } from '@/services/productTypes';
 
 interface Photo {
   id: string;
@@ -38,6 +45,84 @@ export default function LifestyleImagesScreen() {
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [resultB64, setResultB64] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [showProductPicker, setShowProductPicker] = useState(false);
+  const [pickerProducts, setPickerProducts] = useState<Product[]>([]);
+  const [loadingPickerProducts, setLoadingPickerProducts] = useState(false);
+
+  function writeResultToTempFile(): string | null {
+    if (!resultB64) return null;
+    const file = new File(Paths.cache, `lifestyle-${Date.now()}.png`);
+    file.write(resultB64, { encoding: 'base64' });
+    return file.uri;
+  }
+
+  async function handleSaveToPhotos() {
+    if (!resultB64 || saving) return;
+    setSaving(true);
+    try {
+      const fileUri = writeResultToTempFile();
+      if (!fileUri) return;
+      const outcome = await saveImageToMediaLibrary(fileUri);
+      if (outcome === 'saved') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert('Saved', 'Saved to Photos.');
+      } else if (outcome === 'denied') {
+        Alert.alert('Permission required', 'Allow photo library access to save this image.');
+      } else {
+        Alert.alert('Save failed', 'Could not save this image. Please try again.');
+      }
+    } catch {
+      Alert.alert('Save failed', 'Could not save this image. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleAddToProduct() {
+    if (!resultB64) return;
+    setLoadingPickerProducts(true);
+    try {
+      const all = await getProducts();
+      const active = all.filter(p => p.status !== 'archived');
+      if (active.length === 0) {
+        Alert.alert('No products', 'Create a product first, then add this photo to its media gallery.');
+        return;
+      }
+      setPickerProducts(active);
+      setShowProductPicker(true);
+    } catch {
+      Alert.alert("Couldn't load products", 'Try again.');
+    } finally {
+      setLoadingPickerProducts(false);
+    }
+  }
+
+  async function confirmAddToProduct(product: Product) {
+    setShowProductPicker(false);
+    const fileUri = writeResultToTempFile();
+    if (!fileUri) return;
+    try {
+      const existing = product.media ?? [];
+      const newMedia: ProductMedia = {
+        id: `lifestyle-${Date.now()}`,
+        type: 'image',
+        uri: fileUri,
+        isCover: false,
+        sortOrder: existing.length,
+        createdAt: new Date().toISOString(),
+      };
+      const updated = await updateProduct(product.id, { media: [...existing, newMedia] });
+      if (updated) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert('Added', `Added to "${product.name ?? 'product'}" media gallery.`);
+      } else {
+        Alert.alert("Couldn't update product", 'Try again.');
+      }
+    } catch {
+      Alert.alert("Couldn't add to product", 'Try again.');
+    }
+  }
 
   async function pickPhotos(group: 'reference' | 'product') {
     const current = group === 'reference' ? referencePhotos : productPhotos;
@@ -276,10 +361,23 @@ export default function LifestyleImagesScreen() {
             {!loading && (
               <View style={{ gap: 12, marginTop: 20 }}>
                 {resultB64 && (
-                  <TouchableOpacity onPress={generate} activeOpacity={0.85} style={[styles.primaryBtn, { backgroundColor: colors.primary }]}>
-                    <Feather name="refresh-cw" size={16} color={colors.primaryForeground} />
-                    <Text style={[styles.primaryBtnText, { color: colors.primaryForeground }]}>Regenerate</Text>
-                  </TouchableOpacity>
+                  <>
+                    <TouchableOpacity onPress={handleSaveToPhotos} disabled={saving} activeOpacity={0.85} style={[styles.primaryBtn, { backgroundColor: colors.primary }]}>
+                      <Feather name="download" size={16} color={colors.primaryForeground} />
+                      <Text style={[styles.primaryBtnText, { color: colors.primaryForeground }]}>
+                        {saving ? 'Saving…' : 'Save to photos'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleAddToProduct} disabled={loadingPickerProducts} activeOpacity={0.85} style={[styles.primaryBtn, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}>
+                      <Feather name="package" size={16} color={colors.foreground} />
+                      <Text style={[styles.primaryBtnText, { color: colors.foreground }]}>
+                        {loadingPickerProducts ? 'Loading products…' : 'Add to product'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={generate} activeOpacity={0.85} style={styles.secondaryBtn}>
+                      <Text style={[styles.secondaryBtnText, { color: colors.mutedForeground }]}>Regenerate</Text>
+                    </TouchableOpacity>
+                  </>
                 )}
                 <TouchableOpacity onPress={startOver} activeOpacity={0.7} style={styles.secondaryBtn}>
                   <Text style={[styles.secondaryBtnText, { color: colors.mutedForeground }]}>Start over</Text>
@@ -289,6 +387,49 @@ export default function LifestyleImagesScreen() {
           </>
         )}
       </ScrollView>
+
+      <Modal
+        visible={showProductPicker}
+        animationType="slide"
+        presentationStyle="formSheet"
+        onRequestClose={() => setShowProductPicker(false)}
+      >
+        <View style={[styles.pickerRoot, { backgroundColor: colors.background }]}>
+          <View style={styles.pickerHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Choose a product</Text>
+            <TouchableOpacity onPress={() => setShowProductPicker(false)} activeOpacity={0.7}>
+              <Feather name="x" size={20} color={colors.foreground} />
+            </TouchableOpacity>
+          </View>
+          <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground, paddingHorizontal: 20 }]}>
+            The photo will be added to the product's media gallery.
+          </Text>
+          {loadingPickerProducts ? (
+            <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
+          ) : (
+            <FlatList
+              data={pickerProducts}
+              keyExtractor={p => p.id}
+              contentContainerStyle={{ padding: 20 }}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={styles.pickerRow} onPress={() => confirmAddToProduct(item)} activeOpacity={0.82}>
+                  {item.media?.[0]?.uri ? (
+                    <Image source={{ uri: item.media[0].uri }} style={styles.pickerThumb} resizeMode="cover" />
+                  ) : (
+                    <View style={[styles.pickerThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.card }]}>
+                      <Feather name="package" size={20} color={colors.mutedForeground} />
+                    </View>
+                  )}
+                  <Text style={{ flex: 1, color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 14 }} numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                  <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+                </TouchableOpacity>
+              )}
+            />
+          )}
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -296,6 +437,10 @@ export default function LifestyleImagesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 40 },
+  pickerRoot: { flex: 1 },
+  pickerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, paddingBottom: 8 },
+  pickerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+  pickerThumb: { width: 44, height: 44, borderRadius: 8 },
   stepRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   stepDot: { width: 10, height: 10, borderRadius: 5 },
   stepLine: { flex: 1, height: 1, marginHorizontal: 8 },

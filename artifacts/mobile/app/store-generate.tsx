@@ -2,13 +2,14 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
-  KeyboardAvoidingView, Platform, Alert, Switch } from 'react-native';
+  KeyboardAvoidingView, Platform, Alert, Switch, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import { useApi } from '@/lib/api';
 import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
@@ -99,8 +100,13 @@ export default function StoreGenerateScreen() {
   const st = makeStyles(theme);
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
+  const params = useLocalSearchParams<{ toast?: string }>();
   const insets = useSafeAreaInsets();
+  const api = useApi();
   const [step, setStep] = useState(1);
+  const [aiToolLoading, setAiToolLoading] = useState<string | null>(null);
+  const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
+  const [contentUploading, setContentUploading] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Partial<StoreGenerationAnswers>>(DEFAULT_ANSWERS);
   const [saving, setSaving] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
@@ -120,6 +126,12 @@ export default function StoreGenerateScreen() {
       setDraftLoaded(true);
     })();
   }, []);
+
+  useEffect(() => {
+    if (params.toast) {
+      Alert.alert(params.toast, undefined, undefined, { cancelable: true });
+    }
+  }, [params.toast]);
 
   useEffect(() => {
     if (!draftLoaded) return;
@@ -503,30 +515,60 @@ export default function StoreGenerateScreen() {
           <TouchableOpacity
             key={tool}
             style={st.aiToolChip}
+            disabled={!!aiToolLoading}
             onPress={async () => {
               if (!answers.brandStory?.trim()) { Alert.alert('Add your brand story first', 'Write some text below, then use AI to refine it.'); return; }
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setAiToolLoading(tool);
+              setAiSuggestion(null);
               try {
-                const res = await fetch('/api/ai/chat', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ messages: [
+                const res = await api.ai.chat({
+                  messages: [
                     { role: 'system', content: 'You are a brand copywriter. Apply the requested transformation and return ONLY the rewritten brand story text.' },
                     { role: 'user', content: `${tool} this brand story:\n\n${answers.brandStory}` },
-                  ] }),
+                  ],
                 });
-                const data = await res.json();
-                const result = data?.message?.content ?? data?.content;
-                if (result) setAnswers(prev => ({ ...prev, brandStory: result }));
+                if (res?.content) setAiSuggestion(res.content);
+                else Alert.alert('Error', 'AI processing failed. Please try again.');
               } catch { Alert.alert('Error', 'AI processing failed. Please try again.'); }
+              finally { setAiToolLoading(null); }
             }}
             activeOpacity={0.8}
           >
-            <Text style={st.aiToolChipText}>{tool}</Text>
+            {aiToolLoading === tool ? (
+              <ActivityIndicator size="small" color={PURPLE_LIGHT} />
+            ) : (
+              <Text style={st.aiToolChipText}>{tool}</Text>
+            )}
           </TouchableOpacity>
         ))}
       </ScrollView>
-      <Text style={st.aiNote}>AI suggestions will be shown below your text for review before applying.</Text>
+
+      {aiSuggestion ? (
+        <View style={st.aiSuggestionCard}>
+          <Text style={st.aiSuggestionLabel}>AI suggestion</Text>
+          <Text style={st.aiSuggestionText}>{aiSuggestion}</Text>
+          <View style={{ flexDirection: 'row', gap: SP.sm, marginTop: SP.sm }}>
+            <SecondaryButton
+              label="Keep mine"
+              small
+              onPress={() => setAiSuggestion(null)}
+              style={{ flex: 1 }}
+            />
+            <PrimaryButton
+              label="Use this"
+              small
+              onPress={() => {
+                updateAnswers({ brandStory: aiSuggestion });
+                setAiSuggestion(null);
+              }}
+              style={{ flex: 1 }}
+            />
+          </View>
+        </View>
+      ) : (
+        <Text style={st.aiNote}>AI suggestions will be shown below your text for review before applying.</Text>
+      )}
     </View>
   );
 
@@ -639,17 +681,44 @@ export default function StoreGenerateScreen() {
                 {(value === 'logo' || value === 'product_photos' || value === 'campaign_images') && isSelected && (
                   <TouchableOpacity
                     style={st.uploadBtn}
+                    disabled={contentUploading === value}
                     onPress={async () => {
                       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
                       if (!perm.granted) { Alert.alert('Permission required', 'Allow access to your photo library.'); return; }
                       const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
-                      if (!result.canceled && result.assets[0]) {
+                      if (result.canceled || !result.assets[0]) return;
+                      const asset = result.assets[0];
+                      setContentUploading(value);
+                      try {
+                        const uploaded = await api.products.uploadImage({ uri: asset.uri, mimeType: asset.mimeType });
+                        const remoteUri = (uploaded as any)?.objectPath || asset.uri;
+                        if (value === 'logo') {
+                          updateAnswers({ logoUri: remoteUri });
+                        } else {
+                          const existing = answers.contentUploads?.[value] ?? [];
+                          updateAnswers({ contentUploads: { ...(answers.contentUploads ?? {}), [value]: [...existing, remoteUri] } });
+                        }
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                      } catch {
+                        Alert.alert("Couldn't upload photo", 'Try again.');
+                      } finally {
+                        setContentUploading(null);
                       }
                     }}
                     activeOpacity={0.8}
                   >
-                    <Text style={st.uploadBtnText}>Upload</Text>
+                    {contentUploading === value ? (
+                      <ActivityIndicator size="small" color={PURPLE_LIGHT} />
+                    ) : (
+                      <>
+                        {(value === 'logo' ? !!answers.logoUri : (answers.contentUploads?.[value]?.length ?? 0) > 0) ? (
+                          <Feather name="check" size={12} color={PURPLE_LIGHT} />
+                        ) : null}
+                        <Text style={st.uploadBtnText}>
+                          {(value === 'logo' ? !!answers.logoUri : (answers.contentUploads?.[value]?.length ?? 0) > 0) ? 'Uploaded' : 'Upload'}
+                        </Text>
+                      </>
+                    )}
                   </TouchableOpacity>
                 )}
               </TouchableOpacity>
@@ -1143,6 +1212,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   aiToolChipText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
   aiNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, lineHeight: 16 },
+  aiSuggestionCard: {
+    marginTop: SP.sm, padding: SP.md, borderRadius: RADIUS.md,
+    borderWidth: 1, borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM,
+  },
+  aiSuggestionLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: PURPLE_LIGHT, marginBottom: 4 },
+  aiSuggestionText: { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
   // Target customers age
   ageRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
   ageInputWrap: { flex: 1, gap: SP.xs },
@@ -1188,6 +1263,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   contentCardLabelSelected: { color: PURPLE_LIGHT },
   uploadBtn: {
     marginTop: SP.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: PURPLE_DIM,
     borderRadius: RADIUS.pill,
     paddingHorizontal: SP.sm,

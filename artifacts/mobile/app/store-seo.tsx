@@ -2,10 +2,11 @@ import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, TextInput, Switch,
-  StyleSheet, Alert, TouchableOpacity,
+  StyleSheet, Alert, TouchableOpacity, Image, ActivityIndicator,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
   BG, SURFACE, CARD, BORDER,
@@ -16,6 +17,7 @@ import {
 import { BrandthreadCard, PrimaryButton, SectionHeader } from '@/components/BrandthreadUI';
 import { getStorefront, updateSEO } from '@/services/storeService';
 import { Storefront, StoreSEO } from '@/services/storeTypes';
+import { useApi } from '@/lib/api';
 
 export default function StoreSEOScreen() {
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
@@ -31,6 +33,8 @@ export default function StoreSEOScreen() {
     collectionSeoDefaults: { titleTemplate: '{{collection}} – {{store}}', descriptionTemplate: '{{description}}' },
   });
   const [saving, setSaving] = useState(false);
+  const [socialImageUploading, setSocialImageUploading] = useState(false);
+  const api = useApi();
 
   useFocusEffect(useCallback(() => {
     getStorefront().then(s => {
@@ -109,9 +113,35 @@ export default function StoreSEOScreen() {
             />
           </View>
           <View style={se.divider} />
-          <TouchableOpacity style={se.uploadBtn}>
-            <Feather name="image" size={ICON.sm} color={MUTED} />
-            <Text style={se.uploadBtnText}>Upload Social Image</Text>
+          {seo.socialImageUri && (
+            <Image source={{ uri: seo.socialImageUri }} style={se.socialImagePreview} resizeMode="cover" />
+          )}
+          <TouchableOpacity
+            style={se.uploadBtn}
+            disabled={socialImageUploading}
+            onPress={async () => {
+              const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (!perm.granted) { Alert.alert('Permission required', 'Allow access to your photo library.'); return; }
+              const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.85, aspect: [1.91, 1], allowsEditing: true });
+              if (result.canceled || !result.assets[0]) return;
+              setSocialImageUploading(true);
+              try {
+                const uploaded = await api.products.uploadImage({ uri: result.assets[0].uri, mimeType: result.assets[0].mimeType });
+                const remoteUri = (uploaded as any)?.objectPath || result.assets[0].uri;
+                patch({ socialImageUri: remoteUri });
+              } catch {
+                Alert.alert("Couldn't upload image", 'Try again.');
+              } finally {
+                setSocialImageUploading(false);
+              }
+            }}
+          >
+            {socialImageUploading ? (
+              <ActivityIndicator size="small" color={MUTED} />
+            ) : (
+              <Feather name="image" size={ICON.sm} color={MUTED} />
+            )}
+            <Text style={se.uploadBtnText}>{seo.socialImageUri ? 'Change social image' : 'Upload Social Image'}</Text>
           </TouchableOpacity>
         </BrandthreadCard>
 
@@ -260,10 +290,11 @@ const se = StyleSheet.create({
   multiline: { minHeight: 72, paddingTop: 10 },
   uploadBtn: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', borderStyle: 'dashed',
+    borderWidth: 1, borderColor: BORDER, borderStyle: 'dashed',
     borderRadius: RADIUS.sm, padding: SP.md,
   },
   uploadBtnText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
+  socialImagePreview: { width: '100%', height: 140, borderRadius: RADIUS.sm, marginBottom: SP.sm },
   previewTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: '#4285F4' },
   previewUrl: { fontSize: FS.sm, fontFamily: FONT.regular, color: '#34A853', marginTop: 2 },
   previewDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 4, lineHeight: 18 },

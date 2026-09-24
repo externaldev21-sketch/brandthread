@@ -5,19 +5,21 @@ import {
   Image, Linking,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useColors } from '@/hooks/useColors';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE, ON_DARK,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
-  getStories, trackStoryView, subscribeSocial, muteUser,
+  getStories, trackStoryView, subscribeSocial, muteUser, createOrGetConversation, sendMessage,
 } from '@/services/socialService';
 import { useAuth } from '@clerk/expo';
 import { confirmBlock, reportHref } from '@/lib/safety';
@@ -34,6 +36,23 @@ function timeAgo(ms: number): string {
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
   return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function StorySlideVideo({ uri, paused }: { uri: string; paused: boolean }) {
+  const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; });
+  useEffect(() => {
+    if (paused) player.pause();
+    else player.play();
+  }, [paused, player]);
+  useEffect(() => () => { player.pause(); }, [player]);
+  return (
+    <VideoView
+      player={player}
+      style={StyleSheet.absoluteFill}
+      contentFit="cover"
+      nativeControls={false}
+    />
+  );
 }
 
 export default function BuyerStoryViewer() {
@@ -54,6 +73,7 @@ export default function BuyerStoryViewer() {
   const [isPaused, setIsPaused] = useState(false);
   const [isLongPressing, setIsLongPressing] = useState(false);
   const [inputText, setInputText] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
   const [viewerModalVisible, setViewerModalVisible] = useState(false);
   // Like state keyed by storyId
   const [likedSet, setLikedSet] = useState<Set<string>>(new Set());
@@ -136,6 +156,32 @@ export default function BuyerStoryViewer() {
     return unsub;
   }, []);
 
+  const handleSendReply = async () => {
+    const text = inputText.trim();
+    if (!text || sendingReply || !currentStory) return;
+    setSendingReply(true);
+    try {
+      const conv = await createOrGetConversation({
+        type: 'buyer_to_buyer',
+        participant: {
+          userId: currentStory.authorId,
+          name: currentStory.authorName,
+          handle: currentStory.authorHandle,
+          initials: currentStory.authorInitials,
+          color: currentStory.authorColor,
+          accountType: 'buyer',
+        },
+      });
+      await sendMessage(conv.id, text);
+      setInputText('');
+      Haptics.notificationAsync?.(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      Alert.alert('Couldn’t send reply', 'Try again.');
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
   const advanceSlide = useCallback(() => {
     if (!currentStory) return;
     if (slideIdx < currentStory.media.length - 1) {
@@ -201,6 +247,8 @@ export default function BuyerStoryViewer() {
               {currentSlide.textContent}
             </Text>
           </View>
+        ) : currentSlide.imageUri && currentSlide.type === 'video' ? (
+          <StorySlideVideo uri={currentSlide.imageUri} paused={isPaused} />
         ) : currentSlide.imageUri ? (
           <Image
             source={{ uri: currentSlide.imageUri }}
@@ -214,7 +262,6 @@ export default function BuyerStoryViewer() {
               size={80}
               color="rgba(255,255,255,0.2)"
             />
-            <Text style={styles.slidePreviewText}>Story content</Text>
           </View>
         )}
 
@@ -231,8 +278,8 @@ export default function BuyerStoryViewer() {
                 }}
                 activeOpacity={0.82}
               >
-                <Feather name="link-2" size={12} color="#FFF" />
-                <Text style={styles.linkOverlayText} numberOfLines={1}>
+                <Feather name="link-2" size={12} color={theme.onAccent} />
+                <Text style={[styles.linkOverlayText, getOnAccentTextStyle(theme)]} numberOfLines={1}>
                   {overlay.linkText || overlay.linkUrl}
                 </Text>
               </TouchableOpacity>
@@ -324,8 +371,13 @@ export default function BuyerStoryViewer() {
           <TouchableOpacity
             style={styles.productTag}
             onPress={() =>
-              Alert.alert('Product', 'Open ' + currentSlide.productTagName, [
-                { text: 'Shop', onPress: () => router.back() },
+              Alert.alert(currentSlide.productTagName ?? 'Product', undefined, [
+                {
+                  text: 'Shop',
+                  onPress: () => router.push(
+                    `/thread-product-detail?productId=${encodeURIComponent(currentSlide.productTagId ?? '')}&productName=${encodeURIComponent(currentSlide.productTagName ?? '')}` as never,
+                  ),
+                },
                 { text: 'Cancel', style: 'cancel' },
               ])
             }
@@ -391,9 +443,26 @@ export default function BuyerStoryViewer() {
               style={styles.replyInput}
               value={inputText}
               onChangeText={setInputText}
-              placeholder={`Reply to ${currentStory.authorName}...`}
+              placeholder={`Reply to ${currentStory.authorName}…`}
               placeholderTextColor="rgba(255,255,255,0.4)"
+              onFocus={() => setIsPaused(true)}
+              onBlur={() => setIsPaused(false)}
+              onSubmitEditing={handleSendReply}
+              returnKeyType="send"
+              editable={!sendingReply}
             />
+            {inputText.trim().length > 0 && (
+              <TouchableOpacity
+                onPress={handleSendReply}
+                style={styles.likeBtn}
+                activeOpacity={0.7}
+                disabled={sendingReply}
+                accessibilityRole="button"
+                accessibilityLabel="Send reply"
+              >
+                <Feather name="send" size={ICON.md} color={sendingReply ? 'rgba(255,255,255,0.4)' : ON_DARK} />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               onPress={handleLike}
               style={styles.likeBtn}
@@ -709,7 +778,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     zIndex: 8,
   },
   linkOverlayText: {
-    color: '#FFF',
+    color: theme.onAccent,
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
     flexShrink: 1,

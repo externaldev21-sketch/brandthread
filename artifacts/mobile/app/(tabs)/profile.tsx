@@ -17,6 +17,7 @@ import {
   BG, SCREEN_BG, CARD, BORDER, FG, MUTED, SUBTLE,
   FONT, FS, SP, RADIUS, ICON, SURFACE, ACCENT, ACCENT_LIGHT,
 } from '@/lib/theme';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 // ─── Profile data shape ──────────────────────────────────────────────────────
 
@@ -28,6 +29,7 @@ interface SellerProfileData {
   subscriptionPlanId: string | null;
   totalLikes:         number;
   profileImageUrl:    string | null;
+  verified:           boolean;
   metrics: {
     revenueCents: number;
     visitors: number;
@@ -106,6 +108,7 @@ export default function ProfileScreen() {
         subscriptionPlanId: data.subscriptionPlanId ?? null,
         totalLikes:         data.totalLikes ?? 0,
         profileImageUrl:    data.profileImageUrl ?? null,
+        verified:           data.verified === true,
         metrics: data.metrics ?? {
           revenueCents: 0,
           visitors: 0,
@@ -189,6 +192,7 @@ export default function ProfileScreen() {
         subscriptionPlanId: current?.subscriptionPlanId ?? null,
         totalLikes: current?.totalLikes ?? 0,
         profileImageUrl: current?.profileImageUrl ?? null,
+        verified: current?.verified ?? false,
         metrics: current?.metrics ?? {
           revenueCents: 0,
           visitors: 0,
@@ -303,7 +307,7 @@ export default function ProfileScreen() {
             <Text style={s.brandName} numberOfLines={1}>
               {profile?.brandName || profile?.displayName || 'My Brand'}
             </Text>
-            <Feather name="check-circle" size={16} color={colors.primary} />
+            {profile?.verified && <Feather name="check-circle" size={16} color={colors.primary} />}
           </View>
         </TouchableOpacity>
 
@@ -464,7 +468,7 @@ export default function ProfileScreen() {
       <Modal
         visible={profileEditorVisible}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={closeProfileEditor}
       >
         <KeyboardAvoidingView
@@ -477,7 +481,7 @@ export default function ProfileScreen() {
             onPress={closeProfileEditor}
             accessibilityLabel="Close profile editor"
           />
-          <View style={s.sheet}>
+          <SheetRise style={s.sheet}>
             <View style={s.sheetHandle} />
             <View style={s.sheetHeader}>
               <View>
@@ -545,7 +549,7 @@ export default function ProfileScreen() {
                 <Text style={[s.saveButtonText, { color: theme.accent }]}>{savingProfile ? 'Saving…' : 'Save changes'}</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </SheetRise>
         </KeyboardAvoidingView>
       </Modal>
     </>

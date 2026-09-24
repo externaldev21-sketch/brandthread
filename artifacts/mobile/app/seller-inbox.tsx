@@ -4,7 +4,8 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, ListRenderItemInfo } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
+import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -263,7 +264,7 @@ export default function SellerInboxScreen() {
           </Text>
         </View>
       ) : (
-        <FlatList
+        <FlashList
           data={convs}
           keyExtractor={(c) => c.id}
           renderItem={renderItem}

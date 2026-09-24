@@ -41,6 +41,23 @@ interface DiscountCode {
   createdAt: string;
 }
 
+// The server returns minOrderCents/maxUses/usesCount/value-as-string; normalize
+// to the shape this screen renders.
+function normalizeDiscount(raw: any): DiscountCode {
+  return {
+    id: String(raw.id),
+    code: raw.code,
+    type: raw.type,
+    value: Number(raw.value),
+    minOrderAmount: raw.minOrderCents ?? raw.minOrderAmount ?? undefined,
+    usageLimit: raw.maxUses ?? raw.usageLimit ?? undefined,
+    usageCount: raw.usesCount ?? raw.usageCount ?? 0,
+    active: !!raw.active,
+    expiresAt: raw.expiresAt ?? undefined,
+    createdAt: raw.createdAt ?? new Date().toISOString(),
+  };
+}
+
 function fmtValue(d: DiscountCode) {
   return d.type === 'percentage' ? `${d.value}% off` : `${formatCents(d.value)} off`;
 }
@@ -50,12 +67,6 @@ function fmtExpiry(iso?: string) {
   const d = new Date(iso);
   return d < new Date() ? `Expired ${d.toLocaleDateString()}` : `Expires ${d.toLocaleDateString()}`;
 }
-
-const DEMO: DiscountCode[] = [
-  { id: '1', code: 'WELCOME20', type: 'percentage', value: 20, usageCount: 14, active: true, createdAt: new Date().toISOString() },
-  { id: '2', code: 'SAVE10',    type: 'fixed',      value: 1000, minOrderAmount: 5000, usageLimit: 50, usageCount: 23, active: true, createdAt: new Date().toISOString() },
-  { id: '3', code: 'SUMMER25',  type: 'percentage', value: 25, usageCount: 8, active: false, expiresAt: '2026-09-01T00:00:00Z', createdAt: new Date().toISOString() },
-];
 
 export default function DiscountsScreen() {
   const { theme } = useAppTheme();
@@ -67,6 +78,7 @@ export default function DiscountsScreen() {
 
   const [discounts, setDiscounts]   = useState<DiscountCode[]>([]);
   const [loading, setLoading]       = useState(true);
+  const [loadError, setLoadError]   = useState(false);
   const [showModal, setShowModal]   = useState(false);
   const [saving, setSaving]         = useState(false);
 
@@ -82,10 +94,12 @@ export default function DiscountsScreen() {
   const loadDiscounts = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await (api as any).discounts?.list?.() ?? null;
-      setDiscounts(Array.isArray(data) ? data : DEMO);
+      const data = await api.discounts.list();
+      setDiscounts(Array.isArray(data) ? data.map(normalizeDiscount) : []);
+      setLoadError(false);
     } catch {
-      setDiscounts(DEMO);
+      setDiscounts([]);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -120,24 +134,16 @@ export default function DiscountsScreen() {
         code: code.trim().toUpperCase(),
         type: discType,
         value: numValue,
-        minOrderAmount,
-        usageLimit: usageLimit ? parseInt(usageLimit, 10) : undefined,
-        active: true,
+        minOrderCents: minOrderAmount ?? undefined,
+        maxUses: usageLimit ? parseInt(usageLimit, 10) : undefined,
         expiresAt: hasExpiry && expiryDate ? new Date(expiryDate).toISOString() : undefined,
       };
-      const created = await (api as any).discounts?.create?.(payload);
-      if (created) {
-        setDiscounts(prev => [created, ...prev]);
-      } else {
-        // optimistic
-        setDiscounts(prev => [{
-          id: Date.now().toString(), ...payload, usageCount: 0, createdAt: new Date().toISOString(),
-        } as DiscountCode, ...prev]);
-      }
+      const created = await api.discounts.create(payload);
+      setDiscounts(prev => [normalizeDiscount(created), ...prev]);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowModal(false);
-    } catch (e: any) {
-      Alert.alert('Could not save', e?.message ?? 'Please try again.');
+    } catch {
+      Alert.alert("Couldn't create the code", 'Try again.');
     } finally {
       setSaving(false);
     }
@@ -148,7 +154,7 @@ export default function DiscountsScreen() {
     const updated = { ...d, active: !d.active };
     setDiscounts(prev => prev.map(x => x.id === d.id ? updated : x));
     try {
-      await (api as any).discounts?.update?.(d.id, { active: !d.active });
+      await api.discounts.update(d.id, { active: !d.active });
     } catch {
       setDiscounts(prev => prev.map(x => x.id === d.id ? d : x)); // rollback
     }
@@ -161,7 +167,7 @@ export default function DiscountsScreen() {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
           setDiscounts(prev => prev.filter(x => x.id !== d.id));
-          try { await (api as any).discounts?.delete?.(d.id); }
+          try { await api.discounts.remove(d.id); }
           catch { loadDiscounts(); }
         },
       },
@@ -189,7 +195,14 @@ export default function DiscountsScreen() {
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 80 }}>
 
-          {discounts.length === 0 && (
+          {loadError ? (
+            <EmptyState
+              icon="alert-circle"
+              title="Couldn't load your codes"
+              description="Pull to refresh."
+              action={{ label: 'Try again', onPress: () => { void loadDiscounts(); }, icon: 'refresh-cw' }}
+            />
+          ) : discounts.length === 0 && (
             <EmptyState
               icon="tag"
               title="No discount codes yet"
@@ -220,8 +233,8 @@ export default function DiscountsScreen() {
         onPress={openNewModal}
         activeOpacity={0.85}
       >
-        <Feather name="plus" size={24} color="#fff" />
-        <Text style={s.fabText}>New Code</Text>
+        <Feather name="plus" size={24} color={theme.onAccent} />
+        <Text style={s.fabText}>New code</Text>
       </TouchableOpacity>
 
       {/* Create Modal */}
@@ -392,8 +405,8 @@ function DiscountCard({ d, onToggle, onDelete }: {
   );
 }
 
-const createStyles = (theme: { accent: string; accentLight: string; accentDim: string }) => {
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM } = theme;
+const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; onAccent: string }) => {
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, onAccent: ON_ACCENT } = theme;
   return StyleSheet.create({
   root:       { flex: 1, backgroundColor: 'transparent' },
   center:     { flex: 1, alignItems: 'center', justifyContent: 'center' },
@@ -410,7 +423,7 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
   statText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
 
   fab:      { position: 'absolute', right: SP.md, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: PURPLE, borderRadius: 24, paddingHorizontal: SP.md, paddingVertical: 14 },
-  fabText:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: '#fff' },
+  fabText:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: ON_ACCENT },
 
   modal:       { flex: 1, backgroundColor: BG },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingBottom: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },

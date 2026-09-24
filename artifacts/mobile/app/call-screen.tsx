@@ -152,7 +152,7 @@ function NativeCallScreen() {
   function closeAfterRenewalFailure() {
     if (renewalTimerRef.current) clearTimeout(renewalTimerRef.current);
     renewalTimerRef.current = null;
-    setUnavailableReason('The call lost its secure connection and could not be renewed. Media was closed. Return to messages and start a new call.');
+    setUnavailableReason('The call dropped. Try calling again.');
     setStatus('unavailable');
     try {
       engineRef.current?.leaveChannel();
@@ -213,7 +213,7 @@ function NativeCallScreen() {
     }
 
     if (!AgoraModule) {
-      setUnavailableReason('Calling is not supported in Expo Go or this device build. Use a native Brandthread build, or continue by message.');
+      setUnavailableReason("Calls aren't available right now. Keep chatting by message.");
       setStatus('unavailable');
       emitTerminalEvent('failed');
       return;
@@ -234,7 +234,7 @@ function NativeCallScreen() {
     } catch (err: any) {
       const msg = String(err?.message ?? '');
       if (msg.includes('503') || msg.includes('not configured')) {
-        setUnavailableReason('Calling is not configured for this workspace. Continue the conversation by message.');
+        setUnavailableReason("Calls aren't available right now. Keep chatting by message.");
         setStatus('unavailable');
         return;
       }
@@ -249,7 +249,7 @@ function NativeCallScreen() {
     }
 
     if (!tokenData?.appId || !tokenData.channelName) {
-      setUnavailableReason('Calling is not configured for this workspace. Continue the conversation by message.');
+      setUnavailableReason("Calls aren't available right now. Keep chatting by message.");
       setStatus('unavailable');
       emitTerminalEvent('failed');
       return;
@@ -427,9 +427,9 @@ function NativeCallScreen() {
             </View>
             <Text style={s.unavailableTitle}>Call unavailable</Text>
             <Text style={s.unavailableText}>{unavailableReason}</Text>
-            <TouchableOpacity style={s.messageButton} onPress={() => router.back()}>
-              <Feather name="message-circle" size={17} color="#fff" />
-              <Text style={s.messageButtonText}>Return to messages</Text>
+            <TouchableOpacity style={[s.messageButton, { backgroundColor: colors.primary }]} onPress={() => router.back()}>
+              <Feather name="message-circle" size={17} color={colors.primaryForeground} />
+              <Text style={[s.messageButtonText, { color: colors.primaryForeground }]}>Return to messages</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -656,14 +656,12 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.sm,
-    backgroundColor: PURPLE,
     borderRadius: RADIUS.md,
     paddingHorizontal: SP.lg,
     paddingVertical: SP.md,
     marginTop: SP.xl,
   },
   messageButtonText: {
-    color: '#fff',
     fontFamily: FONT.semibold,
     fontSize: FS.sm,
   },

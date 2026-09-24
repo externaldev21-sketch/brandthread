@@ -15,7 +15,7 @@ import {
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
-import { BrandthreadCard, PrimaryButton, SecondaryButton, FilterChip } from '@/components/BrandthreadUI';
+import { BrandthreadCard, PrimaryButton, SecondaryButton, FilterChip, EmptyState } from '@/components/BrandthreadUI';
 import { generateFromSocial, getStoreApplyFailure, StoreApplyFailure } from '@/services/storeService';
 import { useApi } from '@/lib/api';
 
@@ -26,12 +26,6 @@ interface SellerPost {
   title: string;
   desc: string;
 }
-
-const FALLBACK_POSTS: SellerPost[] = [
-  { id: 'p1', title: 'New Drop — Summer Collection', desc: 'Product showcase post' },
-  { id: 'p2', title: 'Behind the Scenes', desc: 'Brand story video' },
-  { id: 'p3', title: 'Customer Feature', desc: 'Community highlight' },
-];
 
 /**
  * Re-encode social screenshots at a bounded size before converting them to
@@ -71,21 +65,22 @@ export default function StoreFromSocialScreen() {
   const [screenshotBase64s, setScreenshotBase64s] = useState<string[]>([]);
   const [profileUrl, setProfileUrl] = useState('');
   const [selectedPostIds, setSelectedPostIds] = useState<string[]>([]);
-  const [sellerPosts, setSellerPosts] = useState<SellerPost[]>(FALLBACK_POSTS);
+  const [sellerPosts, setSellerPosts] = useState<SellerPost[]>([]);
+  const [postsLoading, setPostsLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisFailure, setAnalysisFailure] = useState<StoreApplyFailure | null>(null);
 
-  // Load real seller posts
+  // Load real seller posts — no fake fallback posts if this fails or is empty.
   useEffect(() => {
     (api as any).content?.myPosts?.().then((posts: any[]) => {
-      if (Array.isArray(posts) && posts.length > 0) {
+      if (Array.isArray(posts)) {
         setSellerPosts(posts.map((p: any) => ({
           id: String(p.id ?? p.postId ?? Math.random()),
           title: p.title ?? p.caption ?? 'Post',
           desc: p.type ?? 'Brand post',
         })));
       }
-    }).catch(() => {/* use fallback */});
+    }).catch(() => {}).finally(() => setPostsLoading(false));
   }, [api]);
 
   const addScreenshots = async () => {
@@ -218,7 +213,7 @@ export default function StoreFromSocialScreen() {
           <View style={ss.bannerRow}>
             <Feather name="zap" size={ICON.sm} color={PURPLE_LIGHT} />
             <Text style={[ss.bannerText, { color: PURPLE_LIGHT }]}>
-              Powered by GPT-5 — screenshots are analyzed visually; URL and posts use brand context.
+              We'll pull your colors, type and vibe from your social presence.
             </Text>
           </View>
         </BrandthreadCard>
@@ -288,28 +283,40 @@ export default function StoreFromSocialScreen() {
         {activeTab === 'posts' && (
           <>
             <Text style={ss.tabInfo}>Select posts to base your storefront tone and theme on:</Text>
-            {sellerPosts.map(post => {
-              const selected = selectedPostIds.includes(post.id);
-              return (
-                <TouchableOpacity key={post.id} style={[ss.postRow, selected && ss.postRowSelected]} onPress={() => togglePost(post.id)}>
-                  <View style={[ss.postCheck, selected && ss.postCheckActive]}>
-                    {selected && <Feather name="check" size={12} color="#fff" />}
-                  </View>
-                  <View style={ss.postMeta}>
-                    <Text style={ss.postTitle}>{post.title}</Text>
-                    <Text style={ss.postDesc}>{post.desc}</Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-            <PrimaryButton
-              label={analyzing ? 'Generating...' : `Generate from ${selectedPostIds.length > 0 ? selectedPostIds.length + ' ' : ''}Post${selectedPostIds.length !== 1 ? 's' : ''}`}
-              onPress={handleGenerateFromPosts}
-              loading={analyzing}
-              disabled={selectedPostIds.length === 0 || analyzing}
-              icon="zap"
-              style={ss.actionBtn}
-            />
+            {postsLoading ? (
+              <ActivityIndicator color={PURPLE} style={{ marginVertical: SP.lg }} />
+            ) : sellerPosts.length === 0 ? (
+              <EmptyState
+                icon="image"
+                title="No posts yet"
+                description="Post on Brandthread, then come back."
+              />
+            ) : (
+              <>
+                {sellerPosts.map(post => {
+                  const selected = selectedPostIds.includes(post.id);
+                  return (
+                    <TouchableOpacity key={post.id} style={[ss.postRow, selected && ss.postRowSelected]} onPress={() => togglePost(post.id)}>
+                      <View style={[ss.postCheck, selected && ss.postCheckActive]}>
+                        {selected && <Feather name="check" size={12} color={theme.onAccent} />}
+                      </View>
+                      <View style={ss.postMeta}>
+                        <Text style={ss.postTitle}>{post.title}</Text>
+                        <Text style={ss.postDesc}>{post.desc}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+                <PrimaryButton
+                  label={analyzing ? 'Generating...' : `Generate from ${selectedPostIds.length > 0 ? selectedPostIds.length + ' ' : ''}Post${selectedPostIds.length !== 1 ? 's' : ''}`}
+                  onPress={handleGenerateFromPosts}
+                  loading={analyzing}
+                  disabled={selectedPostIds.length === 0 || analyzing}
+                  icon="zap"
+                  style={ss.actionBtn}
+                />
+              </>
+            )}
           </>
         )}
 

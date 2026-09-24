@@ -17,6 +17,8 @@ const DEVICES = {
 } as const;
 
 const totalWidth = (m: ReturnType<typeof getBuyerTabBarMetrics>) => m.capsuleWidth + m.gap + m.circleSize;
+// Seller: Studio circle · capsule · AI circle, from the same metrics.
+const sellerWidth = (m: ReturnType<typeof getBuyerTabBarMetrics>) => m.capsuleWidth + (m.gap + m.circleSize) * 2;
 
 describe('buyer tab bar metrics', () => {
   it('sizes the phone bar to its content instead of stretching edge to edge', () => {
@@ -25,8 +27,15 @@ describe('buyer tab bar metrics', () => {
       const ratio = totalWidth(m) / device.width;
       expect(m.isTablet).toBe(false);
       expect(ratio).toBeLessThanOrEqual(0.9);
-      expect(ratio).toBeGreaterThanOrEqual(0.7);
+      expect(ratio).toBeGreaterThanOrEqual(0.6);
       expect(m.capsuleWidth).toBe(m.itemWidth * 4 + m.capsulePadding * 2);
+    }
+  });
+
+  it('fits the wider seller bar on every phone with at least 12pt side margins', () => {
+    for (const device of [DEVICES.iphoneSE, DEVICES.iphone15, DEVICES.iphoneProMax, DEVICES.androidGesture, DEVICES.androidButtons, DEVICES.ipadSplitNarrow]) {
+      const m = getBuyerTabBarMetrics(device);
+      expect((device.width - sellerWidth(m)) / 2).toBeGreaterThanOrEqual(12);
     }
   });
 
@@ -37,14 +46,18 @@ describe('buyer tab bar metrics', () => {
       expect(m.capsuleHeight).toBeGreaterThanOrEqual(44);
       expect(m.fieldHeight).toBeGreaterThanOrEqual(40);
       expect(m.circleSize).toBe(m.capsuleHeight);
-      expect(m.labelSize).toBeGreaterThanOrEqual(11);
+      expect(m.indicatorHeight).toBeGreaterThanOrEqual(36);
+      expect(m.indicatorWidth).toBeLessThanOrEqual(m.itemWidth);
     }
   });
 
-  it('never changes the capsule width for search on phones, so nothing fights for width', () => {
-    for (const device of [DEVICES.iphoneSE, DEVICES.iphoneProMax, DEVICES.ipadSplitNarrow]) {
+  it('widens the capsule for search on phones without leaving the screen margins', () => {
+    for (const device of [DEVICES.iphoneSE, DEVICES.iphoneProMax, DEVICES.androidButtons, DEVICES.ipadSplitNarrow]) {
       const m = getBuyerTabBarMetrics(device);
-      expect(m.searchCapsuleWidth).toBe(m.capsuleWidth);
+      expect(m.searchCapsuleWidth).toBeGreaterThan(m.capsuleWidth);
+      expect(m.searchCapsuleWidth + m.gap + m.circleSize).toBeLessThanOrEqual(device.width - 24);
+      // The field (everything right of Home) stays roomy enough to type in.
+      expect(m.searchCapsuleWidth - m.capsulePadding * 2 - m.itemWidth).toBeGreaterThanOrEqual(180);
     }
   });
 

@@ -606,6 +606,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Bulk-import products from a rows array. Returns { successCount, failCount, errors }. */
       import: (rows: Array<{ name: string; description?: string; category?: string; price?: string }>) =>
         post<{ successCount: number; failCount: number; errors?: string[] }>('/api/products/import', { rows }),
+      /** Upload one product photo and return the URL to store in `images`. */
+      uploadImage: (image: { uri: string; mimeType?: string | null }) =>
+        uploadImage<{ objectPath: string }>('/api/products/images', image, getToken, getCacheScope),
     },
     ipCases: {
       create: (body: { listingProductId: string; claimantName: string; claimantEmail: string; rightsType: string; description: string; evidenceReferences: string[] }) =>
@@ -681,6 +684,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       adjust: (variantId: string, body: { delta?: number; newStock?: number }) =>
         patch<any>(`/api/inventory/${variantId}/adjust`, body),
     },
+    discounts: {
+      list:   () => get<any[]>('/api/discount-codes'),
+      create: (body: { code: string; type: 'percentage' | 'fixed' | 'free_shipping'; value: number; minOrderCents?: number; maxUses?: number | null; expiresAt?: string | null }) =>
+        post<any>('/api/discount-codes', body),
+      update: (id: string, body: { active?: boolean; expiresAt?: string | null }) =>
+        patch<any>(`/api/discount-codes/${encodeURIComponent(id)}`, body),
+      remove: (id: string) => del<any>(`/api/discount-codes/${encodeURIComponent(id)}`),
+    },
     /** Manufacturer hub — public directory, invite tokens, threads, sample orders, drop wallets. */
     manufacturers: {
       public: {
@@ -699,6 +710,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       },
       registerViaInvite: (token: string, body: any) =>
         post<any>(`/api/manufacturers/register-via-invite/${encodeURIComponent(token)}`, body),
+      /** Upload a factory/production photo for the signed-in manufacturer.
+       *  Requires an already-registered manufacturer profile (invite/claim
+       *  flow) — anonymous public applications cannot attach photos. */
+      uploadPhoto: (image: { uri: string; mimeType?: string | null }) =>
+        uploadImage<{ photo: string; photos: string[]; revision: number }>(
+          '/api/manufacturers/me/photos', image, getToken, getCacheScope,
+        ),
       favorites: {
         list: () => get<Array<{ manufacturerId: string; createdAt: string }>>('/api/manufacturers/favorites'),
         add: (manufacturerId: string) =>
@@ -1840,6 +1858,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       brandMemoryRebuild: () => post<{ fields: Record<string, string> }>('/api/ai/brand-memory/rebuild', {}),
       suggestions:        () => get<{ suggestions: any[] }>('/api/ai/suggestions'),
       nextActions:        () => get<{ suggestions: any[] }>('/api/ai/suggestions'),
+      /** One-off assistant call — e.g. "rewrite this copy". */
+      chat: (body: { messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>; maxTokens?: number }) =>
+        post<{ content: string; actionCard?: Record<string, unknown>; tokensUsed?: number }>('/api/ai/chat', body),
     },
     /** Security — login sessions */
     security: {

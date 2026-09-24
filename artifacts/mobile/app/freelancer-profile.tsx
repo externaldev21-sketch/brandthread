@@ -17,6 +17,7 @@ import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { centsAtBasisPoints, parseDecimalToCents } from '@/lib/money';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 const PLATFORM_FEE_BASIS_POINTS = 500; // display only — server computes the real fee
 
@@ -361,12 +362,12 @@ export default function FreelancerProfileScreen() {
       )}
 
       {/* Hire modal */}
-      <Modal visible={hireVisible} transparent animationType="slide" onRequestClose={() => setHireVisible(false)}>
+      <Modal visible={hireVisible} transparent animationType="fade" onRequestClose={() => setHireVisible(false)}>
         <KeyboardAvoidingView
           style={styles.modalOverlay}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <View style={styles.modalSheet}>
+          <SheetRise style={styles.modalSheet}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>Hire {freelancer.name}</Text>
             <Text style={styles.modalSub}>
@@ -450,7 +451,7 @@ export default function FreelancerProfileScreen() {
             >
               <Text style={styles.modalCancelText}>Cancel</Text>
             </TouchableOpacity>
-          </View>
+          </SheetRise>
         </KeyboardAvoidingView>
       </Modal>
     </View>

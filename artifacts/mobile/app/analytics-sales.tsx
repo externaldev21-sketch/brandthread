@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Platform, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Platform, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,8 +15,16 @@ import {
   SUCCESS, SUCCESS_DIM, RED, RED_DIM, ORANGE, GOLD,
   FONT, FS,
 } from '@/lib/theme';
-import { getSalesAnalytics, getFilterState, exportAnalytics } from '@/services/analyticsService';
+import { getSalesAnalytics, getFilterState } from '@/services/analyticsService';
 import { SalesAnalytics, AnalyticsMetric, AnalyticsPoint, AnalyticsFilterState } from '@/services/analyticsTypes';
+
+const CHART_TAB_LABELS: Record<'sales' | 'orders' | 'units' | 'aov' | 'refunds', string> = {
+  sales: 'Sales',
+  orders: 'Orders',
+  units: 'Units',
+  aov: 'Avg order',
+  refunds: 'Refunds',
+};
 
 function MiniBar({ points, color }: { points: AnalyticsPoint[]; color: string }) {
   const colors = useColors();
@@ -120,9 +128,6 @@ export default function AnalyticsSalesScreen() {
           <Text style={s.pageTitle}>Sales Analytics</Text>
           <Text style={s.subtitle}>{filter?.dateRange.label ?? '30 days'}</Text>
         </View>
-        <TouchableOpacity onPress={async () => { Alert.alert('Exporting…'); if (filter) { await exportAnalytics('sales', filter.dateRange); Alert.alert('Export ready'); } }} style={s.iconBtn}>
-          <Feather name="share" size={16} color={PURPLE} />
-        </TouchableOpacity>
       </View>
 
       {/* Chart */}
@@ -130,7 +135,7 @@ export default function AnalyticsSalesScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, flexDirection: 'row', marginBottom: 12 }}>
           {(['sales','orders','units','aov','refunds'] as const).map(k => (
             <TouchableOpacity key={k} onPress={() => setActiveChart(k)} style={[s.chartTab, activeChart === k && s.chartTabActive, activeChart === k && { backgroundColor: PURPLE_DIM, borderColor: PURPLE }]}>
-              <Text style={[s.chartTabText, activeChart === k && s.chartTabTextActive, activeChart === k && { color: PURPLE_LIGHT }]}>{k.charAt(0).toUpperCase() + k.slice(1)}</Text>
+              <Text style={[s.chartTabText, activeChart === k && s.chartTabTextActive, activeChart === k && { color: PURPLE_LIGHT }]}>{CHART_TAB_LABELS[k]}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>

@@ -29,6 +29,7 @@ import {
   BlockedComposer, openConversationOptions, openMessageOptions, REMOVED_MESSAGE_TEXT,
   type DmMessagingState,
 } from '@/components/safety/DmSafety';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -770,11 +771,11 @@ export default function SellerConversationScreen() {
       <Modal
         visible={showMediaSheet}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowMediaSheet(false)}
       >
         <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowMediaSheet(false)} />
-        <View style={[s.sheet, { paddingBottom: insets.bottom + SP.md }]}>
+        <SheetRise style={[s.sheet, { paddingBottom: insets.bottom + SP.md }]}>
           <View style={s.sheetHandle} />
           <Text style={s.sheetTitle}>Add to message</Text>
           <TouchableOpacity style={s.sheetOption} onPress={handlePickPhoto}>
@@ -792,14 +793,14 @@ export default function SellerConversationScreen() {
             </View>
           </TouchableOpacity>
           <View style={{ height: 20 }} />
-        </View>
+        </SheetRise>
       </Modal>
 
       {/* ── Attach picker sheet ─────────────────────────────────────────────── */}
       <Modal
         visible={showAttachPicker}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowAttachPicker(false)}
       >
         <TouchableOpacity
@@ -807,7 +808,7 @@ export default function SellerConversationScreen() {
           activeOpacity={1}
           onPress={() => setShowAttachPicker(false)}
         />
-        <View style={[s.sheet, { paddingBottom: insets.bottom + SP.md }]}>
+        <SheetRise style={[s.sheet, { paddingBottom: insets.bottom + SP.md }]}>
           <View style={s.sheetHandle} />
           <Text style={s.sheetTitle}>Attach to message</Text>
 
@@ -850,14 +851,14 @@ export default function SellerConversationScreen() {
           >
             <Text style={[s.sheetOptionLabel, { color: MUTED, textAlign: 'center', flex: 1 }]}>Cancel</Text>
           </TouchableOpacity>
-        </View>
+        </SheetRise>
       </Modal>
 
       {/* ── Product picker modal ────────────────────────────────────────────── */}
       <Modal
         visible={showProductPicker}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowProductPicker(false)}
       >
         <TouchableOpacity
@@ -865,7 +866,7 @@ export default function SellerConversationScreen() {
           activeOpacity={1}
           onPress={() => setShowProductPicker(false)}
         />
-        <View style={[s.productSheet, { paddingBottom: insets.bottom + SP.md }]}>
+        <SheetRise style={[s.productSheet, { paddingBottom: insets.bottom + SP.md }]}>
           <View style={s.sheetHandle} />
           <View style={s.productSheetHeader}>
             <Text style={s.sheetTitle}>Choose a product</Text>
@@ -904,7 +905,7 @@ export default function SellerConversationScreen() {
               ))}
             </ScrollView>
           )}
-        </View>
+        </SheetRise>
       </Modal>
     </KeyboardAvoidingView>
   );

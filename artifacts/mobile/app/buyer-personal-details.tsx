@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useUser } from '@clerk/expo';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE,
   FONT, FS, SP, RADIUS,
@@ -25,18 +26,25 @@ type FieldDef = {
   keyboardType?: 'default' | 'email-address' | 'phone-pad';
 };
 
-// email and birthday are Clerk-managed and locked in the UI.
+// email and birthday are managed in Login methods and locked in the UI.
 const FIELDS: FieldDef[] = [
   { key: 'name',     label: 'Name',      placeholder: 'Your name',         icon: 'user' },
   { key: 'username', label: 'Username',  placeholder: '@username',          icon: 'at-sign' },
   { key: 'email',    label: 'Email',     placeholder: 'your@email.com',     icon: 'mail',    keyboardType: 'email-address', editable: false },
   { key: 'phone',    label: 'Phone',     placeholder: 'Add phone number',   icon: 'phone',   keyboardType: 'phone-pad' },
-  { key: 'birthday', label: 'Birthday',  placeholder: 'Managed via Clerk',  icon: 'calendar', editable: false },
+  { key: 'birthday', label: 'Birthday',  placeholder: 'Set in Login methods', icon: 'calendar', editable: false },
   { key: 'pronouns', label: 'Pronouns',  placeholder: 'e.g. they/them',     icon: 'smile' },
 ];
 
 function Divider() {
   return <View style={{ height: 1, backgroundColor: BORDER, marginLeft: 16 }} />;
+}
+
+/** Masks a real email address, e.g. "jordan@example.com" -> "••••@example.com". */
+function maskEmail(email: string | null | undefined): string {
+  if (!email || !email.includes('@')) return '';
+  const [, domain] = email.split('@');
+  return `••••@${domain}`;
 }
 
 export default function BuyerPersonalDetails() {
@@ -45,6 +53,7 @@ export default function BuyerPersonalDetails() {
   const s = makeStyles();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user } = useUser();
   const [fields, setFields] = useState<BuyerProfileFields>({ ...DEFAULT_BUYER_PROFILE });
   const [loaded, setLoaded] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -68,7 +77,7 @@ export default function BuyerPersonalDetails() {
   }
 
   function getValue(key: string): string {
-    if (key === 'email') return '••••@gmail.com';
+    if (key === 'email') return maskEmail(user?.primaryEmailAddress?.emailAddress);
     if (key === 'birthday') return '';
     const val = (fields as unknown as Record<string, unknown>)[key];
     return typeof val === 'string' ? val : '';
@@ -138,7 +147,7 @@ export default function BuyerPersonalDetails() {
         <View style={s.note}>
           <Feather name="info" size={14} color={MUTED} />
           <Text style={s.noteText}>
-            Email and birthday are managed by Clerk, your sign-in provider. To change them, visit Clerk account settings.
+            Change your email in Login methods.
           </Text>
         </View>
       </ScrollView>
