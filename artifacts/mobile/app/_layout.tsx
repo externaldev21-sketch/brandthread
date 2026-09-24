@@ -1202,8 +1202,9 @@ export default function RootLayout() {
   return (
     <AppIntroSplash ready={appReady}>
       <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache} proxyUrl={proxyUrl}>
-        {PREVIEW_ROLE ? (
-          // DEV preview bypass: don't wait for clerk-js — render screens directly.
+        {PREVIEW_ROLE || DEV_BYPASS_ROLE ? (
+          // Development previews on web and device must not wait for Clerk
+          // before rendering their already-bypassed navigation tree.
           appTree
         ) : (
           <>
