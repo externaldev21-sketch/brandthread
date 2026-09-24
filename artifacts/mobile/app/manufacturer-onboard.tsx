@@ -8,11 +8,12 @@
  * app-only signup.
  */
 import React from 'react';
-import { Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Linking, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PrimaryButton } from '@/components/BrandthreadUI';
+import { Header } from '@/components/layout';
 import { BORDER, CARD, CARD_ELEVATED, FG, FONT, FS, MUTED, RADIUS, SP, SUBTLE } from '@/lib/theme';
 import { BRANDTHREAD_ORIGIN } from '@/lib/shareProfile';
 
@@ -28,10 +29,9 @@ export default function ManufacturerOnboardScreen() {
   const url = portalJoinUrl(typeof token === 'string' ? token : undefined);
 
   return (
-    <View style={[s.root, { paddingTop: insets.top + SP.md, paddingBottom: insets.bottom + SP.md }]}>
-      <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace('/' as never))} style={s.back} accessibilityLabel="Back">
-        <Feather name="arrow-left" size={20} color={FG} />
-      </TouchableOpacity>
+    <View style={s.screen}>
+    <Header title="Manufacturer signup" onBack={() => (router.canGoBack() ? router.back() : router.replace('/' as never))} />
+    <View style={[s.root, { paddingTop: SP.md, paddingBottom: insets.bottom + SP.md }]}>
       <View style={s.body}>
         <View style={s.icon}><Feather name="briefcase" size={28} color={FG} /></View>
         <Text style={s.title}>{token ? 'You were invited to work on Brandthread' : 'List your factory on Brandthread'}</Text>
@@ -48,12 +48,13 @@ export default function ManufacturerOnboardScreen() {
       <PrimaryButton label={token ? 'Accept invite in the portal' : 'Open the manufacturer portal'} icon="external-link" onPress={() => void Linking.openURL(url)} />
       <Text style={s.url} selectable>{url}</Text>
     </View>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
+  screen: { flex: 1 },
   root: { flex: 1, paddingHorizontal: SP.lg, gap: SP.md },
-  back: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: CARD_ELEVATED },
   body: { flex: 1, justifyContent: 'center', gap: SP.md },
   icon: { width: 60, height: 60, borderRadius: 30, backgroundColor: CARD_ELEVATED, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },

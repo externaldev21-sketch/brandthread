@@ -10,6 +10,7 @@ import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE, SUCCESS, RED, ORANGE, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { Header } from '@/components/layout';
 import { useApi } from '@/lib/api';
 import { isManagerRole } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
@@ -168,14 +169,8 @@ export default function PayoutsScreen() {
 
   if (isLoadingRole) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => { haptic(); leaveSetupDestination(); }} style={styles.backBtn}>
-            <Feather name="chevron-left" size={24} color={FG} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Payouts</Text>
-          <View style={styles.backBtn} />
-        </View>
+      <View style={styles.root}>
+        <Header title="Payouts" onBack={() => { haptic(); leaveSetupDestination(); }} />
         <View style={styles.accessLoading}>
             <ActivityIndicator color={theme.accent} />
         </View>
@@ -185,31 +180,20 @@ export default function PayoutsScreen() {
 
   if (currentRole !== 'owner' && !isReadOnly) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => { haptic(); leaveSetupDestination(); }} style={styles.backBtn}>
-            <Feather name="chevron-left" size={24} color={FG} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Payouts</Text>
-          <View style={styles.backBtn} />
-        </View>
+      <View style={styles.root}>
+        <Header title="Payouts" onBack={() => { haptic(); leaveSetupDestination(); }} />
         <RoleLockedView screenTitle="payouts" currentRole={currentRole ?? undefined} />
       </View>
     );
   }
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => { haptic(); leaveSetupDestination(); }} style={styles.backBtn}>
-          <Feather name="chevron-left" size={24} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Payouts</Text>
-        <TouchableOpacity style={styles.backBtn}>
-          <Feather name="help-circle" size={20} color={MUTED} />
-        </TouchableOpacity>
-      </View>
+    <View style={styles.root}>
+      <Header
+        title="Payouts"
+        onBack={() => { haptic(); leaveSetupDestination(); }}
+        actions={[{ icon: 'help-circle', onPress: () => {}, accessibilityLabel: 'Help' }]}
+      />
 
       {/* Balance cards */}
       <View style={styles.balanceRow}>

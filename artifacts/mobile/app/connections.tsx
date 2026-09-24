@@ -19,6 +19,7 @@ import {
 import { useColors } from '@/hooks/useColors';
 import { useUser } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
+import { Header } from '@/components/layout';
 
 interface ConnectionUser {
   id: string;
@@ -105,15 +106,8 @@ export default function ConnectionsScreen() {
   }
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Feather name="arrow-left" size={22} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>{title}</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <View style={s.root}>
+      <Header title={title} />
 
       {loading && (
         <View style={s.center}>
@@ -149,10 +143,6 @@ export default function ConnectionsScreen() {
 const s = StyleSheet.create({
   root:   { flex: 1, backgroundColor: 'transparent' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.lg },
-
-  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
-  headerTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
-  backBtn:     { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
 
   row:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm },
   avatar:       { width: 44, height: 44, borderRadius: 22 },

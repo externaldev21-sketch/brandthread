@@ -12,6 +12,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
+import { Header } from '@/components/layout';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE,
   PURPLE, PURPLE_LIGHT, PURPLE_DIM, SUCCESS, SUCCESS_DIM,
@@ -80,15 +81,8 @@ export default function VacationModeScreen() {
   }
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.headerBack} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-          <Feather name="arrow-left" size={20} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Vacation Mode</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <View style={s.root}>
+      <Header title="Vacation Mode" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 80 }}>
 
@@ -189,9 +183,6 @@ const createStyles = (theme: { accent: string }) => {
   const { accent: PURPLE } = theme;
   return StyleSheet.create({
   root:       { flex: 1, backgroundColor: 'transparent' },
-  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
-  headerBack: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:{ fontSize: FS.md, fontFamily: FONT.bold, color: FG },
 
   statusCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: CARD, borderWidth: 1.5, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md },
   statusIndicator: { width: 10, height: 10, borderRadius: 5 },

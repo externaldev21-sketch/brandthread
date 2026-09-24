@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  Alert, StyleSheet, Modal, TextInput, ActivityIndicator,
+  Alert, StyleSheet, ScrollView, RefreshControl,
+  Modal, TextInput, ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { EmptyState, ListSkeleton } from '@/components/layout';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
@@ -76,6 +78,7 @@ export default function InboxScreen() {
   const [requestActionLoading, setRequestActionLoading] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [composeVisible, setComposeVisible] = useState(false);
   const [composeQuery, setComposeQuery] = useState('');
   const [composeResults, setComposeResults] = useState<ProfileSearchResult[]>([]);
@@ -99,7 +102,7 @@ export default function InboxScreen() {
       setNotifications(notifs);
       setUnreadNotifCount(notifs.filter(n => !n.isRead).length);
     } catch {
-      setLoadError(false);
+      setLoadError(true);
       setConversations([]);
       setNotifications([]);
       setUnreadNotifCount(0);
@@ -107,6 +110,15 @@ export default function InboxScreen() {
       setLoading(false);
     }
   }, [userId]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadData();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadData]);
 
   useFocusEffect(useCallback(() => {
     loadData();
@@ -426,14 +438,13 @@ export default function InboxScreen() {
   }
 
   function renderEmptyState() {
-    if (loading) return <View style={s.emptyState}><Text style={s.emptySubtitle}>Loading conversations…</Text></View>;
     const { icon, title, subtitle } = EMPTY_MESSAGES[activeTab];
     return (
-      <View style={s.emptyState}>
-        <Feather name={icon} size={48} color={MUTED} />
-        <Text style={s.emptyTitle}>{title}</Text>
-        <Text style={s.emptySubtitle}>{subtitle}</Text>
-      </View>
+      <EmptyState
+        icon={loadError ? 'alert-circle' : icon}
+        message={loadError ? 'Could not load your inbox. Pull to refresh and try again.' : `${title} — ${subtitle}`}
+        variant={loadError ? 'error' : 'empty'}
+      />
     );
   }
 
@@ -491,11 +502,19 @@ export default function InboxScreen() {
       </View>
 
       {/* Conversations list */}
-      {activeTab === 'Follows' ? (
+      {loading ? (
+        <View style={[s.listSurface, s.listContent, { paddingBottom: barInset + SP.md }]}>
+          <ListSkeleton rows={6} />
+        </View>
+      ) : activeTab === 'Follows' ? (
         followNotifications.length === 0 ? (
-          <View style={[s.listSurface, s.listContent, { paddingBottom: barInset + SP.md }, s.listEmptyContainer]}>
+          <ScrollView
+            style={s.listSurface}
+            contentContainerStyle={[s.listContent, { paddingBottom: barInset + SP.md }, s.listEmptyContainer]}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
+          >
             {renderEmptyState()}
-          </View>
+          </ScrollView>
         ) : (
           <View style={s.listSurface}>
             <FlashList
@@ -504,13 +523,19 @@ export default function InboxScreen() {
               renderItem={renderFollowRow}
               contentContainerStyle={StyleSheet.flatten([s.listContent, { paddingBottom: barInset + SP.md }])}
               showsVerticalScrollIndicator={false}
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
             />
           </View>
         )
       ) : filteredConvs.length === 0 ? (
-        <View style={[s.listSurface, s.listContent, { paddingBottom: barInset + SP.md }, s.listEmptyContainer]}>
+        <ScrollView
+          style={s.listSurface}
+          contentContainerStyle={[s.listContent, { paddingBottom: barInset + SP.md }, s.listEmptyContainer]}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
+        >
           {renderEmptyState()}
-        </View>
+        </ScrollView>
       ) : (
         <View style={s.listSurface}>
           <FlashList
@@ -520,6 +545,8 @@ export default function InboxScreen() {
             contentContainerStyle={StyleSheet.flatten([s.listContent, { paddingBottom: barInset + SP.md }])}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
           />
         </View>
       )}

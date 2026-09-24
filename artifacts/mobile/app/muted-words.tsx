@@ -15,6 +15,7 @@ import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { PressableScale } from '@/components/BrandthreadUI';
+import { Header } from '@/components/layout';
 import { apiErrorMessage } from '@/lib/safety';
 import type { MutedWord } from '@/lib/safetyTypes';
 
@@ -90,14 +91,8 @@ export default function MutedWordsScreen() {
   const atLimit = words.length >= limit;
 
   return (
-    <KeyboardAvoidingView style={[s.root, { paddingTop: insets.top }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={s.header}>
-        <PressableScale onPress={() => router.back()} style={s.headerBtn} accessibilityLabel="Back" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="arrow-left" size={ICON.lg} color={theme.text} />
-        </PressableScale>
-        <Text style={s.headerTitle}>Muted words</Text>
-        <View style={s.headerBtn} />
-      </View>
+    <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Header title="Muted words" />
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + SP.xxl }} keyboardShouldPersistTaps="handled">
         <Text style={s.lead}>

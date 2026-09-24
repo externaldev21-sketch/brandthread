@@ -29,6 +29,7 @@ import type { BuyerPost, Comment } from '@/services/socialTypes';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
+import { Header } from '@/components/layout';
 
 function PostVideo({ uri }: { uri: string }) {
   const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; });
@@ -176,17 +177,11 @@ export default function BuyerPostViewer() {
     postType === 'photo' ? 'image' : postType === 'slideshow' ? 'layers' : 'video';
 
   return (
-    <View style={[s.page, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity style={s.iconBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={21} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle} numberOfLines={1}>{authorName}</Text>
-        <TouchableOpacity style={s.iconBtn} onPress={handleShare}>
-          <Feather name="send" size={20} color={FG} />
-        </TouchableOpacity>
-      </View>
+    <View style={s.page}>
+      <Header
+        title={authorName}
+        actions={[{ icon: 'send', onPress: handleShare, accessibilityLabel: 'Share' }]}
+      />
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
         {/* Media display */}
@@ -387,9 +382,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const SHADOW_PURPLE = { shadowColor: theme.shadowColor, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 };
   return StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
-  header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
-  iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { flex: 1, textAlign: 'center', color: FG, fontFamily: FONT.bold, fontSize: FS.md },
   media: { width: '100%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
   authorRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingTop: SP.md, gap: 10 },
   avatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },

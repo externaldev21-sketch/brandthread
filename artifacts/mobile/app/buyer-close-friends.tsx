@@ -17,6 +17,7 @@ import {
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { getAcceptedFriends, getCloseFriendIds, saveCloseFriendIds } from '@/services/socialService';
 import type { Friendship } from '@/services/socialTypes';
+import { Header } from '@/components/layout';
 
 export default function BuyerCloseFriends() {
   const { theme } = useAppTheme();
@@ -76,14 +77,8 @@ export default function BuyerCloseFriends() {
   }
 
   return (
-    <View style={[s.page, { paddingTop: insets.top }]}>
-      <View style={s.header}>
-        <TouchableOpacity style={s.iconBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={21} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.title}>Close Friends</Text>
-        <View style={s.iconBtn} />
-      </View>
+    <View style={s.page}>
+      <Header title="Close Friends" />
 
       {/* Info banner */}
       <View style={s.banner}>
@@ -144,9 +139,6 @@ export default function BuyerCloseFriends() {
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
-  header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
-  iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
   banner: { flexDirection: 'row', gap: 10, padding: SP.md, backgroundColor: theme.accentDim, borderBottomWidth: 1, borderBottomColor: BORDER, alignItems: 'flex-start' },
   bannerText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, lineHeight: 17 },
   searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, margin: SP.md, paddingHorizontal: SP.md, height: 40, backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER },

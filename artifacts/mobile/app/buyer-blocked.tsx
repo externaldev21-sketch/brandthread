@@ -13,7 +13,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { getMutedUsers, unmuteUser, subscribeSocial } from '@/services/socialService';
 import type { MuteRecord } from '@/services/socialTypes';
@@ -22,6 +22,7 @@ import { CachedImage } from '@/components/CachedImage';
 import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
 import { apiErrorMessage, confirmUnblock, shortRelativeTime } from '@/lib/safety';
 import type { BlockedAccount } from '@/lib/safetyTypes';
+import { Header } from '@/components/layout';
 
 type Tab = 'blocked' | 'muted';
 
@@ -121,14 +122,8 @@ export default function BlockedAndMutedScreen() {
   );
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
-      <View style={s.header}>
-        <PressableScale onPress={() => router.back()} style={s.headerBtn} accessibilityLabel="Back" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="arrow-left" size={ICON.lg} color={theme.text} />
-        </PressableScale>
-        <Text style={s.headerTitle}>Blocked & muted</Text>
-        <View style={s.headerBtn} />
-      </View>
+    <View style={s.root}>
+      <Header title="Blocked & muted" />
 
       <View style={s.segment} accessibilityRole="tablist">
         {(['blocked', 'muted'] as const).map((key) => {
@@ -224,9 +219,6 @@ export default function BlockedAndMutedScreen() {
 
 const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.md },
   segment: {
     flexDirection: 'row', marginHorizontal: SP.md, marginBottom: SP.md, padding: 4,
     backgroundColor: theme.card, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: theme.border,

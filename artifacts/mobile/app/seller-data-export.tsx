@@ -10,6 +10,7 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { Header } from '@/components/layout';
 import { PrimaryButton, SecondaryButton } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 
@@ -85,15 +86,8 @@ export default function SellerDataExportScreen() {
   }
 
   return (
-      <View style={[styles.root, { paddingTop: Platform.OS === 'web' ? 20 : insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Feather name="arrow-left" size={22} color={theme.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Export My Data</Text>
-        <View style={{ width: 22 }} />
-      </View>
+      <View style={styles.root}>
+      <Header title="Export My Data" />
 
        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* What to include */}

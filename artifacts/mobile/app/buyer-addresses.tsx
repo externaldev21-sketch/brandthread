@@ -8,6 +8,7 @@ import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { useAuth } from '@clerk/expo';
+import { Header } from '@/components/layout';
 
 export default function BuyerAddressesScreen() {
   const { theme } = useAppTheme();
@@ -157,17 +158,11 @@ export default function BuyerAddressesScreen() {
   const showForm = isCreating || editingId;
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => {
-          if (showForm) handleCancel();
-          else router.back();
-        }}>
-          <Feather name={showForm ? 'x' : 'arrow-left'} size={21} color={theme.text} />
-        </TouchableOpacity>
-        <Text style={styles.title}>{showForm ? (isCreating ? 'Add address' : 'Edit address') : 'Shipping addresses'}</Text>
-        <View style={styles.iconBtn} />
-      </View>
+    <View style={styles.root}>
+      <Header
+        title={showForm ? (isCreating ? 'Add address' : 'Edit address') : 'Shipping addresses'}
+        onBack={() => { if (showForm) handleCancel(); else router.back(); }}
+      />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
@@ -287,10 +282,7 @@ export default function BuyerAddressesScreen() {
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.background },
-  header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: theme.border },
-  iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.md },
-  
+
   empty: { padding: SP.xl, alignItems: 'center', marginTop: SP.xl },
   emptyText: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.base, textAlign: 'center' },
   

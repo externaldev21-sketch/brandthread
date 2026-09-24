@@ -58,12 +58,26 @@ vi.mock('react-native', () => {
     Alert: { alert: vi.fn() },
     Image: Object.assign(nativeComponent('Image'), { getSize: imageGetSizeMock }),
     ScrollView: nativeComponent('ScrollView'),
-    StyleSheet: { create: (styles: unknown) => styles },
+    StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
     Text: nativeComponent('Text'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),
     View: nativeComponent('View'),
+    Animated: {
+      Value: class { constructor(_v?: number) {} },
+      View: nativeComponent('Animated.View'),
+      event: () => () => {},
+      timing: () => ({ start: (cb?: () => void) => cb?.() }),
+      sequence: () => ({ start: (cb?: () => void) => cb?.() }),
+      loop: () => ({ start: () => {}, stop: () => {} }),
+    },
+    Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
   };
 });
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
 
 vi.mock('@clerk/expo', () => ({
   useUser: () => ({ user: { id: 'seller-219' }, isLoaded: true }),
@@ -135,7 +149,22 @@ vi.mock('@/lib/theme', () => ({
   FS: { xs: 12, sm: 14, base: 16, xl: 22 },
   SP: { xs: 4, sm: 8, md: 16 },
   RADIUS: { xs: 4, sm: 8, md: 12, lg: 16 },
-  ICON: { sm: 14, md: 18, xxl: 32 },
+  ICON: { sm: 14, md: 18, lg: 24, xl: 28, xxl: 32 },
+  GUTTER: 16,
+  SECTION_GAP: 24,
+  CONTENT_MAX_WIDTH: 720,
+  GRID_MAX_WIDTH: 1080,
+  BREAKPOINT: { tablet: 768, desktopWeb: 1024 },
+  TYPE: {
+    largeTitle: { fontSize: 36, fontFamily: 'Inter', lineHeight: 42 },
+    title: { fontSize: 30, fontFamily: 'Inter', lineHeight: 36 },
+    heading: { fontSize: 22, fontFamily: 'Inter', lineHeight: 28 },
+    subheading: { fontSize: 19, fontFamily: 'Inter', lineHeight: 24 },
+    body: { fontSize: 15, fontFamily: 'Inter', lineHeight: 22 },
+    bodyMedium: { fontSize: 15, fontFamily: 'Inter', lineHeight: 22 },
+    caption: { fontSize: 13, fontFamily: 'Inter', lineHeight: 18 },
+    label: { fontSize: 11, fontFamily: 'Inter', lineHeight: 14 },
+  },
 }));
 
 vi.mock('@/components/BrandthreadUI', () => {

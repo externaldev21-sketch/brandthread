@@ -19,11 +19,20 @@ vi.mock('react-native', () => ({
   RefreshControl: nativeComponent('RefreshControl'),
   ScrollView: nativeComponent('ScrollView'),
   Share: { share: vi.fn() },
-  StyleSheet: { create: (styles: unknown) => styles },
+  StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
   Text: nativeComponent('Text'),
   TextInput: nativeComponent('TextInput'),
   TouchableOpacity: nativeComponent('TouchableOpacity'),
   View: nativeComponent('View'),
+  Animated: {
+    Value: class { constructor(_v?: number) {} },
+    View: nativeComponent('Animated.View'),
+    event: () => () => {},
+    timing: () => ({ start: (cb?: () => void) => cb?.() }),
+    sequence: () => ({ start: (cb?: () => void) => cb?.() }),
+    loop: () => ({ start: () => {}, stop: () => {} }),
+  },
+  Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
 }));
 
 vi.mock('@expo/vector-icons', () => ({
@@ -142,6 +151,21 @@ vi.mock('@/lib/theme', () => ({
   PURPLE_DIM: '#34383e',
   CYAN: '#22d3ee',
   CYAN_DIM: '#164e63',
+  GUTTER: 16,
+  SECTION_GAP: 24,
+  CONTENT_MAX_WIDTH: 720,
+  GRID_MAX_WIDTH: 1080,
+  BREAKPOINT: { tablet: 768, desktopWeb: 1024 },
+  TYPE: {
+    largeTitle: { fontSize: 36, fontFamily: 'System', lineHeight: 42 },
+    title: { fontSize: 30, fontFamily: 'System', lineHeight: 36 },
+    heading: { fontSize: 22, fontFamily: 'System', lineHeight: 28 },
+    subheading: { fontSize: 19, fontFamily: 'System', lineHeight: 24 },
+    body: { fontSize: 15, fontFamily: 'System', lineHeight: 22 },
+    bodyMedium: { fontSize: 15, fontFamily: 'System', lineHeight: 22 },
+    caption: { fontSize: 13, fontFamily: 'System', lineHeight: 18 },
+    label: { fontSize: 11, fontFamily: 'System', lineHeight: 14 },
+  },
 }));
 
 vi.mock('@/services/orderService', () => ({

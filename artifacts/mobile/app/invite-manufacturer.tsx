@@ -18,6 +18,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { BORDER, CARD, CARD_ELEVATED, FG, FONT, FS, ICON, MUTED, ORANGE, RADIUS, SP, SUBTLE, SUCCESS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { Header } from '@/components/layout';
 import { FormInput, PrimaryButton, SecondaryButton, StatusBadge } from '@/components/BrandthreadUI';
 import { createInvitation, getInvitations } from '@/services/manufacturerService';
 import type { ManufacturerInvitation } from '@/services/manufacturerTypes';
@@ -116,14 +117,8 @@ export default function InviteManufacturerScreen() {
   const joinedInvites = (invites ?? []).filter((invite) => invite.status === 'accepted');
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityLabel="Back">
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Invite a manufacturer</Text>
-        <View style={{ width: 36 }} />
-      </View>
+    <View style={s.root}>
+      <Header title="Invite a manufacturer" />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + SP.xl, gap: SP.md }} keyboardShouldPersistTaps="handled">
@@ -209,9 +204,6 @@ export default function InviteManufacturerScreen() {
 
 const s = StyleSheet.create({
   root: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, height: 56, borderBottomWidth: 1, borderBottomColor: BORDER },
-  backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: CARD_ELEVATED },
-  headerTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
   card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md, gap: SP.sm },
   title: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
   body: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 20 },

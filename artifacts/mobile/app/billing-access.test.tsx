@@ -65,13 +65,22 @@ vi.mock('react-native', () => {
     Alert: { alert: vi.fn() },
     AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
     Linking: { openURL: vi.fn(), canOpenURL: vi.fn(async () => true) },
-    Platform: { OS: 'web' },
+    Platform: { OS: 'web', select: (obj: Record<string, unknown>) => obj.web ?? obj.default },
     ScrollView: nativeComponent('ScrollView'),
     Share: { share: vi.fn() },
-    StyleSheet: { create: (styles: unknown) => styles },
+    StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
     Text: nativeComponent('Text'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),
     View: nativeComponent('View'),
+    Animated: {
+      Value: class { constructor(_v?: number) {} },
+      View: nativeComponent('Animated.View'),
+      event: () => () => {},
+      timing: () => ({ start: (cb?: () => void) => cb?.() }),
+      sequence: () => ({ start: (cb?: () => void) => cb?.() }),
+      loop: () => ({ start: () => {}, stop: () => {} }),
+    },
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
   };
 });
 

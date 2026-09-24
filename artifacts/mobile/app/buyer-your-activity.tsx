@@ -16,6 +16,7 @@ import {
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getMyPosts, getSavedItems, getMyReposts } from '@/services/socialService';
+import { Header } from '@/components/layout';
 
 // Simple inline bar chart using plain Views — no chart library
 function BarChart({ data, maxVal }: { data: number[]; maxVal: number }) {
@@ -97,14 +98,8 @@ export default function BuyerYourActivity() {
   ];
 
   return (
-    <View style={[s.page, { paddingTop: insets.top }]}>
-      <View style={s.header}>
-        <TouchableOpacity style={s.iconBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={21} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.title}>Your Activity</Text>
-        <View style={s.iconBtn} />
-      </View>
+    <View style={s.page}>
+      <Header title="Your Activity" />
 
       <ScrollView
         contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}
@@ -148,9 +143,6 @@ export default function BuyerYourActivity() {
 
 const makeStyles = () => StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
-  header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
-  iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
   groupLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SP.sm, marginTop: SP.md },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   statCard: { flex: 1, minWidth: '45%', backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md, gap: 4 },

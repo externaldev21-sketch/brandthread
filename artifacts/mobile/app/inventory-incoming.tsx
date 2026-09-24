@@ -7,6 +7,7 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { Header } from '@/components/layout';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
 import { getIncoming, createIncoming, updateIncomingStatus, receiveIncoming, getInventoryItems, getLocations } from '@/services/inventoryService';
@@ -344,14 +345,8 @@ export default function IncomingInventoryScreen() {
   // ══════════ NEW MODE ══════════
   if (mode === 'new') {
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
-        <View style={s.header}>
-          <TouchableOpacity onPress={() => setMode('list')} style={s.backBtn}>
-            <Feather name="arrow-left" size={ICON.md} color={FG} />
-          </TouchableOpacity>
-          <Text style={s.headerTitle}>Add Incoming</Text>
-          <View style={{ width: 60 }} />
-        </View>
+      <View style={s.root}>
+        <Header title="Add Incoming" onBack={() => setMode('list')} />
 
         <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled">
           {/* Source */}
@@ -519,14 +514,8 @@ export default function IncomingInventoryScreen() {
     }
 
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
-        <View style={s.header}>
-          <TouchableOpacity onPress={() => setMode('view')} style={s.backBtn}>
-            <Feather name="arrow-left" size={ICON.md} color={FG} />
-          </TouchableOpacity>
-          <Text style={s.headerTitle}>Receive Inventory</Text>
-          <View style={{ width: 60 }} />
-        </View>
+      <View style={s.root}>
+        <Header title="Receive Inventory" onBack={() => setMode('view')} />
 
         <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled">
           {/* Demo notice */}
@@ -630,14 +619,8 @@ export default function IncomingInventoryScreen() {
   // ══════════ VIEW MODE ══════════
   if (!selectedRecord) {
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
-        <View style={s.header}>
-          <TouchableOpacity onPress={() => setMode('list')} style={s.backBtn}>
-            <Feather name="arrow-left" size={ICON.md} color={FG} />
-          </TouchableOpacity>
-          <Text style={s.headerTitle}>Incoming</Text>
-          <View style={{ width: 60 }} />
-        </View>
+      <View style={s.root}>
+        <Header title="Incoming" onBack={() => setMode('list')} />
         <EmptyState icon="inbox" title="Record not found" description="This incoming record could not be loaded." />
       </View>
     );

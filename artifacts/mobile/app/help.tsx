@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, TextInput, Linking, Platform, Alert, ActivityIndicator,
+  StyleSheet, TextInput, Linking, Alert, ActivityIndicator,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { Header } from '@/components/layout';
 
 const FAQS = [
   { q: 'How do drops work?', a: 'Drops are limited-time releases from brands you follow. When a drop goes live you get a notification. Tap the drop to view it and place your order before it sells out. Pre-orders are charged immediately and shipped when production is complete.' },
@@ -24,7 +24,6 @@ const FAQS = [
 const CATEGORIES = ['General', 'Billing', 'Account', 'Bug', 'Feature'] as const;
 
 export default function HelpScreen() {
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
   const { user } = useUser();
@@ -72,14 +71,8 @@ export default function HelpScreen() {
   );
 
   return (
-    <View style={[s.root, { paddingTop: Platform.OS === 'web' ? 20 : insets.top }]}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-           <Feather name="arrow-left" size={22} color={theme.text} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Help & Support</Text>
-        <View style={{ width: 22 }} />
-      </View>
+    <View style={s.root}>
+      <Header title="Help & Support" />
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100, gap: 16 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Search */}
@@ -210,8 +203,6 @@ export default function HelpScreen() {
 
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root:       { flex: 1, backgroundColor: theme.background },
-  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: theme.border },
-  headerTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', color: theme.text },
   searchRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: theme.card, borderRadius: 12, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 14, paddingVertical: 12 },
   searchInput: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: theme.text },
   contactRow: { flexDirection: 'row', gap: 10 },

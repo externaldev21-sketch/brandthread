@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, SP, RADIUS, COMP, ICON, ANIM } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { IconButton, FilterChip, StatusBadge, SearchBar, EmptyState } from '@/components/BrandthreadUI';
+import { SkeletonBlock, useCenteredContentPadding } from '@/components/layout';
 import { filterOrders, sortOrders } from '@/services/orderService';
 import { dbStatusToOrderStatus, dbStatusToPaymentStatus } from '@/lib/orderStatusAdapter';
 import { Order, OrderFilterKey, OrderSortKey, OrderAddress, OrderCustomer, FulfillmentStatus, FulfillmentType, OrderStatus, PaymentStatus, CancellationReason, CANCELLATION_REASONS } from '@/services/orderTypes';
@@ -645,6 +646,38 @@ const OrderListRow = React.memo(function OrderListRow({
   );
 });
 
+// ─── Order row skeleton — matches OrderRow's shape: order # row, customer +
+// item lines, then price/time and status pills ─────────────────────────────
+function SellerOrderRowSkeleton() {
+  return (
+    <View style={{ paddingHorizontal: SP.md, paddingVertical: SP.sm, gap: SP.xs }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        <View style={{ gap: SP.xs, flex: 1 }}>
+          <SkeletonBlock width={90} height={13} />
+          <SkeletonBlock width="45%" height={13} />
+          <SkeletonBlock width="65%" height={11} />
+        </View>
+        <View style={{ alignItems: 'flex-end', gap: SP.xs }}>
+          <SkeletonBlock width={56} height={13} />
+          <SkeletonBlock width={40} height={11} />
+        </View>
+      </View>
+      <View style={{ flexDirection: 'row', gap: SP.xs, marginTop: SP.xs }}>
+        <SkeletonBlock width={64} height={16} radius={RADIUS.pill} />
+        <SkeletonBlock width={72} height={16} radius={RADIUS.pill} />
+      </View>
+    </View>
+  );
+}
+
+function SellerOrdersListSkeleton() {
+  return (
+    <View style={{ paddingTop: SP.sm }}>
+      {Array.from({ length: 6 }).map((_, i) => <SellerOrderRowSkeleton key={i} />)}
+    </View>
+  );
+}
+
 export default function OrdersScreen() {
   const { theme } = useAppTheme();
   const s = React.useMemo(() => createStyles(theme), [theme]);
@@ -653,6 +686,9 @@ export default function OrdersScreen() {
   const palette = theme as typeof theme & Record<string, string>;
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  // Extra centering padding beyond each row's own SP.md gutter — 0 on phone,
+  // grows on iPad so the list doesn't stretch edge to edge.
+  const listSidePad = Math.max(0, useCenteredContentPadding() - SP.md);
 
   const api = useApi();
   const { userId, isLoaded: authLoaded, isSignedIn } = useAuth();
@@ -1075,29 +1111,35 @@ export default function OrdersScreen() {
       </View>
 
       {/* ── Order list (section list for date groups) ── */}
-      <FlashList
-        data={listRows}
-        keyExtractor={keyExtractor}
-        getItemType={getItemType}
-        renderItem={renderItem}
-        extraData={selectedIdSet}
-        ListHeaderComponent={ListHeaderComponent}
-        ListEmptyComponent={ListEmptyComponent}
-        contentContainerStyle={[
-          s.listContent,
-          filtered.length === 0 && { flexGrow: 1 },
-          { paddingBottom: insets.bottom + COMP.tabBarH + (selectedIds.length > 0 ? 80 : SP.md) },
-        ]}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={PURPLE}
-            colors={[PURPLE]}
-          />
-        }
-      />
+      {loading && orders.length === 0 ? (
+        <View style={{ flex: 1, paddingHorizontal: listSidePad }}>
+          <SellerOrdersListSkeleton />
+        </View>
+      ) : (
+        <FlashList
+          data={listRows}
+          keyExtractor={keyExtractor}
+          getItemType={getItemType}
+          renderItem={renderItem}
+          extraData={selectedIdSet}
+          ListHeaderComponent={ListHeaderComponent}
+          ListEmptyComponent={ListEmptyComponent}
+          contentContainerStyle={[
+            s.listContent,
+            filtered.length === 0 && { flexGrow: 1 },
+            { paddingHorizontal: listSidePad, paddingBottom: insets.bottom + COMP.tabBarH + (selectedIds.length > 0 ? 80 : SP.md) },
+          ]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={PURPLE}
+              colors={[PURPLE]}
+            />
+          }
+        />
+      )}
 
       {/* Bulk action bar */}
       {selectedIds.length > 0 && (

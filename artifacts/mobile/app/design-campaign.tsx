@@ -72,6 +72,7 @@ import type {
   AdMediaKind,
 } from '@/lib/api';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { Header } from '@/components/layout';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -281,7 +282,6 @@ export default function CreateAdScreen() {
   const insets    = useSafeAreaInsets();
   const api       = useApi();
 
-  const topPad    = insets.top + (Platform.OS === 'web' ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === 'web' ? 34 : 0) + 90;
 
   // ── Campaign state ────────────────────────────────────────────────────────
@@ -676,15 +676,11 @@ export default function CreateAdScreen() {
 
   function renderHeader() {
     return (
-      <View style={[styles.header, { paddingTop: topPad + 8 }]}>
-        <TouchableOpacity onPress={goBack} style={styles.headerBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} accessibilityRole="button" accessibilityLabel="Go back">
-          <Feather name="arrow-left" size={20} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Create Ad</Text>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} accessibilityRole="button" accessibilityLabel="Close">
-          <Feather name="x" size={20} color={MUTED} />
-        </TouchableOpacity>
-      </View>
+      <Header
+        title="Create Ad"
+        onBack={goBack}
+        actions={[{ icon: 'x', onPress: () => router.back(), accessibilityLabel: 'Close' }]}
+      />
     );
   }
 
@@ -1118,9 +1114,6 @@ export default function CreateAdScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  header:             { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingBottom: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
-  headerBtn:          { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:        { flex: 1, textAlign: 'center', fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   stageTitle:         { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: SP.xs },
   stageHeading:       { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, marginBottom: SP.xs },
   stageSub:           { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 20 },

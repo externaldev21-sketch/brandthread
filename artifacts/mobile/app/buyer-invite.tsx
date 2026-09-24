@@ -3,7 +3,6 @@ import {
   View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
@@ -11,11 +10,12 @@ import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  FONT, FS, SP, RADIUS, ICON,
+  FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { PrimaryButton } from '@/components/BrandthreadUI';
+import { Header } from '@/components/layout';
 
 type InviteData = {
   code: string;
@@ -34,7 +34,6 @@ export default function BuyerInviteScreen() {
   const PURPLE = theme.accent;
   const PURPLE_DIM = theme.accentDim;
   const styles = makeStyles(theme);
-  const insets = useSafeAreaInsets();
   const router  = useRouter();
   const api     = useApi();
 
@@ -94,15 +93,8 @@ export default function BuyerInviteScreen() {
   }
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Invite Friends</Text>
-        <View style={styles.headerBtn} />
-      </View>
+    <View style={styles.root}>
+      <Header title="Invite Friends" />
 
       {loading ? (
         <View style={styles.loadingState}>
@@ -191,23 +183,6 @@ export default function BuyerInviteScreen() {
 
 const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.create({
   root:   { flex: 1, backgroundColor: 'transparent' },
-  header: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    paddingHorizontal: SP.md,
-    paddingVertical:   SP.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-  },
-  backBtn:    { width: 36, alignItems: 'flex-start' },
-  headerBtn:  { width: 36 },
-  headerTitle: {
-    flex:       1,
-    textAlign:  'center',
-    fontSize:   FS.base,
-    fontFamily: FONT.semibold,
-    color:      FG,
-  },
   loadingState: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { flex: 1 },
 

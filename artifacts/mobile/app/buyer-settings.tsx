@@ -8,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { ThreadDivider } from '@/components/BrandthreadUI';
+import { Header } from '@/components/layout';
 
 type Row = { label: string; subtitle?: string; icon: keyof typeof Feather.glyphMap; route?: string; section?: string; destructive?: boolean; action?: 'signout' | 'delete' };
 type Group = { title: string; rows: Row[] };
@@ -109,12 +110,8 @@ export default function BuyerSettingsScreen() {
     else if (row.section) router.push(`/buyer-settings-detail?section=${encodeURIComponent(row.section)}` as never);
   };
 
-  return <View style={[styles.page, { paddingTop: insets.top }]}>
-    <View style={styles.header}>
-       <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
-      <Text style={styles.title}>Settings and activity</Text>
-      <View style={styles.iconBtn} />
-    </View>
+  return <View style={styles.page}>
+    <Header title="Settings and activity" />
     <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
        <View style={styles.search}><Feather name="search" size={17} color={colors.mutedForeground} /><TextInput value={query} onChangeText={setQuery} placeholder="Search" placeholderTextColor={colors.mutedForeground} style={styles.searchInput} /></View>
       {groups.map((group, gi) => <React.Fragment key={group.title}>
@@ -135,8 +132,7 @@ export default function BuyerSettingsScreen() {
 
 function makeStyles(colors: ReturnType<typeof useColors>) {
   return StyleSheet.create({
-  page: { flex: 1, backgroundColor: 'transparent' }, header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: colors.border },
-  iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }, title: { color: colors.foreground, fontFamily: FONT.bold, fontSize: FS.md },
+  page: { flex: 1, backgroundColor: 'transparent' },
   search: { height: 44, borderRadius: RADIUS.md, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', gap: 10, alignItems: 'center', paddingHorizontal: 14, marginBottom: SP.lg },
   searchInput: { flex: 1, color: colors.foreground, fontFamily: FONT.regular, fontSize: FS.base }, group: { marginBottom: SP.lg }, groupTitle: { color: colors.mutedForeground, fontFamily: FONT.semibold, fontSize: FS.sm, marginBottom: SP.sm },
   card: { backgroundColor: colors.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' }, row: { minHeight: 58, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 12 }, divider: { borderBottomWidth: 1, borderBottomColor: colors.border }, rowIcon: { width: 28, alignItems: 'center' }, rowLabel: { color: colors.foreground, fontFamily: FONT.medium, fontSize: FS.sm }, rowSub: { color: colors.mutedForeground, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2, lineHeight: 16 }, version: { color: (colors as any).subtle ?? colors.mutedForeground, textAlign: 'center', fontFamily: FONT.regular, fontSize: FS.xs, marginVertical: 8 },

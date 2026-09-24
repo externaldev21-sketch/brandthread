@@ -10,6 +10,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Header } from '@/components/layout';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -208,21 +209,11 @@ export default function StorePagesScreen() {
 
   if (mode === 'list') {
     return (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
-            style={styles.backBtn}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Feather name="arrow-left" size={ICON.md} color={FG} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Pages</Text>
-          <TouchableOpacity style={styles.createBtn} onPress={openNew}>
-            <Feather name="plus" size={ICON.sm} color={PURPLE} />
-            <Text style={styles.createBtnText}>Create</Text>
-          </TouchableOpacity>
-        </View>
+      <View style={styles.root}>
+        <Header
+          title="Pages"
+          actions={[{ icon: 'plus', onPress: openNew, accessibilityLabel: 'Create page' }]}
+        />
 
         {pages.length === 0 ? (
           <View style={styles.emptyWrap}>
@@ -282,17 +273,11 @@ export default function StorePagesScreen() {
   // ─── New / Edit Mode ─────────────────────────────────────────────────────────
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode('list'); }}
-          style={styles.backBtn}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{mode === 'new' ? 'New Page' : 'Edit Page'}</Text>
-      </View>
+    <View style={styles.root}>
+      <Header
+        title={mode === 'new' ? 'New Page' : 'Edit Page'}
+        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode('list'); }}
+      />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -448,47 +433,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   root: {
     flex: 1,
     backgroundColor: 'transparent',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-    minHeight: 56,
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: RADIUS.sm,
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: FS.xl,
-    fontFamily: FONT.bold,
-    color: FG,
-    letterSpacing: -0.3,
-    flex: 1,
-  },
-  createBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: PURPLE_DIM,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    borderColor: BORDER_ACTIVE,
-    paddingHorizontal: SP.sm,
-    paddingVertical: 6,
-  },
-  createBtnText: {
-    fontSize: FS.sm,
-    fontFamily: FONT.semibold,
-    color: PURPLE,
   },
   emptyWrap: {
     flex: 1,

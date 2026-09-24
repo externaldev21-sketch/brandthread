@@ -13,7 +13,8 @@ import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { deriveCardState, formatMoney, formatTimestamp, localTimeLabel, orderStatusLabel, orderTypeLabel } from '@workspace/manufacturer-flow';
-import { BrandthreadHeader, EmptyState, SecondaryButton } from '@/components/BrandthreadUI';
+import { EmptyState, SecondaryButton } from '@/components/BrandthreadUI';
+import { Header } from '@/components/layout';
 import ProductionTimeline from '@/components/manufacturer/ProductionTimeline';
 import { useOrderCardPayment } from '@/components/manufacturer/useOrderCardPayment';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -120,11 +121,11 @@ export default function ProductionDetailScreen() {
     ]);
   };
 
-  const header = <BrandthreadHeader title={order ? orderTypeLabel(order.orderType) : 'Order'} subtitle={order ? 'Live production tracker' : undefined} onBack={() => router.back()} />;
+  const header = <Header title={order ? `${orderTypeLabel(order.orderType)} tracker` : 'Order'} />;
 
   if (loading) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
+      <View style={styles.root}>
         {header}
         <View style={styles.center} testID="tracker-loading"><ActivityIndicator color={FG} /><Text style={styles.muted}>Loading tracker…</Text></View>
       </View>
@@ -133,7 +134,7 @@ export default function ProductionDetailScreen() {
 
   if (!data || !order) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
+      <View style={styles.root}>
         {header}
         <View style={styles.center}>
           <EmptyState
@@ -154,7 +155,7 @@ export default function ProductionDetailScreen() {
   const delivered = order.status === 'delivered';
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={styles.root}>
       {header}
       <ScrollView
         contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + SP.xl, gap: SP.md }}

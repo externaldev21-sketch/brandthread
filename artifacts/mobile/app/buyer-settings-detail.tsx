@@ -9,6 +9,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BuyerSettingsState, loadBuyerSettings, patchBuyerSettings } from '@/lib/buyerSettings';
 import { reportNetworkError } from '@/lib/networkNotice';
 import { useApi } from '@/hooks/useApi';
+import { Header } from '@/components/layout';
 
 type ToggleKey = keyof { [K in keyof BuyerSettingsState as BuyerSettingsState[K] extends boolean ? K : never]: true };
 type Item = { label: string; sub?: string; icon?: keyof typeof Feather.glyphMap; toggle?: ToggleKey; value?: string; action?: () => void };
@@ -103,8 +104,8 @@ export default function BuyerSettingsDetail() {
   }, [api, section, settings]);
   const items = useMemo(() => settings ? cfg.items(settings, router) : [], [cfg, settings, router]);
 
-  return <View style={[styles.page, { paddingTop: insets.top }]}>
-     <View style={styles.header}><TouchableOpacity style={styles.back} onPress={() => router.back()}><Feather name="arrow-left" size={21} color={theme.text}/></TouchableOpacity><Text style={styles.title}>{cfg.title}</Text><View style={styles.back}/></View>
+  return <View style={styles.page}>
+     <Header title={cfg.title} />
     <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}>
       {cfg.intro ? <Text style={styles.intro}>{cfg.intro}</Text> : null}
       {loading ? <Text style={styles.intro}>Loading settings…</Text> : settings && items.length > 0 ? <View style={styles.card}>{items.map((item, i) => {
@@ -118,4 +119,4 @@ export default function BuyerSettingsDetail() {
     </ScrollView>
   </View>;
 }
-const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({ page:{flex:1,backgroundColor:theme.background}, header:{height:58,flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:SP.md,borderBottomWidth:1,borderBottomColor:theme.border},back:{width:40,height:40,alignItems:'center',justifyContent:'center'},title:{color:theme.text,fontFamily:FONT.bold,fontSize:FS.md},intro:{color:theme.muted,fontFamily:FONT.regular,fontSize:13,lineHeight:19,marginBottom:SP.md},card:{backgroundColor:theme.card,borderWidth:1,borderColor:theme.border,borderRadius:RADIUS.lg,overflow:'hidden'},row:{minHeight:60,paddingHorizontal:14,paddingVertical:12,flexDirection:'row',alignItems:'center',gap:10},divider:{borderBottomWidth:1,borderBottomColor:theme.border},itemIcon:{width:28,alignItems:'center'},label:{color:theme.text,fontFamily:FONT.medium,fontSize:14},sub:{color:theme.muted,fontFamily:FONT.regular,fontSize:11.5,marginTop:3,lineHeight:16},value:{color:theme.muted,fontFamily:FONT.regular,fontSize:12,textTransform:'capitalize',maxWidth:110},});
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({ page:{flex:1,backgroundColor:theme.background},intro:{color:theme.muted,fontFamily:FONT.regular,fontSize:13,lineHeight:19,marginBottom:SP.md},card:{backgroundColor:theme.card,borderWidth:1,borderColor:theme.border,borderRadius:RADIUS.lg,overflow:'hidden'},row:{minHeight:60,paddingHorizontal:14,paddingVertical:12,flexDirection:'row',alignItems:'center',gap:10},divider:{borderBottomWidth:1,borderBottomColor:theme.border},itemIcon:{width:28,alignItems:'center'},label:{color:theme.text,fontFamily:FONT.medium,fontSize:14},sub:{color:theme.muted,fontFamily:FONT.regular,fontSize:11.5,marginTop:3,lineHeight:16},value:{color:theme.muted,fontFamily:FONT.regular,fontSize:12,textTransform:'capitalize',maxWidth:110},});
