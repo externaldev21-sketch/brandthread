@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Platform, TextInput, Modal, Pressable, KeyboardAvoidingView,
-  RefreshControl, useWindowDimensions,
+  Platform, ActivityIndicator, RefreshControl, useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -10,65 +9,24 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@clerk/expo';
-import { type SearchResult } from '@/lib/searchData';
+import { type SearchResult, type TrendingTerm, type SuggestedBrand, type SuggestedProduct } from '@/lib/searchData';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { formatCents, parseDecimalToCents } from '@/lib/money';
-import { EmptyState, SearchResultsSkeleton } from '@/components/BrandthreadUI';
+import { EmptyState } from '@/components/BrandthreadUI';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { CachedImage } from '@/components/CachedImage';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useBuyerSearch } from '@/contexts/BuyerSearchContext';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { FONT, FS, GUTTER, GRID_MAX_WIDTH } from '@/lib/theme';
-import { SheetRise } from '@/components/motion/SheetRise';
 import { GridSkeleton, ResponsiveContainer, useGridColumns } from '@/components/layout';
+import { ProductTile } from '@/components/search/ProductTile';
+import { PersonRow, type SearchPerson } from '@/components/search/PersonRow';
+import { SegmentedTabs, type SearchTabKey } from '@/components/search/SegmentedTabs';
 
-type PersonResult = {
-  userId: string; name: string; username: string | null;
-  handle: string; initials: string; color: string;
-  bio: string | null; isFollowing: boolean;
-};
-
+type PersonResult = SearchPerson;
 type ProductResult = Extract<SearchResult, { kind: 'product' }>;
-
-// Fixed 4:5 aspect ratio for every card so the grid never has uneven row
-// heights — no per-image aspect-ratio measurement.
-const GRID_CARD_ASPECT = 0.8;
-
-function ProductGridCard({ item, accent, onPress, width }: {
-  item: ProductResult;
-  accent: string;
-  onPress: () => void;
-  width: number;
-}) {
-  const { theme } = useAppTheme();
-  const styles = makeStyles(theme);
-
-  return (
-    <TouchableOpacity style={[styles.masonryCard, { width }]} onPress={onPress} activeOpacity={0.88}>
-      <View style={[styles.masonryMedia, { width, height: width / GRID_CARD_ASPECT, backgroundColor: item.color }]}>
-        {item.imageUri ? (
-          <CachedImage source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-        ) : (
-          <View style={styles.masonryFallback}>
-            <Text style={styles.masonryInitials}>{item.initials}</Text>
-            <View style={styles.masonryFallbackLine} />
-          </View>
-        )}
-        <View style={styles.masonryPrice}>
-          <Text style={styles.masonryPriceText}>{formatCents(item.priceCents)}</Text>
-        </View>
-      </View>
-      <Text style={styles.masonryName} numberOfLines={2}>{item.name}</Text>
-      <View style={styles.masonryBrandRow}>
-        <View style={[styles.masonryBrandDot, { backgroundColor: item.color }]} />
-        <Text style={styles.masonryBrand} numberOfLines={1}>{item.brand}</Text>
-        <Feather name="bookmark" size={13} color={accent} />
-      </View>
-    </TouchableOpacity>
-  );
-}
+type BrandResult = Extract<SearchResult, { kind: 'brand' }>;
 
 export default function SearchScreen() {
   const insets = useSafeAreaInsets();
@@ -79,50 +37,38 @@ export default function SearchScreen() {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const bg      = theme.background;
-  const card    = theme.card;
-  const border  = theme.border;
   const fg      = theme.text;
   const muted   = theme.muted;
   const primary = theme.accent;
-  const primaryDim = theme.accentDim;
 
   const api    = useApi();
   const { userId } = useAuth();
-  const {
-    query, setQuery, filtersRequest, submitRequest, setActiveFilterCount, keyboardHeight,
-  } = useBuyerSearch();
+  // Filters were removed entirely from this screen. The tab bar's filter
+  // button still calls `requestFilters()` and reads `activeFilterCount`
+  // (owned elsewhere, not touched here) — this screen simply never listens
+  // for `filtersRequest` and never raises `activeFilterCount`, so the button
+  // becomes an inert no-op without any change to the tab bar or context.
+  const { query, setQuery, submitRequest, keyboardHeight } = useBuyerSearch();
   const barInset = useBuyerTabBarInset();
-  const [sort, setSort] = useState<string>(''); // '', 'relevance', 'price_asc', 'price_desc', 'newest'
-  const [minPrice, setMinPrice] = useState<string>('');
-  const [maxPrice, setMaxPrice] = useState<string>('');
-  const [category, setCategory] = useState<string>('');
-  const [showFilters, setShowFilters] = useState(false);
-  const [draftSort, setDraftSort] = useState('');
-  const [draftMinPrice, setDraftMinPrice] = useState('');
-  const [draftMaxPrice, setDraftMaxPrice] = useState('');
-  const [draftCategory, setDraftCategory] = useState('');
 
+  const [activeTab, setActiveTab] = useState<SearchTabKey>('top');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [people,  setPeople]  = useState<PersonResult[]>([]);
+  const [followPending, setFollowPending] = useState<Record<string, boolean>>({});
   const [searching, setSearching] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [trending, setTrending] = useState<TrendingTerm[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState(true);
+  const [suggestedBrands, setSuggestedBrands] = useState<SuggestedBrand[]>([]);
+  const [suggestedProducts, setSuggestedProducts] = useState<SuggestedProduct[]>([]);
+  const [suggestedLoading, setSuggestedLoading] = useState(true);
   const topPad = Platform.OS === 'web' ? 24 : insets.top;
   const recentKey = `bt:buyer-search-recent:${userId ?? 'anon'}`;
-
-  const hasActiveFilters = sort !== '' || minPrice !== '' || maxPrice !== '' || category !== '';
+  const trimmedQuery = query.trim();
 
   useEffect(() => {
     if (typeof linkQuery === 'string' && linkQuery.length > 0) setQuery(linkQuery);
   }, [linkQuery, setQuery]);
-
-  // Open only when the tab bar's filter button asks, never on first mount.
-  const handledFiltersRequest = useRef(filtersRequest);
-  useEffect(() => {
-    if (filtersRequest === handledFiltersRequest.current) return;
-    handledFiltersRequest.current = filtersRequest;
-    openFilters();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtersRequest]);
 
   const handledSubmitRequest = useRef(submitRequest);
   useEffect(() => {
@@ -132,18 +78,13 @@ export default function SearchScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submitRequest]);
 
-  const activeFilterCount = [sort, minPrice || maxPrice, category].filter(Boolean).length;
-  useEffect(() => {
-    setActiveFilterCount(activeFilterCount);
-  }, [activeFilterCount, setActiveFilterCount]);
-
   // Results scroll clear of the floating bar, and of the keyboard while the
   // bar rides above it.
   const bottomSpacerStyle = useAnimatedStyle(() => ({
     height: barInset + keyboardHeight.value + 16,
   }));
   const productResults = useMemo(() => results.filter((result): result is ProductResult => result.kind === 'product'), [results]);
-  const brandResults = useMemo(() => results.filter(result => result.kind === 'brand'), [results]);
+  const brandResults   = useMemo(() => results.filter((result): result is BrandResult => result.kind === 'brand'), [results]);
 
   // Fixed-column product grid (2 on phone, 3-4 on iPad) with an even gutter —
   // measured from the grid's own laid-out width so it also works inside the
@@ -155,33 +96,7 @@ export default function SearchScreen() {
   const effectiveGridWidth = gridWidth > 0 ? gridWidth : fallbackGridWidth;
   const gridCardWidth = Math.max(1, (effectiveGridWidth - GUTTER * (gridColumns - 1)) / gridColumns);
 
-  const clearFilters = () => {
-    setSort('');
-    setMinPrice('');
-    setMaxPrice('');
-    setCategory('');
-  };
-  const openFilters = () => {
-    setDraftSort(sort);
-    setDraftMinPrice(minPrice);
-    setDraftMaxPrice(maxPrice);
-    setDraftCategory(category);
-    setShowFilters(true);
-  };
-  const applyFilters = () => {
-    setSort(draftSort);
-    setMinPrice(draftMinPrice);
-    setMaxPrice(draftMaxPrice);
-    setCategory(draftCategory);
-    setShowFilters(false);
-  };
-  const clearDraftFilters = () => {
-    setDraftSort('');
-    setDraftMinPrice('');
-    setDraftMaxPrice('');
-    setDraftCategory('');
-  };
-
+  // ── Recent searches ──────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     AsyncStorage.getItem(recentKey)
@@ -208,28 +123,67 @@ export default function SearchScreen() {
     });
   }
 
+  function clearRecentSearches() {
+    Haptics.selectionAsync().catch(() => {});
+    setRecentSearches([]);
+    AsyncStorage.removeItem(recentKey).catch(() => {});
+  }
+
+  function removeRecentSearch(term: string) {
+    Haptics.selectionAsync().catch(() => {});
+    setRecentSearches((current) => {
+      const next = current.filter((item) => item.toLowerCase() !== term.toLowerCase());
+      AsyncStorage.setItem(recentKey, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }
+
+  // ── Empty-state trending + suggested content — loaded once, also used as ──
+  // a "try one of these instead" fallback under a no-results state.
+  useEffect(() => {
+    let cancelled = false;
+    setTrendingLoading(true);
+    api.public.trending(8)
+      .then((res) => { if (!cancelled) setTrending(res?.trending ?? []); })
+      .catch(() => { if (!cancelled) setTrending([]); })
+      .finally(() => { if (!cancelled) setTrendingLoading(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setSuggestedLoading(true);
+    api.public.suggested(8)
+      .then((res) => {
+        if (cancelled) return;
+        setSuggestedBrands(res?.brands ?? []);
+        setSuggestedProducts(res?.products ?? []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSuggestedBrands([]);
+        setSuggestedProducts([]);
+      })
+      .finally(() => { if (!cancelled) setSuggestedLoading(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Debounced instant search ─────────────────────────────────────────────
   const performSearch = useCallback(async (term: string) => {
-    const minPriceCents = minPrice ? parseDecimalToCents(minPrice) : undefined;
-    const maxPriceCents = maxPrice ? parseDecimalToCents(maxPrice) : undefined;
-    const [brandRes, peopleData] = await Promise.allSettled([
-      api.public.search({
-        q: term,
-        sort: sort || undefined,
-        minPriceCents: minPriceCents ?? undefined,
-        maxPriceCents: maxPriceCents ?? undefined,
-        category: category || undefined,
-        limit: 20,
-      }),
+    const [productRes, peopleRes] = await Promise.allSettled([
+      api.public.search({ q: term, limit: 20 }),
       api.social.search(term, 10),
     ]);
-    setResults(brandRes.status === 'fulfilled' ? brandRes.value.results ?? [] : []);
-    setPeople(peopleData.status === 'fulfilled' ? peopleData.value as PersonResult[] : []);
+    setResults(productRes.status === 'fulfilled' ? productRes.value.results ?? [] : []);
+    setPeople(peopleRes.status === 'fulfilled' ? (peopleRes.value as PersonResult[]) : []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sort, minPrice, maxPrice, category]);
+  }, []);
 
   useEffect(() => {
     const q = query.trim();
-    if (q.length < 1 && !hasActiveFilters) {
+    if (q.length < 1) {
       setResults([]);
       setPeople([]);
       setSearching(false);
@@ -242,120 +196,238 @@ export default function SearchScreen() {
       if (!cancelled) setSearching(false);
     }, 350);
     return () => { cancelled = true; clearTimeout(timer); };
-  // Query/filter changes and explicit retries are the only search triggers.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, sort, minPrice, maxPrice, category, hasActiveFilters]);
+  }, [query, performSearch]);
 
   const [refreshing, setRefreshing] = useState(false);
   const handleRefresh = useCallback(() => {
     const q = query.trim();
-    if (q.length < 1 && !hasActiveFilters) return;
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    performSearch(q).finally(() => setRefreshing(false));
-  }, [query, hasActiveFilters, performSearch]);
+    const tasks: Promise<unknown>[] = [];
+    if (q.length >= 1) tasks.push(performSearch(q));
+    tasks.push(
+      api.public.trending(8).then((res) => setTrending(res?.trending ?? [])).catch(() => {}),
+      api.public.suggested(8).then((res) => {
+        setSuggestedBrands(res?.brands ?? []);
+        setSuggestedProducts(res?.products ?? []);
+      }).catch(() => {}),
+    );
+    Promise.allSettled(tasks).finally(() => setRefreshing(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, performSearch]);
 
-  const suggestions = useMemo(() => {
-    const seen = new Set<string>();
-    const values: string[] = [];
-    for (const value of [
-      ...people.flatMap((person) => [person.name, person.handle]),
-      ...results.map((result) => result.name),
-    ]) {
-      const term = value?.trim();
-      const key = term?.toLowerCase();
-      if (!term || !key || seen.has(key)) continue;
-      seen.add(key);
-      values.push(term);
-      if (values.length === 6) break;
-    }
-    return values;
-  }, [people, results]);
-
-  function goToBrand() {
+  function goToBrand(sellerId?: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    router.navigate('/(buyer)/discover' as never);
+    if (sellerId) {
+      router.push({ pathname: '/seller-profile' as any, params: { sellerId } });
+    } else {
+      router.navigate('/(buyer)/discover' as never);
+    }
   }
 
-  function clearRecentSearches() {
-    Haptics.selectionAsync().catch(() => {});
-    setRecentSearches([]);
-    AsyncStorage.removeItem(recentKey).catch(() => {});
+  function goToProduct(productId: string) {
+    push({ pathname: '/thread-product-detail' as any, params: { productId } } as never);
   }
 
   function handleResultPress(r: SearchResult) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     rememberSearch(query || r.name);
     if (r.kind === 'brand' && (r as any).sellerId) {
-      router.push({ pathname: '/seller-profile' as any, params: { sellerId: (r as any).sellerId } });
+      goToBrand((r as any).sellerId);
     } else if (r.kind === 'product' && (r as any).productId) {
-      push({ pathname: '/thread-product-detail' as any, params: { productId: (r as any).productId } } as never);
+      goToProduct((r as any).productId);
     } else {
       goToBrand();
     }
   }
 
-  const SortChip = ({ label, active, onPress }: { label: string, active: boolean, onPress: () => void }) => (
-    <TouchableOpacity
-      style={[styles.filterChip, { borderColor: active ? primary : border, backgroundColor: active ? primaryDim : 'transparent' }]}
-      onPress={() => { Haptics.selectionAsync(); onPress(); }}
-    >
-      <Text style={[styles.filterChipText, { color: active ? primary : fg }]}>{label}</Text>
-    </TouchableOpacity>
+  function handlePersonPress(p: PersonResult) {
+    rememberSearch(query || p.name);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push({
+      pathname: '/buyer-other-profile' as any,
+      params: { userId: p.userId, name: p.name, handle: p.handle, initials: p.initials, color: p.color },
+    });
+  }
+
+  async function handleToggleFollow(person: PersonResult) {
+    if (followPending[person.userId]) return;
+    const wasFollowing = person.isFollowing;
+    setFollowPending((prev) => ({ ...prev, [person.userId]: true }));
+    try {
+      if (wasFollowing) {
+        await api.social.unfollow(person.userId);
+      } else {
+        await api.social.follow(person.userId);
+      }
+      setPeople((prev) => prev.map((p) => (p.userId === person.userId ? { ...p, isFollowing: !wasFollowing } : p)));
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    } catch {
+      // Keep the previous state on failure — no destructive optimistic flip.
+    } finally {
+      setFollowPending((prev) => {
+        const next = { ...prev };
+        delete next[person.userId];
+        return next;
+      });
+    }
+  }
+
+  function submitTerm(term: string) {
+    rememberSearch(term);
+    setQuery(term);
+  }
+
+  const productGrid = (items: ProductResult[]) => (
+    <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
+      <View
+        style={styles.grid}
+        onLayout={({ nativeEvent }) => {
+          const nextWidth = Math.round(nativeEvent.layout.width);
+          if (nextWidth > 0 && nextWidth !== gridWidth) setGridWidth(nextWidth);
+        }}
+      >
+        {items.map((item) => (
+          <ProductTile
+            key={item.id}
+            item={item}
+            accent={primary}
+            width={gridCardWidth}
+            onPress={() => handleResultPress(item)}
+          />
+        ))}
+      </View>
+    </ResponsiveContainer>
   );
+
+  const brandRows = (items: BrandResult[]) => items.map((r) => (
+    <TouchableOpacity
+      key={r.id}
+      style={styles.row}
+      activeOpacity={0.7}
+      onPress={() => handleResultPress(r)}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${r.name}`}
+    >
+      <View style={[styles.avatar, { backgroundColor: r.color }]}>
+        <Text style={styles.avatarText}>{r.initials}</Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.rowText, { color: fg }]} numberOfLines={1}>{r.name}</Text>
+        <Text style={[styles.rowSub, { color: muted }]} numberOfLines={1}>{r.handle}</Text>
+      </View>
+      <Feather name="chevron-right" size={16} color={muted} />
+    </TouchableOpacity>
+  ));
+
+  const personRows = (items: PersonResult[]) => items.map((p) => (
+    <PersonRow
+      key={p.userId}
+      person={p}
+      loading={!!followPending[p.userId]}
+      onPress={() => handlePersonPress(p)}
+      onToggleFollow={() => handleToggleFollow(p)}
+    />
+  ));
+
+  const noResultsFallbackTerms = useMemo(() => {
+    const seen = new Set<string>();
+    const terms: string[] = [];
+    for (const t of [...trending.map((t) => t.term), ...suggestedBrands.map((b) => b.name)]) {
+      const key = t?.trim().toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      terms.push(t.trim());
+      if (terms.length === 6) break;
+    }
+    return terms;
+  }, [trending, suggestedBrands]);
+
+  function renderNoResults() {
+    return (
+      <View testID="buyer-search-no-results">
+        <EmptyState
+          compact
+          icon="search"
+          title="No results — yet."
+          description={`We couldn't find anything for "${trimmedQuery}". Try a broader term.`}
+        />
+        {noResultsFallbackTerms.length > 0 && (
+          <View style={styles.tryChips}>
+            {noResultsFallbackTerms.map((term) => (
+              <TouchableOpacity
+                key={term}
+                style={[styles.tryChip, { borderColor: theme.border, backgroundColor: theme.card }]}
+                activeOpacity={0.75}
+                onPress={() => submitTerm(term)}
+                accessibilityRole="button"
+                accessibilityLabel={`Search for ${term}`}
+              >
+                <Text style={[styles.tryChipText, { color: fg }]}>{term}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  function renderLoading() {
+    return (
+      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginTop: 16 }}>
+        <GridSkeleton columns={gridColumns} cardWidth={gridCardWidth} rows={2} gap={GUTTER} />
+      </ResponsiveContainer>
+    );
+  }
+
+  function renderTabContent() {
+    const totalCount = results.length + people.length;
+    if (searching && totalCount === 0) return renderLoading();
+
+    if (activeTab === 'people') {
+      if (people.length === 0) return renderNoResults();
+      return <View>{personRows(people)}</View>;
+    }
+    if (activeTab === 'brands') {
+      if (brandResults.length === 0) return renderNoResults();
+      return <View>{brandRows(brandResults)}</View>;
+    }
+    if (activeTab === 'products') {
+      if (productResults.length === 0) return renderNoResults();
+      return productGrid(productResults);
+    }
+
+    // Top — a smart-mixed short list of a few of each kind.
+    if (totalCount === 0) return renderNoResults();
+    const topPeople = people.slice(0, 3);
+    const topBrands = brandResults.slice(0, 3);
+    const topProducts = productResults.slice(0, 6);
+    return (
+      <View>
+        {topPeople.length > 0 && (
+          <>
+            <Text style={[styles.sectionLabel, { color: muted }]}>PEOPLE</Text>
+            {personRows(topPeople)}
+          </>
+        )}
+        {topBrands.length > 0 && (
+          <>
+            <Text style={[styles.sectionLabel, { color: muted }]}>BRANDS</Text>
+            {brandRows(topBrands)}
+          </>
+        )}
+        {topProducts.length > 0 && (
+          <>
+            <Text style={[styles.sectionLabel, { color: muted }]}>PRODUCTS</Text>
+            {productGrid(topProducts)}
+          </>
+        )}
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
-      <Modal
-        visible={showFilters}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={() => setShowFilters(false)}
-      >
-        <KeyboardAvoidingView style={styles.modalRoot} behavior="padding">
-          <Pressable
-            style={styles.sheetBackdrop}
-            onPress={() => setShowFilters(false)}
-            accessibilityRole="button"
-            accessibilityLabel="Dismiss search filters"
-          />
-          <SheetRise style={[styles.filterSheet, { backgroundColor: card, borderColor: border, paddingBottom: Math.max(insets.bottom, 16) }]}>
-            <View style={styles.sheetHandle} />
-            <View style={styles.sheetTitleRow}>
-              <View>
-                <Text style={[styles.sheetTitle, { color: fg }]}>Filter and sort</Text>
-                <Text style={[styles.sheetSubtitle, { color: muted }]}>Changes apply when you tap Apply.</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowFilters(false)} style={styles.sheetClose} accessibilityLabel="Close filters">
-                <Feather name="x" size={20} color={muted} />
-              </TouchableOpacity>
-            </View>
-            <Text style={[styles.filterLabel, { color: muted }]}>SORT BY</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 18 }} keyboardShouldPersistTaps="handled">
-              <SortChip label="Relevance" active={!draftSort} onPress={() => setDraftSort('')} />
-              <SortChip label="Price: Low-High" active={draftSort === 'price_asc'} onPress={() => setDraftSort('price_asc')} />
-              <SortChip label="Price: High-Low" active={draftSort === 'price_desc'} onPress={() => setDraftSort('price_desc')} />
-              <SortChip label="Newest" active={draftSort === 'newest'} onPress={() => setDraftSort('newest')} />
-            </ScrollView>
-            <Text style={[styles.filterLabel, { color: muted }]}>PRODUCT FILTERS</Text>
-            <View style={styles.filterRow}>
-              <TextInput style={[styles.filterInput, { color: fg, borderColor: border }]} placeholder="Min $" placeholderTextColor={muted} keyboardType="numeric" value={draftMinPrice} onChangeText={setDraftMinPrice} />
-              <TextInput style={[styles.filterInput, { color: fg, borderColor: border }]} placeholder="Max $" placeholderTextColor={muted} keyboardType="numeric" value={draftMaxPrice} onChangeText={setDraftMaxPrice} />
-            </View>
-            <TextInput style={[styles.filterInput, styles.categoryInput, { color: fg, borderColor: border }]} placeholder="Category" placeholderTextColor={muted} value={draftCategory} onChangeText={setDraftCategory} />
-            <View style={styles.sheetActions}>
-              <TouchableOpacity onPress={clearDraftFilters} style={[styles.sheetAction, { borderColor: border }]} accessibilityRole="button">
-                <Text style={[styles.clearBtnText, { color: fg }]}>Clear all</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={applyFilters} style={[styles.sheetAction, { backgroundColor: primary, borderColor: primary }]} accessibilityRole="button">
-                <Text style={[styles.applyText, { color: theme.onAccent }]}>Apply</Text>
-              </TouchableOpacity>
-            </View>
-          </SheetRise>
-        </KeyboardAvoidingView>
-      </Modal>
-
       <ScrollView
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
@@ -372,197 +444,130 @@ export default function SearchScreen() {
         <View style={styles.titleBlock}>
           <Text style={[styles.title, { color: fg }]} accessibilityRole="header">Search</Text>
           <Text style={[styles.subtitle, { color: muted }]}>
-            {query.trim().length === 0
+            {trimmedQuery.length === 0
               ? 'Brands, pieces and people on Brandthread'
-              : `Showing matches for “${query.trim()}”`}
+              : `Showing matches for "${trimmedQuery}"`}
           </Text>
         </View>
-        {query.trim().length === 0 ? (
+
+        {trimmedQuery.length === 0 ? (
           <View testID="buyer-search-empty-state" accessibilityLabel="Search is empty">
-            {recentSearches.length > 0 ? (
-              <View style={styles.sectionHeaderRow}>
-                <Text style={[styles.sectionLabel, { color: muted, paddingHorizontal: 0 }]}>RECENT</Text>
-                <TouchableOpacity
-                  onPress={clearRecentSearches}
-                  accessibilityRole="button"
-                  accessibilityLabel="Clear recent searches"
-                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                >
-                  <Text style={[styles.sectionAction, { color: fg }]}>Clear</Text>
-                </TouchableOpacity>
-              </View>
-            ) : null}
-            {recentSearches.map((term) => (
-              <TouchableOpacity
-                key={term}
-                style={styles.row}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel={`Search for ${term}`}
-                onPress={() => {
-                  rememberSearch(term);
-                  setQuery(term);
-                }}
-              >
-                <Feather name="clock" size={16} color={muted} />
-                <Text style={[styles.rowText, { color: fg, flex: 1 }]} numberOfLines={1}>{term}</Text>
-                <Feather name="arrow-up-left" size={15} color={muted} />
-              </TouchableOpacity>
-            ))}
-
-            <Text style={[styles.sectionLabel, { color: muted, marginTop: 8 }]}>TRY</Text>
-            <View style={styles.tryChips}>
-              {SEARCH_STARTERS.map((term) => (
-                <TouchableOpacity
-                  key={term}
-                  style={[styles.tryChip, { borderColor: border, backgroundColor: card }]}
-                  activeOpacity={0.75}
-                  onPress={() => { Haptics.selectionAsync().catch(() => {}); setQuery(term); }}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Search for ${term}`}
-                >
-                  <Text style={[styles.tryChipText, { color: fg }]}>{term}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={[styles.sectionLabel, { color: muted, marginTop: 8 }]}>DISCOVER</Text>
-            <TouchableOpacity
-              style={styles.row}
-              activeOpacity={0.7}
-              onPress={goToBrand}
-            >
-              <Feather name="compass" size={17} color={primary} />
-              <Text style={[styles.rowText, { color: fg }]}>Browse trending brands and drops</Text>
-              <Feather name="chevron-right" size={17} color={muted} />
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View testID="buyer-search-results-state" accessibilityLabel={`Search results for ${query}`}>
-            {suggestions.length > 0 ? (
+            {recentSearches.length > 0 && (
               <>
-                <Text style={[styles.sectionLabel, { color: muted }]}>SUGGESTIONS</Text>
-                {suggestions.map((term) => (
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={[styles.sectionLabel, { color: muted, paddingHorizontal: 0 }]}>RECENT</Text>
                   <TouchableOpacity
-                    key={term}
-                    style={styles.row}
-                    activeOpacity={0.7}
-                    onPress={() => {
-                      rememberSearch(term);
-                      setQuery(term);
-                    }}
+                    onPress={clearRecentSearches}
+                    accessibilityRole="button"
+                    accessibilityLabel="Clear recent searches"
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   >
-                    <Feather name="search" size={16} color={muted} />
-                    <Text style={[styles.rowText, { color: fg }]}>{term}</Text>
-                    <Feather name="arrow-up-left" size={15} color={muted} />
+                    <Text style={[styles.sectionAction, { color: fg }]}>Clear all</Text>
                   </TouchableOpacity>
+                </View>
+                {recentSearches.map((term) => (
+                  <View key={term} style={styles.row}>
+                    <TouchableOpacity
+                      style={styles.recentTouchArea}
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Search for ${term}`}
+                      onPress={() => submitTerm(term)}
+                    >
+                      <Feather name="clock" size={16} color={muted} />
+                      <Text style={[styles.rowText, { color: fg, flex: 1 }]} numberOfLines={1}>{term}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => removeRecentSearch(term)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove ${term} from recent searches`}
+                    >
+                      <Feather name="x" size={16} color={muted} />
+                    </TouchableOpacity>
+                  </View>
                 ))}
               </>
-            ) : null}
-            {searching && results.length === 0 && people.length === 0 ? (
-              <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginTop: 16 }}>
-                <GridSkeleton columns={gridColumns} cardWidth={gridCardWidth} rows={2} gap={GUTTER} />
-              </ResponsiveContainer>
-            ) : !searching && results.length === 0 && people.length === 0 ? (
-              <EmptyState
-                compact
-                icon="search"
-                title="No exact match — yet."
-                description={`We couldn’t find “${query}”. Try a broader phrase or clear a filter to uncover more.`}
-                action={hasActiveFilters ? { label: 'Clear filters', icon: 'x', onPress: clearFilters } : undefined}
-              />
-            ) : (
+            )}
+
+            {(trendingLoading || trending.length > 0) && (
               <>
-                {/* ── People section ─────────────────────────────────── */}
-                {people.length > 0 && (
-                  <>
-                    <Text style={[styles.sectionLabel, { color: muted }]}>PEOPLE</Text>
-                    {people.map((p: PersonResult) => (
+                <Text style={[styles.sectionLabel, { color: muted, marginTop: 8 }]}>TRENDING</Text>
+                {trendingLoading ? (
+                  <ActivityIndicator style={{ marginLeft: 16, marginTop: 4 }} color={primary} />
+                ) : (
+                  <View style={styles.tryChips}>
+                    {trending.map((t, index) => (
                       <TouchableOpacity
-                        key={p.userId}
-                        style={styles.row}
-                        activeOpacity={0.7}
-                        onPress={() => {
-                          rememberSearch(query || p.name);
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                          router.push({
-                            pathname: '/buyer-other-profile' as any,
-                            params: {
-                              userId: p.userId,
-                              name: p.name,
-                              handle: p.handle,
-                              initials: p.initials,
-                              color: p.color,
-                            },
-                          });
-                        }}
+                        key={`${t.term}-${index}`}
+                        style={[styles.tryChip, { borderColor: theme.border, backgroundColor: theme.card }]}
+                        activeOpacity={0.75}
+                        onPress={() => submitTerm(t.term)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Search for ${t.term}`}
                       >
-                        <View style={[styles.avatar, { backgroundColor: p.color }]}>
-                          <Text style={styles.avatarText}>{p.initials}</Text>
+                        <Feather name={t.type === 'brand' ? 'trending-up' : 'hash'} size={12} color={primary} />
+                        <Text style={[styles.tryChipText, { color: fg }]}>{t.term}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </>
+            )}
+
+            {(suggestedLoading || suggestedBrands.length > 0) && (
+              <>
+                <Text style={[styles.sectionLabel, { color: muted, marginTop: 8 }]}>BRANDS TO FOLLOW</Text>
+                {suggestedLoading ? (
+                  <ActivityIndicator style={{ marginLeft: 16, marginTop: 4 }} color={primary} />
+                ) : (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.brandAvatarRow}>
+                    {suggestedBrands.map((b) => (
+                      <TouchableOpacity
+                        key={b.id}
+                        style={styles.brandAvatarItem}
+                        activeOpacity={0.75}
+                        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); goToBrand(b.sellerId); }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Visit ${b.name}`}
+                      >
+                        <View style={[styles.brandAvatar, { backgroundColor: b.color }]}>
+                          <Text style={styles.avatarText}>{b.initials}</Text>
                         </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={[styles.rowText, { color: fg }]}>{p.name}</Text>
-                          <Text style={[styles.rowSub, { color: muted }]}>
-                            {p.handle}{p.bio ? `  ·  ${p.bio.slice(0, 40)}` : ''}
+                        <Text style={[styles.brandAvatarName, { color: fg }]} numberOfLines={1}>{b.name}</Text>
+                        {b.followerCount > 0 && (
+                          <Text style={[styles.brandAvatarSub, { color: muted }]} numberOfLines={1}>
+                            {b.followerCount} {b.followerCount === 1 ? 'follower' : 'followers'}
                           </Text>
-                        </View>
-                        {p.isFollowing && (
-                          <View style={styles.followingBadge}>
-                            <Text style={[styles.followingBadge, { borderColor: primary }, styles.followingBadgeText, { color: primary }]}>Following</Text>
-                          </View>
                         )}
                       </TouchableOpacity>
                     ))}
-                  </>
+                  </ScrollView>
                 )}
-                {brandResults.length > 0 && (
-                  <>
-                    <Text style={[styles.sectionLabel, { color: muted, marginTop: people.length > 0 ? 8 : 0 }]}>
-                      BRANDS
-                    </Text>
-                    {brandResults.map((r) => (
-                      <TouchableOpacity
-                        key={r.id}
-                        style={styles.row}
-                        activeOpacity={0.7}
-                        onPress={() => handleResultPress(r)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Open ${r.name}`}
-                      >
-                        <View style={[styles.avatar, { backgroundColor: r.color }]}>
-                          <Text style={styles.avatarText}>{r.initials}</Text>
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={[styles.rowText, { color: fg }]}>{r.name}</Text>
-                          <Text style={[styles.rowSub, { color: muted }]}>{r.handle}</Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </>
-                )}
-                {productResults.length > 0 && (
+              </>
+            )}
+
+            {(suggestedLoading || suggestedProducts.length > 0) && (
+              <>
+                <Text style={[styles.sectionLabel, { color: muted, marginTop: 8 }]}>DISCOVER SOMETHING NEW</Text>
+                {suggestedLoading ? (
+                  renderLoading()
+                ) : (
                   <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
-                    <View style={[styles.editorialHeader, { paddingHorizontal: 0 }]}>
-                      <View>
-                        <Text style={[styles.sectionLabel, { color: muted, paddingHorizontal: 0, paddingBottom: 3 }]}>DISCOVERED FOR YOU</Text>
-                        <Text style={[styles.editorialTitle, { color: fg }]}>{productResults.length} pieces worth a look</Text>
-                      </View>
-                      <Feather name="grid" size={18} color={primary} />
-                    </View>
                     <View
-                      style={styles.masonryGrid}
+                      style={styles.grid}
                       onLayout={({ nativeEvent }) => {
                         const nextWidth = Math.round(nativeEvent.layout.width);
                         if (nextWidth > 0 && nextWidth !== gridWidth) setGridWidth(nextWidth);
                       }}
                     >
-                      {productResults.map(item => (
-                        <ProductGridCard
-                          key={item.id}
-                          item={item}
+                      {suggestedProducts.map((p) => (
+                        <ProductTile
+                          key={p.id}
+                          item={p}
                           accent={primary}
                           width={gridCardWidth}
-                          onPress={() => handleResultPress(item)}
+                          onPress={() => { rememberSearch(p.name); goToProduct(p.productId); }}
                         />
                       ))}
                     </View>
@@ -570,16 +575,31 @@ export default function SearchScreen() {
                 )}
               </>
             )}
+
+            <Text style={[styles.sectionLabel, { color: muted, marginTop: 8 }]}>DISCOVER</Text>
+            <TouchableOpacity
+              style={styles.row}
+              activeOpacity={0.7}
+              onPress={() => goToBrand()}
+            >
+              <Feather name="compass" size={17} color={primary} />
+              <Text style={[styles.rowText, { color: fg }]}>Browse trending brands and drops</Text>
+              <Feather name="chevron-right" size={17} color={muted} />
+            </TouchableOpacity>
           </View>
+        ) : (
+          <>
+            <SegmentedTabs active={activeTab} onChange={setActiveTab} />
+            <View testID="buyer-search-results-state" accessibilityLabel={`Search results for ${query}`}>
+              {renderTabContent()}
+            </View>
+          </>
         )}
         <Animated.View style={bottomSpacerStyle} />
       </ScrollView>
     </View>
   );
 }
-
-// Starter queries, not results: they only prefill the field.
-const SEARCH_STARTERS = ['Outerwear', 'Denim', 'Knitwear', 'Sneakers', 'Accessories', 'Vintage'] as const;
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   titleBlock: { paddingHorizontal: 16, paddingBottom: 6 },
@@ -591,17 +611,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   },
   sectionAction: { fontSize: FS.sm, fontFamily: FONT.semibold, paddingTop: 16, paddingBottom: 6 },
   tryChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
-  tryChip: { minHeight: 36, paddingHorizontal: 14, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, justifyContent: 'center' },
+  tryChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    minHeight: 36, paddingHorizontal: 14, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, justifyContent: 'center',
+  },
   tryChipText: { fontSize: FS.sm, fontFamily: FONT.medium },
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1,
-  },
-  searchBar: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, height: 38,
-  },
-  searchInput: { flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular', padding: 0 },
   sectionLabel: {
     fontSize: 11.5, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.4,
     paddingHorizontal: 16, paddingTop: 16, paddingBottom: 6,
@@ -610,49 +624,18 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingHorizontal: 16, paddingVertical: 11,
   },
+  recentTouchArea: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   rowText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
   rowSub: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  priceTag: { fontSize: 14, fontFamily: 'Inter_700Bold' },
   avatar: {
     width: 38, height: 38, borderRadius: 19,
     alignItems: 'center', justifyContent: 'center',
   },
   avatarText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: theme.onAccent },
-  editorialHeader: { marginTop: 18, paddingHorizontal: 16, paddingBottom: 14, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
-  editorialTitle: { fontSize: 21, fontFamily: 'Inter_700Bold', letterSpacing: -0.45 },
-  masonryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: GUTTER },
-  masonryCard: {},
-  masonryMedia: { borderRadius: 18, overflow: 'hidden', justifyContent: 'flex-end' },
-  masonryFallback: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: `${theme.background}24` },
-  masonryInitials: { color: theme.onAccent, fontSize: 36, fontFamily: 'Inter_700Bold', opacity: 0.9 },
-  masonryFallbackLine: { width: 42, height: 2, borderRadius: 1, backgroundColor: `${theme.onAccent}8A`, marginTop: 10 },
-  masonryPrice: { alignSelf: 'flex-start', backgroundColor: `${theme.background}C7`, borderRadius: 12, paddingHorizontal: 9, paddingVertical: 6, margin: 9 },
-  masonryPriceText: { color: theme.text, fontSize: 12, fontFamily: 'Inter_700Bold' },
-  // Fixed height accommodates two lines so cards never shift height whether
-  // the product name wraps or not (numberOfLines={2} below).
-  masonryName: { color: theme.text, fontSize: 14, lineHeight: 18, height: 36, fontFamily: 'Inter_700Bold', marginTop: 8 },
-  masonryBrandRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5, height: 20 },
-  masonryBrandDot: { width: 15, height: 15, borderRadius: 8 },
-  masonryBrand: { color: theme.muted, fontSize: 11, fontFamily: 'Inter_500Medium', flex: 1 },
-  followingBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1 },
-  followingBadgeText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-  modalRoot: { flex: 1, justifyContent: 'flex-end' },
-  sheetBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: `${theme.background}9E` },
-  filterSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, paddingHorizontal: 18, paddingTop: 10 },
-  sheetHandle: { width: 42, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: 'center', marginBottom: 18 },
-  sheetTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
-  sheetTitle: { fontSize: 21, fontFamily: 'Inter_700Bold' },
-  sheetSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 3 },
-  sheetClose: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
-  filterLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.8, marginBottom: 9 },
-  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  filterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, marginRight: 8 },
-  filterChipText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  filterInput: { flex: 1, height: 46, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, fontSize: 14, fontFamily: 'Inter_400Regular' },
-  categoryInput: { flex: 0, marginBottom: 22 },
-  sheetActions: { flexDirection: 'row', gap: 10 },
-  sheetAction: { flex: 1, minHeight: 48, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  applyText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
-  clearBtn: { alignSelf: 'flex-end', paddingVertical: 4 },
-  clearBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GUTTER },
+  brandAvatarRow: { flexDirection: 'row', gap: 16, paddingHorizontal: 16, paddingVertical: 4 },
+  brandAvatarItem: { alignItems: 'center', width: 74 },
+  brandAvatar: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  brandAvatarName: { fontSize: 12, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
+  brandAvatarSub: { fontSize: 10, fontFamily: 'Inter_400Regular', textAlign: 'center', marginTop: 1 },
 });

@@ -889,7 +889,6 @@ function RootLayoutNav() {
           <Stack.Screen name="navigation-isolation-probe" options={{ headerShown: false, animation: 'none', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         ) : null}
         {/* Feature screens */}
-        <Stack.Screen name="chat/[id]"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="camera-capture"    options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="brand"            options={{ headerShown: false }} />
         <Stack.Screen name="seller-profile"   options={{ headerShown: false, animation: 'ios_from_right' }} />
