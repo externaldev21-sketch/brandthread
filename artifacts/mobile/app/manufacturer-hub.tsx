@@ -147,7 +147,6 @@ export default function ManufacturerHub() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeS(theme), [theme]);
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { tab, from } = useLocalSearchParams<{ tab?: string; from?: string }>();
   const [activeTab, setActiveTab] = useState<Tab>(tab === 'messages' ? 'messages' : 'discover');
   const isSellerSetup = isSellerSetupOrigin(from);

@@ -27,6 +27,7 @@ import {
   BrandthreadCard, PrimaryButton, SecondaryButton,
   StatusBadge, SectionHeader, EmptyState,
 } from '@/components/BrandthreadUI';
+import { Header } from '@/components/layout';
 
 interface DiscountCode {
   id: string;
@@ -178,17 +179,11 @@ export default function DiscountsScreen() {
   const inactive = discounts.filter(d => !d.active);
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Feather name="arrow-left" size={20} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Discounts</Text>
-        <TouchableOpacity style={s.addBtn} onPress={openNewModal}>
-          <Feather name="plus" size={20} color={PURPLE_LIGHT} />
-        </TouchableOpacity>
-      </View>
+    <View style={s.root}>
+      <Header
+        title="Discounts"
+        actions={[{ icon: 'plus', onPress: openNewModal, accessibilityLabel: 'New discount' }]}
+      />
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color={PURPLE} /></View>
@@ -410,11 +405,6 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
   return StyleSheet.create({
   root:       { flex: 1, backgroundColor: 'transparent' },
   center:     { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
-  headerTitle:{ fontSize: FS.md, fontFamily: FONT.bold, color: FG },
-  backBtn:    { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  addBtn:     { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-
   card:     { marginBottom: SP.sm },
   codeText: { fontSize: FS.base, fontFamily: FONT.bold, color: FG, letterSpacing: 1.5, marginBottom: 2 },
   valueText:{ fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE_LIGHT, marginBottom: 2 },

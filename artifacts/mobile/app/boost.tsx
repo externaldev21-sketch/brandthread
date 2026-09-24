@@ -397,7 +397,6 @@ export default function BoostScreen() {
   const api     = useApi();
   const params  = useLocalSearchParams<{ id?: string; paymentReturn?: string; bt_preview?: string }>();
 
-  const topPad    = insets.top + (Platform.OS === 'web' ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === 'web' ? 34 : 0) + 90;
   const inSellerPreview = isSellerDevPreview(
     params.bt_preview === 'buyer' ? '?bt_preview=buyer' : '?bt_preview=seller',
@@ -1145,30 +1144,6 @@ export default function BoostScreen() {
 
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: BG },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
-    backgroundColor: BG,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontFamily: FONT.semibold,
-    fontSize: FS.md,
-    color: FG,
-  },
-  headerBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 
   // Summary card
   summaryCard: {

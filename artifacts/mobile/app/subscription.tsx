@@ -19,6 +19,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { Header } from '@/components/layout';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/hooks/useApi';
@@ -246,14 +247,8 @@ export default function SubscriptionScreen() {
 
   if (isLoadingRole) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => { haptic(); router.back(); }} style={styles.backBtn}>
-            <Feather name="chevron-left" size={24} color={theme.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Subscription</Text>
-          <View style={styles.backBtn} />
-        </View>
+      <View style={styles.root}>
+        <Header title="Subscription" />
         <View style={styles.accessLoading}>
           <ActivityIndicator color={theme.accent} />
         </View>
@@ -263,29 +258,16 @@ export default function SubscriptionScreen() {
 
   if (currentRole !== 'owner' && !isReadOnly) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => { haptic(); router.back(); }} style={styles.backBtn}>
-            <Feather name="chevron-left" size={24} color={theme.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Subscription</Text>
-          <View style={styles.backBtn} />
-        </View>
+      <View style={styles.root}>
+        <Header title="Subscription" />
         <RoleLockedView screenTitle="subscription & billing" currentRole={currentRole ?? undefined} />
       </View>
     );
   }
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => { haptic(); router.back(); }} style={styles.backBtn}>
-          <Feather name="chevron-left" size={24} color={theme.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Subscription</Text>
-        <View style={styles.backBtn} />
-      </View>
+    <View style={styles.root}>
+      <Header title="Subscription" />
 
       {/* Tabs */}
       <View style={styles.tabRow}>
@@ -587,9 +569,6 @@ const createStyles = (theme: AppThemePreset) => {
   return StyleSheet.create({
   root:               { flex: 1, backgroundColor: 'transparent' },
   accessLoading:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header:             { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
-  backBtn:            { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:        { flex: 1, textAlign: 'center', color: FG, fontSize: FS.lg, fontFamily: FONT.semibold },
   tabRow:             { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, marginHorizontal: SP.md },
   tab:                { flex: 1, paddingVertical: SP.sm, alignItems: 'center' },
   tabActive:          { borderBottomWidth: 2, borderBottomColor: PURPLE },

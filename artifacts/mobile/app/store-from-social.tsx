@@ -9,7 +9,7 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Feather } from '@expo/vector-icons';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { Header } from '@/components/layout';
 import {
   BG, CARD, SURFACE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -58,7 +58,6 @@ export default function StoreFromSocialScreen() {
   const ss = makeStyles(theme);
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
-  const headerTopInset = useHeaderTopInset();
   const api = useApi();
   const [activeTab, setActiveTab] = useState<TabMode>('upload');
   const [screenshots, setScreenshots] = useState<string[]>([]);
@@ -192,16 +191,7 @@ export default function StoreFromSocialScreen() {
 
   return (
     <View style={ss.root}>
-      <View style={[ss.header, { paddingTop: headerTopInset + SP.sm }]}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={ss.backBtn}
-          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-        >
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={ss.headerTitle}>Generate from Social</Text>
-      </View>
+      <Header title="Generate from Social" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={ss.scroll}>
         <Text style={ss.subtitle}>
@@ -372,17 +362,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE_LIGHT = theme.accentLight;
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    paddingHorizontal: SP.md, paddingVertical: SP.sm,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)',
-  },
-  backBtn: {
-    width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  headerTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
   scroll: { paddingBottom: 80, paddingTop: SP.md },
   subtitle: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginHorizontal: SP.md, marginBottom: SP.md, lineHeight: 20 },
   card: { marginHorizontal: SP.md, marginBottom: SP.sm, gap: SP.md },

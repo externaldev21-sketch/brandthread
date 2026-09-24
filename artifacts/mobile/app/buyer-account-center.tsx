@@ -10,6 +10,7 @@ import {
   ON_DARK,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { Header } from '@/components/layout';
 
 type Row = {
   label: string;
@@ -35,14 +36,8 @@ export default function BuyerAccountCenter() {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[s.page, { paddingTop: insets.top }]}>
-      <View style={s.header}>
-        <TouchableOpacity style={s.back} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={21} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.title}>Accounts Center</Text>
-        <View style={s.back} />
-      </View>
+    <View style={s.page}>
+      <Header title="Accounts Center" />
 
       <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}>
         {/* Hero */}
@@ -81,9 +76,6 @@ export default function BuyerAccountCenter() {
 
 const s = StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
-  header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
-  back: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
   hero: { flexDirection: 'row', gap: 14, alignItems: 'center', borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: 16, marginBottom: 16 },
   logo: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   logoText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 24 },

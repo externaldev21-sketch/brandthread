@@ -13,6 +13,7 @@ import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButt
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { Header } from '@/components/layout';
 
 function parseCsvLine(line: string): string[] {
   const values: string[] = [];
@@ -161,19 +162,8 @@ export default function ProductImportScreen() {
   const bulkCount = bulkNames.split('\n').filter(l => l.trim().length > 0).length;
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
-      {/* ── Header ── */}
-      <View style={s.header}>
-        <TouchableOpacity
-          style={s.backBtn}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Import Products</Text>
-        <View style={{ width: COMP.iconBtn }} />
-      </View>
+    <View style={s.screen}>
+      <Header title="Import Products" onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}

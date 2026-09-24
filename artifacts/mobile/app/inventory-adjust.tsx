@@ -11,6 +11,7 @@ import { formatCents } from '@/lib/money';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
 import { getInventoryItems, getLocations, adjustStock } from '@/services/inventoryService';
 import { InventoryItem, InventoryLocation, AdjustmentType, ADJUSTMENT_TYPES } from '@/services/inventoryTypes';
+import { Header } from '@/components/layout';
 
 export default function InventoryAdjustScreen() {
   const { theme } = useAppTheme();
@@ -158,17 +159,10 @@ export default function InventoryAdjustScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.root, { paddingTop: insets.top }]}
+      style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* HEADER */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Adjust Stock</Text>
-        <View style={{ width: 36 }} />
-      </View>
+      <Header title="Adjust Stock" />
 
       <ScrollView
         style={styles.scroll}
@@ -548,21 +542,6 @@ const createStyles = (theme: { accent: string; accentDim: string; secondary: str
   const GRAD_CARD_GLOW = (theme as any).glowGradient;
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-  },
-  backBtn: {
-    width: 36, height: 36, borderRadius: RADIUS.sm,
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  headerTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, letterSpacing: -0.3 },
   scroll: { flex: 1 },
   scrollContent: { paddingTop: SP.md },
   sectionHeader: { marginTop: SP.md, marginBottom: SP.sm },

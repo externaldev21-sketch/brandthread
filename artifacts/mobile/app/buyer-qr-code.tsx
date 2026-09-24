@@ -124,9 +124,6 @@ export default function BuyerQRCode() {
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
-  header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
-  iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
 
   body: { flex: 1, padding: SP.md, alignItems: 'center' },
 

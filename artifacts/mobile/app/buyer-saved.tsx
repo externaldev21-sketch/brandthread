@@ -15,6 +15,7 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { getSavedItems, removeSavedItem, subscribeSocial } from '@/services/socialService';
 import { SavedItem, SavedItemType } from '@/services/socialTypes';
 import { reportNetworkError } from '@/lib/networkNotice';
+import { Header } from '@/components/layout';
 
 const { width: W } = Dimensions.get('window');
 const TILE_SIZE = (W - SP.md * 2 - SP.sm) / 2;
@@ -181,17 +182,8 @@ export default function BuyerSaved() {
   const isGrid = activeTab === 'post' || activeTab === 'product';
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* HEADER */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="arrow-left" size={ICON.lg} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Saved</Text>
-        <View style={styles.headerBtn}>
-          <Feather name="bookmark" size={ICON.md} color={MUTED} />
-        </View>
-      </View>
+    <View style={styles.root}>
+      <Header title="Saved" />
 
       {/* TAB BAR */}
       <View>
@@ -266,24 +258,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   root: {
     flex: 1,
     backgroundColor: 'transparent',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
-  },
-  headerBtn: {
-    width: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: FS.md,
-    fontFamily: FONT.bold,
-    color: FG,
   },
   tabBar: {
     paddingHorizontal: SP.md,

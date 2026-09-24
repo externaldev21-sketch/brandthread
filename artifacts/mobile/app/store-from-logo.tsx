@@ -11,7 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { Header } from '@/components/layout';
 import {
   BG, CARD, SURFACE, BORDER,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -102,7 +102,6 @@ export default function StoreFromLogoScreen() {
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const { user, isLoaded: isUserLoaded } = useUser();
-  const headerTopInset = useHeaderTopInset();
   const [logoUri, setLogoUri] = useState<string | null>(null);
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const [preparingLogo, setPreparingLogo] = useState(false);
@@ -262,16 +261,7 @@ export default function StoreFromLogoScreen() {
 
   return (
     <View style={fl.root}>
-      <View style={[fl.header, { paddingTop: headerTopInset + SP.sm }]}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={fl.backBtn}
-          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-        >
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={fl.headerTitle}>Generate from Logo</Text>
-      </View>
+      <Header title="Generate from Logo" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={fl.scroll}>
         <Text style={fl.subtitle}>
@@ -487,17 +477,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE_LIGHT = theme.accentLight;
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    paddingHorizontal: SP.md, paddingVertical: SP.sm,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)',
-  },
-  backBtn: {
-    width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  headerTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
   scroll: { paddingBottom: 60, paddingTop: SP.md },
   subtitle: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginHorizontal: SP.md, marginBottom: SP.md, lineHeight: 20 },
   card: { marginHorizontal: SP.md, marginBottom: SP.sm, gap: SP.md },
