@@ -290,10 +290,15 @@ export function activityDetail(row: ActivityRow): string | null {
 /** Mirrors the server's `filter=orders` definition in notifications-feed.ts. */
 const ORDER_CATEGORIES = new Set(['orders', 'order', 'payout', 'payouts', 'payment', 'production']);
 const ORDER_TYPES = new Set(['low_stock', 'out_of_stock']);
+// price_drop/back_in_stock/new_product are published under category "stock"
+// (seller alerts) or "social" (buyer alerts) depending on the publisher, but
+// they're always a buyer-facing "things you follow/saved" event for the
+// Activity Center's purposes.
+const SOCIAL_TYPES = new Set(['price_drop', 'back_in_stock', 'waitlist_restock', 'product_restocked', 'new_product']);
 
 export function activityKind(item: Pick<ActivityItem, 'category' | 'type'>): 'orders' | 'social' | 'other' {
   if (ORDER_CATEGORIES.has(item.category) || ORDER_TYPES.has(item.type)) return 'orders';
-  if (item.category === 'social') return 'social';
+  if (item.category === 'social' || SOCIAL_TYPES.has(item.type)) return 'social';
   return 'other';
 }
 

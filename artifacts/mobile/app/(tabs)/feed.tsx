@@ -20,6 +20,7 @@ import {
 import type { SellerThreadPost } from '@/services/socialService';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
 import { Asset } from 'expo-asset';
 import type { ViewToken } from 'react-native';
@@ -746,6 +747,9 @@ function VideoVisual({
   immersive = false,
   progressBottom,
   pageAspect = 9 / 16,
+  pageWidth,
+  pageHeight,
+  bottomStripHeight = 0,
 }: {
   source: VideoSource;
   isActive: boolean;
@@ -759,6 +763,16 @@ function VideoVisual({
   progressBottom?: number;
   /** Width / height of the page the clip is shown in. */
   pageAspect?: number;
+  /** Page pixel size — needed to clip the sharp frame above the tab bar. */
+  pageWidth?: number;
+  pageHeight?: number;
+  /**
+   * Height of the floating-tab-bar zone at the bottom of an immersive page.
+   * The sharp video stops above it; a separate blurred/darkened mirror of the
+   * same clip fills that strip instead, so nothing sharp ever plays under
+   * the bar and the bar's icons stay pin-sharp on top.
+   */
+  bottomStripHeight?: number;
 }) {
   const player = useVideoPlayer(source, p => {
     p.loop = true;
@@ -797,36 +811,71 @@ function VideoVisual({
     if (isActive && !paused) player.play();
     else player.pause();
   }, [isActive, paused, player]);
+
+  // The playable frame stops just above the floating tab bar instead of
+  // playing sharp underneath it. A second mirror of the same player (cheap —
+  // it shares the already-decoding video, no extra decode) shows only the
+  // bottom slice of the same frame in that strip, blurred and darkened, so it
+  // reads as a soft continuation rather than a hard cut or missing content.
+  const showBottomStrip = immersive && fit === 'cover' && bottomStripHeight > 0 && pageWidth != null && pageHeight != null;
+  const sharpClipStyle = showBottomStrip ? { bottom: bottomStripHeight, overflow: 'hidden' as const } : null;
+
   return (
     <>
-      {immersive && fit === 'contain' && posterImage && (
-        <Image
-          source={posterImage}
-          style={[StyleSheet.absoluteFill, styles.letterboxBackdrop]}
-          resizeMode="cover"
-          blurRadius={40}
-          accessibilityElementsHidden
-          importantForAccessibility="no"
+      <View style={[StyleSheet.absoluteFill, sharpClipStyle]}>
+        {immersive && fit === 'contain' && posterImage && (
+          <Image
+            source={posterImage}
+            style={[StyleSheet.absoluteFill, styles.letterboxBackdrop]}
+            resizeMode="cover"
+            blurRadius={40}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          />
+        )}
+        {showPoster && (
+          <Image
+            source={posterSource ?? { uri: posterUri! }}
+            style={StyleSheet.absoluteFill}
+            resizeMode={fit}
+          />
+        )}
+        <VideoView
+          player={player}
+          // Explicit size: on web the style lands on a <video>, which ignores
+          // inset-only sizing and would otherwise render at its intrinsic size.
+          style={[StyleSheet.absoluteFill, styles.videoFill, showPoster && { opacity: 0 }]}
+          contentFit={fit}
+          nativeControls={false}
         />
-      )}
-      {showPoster && (
-        <Image
-          source={posterSource ?? { uri: posterUri! }}
-          style={StyleSheet.absoluteFill}
-          resizeMode={fit}
-        />
-      )}
-      <VideoView
-        player={player}
-        // Explicit size: on web the style lands on a <video>, which ignores
-        // inset-only sizing and would otherwise render at its intrinsic size.
-        style={[StyleSheet.absoluteFill, styles.videoFill, showPoster && { opacity: 0 }]}
-        contentFit={fit}
-        nativeControls={false}
-      />
-      {paused && (
-        <View style={styles.pauseOverlay}>
-          <Feather name="play" size={56} color="#FFFFFFCC" />
+        {paused && (
+          <View style={styles.pauseOverlay}>
+            <Feather name="play" size={56} color="#FFFFFFCC" />
+          </View>
+        )}
+      </View>
+      {showBottomStrip && (
+        <View pointerEvents="none" style={[styles.bottomBlurStrip, { height: bottomStripHeight }]}>
+          <View style={{ position: 'absolute', left: 0, width: pageWidth!, height: pageHeight!, top: -(pageHeight! - bottomStripHeight) }}>
+            <VideoView
+              player={player}
+              style={[StyleSheet.absoluteFill, styles.videoFill]}
+              contentFit="cover"
+              nativeControls={false}
+            />
+          </View>
+          {/* iOS/web can sample the live video through a real blur; Android's
+              blur can't sample video surfaces (see TabBarGlass), so it falls
+              back to a denser dark tint instead of redrawing every frame. */}
+          {Platform.OS !== 'android' && (
+            <BlurView intensity={70} tint="dark" style={StyleSheet.absoluteFill} />
+          )}
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: Platform.OS === 'android' ? 'rgba(0,0,0,0.82)' : 'rgba(0,0,0,0.38)' },
+            ]}
+          />
         </View>
       )}
       {progressBottom != null && isActive && (
@@ -958,6 +1007,9 @@ function SpotlightPage({
                 immersive={immersive}
                 progressBottom={immersive ? bottomClearance - 10 : undefined}
                 pageAspect={pageHeight > 0 ? pageWidth / pageHeight : undefined}
+                pageWidth={pageWidth}
+                pageHeight={pageHeight}
+                bottomStripHeight={immersive ? bottomClearance : 0}
               />
             )
             : <PhotoVisual uris={item.mediaUris} pageWidth={pageWidth} pageHeight={pageHeight} />}
@@ -2177,6 +2229,7 @@ const styles = StyleSheet.create({
   mediaDots: { position: 'absolute', top: '50%', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 5 },
   videoFill: { width: '100%', height: '100%' },
   letterboxBackdrop: { opacity: 0.55 },
+  bottomBlurStrip: { position: 'absolute', left: 0, right: 0, bottom: 0, overflow: 'hidden' },
   topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0 },
   progressTrack: {
@@ -2254,7 +2307,7 @@ const styles = StyleSheet.create({
   buyerCartBadge: { top: 5, right: 3 },
   buyerFeedTabUnderline: { position: 'absolute', bottom: 6, alignSelf: 'center' },
   buyerFeedTab: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 6 },
-  buyerFeedTabText: { fontSize: FS.base, textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  buyerFeedTabText: { fontSize: FS.base, textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 1 },
   topAvatarBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   topAvatar: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   unreadDot: { position: 'absolute', top: 4, right: 4, width: 9, height: 9, borderRadius: 4.5, backgroundColor: RED, borderWidth: 1.5, borderColor: BG },

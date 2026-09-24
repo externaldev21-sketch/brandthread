@@ -7,14 +7,43 @@ import crypto from "crypto";
 import { reversePurchasePointsOnce } from "./loyalty";
 import { sendReturnStatusEmail } from "../lib/brandthreadEmail";
 import { logger } from "../lib/logger";
+import { publishNotification } from "./notifications-feed";
 
 const router = Router();
 router.use(requireAuth);
 
+const RETURN_STATUS_COPY: Record<"pending" | "approved" | "denied" | "refunded", { type: string; title: string; body: (orderNumber: string, refundAmountCents?: number | null) => string }> = {
+  pending: {
+    type: "return_requested",
+    title: "Return request received",
+    body: (orderNumber) => `We received your return request for order #${orderNumber}.`,
+  },
+  approved: {
+    type: "return_approved",
+    title: "Return approved",
+    body: (orderNumber) => `Your return for order #${orderNumber} was approved.`,
+  },
+  denied: {
+    type: "return_denied",
+    title: "Return update",
+    body: (orderNumber) => `Your return for order #${orderNumber} was declined.`,
+  },
+  refunded: {
+    type: "return_refunded",
+    title: "Refund issued",
+    body: (orderNumber, refundAmountCents) =>
+      refundAmountCents
+        ? `A refund of $${(refundAmountCents / 100).toFixed(2)} was issued for order #${orderNumber}.`
+        : `A refund was issued for order #${orderNumber}.`,
+  },
+};
+
 async function notifyReturnStatus(returnId: string, status: "pending" | "approved" | "denied" | "refunded", refundAmountCents?: number | null, sellerResponse?: string | null): Promise<void> {
   const [row] = await db
     .select({
+      buyerId: returns.buyerId,
       buyerEmail: users.email,
+      orderId: returns.orderId,
       orderNumber: orders.orderNumber,
     })
     .from(returns)
@@ -26,6 +55,20 @@ async function notifyReturnStatus(returnId: string, status: "pending" | "approve
   if (!row?.buyerEmail) {
     return;
   }
+
+  const copy = RETURN_STATUS_COPY[status];
+  await publishNotification({
+    userId: row.buyerId,
+    category: "returns",
+    type: copy.type,
+    title: copy.title,
+    body: copy.body(row.orderNumber, refundAmountCents),
+    targetId: returnId,
+    targetType: "return",
+    cta: "View return",
+  }).catch((err) => {
+    logger.warn({ err, returnId, status }, "Return status push notification failed");
+  });
 
   const sent = await sendReturnStatusEmail({
     to: row.buyerEmail,

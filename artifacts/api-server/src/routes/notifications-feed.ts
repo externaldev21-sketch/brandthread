@@ -78,6 +78,13 @@ async function resolveTargetImage(value: string | null): Promise<string | null> 
 export const ORDER_ACTIVITY_CATEGORIES = ["orders", "order", "payout", "payouts", "payment", "production"] as const;
 /** Inventory alerts are inserted without an orders category but belong there. */
 export const ORDER_ACTIVITY_TYPES = ["low_stock", "out_of_stock"] as const;
+/**
+ * price_drop/back_in_stock/new_product are published under category "stock"
+ * (artifacts/api-server/src/lib/stockNotifications.ts) or "social"
+ * (activityEvents.ts), but are always a buyer "things you follow/saved"
+ * event for the Activity Center's Social filter.
+ */
+export const SOCIAL_ACTIVITY_TYPES = ["price_drop", "back_in_stock", "waitlist_restock", "product_restocked", "new_product"] as const;
 
 function filterCondition(filter: unknown): SQL | undefined {
   if (filter === "orders") {
@@ -86,7 +93,12 @@ function filterCondition(filter: unknown): SQL | undefined {
       inArray(notificationsFeed.type, [...ORDER_ACTIVITY_TYPES]),
     );
   }
-  if (filter === "social") return eq(notificationsFeed.category, "social");
+  if (filter === "social") {
+    return or(
+      eq(notificationsFeed.category, "social"),
+      inArray(notificationsFeed.type, [...SOCIAL_ACTIVITY_TYPES]),
+    );
+  }
   return undefined;
 }
 
@@ -209,6 +221,7 @@ export async function publishNotification(n: {
       data: {
         notificationId: notification.id,
         type: n.type,
+        category: n.category,
         targetId: n.targetId,
         targetType: n.targetType,
         cta: n.cta,

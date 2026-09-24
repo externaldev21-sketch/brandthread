@@ -248,6 +248,10 @@ describe('classification and routing', () => {
     expect(activityKind({ category: 'orders', type: 'new_order_received' })).toBe('orders');
     expect(activityKind({ category: 'system', type: 'low_stock' })).toBe('orders');
     expect(activityKind({ category: 'social', type: 'price_drop' })).toBe('social');
+    // price_drop/back_in_stock are published under category "stock" by
+    // artifacts/api-server/src/lib/stockNotifications.ts.
+    expect(activityKind({ category: 'stock', type: 'price_drop' })).toBe('social');
+    expect(activityKind({ category: 'stock', type: 'back_in_stock' })).toBe('social');
     expect(activityKind({ category: 'messages', type: 'new_friend_message' })).toBe('other');
   });
 

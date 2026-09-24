@@ -27,6 +27,7 @@ import type {
   BlockedAccount,
   BulkPaymentOptions,
   BulkWalletPaymentInput,
+  CallAvailability,
   CallCredentials,
   CallTokenInput,
   CallTokenRenewalInput,
@@ -40,6 +41,7 @@ import type {
   DeleteAccountInput,
   DropBroadcastPreview,
   GetModerationAccess200,
+  GetPartnerManufacturer200,
   HealthStatus,
   LegalAcceptanceInput,
   LikeCommentInput,
@@ -55,7 +57,10 @@ import type {
   ManufacturerConnectOnboardingInput,
   ManufacturerConnectStatus,
   ManufacturerDashboard,
+  ManufacturerDirectoryFacets,
   ManufacturerInput,
+  ManufacturerInviteRegistration,
+  ManufacturerInviteResolution,
   ManufacturerPayment,
   ManufacturerPaymentActivity,
   ManufacturerPaymentInput,
@@ -73,6 +78,10 @@ import type {
   MutedWord,
   MutedWordInput,
   OkResponse,
+  OrderCardCancelInput,
+  OrderCardInput,
+  OrderCardResult,
+  OrderTimeline,
   ProductionOrderInput,
   PublicManufacturer,
   RenewCallToken200,
@@ -261,6 +270,83 @@ export const useCreateCallToken = <TError = ErrorType<void>,
       > => {
       return useMutation(getCreateCallTokenMutationOptions(options));
     }
+
+export const getGetCallAvailabilityUrl = () => {
+
+
+
+
+  return `/api/call/availability`
+}
+
+/**
+ * @summary Whether voice and video calling is configured on this server
+ */
+export const getCallAvailability = async ( options?: RequestInit): Promise<CallAvailability> => {
+
+  return customFetch<CallAvailability>(getGetCallAvailabilityUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCallAvailabilityQueryKey = () => {
+    return [
+    `/api/call/availability`
+    ] as const;
+    }
+
+
+export const getGetCallAvailabilityQueryOptions = <TData = Awaited<ReturnType<typeof getCallAvailability>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCallAvailability>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCallAvailabilityQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCallAvailability>>> = ({ signal }) => getCallAvailability({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCallAvailability>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCallAvailabilityQueryResult = NonNullable<Awaited<ReturnType<typeof getCallAvailability>>>
+export type GetCallAvailabilityQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Whether voice and video calling is configured on this server
+ */
+
+export function useGetCallAvailability<TData = Awaited<ReturnType<typeof getCallAvailability>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCallAvailability>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCallAvailabilityQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getRenewCallTokenUrl = () => {
 
@@ -851,6 +937,83 @@ export function useListPublicManufacturers<TData = Awaited<ReturnType<typeof lis
 
 
 
+export const getGetManufacturerDirectoryFacetsUrl = () => {
+
+
+
+
+  return `/api/manufacturers/public/facets`
+}
+
+/**
+ * @summary Countries and specialties present in the live public directory, with counts
+ */
+export const getManufacturerDirectoryFacets = async ( options?: RequestInit): Promise<ManufacturerDirectoryFacets> => {
+
+  return customFetch<ManufacturerDirectoryFacets>(getGetManufacturerDirectoryFacetsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetManufacturerDirectoryFacetsQueryKey = () => {
+    return [
+    `/api/manufacturers/public/facets`
+    ] as const;
+    }
+
+
+export const getGetManufacturerDirectoryFacetsQueryOptions = <TData = Awaited<ReturnType<typeof getManufacturerDirectoryFacets>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getManufacturerDirectoryFacets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetManufacturerDirectoryFacetsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getManufacturerDirectoryFacets>>> = ({ signal }) => getManufacturerDirectoryFacets({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getManufacturerDirectoryFacets>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetManufacturerDirectoryFacetsQueryResult = NonNullable<Awaited<ReturnType<typeof getManufacturerDirectoryFacets>>>
+export type GetManufacturerDirectoryFacetsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Countries and specialties present in the live public directory, with counts
+ */
+
+export function useGetManufacturerDirectoryFacets<TData = Awaited<ReturnType<typeof getManufacturerDirectoryFacets>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getManufacturerDirectoryFacets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetManufacturerDirectoryFacetsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetPublicManufacturerUrl = (manufacturerId: string,) => {
 
 
@@ -991,6 +1154,520 @@ export const useApplyAsManufacturer = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getApplyAsManufacturerMutationOptions(options));
     }
+
+export const getResolveManufacturerInviteUrl = (token: string,) => {
+
+
+
+
+  return `/api/manufacturers/invite-tokens/resolve/${token}`
+}
+
+/**
+ * @summary Look up a private seller invite before signing up
+ */
+export const resolveManufacturerInvite = async (token: string, options?: RequestInit): Promise<ManufacturerInviteResolution> => {
+
+  return customFetch<ManufacturerInviteResolution>(getResolveManufacturerInviteUrl(token),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getResolveManufacturerInviteQueryKey = (token: string,) => {
+    return [
+    `/api/manufacturers/invite-tokens/resolve/${token}`
+    ] as const;
+    }
+
+
+export const getResolveManufacturerInviteQueryOptions = <TData = Awaited<ReturnType<typeof resolveManufacturerInvite>>, TError = ErrorType<void>>(token: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof resolveManufacturerInvite>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getResolveManufacturerInviteQueryKey(token);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof resolveManufacturerInvite>>> = ({ signal }) => resolveManufacturerInvite(token, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: token !== null && token !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof resolveManufacturerInvite>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ResolveManufacturerInviteQueryResult = NonNullable<Awaited<ReturnType<typeof resolveManufacturerInvite>>>
+export type ResolveManufacturerInviteQueryError = ErrorType<void>
+
+
+/**
+ * @summary Look up a private seller invite before signing up
+ */
+
+export function useResolveManufacturerInvite<TData = Awaited<ReturnType<typeof resolveManufacturerInvite>>, TError = ErrorType<void>>(
+ token: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof resolveManufacturerInvite>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getResolveManufacturerInviteQueryOptions(token,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRegisterManufacturerViaInviteUrl = (token: string,) => {
+
+
+
+
+  return `/api/manufacturers/register-via-invite/${token}`
+}
+
+/**
+ * @summary Register (or link an existing profile) through a seller's private invite
+ */
+export const registerManufacturerViaInvite = async (token: string,
+    manufacturerInput: ManufacturerInput, options?: RequestInit): Promise<ManufacturerInviteRegistration> => {
+
+  return customFetch<ManufacturerInviteRegistration>(getRegisterManufacturerViaInviteUrl(token),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(manufacturerInput)
+  }
+);}
+
+
+
+
+export const getRegisterManufacturerViaInviteMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerManufacturerViaInvite>>, TError,{token: string;data: BodyType<ManufacturerInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registerManufacturerViaInvite>>, TError,{token: string;data: BodyType<ManufacturerInput>}, TContext> => {
+
+const mutationKey = ['registerManufacturerViaInvite'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerManufacturerViaInvite>>, {token: string;data: BodyType<ManufacturerInput>}> = (props) => {
+          const {token,data} = props ?? {};
+
+          return  registerManufacturerViaInvite(token,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegisterManufacturerViaInviteMutationResult = NonNullable<Awaited<ReturnType<typeof registerManufacturerViaInvite>>>
+    export type RegisterManufacturerViaInviteMutationBody = BodyType<ManufacturerInput>
+    export type RegisterManufacturerViaInviteMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Register (or link an existing profile) through a seller's private invite
+ */
+export const useRegisterManufacturerViaInvite = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerManufacturerViaInvite>>, TError,{token: string;data: BodyType<ManufacturerInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof registerManufacturerViaInvite>>,
+        TError,
+        {token: string;data: BodyType<ManufacturerInput>},
+        TContext
+      > => {
+      return useMutation(getRegisterManufacturerViaInviteMutationOptions(options));
+    }
+
+export const getSendManufacturerOrderCardUrl = (threadId: string,) => {
+
+
+
+
+  return `/api/manufacturers/me/threads/${threadId}/order-cards`
+}
+
+/**
+ * @summary Price a sample or bulk order and send it to the seller as a payable card in chat
+ */
+export const sendManufacturerOrderCard = async (threadId: string,
+    orderCardInput: OrderCardInput, options?: RequestInit): Promise<OrderCardResult> => {
+
+  return customFetch<OrderCardResult>(getSendManufacturerOrderCardUrl(threadId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(orderCardInput)
+  }
+);}
+
+
+
+
+export const getSendManufacturerOrderCardMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendManufacturerOrderCard>>, TError,{threadId: string;data: BodyType<OrderCardInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendManufacturerOrderCard>>, TError,{threadId: string;data: BodyType<OrderCardInput>}, TContext> => {
+
+const mutationKey = ['sendManufacturerOrderCard'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendManufacturerOrderCard>>, {threadId: string;data: BodyType<OrderCardInput>}> = (props) => {
+          const {threadId,data} = props ?? {};
+
+          return  sendManufacturerOrderCard(threadId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendManufacturerOrderCardMutationResult = NonNullable<Awaited<ReturnType<typeof sendManufacturerOrderCard>>>
+    export type SendManufacturerOrderCardMutationBody = BodyType<OrderCardInput>
+    export type SendManufacturerOrderCardMutationError = ErrorType<void>
+
+    /**
+ * @summary Price a sample or bulk order and send it to the seller as a payable card in chat
+ */
+export const useSendManufacturerOrderCard = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendManufacturerOrderCard>>, TError,{threadId: string;data: BodyType<OrderCardInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendManufacturerOrderCard>>,
+        TError,
+        {threadId: string;data: BodyType<OrderCardInput>},
+        TContext
+      > => {
+      return useMutation(getSendManufacturerOrderCardMutationOptions(options));
+    }
+
+export const getGetManufacturerOrderTimelineUrl = (orderId: string,) => {
+
+
+
+
+  return `/api/manufacturers/orders/${orderId}/timeline`
+}
+
+/**
+ * @summary Six-stage tracker with stage timestamps and shipment tracking, for either participant
+ */
+export const getManufacturerOrderTimeline = async (orderId: string, options?: RequestInit): Promise<OrderTimeline> => {
+
+  return customFetch<OrderTimeline>(getGetManufacturerOrderTimelineUrl(orderId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetManufacturerOrderTimelineQueryKey = (orderId: string,) => {
+    return [
+    `/api/manufacturers/orders/${orderId}/timeline`
+    ] as const;
+    }
+
+
+export const getGetManufacturerOrderTimelineQueryOptions = <TData = Awaited<ReturnType<typeof getManufacturerOrderTimeline>>, TError = ErrorType<unknown>>(orderId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getManufacturerOrderTimeline>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetManufacturerOrderTimelineQueryKey(orderId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getManufacturerOrderTimeline>>> = ({ signal }) => getManufacturerOrderTimeline(orderId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: orderId !== null && orderId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getManufacturerOrderTimeline>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetManufacturerOrderTimelineQueryResult = NonNullable<Awaited<ReturnType<typeof getManufacturerOrderTimeline>>>
+export type GetManufacturerOrderTimelineQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Six-stage tracker with stage timestamps and shipment tracking, for either participant
+ */
+
+export function useGetManufacturerOrderTimeline<TData = Awaited<ReturnType<typeof getManufacturerOrderTimeline>>, TError = ErrorType<unknown>>(
+ orderId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getManufacturerOrderTimeline>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetManufacturerOrderTimelineQueryOptions(orderId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCancelManufacturerOrderCardUrl = (orderId: string,) => {
+
+
+
+
+  return `/api/manufacturers/orders/${orderId}/cancel`
+}
+
+/**
+ * @summary Withdraw (manufacturer) or decline (seller) an unpaid order card
+ */
+export const cancelManufacturerOrderCard = async (orderId: string,
+    orderCardCancelInput?: OrderCardCancelInput, options?: RequestInit): Promise<SampleOrder> => {
+
+  return customFetch<SampleOrder>(getCancelManufacturerOrderCardUrl(orderId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(orderCardCancelInput)
+  }
+);}
+
+
+
+
+export const getCancelManufacturerOrderCardMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelManufacturerOrderCard>>, TError,{orderId: string;data?: BodyType<OrderCardCancelInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelManufacturerOrderCard>>, TError,{orderId: string;data?: BodyType<OrderCardCancelInput>}, TContext> => {
+
+const mutationKey = ['cancelManufacturerOrderCard'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelManufacturerOrderCard>>, {orderId: string;data?: BodyType<OrderCardCancelInput>}> = (props) => {
+          const {orderId,data} = props ?? {};
+
+          return  cancelManufacturerOrderCard(orderId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelManufacturerOrderCardMutationResult = NonNullable<Awaited<ReturnType<typeof cancelManufacturerOrderCard>>>
+    export type CancelManufacturerOrderCardMutationBody = BodyType<OrderCardCancelInput> | undefined
+    export type CancelManufacturerOrderCardMutationError = ErrorType<void>
+
+    /**
+ * @summary Withdraw (manufacturer) or decline (seller) an unpaid order card
+ */
+export const useCancelManufacturerOrderCard = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelManufacturerOrderCard>>, TError,{orderId: string;data?: BodyType<OrderCardCancelInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelManufacturerOrderCard>>,
+        TError,
+        {orderId: string;data?: BodyType<OrderCardCancelInput>},
+        TContext
+      > => {
+      return useMutation(getCancelManufacturerOrderCardMutationOptions(options));
+    }
+
+export const getConfirmManufacturerOrderDeliveryUrl = (orderId: string,) => {
+
+
+
+
+  return `/api/manufacturers/orders/${orderId}/confirm-delivery`
+}
+
+/**
+ * @summary Seller confirms a shipped order arrived
+ */
+export const confirmManufacturerOrderDelivery = async (orderId: string, options?: RequestInit): Promise<SampleOrder> => {
+
+  return customFetch<SampleOrder>(getConfirmManufacturerOrderDeliveryUrl(orderId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getConfirmManufacturerOrderDeliveryMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmManufacturerOrderDelivery>>, TError,{orderId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmManufacturerOrderDelivery>>, TError,{orderId: string}, TContext> => {
+
+const mutationKey = ['confirmManufacturerOrderDelivery'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmManufacturerOrderDelivery>>, {orderId: string}> = (props) => {
+          const {orderId} = props ?? {};
+
+          return  confirmManufacturerOrderDelivery(orderId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmManufacturerOrderDeliveryMutationResult = NonNullable<Awaited<ReturnType<typeof confirmManufacturerOrderDelivery>>>
+
+    export type ConfirmManufacturerOrderDeliveryMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Seller confirms a shipped order arrived
+ */
+export const useConfirmManufacturerOrderDelivery = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmManufacturerOrderDelivery>>, TError,{orderId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmManufacturerOrderDelivery>>,
+        TError,
+        {orderId: string},
+        TContext
+      > => {
+      return useMutation(getConfirmManufacturerOrderDeliveryMutationOptions(options));
+    }
+
+export const getGetPartnerManufacturerUrl = (manufacturerId: string,) => {
+
+
+
+
+  return `/api/manufacturers/partners/${manufacturerId}`
+}
+
+/**
+ * @summary Seller-scoped profile for a public manufacturer or a private one the seller is connected to
+ */
+export const getPartnerManufacturer = async (manufacturerId: string, options?: RequestInit): Promise<GetPartnerManufacturer200> => {
+
+  return customFetch<GetPartnerManufacturer200>(getGetPartnerManufacturerUrl(manufacturerId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPartnerManufacturerQueryKey = (manufacturerId: string,) => {
+    return [
+    `/api/manufacturers/partners/${manufacturerId}`
+    ] as const;
+    }
+
+
+export const getGetPartnerManufacturerQueryOptions = <TData = Awaited<ReturnType<typeof getPartnerManufacturer>>, TError = ErrorType<void>>(manufacturerId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPartnerManufacturer>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPartnerManufacturerQueryKey(manufacturerId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPartnerManufacturer>>> = ({ signal }) => getPartnerManufacturer(manufacturerId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: manufacturerId !== null && manufacturerId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPartnerManufacturer>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPartnerManufacturerQueryResult = NonNullable<Awaited<ReturnType<typeof getPartnerManufacturer>>>
+export type GetPartnerManufacturerQueryError = ErrorType<void>
+
+
+/**
+ * @summary Seller-scoped profile for a public manufacturer or a private one the seller is connected to
+ */
+
+export function useGetPartnerManufacturer<TData = Awaited<ReturnType<typeof getPartnerManufacturer>>, TError = ErrorType<void>>(
+ manufacturerId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPartnerManufacturer>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPartnerManufacturerQueryOptions(manufacturerId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getListManufacturerRelationshipsUrl = () => {
 

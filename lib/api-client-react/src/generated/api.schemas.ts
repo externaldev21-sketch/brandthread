@@ -60,6 +60,18 @@ export interface CallCredentials {
   expiresAt: string;
 }
 
+export type CallAvailabilityProvider = typeof CallAvailabilityProvider[keyof typeof CallAvailabilityProvider];
+
+
+export const CallAvailabilityProvider = {
+  agora: 'agora',
+} as const;
+
+export interface CallAvailability {
+  configured: boolean;
+  provider: CallAvailabilityProvider;
+}
+
 export interface DropBroadcastPreview {
   /** @minimum 0 */
   followers: number;
@@ -87,6 +99,9 @@ export interface Manufacturer {
   contactEmail?: string | null;
   /** @nullable */
   contactPhone?: string | null;
+  /** @nullable */
+  timeZone?: string | null;
+  isPublicDirectory?: boolean;
   status: string;
   /** @nullable */
   verifiedAt?: string | null;
@@ -111,6 +126,8 @@ export interface ManufacturerInput {
   website?: string;
   contactEmail?: string;
   contactPhone?: string;
+  /** @maxLength 64 */
+  timeZone?: string;
 }
 
 export interface ManufacturerUpdate {
@@ -129,6 +146,9 @@ export interface ManufacturerUpdate {
   website?: string;
   contactEmail?: string;
   contactPhone?: string;
+  /** @maxLength 64 */
+  timeZone?: string;
+  isPublicDirectory?: boolean;
 }
 
 export interface ManufacturerPhotoReorder {
@@ -160,15 +180,280 @@ export interface PublicManufacturer {
   photos: string[];
   /** @nullable */
   website?: string | null;
+  /** @nullable */
+  timeZone?: string | null;
   isVerified: boolean;
   /** @nullable */
   rating?: number | null;
+  reviewCount?: number;
   /** @nullable */
   responseTime?: string | null;
   createdAt: string;
   updatedAt: string;
   /** @minimum 1 */
   revision: number;
+}
+
+export type ManufacturerDirectoryFacetsCountriesItem = {
+  name: string;
+  count: number;
+};
+
+export type ManufacturerDirectoryFacetsSpecialtiesItem = {
+  name: string;
+  count: number;
+};
+
+export interface ManufacturerDirectoryFacets {
+  total: number;
+  countries: ManufacturerDirectoryFacetsCountriesItem[];
+  specialties: ManufacturerDirectoryFacetsSpecialtiesItem[];
+}
+
+export interface ManufacturerInviteResolution {
+  valid: boolean;
+  sellerName: string;
+  /** @nullable */
+  companyName?: string | null;
+  /** @nullable */
+  contactName?: string | null;
+  /** @nullable */
+  contactEmail?: string | null;
+}
+
+export type ManufacturerInviteRegistration = Manufacturer & {
+  invitedBySellerId: string;
+  threadId: string;
+};
+
+export type OrderCardInputOrderType = typeof OrderCardInputOrderType[keyof typeof OrderCardInputOrderType];
+
+
+export const OrderCardInputOrderType = {
+  sample: 'sample',
+  bulk: 'bulk',
+} as const;
+
+export interface OrderCardInput {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  clientRequestId: string;
+  orderType: OrderCardInputOrderType;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  title: string;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  description?: string | null;
+  /** @minimum 1 */
+  quantity: number;
+  /** @minimum 100 */
+  priceCents: number;
+}
+
+export interface OrderCardCancelInput {
+  /** @maxLength 500 */
+  reason?: string;
+}
+
+export type SampleOrderOrderType = typeof SampleOrderOrderType[keyof typeof SampleOrderOrderType];
+
+
+export const SampleOrderOrderType = {
+  sample: 'sample',
+  bulk: 'bulk',
+} as const;
+
+export type SampleOrderIssuedBy = typeof SampleOrderIssuedBy[keyof typeof SampleOrderIssuedBy];
+
+
+export const SampleOrderIssuedBy = {
+  seller: 'seller',
+  manufacturer: 'manufacturer',
+} as const;
+
+export interface SampleOrder {
+  id: string;
+  manufacturerId: string;
+  sellerId: string;
+  /** Seller brand name (manufacturer-facing endpoints) */
+  sellerName?: string;
+  /** @nullable */
+  threadId?: string | null;
+  orderType: SampleOrderOrderType;
+  issuedBy?: SampleOrderIssuedBy;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  quantity: number;
+  priceCents: number;
+  status: string;
+  /** @nullable */
+  carrier?: string | null;
+  /** @nullable */
+  trackingNumber?: string | null;
+  /** @nullable */
+  shippedAt?: string | null;
+  /** @nullable */
+  deliveredAt?: string | null;
+  /** Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints. */
+  imageUrls?: string[];
+  createdAt: string;
+  updatedAt: string;
+  /** @minimum 1 */
+  revision: number;
+  [key: string]: unknown;
+ }
+
+export type MessageMessageType = typeof MessageMessageType[keyof typeof MessageMessageType];
+
+
+export const MessageMessageType = {
+  text: 'text',
+  image: 'image',
+  sample_card: 'sample_card',
+  bulk_card: 'bulk_card',
+  system: 'system',
+} as const;
+
+export type OrderCardSnapshotOrderType = typeof OrderCardSnapshotOrderType[keyof typeof OrderCardSnapshotOrderType];
+
+
+export const OrderCardSnapshotOrderType = {
+  sample: 'sample',
+  bulk: 'bulk',
+} as const;
+
+export interface OrderCardSnapshot {
+  id: string;
+  orderType: OrderCardSnapshotOrderType;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  quantity: number;
+  priceCents: number;
+  currency?: string;
+  status: string;
+  issuedBy?: string;
+  /** @nullable */
+  carrier?: string | null;
+  /** @nullable */
+  trackingNumber?: string | null;
+  paymentReviewState?: string;
+  manufacturerPayoutReady?: boolean;
+  revision: number;
+  updatedAt: string;
+}
+
+/**
+ * @nullable
+ */
+export type MessageCardData = { [key: string]: unknown } | null;
+
+export interface Message {
+  id: string;
+  threadId: string;
+  senderRole: string;
+  senderId: string;
+  content: string;
+  messageType: MessageMessageType;
+  mediaUrls: string[];
+  /** @nullable */
+  cardData?: MessageCardData;
+  /** Live state of the order a sample/bulk card refers to. */
+  order?: OrderCardSnapshot | null;
+  sentAt: string;
+}
+
+export interface OrderCardResult {
+  order: SampleOrder;
+  message: Message;
+}
+
+export type OrderTimelineStepStage = typeof OrderTimelineStepStage[keyof typeof OrderTimelineStepStage];
+
+
+export const OrderTimelineStepStage = {
+  payment_received: 'payment_received',
+  processing: 'processing',
+  cut_and_sew: 'cut_and_sew',
+  packing: 'packing',
+  shipped: 'shipped',
+  delivered: 'delivered',
+} as const;
+
+export type OrderTimelineStepState = typeof OrderTimelineStepState[keyof typeof OrderTimelineStepState];
+
+
+export const OrderTimelineStepState = {
+  done: 'done',
+  current: 'current',
+  upcoming: 'upcoming',
+} as const;
+
+export interface OrderTimelineStep {
+  stage: OrderTimelineStepStage;
+  label: string;
+  description: string;
+  state: OrderTimelineStepState;
+  /** @nullable */
+  at: string | null;
+}
+
+export interface OrderTimelineEvent {
+  id: string;
+  actorRole: string;
+  /** @nullable */
+  fromStatus?: string | null;
+  toStatus: string;
+  /** @nullable */
+  note?: string | null;
+  createdAt: string;
+}
+
+export type OrderTimelineViewerRole = typeof OrderTimelineViewerRole[keyof typeof OrderTimelineViewerRole];
+
+
+export const OrderTimelineViewerRole = {
+  seller: 'seller',
+  manufacturer: 'manufacturer',
+} as const;
+
+export type OrderTimelineManufacturer = {
+  id: string;
+  businessName: string;
+  country: string;
+  /** @nullable */
+  timeZone?: string | null;
+};
+
+export type OrderTimelineTracking = {
+  /** @nullable */
+  carrier: string | null;
+  /** @nullable */
+  carrierName: string | null;
+  /** @nullable */
+  trackingNumber: string | null;
+  /** @nullable */
+  url: string | null;
+};
+
+export interface OrderTimeline {
+  viewerRole: OrderTimelineViewerRole;
+  order: OrderCardSnapshot;
+  manufacturer?: OrderTimelineManufacturer;
+  steps: OrderTimelineStep[];
+  events: OrderTimelineEvent[];
+  createdAt?: string;
+  /** @nullable */
+  paidAt?: string | null;
+  tracking: OrderTimelineTracking;
 }
 
 export type ManufacturerApplicationInput = ManufacturerInput & {
@@ -223,34 +508,6 @@ export interface ManufacturerThreadInput {
 
 export type ManufacturerDashboardActiveSellersItem = { [key: string]: unknown };
 
-export type SampleOrderOrderType = typeof SampleOrderOrderType[keyof typeof SampleOrderOrderType];
-
-
-export const SampleOrderOrderType = {
-  sample: 'sample',
-  bulk: 'bulk',
-} as const;
-
-export interface SampleOrder {
-  id: string;
-  manufacturerId: string;
-  sellerId: string;
-  /** @nullable */
-  threadId?: string | null;
-  orderType: SampleOrderOrderType;
-  title: string;
-  quantity: number;
-  priceCents: number;
-  status: string;
-  /** Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints. */
-  imageUrls?: string[];
-  createdAt: string;
-  updatedAt: string;
-  /** @minimum 1 */
-  revision: number;
-  [key: string]: unknown;
- }
-
 export interface MessageThread {
   id: string;
   manufacturerId: string;
@@ -282,35 +539,6 @@ export interface ManufacturerDashboard {
   sampleOrders: OrderBuckets;
   bulkOrders: OrderBuckets;
   orderHistory: SampleOrder[];
-}
-
-export type MessageMessageType = typeof MessageMessageType[keyof typeof MessageMessageType];
-
-
-export const MessageMessageType = {
-  text: 'text',
-  image: 'image',
-  sample_card: 'sample_card',
-  bulk_card: 'bulk_card',
-  system: 'system',
-} as const;
-
-/**
- * @nullable
- */
-export type MessageCardData = { [key: string]: unknown } | null;
-
-export interface Message {
-  id: string;
-  threadId: string;
-  senderRole: string;
-  senderId: string;
-  content: string;
-  messageType: MessageMessageType;
-  mediaUrls: string[];
-  /** @nullable */
-  cardData?: MessageCardData;
-  sentAt: string;
 }
 
 export type MessageInputMessageType = typeof MessageInputMessageType[keyof typeof MessageInputMessageType];
@@ -488,6 +716,17 @@ export const ManufacturerConnectStatusStatus = {
   active: 'active',
 } as const;
 
+/**
+ * @nullable
+ */
+export type ManufacturerConnectStatusAccountType = typeof ManufacturerConnectStatusAccountType[keyof typeof ManufacturerConnectStatusAccountType] | null;
+
+
+export const ManufacturerConnectStatusAccountType = {
+  full: 'full',
+  recipient: 'recipient',
+} as const;
+
 export interface ManufacturerConnectStatus {
   connected: boolean;
   ready: boolean;
@@ -501,6 +740,12 @@ export interface ManufacturerConnectStatus {
   disabledReason?: string | null;
   /** @nullable */
   recovery?: string | null;
+  /** @nullable */
+  country?: string | null;
+  /** @nullable */
+  payoutCurrency?: string | null;
+  /** @nullable */
+  accountType?: ManufacturerConnectStatusAccountType;
 }
 
 export interface ManufacturerConnectOnboardingInput {
@@ -951,6 +1196,33 @@ export type ListPublicManufacturersParams = {
 q?: string;
 country?: string;
 specialty?: string;
+/**
+ * @minimum 0
+ */
+minYears?: number;
+/**
+ * @minimum 1
+ */
+maxMoq?: number;
+verified?: boolean;
+hasPhotos?: boolean;
+sort?: ListPublicManufacturersSort;
+};
+
+export type ListPublicManufacturersSort = typeof ListPublicManufacturersSort[keyof typeof ListPublicManufacturersSort];
+
+
+export const ListPublicManufacturersSort = {
+  recommended: 'recommended',
+  newest: 'newest',
+  experience: 'experience',
+  rating: 'rating',
+  moq: 'moq',
+} as const;
+
+export type GetPartnerManufacturer200 = PublicManufacturer & {
+  isConnected: boolean;
+  isPublicDirectory: boolean;
 };
 
 export type UploadManufacturerThreadAttachment201 = {

@@ -252,52 +252,9 @@ describe("follows", () => {
   });
 });
 
-describe("saved products", () => {
-  it("publishes back_in_stock when a saved product's variant is restocked", async () => {
-    const response = await call("PATCH", `/api/products/${productId}/variants/${variantId}`, sellerId, { stock: 4 });
-    expect(response.status).toBe(200);
-    await settle(() => expect(publishedOfType("back_in_stock")).toHaveLength(1));
-    expect(publishedOfType("back_in_stock")[0]).toEqual(expect.objectContaining({
-      userId: shopperId,
-      category: "social",
-      type: "back_in_stock",
-      targetId: productId,
-      targetType: "product",
-      targetImageUrl: PRODUCT_IMAGE,
-      actorName: "North Loom",
-    }));
-
-    // Stock moving between positive values is not a restock.
-    spies.publish.mockClear();
-    await call("PATCH", `/api/products/${productId}/variants/${variantId}`, sellerId, { stock: 9 });
-    await settle();
-    expect(publishedOfType("back_in_stock")).toHaveLength(0);
-  });
-
-  it("publishes price_drop on a decrease only, at most once per cooldown window", async () => {
-    await call("PATCH", `/api/products/${productId}/variants/${variantId}`, sellerId, { priceCents: 6000 });
-    await settle();
-    expect(publishedOfType("price_drop")).toHaveLength(0);
-
-    await call("PATCH", `/api/products/${productId}/variants/${variantId}`, sellerId, { priceCents: 4000 });
-    await settle(() => expect(publishedOfType("price_drop")).toHaveLength(1));
-    expect(publishedOfType("price_drop")[0]).toEqual(expect.objectContaining({
-      userId: shopperId,
-      category: "social",
-      type: "price_drop",
-      body: "Now $40.00 (was $60.00).",
-      targetId: productId,
-      targetType: "product",
-      targetImageUrl: PRODUCT_IMAGE,
-    }));
-
-    spies.publish.mockClear();
-    await call("PATCH", `/api/products/${productId}/variants/${variantId}`, sellerId, { priceCents: 3500 });
-    await settle();
-    expect(publishedOfType("price_drop")).toHaveLength(0);
-    expect(await feedRows(shopperId, "price_drop")).toHaveLength(1);
-  });
-});
+// back_in_stock / price_drop / low_stock are now published from
+// ../../lib/stockNotifications (merged from the push-notifications work);
+// see stockNotifications.test.ts for that coverage.
 
 describe("followed brands", () => {
   it("publishes new_product to followers once, even if the listing is republished", async () => {

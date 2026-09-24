@@ -5,19 +5,33 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { SampleOrderIssuedBy } from './sampleOrderIssuedBy';
 import type { SampleOrderOrderType } from './sampleOrderOrderType';
 
 export interface SampleOrder {
   id: string;
   manufacturerId: string;
   sellerId: string;
+  /** Seller brand name (manufacturer-facing endpoints) */
+  sellerName?: string;
   /** @nullable */
   threadId?: string | null;
   orderType: SampleOrderOrderType;
+  issuedBy?: SampleOrderIssuedBy;
   title: string;
+  /** @nullable */
+  description?: string | null;
   quantity: number;
   priceCents: number;
   status: string;
+  /** @nullable */
+  carrier?: string | null;
+  /** @nullable */
+  trackingNumber?: string | null;
+  /** @nullable */
+  shippedAt?: string | null;
+  /** @nullable */
+  deliveredAt?: string | null;
   /** Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints. */
   imageUrls?: string[];
   createdAt: string;

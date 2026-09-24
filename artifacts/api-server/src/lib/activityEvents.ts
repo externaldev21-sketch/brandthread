@@ -12,14 +12,16 @@
  *   post_comment   — someone commented on your post     (actor, post thumbnail)
  *   comment_reply  — someone replied to your comment    (actor, post thumbnail)
  *   mention        — someone @mentioned you in a comment (actor, post thumbnail)
- *   price_drop     — a product you saved got cheaper     (brand, product image)
- *   back_in_stock  — a product you saved is available    (brand, product image)
  *   new_product    — a brand you follow listed something (brand, product image)
+ *
+ * price_drop and back_in_stock are published from ./stockNotifications
+ * instead (merged from the push-notifications work), which also owns the
+ * seller-facing low/out-of-stock alert.
  */
 import {
-  db, follows, notificationsFeed, posts, products, savedItems, users,
+  db, follows, notificationsFeed, posts, products, users,
 } from "@workspace/db";
-import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { publishNotification } from "../routes/notifications-feed";
 import { blockedUserIds, profilesById, type ProfileSummary } from "./safety";
 import { logger } from "./logger";
@@ -36,8 +38,6 @@ export function avatarColor(userId: string): string {
   return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
 }
 
-/** A price drop or restock for the same saved product is announced at most once a day. */
-export const PRODUCT_ALERT_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 /** Large follower lists are fanned out in small parallel batches. */
 const FANOUT_BATCH = 10;
 const MAX_MENTIONS = 10;
@@ -64,10 +64,6 @@ async function actorFields(userId: string): Promise<ActorFields | null> {
   const profile = (await profilesById([userId])).get(userId);
   if (!profile || profile.deleted || profile.suspended) return null;
   return actorFieldsFromProfile(profile);
-}
-
-function formatCents(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
 }
 
 function excerpt(text: string, max = 120): string {
@@ -251,89 +247,8 @@ async function loadListedProduct(productId: string) {
   return product;
 }
 
-/** Users who saved this product, minus the seller and anyone alerted recently. */
-async function savedProductRecipients(productId: string, ownerId: string, type: string): Promise<string[]> {
-  const savers = await db
-    .selectDistinct({ userId: savedItems.userId })
-    .from(savedItems)
-    .where(and(eq(savedItems.itemType, "product"), eq(savedItems.targetId, productId)));
-  const candidates = savers.map((row) => row.userId).filter((id) => id && id !== ownerId);
-  if (candidates.length === 0) return [];
-
-  const recent = await db
-    .select({ userId: notificationsFeed.userId })
-    .from(notificationsFeed)
-    .where(and(
-      eq(notificationsFeed.type, type),
-      eq(notificationsFeed.targetId, productId),
-      inArray(notificationsFeed.userId, candidates),
-      gt(notificationsFeed.createdAt, new Date(Date.now() - PRODUCT_ALERT_COOLDOWN_MS)),
-    ));
-  const skip = new Set(recent.map((row) => row.userId));
-  return candidates.filter((id) => !skip.has(id));
-}
-
 async function brandActor(ownerId: string): Promise<ActorFields | null> {
   return actorFields(ownerId);
-}
-
-/** Tell everyone who saved a product that its price went down. */
-export async function notifyPriceDrop(input: {
-  productId: string;
-  oldPriceCents: number;
-  newPriceCents: number;
-}): Promise<void> {
-  if (!(input.newPriceCents > 0) || input.newPriceCents >= input.oldPriceCents) return;
-  try {
-    const product = await loadListedProduct(input.productId);
-    if (!product) return;
-    const recipients = await savedProductRecipients(product.id, product.ownerId, "price_drop");
-    if (recipients.length === 0) return;
-    const actor = await brandActor(product.ownerId);
-    const image = productThumbnail(product.images);
-
-    await fanOut(recipients, (userId) => publishNotification({
-      userId,
-      category: "social",
-      type: "price_drop",
-      title: `Price drop on ${product.name}`,
-      body: `Now ${formatCents(input.newPriceCents)} (was ${formatCents(input.oldPriceCents)}).`,
-      ...(actor ?? {}),
-      targetId: product.id,
-      targetType: "product",
-      targetImageUrl: image,
-      pushCategory: "drop",
-    }));
-  } catch (err) {
-    logger.warn({ err, productId: input.productId }, "Price drop notification failed");
-  }
-}
-
-/** Tell everyone who saved a product that it can be bought again. */
-export async function notifyBackInStock(input: { productId: string }): Promise<void> {
-  try {
-    const product = await loadListedProduct(input.productId);
-    if (!product) return;
-    const recipients = await savedProductRecipients(product.id, product.ownerId, "back_in_stock");
-    if (recipients.length === 0) return;
-    const actor = await brandActor(product.ownerId);
-    const image = productThumbnail(product.images);
-
-    await fanOut(recipients, (userId) => publishNotification({
-      userId,
-      category: "social",
-      type: "back_in_stock",
-      title: `${product.name} is back in stock`,
-      body: "An item you saved is available again. Grab it before it sells out.",
-      ...(actor ?? {}),
-      targetId: product.id,
-      targetType: "product",
-      targetImageUrl: image,
-      pushCategory: "drop",
-    }));
-  } catch (err) {
-    logger.warn({ err, productId: input.productId }, "Back-in-stock notification failed");
-  }
 }
 
 // ─── Followed brands ──────────────────────────────────────────────────────────
