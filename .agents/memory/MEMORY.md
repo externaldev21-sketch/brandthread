@@ -79,3 +79,4 @@
 - [Expo stale preview bundles](expo-stale-preview-bundles.md) — if source checks pass but a phone still shows retired UI, clear Metro caches, restart Expo, and reload the open client.
 - [Friend-only repost identity](friend-only-repost-identity.md) — repost avatars are server-authorized for mutual buyer friends only; explicit add/remove and uniqueness keep state retry-safe.
 - [Native release fixtures](native-release-fixtures.md) — release runners use repository-owned lifecycle code; credentials stay in runner secrets and API failure controls stay buyer-scoped.
+- [Install-triggered workflow collisions](install-workflow-collisions.md) — package sync can leave duplicate listeners on managed ports; clear stale process groups before one managed restart.
