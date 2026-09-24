@@ -1302,6 +1302,19 @@ export const trendingCache = pgTable('trending_cache', {
   itemCount:   integer('item_count').notNull().default(0),
 });
 
+// ─── Seller Ranking Cache (Discover feed) ─────────────────────────────────────
+// Stores the pre-computed daily seller ranking so GET /api/public/discover/feed
+// is a simple cache read rather than an expensive live aggregation. One row
+// per calendar day (UTC). Upserted by the computeSellerRanking job. Shape
+// mirrors trending_cache exactly.
+export const sellerRankingCache = pgTable('seller_ranking_cache', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  computedAt:  timestamp('computed_at').defaultNow().notNull(),
+  cacheDate:   text('cache_date').notNull().unique(),   // 'YYYY-MM-DD' UTC
+  results:     json('results').$type<any[]>().notNull().default([]),
+  itemCount:   integer('item_count').notNull().default(0),
+});
+
 // ─── Seller Tax Configuration ─────────────────────────────────────────────────
 export const sellerTaxConfig = pgTable('seller_tax_config', {
   id:                  uuid('id').primaryKey().defaultRandom(),

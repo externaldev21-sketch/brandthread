@@ -1146,12 +1146,17 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
     return res.status(404).json({ error: "Post not found" });
   }
   const { type, value } = req.body as {
-    type: "like" | "repost" | "view" | "watch_time" | "shop_click";
+    type: "like" | "repost" | "view" | "watch_time" | "shop_click" | "share";
     value?: string;
   };
 
-  if (!["like", "repost", "view", "watch_time", "shop_click"].includes(type)) {
-    return res.status(400).json({ error: "type must be like, repost, view, watch_time, or shop_click" });
+  // "share" is a new interaction type added for Discover's seller-ranking
+  // job (see jobs/computeSellerRanking.ts): it records a buyer sharing a
+  // post out of the app (share sheet, copy link, etc.), which previously had
+  // no tracking at all. Non-idempotent, like view/watch_time/shop_click —
+  // one row is recorded per share tap.
+  if (!["like", "repost", "view", "watch_time", "shop_click", "share"].includes(type)) {
+    return res.status(400).json({ error: "type must be like, repost, view, watch_time, shop_click, or share" });
   }
   const [visiblePost] = await db.select({ id: posts.id, visibility: posts.visibility }).from(posts)
     .where(and(eq(posts.id, id), visiblePostCondition()))
@@ -1161,7 +1166,7 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
     return res.status(403).json({ error: "Reposts are disabled for this post" });
   }
 
-  if (type === "view" || type === "watch_time" || type === "shop_click") {
+  if (type === "view" || type === "watch_time" || type === "shop_click" || type === "share") {
     await db.insert(interactions).values({ userId: clerkId, postId: id, type, value: value ?? null });
     return res.json({ action: "recorded" });
   }
