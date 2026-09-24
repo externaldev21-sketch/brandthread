@@ -66,6 +66,9 @@ vi.mock('react-native', () => {
       Value: MockAnimatedValue,
       event: vi.fn(),
       View: nativeComponent('AnimatedView'),
+      timing: () => ({ start: (cb?: () => void) => cb?.() }),
+      sequence: () => ({ start: (cb?: () => void) => cb?.() }),
+      loop: () => ({ start: () => {}, stop: () => {} }),
     },
     Dimensions: {
       get: () => ({ width: 390, height: 844 }),
@@ -79,10 +82,13 @@ vi.mock('react-native', () => {
     StyleSheet: {
       absoluteFill: {},
       create: (styles: unknown) => styles,
+      hairlineWidth: 1,
     },
     Text: nativeComponent('Text'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),
     View: nativeComponent('View'),
+    Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
   };
 });
 

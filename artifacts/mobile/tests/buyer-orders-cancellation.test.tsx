@@ -33,10 +33,19 @@ vi.mock('react-native', () => {
       ...(data ?? []).map((item, index) => renderItem({ item, index })),
     ),
     RefreshControl: nativeComponent('RefreshControl'),
-    StyleSheet: { create: (styles: unknown) => styles },
+    StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
     Text: nativeComponent('Text'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),
     View: nativeComponent('View'),
+    Animated: {
+      Value: class { constructor(_v?: number) {} },
+      View: nativeComponent('Animated.View'),
+      event: () => () => {},
+      timing: () => ({ start: (cb?: () => void) => cb?.() }),
+      sequence: () => ({ start: (cb?: () => void) => cb?.() }),
+      loop: () => ({ start: () => {}, stop: () => {} }),
+    },
+    Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
     // The floating buyer tab bar inset reads the window size.
     useWindowDimensions: () => ({ width: 393, height: 852, scale: 3, fontScale: 1 }),
   };

@@ -19,11 +19,20 @@ vi.mock('react-native', () => ({
   RefreshControl: nativeComponent('RefreshControl'),
   ScrollView: nativeComponent('ScrollView'),
   Share: { share: vi.fn() },
-  StyleSheet: { create: (styles: unknown) => styles },
+  StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
   Text: nativeComponent('Text'),
   TextInput: nativeComponent('TextInput'),
   TouchableOpacity: nativeComponent('TouchableOpacity'),
   View: nativeComponent('View'),
+  Animated: {
+    Value: class { constructor(_v?: number) {} },
+    View: nativeComponent('Animated.View'),
+    event: () => () => {},
+    timing: () => ({ start: (cb?: () => void) => cb?.() }),
+    sequence: () => ({ start: (cb?: () => void) => cb?.() }),
+    loop: () => ({ start: () => {}, stop: () => {} }),
+  },
+  Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
 }));
 
 vi.mock('@expo/vector-icons', () => ({
