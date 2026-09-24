@@ -20,6 +20,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 import { stripe } from "../lib/stripe";
 import { cashOutableAmount, isValidPayoutIdempotencyKey } from "../lib/payoutSafety";
+import { publishNotification } from "./notifications-feed";
 
 const router = Router();
 router.use(requireAuth);
@@ -807,6 +808,20 @@ router.post("/payout", requireRole("owner"), async (req, res) => {
           : {}),
       });
       return;
+    }
+
+    if (!result.duplicate) {
+      void publishNotification({
+        userId: sellerId,
+        category: "payout",
+        type: "payout_sent",
+        title: "Payout sent",
+        body: `${formatCents(result.payout.amount, result.payout.currency)} is on its way to your bank — arriving ${result.payout.arrivalDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}.`,
+        targetId: result.payout.id,
+        targetType: "payout",
+        cta: "View payouts",
+        pushChannelId: "payout",
+      }).catch((err) => req.log.error({ err, sellerId }, "Payout sent notification failed"));
     }
 
     res.status(result.duplicate ? 200 : 201).json({

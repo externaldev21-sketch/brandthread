@@ -3,11 +3,12 @@
  * Mounted at /api/public — no requireAuth middleware.
  */
 import { Router } from "express";
-import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, boosts, orders, orderItems, savedCollections, savedItems } from "@workspace/db";
+import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems, savedCollections, savedItems } from "@workspace/db";
 import { adaptSavedRows } from "../lib/savedItemAdapter";
 import { fetchProductBadgeInfo } from "../lib/savedProductBadges";
 import { eq, and, asc, desc, ne, inArray, notInArray, or, ilike, sql, count, gte, lte, isNull, isNotNull } from "drizzle-orm";
 import { computeTrendingForToday, isCacheFresh } from "../jobs/computeTrending";
+import { computeSellerRankingForToday, isSellerRankingCacheFresh } from "../jobs/computeSellerRanking";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { requireAuth } from "../middlewares/requireAuth";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
@@ -28,6 +29,9 @@ import {
 // a fresh deploy before the 2-min warm job fires).  All concurrent waiters
 // share the same Promise and get the result once it resolves.
 let trendingInflight: Promise<void> | null = null;
+
+// Same pattern for the Discover seller-ranking cache — see computeSellerRanking.ts.
+let sellerRankingInflight: Promise<void> | null = null;
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -1158,6 +1162,73 @@ router.get("/profiles/:username", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to resolve public profile by username");
     res.status(500).json({ error: "Failed to load profile" });
+  }
+});
+
+// ─── GET /api/public/discover/feed ────────────────────────────────────────────
+// Serves the pre-computed daily Discover seller ranking from
+// seller_ranking_cache. The list is calculated once per day by the
+// computeSellerRanking background job (recency-decayed engagement,
+// follower-normalized, rotation bonus, capped at 2 products per seller,
+// cold-start fallback to newest active brands). On a cache miss, computation
+// runs synchronously so the response is still correct (deduped via an
+// in-flight promise so concurrent requests share one computation).
+// Unauthenticated — signed-out buyers can browse Discover.
+// Query params: ?limit=20&offset=0 (limit capped at 50)
+router.get("/discover/feed", async (req, res) => {
+  try {
+    const page = parsePagination(req.query, { limit: 20 });
+    if (!page.success || page.data.limit > 50 || page.data.offset < 0) {
+      return res.status(400).json({ error: "Invalid discover query", code: "VALIDATION_ERROR" });
+    }
+    const { limit, offset } = page.data;
+    const today = new Date().toISOString().slice(0, 10); // 'YYYY-MM-DD' UTC
+
+    const paginate = (allItems: any[], source: "cache" | "computed") => {
+      const items = allItems.slice(offset, offset + limit).map((item, i) => ({
+        ...item,
+        rank: offset + i + 1,
+      }));
+      const nextOffset = offset + limit < allItems.length ? offset + limit : null;
+      return { items, nextOffset, source };
+    };
+
+    // ── Attempt cache read ───────────────────────────────────────────────────
+    const [cached] = await db
+      .select()
+      .from(sellerRankingCache)
+      .where(eq(sellerRankingCache.cacheDate, today))
+      .limit(1);
+
+    if (cached && isSellerRankingCacheFresh(cached.computedAt) && Array.isArray(cached.results) && cached.results.length > 0) {
+      const { items, nextOffset } = paginate(cached.results as any[], "cache");
+      return res.json({ items, computedAt: cached.computedAt, source: "cache", nextOffset });
+    }
+
+    // ── Cache miss — compute synchronously (once per day maximum) ───────────
+    req.log.info({ cacheDate: today }, "Discover feed cache miss; computing synchronously");
+    if (!sellerRankingInflight) {
+      sellerRankingInflight = computeSellerRankingForToday().finally(() => {
+        sellerRankingInflight = null;
+      });
+    }
+    await sellerRankingInflight;
+
+    const [fresh] = await db
+      .select()
+      .from(sellerRankingCache)
+      .where(eq(sellerRankingCache.cacheDate, today))
+      .limit(1);
+
+    if (fresh && Array.isArray(fresh.results) && fresh.results.length > 0) {
+      const { items, nextOffset } = paginate(fresh.results as any[], "computed");
+      return res.json({ items, computedAt: fresh.computedAt, source: "computed", nextOffset });
+    }
+
+    return res.json({ items: [], computedAt: fresh?.computedAt ?? new Date().toISOString(), source: "empty", nextOffset: null });
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch discover feed");
+    return res.status(500).json({ error: "Failed to fetch discover feed" });
   }
 });
 

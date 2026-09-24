@@ -596,6 +596,7 @@ export default function DiscoverScreen() {
   const insets    = useSafeAreaInsets();
   const barInset = useBuyerTabBarInset();
   const router    = useRouter();
+  const { push }  = useThreadPull();
   const api       = useApi();
   const { theme } = useAppTheme();
   const palette = theme as typeof theme & { background?: string; card?: string; border?: string; text?: string; muted?: string; };
@@ -873,6 +874,29 @@ export default function DiscoverScreen() {
           sub="Products from across the platform"
         />
       </ResponsiveContainer>
+
+      {/* ─ Entry point into the full-screen, swipeable Discover pager ─ */}
+      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.md }}>
+        <TouchableOpacity
+          style={[fy.banner, { backgroundColor: theme.card, borderColor: theme.border }]}
+          activeOpacity={0.85}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            push('/(buyer)/discover-feed' as never);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Open full-screen For You feed"
+        >
+          <View style={[fy.bannerIcon, { backgroundColor: theme.accentDim }]}>
+            <Feather name="zap" size={18} color={theme.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[fy.bannerTitle, { color: FG }]}>For You, full screen</Text>
+            <Text style={[fy.bannerSub, { color: MUTED }]}>Swipe through products one at a time</Text>
+          </View>
+          <Feather name="chevron-right" size={18} color={MUTED} />
+        </TouchableOpacity>
+      </ResponsiveContainer>
       {forYouLoading ? (
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
           <CardSkeleton width={showcaseSkeletonWidth} />
@@ -943,4 +967,11 @@ const s = StyleSheet.create({
   greeting:  { fontSize: 12, fontFamily: FONT.medium, letterSpacing: 0.3 },
   pageTitle: { fontSize: 28, fontFamily: FONT.bold, letterSpacing: -0.6 },
   headerBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+});
+
+const fy = StyleSheet.create({
+  banner:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.md, borderWidth: 1 },
+  bannerIcon:  { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  bannerTitle: { fontSize: 14, fontFamily: FONT.semibold },
+  bannerSub:   { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
 });

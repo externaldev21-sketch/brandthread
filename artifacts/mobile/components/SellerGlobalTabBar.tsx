@@ -178,7 +178,7 @@ interface SellerGlobalTabBarProps {
 }
 
 export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
-  const metrics = useTabBarMetrics();
+  const metrics = useTabBarMetrics(2);
   const router = useRouter();
   const segments = useSegments();
   const api = useApi();

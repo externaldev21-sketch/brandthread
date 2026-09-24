@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl,
@@ -15,20 +15,14 @@ import { BuyerOrderView, cancellationReasonLabel, TrackingStatus, OrderStatus } 
 import { getBuyerOrdersWithStatus } from '@/services/orderService';
 import { visibleOrdersForBuyer } from '@/lib/buyerOrdersVisibility';
 import { formatCents } from '@/lib/money';
-import {
-  BG, CARD, CARD_ELEVATED, BORDER,
-  FG, MUTED, SUBTLE,
-  SUCCESS, SUCCESS_DIM,
-  BLUE, BLUE_DIM,
-  ORANGE, ORANGE_DIM,
-  RED, RED_DIM,
-  FONT, FS, SP, RADIUS, COMP, ICON,
-} from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
   BrandthreadScreen, BrandthreadHeader, FilterChip,
-  StatusBadge, EmptyState, PrimaryButton,
+  StatusBadge, EmptyState,
 } from '@/components/BrandthreadUI';
 import { SkeletonBlock, useCenteredContentPadding } from '@/components/layout';
+import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
+import type { AppThemePreset } from '@/contexts/AppThemeContext';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -101,13 +95,17 @@ function applyFilter(orders: BuyerOrderView[], filter: BuyerFilterKey): BuyerOrd
 }
 
 // ─── Order Card ───────────────────────────────────────────────────────────────
+// Visual, tracker-forward card: seller + order meta up top, a live compact
+// status tracker as the centerpiece, then item preview / total / actions.
 
 const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { order: BuyerOrderView; onOpen: (orderId: string) => void }) {
   const onPress = () => onOpen(order.id);
   const { theme } = useAppTheme();
+  const styles = useMemo(() => cardStyles(theme), [theme]);
   const firstItem = order.lineItems[0];
   const extraCount = order.lineItems.length - 1;
   const sellerInitial = order.sellerName.charAt(0).toUpperCase();
+  const isTerminalStatus = order.status === 'cancelled' || order.status === 'refunded' || order.status === 'disputed';
 
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.82} onPress={onPress}>
@@ -120,6 +118,7 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
           <Text style={styles.sellerName}>{order.sellerName}</Text>
           <Text style={styles.orderMeta}>{order.orderNumber} · {fmtDate(order.createdAt)}</Text>
         </View>
+        <StatusBadge label={statusBadgeLabel(order.status)} variant={statusBadgeVariant(order.status)} small />
       </View>
 
       {/* Items */}
@@ -134,12 +133,13 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
         )}
       </View>
 
-      {/* Divider */}
-      <View style={styles.divider} />
+      {/* Live status tracker — visual centerpiece of the card */}
+      <View style={styles.trackerWrap}>
+        <OrderStatusTimeline status={order.status} compact />
+      </View>
 
-      {/* Status row */}
+      {/* Price + pre-order row */}
       <View style={styles.statusRow}>
-        <StatusBadge label={statusBadgeLabel(order.status)} variant={statusBadgeVariant(order.status)} />
         {order.isPreOrder && (
           <View style={styles.preOrderBadge}>
             <Text style={styles.preOrderText}>PRE-ORDER</Text>
@@ -147,9 +147,10 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
         )}
         <Text style={styles.totalText}>{formatCents(order.payment.totalCents)}</Text>
       </View>
+
       {order.status === 'cancelled' && (
         <View style={styles.cancellationBanner}>
-          <Feather name="x-circle" size={ICON.sm} color={RED} />
+          <Feather name="x-circle" size={ICON.sm} color={theme.error} />
           <View style={styles.cancellationCopy}>
             <Text style={styles.cancellationLabel}>Order cancelled</Text>
             <Text style={styles.cancellationReason} numberOfLines={1}>
@@ -160,9 +161,9 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
       )}
 
       {/* Tracking info */}
-      {order.trackingStatus && (
+      {order.trackingStatus && !isTerminalStatus && (
         <View style={styles.trackingRow}>
-          <Feather name="truck" size={ICON.xs} color={BLUE} />
+          <Feather name="truck" size={ICON.xs} color={theme.secondary} />
           <Text style={styles.trackingText}>
             {trackingLabel(order.trackingStatus)}
             {order.estimatedDelivery ? ` → Est. ${fmtDate(order.estimatedDelivery)}` : ''}
@@ -181,8 +182,8 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
             activeOpacity={0.8}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
           >
-            <Feather name="map-pin" size={12} color={BLUE} />
-            <Text style={[styles.actionBtnText, { color: BLUE }]}>Track Shipment</Text>
+            <Feather name="map-pin" size={12} color={theme.secondary} />
+            <Text style={[styles.actionBtnText, { color: theme.secondary }]}>Track Shipment</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -193,6 +194,8 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
 // ─── Order card skeleton — matches BuyerOrderCard: avatar + seller/date, item
 // line, then a status + price row ──────────────────────────────────────────
 function BuyerOrderCardSkeleton() {
+  const { theme } = useAppTheme();
+  const styles = useMemo(() => cardStyles(theme), [theme]);
   return (
     <View style={styles.card}>
       <View style={styles.cardTopRow}>
@@ -205,9 +208,10 @@ function BuyerOrderCardSkeleton() {
       <View style={{ marginTop: SP.sm }}>
         <SkeletonBlock width="70%" height={13} />
       </View>
-      <View style={styles.divider} />
+      <View style={{ marginTop: SP.md }}>
+        <SkeletonBlock width="100%" height={10} />
+      </View>
       <View style={styles.statusRow}>
-        <SkeletonBlock width={64} height={18} radius={RADIUS.pill} />
         <SkeletonBlock width={56} height={14} style={{ marginLeft: 'auto' as any }} />
       </View>
     </View>
@@ -295,6 +299,7 @@ export default function BuyerOrdersScreen() {
 
   const retry = useCallback(() => {
     if (refreshing) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     consecutiveFailuresRef.current = 0;
     setRefreshing(true);
     if (orders.length === 0) setLoading(true);
@@ -365,14 +370,14 @@ export default function BuyerOrdersScreen() {
       ) : (
         <>
           {loadError && orders.length > 0 && (
-            <View style={styles.loadErrorBanner}>
-              <Feather name="alert-triangle" size={16} color={ORANGE} />
-              <View style={styles.loadErrorCopy}>
-                <Text style={styles.loadErrorBannerTitle}>Couldn't load your orders</Text>
-                <Text style={styles.loadErrorBannerText}>Showing your last saved orders. Pull to refresh.</Text>
+            <View style={[screenStyles.loadErrorBanner, { borderColor: theme.warning, backgroundColor: `${theme.warning}1F` }]}>
+              <Feather name="alert-triangle" size={16} color={theme.warning} />
+              <View style={screenStyles.loadErrorCopy}>
+                <Text style={[screenStyles.loadErrorBannerTitle, { color: theme.text }]}>Couldn't load your orders</Text>
+                <Text style={[screenStyles.loadErrorBannerText, { color: theme.muted }]}>Showing your last saved orders. Pull to refresh.</Text>
               </View>
               <TouchableOpacity onPress={retry} accessibilityRole="button" accessibilityLabel="Retry">
-                <Text style={styles.bannerRetryText}>Retry</Text>
+                <Text style={[screenStyles.bannerRetryText, { color: theme.warning }]}>Retry</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -429,182 +434,157 @@ function OrderCardGap() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: CARD,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: BORDER,
-    padding: SP.md,
-  },
-  cardTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
-  },
-  avatarCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: FS.base,
-    fontFamily: FONT.bold,
-  },
-  sellerName: {
-    fontSize: FS.base,
-    fontFamily: FONT.semibold,
-    color: FG,
-  },
-  orderMeta: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: MUTED,
-    marginTop: 1,
-  },
-  itemText: {
-    fontSize: FS.sm,
-    fontFamily: FONT.medium,
-    color: FG,
-  },
-  moreText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: MUTED,
-    marginTop: 2,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: BORDER,
-    marginVertical: SP.sm,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
-    flexWrap: 'wrap',
-  },
-  cancellationBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
-    marginTop: SP.sm,
-    paddingHorizontal: SP.sm,
-    paddingVertical: 7,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: 'rgba(248,113,113,0.28)',
-    backgroundColor: RED_DIM,
-  },
-  cancellationCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  cancellationLabel: {
-    fontSize: FS.xs,
-    fontFamily: FONT.bold,
-    color: RED,
-    letterSpacing: 0.2,
-  },
-  cancellationReason: {
-    fontSize: FS.xs,
-    fontFamily: FONT.medium,
-    color: MUTED,
-  },
-  preOrderBadge: {
-    backgroundColor: BLUE_DIM,
-    borderRadius: RADIUS.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  preOrderText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.bold,
-    color: BLUE,
-    letterSpacing: 0.4,
-  },
-  totalText: {
-    marginLeft: 'auto' as any,
-    fontSize: FS.base,
-    fontFamily: FONT.bold,
-    color: FG,
-  },
-  trackingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.xs,
-    marginTop: SP.xs,
-  },
-  trackingText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.medium,
-    color: BLUE,
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: SP.sm,
-    marginTop: SP.sm,
-    flexWrap: 'wrap',
-  },
-  actionBtn: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: RADIUS.sm,
-    backgroundColor: CARD_ELEVATED,
-    borderWidth: 1,
-    borderColor: BORDER,
-    flexDirection: 'row',
-    gap: 4,
-  },
-  actionBtnSecondary: {
-    backgroundColor: BLUE_DIM,
-    borderColor: BORDER,
-  },
-  actionBtnText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
-    color: FG,
-  },
-  loadErrorState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: SP.xl,
-  },
-  loadErrorTitle: {
-    marginTop: SP.md,
-    fontSize: FS.base,
-    fontFamily: FONT.semibold,
-    color: FG,
-    textAlign: 'center',
-  },
-  loadErrorText: {
-    marginTop: SP.xs,
-    maxWidth: 320,
-    fontSize: FS.sm,
-    fontFamily: FONT.regular,
-    color: MUTED,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  retryButton: {
-    marginTop: SP.md,
-    paddingHorizontal: SP.lg,
-    paddingVertical: SP.sm,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: BORDER,
-  },
-  retryButtonText: {
-    fontSize: FS.sm,
-    fontFamily: FONT.semibold,
-    color: FG,
-  },
+function cardStyles(theme: AppThemePreset) {
+  return StyleSheet.create({
+    card: {
+      backgroundColor: theme.card,
+      borderRadius: RADIUS.lg,
+      borderWidth: 1,
+      borderColor: theme.border,
+      padding: SP.md,
+    },
+    cardTopRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SP.sm,
+    },
+    avatarCircle: {
+      width: 40,
+      height: 40,
+      borderRadius: RADIUS.pill,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarText: {
+      fontSize: FS.base,
+      fontFamily: FONT.bold,
+    },
+    sellerName: {
+      fontSize: FS.base,
+      fontFamily: FONT.semibold,
+      color: theme.text,
+    },
+    orderMeta: {
+      fontSize: FS.xs,
+      fontFamily: FONT.regular,
+      color: theme.muted,
+      marginTop: 1,
+    },
+    itemText: {
+      fontSize: FS.sm,
+      fontFamily: FONT.medium,
+      color: theme.text,
+    },
+    moreText: {
+      fontSize: FS.xs,
+      fontFamily: FONT.regular,
+      color: theme.muted,
+      marginTop: 2,
+    },
+    trackerWrap: {
+      marginTop: SP.md,
+      paddingVertical: SP.xs,
+      paddingHorizontal: 2,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+    },
+    statusRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SP.sm,
+      flexWrap: 'wrap',
+      marginTop: SP.sm,
+    },
+    cancellationBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SP.sm,
+      marginTop: SP.sm,
+      paddingHorizontal: SP.sm,
+      paddingVertical: 7,
+      borderRadius: RADIUS.sm,
+      borderWidth: 1,
+      borderColor: `${theme.error}48`,
+      backgroundColor: `${theme.error}1F`,
+    },
+    cancellationCopy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    cancellationLabel: {
+      fontSize: FS.xs,
+      fontFamily: FONT.bold,
+      color: theme.error,
+      letterSpacing: 0.2,
+    },
+    cancellationReason: {
+      fontSize: FS.xs,
+      fontFamily: FONT.medium,
+      color: theme.muted,
+    },
+    preOrderBadge: {
+      backgroundColor: theme.secondaryDim,
+      borderRadius: RADIUS.pill,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    preOrderText: {
+      fontSize: FS.xs,
+      fontFamily: FONT.bold,
+      color: theme.secondary,
+      letterSpacing: 0.4,
+    },
+    totalText: {
+      marginLeft: 'auto' as any,
+      fontSize: FS.base,
+      fontFamily: FONT.bold,
+      color: theme.text,
+    },
+    trackingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SP.xs,
+      marginTop: SP.xs,
+    },
+    trackingText: {
+      fontSize: FS.xs,
+      fontFamily: FONT.medium,
+      color: theme.secondary,
+    },
+    actionsRow: {
+      flexDirection: 'row',
+      gap: SP.sm,
+      marginTop: SP.sm,
+      flexWrap: 'wrap',
+    },
+    actionBtn: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 10,
+      borderRadius: RADIUS.sm,
+      backgroundColor: theme.cardElevated,
+      borderWidth: 1,
+      borderColor: theme.border,
+      flexDirection: 'row',
+      gap: 4,
+    },
+    actionBtnSecondary: {
+      backgroundColor: theme.secondaryDim,
+      borderColor: theme.border,
+    },
+    actionBtnText: {
+      fontSize: FS.xs,
+      fontFamily: FONT.semibold,
+      color: theme.text,
+    },
+  });
+}
+
+const screenStyles = StyleSheet.create({
   loadErrorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -615,8 +595,6 @@ const styles = StyleSheet.create({
     paddingVertical: SP.sm,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: ORANGE,
-    backgroundColor: ORANGE_DIM,
   },
   loadErrorCopy: {
     flex: 1,
@@ -625,18 +603,15 @@ const styles = StyleSheet.create({
   loadErrorBannerTitle: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    color: FG,
   },
   loadErrorBannerText: {
     marginTop: 2,
     fontSize: FS.xs,
     fontFamily: FONT.regular,
-    color: MUTED,
     lineHeight: 16,
   },
   bannerRetryText: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    color: ORANGE,
   },
 });

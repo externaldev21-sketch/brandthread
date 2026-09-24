@@ -31,6 +31,7 @@ export function createNotificationResponseHandler(
       route?: unknown;
       targetId?: unknown;
       targetType?: unknown;
+      type?: unknown;
     } | undefined;
 
     if (data?.route === '/subscription') {
@@ -55,6 +56,37 @@ export function createNotificationResponseHandler(
     }
     if (data?.targetType === 'bulk_order' && typeof data.targetId === 'string' && data.targetId) {
       router.push(`/production-detail?id=${encodeURIComponent(data.targetId)}`);
+      return;
+    }
+    if (data?.targetType === 'conversation' && typeof data.targetId === 'string' && data.targetId) {
+      router.push(`/chat/${encodeURIComponent(data.targetId)}`);
+      return;
+    }
+    if (data?.targetType === 'drop' && typeof data.targetId === 'string' && data.targetId) {
+      router.push(`/buyer-drop-detail?id=${encodeURIComponent(data.targetId)}`);
+      return;
+    }
+    // Price drop / back-in-stock alerts are buyer-facing; low-stock alerts on
+    // the same "product" targetType are seller-facing. Distinguish by
+    // notification type, which the server always includes alongside targetId.
+    if (data?.targetType === 'product' && typeof data.targetId === 'string' && data.targetId) {
+      if (data.type === 'low_stock') {
+        router.push(`/product-detail?id=${encodeURIComponent(data.targetId)}`);
+      } else {
+        router.push(`/buyer-product-detail?productId=${encodeURIComponent(data.targetId)}`);
+      }
+      return;
+    }
+    if (data?.targetType === 'return' && typeof data.targetId === 'string' && data.targetId) {
+      router.push(`/return-detail?returnId=${encodeURIComponent(data.targetId)}`);
+      return;
+    }
+    if (data?.targetType === 'payout') {
+      router.push('/payouts');
+      return;
+    }
+    if (data?.targetType === 'post' && typeof data.targetId === 'string' && data.targetId) {
+      router.push('/(tabs)/feed');
     }
   };
 }

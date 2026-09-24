@@ -17,6 +17,7 @@ import techpackRouter from "./techpack";
 import manufacturersRouter from "./manufacturers";
 import manufacturerPublicRouter from "./manufacturer-public";
 import manufacturerConnectRouter from "./manufacturer-connect";
+import manufacturerFlowRouter from "./manufacturer-flow";
 import sampleOrdersRouter from "./sample-orders";
 import dropWalletRouter from "./drop-wallet";
 import inventoryRouter from "./inventory";
@@ -86,6 +87,8 @@ import featureFlagsRouter from "./feature-flags";
 import ipCasesRouter from "./ip-cases";
 import shopifyImportRouter from "./shopify-import";
 import designStudioRouter from "./design-studio";
+import packagePresetsRouter from "./package-presets";
+import webhooksShippoRouter from "./webhooks-shippo";
 
 const router = Router();
 
@@ -94,6 +97,7 @@ router.use("/config/features", featureFlagsRouter);
 router.use("/public",          publicRouter);
 router.use("/guest/checkout",  guestCheckoutRouter);
 router.use("/webhooks",        webhooksRouter);
+router.use("/webhooks/shippo", webhooksShippoRouter);
 router.use("/support",         supportRouter);
 router.use("/support-chat",    supportChatRouter);
 router.use("/ip-cases",        ipCasesRouter);
@@ -127,6 +131,8 @@ router.use("/techpack",        tc, requirePlan("growth"), techpackRouter);
 router.use("/manufacturers/public",          manufacturerPublicRouter);
 router.use("/manufacturers/connect",         tc, manufacturerConnectRouter);
 // Growth-plan-gated Manufacturer Hub
+// Order cards + tracker (auth handled per route; falls through otherwise)
+router.use("/manufacturers",   tc, manufacturerFlowRouter);
 router.use("/manufacturers",   tc, manufacturersRouter);
 router.use("/inventory",       tc, inventoryRouter);
 router.use("/seller-hub",      tc, sellerHubRouter);

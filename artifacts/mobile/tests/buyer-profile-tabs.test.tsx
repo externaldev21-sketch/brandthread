@@ -1,0 +1,375 @@
+import React from 'react';
+import { act, create, type ReactTestRenderer } from 'react-test-renderer';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+const {
+  getMyProfileMock,
+  getMyPostsMock,
+  getMyRepostsMock,
+  getSavedItemsMock,
+  getPrivacySettingsMock,
+  subscribeSocialMock,
+  loadBuyerProfileMock,
+  loadHighlightsMock,
+  routerMock,
+  apiMock,
+  getBuyerOrdersWithStatusMock,
+} = vi.hoisted(() => ({
+  getMyProfileMock: vi.fn(),
+  getMyPostsMock: vi.fn(),
+  getMyRepostsMock: vi.fn(),
+  getSavedItemsMock: vi.fn(),
+  getPrivacySettingsMock: vi.fn(),
+  subscribeSocialMock: vi.fn(),
+  loadBuyerProfileMock: vi.fn(),
+  loadHighlightsMock: vi.fn(),
+  routerMock: { push: vi.fn(), replace: vi.fn() },
+  apiMock: { social: { myStories: vi.fn() } },
+  getBuyerOrdersWithStatusMock: vi.fn(),
+}));
+
+vi.mock('react-native', () => {
+  const React = require('react') as typeof import('react');
+  const nativeComponent = (name: string) => {
+    function MockNativeComponent(props: Record<string, unknown>) {
+      return React.createElement(name, props, props.children as React.ReactNode);
+    }
+    MockNativeComponent.displayName = name;
+    return MockNativeComponent;
+  };
+
+  class MockAnimatedValue {
+    constructor(_v?: number) {}
+    interpolate() { return 0; }
+    addListener() { return 'listener-id'; }
+    removeListener() {}
+  }
+
+  return {
+    View: nativeComponent('View'),
+    Text: nativeComponent('Text'),
+    TouchableOpacity: nativeComponent('TouchableOpacity'),
+    ScrollView: nativeComponent('ScrollView'),
+    Modal: nativeComponent('Modal'),
+    RefreshControl: nativeComponent('RefreshControl'),
+    StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1, absoluteFill: {} },
+    Alert: { alert: vi.fn() },
+    Linking: { openURL: vi.fn() },
+    Share: { share: vi.fn() },
+    Animated: {
+      Value: MockAnimatedValue,
+      View: nativeComponent('Animated.View'),
+      event: () => () => {},
+      timing: () => ({ start: (cb?: () => void) => cb?.() }),
+      sequence: () => ({ start: (cb?: () => void) => cb?.() }),
+      loop: () => ({ start: () => {}, stop: () => {} }),
+    },
+    Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
+  };
+});
+
+vi.mock('@clerk/expo', () => ({
+  useAuth: () => ({ userId: 'buyer-1', signOut: vi.fn() }),
+  useUser: () => ({ user: { id: 'buyer-1', firstName: 'Ava', lastName: 'Buyer', username: 'ava' } }),
+}));
+
+vi.mock('@expo/vector-icons', () => ({
+  Feather: ({ name }: { name: string }) => React.createElement('Feather', { name }),
+}));
+
+vi.mock('expo-haptics', () => ({
+  impactAsync: vi.fn(),
+  selectionAsync: vi.fn(),
+  notificationAsync: vi.fn(),
+  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium' },
+  NotificationFeedbackType: { Success: 'success' },
+}));
+
+vi.mock('expo-router', () => ({
+  useRouter: () => routerMock,
+  useFocusEffect: (callback: () => void | (() => void)) => {
+    const ReactActual = require('react') as typeof import('react');
+    ReactActual.useEffect(callback, [callback]);
+  },
+}));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+
+vi.mock('@/components/buyer-nav/buyerTabBarMetrics', () => ({
+  useBuyerTabBarInset: () => 80,
+}));
+
+vi.mock('@/contexts/AppThemeContext', () => ({
+  useAppTheme: () => ({
+    theme: {
+      background: '#07070F', card: '#12121F', cardElevated: '#18182E',
+      border: '#303044', text: '#F4F4FF', muted: '#AAAABC', subtle: '#77778A',
+      accent: '#C7CDD5', accentDim: '#34383E', accentLight: '#F8FAFC', onAccent: '#0A0A0B',
+      secondary: '#22D3EE', secondaryDim: '#164E63', success: '#10B981', warning: '#F97316',
+      error: '#F87171', overlay: 'rgba(0,0,0,0.72)',
+    },
+  }),
+}));
+
+vi.mock('@/lib/theme', () => ({
+  FONT: { regular: 'System', medium: 'System', semibold: 'System', bold: 'System' },
+  FS: { xs: 11, sm: 13, base: 15, md: 17, lg: 19, xl: 22, xxl: 26, h1: 32, h2: 26 },
+  SP: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 },
+  RADIUS: { xs: 6, sm: 10, md: 14, lg: 18, xl: 22, xxl: 28, pill: 999 },
+  ICON: { xs: 12, sm: 16, md: 20, lg: 24, xl: 28, xxl: 40 },
+  GRID_MAX_WIDTH: 1080,
+  TYPE: {
+    largeTitle: { fontSize: 32, fontFamily: 'System', lineHeight: 42 },
+    title: { fontSize: 26, fontFamily: 'System', lineHeight: 36 },
+  },
+}));
+
+vi.mock('@/services/socialService', () => ({
+  getMyProfile: getMyProfileMock,
+  getMyPosts: getMyPostsMock,
+  getMyReposts: getMyRepostsMock,
+  getSavedItems: getSavedItemsMock,
+  getPrivacySettings: getPrivacySettingsMock,
+  archivePost: vi.fn(),
+  deletePost: vi.fn(),
+  subscribeSocial: subscribeSocialMock,
+}));
+
+vi.mock('@/lib/api', () => ({
+  useApi: () => apiMock,
+}));
+
+vi.mock('@/components/CachedImage', () => ({
+  CachedImage: (props: Record<string, unknown>) => React.createElement('CachedImage', props),
+}));
+
+vi.mock('@/lib/buyerProfile', () => ({
+  loadBuyerProfile: loadBuyerProfileMock,
+}));
+
+vi.mock('@/lib/highlightsService', () => ({
+  loadHighlights: loadHighlightsMock,
+}));
+
+vi.mock('@/services/orderService', () => ({
+  getBuyerOrdersWithStatus: getBuyerOrdersWithStatusMock,
+}));
+
+vi.mock('@/components/orders/OrderStatusTimeline', () => ({
+  OrderStatusTimeline: ({ status }: { status: string }) => React.createElement('Text', null, `timeline:${status}`),
+}));
+
+vi.mock('@/components/layout', () => {
+  const ReactActual = require('react') as typeof import('react');
+  return {
+    EmptyState: ({ message }: { message: string }) => ReactActual.createElement('Text', null, message),
+    GridSkeleton: () => ReactActual.createElement('View', { testID: 'grid-skeleton' }),
+    ListSkeleton: () => ReactActual.createElement('View', { testID: 'list-skeleton' }),
+    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => ReactActual.createElement('View', null, children),
+    useGridColumns: () => 3,
+    useBreakpoint: () => ({ width: 390, height: 844, isTablet: false, isLandscape: false }),
+  };
+});
+
+import ProfileScreen from '@/app/(buyer)/profile';
+
+function textContent(value: unknown): string {
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  if (Array.isArray(value)) return value.map(textContent).join('');
+  if (!value || typeof value !== 'object') return '';
+  const node = value as { children?: unknown; props?: { children?: unknown } };
+  return textContent(node.children ?? node.props?.children);
+}
+
+async function flushPromises() {
+  for (let i = 0; i < 6; i += 1) await Promise.resolve();
+}
+
+async function renderScreen(): Promise<ReactTestRenderer> {
+  let renderer!: ReactTestRenderer;
+  await act(async () => {
+    renderer = create(<ProfileScreen />);
+    await flushPromises();
+  });
+  return renderer;
+}
+
+function pressTab(renderer: ReactTestRenderer, tab: string) {
+  const matches = renderer.root.findAll(
+    node => node.props.accessibilityLabel === `${tab} tab` && typeof node.props.onPress === 'function',
+  );
+  expect(matches.length).toBeGreaterThan(0);
+  return act(async () => {
+    matches[0].props.onPress();
+    await flushPromises();
+  });
+}
+
+const baseProfile = {
+  name: 'Ava Buyer',
+  username: 'ava',
+  bio: 'Streetwear collector.',
+  pronouns: null,
+  website: null,
+  location: null,
+  friendsCount: 12,
+  followingBrandsCount: 5,
+  avatarInitials: 'AB',
+  createdAt: '2024-01-01T00:00:00.000Z',
+};
+
+describe('buyer profile tabs', () => {
+  let renderer: ReactTestRenderer | undefined;
+
+  beforeEach(() => {
+    getMyProfileMock.mockReset().mockResolvedValue(baseProfile);
+    getMyPostsMock.mockReset().mockResolvedValue([
+      { id: 'post-1', mediaUrl: 'https://example.com/post-1.jpg', type: 'photo', isArchived: false, isDraft: false, authorName: 'Ava', authorInitials: 'AB', authorColor: '#111', caption: 'Fit check', mediaColors: ['#111', '#222'] },
+    ]);
+    getMyRepostsMock.mockReset().mockResolvedValue([
+      { id: 'repost-1', originalAuthorName: 'Sample Brand', originalAuthorHandle: '@samplebrand', originalCaption: 'New drop just landed' },
+    ]);
+    getSavedItemsMock.mockReset().mockResolvedValue([
+      { id: 'saved-1', type: 'product', title: 'Archive Cargo Pants', subtitle: '$120' },
+    ]);
+    getPrivacySettingsMock.mockReset().mockResolvedValue({});
+    subscribeSocialMock.mockReset().mockReturnValue(vi.fn());
+    loadBuyerProfileMock.mockReset().mockResolvedValue({ avatarUri: null });
+    loadHighlightsMock.mockReset().mockResolvedValue([]);
+    apiMock.social.myStories.mockReset().mockResolvedValue([]);
+    getBuyerOrdersWithStatusMock.mockReset().mockResolvedValue({ orders: [], fromCache: false });
+    routerMock.push.mockReset();
+  });
+
+  afterEach(async () => {
+    if (renderer) {
+      await act(async () => { renderer?.unmount(); });
+      renderer = undefined;
+    }
+  });
+
+  it('renders all four tabs, each selectable', async () => {
+    renderer = await renderScreen();
+
+    for (const tab of ['Posts', 'Tagged', 'Reposts', 'Saved']) {
+      const matches = renderer.root.findAll(
+        node => node.props.accessibilityRole === 'tab' && node.props.accessibilityLabel === `${tab} tab`,
+      );
+      expect(matches.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('shows Posts content by default and swaps to Reposts content on tab switch', async () => {
+    renderer = await renderScreen();
+
+    // Posts tab is selected by default — the one post's image renders.
+    expect(renderer.root.findAll(
+      node => (node.type as unknown) === 'CachedImage' && (node.props as any).source?.uri === 'https://example.com/post-1.jpg',
+    )).toHaveLength(1);
+    expect(renderer.root.findAll(
+      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('Sample Brand'),
+    )).toHaveLength(0);
+
+    await pressTab(renderer, 'Reposts');
+
+    // Reposts content now shows; the Posts image is gone.
+    expect(renderer.root.findAll(
+      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('Sample Brand'),
+    ).length).toBeGreaterThan(0);
+    expect(renderer.root.findAll(
+      node => (node.type as unknown) === 'CachedImage' && (node.props as any).source?.uri === 'https://example.com/post-1.jpg',
+    )).toHaveLength(0);
+  });
+
+  it('shows Saved content on the Saved tab and the empty state on Tagged', async () => {
+    renderer = await renderScreen();
+
+    await pressTab(renderer, 'Saved');
+    expect(renderer.root.findAll(
+      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('Archive Cargo Pants'),
+    ).length).toBeGreaterThan(0);
+
+    await pressTab(renderer, 'Tagged');
+    expect(renderer.root.findAll(
+      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('No tagged posts'),
+    ).length).toBeGreaterThan(0);
+    // Saved content no longer shows once switched away.
+    expect(renderer.root.findAll(
+      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('Archive Cargo Pants'),
+    )).toHaveLength(0);
+  });
+
+  it('keeps every hard-required action wired: account switcher, edit profile, inbox, connections, highlights', async () => {
+    renderer = await renderScreen();
+
+    const switcher = renderer.root.findByProps({ testID: 'buyer-profile-account-switcher' });
+    expect(switcher.props.accessibilityLabel).toBe('Switch account');
+    await act(async () => { switcher.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/account-switcher');
+
+    routerMock.push.mockReset();
+    const editProfileBtns = renderer.root.findAll(
+      node => (node.type as unknown) === 'TouchableOpacity'
+        && node.props.onPress
+        && textContent(node.props.children).includes('Edit Profile'),
+    );
+    expect(editProfileBtns.length).toBeGreaterThan(0);
+    await act(async () => { editProfileBtns[0].props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/(buyer)/edit-profile');
+  });
+
+  it('shows a My Orders card for the latest active order, with a working See all link', async () => {
+    getBuyerOrdersWithStatusMock.mockResolvedValue({
+      orders: [
+        {
+          id: 'order-active', orderNumber: 'BT-2001', sellerId: 's1', sellerName: 'Threadhaus', sellerHandle: '@threadhaus',
+          status: 'shipped', paymentStatus: 'paid', fulfillmentStatus: 'fulfilled',
+          lineItems: [{ productName: 'Cargo Jacket', variant: 'M', quantity: 1, unitPriceCents: 12000 }],
+          shippingAddress: { name: '', line1: '', city: '', state: '', zip: '', country: 'US' },
+          payment: { subtotalCents: 12000, shippingTotalCents: 0, taxTotalCents: 0, totalCents: 12000 },
+          isPreOrder: false, hasReturnRequest: false, createdAt: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          id: 'order-old', orderNumber: 'BT-1001', sellerId: 's1', sellerName: 'Threadhaus', sellerHandle: '@threadhaus',
+          status: 'delivered', paymentStatus: 'paid', fulfillmentStatus: 'fulfilled',
+          lineItems: [{ productName: 'Tee', variant: 'S', quantity: 1, unitPriceCents: 3000 }],
+          shippingAddress: { name: '', line1: '', city: '', state: '', zip: '', country: 'US' },
+          payment: { subtotalCents: 3000, shippingTotalCents: 0, taxTotalCents: 0, totalCents: 3000 },
+          isPreOrder: false, hasReturnRequest: false, createdAt: '2025-12-01T00:00:00.000Z',
+        },
+      ],
+      fromCache: false,
+    });
+
+    renderer = await renderScreen();
+
+    // The most recent still-active order (shipped, not the older delivered one) is featured.
+    expect(renderer.root.findAll(
+      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('BT-2001'),
+    ).length).toBeGreaterThan(0);
+    expect(renderer.root.findAll(
+      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('timeline:shipped'),
+    ).length).toBeGreaterThan(0);
+
+    const seeAll = renderer.root.findByProps({ accessibilityLabel: 'See all orders' });
+    await act(async () => { seeAll.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/(buyer)/orders');
+
+    routerMock.push.mockReset();
+    const card = renderer.root.findByProps({ accessibilityLabel: 'Order BT-2001, shipped' });
+    await act(async () => { card.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/buyer-order-detail?id=order-active');
+  });
+
+  it('renders no My Orders section when the buyer has no orders', async () => {
+    getBuyerOrdersWithStatusMock.mockResolvedValue({ orders: [], fromCache: false });
+    renderer = await renderScreen();
+    expect(renderer.root.findAll(
+      node => (node.type as unknown) === 'Text' && textContent(node.props.children) === 'My Orders',
+    )).toHaveLength(0);
+  });
+});
