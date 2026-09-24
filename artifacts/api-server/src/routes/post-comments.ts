@@ -22,6 +22,7 @@ import { Router } from "express";
 import { and, asc, count, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
 import { db, postCommentLikes, postComments, posts } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
+import { rateLimit } from "../middlewares/rateLimit";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition } from "../lib/postVisibility";
 import {
@@ -201,7 +202,7 @@ router.get("/:postId/comments", async (req, res) => {
 });
 
 // ─── POST /api/posts/:postId/comments ────────────────────────────────────────
-router.post("/:postId/comments", requireAuth, async (req, res) => {
+router.post("/:postId/comments", requireAuth, rateLimit("comment"), async (req, res) => {
   const authorId = (req as any).clerkUserId as string;
   const postId = String(req.params.postId);
   if (!UUID_RE.test(postId)) return res.status(404).json({ error: "Post not found" });

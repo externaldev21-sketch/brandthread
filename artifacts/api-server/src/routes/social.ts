@@ -13,6 +13,7 @@ import { Router } from "express";
 import { db, users, follows, stories, storyLikes, storyViews, blocks, posts, interactions } from "@workspace/db";
 import { eq, and, or, ilike, ne, inArray, sql, gt, desc, count, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { rateLimit } from "../middlewares/rateLimit";
 import { publishNotification } from "./notifications-feed";
 import { resolveToClerkId } from "./public";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
@@ -174,7 +175,7 @@ async function buildBuyerPosts(viewerId: string, authorIds: string[], limit: num
 }
 
 // ─── POST /api/social/follow ──────────────────────────────────────────────────
-router.post("/follow", async (req, res) => {
+router.post("/follow", rateLimit("follow"), async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const { userId } = req.body as { userId?: string };
   if (!userId || typeof userId !== "string") {
@@ -246,7 +247,7 @@ router.post("/follow", async (req, res) => {
 });
 
 // ─── DELETE /api/social/follow/:userId ───────────────────────────────────────
-router.delete("/follow/:userId", async (req, res) => {
+router.delete("/follow/:userId", rateLimit("follow"), async (req, res) => {
   const myId   = (req as any).clerkUserId as string;
   const target = req.params.userId;
   const followersCount = await db.transaction(async (tx) => {

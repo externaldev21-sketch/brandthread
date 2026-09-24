@@ -11,7 +11,11 @@ export type RateLimitPolicyName =
   | "expensive"
   | "mutation"
   | "authenticated-read"
-  | "public-read";
+  | "public-read"
+  | "messaging"
+  | "comment"
+  | "follow"
+  | "report";
 
 export type RateLimitPolicy = {
   id: RateLimitPolicyName;
@@ -68,6 +72,30 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
     limit: 240,
     windowMs: 5 * 60_000,
     message: "Too many requests. Please wait a moment and try again.",
+  },
+  messaging: {
+    id: "messaging",
+    limit: 30,
+    windowMs: 60_000,
+    message: "Too many messages sent. Please wait a moment and try again.",
+  },
+  comment: {
+    id: "comment",
+    limit: 20,
+    windowMs: 60_000,
+    message: "Too many comments. Please wait a moment and try again.",
+  },
+  follow: {
+    id: "follow",
+    limit: 30,
+    windowMs: 60_000,
+    message: "Too many follow requests. Please wait a moment and try again.",
+  },
+  report: {
+    id: "report",
+    limit: 10,
+    windowMs: 5 * 60_000,
+    message: "Too many reports submitted. Please wait before submitting another.",
   },
 };
 
