@@ -5,6 +5,7 @@ import { useColors } from '@/hooks/useColors';
 import { getDeactivationStatus, reactivate } from '@/lib/accountService';
 import { BuyerSearchProvider } from '@/contexts/BuyerSearchContext';
 import { BuyerTabBar } from '@/components/buyer-nav/BuyerTabBar';
+import { TabScreenErrorFallback } from '@/components/ErrorBoundary';
 import { getConversations, getNotifications, subscribeSocial } from '@/services/socialService';
 
 // ─── Buyer tab layout ─────────────────────────────────────────────────────────
@@ -50,6 +51,10 @@ function BuyerTabLayout() {
     <Tabs
       detachInactiveScreens
       tabBar={(props) => <BuyerTabBar {...props} inboxBadgeCount={inboxBadgeCount} />}
+      // A render crash in one tab shows a friendly per-tab fallback instead
+      // of taking down the whole app; the root layout's ErrorBoundary is
+      // still the last-resort catch-all above this.
+      unstable_screenErrorBoundary={TabScreenErrorFallback}
       screenOptions={{
         freezeOnBlur: true,
         headerShown: false,
