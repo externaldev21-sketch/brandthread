@@ -35,7 +35,7 @@ describe('ai-brain input is never behind the seller tab bar', () => {
   it('reserves the shared seller tab-bar height at rest and a small gap above the keyboard', () => {
     expect(screen).toContain('useTabBarMetrics(2)');
     expect(screen).toContain('sellerBar.occupiedHeight');
-    expect(screen).toContain('keyboardVisible ? 8 : sellerBar.occupiedHeight');
+    expect(screen).toContain('keyboardVisible ? 8 : Math.max(sellerBar.occupiedHeight, noticeClearance)');
     expect(screen).toContain('composerBottomInset');
   });
 

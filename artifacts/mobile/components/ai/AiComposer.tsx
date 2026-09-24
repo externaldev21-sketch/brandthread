@@ -81,6 +81,9 @@ export default function AiComposer({
 
           <TextInput
             style={styles.textInput}
+            // On web, an ancestor press handler dismisses the keyboard on
+            // bubbled clicks. Keep the tap inside the composer so focus sticks.
+            {...(Platform.OS === 'web' ? { onClick: (event: React.MouseEvent) => event.stopPropagation() } : {})}
             value={value}
             onChangeText={onChangeText}
             placeholder={placeholder}

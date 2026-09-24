@@ -39,6 +39,7 @@ import { useReducedMotion } from 'react-native-reanimated';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import AuroraGlow from '@/components/ai/AuroraGlow';
 import AiComposer from '@/components/ai/AiComposer';
+import { useCookieConsent } from '@/contexts/CookieConsentContext';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import MarkdownLite from '@/components/ai/MarkdownLite';
 import { useColors } from '@/hooks/useColors';
@@ -393,6 +394,7 @@ export default function AiBrainScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const sellerBar = useTabBarMetrics(2);
+  const { noticeClearance } = useCookieConsent();
   const { width } = useWindowDimensions();
   const isTablet = width >= BREAKPOINT.tablet;
   const { getToken, userId, isSignedIn, isLoaded } = useAuth();
@@ -661,7 +663,7 @@ export default function AiBrainScreen() {
   // The bar is absolutely positioned outside this screen. Leave room for its
   // whole footprint at rest; once the keyboard opens, KAV lifts the composer
   // above the keyboard so it needs only a small gap.
-  const composerBottomInset = keyboardVisible ? 8 : sellerBar.occupiedHeight;
+  const composerBottomInset = keyboardVisible ? 8 : Math.max(sellerBar.occupiedHeight, noticeClearance);
 
   return (
     <View style={styles.root}>
