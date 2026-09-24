@@ -34,8 +34,9 @@ import {
   RED, RED_DIM,
   GOLD,
   GRAD_SUCCESS_G,
-  FONT, FS, SP, RADIUS, COMP, ICON,
+  FONT, FS, SP, RADIUS, COMP, ICON, TYPE,
 } from '@/lib/theme';
+import { ResponsiveContainer, StickyFooter } from '@/components/layout';
 
 type ThemeAliases = {
   theme: AppThemePreset;
@@ -853,7 +854,7 @@ export default function BuyerProductDetailScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={s.body}>
+        <ResponsiveContainer style={s.body}>
           {/* Badges */}
           <View style={s.badgeRow}>
             {product.isPreOrder && (
@@ -1117,7 +1118,7 @@ export default function BuyerProductDetailScreen() {
           <Text style={s.reviewsHeader}>You Might Also Like</Text>
           <RelatedProducts productId={product.id} />
 
-        </View>
+        </ResponsiveContainer>
       </ScrollView>
 
       {/* Add-to-bag confirmation banner — slides in above the action bar */}
@@ -1141,9 +1142,13 @@ export default function BuyerProductDetailScreen() {
         </View>
       )}
 
-      {/* Persistent purchase bar remains visible while product content scrolls. */}
+      {/* Persistent purchase bar remains visible while product content scrolls.
+          This screen is pushed as a root stack card over the whole app (not
+          nested under the buyer tab group), so it never sits behind the
+          floating tab bar — no tabBarInset is passed. */}
+      <StickyFooter style={s.actionBar}>
       <View
-        style={[s.actionBar, { paddingBottom: insets.bottom + SP.sm }]}
+        style={s.actionBarRow}
         accessibilityRole="toolbar"
         accessibilityLabel="Product purchase actions"
       >
@@ -1241,6 +1246,7 @@ export default function BuyerProductDetailScreen() {
           </TouchableOpacity>
         )}
       </View>
+      </StickyFooter>
     </View>
   );
 }
@@ -1451,18 +1457,18 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderRadius: RADIUS.pill, backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems: 'center', justifyContent: 'center',
   },
-  body: { padding: SP.md },
+  body: { paddingVertical: SP.md },
   badgeRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
   preOrderBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: CYAN_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
   preOrderBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: CYAN, letterSpacing: 0.4 },
   saleBadge: { backgroundColor: RED_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
   saleBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: RED, letterSpacing: 0.4 },
-  productName: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, marginBottom: SP.sm, lineHeight: 28 },
+  productName: { ...TYPE.title, color: FG, marginBottom: SP.sm },
   sellerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginBottom: SP.md },
   sellerAvatar: { width: 24, height: 24, borderRadius: RADIUS.pill, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
   sellerInitial: { fontSize: FS.xs, fontFamily: FONT.bold, color: PURPLE_LIGHT },
-  sellerName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  sellerHandle: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  sellerName: { ...TYPE.bodyMedium, color: FG },
+  sellerHandle: { ...TYPE.caption, color: MUTED },
   paymentWarningBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1486,7 +1492,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   vacationTitle: { color: ORANGE, fontFamily: FONT.bold, fontSize: FS.sm, marginBottom: 3 },
   vacationText: { color: FG, fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 18 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
-  price: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
+  price: { ...TYPE.heading, fontFamily: FONT.bold, color: FG },
   priceSale: { color: SUCCESS },
   comparePrice: { fontSize: FS.base, fontFamily: FONT.regular, color: SUBTLE, textDecorationLine: 'line-through' },
   savings: { fontSize: FS.sm, fontFamily: FONT.semibold, color: SUCCESS },
@@ -1501,11 +1507,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   stockText: { fontSize: FS.sm, fontFamily: FONT.medium },
   descTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
   desc: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 22 },
-  actionBar: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.md,
-    backgroundColor: BG, borderTopWidth: 1, borderTopColor: BORDER,
-  },
+  // Passed as StickyFooter's own `style` — it already supplies the absolute
+  // positioning, safe-area/tab-bar-aware bottom padding, background, and
+  // top border/shadow; only the original paddingTop is preserved here.
+  actionBar: { paddingTop: SP.md },
+  actionBarRow: { flexDirection: 'row', gap: SP.sm },
   addToCartBtn: {
     width: COMP.buttonH, height: COMP.buttonH, borderRadius: RADIUS.md,
     borderWidth: 1, borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM,

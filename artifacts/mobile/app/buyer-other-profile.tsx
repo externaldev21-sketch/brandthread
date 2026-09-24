@@ -1,7 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Alert, Image,
-  StyleSheet, Dimensions, Modal, ActivityIndicator,
+  StyleSheet, Dimensions, Modal, ActivityIndicator, Animated, RefreshControl,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -11,7 +11,7 @@ import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import {
   BG, CARD, BORDER,
   FG, MUTED, SUBTLE, ON_DARK, RED, OVERLAY,
-  FONT, FS, SP, RADIUS, ICON, SURFACE, ACCENT,
+  FONT, FS, SP, RADIUS, ICON, SURFACE, ACCENT, GRID_MAX_WIDTH,
 } from '@/lib/theme';
 import { PrimaryButton, SecondaryButton } from '@/components/BrandthreadUI';
 import {
@@ -21,10 +21,14 @@ import { useApi } from '@/lib/api';
 import { useAuth } from '@clerk/expo';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
+import { EmptyState, GridSkeleton, ResponsiveContainer, useGridColumns, useBreakpoint } from '@/components/layout';
 
 const { width } = Dimensions.get('window');
 const GRID_GAP  = 1;
 const CELL_SIZE = (width - GRID_GAP * 2) / 3;
+
+// Compact bar fades in once the avatar/name section has scrolled past this offset.
+const COMPACT_THRESHOLD = 130;
 
 type ProfilePost = { id: string; mediaUrl?: string; mediaColors: string[]; type: string };
 
@@ -66,6 +70,17 @@ export default function BuyerOtherProfileScreen() {
   // After the profile loads, profile.userId is always the canonical clerkId.
   // Use canonicalUserId for all follow/unfollow/message/block actions.
   const [canonicalUserId, setCanonicalUserId] = useState<string>(userId);
+  const [refreshing, setRefreshing] = useState(false);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const compactOpacity = scrollY.interpolate({
+    inputRange: [COMPACT_THRESHOLD - 24, COMPACT_THRESHOLD],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+  const gridColumns = useGridColumns({ phone: 3, tablet: 4, tabletLandscape: 5 });
+  const { width: winWidth, isTablet } = useBreakpoint();
+  const gridWidth = isTablet ? Math.min(winWidth, GRID_MAX_WIDTH) : winWidth;
+  const gridCellSize = (gridWidth - GRID_GAP * (gridColumns - 1)) / gridColumns;
 
   // Derived display values — once the real profile has loaded, it always
   // overrides the route-param placeholders (which may be stale or "@unknown"
@@ -118,6 +133,12 @@ export default function BuyerOtherProfileScreen() {
   };
 
   useFocusEffect(useCallback(() => { loadProfile(); }, [loadProfile]));
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadProfile();
+    setRefreshing(false);
+  }, [loadProfile]);
 
   // ── Follow / unfollow ──────────────────────────────────────────────────────
   const handleFollow = async () => {
@@ -210,6 +231,14 @@ export default function BuyerOtherProfileScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Compact collapsed bar — avatar thumbnail + name, fades in on scroll */}
+      <Animated.View pointerEvents="none" style={[styles.compactBar, { top: insets.top, opacity: compactOpacity }]}>
+        <View style={[styles.compactAvatar, { backgroundColor: color }]}>
+          <Text style={styles.compactAvatarText}>{initials}</Text>
+        </View>
+        <Text style={styles.compactName} numberOfLines={1}>{displayName}</Text>
+      </Animated.View>
+
       {/* Back button */}
       <TouchableOpacity
         style={[styles.backBtn, { top: insets.top + SP.sm }]}
@@ -226,7 +255,13 @@ export default function BuyerOtherProfileScreen() {
         <Text style={styles.inboxBtnText}>Messages</Text>
       </TouchableOpacity>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
+      <Animated.ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
+        scrollEventThrottle={16}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={MUTED} />}
+      >
         {/* Spacer below floating back button */}
         <View style={{ height: 56 }} />
 
@@ -314,46 +349,49 @@ export default function BuyerOtherProfileScreen() {
 
         {/* ── Posts grid ── */}
         <View style={styles.postsSection}>
-          {posts.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Feather name="image" size={32} color={MUTED} />
-              <Text style={styles.emptyTitle}>No posts yet.</Text>
-            </View>
+          {!apiLoaded ? (
+            <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ paddingHorizontal: 0 }}>
+              <GridSkeleton columns={gridColumns} cardWidth={gridCellSize} rows={2} gap={GRID_GAP} />
+            </ResponsiveContainer>
+          ) : posts.length === 0 ? (
+            <EmptyState icon="image" message="No posts yet." />
           ) : (
-            <View style={styles.grid}>
-              {posts.map(post => (
-                <TouchableOpacity
-                  key={post.id}
-                  style={styles.gridCell}
-                  activeOpacity={0.85}
-                  accessibilityRole="button"
-                  accessibilityLabel="Open post"
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    const qs = new URLSearchParams({
-                      postId: post.id,
-                      postAuthorName: displayName,
-                      postAuthorInitials: displayInitials,
-                      postAuthorColor: hasRealColor ? color : theme.cardElevated,
-                      postMediaColor1: post.mediaColors?.[0] ?? '#1a1a2e',
-                      postMediaColor2: post.mediaColors?.[1] ?? '#0d0d1a',
-                      postType: post.type,
-                    });
-                    router.push(`/buyer-post-viewer?${qs.toString()}` as never);
-                  }}
-                >
-                  {post.mediaUrl
-                    ? <Image source={{ uri: post.mediaUrl }} style={styles.gridCellInner} resizeMode="cover" />
-                    : <View style={[styles.gridCellInner, { backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' }]}>
-                        <Feather name={postTypeIcon(post.type) as any} size={ICON.md} color={MUTED} />
-                      </View>
-                  }
-                </TouchableOpacity>
-              ))}
-            </View>
+            <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ paddingHorizontal: 0 }}>
+              <View style={styles.grid}>
+                {posts.map(post => (
+                  <TouchableOpacity
+                    key={post.id}
+                    style={[styles.gridCell, { width: gridCellSize, height: gridCellSize }]}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityLabel="Open post"
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      const qs = new URLSearchParams({
+                        postId: post.id,
+                        postAuthorName: displayName,
+                        postAuthorInitials: displayInitials,
+                        postAuthorColor: hasRealColor ? color : theme.cardElevated,
+                        postMediaColor1: post.mediaColors?.[0] ?? '#1a1a2e',
+                        postMediaColor2: post.mediaColors?.[1] ?? '#0d0d1a',
+                        postType: post.type,
+                      });
+                      router.push(`/buyer-post-viewer?${qs.toString()}` as never);
+                    }}
+                  >
+                    {post.mediaUrl
+                      ? <Image source={{ uri: post.mediaUrl }} style={styles.gridCellInner} resizeMode="cover" />
+                      : <View style={[styles.gridCellInner, { backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' }]}>
+                          <Feather name={postTypeIcon(post.type) as any} size={ICON.md} color={MUTED} />
+                        </View>
+                    }
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ResponsiveContainer>
           )}
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* ── More options sheet ── */}
       <Modal visible={moreSheetOpen} transparent animationType="slide" onRequestClose={() => setMoreSheetOpen(false)}>
@@ -378,6 +416,19 @@ export default function BuyerOtherProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
 
+  // Compact collapsed bar (avatar thumbnail + name), fades in on scroll
+  compactBar: {
+    position: 'absolute', left: 0, right: 0, zIndex: 8,
+    height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.xs,
+    paddingHorizontal: 72,
+  },
+  compactAvatar: {
+    width: 26, height: 26, borderRadius: 13,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  compactAvatarText: { fontFamily: FONT.bold, fontSize: 10, color: ON_DARK },
+  compactName: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, maxWidth: '70%' },
+
   // Floating nav buttons
   backBtn: {
     position: 'absolute', left: SP.md, zIndex: 10,
@@ -385,7 +436,7 @@ const styles = StyleSheet.create({
     borderRadius: 20, alignItems: 'center', justifyContent: 'center',
   },
   inboxBtn: {
-    position: 'absolute', right: SP.md, zIndex: 5,
+    position: 'absolute', right: SP.md, zIndex: 9,
     height: 36, flexDirection: 'row', alignItems: 'center', gap: SP.xs,
     paddingHorizontal: SP.sm, borderRadius: RADIUS.pill,
     backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,

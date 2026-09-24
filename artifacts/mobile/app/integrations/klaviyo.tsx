@@ -1,14 +1,14 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
-  ActivityIndicator, Alert, Linking, Platform,
+  ActivityIndicator, Alert, Linking,
 } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
+import { Header } from '@/components/layout';
 
 type KlaviyoStatus = {
   connected: boolean;
@@ -21,7 +21,6 @@ type KlaviyoStatus = {
 
 export default function KlaviyoIntegrationScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
 
@@ -96,17 +95,9 @@ export default function KlaviyoIntegrationScreen() {
     ]);
   }
 
-  const topPad = Platform.OS === 'web' ? 24 : insets.top;
-
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <View style={[styles.header, { paddingTop: topPad + 12 }]}>
-        <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} onPress={() => router.back()}>
-          <Feather name="chevron-left" size={22} color={colors.foreground} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Klaviyo</Text>
-        <View style={{ width: 22 }} />
-      </View>
+      <Header title="Klaviyo" />
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
         <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -212,9 +203,6 @@ export default function KlaviyoIntegrationScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 16 },
-  headerTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
-
   hero: { borderRadius: 16, borderWidth: 1, padding: 20, alignItems: 'center', marginBottom: 20, gap: 8 },
   heroIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   heroTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', textAlign: 'center' },

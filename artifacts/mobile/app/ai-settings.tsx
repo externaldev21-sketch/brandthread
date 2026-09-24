@@ -15,15 +15,15 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE,
+  CARD, BORDER, FG, MUTED, SUBTLE, PURPLE,
   FONT, FS, SP, RADIUS,
 } from '../lib/theme';
 import { AISettings } from '../services/aiTypes';
 import { getAISettings, saveAISettings, clearSession } from '../services/aiService';
 import { clearAuditLog } from '../services/aiAuditLog';
 import { useColors } from '@/hooks/useColors';
+import { Header } from '@/components/layout';
 
 const BORDER_COLOR = 'rgba(255,255,255,0.07)';
 const TRACK_FALSE  = 'rgba(255,255,255,0.07)';
@@ -195,7 +195,6 @@ const rowStyles = StyleSheet.create({
 
 export default function AiSettingsScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const [settings, setSettings] = useState<AISettings | null>(null);
 
   useEffect(() => {
@@ -249,14 +248,7 @@ export default function AiSettingsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBack}>
-          <Feather name="chevron-left" size={24} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>AI Settings</Text>
-        <View style={styles.headerPlaceholder} />
-      </View>
+      <Header title="AI Settings" />
 
       <ScrollView
         style={styles.scroll}
@@ -414,30 +406,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'transparent',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.md,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER_COLOR,
-    backgroundColor: BG,
-  },
-  headerBack: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.md,
-    color: FG,
-  },
-  headerPlaceholder: {
-    width: 40,
   },
   scroll: {
     flex: 1,

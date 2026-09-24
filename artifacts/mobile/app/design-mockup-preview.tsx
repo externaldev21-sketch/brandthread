@@ -26,6 +26,7 @@ import {
 import { getProject, createBrandAsset } from '@/services/designService';
 import { DesignProject } from '@/services/designTypes';
 import DesignLayerCompositor from '@/components/DesignLayerCompositor';
+import { Header } from '@/components/layout';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const PANEL_H = SCREEN_H * 0.6;
@@ -131,14 +132,8 @@ export default function DesignMockupPreviewScreen() {
 
   if (!project) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Feather name="arrow-left" size={ICON.md} color={FG} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Mockup Preview</Text>
-          <View style={{ width: 40 }} />
-        </View>
+      <View style={styles.root}>
+        <Header title="Mockup Preview" />
         <View style={styles.centered}>
           <Feather name="image" size={48} color={SUBTLE} />
           <Text style={styles.disclaimer}>Open a garment project to see the mockup preview.</Text>
@@ -149,15 +144,8 @@ export default function DesignMockupPreviewScreen() {
   }
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mockup Preview</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <View style={styles.root}>
+      <Header title="Mockup Preview" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* View tabs */}
@@ -246,13 +234,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   scrollContent: { paddingBottom: 120 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.lg },
   disclaimer: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', marginTop: SP.md },
-
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SP.md, paddingVertical: SP.sm,
-  },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
 
   tabsRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
   tabBtn: {

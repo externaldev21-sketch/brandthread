@@ -11,7 +11,7 @@ import {
   BG, CARD, BORDER,
   FG, MUTED, SUBTLE,
   RED, ON_DARK,
-  FONT, FS, SP, RADIUS, ICON,
+  FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
@@ -21,6 +21,7 @@ import type { FriendSuggestion } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 import { useAuth } from '@clerk/expo';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
+import { Header } from '@/components/layout';
 
 type Tab = 'incoming' | 'sent' | 'suggested';
 
@@ -334,23 +335,11 @@ export default function BuyerFriendRequestsScreen() {
   }
 
   return (
-    <View style={[s.container, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={[s.header, { paddingTop: SP.md }]}>
-        <TouchableOpacity
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          onPress={() => router.back()}
-        >
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Connections</Text>
-        <TouchableOpacity
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          onPress={() => router.push('/(buyer)/search' as never)}
-        >
-          <Feather name="search" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-      </View>
+    <View style={s.container}>
+      <Header
+        title="Connections"
+        actions={[{ icon: 'search', onPress: () => router.push('/(buyer)/search' as never), accessibilityLabel: 'Search' }]}
+      />
 
       {/* Tabs */}
       <View style={s.tabBar}>
@@ -385,8 +374,6 @@ export default function BuyerFriendRequestsScreen() {
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   container:       { flex: 1, backgroundColor: 'transparent' },
-  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingBottom: SP.md, borderBottomWidth: 1, borderColor: BORDER },
-  headerTitle:     { fontFamily: FONT.bold, fontSize: FS.lg, color: FG },
   tabBar:          { flexDirection: 'row', borderBottomWidth: 1, borderColor: BORDER },
   tabItem:         { flex: 1, alignItems: 'center', paddingVertical: SP.sm + 2, borderBottomWidth: 2, borderColor: 'transparent' },
   tabItemActive:   { borderColor: theme.accent },

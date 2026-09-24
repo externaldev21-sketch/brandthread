@@ -21,6 +21,7 @@ import { getEntitlementRejection } from '@/lib/entitlementError';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter, completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
+import { Header } from '@/components/layout';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState,
@@ -146,7 +147,6 @@ export default function ManufacturerHub() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeS(theme), [theme]);
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { tab, from } = useLocalSearchParams<{ tab?: string; from?: string }>();
   const [activeTab, setActiveTab] = useState<Tab>(tab === 'messages' ? 'messages' : 'discover');
   const isSellerSetup = isSellerSetupOrigin(from);
@@ -183,8 +183,7 @@ export default function ManufacturerHub() {
   };
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
-      {/* Header */}
+    <View style={s.root}>
       <HubHeader activeTab={activeTab} router={router} onLeave={leaveSetupDestination} />
 
       {/* Tab bar */}
@@ -252,37 +251,18 @@ function HubHeader({ activeTab, router, onLeave }: {
   router: ReturnType<typeof useRouter>;
   onLeave: () => void;
 }) {
-  const { theme } = useAppTheme();
-  const s = useMemo(() => makeS(theme), [theme]);
   return (
-    <View style={s.header}>
-      {/* Back button — always visible */}
-      <TouchableOpacity
-        style={s.headerBtn}
-        onPress={onLeave}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        activeOpacity={0.75}
-      >
-        <Feather name="arrow-left" size={ICON.sm} color={theme.text} />
-      </TouchableOpacity>
-
-      <Text style={[s.headerTitle, { flex: 1, marginHorizontal: SP.sm }]}>Manufacturer Hub</Text>
-
-      {/* Search/filter icons removed here — Discover already has its own working
-          search + filter controls; these were dead (no onPress). */}
-      <View style={s.headerActions}>
-        {/* Invite button shown on Discover tab — add your own off-platform manufacturer */}
-        {activeTab === 'discover' && (
-          <TouchableOpacity
-            style={s.headerBtn}
-            onPress={() => router.push('/invite-manufacturer' as never)}
-            activeOpacity={0.75}
-          >
-            <Feather name="user-plus" size={ICON.sm} color={theme.accentLight} />
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
+    <Header
+      title="Manufacturer Hub"
+      onBack={onLeave}
+      actions={activeTab === 'discover' ? [
+        {
+          icon: 'user-plus',
+          onPress: () => router.push('/invite-manufacturer' as never),
+          accessibilityLabel: 'Invite a manufacturer',
+        },
+      ] : []}
+    />
   );
 }
 

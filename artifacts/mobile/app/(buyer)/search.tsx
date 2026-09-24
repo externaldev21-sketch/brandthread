@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Platform, TextInput, Image as RNImage, Modal, Pressable, KeyboardAvoidingView,
+  Platform, TextInput, Modal, Pressable, KeyboardAvoidingView,
+  RefreshControl, useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -19,8 +20,9 @@ import { CachedImage } from '@/components/CachedImage';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useBuyerSearch } from '@/contexts/BuyerSearchContext';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { FONT, FS } from '@/lib/theme';
+import { FONT, FS, GUTTER, GRID_MAX_WIDTH } from '@/lib/theme';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { GridSkeleton, ResponsiveContainer, useGridColumns } from '@/components/layout';
 
 type PersonResult = {
   userId: string; name: string; username: string | null;
@@ -30,25 +32,22 @@ type PersonResult = {
 
 type ProductResult = Extract<SearchResult, { kind: 'product' }>;
 
-function MasonryCard({ item, accent, onPress }: {
+// Fixed 4:5 aspect ratio for every card so the grid never has uneven row
+// heights — no per-image aspect-ratio measurement.
+const GRID_CARD_ASPECT = 0.8;
+
+function ProductGridCard({ item, accent, onPress, width }: {
   item: ProductResult;
   accent: string;
   onPress: () => void;
+  width: number;
 }) {
   const { theme } = useAppTheme();
   const styles = makeStyles(theme);
-  const [aspectRatio, setAspectRatio] = useState(0.82);
-
-  useEffect(() => {
-    if (!item.imageUri) return;
-    RNImage.getSize(item.imageUri, (width, height) => {
-      if (width > 0 && height > 0) setAspectRatio(Math.max(0.62, Math.min(1.24, width / height)));
-    });
-  }, [item.imageUri]);
 
   return (
-    <TouchableOpacity style={styles.masonryCard} onPress={onPress} activeOpacity={0.88}>
-      <View style={[styles.masonryMedia, { aspectRatio, backgroundColor: item.color }]}>
+    <TouchableOpacity style={[styles.masonryCard, { width }]} onPress={onPress} activeOpacity={0.88}>
+      <View style={[styles.masonryMedia, { width, height: width / GRID_CARD_ASPECT, backgroundColor: item.color }]}>
         {item.imageUri ? (
           <CachedImage source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
         ) : (
@@ -145,10 +144,16 @@ export default function SearchScreen() {
   }));
   const productResults = useMemo(() => results.filter((result): result is ProductResult => result.kind === 'product'), [results]);
   const brandResults = useMemo(() => results.filter(result => result.kind === 'brand'), [results]);
-  const productColumns = useMemo(() => [
-    productResults.filter((_, index) => index % 2 === 0),
-    productResults.filter((_, index) => index % 2 === 1),
-  ], [productResults]);
+
+  // Fixed-column product grid (2 on phone, 3-4 on iPad) with an even gutter —
+  // measured from the grid's own laid-out width so it also works inside the
+  // centered ResponsiveContainer column on iPad.
+  const gridColumns = useGridColumns({ phone: 2, tablet: 3, tabletLandscape: 4 });
+  const { width: winWidth } = useWindowDimensions();
+  const [gridWidth, setGridWidth] = useState(0);
+  const fallbackGridWidth = Math.min(winWidth, GRID_MAX_WIDTH) - GUTTER * 2;
+  const effectiveGridWidth = gridWidth > 0 ? gridWidth : fallbackGridWidth;
+  const gridCardWidth = Math.max(1, (effectiveGridWidth - GUTTER * (gridColumns - 1)) / gridColumns);
 
   const clearFilters = () => {
     setSort('');
@@ -203,6 +208,25 @@ export default function SearchScreen() {
     });
   }
 
+  const performSearch = useCallback(async (term: string) => {
+    const minPriceCents = minPrice ? parseDecimalToCents(minPrice) : undefined;
+    const maxPriceCents = maxPrice ? parseDecimalToCents(maxPrice) : undefined;
+    const [brandRes, peopleData] = await Promise.allSettled([
+      api.public.search({
+        q: term,
+        sort: sort || undefined,
+        minPriceCents: minPriceCents ?? undefined,
+        maxPriceCents: maxPriceCents ?? undefined,
+        category: category || undefined,
+        limit: 20,
+      }),
+      api.social.search(term, 10),
+    ]);
+    setResults(brandRes.status === 'fulfilled' ? brandRes.value.results ?? [] : []);
+    setPeople(peopleData.status === 'fulfilled' ? peopleData.value as PersonResult[] : []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sort, minPrice, maxPrice, category]);
+
   useEffect(() => {
     const q = query.trim();
     if (q.length < 1 && !hasActiveFilters) {
@@ -214,29 +238,22 @@ export default function SearchScreen() {
     let cancelled = false;
     setSearching(true);
     const timer = setTimeout(async () => {
-      const minPriceCents = minPrice ? parseDecimalToCents(minPrice) : undefined;
-      const maxPriceCents = maxPrice ? parseDecimalToCents(maxPrice) : undefined;
-      const [brandRes, peopleData] = await Promise.allSettled([
-        api.public.search({
-          q,
-          sort: sort || undefined,
-          minPriceCents: minPriceCents ?? undefined,
-          maxPriceCents: maxPriceCents ?? undefined,
-          category: category || undefined,
-          limit: 20,
-        }),
-        api.social.search(q, 10),
-      ]);
-      if (!cancelled) {
-        setResults(brandRes.status === 'fulfilled' ? brandRes.value.results ?? [] : []);
-        setPeople(peopleData.status === 'fulfilled' ? peopleData.value as PersonResult[] : []);
-        setSearching(false);
-      }
+      await performSearch(q);
+      if (!cancelled) setSearching(false);
     }, 350);
     return () => { cancelled = true; clearTimeout(timer); };
   // Query/filter changes and explicit retries are the only search triggers.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, sort, minPrice, maxPrice, category, hasActiveFilters]);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = useCallback(() => {
+    const q = query.trim();
+    if (q.length < 1 && !hasActiveFilters) return;
+    setRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    performSearch(q).finally(() => setRefreshing(false));
+  }, [query, hasActiveFilters, performSearch]);
 
   const suggestions = useMemo(() => {
     const seen = new Set<string>();
@@ -343,6 +360,14 @@ export default function SearchScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         contentContainerStyle={{ paddingTop: topPad + 12 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={primary}
+            colors={[primary]}
+          />
+        }
       >
         <View style={styles.titleBlock}>
           <Text style={[styles.title, { color: fg }]} accessibilityRole="header">Search</Text>
@@ -435,7 +460,9 @@ export default function SearchScreen() {
               </>
             ) : null}
             {searching && results.length === 0 && people.length === 0 ? (
-              <SearchResultsSkeleton />
+              <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginTop: 16 }}>
+                <GridSkeleton columns={gridColumns} cardWidth={gridCardWidth} rows={2} gap={GUTTER} />
+              </ResponsiveContainer>
             ) : !searching && results.length === 0 && people.length === 0 ? (
               <EmptyState
                 compact
@@ -514,29 +541,32 @@ export default function SearchScreen() {
                   </>
                 )}
                 {productResults.length > 0 && (
-                  <>
-                    <View style={styles.editorialHeader}>
+                  <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
+                    <View style={[styles.editorialHeader, { paddingHorizontal: 0 }]}>
                       <View>
                         <Text style={[styles.sectionLabel, { color: muted, paddingHorizontal: 0, paddingBottom: 3 }]}>DISCOVERED FOR YOU</Text>
                         <Text style={[styles.editorialTitle, { color: fg }]}>{productResults.length} pieces worth a look</Text>
                       </View>
                       <Feather name="grid" size={18} color={primary} />
                     </View>
-                    <View style={styles.masonryGrid}>
-                      {productColumns.map((column, columnIndex) => (
-                        <View style={styles.masonryColumn} key={columnIndex}>
-                          {column.map(item => (
-                            <MasonryCard
-                              key={item.id}
-                              item={item}
-                              accent={primary}
-                              onPress={() => handleResultPress(item)}
-                            />
-                          ))}
-                        </View>
+                    <View
+                      style={styles.masonryGrid}
+                      onLayout={({ nativeEvent }) => {
+                        const nextWidth = Math.round(nativeEvent.layout.width);
+                        if (nextWidth > 0 && nextWidth !== gridWidth) setGridWidth(nextWidth);
+                      }}
+                    >
+                      {productResults.map(item => (
+                        <ProductGridCard
+                          key={item.id}
+                          item={item}
+                          accent={primary}
+                          width={gridCardWidth}
+                          onPress={() => handleResultPress(item)}
+                        />
                       ))}
                     </View>
-                  </>
+                  </ResponsiveContainer>
                 )}
               </>
             )}
@@ -590,17 +620,18 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   avatarText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: theme.onAccent },
   editorialHeader: { marginTop: 18, paddingHorizontal: 16, paddingBottom: 14, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
   editorialTitle: { fontSize: 21, fontFamily: 'Inter_700Bold', letterSpacing: -0.45 },
-  masonryGrid: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingHorizontal: 12 },
-  masonryColumn: { flex: 1, gap: 18 },
-  masonryCard: { flex: 1 },
-  masonryMedia: { width: '100%', minHeight: 145, maxHeight: 280, borderRadius: 18, overflow: 'hidden', justifyContent: 'flex-end' },
+  masonryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: GUTTER },
+  masonryCard: {},
+  masonryMedia: { borderRadius: 18, overflow: 'hidden', justifyContent: 'flex-end' },
   masonryFallback: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: `${theme.background}24` },
   masonryInitials: { color: theme.onAccent, fontSize: 36, fontFamily: 'Inter_700Bold', opacity: 0.9 },
   masonryFallbackLine: { width: 42, height: 2, borderRadius: 1, backgroundColor: `${theme.onAccent}8A`, marginTop: 10 },
   masonryPrice: { alignSelf: 'flex-start', backgroundColor: `${theme.background}C7`, borderRadius: 12, paddingHorizontal: 9, paddingVertical: 6, margin: 9 },
   masonryPriceText: { color: theme.text, fontSize: 12, fontFamily: 'Inter_700Bold' },
-  masonryName: { color: theme.text, fontSize: 14, lineHeight: 18, fontFamily: 'Inter_700Bold', marginTop: 8 },
-  masonryBrandRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5 },
+  // Fixed height accommodates two lines so cards never shift height whether
+  // the product name wraps or not (numberOfLines={2} below).
+  masonryName: { color: theme.text, fontSize: 14, lineHeight: 18, height: 36, fontFamily: 'Inter_700Bold', marginTop: 8 },
+  masonryBrandRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5, height: 20 },
   masonryBrandDot: { width: 15, height: 15, borderRadius: 8 },
   masonryBrand: { color: theme.muted, fontSize: 11, fontFamily: 'Inter_500Medium', flex: 1 },
   followingBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1 },

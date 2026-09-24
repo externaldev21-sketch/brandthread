@@ -5,6 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { Header } from '@/components/layout';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
 import { getLocations, getInventoryItems, getTransfer, getTransfers, createTransfer, shipTransfer, receiveTransfer } from '@/services/inventoryService';
@@ -517,17 +518,10 @@ export default function InventoryTransferScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.root, { paddingTop: insets.top }]}
+      style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* HEADER */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>New Transfer</Text>
-        <View style={{ width: 36 }} />
-      </View>
+      <Header title="New Transfer" />
 
       <ScrollView
         style={styles.scroll}

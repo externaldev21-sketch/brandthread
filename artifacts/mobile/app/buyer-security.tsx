@@ -10,6 +10,7 @@ import {
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { loadBuyerSettings, patchBuyerSettings } from '@/lib/buyerSettings';
+import { Header } from '@/components/layout';
 
 export default function BuyerSecurity() {
   const { theme } = useAppTheme();
@@ -44,14 +45,8 @@ export default function BuyerSecurity() {
   if (!loaded) return <View style={[s.page, { paddingTop: insets.top }]} />;
 
   return (
-    <View style={[s.page, { paddingTop: insets.top }]}>
-      <View style={s.header}>
-        <TouchableOpacity style={s.iconBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={21} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.title}>Password and security</Text>
-        <View style={s.iconBtn} />
-      </View>
+    <View style={s.page}>
+      <Header title="Password and security" />
 
       <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}>
         {/* Protection toggles */}
@@ -146,9 +141,6 @@ export default function BuyerSecurity() {
 
 const makeStyles = () => StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
-  header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
-  iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
   groupLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SP.sm, marginTop: SP.md },
   card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden', marginBottom: SP.sm },
   row: { minHeight: 60, paddingHorizontal: SP.md, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },

@@ -175,3 +175,31 @@ export const COMP = {
   iconBtn:    44,   // icon button; minimum comfortable touch target
   minTouchTarget: 44,
 } as const;
+
+// ─── Layout / Breakpoints ─────────────────────────────────────────────────────
+// Shared grid used across buyer + seller screens: 16pt side gutters on phone,
+// a centered max-width content column on iPad/landscape, and consistent
+// section gaps. Screens should read gutters/section gaps from here instead of
+// one-off paddings.
+export const GUTTER = SP.md;          // 16pt side gutter (phone)
+export const SECTION_GAP = SP.lg;     // 24pt gap between stacked sections
+export const CONTENT_MAX_WIDTH = 720; // centered column cap for forms/detail on iPad
+export const GRID_MAX_WIDTH = 1080;   // centered column cap for multi-column grids on iPad
+
+export const BREAKPOINT = {
+  tablet: 768,   // iPad portrait and up
+  desktopWeb: 1024,
+} as const;
+
+// Heading / body type scale (paired with FS above). Use these role names
+// instead of picking raw FS.* sizes per screen.
+export const TYPE = {
+  largeTitle: { fontSize: FS.h1, fontFamily: FONT.bold, lineHeight: 42 },
+  title:      { fontSize: FS.h2, fontFamily: FONT.bold, lineHeight: 36 },
+  heading:    { fontSize: FS.xl, fontFamily: FONT.semibold, lineHeight: 28 },
+  subheading: { fontSize: FS.lg, fontFamily: FONT.semibold, lineHeight: 24 },
+  body:       { fontSize: FS.base, fontFamily: FONT.regular, lineHeight: 22 },
+  bodyMedium: { fontSize: FS.base, fontFamily: FONT.medium, lineHeight: 22 },
+  caption:    { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
+  label:      { fontSize: FS.xs, fontFamily: FONT.semibold, lineHeight: 14 },
+} as const;

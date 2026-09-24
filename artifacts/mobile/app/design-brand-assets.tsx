@@ -21,6 +21,7 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { SearchBar, EmptyState } from '@/components/BrandthreadUI';
+import { Header } from '@/components/layout';
 import { Share } from 'react-native';
 import {
   getBrandAssets, addBrandAsset, renameBrandAsset, deleteBrandAsset, getProjects,
@@ -222,16 +223,10 @@ export default function DesignBrandAssetsScreen() {
 
   return (
     <View style={bas.root}>
-      {/* ── TOP BAR ── */}
-      <View style={[bas.topBar, { paddingTop: insets.top + 4 }]}>
-        <TouchableOpacity style={bas.backBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={bas.topTitle}>Brand Assets</Text>
-        <TouchableOpacity style={bas.addBtn} onPress={handleAddAsset}>
-          <Feather name="plus" size={ICON.md} color={PURPLE_LIGHT} />
-        </TouchableOpacity>
-      </View>
+      <Header
+        title="Brand Assets"
+        actions={[{ icon: 'plus', onPress: handleAddAsset, accessibilityLabel: 'Add asset' }]}
+      />
 
       {/* ── SEARCH ── */}
       <View style={bas.searchWrap}>
@@ -322,11 +317,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const { accent: PURPLE, accentDim: PURPLE_DIM } = theme;
   return StyleSheet.create({
   root:          { flex: 1, backgroundColor: 'transparent' },
-  topBar:        { flexDirection: 'row', alignItems: 'center', backgroundColor: SURFACE, borderBottomWidth: 1, borderBottomColor: BORDER, paddingHorizontal: SP.md, paddingBottom: SP.sm, gap: SP.sm },
-  backBtn:       { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  topTitle:      { flex: 1, fontSize: FS.xl, fontFamily: FONT.bold, color: FG, letterSpacing: -0.3 },
-  addBtn:        { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: PURPLE_DIM, borderWidth: 1, borderColor: BORDER_ACTIVE, alignItems: 'center', justifyContent: 'center' },
-
   searchWrap:    { paddingHorizontal: SP.md, paddingVertical: SP.sm },
 
   tabsScroll:    { flexGrow: 0 },

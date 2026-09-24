@@ -21,6 +21,7 @@ import {
 } from '@/lib/theme';
 import { SearchBar, EmptyState } from '@/components/BrandthreadUI';
 import { createProject } from '@/services/designService';
+import { Header } from '@/components/layout';
 
 // ─── Template data ─────────────────────────────────────────────────────────────
 type TemplateCategory = 'Garments' | 'Social' | 'Product' | 'Packaging';
@@ -116,13 +117,7 @@ export default function DesignTemplatesScreen() {
 
   return (
     <View style={ts.root}>
-      {/* ── TOP BAR ── */}
-      <View style={[ts.topBar, { paddingTop: insets.top + 4 }]}>
-        <TouchableOpacity style={ts.backBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={ts.topTitle}>Templates</Text>
-      </View>
+      <Header title="Templates" />
 
       {/* ── SEARCH ── */}
       <View style={ts.searchWrap}>
@@ -215,10 +210,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const { accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
   return StyleSheet.create({
   root:          { flex: 1, backgroundColor: 'transparent' },
-  topBar:        { flexDirection: 'row', alignItems: 'center', backgroundColor: SURFACE, borderBottomWidth: 1, borderBottomColor: BORDER, paddingHorizontal: SP.md, paddingBottom: SP.sm, gap: SP.sm },
-  backBtn:       { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  topTitle:      { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, letterSpacing: -0.3 },
-
   searchWrap:    { paddingHorizontal: SP.md, paddingVertical: SP.sm },
 
   tabsScroll:    { flexGrow: 0 },

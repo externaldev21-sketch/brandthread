@@ -9,7 +9,6 @@ import {
   Alert, ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
@@ -22,6 +21,7 @@ import {
 } from '@/components/BrandthreadUI';
 import { getVersions, restoreVersion, duplicateProject } from '@/services/designService';
 import { DesignVersion } from '@/services/designTypes';
+import { Header } from '@/components/layout';
 
 function formatDate(iso: string): string {
   try {
@@ -39,7 +39,6 @@ export default function DesignVersionsScreen() {
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
   const styles = createStyles(theme);
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { projectId } = useLocalSearchParams<{ projectId?: string }>();
 
   const [versions, setVersions]   = useState<DesignVersion[]>([]);
@@ -138,15 +137,8 @@ export default function DesignVersionsScreen() {
   );
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Version History</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <View style={styles.root}>
+      <Header title="Version History" />
 
       {loading ? (
         <View style={styles.centered}>
@@ -191,13 +183,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { paddingHorizontal: SP.md, paddingBottom: 120 },
   emptyState: { marginTop: 60 },
-
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SP.md, paddingVertical: SP.sm,
-  },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
 
   versionCard: { marginBottom: SP.sm },
   versionTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: SP.sm },

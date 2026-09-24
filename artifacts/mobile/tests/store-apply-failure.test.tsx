@@ -49,10 +49,20 @@ vi.mock('react-native', () => {
     Alert: { alert: vi.fn() },
     Image,
     ScrollView: nativeComponent('ScrollView'),
-    StyleSheet: { create: (styles: unknown) => styles },
+    StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
     Text: nativeComponent('Text'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),
     View: nativeComponent('View'),
+    Animated: {
+      Value: class { constructor(_v?: number) {} },
+      View: nativeComponent('Animated.View'),
+      event: () => () => {},
+      timing: () => ({ start: (cb?: () => void) => cb?.() }),
+      sequence: () => ({ start: (cb?: () => void) => cb?.() }),
+      loop: () => ({ start: () => {}, stop: () => {} }),
+    },
+    Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
   };
 });
 
@@ -127,6 +137,25 @@ vi.mock('@/lib/theme', () => ({
   SP: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 },
   RADIUS: { sm: 8, md: 12, lg: 16, pill: 999 },
   ICON: { sm: 16, md: 20, lg: 24, xl: 32, xxl: 40 },
+  GUTTER: 16,
+  SECTION_GAP: 24,
+  CONTENT_MAX_WIDTH: 720,
+  GRID_MAX_WIDTH: 1080,
+  BREAKPOINT: { tablet: 768, desktopWeb: 1024 },
+  TYPE: {
+    largeTitle: { fontSize: 36, fontFamily: 'System', lineHeight: 42 },
+    title: { fontSize: 30, fontFamily: 'System', lineHeight: 36 },
+    heading: { fontSize: 22, fontFamily: 'System', lineHeight: 28 },
+    subheading: { fontSize: 19, fontFamily: 'System', lineHeight: 24 },
+    body: { fontSize: 15, fontFamily: 'System', lineHeight: 22 },
+    bodyMedium: { fontSize: 15, fontFamily: 'System', lineHeight: 22 },
+    caption: { fontSize: 13, fontFamily: 'System', lineHeight: 18 },
+    label: { fontSize: 11, fontFamily: 'System', lineHeight: 14 },
+  },
+}));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
 vi.mock('@/components/BrandthreadUI', () => {

@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { StickyFooter } from '@/components/layout';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -30,7 +31,7 @@ import {
 import { useApi } from '@/hooks/useApi';
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import {
-  FONT, FS, SP, RADIUS, COMP, ICON,
+  FONT, FS, SP, RADIUS, COMP, ICON, TYPE,
 } from '@/lib/theme';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -96,7 +97,7 @@ const makeQuantityStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   btn: { width: COMP.minTouchTarget, height: COMP.minTouchTarget, borderRadius: 8, backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   btnDisabled: { opacity: 0.4 },
-  val: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, minWidth: 20, textAlign: 'center' },
+  val: { ...TYPE.bodyMedium, fontFamily: FONT.semibold, color: theme.text, minWidth: 20, textAlign: 'center' },
 });
 
 // ─── Cart Item Row ─────────────────────────────────────────────────────────────
@@ -242,7 +243,7 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
   productImage: { width: '100%', height: '100%' },
-  name: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginBottom: 4, lineHeight: 18 },
+  name: { ...TYPE.bodyMedium, fontFamily: FONT.semibold, color: theme.text, marginBottom: 4 },
   variantRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
   variant: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
   preOrderBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
@@ -265,7 +266,7 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
   bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   priceBlock: { alignItems: 'flex-end' },
   comparePrice: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, textDecorationLine: 'line-through' },
-  price: { fontSize: FS.base, fontFamily: FONT.bold, color: theme.text },
+  price: { ...TYPE.bodyMedium, fontFamily: FONT.bold, color: theme.text },
   priceDiscounted: { color: theme.success },
   actions: { flexDirection: 'row', alignItems: 'center', marginTop: SP.xs },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: COMP.minTouchTarget, paddingVertical: 4, paddingHorizontal: 8 },
@@ -460,14 +461,14 @@ const makeSummaryStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { backgroundColor: theme.cardGlass, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, padding: SP.md, marginBottom: SP.md },
   title: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
-  label: { fontSize: FS.base, fontFamily: FONT.regular, color: theme.muted },
+  label: { ...TYPE.body, color: theme.muted },
   labelSm: { fontSize: FS.sm },
-  value: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
+  value: { ...TYPE.bodyMedium, fontFamily: FONT.semibold, color: theme.text },
   valueSm: { fontSize: FS.sm },
   divider: { height: 1, backgroundColor: theme.border, marginVertical: SP.sm },
   totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: SP.xs },
-  totalLabel: { fontSize: FS.md, fontFamily: FONT.bold, color: theme.text },
-  totalValue: { fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text },
+  totalLabel: { ...TYPE.subheading, color: theme.text },
+  totalValue: { ...TYPE.subheading, color: theme.text },
   note: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginTop: SP.sm },
   preOrderNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: SP.sm },
   preOrderNoteText: { fontSize: FS.xs, fontFamily: FONT.regular, flex: 1 },
@@ -917,7 +918,7 @@ export default function CartScreen() {
 
           {/* Checkout button */}
           {hasItems && (
-          <View style={[s.checkoutBar, { paddingBottom: barInset + SP.xs }]}>
+            <StickyFooter tabBarInset={barInset}>
               <PressableScale
                 style={[s.checkoutBtn, { shadowColor: theme.shadowColor }]}
                 onPress={handleCheckout}
@@ -947,7 +948,7 @@ export default function CartScreen() {
               <Text style={s.secureNote}>
                 <Feather name="shield" size={11} color={theme.subtle} /> Secured by Brandthread
               </Text>
-            </View>
+            </StickyFooter>
           )}
         </>
       )}
@@ -995,17 +996,6 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
   appliedPointsTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.success },
   appliedPointsSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
   savedHint: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, textAlign: 'center', marginBottom: SP.lg },
-  checkoutBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: SP.md,
-    paddingTop: SP.md,
-    backgroundColor: theme.background,
-    borderTopWidth: 1,
-    borderTopColor: theme.border,
-  },
   checkoutBtn: { borderRadius: RADIUS.lg, overflow: 'hidden', shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   checkoutGrad: {
     flexDirection: 'row',

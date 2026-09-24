@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { Header } from '@/components/layout';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, StatusBadge, FilterChip, SectionHeader } from '@/components/BrandthreadUI';
 import { getProduct } from '@/services/productService';
 import { Product, ProductVariant, OptionValue } from '@/services/productTypes';
@@ -278,7 +279,7 @@ export default function ProductStoreScreen() {
   const STICKY_BOTTOM_H = COMP.buttonH + SP.md + Math.max(insets.bottom, SP.md);
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
 
       {/* ── ScrollView content ──────────────────────────────────────────── */}
       <ScrollView
@@ -287,15 +288,11 @@ export default function ProductStoreScreen() {
       >
 
         {/* 1. Header row */}
-        <View style={s.headerRow}>
-          <TouchableOpacity onPress={handleBack} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Feather name="arrow-left" size={ICON.md} color={FG} />
-          </TouchableOpacity>
-          <Text style={s.headerLabel}>Product Preview</Text>
-          <TouchableOpacity onPress={handleShare} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Feather name="share-2" size={ICON.md} color={FG} />
-          </TouchableOpacity>
-        </View>
+        <Header
+          title="Product Preview"
+          onBack={handleBack}
+          actions={[{ icon: 'share-2', onPress: handleShare, accessibilityLabel: 'Share product' }]}
+        />
 
         {/* Preview notice */}
         <View style={s.previewNotice}>

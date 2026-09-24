@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { Header } from '@/components/layout';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
 import { getLocations, addLocation, updateLocation, archiveLocation } from '@/services/inventoryService';
@@ -279,19 +280,8 @@ export default function InventoryLocationScreen() {
   // ── ADD / EDIT MODE ─────────────────────────────────────────────────────────
 
   return (
-    <View style={[ls.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={ls.header}>
-        <TouchableOpacity
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goList(); }}
-          style={ls.backBtn}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={ls.headerTitle}>{mode === 'add' ? 'Add Location' : 'Edit Location'}</Text>
-        <View style={{ width: 60 }} />
-      </View>
+    <View style={ls.root}>
+      <Header title={mode === 'add' ? 'Add Location' : 'Edit Location'} onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goList(); }} />
 
       <ScrollView
         contentContainerStyle={[ls.formContent, { paddingBottom: insets.bottom + 100 }]}

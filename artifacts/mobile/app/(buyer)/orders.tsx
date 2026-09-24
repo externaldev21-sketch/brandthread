@@ -26,8 +26,9 @@ import {
 } from '@/lib/theme';
 import {
   BrandthreadScreen, BrandthreadHeader, FilterChip,
-  StatusBadge, EmptyState, PrimaryButton, BrandedLoader,
+  StatusBadge, EmptyState, PrimaryButton,
 } from '@/components/BrandthreadUI';
+import { SkeletonBlock, useCenteredContentPadding } from '@/components/layout';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -189,12 +190,45 @@ const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { o
   );
 });
 
+// ─── Order card skeleton — matches BuyerOrderCard: avatar + seller/date, item
+// line, then a status + price row ──────────────────────────────────────────
+function BuyerOrderCardSkeleton() {
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardTopRow}>
+        <SkeletonBlock width={40} height={40} radius={RADIUS.pill} />
+        <View style={{ flex: 1, gap: SP.xs }}>
+          <SkeletonBlock width="55%" height={14} />
+          <SkeletonBlock width="35%" height={11} />
+        </View>
+      </View>
+      <View style={{ marginTop: SP.sm }}>
+        <SkeletonBlock width="70%" height={13} />
+      </View>
+      <View style={styles.divider} />
+      <View style={styles.statusRow}>
+        <SkeletonBlock width={64} height={18} radius={RADIUS.pill} />
+        <SkeletonBlock width={56} height={14} style={{ marginLeft: 'auto' as any }} />
+      </View>
+    </View>
+  );
+}
+
+function BuyerOrdersListSkeleton() {
+  return (
+    <View style={{ gap: SP.md }}>
+      {Array.from({ length: 4 }).map((_, i) => <BuyerOrderCardSkeleton key={i} />)}
+    </View>
+  );
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function BuyerOrdersScreen() {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const barInset = useBuyerTabBarInset();
+  const centeredPadding = useCenteredContentPadding();
   const router = useRouter();
   const openOrder = useCallback((orderId: string) => {
     router.push(('/buyer-order-detail?id=' + orderId) as never);
@@ -314,7 +348,7 @@ export default function BuyerOrdersScreen() {
         data={FILTER_CHIPS}
         keyExtractor={i => i.key}
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: SP.md, gap: 8, paddingBottom: SP.sm }}
+        contentContainerStyle={{ paddingHorizontal: centeredPadding, gap: 8, paddingBottom: SP.sm }}
         renderItem={({ item }) => (
           <FilterChip
             label={item.label}
@@ -325,7 +359,9 @@ export default function BuyerOrdersScreen() {
       />
 
       {visibleLoading ? (
-        <BrandedLoader label="Checking in with your orders…" />
+        <View style={{ paddingHorizontal: centeredPadding, paddingTop: SP.sm }}>
+          <BuyerOrdersListSkeleton />
+        </View>
       ) : (
         <>
           {loadError && orders.length > 0 && (
@@ -373,7 +409,7 @@ export default function BuyerOrdersScreen() {
               showsVerticalScrollIndicator={false}
               refreshControl={<RefreshControl refreshing={refreshing} onRefresh={retry} tintColor={theme.accent} />}
               contentContainerStyle={{
-                paddingHorizontal: SP.md,
+                paddingHorizontal: centeredPadding,
                 paddingTop: SP.sm,
                 paddingBottom: barInset + SP.md,
               }}

@@ -13,6 +13,7 @@ import {
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields } from '@/lib/buyerProfile';
 import { updateMyProfile, getMyProfile } from '@/services/socialService';
+import { Header } from '@/components/layout';
 
 /** Fields stored in BuyerProfileFields — everything editable is persisted. */
 type PersistedKey = keyof Omit<BuyerProfileFields, 'aiCreator' | 'avatarUri'>;
@@ -102,14 +103,8 @@ export default function BuyerPersonalDetails() {
   if (!loaded) return <View style={{ flex: 1, backgroundColor: 'transparent' }} />;
 
   return (
-    <View style={[s.page, { paddingTop: insets.top }]}>
-      <View style={s.header}>
-        <TouchableOpacity style={s.iconBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={21} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.title}>Personal Details</Text>
-        <View style={s.iconBtn} />
-      </View>
+    <View style={s.page}>
+      <Header title="Personal Details" />
 
       <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 100 }}>
         <Text style={s.sectionDesc}>
@@ -167,9 +162,6 @@ export default function BuyerPersonalDetails() {
 
 const makeStyles = () => StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
-  header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
-  iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
   sectionDesc: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 18, marginBottom: SP.md },
   card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: 14, gap: 10 },

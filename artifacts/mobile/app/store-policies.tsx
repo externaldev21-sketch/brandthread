@@ -13,6 +13,7 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { Header } from '@/components/layout';
 import {
   BG, CARD, SURFACE, BORDER,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -203,11 +204,7 @@ export default function StorePoliciesScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: 'transparent' }]}>
-      <View style={[s.header, { borderBottomColor: BORDER, height: 56 + headerTopInset, paddingTop: headerTopInset }]}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 2, bottom: 2, left: 2, right: 2 }}><Feather name="arrow-left" size={21} color={FG} /></TouchableOpacity>
-        <Text style={[s.headerTitle, { color: FG }]}>Store policies</Text>
-        <View style={{ width: 70 }} />
-      </View>
+      <Header title="Store policies" />
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color={PURPLE} /></View>

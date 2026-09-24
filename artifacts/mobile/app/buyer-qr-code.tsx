@@ -13,6 +13,7 @@ import {
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { getMyProfile } from '@/services/socialService';
 import type { BuyerSocialProfile } from '@/services/socialTypes';
+import { Header } from '@/components/layout';
 
 export default function BuyerQRCode() {
   const { theme } = useAppTheme();
@@ -46,16 +47,11 @@ export default function BuyerQRCode() {
   }
 
   return (
-    <View style={[s.page, { paddingTop: insets.top }]}>
-      <View style={s.header}>
-        <TouchableOpacity style={s.iconBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={21} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.title}>QR Code</Text>
-        <TouchableOpacity style={s.iconBtn} onPress={handleShare}>
-          <Feather name="share-2" size={21} color={FG} />
-        </TouchableOpacity>
-      </View>
+    <View style={s.page}>
+      <Header
+        title="QR Code"
+        actions={[{ icon: 'share-2', onPress: handleShare, accessibilityLabel: 'Share' }]}
+      />
 
       <View style={s.body}>
         {/* Card */}
@@ -128,9 +124,6 @@ export default function BuyerQRCode() {
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
-  header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
-  iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
 
   body: { flex: 1, padding: SP.md, alignItems: 'center' },
 

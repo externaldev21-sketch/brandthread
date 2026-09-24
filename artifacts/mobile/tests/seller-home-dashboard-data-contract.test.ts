@@ -25,12 +25,12 @@ describe('seller home dashboard data contract', () => {
     expect(source).toContain("Couldn’t refresh your sales. Pull to refresh.");
   });
 
-  it('uses the Dashboard title and full-width stacked metrics that scale large values', () => {
+  it('uses the Dashboard title and an even KPI tile grid that scales large values', () => {
     expect(source).toMatch(/<Text style=\{\[styles\.screenTitle,[\s\S]*?\}>Dashboard<\/Text>/);
-    expect(source).toContain("flexDirection: 'column'");
-    expect(source).toContain("width: '100%'");
-    expect(source.match(/adjustsFontSizeToFit/g)).toHaveLength(3);
-    expect(source.match(/numberOfLines=\{1\}/g)).toHaveLength(3);
+    expect(source).toContain("flexWrap: 'wrap'");
+    expect(source).toContain("width: '48%'");
+    expect(source.match(/adjustsFontSizeToFit/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(source.match(/numberOfLines=\{1\}/g)?.length).toBeGreaterThanOrEqual(4);
   });
 
   it('shows pending and cash-outable balances as inline rows under Visitors', () => {

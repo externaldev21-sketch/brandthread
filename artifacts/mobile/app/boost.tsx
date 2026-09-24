@@ -53,6 +53,7 @@ import {
   buildBoostReturnUrl,
 } from '@/services/boostService';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { Header } from '@/components/layout';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -396,7 +397,6 @@ export default function BoostScreen() {
   const api     = useApi();
   const params  = useLocalSearchParams<{ id?: string; paymentReturn?: string; bt_preview?: string }>();
 
-  const topPad    = insets.top + (Platform.OS === 'web' ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === 'web' ? 34 : 0) + 90;
   const inSellerPreview = isSellerDevPreview(
     params.bt_preview === 'buyer' ? '?bt_preview=buyer' : '?bt_preview=seller',
@@ -748,27 +748,11 @@ export default function BoostScreen() {
 
   function renderHeader(title: string) {
     return (
-      <View style={[s.header, { paddingTop: topPad + 8 }]}>
-        <TouchableOpacity
-          onPress={goBack}
-          style={s.headerBtn}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Feather name="arrow-left" size={20} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>{title}</Text>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={s.headerBtn}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          accessibilityLabel="Close"
-          accessibilityRole="button"
-        >
-          <Feather name="x" size={20} color={MUTED} />
-        </TouchableOpacity>
-      </View>
+      <Header
+        title={title}
+        onBack={goBack}
+        actions={[{ icon: 'x', onPress: () => router.back(), accessibilityLabel: 'Close' }]}
+      />
     );
   }
 
@@ -1160,30 +1144,6 @@ export default function BoostScreen() {
 
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: BG },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
-    backgroundColor: BG,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontFamily: FONT.semibold,
-    fontSize: FS.md,
-    color: FG,
-  },
-  headerBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 
   // Summary card
   summaryCard: {

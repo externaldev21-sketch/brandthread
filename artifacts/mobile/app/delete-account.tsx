@@ -18,11 +18,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { clearAccountLifecycleState } from '@/lib/accountService';
 import { PressableScale, PrimaryButton, SecondaryButton } from '@/components/BrandthreadUI';
+import { Header } from '@/components/layout';
 import { apiErrorCode, apiErrorDetails, apiErrorMessage } from '@/lib/safety';
 import type { AccountDeletionCheck, DeletionBlocker } from '@/lib/safetyTypes';
 
@@ -118,14 +119,8 @@ export default function DeleteAccountScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={[s.root, { paddingTop: insets.top }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={s.header}>
-        <PressableScale onPress={goBack} style={s.headerBtn} accessibilityLabel="Back" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="arrow-left" size={ICON.lg} color={theme.text} />
-        </PressableScale>
-        <Text style={s.headerTitle}>Delete account</Text>
-        <View style={s.headerBtn} />
-      </View>
+    <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Header title="Delete account" onBack={goBack} />
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + SP.xxl }} keyboardShouldPersistTaps="handled">
         {step === 'overview' ? (
@@ -295,9 +290,6 @@ export default function DeleteAccountScreen() {
 
 const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.md },
   heroIcon: {
     width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center',
     backgroundColor: theme.card, borderWidth: 1, borderColor: theme.error + '55', marginTop: SP.md, marginBottom: SP.md,

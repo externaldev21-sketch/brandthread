@@ -20,6 +20,7 @@ import {
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useAuth } from '@clerk/expo';
+import { Header } from '@/components/layout';
 
 interface PaymentMethod {
   id: string;
@@ -125,14 +126,8 @@ export default function BuyerPaymentMethodsScreen() {
   }
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Feather name="arrow-left" size={22} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.title}>Payment methods</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <View style={s.root}>
+      <Header title="Payment methods" />
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color={theme.accent} /></View>
@@ -219,9 +214,6 @@ export default function BuyerPaymentMethodsScreen() {
 
 const s = StyleSheet.create({
   root:    { flex: 1, backgroundColor: 'transparent' },
-  header:  { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title:   { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   center:  { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 },
   errorText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20, marginBottom: 16 },
   retryBtn: { borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 20, paddingVertical: 10 },

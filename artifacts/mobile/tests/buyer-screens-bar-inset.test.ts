@@ -26,7 +26,7 @@ describe('screens behind the floating buyer bar', () => {
 
   it('lifts the cart checkout summary above the bar', () => {
     const cart = read('app/(buyer)/cart.tsx');
-    expect(cart).toContain('<View style={[s.checkoutBar, { paddingBottom: barInset + SP.xs }]}>');
+    expect(cart).toContain('<StickyFooter tabBarInset={barInset}>');
   });
 });
 
