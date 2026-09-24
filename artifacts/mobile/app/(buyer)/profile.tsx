@@ -27,9 +27,17 @@ import { loadHighlights, type Highlight } from '@/lib/highlightsService';
 import {
   EmptyState, GridSkeleton, ListSkeleton, ResponsiveContainer, useGridColumns, useBreakpoint,
 } from '@/components/layout';
+import { getBuyerOrdersWithStatus } from '@/services/orderService';
+import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
+import type { BuyerOrderView } from '@/services/orderTypes';
 import type {
   BuyerSocialProfile, BuyerPost, RepostRecord, SavedItem, PrivacySettings,
 } from '@/services/socialTypes';
+
+// Statuses still "in flight" — an order in one of these is what the My Orders
+// card surfaces first; a fully-resolved order (delivered/cancelled/refunded/
+// disputed) falls back to just showing the most recent order overall.
+const ACTIVE_ORDER_STATUSES: BuyerOrderView['status'][] = ['new', 'processing', 'ready_to_ship', 'shipped'];
 
 const GRID_GAP = 2;
 // Rough height of everything above the tab strip (avatar, name, stats, actions,
@@ -229,6 +237,7 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [highlights, setHighlights] = useState<Highlight[]>([]);
+  const [myOrders, setMyOrders] = useState<BuyerOrderView[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [stickyTabsVisible, setStickyTabsVisible] = useState(false);
@@ -286,7 +295,7 @@ export default function ProfileScreen() {
     }
     setLoadError(false);
     try {
-      const [p, po, rp, sv, pr, bp, hl, myStories] = await Promise.all([
+      const [p, po, rp, sv, pr, bp, hl, myStories, ordersResult] = await Promise.all([
         getMyProfile(),
         getMyPosts(),
         getMyReposts(),
@@ -295,6 +304,7 @@ export default function ProfileScreen() {
         loadBuyerProfile(),
         loadHighlights(),
         api.social.myStories().catch(() => []),
+        getBuyerOrdersWithStatus(user.id).catch(() => ({ orders: [] as BuyerOrderView[], fromCache: true })),
       ]);
       if (accountRef.current !== user?.id) return;
       setProfile(p);
@@ -305,6 +315,7 @@ export default function ProfileScreen() {
       setAvatarUri(bp.avatarUri || null);
       setHighlights(hl);
       setHasActiveStory(Array.isArray(myStories) && myStories.length > 0);
+      setMyOrders(ordersResult.orders);
     } catch (error) {
       setLoadError(true);
       setProfile(null);
@@ -357,6 +368,21 @@ export default function ProfileScreen() {
     Haptics.selectionAsync();
     router.push('/buyer-highlights-manager' as any);
   }, [router]);
+
+  // ── My Orders card: the latest in-flight order, or the latest order overall
+  // once everything's resolved, so there's always a fast way back into orders. ──
+  const featuredOrder = myOrders.find(o => ACTIVE_ORDER_STATUSES.includes(o.status)) ?? myOrders[0] ?? null;
+
+  const handleOrdersSeeAll = useCallback(() => {
+    Haptics.selectionAsync();
+    router.push('/(buyer)/orders' as never);
+  }, [router]);
+
+  const handleFeaturedOrderPress = useCallback(() => {
+    if (!featuredOrder) return;
+    Haptics.selectionAsync();
+    router.push(`/buyer-order-detail?id=${featuredOrder.id}` as never);
+  }, [featuredOrder, router]);
 
   // ── Post sheet ──
   const handlePostLongPress = useCallback((post: BuyerPost) => {
@@ -532,6 +558,46 @@ export default function ProfileScreen() {
           <Feather name="share-2" size={ICON.sm} color={theme.text} />
         </TouchableOpacity>
       </View>
+
+      {/* ── My Orders — always-visible way back to order history ── */}
+      {featuredOrder ? (
+        <View style={styles.ordersSection}>
+          <View style={styles.ordersSectionHeader}>
+            <Text style={[styles.ordersSectionTitle, { color: theme.text }]}>My Orders</Text>
+            <TouchableOpacity
+              onPress={handleOrdersSeeAll}
+              accessibilityRole="button"
+              accessibilityLabel="See all orders"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={[styles.ordersSeeAll, { color: theme.secondary }]}>See all</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            style={[styles.orderCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+            onPress={handleFeaturedOrderPress}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={`Order ${featuredOrder.orderNumber}, ${featuredOrder.status.replace(/_/g, ' ')}`}
+          >
+            {featuredOrder.lineItems[0]?.imageUri ? (
+              <CachedImage source={{ uri: featuredOrder.lineItems[0].imageUri }} style={styles.orderCardImage} contentFit="cover" />
+            ) : (
+              <View style={[styles.orderCardImage, styles.orderCardImagePlaceholder, { backgroundColor: theme.cardElevated }]}>
+                <Feather name="shopping-bag" size={ICON.md} color={theme.muted} />
+              </View>
+            )}
+            <View style={styles.orderCardBody}>
+              <Text style={[styles.orderCardSeller, { color: theme.text }]} numberOfLines={1}>{featuredOrder.sellerName}</Text>
+              <Text style={[styles.orderCardMeta, { color: theme.muted }]} numberOfLines={1}>
+                {featuredOrder.orderNumber} · {featuredOrder.lineItems.length} item{featuredOrder.lineItems.length === 1 ? '' : 's'}
+              </Text>
+              <OrderStatusTimeline status={featuredOrder.status} compact />
+            </View>
+            <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       {/* ── Story-style Highlights row ── */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.highlightsRow}>
@@ -814,6 +880,21 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderWidth: 1,
     borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center',
   },
+
+  // My Orders
+  ordersSection: { paddingHorizontal: SP.md, marginTop: SP.lg },
+  ordersSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },
+  ordersSectionTitle: { fontFamily: FONT.bold, fontSize: FS.md },
+  ordersSeeAll: { fontFamily: FONT.semibold, fontSize: FS.sm },
+  orderCard: {
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1, borderRadius: RADIUS.md, padding: SP.sm, gap: SP.sm,
+  },
+  orderCardImage: { width: 52, height: 52, borderRadius: RADIUS.sm },
+  orderCardImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  orderCardBody: { flex: 1, gap: 2 },
+  orderCardSeller: { fontFamily: FONT.semibold, fontSize: FS.sm },
+  orderCardMeta: { fontFamily: FONT.regular, fontSize: FS.xs, marginBottom: 2 },
 
   // Highlights
   highlightsRow: { paddingHorizontal: SP.md, paddingVertical: SP.md, gap: SP.md },

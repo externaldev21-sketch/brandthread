@@ -15,6 +15,7 @@ const {
   loadHighlightsMock,
   routerMock,
   apiMock,
+  getBuyerOrdersWithStatusMock,
 } = vi.hoisted(() => ({
   getMyProfileMock: vi.fn(),
   getMyPostsMock: vi.fn(),
@@ -26,6 +27,7 @@ const {
   loadHighlightsMock: vi.fn(),
   routerMock: { push: vi.fn(), replace: vi.fn() },
   apiMock: { social: { myStories: vi.fn() } },
+  getBuyerOrdersWithStatusMock: vi.fn(),
 }));
 
 vi.mock('react-native', () => {
@@ -153,6 +155,14 @@ vi.mock('@/lib/highlightsService', () => ({
   loadHighlights: loadHighlightsMock,
 }));
 
+vi.mock('@/services/orderService', () => ({
+  getBuyerOrdersWithStatus: getBuyerOrdersWithStatusMock,
+}));
+
+vi.mock('@/components/orders/OrderStatusTimeline', () => ({
+  OrderStatusTimeline: ({ status }: { status: string }) => React.createElement('Text', null, `timeline:${status}`),
+}));
+
 vi.mock('@/components/layout', () => {
   const ReactActual = require('react') as typeof import('react');
   return {
@@ -231,6 +241,7 @@ describe('buyer profile tabs', () => {
     loadBuyerProfileMock.mockReset().mockResolvedValue({ avatarUri: null });
     loadHighlightsMock.mockReset().mockResolvedValue([]);
     apiMock.social.myStories.mockReset().mockResolvedValue([]);
+    getBuyerOrdersWithStatusMock.mockReset().mockResolvedValue({ orders: [], fromCache: false });
     routerMock.push.mockReset();
   });
 
@@ -309,5 +320,56 @@ describe('buyer profile tabs', () => {
     expect(editProfileBtns.length).toBeGreaterThan(0);
     await act(async () => { editProfileBtns[0].props.onPress(); });
     expect(routerMock.push).toHaveBeenCalledWith('/(buyer)/edit-profile');
+  });
+
+  it('shows a My Orders card for the latest active order, with a working See all link', async () => {
+    getBuyerOrdersWithStatusMock.mockResolvedValue({
+      orders: [
+        {
+          id: 'order-active', orderNumber: 'BT-2001', sellerId: 's1', sellerName: 'Threadhaus', sellerHandle: '@threadhaus',
+          status: 'shipped', paymentStatus: 'paid', fulfillmentStatus: 'fulfilled',
+          lineItems: [{ productName: 'Cargo Jacket', variant: 'M', quantity: 1, unitPriceCents: 12000 }],
+          shippingAddress: { name: '', line1: '', city: '', state: '', zip: '', country: 'US' },
+          payment: { subtotalCents: 12000, shippingTotalCents: 0, taxTotalCents: 0, totalCents: 12000 },
+          isPreOrder: false, hasReturnRequest: false, createdAt: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          id: 'order-old', orderNumber: 'BT-1001', sellerId: 's1', sellerName: 'Threadhaus', sellerHandle: '@threadhaus',
+          status: 'delivered', paymentStatus: 'paid', fulfillmentStatus: 'fulfilled',
+          lineItems: [{ productName: 'Tee', variant: 'S', quantity: 1, unitPriceCents: 3000 }],
+          shippingAddress: { name: '', line1: '', city: '', state: '', zip: '', country: 'US' },
+          payment: { subtotalCents: 3000, shippingTotalCents: 0, taxTotalCents: 0, totalCents: 3000 },
+          isPreOrder: false, hasReturnRequest: false, createdAt: '2025-12-01T00:00:00.000Z',
+        },
+      ],
+      fromCache: false,
+    });
+
+    renderer = await renderScreen();
+
+    // The most recent still-active order (shipped, not the older delivered one) is featured.
+    expect(renderer.root.findAll(
+      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('BT-2001'),
+    ).length).toBeGreaterThan(0);
+    expect(renderer.root.findAll(
+      node => (node.type as unknown) === 'Text' && textContent(node.props.children).includes('timeline:shipped'),
+    ).length).toBeGreaterThan(0);
+
+    const seeAll = renderer.root.findByProps({ accessibilityLabel: 'See all orders' });
+    await act(async () => { seeAll.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/(buyer)/orders');
+
+    routerMock.push.mockReset();
+    const card = renderer.root.findByProps({ accessibilityLabel: 'Order BT-2001, shipped' });
+    await act(async () => { card.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/buyer-order-detail?id=order-active');
+  });
+
+  it('renders no My Orders section when the buyer has no orders', async () => {
+    getBuyerOrdersWithStatusMock.mockResolvedValue({ orders: [], fromCache: false });
+    renderer = await renderScreen();
+    expect(renderer.root.findAll(
+      node => (node.type as unknown) === 'Text' && textContent(node.props.children) === 'My Orders',
+    )).toHaveLength(0);
   });
 });

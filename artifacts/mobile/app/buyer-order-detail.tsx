@@ -38,7 +38,7 @@ import {
   GradientCard, StatusBadge, PrimaryButton, SecondaryButton,
 } from '@/components/BrandthreadUI';
 import { ResponsiveContainer } from '@/components/layout';
-import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
+import { OrderProgressTimeline } from '@/components/orders/OrderProgressTimeline';
 import { formatCents } from '@/lib/money';
 import { visibleOrderForBuyer } from '@/lib/buyerOrdersVisibility';
 import { canBuyerCancel } from '@/services/orderPolicy';
@@ -392,6 +392,7 @@ function adaptOrderDetail(row: any): BuyerOrderView {
     trackingCarrier:   row.carrier           ?? undefined,
     trackingStatus:    row.trackingStatus    ?? undefined,
     estimatedDelivery: row.estimatedDelivery ?? undefined,
+    shippedAt:         row.shippedAt         ?? undefined,
     isPreOrder:        false,
     hasReturnRequest:  false,
     cancellationReason: row.cancellationReason ?? null,
@@ -810,13 +811,25 @@ export default function BuyerOrderDetailScreen() {
           </GradientCard>
         </View>
 
-        {/* Live status tracker — the visual centerpiece of this screen. Shared
-            with the seller order-detail screen so the two never disagree on
-            stage order or terminal-state handling. */}
+        {/* Live, timestamped progress tracker — the visual centerpiece of this
+            screen: Order placed → Processing → Shipped (carrier + tracking,
+            tap to track) → Out for delivery → Delivered, current step
+            highlighted and animated, future steps dimmed. Cancel/return/
+            refund states are handled by the cards below (BuyerCancellation-
+            DetailsCard / return request card / BuyerTrackingAlertCard) — this
+            tracker itself collapses to a single exception pill for those. */}
         <View style={{ marginBottom: SP.md }}>
           <Text style={[sc.title, { color: theme.muted, paddingHorizontal: SP.md }]}>Order Progress</Text>
           <BrandthreadCard style={{ marginHorizontal: SP.md }} glow={!isTerminal}>
-            <OrderStatusTimeline status={order.status} />
+            <OrderProgressTimeline
+              status={order.status}
+              createdAt={order.createdAt}
+              shippedAt={order.shippedAt}
+              trackingStatus={order.trackingStatus}
+              trackingCarrier={order.trackingCarrier}
+              trackingNumber={order.trackingNumber}
+              onTrackPress={handleTrackOnCarrier}
+            />
           </BrandthreadCard>
         </View>
 
