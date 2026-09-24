@@ -8,3 +8,9 @@ Brandthread web is the existing Expo Router product exported for browser hosting
 **Why:** Static browser hosting changes the auth origin and exposes every route to direct navigation. A same-origin boundary keeps deployment/custom-domain changes from breaking authenticated calls, while avoiding hardcoded temporary domains. Multiple crawlable hostnames also split search authority and can leak unstable generated URLs into links, emails, and hosted payment flows.
 
 **How to apply:** Build browser releases with Expo's web static export and serve deep links through an HTML-only SPA fallback. Published builds, metadata, API-generated links, and hosted-flow callbacks use `https://brandthread.app`; local previews keep their active development origin. In production, launch the Node static server directly (not through a package-manager wrapper) and use `/status` as the explicit startup probe. Keep preview auth bypasses explicit and development-only. Camera capture, native push, biometrics, Agora live video, and calls must show a clear mobile-only state on web; never report success or silently no-op.
+
+React Native `Alert.alert` is not a visible validation surface in Expo web. Forms shared with web must show blocking validation and request failures inline as well; a native alert may supplement, but not replace, that feedback.
+
+**Why:** A product form could reject an incomplete publish while appearing to do nothing in the browser preview, even though its native alert path worked.
+
+**How to apply:** On any cross-platform form, render publish/save errors in the page near the action. Verify an invalid submission visibly fails in the web preview, not just through a mocked native alert.

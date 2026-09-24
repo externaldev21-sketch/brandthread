@@ -166,11 +166,6 @@ describe('seller bar full-screen deny-list', () => {
     'quote-request',
     'seller-go-live',
     'seller-live',
-    // Brandthread AI screen: immersive full-screen chat with its own
-    // floating composer pinned to the safe-area bottom inset — the bar must
-    // never render underneath it (it previously did, and the AI composer
-    // rendered behind it).
-    'ai-brain',
   ];
 
   for (const route of mustHideBar) {
@@ -179,6 +174,10 @@ describe('seller bar full-screen deny-list', () => {
       expect(setBody).toContain(`'${route}'`);
     });
   }
+
+  it('keeps the seller bar visible on the AI chat route', () => {
+    expect(setBlock()![1]).not.toContain("'ai-brain'");
+  });
 
   // Normal pushed seller management screens — the bar must show on all of
   // these, so none of them may appear in the deny-list.

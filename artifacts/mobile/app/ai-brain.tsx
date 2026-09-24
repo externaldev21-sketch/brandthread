@@ -9,11 +9,8 @@
  *  - The UI only shows a temporary streaming indicator (not persisted).
  *  - This eliminates the duplicate-message defect.
  *
- * This screen is an immersive full-screen takeover (see the deny-list entry
- * in app/_layout.tsx) — the floating seller tab bar never renders underneath
- * it, so the composer, suggestions and messages never fight it for space or
- * the keyboard. All bottom spacing here answers only to the safe-area home
- * indicator inset, never the tab bar's own metrics.
+ * The seller tab bar stays mounted. Its shared metrics reserve space for the
+ * composer at rest; keyboard avoidance replaces that spacing while typing.
  */
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
@@ -24,6 +21,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Pressable,
   Alert,
@@ -41,6 +39,7 @@ import { useReducedMotion } from 'react-native-reanimated';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import AuroraGlow from '@/components/ai/AuroraGlow';
 import AiComposer from '@/components/ai/AiComposer';
+import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import MarkdownLite from '@/components/ai/MarkdownLite';
 import { useColors } from '@/hooks/useColors';
 import {
@@ -393,9 +392,10 @@ export default function AiBrainScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const sellerBar = useTabBarMetrics(2);
   const { width } = useWindowDimensions();
   const isTablet = width >= BREAKPOINT.tablet;
-  const { getToken, userId } = useAuth();
+  const { getToken, userId, isSignedIn, isLoaded } = useAuth();
   const params = useLocalSearchParams<{ context?: string }>();
 
   const parsedContext: AIScreenContext = useMemo(() => {
@@ -411,6 +411,7 @@ export default function AiBrainScreen() {
   const [session, setSession] = useState<AISession | null>(null);
   const [inputText, setInputText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   /**
    * When a request fails we keep the error alongside the preserved input
    * so the user can retry without retyping.
@@ -419,6 +420,12 @@ export default function AiBrainScreen() {
   const [pendingRetryText, setPendingRetryText] = useState<string>('');
 
   const flatListRef = useRef<FlatList<AIMessage>>(null);
+
+  useEffect(() => {
+    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboardVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   // Track the last user/store context so we can reload on switch.
   const lastUserIdRef = useRef<string | null | undefined>(undefined);
@@ -452,6 +459,10 @@ export default function AiBrainScreen() {
     async (override?: string) => {
       const text = (override ?? inputText).trim();
       if (!text || isGenerating || !session) return;
+      if (!isSignedIn) {
+        setErrorMsg('Sign in to use Brandthread AI.');
+        return;
+      }
 
       setInputText('');
       setErrorMsg(null);
@@ -459,9 +470,8 @@ export default function AiBrainScreen() {
       setIsGenerating(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-      const token = await getToken().catch(() => null);
-
       try {
+        const token = await getToken();
         const result = await sendMessage({
           userText: text,
           session,
@@ -481,7 +491,7 @@ export default function AiBrainScreen() {
         setIsGenerating(false);
       }
     },
-    [inputText, isGenerating, session, getToken, userId, storeContext],
+    [inputText, isGenerating, session, isSignedIn, getToken, userId, storeContext],
   );
 
   // ─── Pill tap (populates composer only — user taps send) ────────────────────
@@ -648,10 +658,10 @@ export default function AiBrainScreen() {
 
   const label = contextLabel(parsedContext);
   const canSend = inputText.trim().length > 0 && !isGenerating;
-  // Home-indicator-safe bottom padding. The tab bar never renders on this
-  // screen (see the full-screen deny-list in app/_layout.tsx), so this is
-  // the only bottom inset the composer needs to clear.
-  const composerBottomInset = Math.max(insets.bottom, 8);
+  // The bar is absolutely positioned outside this screen. Leave room for its
+  // whole footprint at rest; once the keyboard opens, KAV lifts the composer
+  // above the keyboard so it needs only a small gap.
+  const composerBottomInset = keyboardVisible ? 8 : sellerBar.occupiedHeight;
 
   return (
     <View style={styles.root}>
@@ -696,7 +706,23 @@ export default function AiBrainScreen() {
         </View>
 
         {/* ── Error banner ────────────────────────────────────────────────── */}
-        {errorMsg ? (
+        {!isSignedIn ? (
+          <View style={styles.signInBanner}>
+            <Text style={styles.signInBannerText}>
+              {isLoaded ? 'Sign in to chat with your brand’s data.' : 'Checking your account…'}
+            </Text>
+            {isLoaded ? (
+              <TouchableOpacity
+                onPress={() => router.push('/sign-in' as never)}
+                accessibilityRole="button"
+                accessibilityLabel="Sign in to use Brandthread AI"
+                style={styles.signInButton}
+              >
+                <Text style={styles.signInButtonText}>Sign in</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : errorMsg ? (
           <View style={styles.errorBanner}>
             <Feather name="alert-circle" size={14} color={RED} style={{ marginRight: 6 }} />
             <Text style={styles.errorBannerText} numberOfLines={2}>{errorMsg}</Text>
@@ -803,6 +829,29 @@ const styles = StyleSheet.create({
   },
 
   // ── Error banner
+  signInBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.xs,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: BORDER,
+  },
+  signInBannerText: {
+    flex: 1,
+    color: MUTED,
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+  },
+  signInButton: {
+    paddingHorizontal: SP.sm,
+    paddingVertical: SP.xs,
+  },
+  signInButtonText: {
+    color: FG,
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+  },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -24,16 +24,18 @@ const composer = read('components/ai/AiComposer.tsx');
 // ─── Bug fix: composer/content must clear the tab bar + home indicator ───────
 
 describe('ai-brain input is never behind the seller tab bar', () => {
-  it('the ai-brain route is deny-listed so the global seller tab bar never mounts on top of it', () => {
+  it('the ai-brain route keeps the global seller tab bar mounted', () => {
     const setBlock = rootLayout.match(
       /const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set\(\[([\s\S]*?)\]\)/,
     );
     expect(setBlock, 'deny-list set must exist').toBeTruthy();
-    expect(setBlock![1]).toContain("'ai-brain'");
+    expect(setBlock![1]).not.toContain("'ai-brain'");
   });
 
-  it('the composer pins its own bottom padding to the safe-area inset, not a hardcoded value', () => {
-    expect(screen).toContain('insets.bottom');
+  it('reserves the shared seller tab-bar height at rest and a small gap above the keyboard', () => {
+    expect(screen).toContain('useTabBarMetrics(2)');
+    expect(screen).toContain('sellerBar.occupiedHeight');
+    expect(screen).toContain('keyboardVisible ? 8 : sellerBar.occupiedHeight');
     expect(screen).toContain('composerBottomInset');
   });
 
@@ -45,6 +47,22 @@ describe('ai-brain input is never behind the seller tab bar', () => {
   it('renders the composer through the shared AiComposer component, not an inline input row', () => {
     expect(screen).toContain('<AiComposer');
     expect(screen).toContain("from '@/components/ai/AiComposer'");
+  });
+
+  it('keeps the input focusable and submits text from the keyboard or send button', () => {
+    expect(composer).toContain('pointerEvents="none"');
+    expect(composer).toContain('submitBehavior="submit"');
+    expect(composer).toContain('onChangeText={onChangeText}');
+    expect(composer).toContain('onPress={isGenerating ? onStop : onSend}');
+    expect(composer).toContain('zIndex: 1');
+    expect(composer).toContain('height: 36');
+    expect(composer).toContain('minHeight: 36');
+  });
+
+  it('directs signed-out preview users to real sign-in instead of pretending AI can answer', () => {
+    expect(screen).toContain("router.push('/sign-in'");
+    expect(screen).toContain('if (!isSignedIn)');
+    expect(screen).toContain('const token = await getToken()');
   });
 });
 
