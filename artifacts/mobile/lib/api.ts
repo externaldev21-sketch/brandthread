@@ -666,6 +666,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Schedule the follower broadcast for the drop's releaseAt. */
       scheduleBroadcast: (dropId: string, scheduledBroadcastAt: string) =>
         patch<any>(`/api/drops/${encodeURIComponent(dropId)}`, { scheduledBroadcastAt }),
+      /** Cancel a drop before/after launch. Pre-order drops with held funds require { confirm: true }. */
+      cancel: (dropId: string, confirm?: boolean) =>
+        post<any>(`/api/drops/${encodeURIComponent(dropId)}/cancel`, confirm ? { confirm } : {}),
     },
     analytics: {
       dashboard:  () => get('/api/analytics/dashboard'),
@@ -1695,7 +1698,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     /** Buyer-facing drops listing (active, with countdown releaseAt) */
     publicDrops: {
-      list: () => get<any[]>('/api/public/drops'),
+      list: (section?: 'upcoming' | 'live' | 'recent') =>
+        get<any[]>(`/api/public/drops${section ? `?section=${section}` : ''}`),
       get:  (id: string) => get<any>(`/api/public/drops/${encodeURIComponent(id)}`),
       notificationStatus: (id: string) =>
         get<{ subscribed: boolean }>(`/api/public/drops/${encodeURIComponent(id)}/notify`),

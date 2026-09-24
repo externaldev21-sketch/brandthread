@@ -30,6 +30,7 @@ import { formatCents } from '@/lib/money';
 import { getSellerFollowState, setSellerFollowing } from '@/services/socialService';
 import { FONT, FS, SP, RADIUS, GRID_MAX_WIDTH } from '@/lib/theme';
 import { buildCanonicalProfileUrl } from '@/lib/shareProfile';
+import { BrandDropsCard } from '@/components/BrandDropsCard';
 import { confirmBlock, reportHref } from '@/lib/safety';
 import { GridSkeleton, ResponsiveContainer, useGridColumns, useBreakpoint } from '@/components/layout';
 import { BrandHero, useBrandHeroScrollY, type BrandHeroStat } from '@/components/profile/BrandHero';
@@ -799,6 +800,9 @@ export default function SellerProfileScreen() {
             </View>
           )}
         </BrandHero>
+
+        {/* Drops entry point — small, additive; see BrandDropsCard */}
+        <BrandDropsCard sellerId={canonicalSellerId ?? profile.sellerId} sellerName={profile.brandName} />
 
         {/* Shop button (buyer only) */}
         {!isOwner && (

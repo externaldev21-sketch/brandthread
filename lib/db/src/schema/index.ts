@@ -242,6 +242,15 @@ export const drops = pgTable('drops', {
   releaseAt: timestamp('release_at'),             // when the drop goes live to buyers (countdown)
   endsAt: timestamp('ends_at', { withTimezone: true }),
   scheduledBroadcastAt: timestamp('scheduled_broadcast_at'), // when the follower notification should be sent
+  // ── Cinematic launch page (buyer-facing) ─────────────────────────────────
+  heroImageUrl: text('hero_image_url'),
+  heroVideoUrl: text('hero_video_url'),
+  // IANA tz name the seller picked the launch time in, e.g. 'America/New_York'.
+  // releaseAt itself is always stored/compared in UTC; this is display-only.
+  launchTimezone: text('launch_timezone').notNull().default('UTC'),
+  // Minutes before releaseAt that followers of this seller may buy/see the
+  // drop unlock. 0 = no early access. Checked server-side in checkoutPlan.ts.
+  earlyAccessMinutes: integer('early_access_minutes').notNull().default(0),
   estimatedShipDate: timestamp('estimated_ship_date'),
   totalCollectedCents: integer('total_collected_cents').notNull().default(0),
   orderCount: integer('order_count').notNull().default(0),

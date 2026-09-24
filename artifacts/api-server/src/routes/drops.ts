@@ -7,8 +7,10 @@ import {
   follows,
   dropAlertSubscriptions,
   dropBroadcasts,
+  products,
+  productVariants,
 } from "@workspace/db";
-import { eq, desc, and, notExists } from "drizzle-orm";
+import { eq, desc, and, notExists, isNull, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole } from "../middlewares/requireRole";
 import { deliverDropBroadcast } from "../lib/dropBroadcast";
@@ -27,6 +29,11 @@ const dropFields = {
   type: drops.type,
   status: drops.status,
   releaseAt: drops.releaseAt,
+  endsAt: drops.endsAt,
+  heroImageUrl: drops.heroImageUrl,
+  heroVideoUrl: drops.heroVideoUrl,
+  launchTimezone: drops.launchTimezone,
+  earlyAccessMinutes: drops.earlyAccessMinutes,
   scheduledBroadcastAt: drops.scheduledBroadcastAt,
   estimatedShipDate: drops.estimatedShipDate,
   totalCollectedCents: drops.totalCollectedCents,
@@ -76,7 +83,10 @@ router.get("/", async (req, res) => {
 // POST /api/drops
 router.post("/", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const { name, type, estimatedShipDate, estimatedPayoutDate, fulfillmentDeadlineAt } = req.body;
+  const {
+    name, type, estimatedShipDate, estimatedPayoutDate, fulfillmentDeadlineAt,
+    releaseAt, endsAt, heroImageUrl, heroVideoUrl, launchTimezone, earlyAccessMinutes,
+  } = req.body;
   if (!name || typeof name !== "string") { res.status(400).json({ error: "name required" }); return; }
   if (!["pre-order", "pre-made"].includes(type)) {
     res.status(400).json({ error: "type must be 'pre-order' or 'pre-made'" }); return;
@@ -84,6 +94,20 @@ router.post("/", requireRole("manager"), async (req, res) => {
   const shipDate = estimatedShipDate ? new Date(estimatedShipDate) : undefined;
   if (shipDate && Number.isNaN(shipDate.valueOf())) {
     res.status(400).json({ error: "estimatedShipDate must be a valid ISO date" }); return;
+  }
+  const parsedReleaseAt = releaseAt ? new Date(releaseAt) : undefined;
+  if (parsedReleaseAt && Number.isNaN(parsedReleaseAt.valueOf())) {
+    res.status(400).json({ error: "releaseAt must be a valid ISO date" }); return;
+  }
+  const parsedEndsAt = endsAt ? new Date(endsAt) : undefined;
+  if (parsedEndsAt && Number.isNaN(parsedEndsAt.valueOf())) {
+    res.status(400).json({ error: "endsAt must be a valid ISO date" }); return;
+  }
+  if (parsedReleaseAt && parsedEndsAt && parsedEndsAt.valueOf() <= parsedReleaseAt.valueOf()) {
+    res.status(400).json({ error: "endsAt must be after releaseAt" }); return;
+  }
+  if (earlyAccessMinutes !== undefined && (!Number.isInteger(earlyAccessMinutes) || earlyAccessMinutes < 0)) {
+    res.status(400).json({ error: "earlyAccessMinutes must be a non-negative integer" }); return;
   }
   // Pre-order money is held by Brandthread until each order ships, and is
   // refunded automatically if unshipped orders remain after the deadline.
@@ -105,6 +129,12 @@ router.post("/", requireRole("manager"), async (req, res) => {
     payoutStatus,
     estimatedShipDate: shipDate,
     estimatedPayoutDate: estimatedPayoutDate ? new Date(estimatedPayoutDate) : undefined,
+    ...(parsedReleaseAt && { releaseAt: parsedReleaseAt }),
+    ...(parsedEndsAt && { endsAt: parsedEndsAt }),
+    ...(typeof heroImageUrl === "string" && { heroImageUrl }),
+    ...(typeof heroVideoUrl === "string" && { heroVideoUrl }),
+    ...(typeof launchTimezone === "string" && launchTimezone && { launchTimezone }),
+    ...(earlyAccessMinutes !== undefined && { earlyAccessMinutes }),
     ...(type === "pre-order" ? { escrowState: "collecting", fulfillmentDeadlineAt: deadline } : {}),
   }).returning();
   res.status(201).json(drop);
@@ -129,18 +159,33 @@ router.get("/:id", async (req, res) => {
     .where(and(eq(drops.id, req.params.id), eq(drops.ownerId, ownerId)))
     .limit(1);
   if (!drop) { res.status(404).json({ error: "Not found" }); return; }
-  const dropOrders = await db
-    .select({
-      id: orders.id, orderNumber: orders.orderNumber, status: orders.status,
-      totalCents: orders.totalCents, createdAt: orders.createdAt,
-      customerName: customers.name,
-    })
-    .from(orders)
-    .leftJoin(customers, eq(orders.customerId, customers.id))
-    .where(and(eq(orders.dropId, drop.id), eq(orders.ownerId, ownerId)))
-    .orderBy(desc(orders.createdAt))
-    .limit(20);
-  res.json({ ...drop, orders: dropOrders });
+  const [dropOrders, dropProducts] = await Promise.all([
+    db
+      .select({
+        id: orders.id, orderNumber: orders.orderNumber, status: orders.status,
+        totalCents: orders.totalCents, createdAt: orders.createdAt,
+        customerName: customers.name,
+      })
+      .from(orders)
+      .leftJoin(customers, eq(orders.customerId, customers.id))
+      .where(and(eq(orders.dropId, drop.id), eq(orders.ownerId, ownerId)))
+      .orderBy(desc(orders.createdAt))
+      .limit(20),
+    // Product list + aggregate remaining stock, for the seller's drop-page preview.
+    db
+      .select({
+        id: products.id, name: products.name, description: products.description,
+        images: products.images, status: products.status,
+        stockRemaining: sql<number>`coalesce(sum(${productVariants.stock}), 0)`,
+      })
+      .from(products)
+      .leftJoin(productVariants, eq(productVariants.productId, products.id))
+      .where(and(eq(products.dropId, drop.id), isNull(products.deletedAt)))
+      .groupBy(products.id)
+      .orderBy(products.createdAt)
+      .limit(50),
+  ]);
+  res.json({ ...drop, orders: dropOrders, products: dropProducts });
 });
 
 // PATCH /api/drops/:id
@@ -152,6 +197,7 @@ router.patch("/:id", requireRole("manager"), async (req, res) => {
   const {
     name, status, mfgProgress, estimatedShipDate,
     scheduledBroadcastAt, fulfillmentDeadlineAt,
+    releaseAt, endsAt, heroImageUrl, heroVideoUrl, launchTimezone, earlyAccessMinutes,
   } = req.body;
   const scheduleWasProvided = Object.prototype.hasOwnProperty.call(req.body, "scheduledBroadcastAt");
 
@@ -162,6 +208,23 @@ router.patch("/:id", requireRole("manager"), async (req, res) => {
   const validStatuses = ["draft", "active", "closed", "fulfilled"];
   if (status && !validStatuses.includes(status)) {
     res.status(400).json({ error: `status must be one of: ${validStatuses.join(", ")}` }); return;
+  }
+  let parsedReleaseAt: Date | undefined;
+  if (releaseAt !== undefined && releaseAt !== null) {
+    parsedReleaseAt = new Date(releaseAt);
+    if (Number.isNaN(parsedReleaseAt.valueOf())) {
+      res.status(400).json({ error: "releaseAt must be a valid ISO date" }); return;
+    }
+  }
+  let parsedEndsAt: Date | undefined;
+  if (endsAt !== undefined && endsAt !== null) {
+    parsedEndsAt = new Date(endsAt);
+    if (Number.isNaN(parsedEndsAt.valueOf())) {
+      res.status(400).json({ error: "endsAt must be a valid ISO date" }); return;
+    }
+  }
+  if (earlyAccessMinutes !== undefined && (!Number.isInteger(earlyAccessMinutes) || earlyAccessMinutes < 0)) {
+    res.status(400).json({ error: "earlyAccessMinutes must be a non-negative integer" }); return;
   }
 
   const [currentDrop] = await db.select({
@@ -237,6 +300,12 @@ router.patch("/:id", requireRole("manager"), async (req, res) => {
       ...(estimatedShipDate && { estimatedShipDate: new Date(estimatedShipDate) }),
       ...(deadline && { fulfillmentDeadlineAt: deadline }),
       ...(scheduleWasProvided && { scheduledBroadcastAt: scheduledBroadcastDate }),
+      ...(parsedReleaseAt && { releaseAt: parsedReleaseAt }),
+      ...(parsedEndsAt && { endsAt: parsedEndsAt }),
+      ...(typeof heroImageUrl === "string" && { heroImageUrl }),
+      ...(typeof heroVideoUrl === "string" && { heroVideoUrl }),
+      ...(typeof launchTimezone === "string" && launchTimezone && { launchTimezone }),
+      ...(earlyAccessMinutes !== undefined && { earlyAccessMinutes }),
       updatedAt: new Date(),
     })
     .where(and(...updateConditions))
@@ -278,6 +347,43 @@ router.post("/:id/cancel-preorders", requireRole("manager"), async (req, res): P
     req.log.error({ err, dropId: drop.id }, "Failed to cancel preorder drop");
     res.status(500).json({ error: "Could not cancel the drop. Refunds will be retried automatically." });
   }
+});
+
+// ─── POST /api/drops/:id/cancel ──────────────────────────────────────────────
+// Unified cancel for the seller's "Cancel drop" action. Pre-order drops with
+// money already held route through the existing refund flow; everything else
+// (pre-made drops, or a preorder drop that hasn't collected a single order)
+// just closes the drop so it stops accepting purchases and drops off Discover.
+router.post("/:id/cancel", requireRole("manager"), async (req, res): Promise<void> => {
+  const sellerId = (req as any).clerkUserId as string;
+  const [drop] = await db.select({
+    id: drops.id, type: drops.type, status: drops.status, escrowState: drops.escrowState,
+  }).from(drops).where(and(eq(drops.id, req.params.id), eq(drops.ownerId, sellerId))).limit(1);
+  if (!drop) { res.status(404).json({ error: "Drop not found" }); return; }
+  if (drop.status === "closed" || drop.status === "fulfilled") {
+    res.status(409).json({ error: `This drop is already ${drop.status}`, code: "DROP_FINISHED" }); return;
+  }
+
+  if (drop.type === "pre-order" && drop.escrowState && !["completed", "failed"].includes(drop.escrowState)) {
+    if (req.body?.confirm !== true) {
+      res.status(400).json({ error: "This drop has held preorder funds. Send { confirm: true } to refund every unshipped order and cancel.", code: "CONFIRM_REQUIRED" });
+      return;
+    }
+    try {
+      const summary = await failDrop(drop.id, "seller_cancelled", sellerId);
+      res.json({ ...summary, status: "closed" });
+    } catch (err) {
+      req.log.error({ err, dropId: drop.id }, "Failed to cancel preorder drop");
+      res.status(500).json({ error: "Could not cancel the drop. Refunds will be retried automatically." });
+    }
+    return;
+  }
+
+  const [updated] = await db.update(drops)
+    .set({ status: "closed", scheduledBroadcastAt: null, updatedAt: new Date() })
+    .where(and(eq(drops.id, drop.id), eq(drops.ownerId, sellerId)))
+    .returning();
+  res.json(updated);
 });
 
 // ─── GET /api/drops/:id/broadcast-preview ────────────────────────────────────

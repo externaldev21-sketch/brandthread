@@ -1030,6 +1030,10 @@ function RootLayoutNav() {
         <Stack.Screen name="buyer-qr-code"              options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-post-viewer"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-drop-detail"        options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-drops"              options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-drops"             options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-drop-create"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-drop-preview"      options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-highlights-manager"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-report"            options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-post-comments"     options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal', contentStyle: OPAQUE_SCREEN_CONTENT }} />

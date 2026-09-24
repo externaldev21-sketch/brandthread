@@ -4,9 +4,11 @@
  */
 import { Router } from "express";
 import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems, follows, savedCollections, savedItems } from "@workspace/db";
+import { getAuth } from "@clerk/express";
+import { effectiveDropLaunchAt } from "../lib/money/dropLaunch";
 import { adaptSavedRows } from "../lib/savedItemAdapter";
 import { fetchProductBadgeInfo } from "../lib/savedProductBadges";
-import { eq, and, asc, desc, ne, inArray, notInArray, or, ilike, sql, count, gte, lte, isNull, isNotNull } from "drizzle-orm";
+import { eq, and, asc, desc, ne, inArray, notInArray, or, ilike, sql, count, gt, gte, lte, isNull, isNotNull } from "drizzle-orm";
 import { computeTrendingForToday, isCacheFresh } from "../jobs/computeTrending";
 import { computeSellerRankingForToday, isSellerRankingCacheFresh } from "../jobs/computeSellerRanking";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -916,25 +918,65 @@ router.get("/sellers/:sellerId", async (req, res) => {
 });
 
 // ─── GET /api/public/drops — buyer-facing active drops with countdown ─────────
+// ?section=upcoming|live|recent narrows the browse screen's three tabs; the
+// bare endpoint (no section) keeps its original "active, soonest first"
+// shape for existing callers (Discover, Following).
 router.get("/drops", async (req, res) => {
   setPublicCacheHeaders(res);
-  const activeDrops = await db
-    .select({
-      id:                drops.id,
-      ownerId:           drops.ownerId,
-      name:              drops.name,
-      type:              drops.type,
-      status:            drops.status,
-      releaseAt:         drops.releaseAt,
-      estimatedShipDate: drops.estimatedShipDate,
-      orderCount:        drops.orderCount,
-      mfgProgress:       drops.mfgProgress,
-      createdAt:         drops.createdAt,
-    })
-    .from(drops)
-    .where(eq(drops.status, "active"))
-    .orderBy(drops.releaseAt)
-    .limit(50);
+  const now = new Date();
+  const section = typeof req.query.section === "string" ? req.query.section : undefined;
+
+  const dropSelect = {
+    id:                drops.id,
+    ownerId:           drops.ownerId,
+    name:              drops.name,
+    type:              drops.type,
+    status:            drops.status,
+    releaseAt:         drops.releaseAt,
+    endsAt:            drops.endsAt,
+    heroImageUrl:      drops.heroImageUrl,
+    heroVideoUrl:      drops.heroVideoUrl,
+    launchTimezone:    drops.launchTimezone,
+    estimatedShipDate: drops.estimatedShipDate,
+    orderCount:        drops.orderCount,
+    mfgProgress:       drops.mfgProgress,
+    createdAt:         drops.createdAt,
+  };
+
+  let activeDrops;
+  if (section === "recent") {
+    activeDrops = await db.select(dropSelect).from(drops)
+      .where(and(
+        inArray(drops.status, ["closed", "fulfilled"]),
+        isNotNull(drops.releaseAt),
+      ))
+      .orderBy(desc(drops.releaseAt))
+      .limit(50);
+  } else if (section === "live") {
+    activeDrops = await db.select(dropSelect).from(drops)
+      .where(and(
+        eq(drops.status, "active"),
+        isNotNull(drops.releaseAt),
+        lte(drops.releaseAt, now),
+        or(isNull(drops.endsAt), gt(drops.endsAt, now)),
+      ))
+      .orderBy(drops.releaseAt)
+      .limit(50);
+  } else if (section === "upcoming") {
+    activeDrops = await db.select(dropSelect).from(drops)
+      .where(and(
+        eq(drops.status, "active"),
+        isNotNull(drops.releaseAt),
+        gt(drops.releaseAt, now),
+      ))
+      .orderBy(drops.releaseAt)
+      .limit(50);
+  } else {
+    activeDrops = await db.select(dropSelect).from(drops)
+      .where(eq(drops.status, "active"))
+      .orderBy(drops.releaseAt)
+      .limit(50);
+  }
 
   if (activeDrops.length === 0) return res.json([]);
 
@@ -948,17 +990,21 @@ router.get("/drops", async (req, res) => {
   return res.json(activeDrops.map((d) => ({ ...d, seller: sellerMap.get(d.ownerId) ?? null })));
 });
 
-// ─── GET /api/public/drops/:id — single active drop detail ────────────────────
+// ─── GET /api/public/drops/:id — single drop detail (countdown, live, or recap) ──
+// Any non-draft status is visible: 'active' covers upcoming-countdown and live,
+// 'closed'/'fulfilled' still resolve so the buyer page can render its recap
+// state instead of a dead link once the drop is over.
 router.get("/drops/:id", async (req, res) => {
   setPublicCacheHeaders(res);
   const [drop] = await db
     .select()
     .from(drops)
-    .where(and(eq(drops.id, req.params.id), eq(drops.status, "active")))
+    .where(and(eq(drops.id, req.params.id), ne(drops.status, "draft")))
     .limit(1);
-  if (!drop) return res.status(404).json({ error: "Drop not found or not active" });
+  if (!drop) return res.status(404).json({ error: "Drop not found" });
 
-  const [[seller], dropProducts] = await Promise.all([
+  const { userId } = getAuth(req);
+  const [[seller], dropProducts, isFollower] = await Promise.all([
     db
       .select({ displayName: users.displayName, brandName: users.brandName, verified: users.verified, verificationStatus: users.verificationStatus, activeStanding: users.activeStanding, policyRestricted: users.policyRestricted })
       .from(users)
@@ -966,22 +1012,44 @@ router.get("/drops/:id", async (req, res) => {
       .limit(1),
     db
       .select({
-        id:          products.id,
-        name:        products.name,
-        description: products.description,
-        category:    products.category,
-        status:      products.status,
-        images:      products.images,
-        isPreOrder:  products.isPreOrder,
-        createdAt:   products.createdAt,
+        id:             products.id,
+        name:           products.name,
+        description:    products.description,
+        category:       products.category,
+        status:         products.status,
+        images:         products.images,
+        isPreOrder:     products.isPreOrder,
+        createdAt:      products.createdAt,
+        stockRemaining: sql<number>`coalesce(sum(${productVariants.stock}), 0)`,
       })
       .from(products)
+      .leftJoin(productVariants, eq(productVariants.productId, products.id))
       .where(and(eq(products.dropId, req.params.id), eq(products.status, "active"), isNull(products.deletedAt)))
+      .groupBy(products.id)
       .orderBy(products.createdAt)
       .limit(50),
+    userId
+      ? db.select({ followerId: follows.followerId }).from(follows)
+          .where(and(eq(follows.followerId, userId), eq(follows.followingId, drop.ownerId)))
+          .limit(1)
+          .then((rows) => rows.length > 0)
+      : Promise.resolve(false),
   ]);
 
-  return res.json({ ...drop, seller: seller ? { ...seller, verified: deriveSellerVerified(seller) } : null, products: dropProducts });
+  // The effective moment this viewer may buy/see the drop unlock — releaseAt
+  // pulled forward by the seller's early-access window for their followers.
+  const viewerHasEarlyAccess = isFollower && drop.earlyAccessMinutes > 0;
+  const effectiveReleaseAt = drop.releaseAt
+    ? effectiveDropLaunchAt(drop.releaseAt, drop.earlyAccessMinutes, isFollower)
+    : null;
+
+  return res.json({
+    ...drop,
+    seller: seller ? { ...seller, verified: deriveSellerVerified(seller) } : null,
+    products: dropProducts.map((p) => ({ ...p, soldOut: p.stockRemaining <= 0 })),
+    viewerHasEarlyAccess,
+    effectiveReleaseAt,
+  });
 });
 
 router.get("/drops/:id/notify", requireAuth, async (req, res): Promise<void> => {
