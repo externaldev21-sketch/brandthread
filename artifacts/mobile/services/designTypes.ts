@@ -7,10 +7,13 @@ export type DesignLayerType = 'drawing' | 'text' | 'image' | 'shape' | 'group';
 export type GarmentType = 'tshirt' | 'hoodie' | 'sweatshirt' | 'sweatpants' | 'shorts' | 'jacket' | 'denim' | 'hat' | 'bag' | 'packaging';
 export type GarmentView = 'front' | 'back' | 'side' | 'detail';
 export type PlacementType = 'center_chest' | 'left_chest' | 'full_front' | 'full_back' | 'upper_back' | 'sleeve' | 'pocket' | 'neck_label' | 'hem_label' | 'custom';
-export type ShapeKind = 'rect' | 'circle' | 'triangle' | 'line' | 'star';
+export type ShapeKind = 'rect' | 'circle' | 'triangle' | 'line' | 'star' | 'ellipse' | 'polygon';
 export type BlendModeKind = 'normal' | 'multiply' | 'screen' | 'overlay' | 'darken' | 'lighten';
 export type EffectKind = 'shadow' | 'blur' | 'glow' | 'outline' | 'grayscale' | 'contrast' | 'brightness' | 'saturation' | 'tint';
-export type CanvasPresetId = 'square' | 'portrait' | 'landscape' | 'story' | 'post' | 'product' | 'print' | 'custom';
+export type CanvasPresetId =
+  | 'square' | 'portrait' | 'landscape' | 'story' | 'post' | 'product' | 'print' | 'custom'
+  // Procreate-style print/garment presets (lib/canvasPresets.ts holds concrete px/dpi)
+  | 'a4' | 'tee_front' | 'tee_back' | 'hoodie_front' | 'hoodie_back' | 'label';
 
 // AIStyleKind — union of all styles referenced across screens
 export type AIStyleKind =
@@ -136,6 +139,19 @@ export interface DesignLayer {
   updatedAt: string;
   /** Persisted adjustments (curves, liquify). Added by AdjustmentsTool. */
   adjustments?: import('../lib/adjustmentsModel').DesignLayerAdjustments;
+  /**
+   * Garment guide layer (lib/garmentTemplates.ts): a LOCKED, non-exportable
+   * flat-sketch outline rendered beneath the user's design layers. Always
+   * paired with locked: true. Excluded from export/flatten and from
+   * hit-testing/selection.
+   */
+  isTemplate?: boolean;
+  /** Blend mode for this layer's compositing (extends the opacity-only model). */
+  blendMode?: BlendModeKind;
+  /** Alpha lock — new strokes/fills only affect already-opaque pixels of this layer. */
+  alphaLocked?: boolean;
+  /** Clipping mask — layer is clipped to the alpha of the layer directly below it. */
+  clippingMask?: boolean;
 }
 
 export interface DesignCanvas {
@@ -144,6 +160,10 @@ export interface DesignCanvas {
   backgroundHex: string;
   backgroundImageUri?: string;
   backgroundOpacity?: number;
+  /** Print resolution in dots-per-inch (set by canvas creation presets, up to 4000px @ 300dpi). */
+  dpi?: number;
+  /** Which CanvasPresetId (if any) this canvas was created from. */
+  presetId?: CanvasPresetId;
 }
 
 export interface GarmentPlacement {
@@ -347,7 +367,7 @@ export const AI_STYLES: { value: AIStyleKind; label: string }[] = [
   { value: 'custom',     label: 'Custom' },
 ];
 
-export const CANVAS_PRESETS: { id: CanvasPresetId; label: string; width: number; height: number; ratio?: string }[] = [
+export const CANVAS_PRESETS: { id: CanvasPresetId; label: string; width: number; height: number; ratio?: string; dpi?: number }[] = [
   { id: 'square',   label: 'Square',        width: 1080, height: 1080, ratio: '1:1' },
   { id: 'portrait', label: 'Portrait',      width: 1080, height: 1350, ratio: '4:5' },
   { id: 'landscape',label: 'Landscape',     width: 1920, height: 1080, ratio: '16:9' },
@@ -355,6 +375,12 @@ export const CANVAS_PRESETS: { id: CanvasPresetId; label: string; width: number;
   { id: 'post',     label: 'Post',          width: 1080, height: 1350, ratio: '4:5' },
   { id: 'product',  label: 'Product Image', width: 2000, height: 2000, ratio: '1:1' },
   { id: 'print',    label: 'Print',         width: 3300, height: 5100, ratio: 'Letter' },
+  { id: 'a4',       label: 'A4 Print',      width: 2480, height: 3508, ratio: 'A4',    dpi: 300 },
+  { id: 'tee_front',    label: 'Tee — Front',    width: 4000, height: 4000, ratio: '1:1', dpi: 300 },
+  { id: 'tee_back',     label: 'Tee — Back',     width: 4000, height: 4000, ratio: '1:1', dpi: 300 },
+  { id: 'hoodie_front', label: 'Hoodie — Front', width: 3600, height: 4000, ratio: '9:10', dpi: 300 },
+  { id: 'hoodie_back',  label: 'Hoodie — Back',  width: 3600, height: 4000, ratio: '9:10', dpi: 300 },
+  { id: 'label',        label: 'Label',          width: 1200, height: 600,  ratio: '2:1',  dpi: 300 },
   { id: 'custom',   label: 'Custom Size',   width: 1080, height: 1080 },
 ];
 
