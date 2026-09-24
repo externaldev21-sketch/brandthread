@@ -165,7 +165,7 @@ export interface MessageAttachment {
   meta?: Record<string, string>;
 }
 
-export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'failed';
+export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
 
 /** Small fixed reaction bar (no free-form emoji picker). One of REACTION_TYPES. */
 export type ReactionType = 'like' | 'love' | 'haha' | 'wow' | 'sad' | 'fire';
@@ -179,6 +179,12 @@ export interface MessageReaction {
   /** Same value as `emoji`, explicitly typed. */
   reactionType?: ReactionType;
   createdAt?: string;
+  /** The API's own field names (see `GET/POST /api/conversations/:id/messages`).
+   *  Present on reactions that came straight from the server; local/optimistic
+   *  reactions use `fromId`/`fromName`/`emoji` instead. Readers should fall
+   *  back through both naming schemes. */
+  userId?: string;
+  userName?: string;
 }
 
 export interface Message {
@@ -194,6 +200,11 @@ export interface Message {
   replyPreview?: string;
   reactions: MessageReaction[];
   status: MessageStatus;   // delivered/read only shown with backend confirmation
+  /** ISO timestamp the recipient's device received the message, when known. */
+  deliveredAt?: string;
+  /** ISO timestamp the recipient read the message, when known — drives the
+   *  double-check "read" receipt. */
+  readAt?: string;
   ts: number;              // Unix ms
   deletedForMe: boolean;
 }
