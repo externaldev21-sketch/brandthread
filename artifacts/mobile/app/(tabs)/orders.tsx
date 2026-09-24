@@ -850,8 +850,13 @@ export default function OrdersScreen() {
   }, [api, loadData]);
 
   const handleShip = useCallback((orderId: string) => {
-    router.push(('/order-detail?id=' + orderId + '&tab=shipping') as never);
+    router.push(('/fulfill-order?orderId=' + orderId) as never);
   }, [router]);
+
+  const handleBulkFulfill = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push(('/fulfill-batch?orderIds=' + selectedIds.join(',')) as never);
+  }, [router, selectedIds]);
 
   const handleCardPress = useCallback((order: Order) => {
     if (selectedIds.length > 0) {
@@ -1154,6 +1159,10 @@ export default function OrdersScreen() {
               <TouchableOpacity style={s.bulkBtn} onPress={handleBulkMarkReady} accessibilityRole="button" accessibilityLabel="Mark selected orders ready">
                 <Feather name="package" size={ICON.xs} color={SUCCESS} />
                 <Text style={[s.bulkBtnText, { color: SUCCESS }]}>Ready</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.bulkBtn} onPress={handleBulkFulfill} accessibilityRole="button" accessibilityLabel="Fulfill selected orders">
+                <Feather name="send" size={ICON.xs} color={BLUE} />
+                <Text style={[s.bulkBtnText, { color: BLUE }]}>Fulfill</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.bulkBtn} onPress={handleExportCsv} accessibilityRole="button" accessibilityLabel="Export selected orders">
                 <Feather name="download" size={ICON.xs} color={MUTED} />
