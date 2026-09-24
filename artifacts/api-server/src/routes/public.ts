@@ -3,7 +3,7 @@
  * Mounted at /api/public — no requireAuth middleware.
  */
 import { Router } from "express";
-import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, boosts, orders, orderItems } from "@workspace/db";
+import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, boosts, orders, orderItems, follows } from "@workspace/db";
 import { eq, and, asc, desc, ne, inArray, notInArray, or, ilike, sql, count, gte, lte, isNull, isNotNull } from "drizzle-orm";
 import { computeTrendingForToday, isCacheFresh } from "../jobs/computeTrending";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -543,6 +543,137 @@ router.get("/search", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "Public search failed");
     res.status(500).json({ error: "Search failed" });
+  }
+});
+
+// ─── GET /api/public/search/trending — trending searches (empty-state chips) ──
+// There is no search-query logging table yet, so "trending" is approximated
+// from data we already have: the categories with the most active listings
+// (a proxy for what buyers are currently browsing/searching for) plus the
+// brands gaining the most followers. This intentionally avoids standing up
+// new tracking infrastructure for a lightweight empty-state feature.
+router.get("/search/trending", async (req, res) => {
+  try {
+    const parsedLimit = parseNonNegativeInteger(req.query.limit, "limit", 8);
+    if (typeof parsedLimit !== "number" || parsedLimit < 1) {
+      res.status(400).json({ error: "limit must be at least 1" }); return;
+    }
+    const lim = Math.min(parsedLimit, 20);
+
+    const [topCategories, topBrands] = await Promise.all([
+      db.select({ category: products.category, count: count() })
+        .from(products)
+        .where(and(eq(products.status, "active"), isNull(products.deletedAt)))
+        .groupBy(products.category)
+        .orderBy(desc(count()))
+        .limit(lim),
+      db.select({ sellerId: follows.followingId, followerCount: count() })
+        .from(follows)
+        .innerJoin(users, eq(users.clerkId, follows.followingId))
+        .where(and(eq(users.accountType, "seller"), isNull(users.suspendedAt), isNull(users.deletedAt)))
+        .groupBy(follows.followingId)
+        .orderBy(desc(count()))
+        .limit(lim),
+    ]);
+
+    const brandIds = topBrands.map((b) => b.sellerId);
+    const brandRows = brandIds.length > 0
+      ? await db.select({ clerkId: users.clerkId, displayName: users.displayName, brandName: users.brandName })
+          .from(users).where(inArray(users.clerkId, brandIds))
+      : [];
+    const brandNameById = new Map(brandRows.map((b) => [b.clerkId, b.brandName ?? b.displayName ?? "Brand"]));
+
+    const trending = [
+      ...topCategories.map((c) => ({ term: c.category, type: "category" as const })),
+      ...topBrands.map((b) => ({ term: brandNameById.get(b.sellerId) ?? "Brand", type: "brand" as const })),
+    ].slice(0, lim);
+
+    res.json({ trending });
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch trending searches");
+    res.status(500).json({ error: "Failed to fetch trending searches" });
+  }
+});
+
+// ─── GET /api/public/search/suggested — suggested brands/products (empty state) ─
+// Suggested brands = most-followed sellers; suggested products = most
+// recently listed active products. Both are cheap, already-indexed queries
+// that need no new tracking tables.
+router.get("/search/suggested", async (req, res) => {
+  try {
+    const parsedLimit = parseNonNegativeInteger(req.query.limit, "limit", 6);
+    if (typeof parsedLimit !== "number" || parsedLimit < 1) {
+      res.status(400).json({ error: "limit must be at least 1" }); return;
+    }
+    const lim = Math.min(parsedLimit, 20);
+    const viewerId = optionalViewerId(req);
+
+    const [topBrands, recentProducts] = await Promise.all([
+      db.select({ sellerId: follows.followingId, followerCount: count() })
+        .from(follows)
+        .innerJoin(users, eq(users.clerkId, follows.followingId))
+        .where(and(
+          eq(users.accountType, "seller"),
+          isNull(users.suspendedAt),
+          isNull(users.deletedAt),
+          notBlockedWith(viewerId, follows.followingId),
+        ))
+        .groupBy(follows.followingId)
+        .orderBy(desc(count()))
+        .limit(lim),
+      db.select({
+        id: products.id, name: products.name, ownerId: products.ownerId,
+        category: products.category, images: products.images, createdAt: products.createdAt,
+      }).from(products)
+        .where(and(
+          eq(products.status, "active"),
+          isNull(products.deletedAt),
+          notBlockedWith(viewerId, products.ownerId),
+        ))
+        .orderBy(desc(products.createdAt))
+        .limit(lim),
+    ]);
+
+    const sellerIds = [...new Set([...topBrands.map((b) => b.sellerId), ...recentProducts.map((p) => p.ownerId)])];
+    const sellerRows = sellerIds.length > 0
+      ? await db.select({ clerkId: users.clerkId, displayName: users.displayName, brandName: users.brandName })
+          .from(users).where(inArray(users.clerkId, sellerIds))
+      : [];
+    const sellerMap = new Map(sellerRows.map((s) => [s.clerkId, s.brandName ?? s.displayName ?? "Brand"]));
+
+    const PALETTE = ["#8B5CF6", "#0891B2", "#0F766E", "#B45309", "#1D4ED8", "#BE185D", "#065F46"];
+    const hashColor = (str: string) => {
+      let h = 0;
+      for (const c of str) h = (h * 31 + c.charCodeAt(0)) & 0xffffff;
+      return PALETTE[Math.abs(h) % PALETTE.length];
+    };
+    const mkInitials = (name: string) =>
+      name.split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+    const mkHandle = (name: string) =>
+      "@" + name.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 20);
+
+    res.json({
+      brands: topBrands.map((b) => {
+        const name = sellerMap.get(b.sellerId) ?? "Brand";
+        return {
+          id: b.sellerId, sellerId: b.sellerId, name, handle: mkHandle(name),
+          color: hashColor(b.sellerId), initials: mkInitials(name),
+          followerCount: Number(b.followerCount ?? 0),
+        };
+      }),
+      products: recentProducts.map((p) => {
+        const brandName = sellerMap.get(p.ownerId) ?? "Brand";
+        const images = Array.isArray(p.images) ? p.images.filter((i): i is string => typeof i === "string") : [];
+        return {
+          id: p.id, productId: p.id, name: p.name, brand: brandName,
+          category: p.category, imageUri: images[0] ?? null,
+          color: hashColor(p.ownerId), initials: mkInitials(brandName),
+        };
+      }),
+    });
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch suggested search results");
+    res.status(500).json({ error: "Failed to fetch suggested search results" });
   }
 });
 

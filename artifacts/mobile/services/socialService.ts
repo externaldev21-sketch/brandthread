@@ -10,7 +10,7 @@ import type {
   BuyerSocialProfile, BuyerPost, RepostRecord,
   Friendship, FriendshipStatus, FriendRequest, FriendSuggestion,
   Conversation, ConversationType, ConversationParticipant,
-  Message, MessageAttachment, MessageReaction,
+  Message, MessageAttachment, MessageReaction, ReactionType,
   Story, StoryMedia, StoryPrivacySettings, StoryViewer,
   Notification, NotificationCategory, NotificationPreference,
   BlockRecord, MuteRecord, RestrictRecord,
@@ -1071,16 +1071,40 @@ export async function retryMessage(conversationId: string, messageId: string): P
     throw error;
   }
 }
+// Reactions are now persisted server-side (one active reaction per user per
+// message — re-reacting with the same value toggles it off, matching the
+// small fixed reaction bar; anything else upserts/replaces the caller's
+// reaction). The local AsyncStorage cache is updated only after the server
+// call succeeds, matching this file's offline-first pattern elsewhere.
 export async function addReaction(conversationId: string, messageId: string, emoji: string): Promise<void> {
   const k = K();
   const msgKey = k.messages(conversationId);
-  const msgs = await getMessages(conversationId, k);
+  const msgs = await load<Message[]>(msgKey, []);
   const idx = msgs.findIndex(m => m.id === messageId);
-  if (idx < 0) return;
-  const existing = msgs[idx].reactions.findIndex(r => r.fromId === MY_USER_ID && r.emoji === emoji);
-  if (existing >= 0) { msgs[idx].reactions.splice(existing, 1); }
-  else { msgs[idx].reactions = [...msgs[idx].reactions, { emoji, fromId: MY_USER_ID, fromName: MY_NAME }]; }
-  await save(msgKey, msgs); notify();
+  const existingMine = idx >= 0 ? msgs[idx].reactions.find(r => r.fromId === MY_USER_ID) : undefined;
+  const isToggleOff = existingMine?.emoji === emoji;
+
+  const path = `/api/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/reactions`;
+  if (isToggleOff) {
+    await serviceRequest<{ ok: boolean }>(path, { method: 'DELETE' });
+  } else {
+    await serviceRequest<MessageReaction>(path, {
+      method: 'PUT',
+      body: JSON.stringify({ reactionType: emoji }),
+    });
+  }
+
+  if (idx >= 0 && _socialUserId === k.userId) {
+    const others = msgs[idx].reactions.filter(r => r.fromId !== MY_USER_ID);
+    msgs[idx] = {
+      ...msgs[idx],
+      reactions: isToggleOff
+        ? others
+        : [...others, { emoji, fromId: MY_USER_ID, fromName: MY_NAME, reactionType: emoji as ReactionType, createdAt: iso() }],
+    };
+    await save(msgKey, msgs);
+    notify();
+  }
 }
 export async function deleteMessageForMe(conversationId: string, messageId: string): Promise<void> {
   const k = K();

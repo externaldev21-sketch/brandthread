@@ -1092,6 +1092,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Upload a base64-encoded image/video/audio file and get back a public URL. */
       uploadMedia: (body: { data: string; mimeType: string; extension: string }) =>
         post<{ url: string }>('/api/conversations/upload-media', body),
+      /** Set (or replace) my reaction on a message — one active reaction per user per message. */
+      addReaction: (conversationId: string, messageId: string, reactionType: string) =>
+        put<{ userId: string; userName: string; reactionType: string; createdAt: string }>(
+          `/api/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/reactions`,
+          { reactionType },
+        ),
+      /** Remove my reaction from a message. */
+      removeReaction: (conversationId: string, messageId: string) =>
+        del<{ ok: boolean }>(
+          `/api/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/reactions`,
+        ),
     },
     /** 1:1 voice / video call tokens (Agora RTC). */
     call: {

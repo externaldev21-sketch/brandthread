@@ -162,10 +162,18 @@ export interface MessageAttachment {
 
 export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'failed';
 
+/** Small fixed reaction bar (no free-form emoji picker). One of REACTION_TYPES. */
+export type ReactionType = 'like' | 'love' | 'haha' | 'wow' | 'sad' | 'fire';
+
 export interface MessageReaction {
+  /** The reaction chosen — `emoji` is a legacy name kept for existing call sites;
+   *  its value is always one of ReactionType, not a free-form emoji string. */
   emoji: string;
   fromId: string;
   fromName: string;
+  /** Same value as `emoji`, explicitly typed. */
+  reactionType?: ReactionType;
+  createdAt?: string;
 }
 
 export interface Message {
