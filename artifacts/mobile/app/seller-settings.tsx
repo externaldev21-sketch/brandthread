@@ -1,348 +1,294 @@
 /**
- * Seller Settings & Tools — Stack Screen
- *
- * Replaces the old "More" tab. Accessible via the gear icon on the Profile tab.
- * Contains the 6 section groups (Store, Design Studio, Operations, Growth,
- * Money, Account) plus Sign out. The user card lives on the Profile tab now,
- * so this screen is purely a navigation hub.
+ * Seller Settings Hub — its own screen, separate from Buyer Settings.
+ * Profile card + search + compact grouped iOS-Settings-style sections.
  */
-
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, LayoutAnimation, Platform, UIManager } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAuth } from '@clerk/expo';
-import { getSetupState, completionPercent } from '@/lib/setupStore';
+import { useAuth, useUser } from '@clerk/expo';
+import { useColors } from '@/hooks/useColors';
 import { FONT, FS, SP } from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
-import { Header } from '@/components/layout';
-import { NavigationCard } from '@/components/BrandthreadUI';
-import { SecondaryButton } from '@/components/BrandthreadUI';
+import { hapticLight, hapticSuccess } from '@/lib/haptics';
+import { useApi } from '@/hooks/useApi';
+import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
+import { GROWTH_PLAN_ENFORCEMENT_ENABLED } from '@/lib/growthTools';
+import { SELLER_SETTINGS_CATALOG, SettingsCatalogItem } from '@/services/settingsCatalog';
+import { SettingsProfileCard, SettingsSearchBar, SettingsSection, SettingsRow, ConfirmSheet } from '@/components/settings/SettingsKit';
+import { IconButton } from '@/components/BrandthreadUI';
+import PlanUpsellModal from '@/components/PlanUpsellModal';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
 
-// ─── Enable LayoutAnimation on Android ────────────────────────────────────────
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface NavItem {
-  icon: keyof typeof Feather.glyphMap;
-  label: string;
-  desc: string;
-  accent: string;
-  badge?: boolean;
-  route?: string;
-}
-
-// Semantic accent tokens keep section definitions module-safe while resolving
-// to the active runtime palette at render time.
-const PURPLE = 'accent';
-const PURPLE_LIGHT = 'accentLight';
-const PURPLE_DIM = 'accentDim';
-const CYAN = 'secondary';
-const CYAN_DIM = 'secondaryDim';
-const BLUE = 'secondary';
-const ORANGE = 'warning';
-const RED = 'error';
-const GOLD = 'warning';
-const SUCCESS = 'success';
-const MUTED = 'muted';
-
-// ─── Section definitions (same as old More screen) ───────────────────────────
-
-const STORE_ITEMS: NavItem[] = [
-  { icon: 'layout', label: 'Store Builder', desc: 'Customize your storefront',  accent: PURPLE, route: '/store-builder' },
-  { icon: 'grid',   label: 'Collections',   desc: 'Group products',              accent: CYAN,   route: '/store-collections' },
-  { icon: 'globe',  label: 'Domains',       desc: 'Custom domain settings',      accent: BLUE,   route: '/store-domain' },
-  { icon: 'tag',    label: 'Discounts',     desc: 'Coupon codes and offers',      accent: GOLD, route: '/discounts' },
-];
-
-const STUDIO_ITEMS: NavItem[] = [
-  { icon: 'edit-3',      label: 'Design Studio',      desc: 'Create designs and mockups',  accent: PURPLE, route: '/design' },
-  { icon: 'camera',      label: 'AI Photoshoot',      desc: 'Generate product photos',     accent: BLUE,   route: '/design-ai-photoshoot' },
-  { icon: 'scissors',    label: 'Background Removal', desc: 'Clean image backgrounds',     accent: CYAN,   route: '/design-bg-removal' },
-  { icon: 'trending-up', label: 'Campaign Generator', desc: 'Create campaign assets',      accent: ORANGE, route: '/design-campaign' },
-  { icon: 'layers',      label: 'Brand Assets',       desc: 'Logos, colors and graphics',  accent: GOLD,   route: '/design-brand-assets' },
-];
-
-const OPERATIONS_ITEMS: NavItem[] = [
-  { icon: 'archive',   label: 'Inventory',        desc: 'Track stock levels',             accent: BLUE,   route: '/inventory' },
-  { icon: 'truck',     label: 'Shipping',         desc: 'Rates, zones and carriers',      accent: ORANGE, route: '/shipping' },
-  { icon: 'tool',      label: 'Manufacturer Hub', desc: 'Find and manage manufacturers',  accent: PURPLE, badge: true, route: '/manufacturer-hub' },
-  { icon: 'users',     label: 'Customers',        desc: 'Browse your customer list',      accent: PURPLE_LIGHT, route: '/customer-accounts' },
-  { icon: 'sun',       label: 'Vacation Mode',    desc: 'Pause your store while away',    accent: ORANGE, route: '/vacation-mode' },
-  { icon: 'flag',      label: 'Review Reports',   desc: 'Moderate flagged content',       accent: RED,    route: '/admin-reports' },
-];
-
-const GROWTH_ITEMS: NavItem[] = [
-  { icon: 'message-circle', label: 'Messages',   desc: 'Read and reply to buyer DMs',       accent: PURPLE, route: '/seller-inbox' },
-  { icon: 'zap',            label: 'Boost Posts', desc: 'Promote content for wider reach',   accent: GOLD,   route: '/boost' },
-  { icon: 'trending-up',    label: 'Marketing',  desc: 'Campaigns and promotions',           accent: ORANGE, route: '/(tabs)/marketing' },
-  { icon: 'bar-chart-2',    label: 'Analytics',  desc: 'Sales, traffic and insights',        accent: BLUE,   route: '/(tabs)/analytics' },
-  { icon: 'video',          label: 'Content',    desc: 'Posts, drafts and scheduled',        accent: CYAN,   route: '/content' },
-  { icon: 'briefcase',      label: 'Community',  desc: 'Hire freelance creatives',           accent: CYAN,   route: '/community' },
-];
-
-const MONEY_ITEMS: NavItem[] = [
-  { icon: 'dollar-sign', label: 'Payouts',          desc: 'Bank account and payout history', accent: SUCCESS, route: '/payouts' },
-  { icon: 'star',        label: 'Subscription',     desc: 'Manage your Brandthread plan',    accent: GOLD, badge: true, route: '/subscription' },
-  { icon: 'percent',     label: 'Taxes and Duties', desc: 'Tax rules and collection',        accent: MUTED, route: '/taxes-duties' },
-];
-
-const ACCOUNT_ITEMS: NavItem[] = [
-  { icon: 'users',       label: 'Team',           desc: 'Invite collaborators',          accent: BLUE,   route: '/team' },
-  { icon: 'link',        label: 'Integrations',   desc: 'Connect third-party services',  accent: PURPLE, route: '/integrations/klaviyo' },
-  { icon: 'bell',        label: 'Notifications',  desc: 'Push and email preferences',    accent: ORANGE, route: '/notifications-settings' },
-  { icon: 'gift',        label: 'Invite Friends', desc: 'Share your referral code and see rewards', accent: GOLD, route: '/buyer-invite' },
-  { icon: 'download',    label: 'Download My Data', desc: 'Export your products, orders and customers', accent: BLUE, route: '/seller-data-export' },
-  { icon: 'droplet',     label: 'App theme',       desc: 'Change the colors of the whole app',       accent: PURPLE, route: '/app-theme' },
-  { icon: 'settings',    label: 'Settings',       desc: 'App and account settings',      accent: MUTED,  route: '/settings' },
-  { icon: 'trash-2',     label: 'Delete Account', desc: 'Permanently erase your account', accent: RED, route: '/delete-account' },
-  { icon: 'help-circle', label: 'Help & Support', desc: 'Guides, FAQs and contact us',  accent: CYAN,   route: '/help' },
-];
-
-const SECTIONS: {
-  key: string;
-  title: string;
-  icon: keyof typeof Feather.glyphMap;
-  items: NavItem[];
-}[] = [
-  { key: 'store',      title: 'Store',          icon: 'layout',      items: STORE_ITEMS },
-  { key: 'studio',     title: 'Design Studio',  icon: 'zap',         items: STUDIO_ITEMS },
-  { key: 'operations', title: 'Operations',     icon: 'tool',        items: OPERATIONS_ITEMS },
-  { key: 'growth',     title: 'Growth',         icon: 'trending-up', items: GROWTH_ITEMS },
-  { key: 'money',      title: 'Money',          icon: 'dollar-sign', items: MONEY_ITEMS },
-  { key: 'account',    title: 'Account',        icon: 'user',        items: ACCOUNT_ITEMS },
-];
-
-// ─── Screen ───────────────────────────────────────────────────────────────────
-
 export default function SellerSettingsScreen() {
-  const { theme } = useAppTheme();
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
-  const s = React.useMemo(() => createStyles(theme), [theme]);
-  const router     = useRouter();
-  const insets     = useSafeAreaInsets();
+  const colors = useColors();
+  const s = useMemo(() => makeStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const api = useApi();
   const { signOut } = useAuth();
-  const [setupPct, setSetupPct] = useState(0);
-  const [expanded, setExpanded] = useState<Record<string, boolean>>(
-    Object.fromEntries(SECTIONS.map(s => [s.key, true])),
-  );
+  const { user } = useUser();
+  const { hasPlan, loading: planLoading, error: planError, retry: retryPlan } = useSubscriptionPlan();
 
-  // Keep the old deep link alive, but make the shared hub the only settings
-  // index so buyers and sellers do not encounter competing navigation trees.
+  const [query, setQuery] = useState('');
+  const [isModerator, setIsModerator] = useState(false);
+  const [upsellFeature, setUpsellFeature] = useState<string | null>(null);
+  const [signOutVisible, setSignOutVisible] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [scopeVisible, setScopeVisible] = useState(false);
+  const [accountScope, setAccountScope] = useState<'global' | 'us'>('global');
+  const [scopeLoading, setScopeLoading] = useState(false);
+  const [scopeSaving, setScopeSaving] = useState<'global' | 'us' | null>(null);
+
   useEffect(() => {
-    router.replace('/settings' as never);
-  }, [router]);
+    let active = true;
+    api.moderation.me()
+      .then((result) => { if (active) setIsModerator(result.isModerator); })
+      .catch(() => { if (active) setIsModerator(false); });
+    return () => { active = false; };
+  }, [api]);
 
-  useEffect(() => {
-    getSetupState().then(s => setSetupPct(completionPercent(s)));
-  }, []);
+  const profileName = user?.fullName || user?.username || 'Your Brandthread store';
+  const profileInitials = [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join('').toUpperCase() || 'BT';
+  const topPad = Platform.OS === 'web' ? 24 : insets.top;
 
-  const handleSignOut = async () => {
+  const groups = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const visible = SELLER_SETTINGS_CATALOG
+      .map((group) => ({ ...group, items: group.items.filter((item) => !item.requiresModerator || isModerator) }))
+      .filter((group) => group.items.length > 0);
+    if (!q) return visible;
+    return visible
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) =>
+          `${item.label} ${item.description} ${item.aliases.join(' ')}`.toLowerCase().includes(q),
+        ),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [query, isModerator]);
+
+  async function openAccountScope() {
+    setScopeVisible(true);
+    setScopeLoading(true);
+    try {
+      const data = await api.seller.getSettings();
+      setAccountScope(data.settings?.accountScope === 'us' ? 'us' : 'global');
+    } finally {
+      setScopeLoading(false);
+    }
+  }
+
+  async function chooseAccountScope(nextScope: 'global' | 'us') {
+    if (scopeSaving || nextScope === accountScope) { setScopeVisible(false); return; }
+    hapticLight();
+    setScopeSaving(nextScope);
+    try {
+      await api.seller.updateSettings({ accountScope: nextScope });
+      setAccountScope(nextScope);
+      setScopeVisible(false);
+    } finally {
+      setScopeSaving(null);
+    }
+  }
+
+  async function handleItem(item: SettingsCatalogItem) {
+    hapticLight();
+    if (
+      GROWTH_PLAN_ENFORCEMENT_ENABLED &&
+      item.requiresGrowth &&
+      (planLoading || !!planError || !hasPlan('growth'))
+    ) {
+      if (planError) retryPlan();
+      setUpsellFeature(item.label);
+      return;
+    }
+    if (item.action === 'sign-out') { setSignOutVisible(true); return; }
+    if (item.action === 'delete-account') { router.push('/delete-account' as never); return; }
+    if (item.action === 'account-scope') { await openAccountScope(); return; }
+    if (item.route) router.push(item.route as never);
+  }
+
+  async function confirmSignOut() {
+    setSigningOut(true);
     try {
       await signOut();
-      await AsyncStorage.removeItem('@brandthread/onboarding_complete');
-      router.replace('/sign-in');
-    } catch {
-      Alert.alert('Error', 'Failed to sign out. Please try again.');
+      hapticSuccess();
+      router.replace('/sign-in' as never);
+    } finally {
+      setSigningOut(false);
+      setSignOutVisible(false);
     }
-  };
-
-  const handleNavPress = (item: NavItem) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (item.route) {
-      router.push(item.route as any);
-    }
-  };
-
-  const toggleSection = (key: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
-  };
+  }
 
   return (
-    <View style={s.root}>
-
-      <Header title="Settings & Tools" />
+    <View style={s.page}>
+      <View style={[s.header, { paddingTop: topPad + 12 }]}>
+        <Text style={s.headerTitle}>Settings</Text>
+        <IconButton name="x" color={colors.foreground} onPress={() => { hapticLight(); router.back(); }} accessibilityLabel="Close settings" />
+      </View>
 
       <ScrollView
+        contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + 48 }}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={s.scrollContent}
+        keyboardShouldPersistTaps="handled"
       >
+        <SettingsProfileCard
+          eyebrow="Seller account"
+          name={profileName}
+          subtitle={user?.primaryEmailAddress?.emailAddress}
+          initials={profileInitials}
+          onPress={() => router.push('/edit-profile' as never)}
+        />
 
-        {/* ── Setup progress strip ──────────────────────────────────────── */}
-        {setupPct < 100 && (
-          <TouchableOpacity
-            style={s.progressStrip}
-            onPress={() => router.push('/(tabs)/index' as any)}
-            activeOpacity={0.8}
-          >
-            <View style={{ flex: 1, gap: 4 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={s.progressLabel}>Store setup</Text>
-                <Text style={[s.progressLabel, { color: theme.accentLight }]}>{setupPct}%</Text>
-              </View>
-              <View style={s.track}>
-                <View style={[s.fill, { width: `${setupPct}%` }]} />
-              </View>
-            </View>
-            <Feather name="chevron-right" size={15} color={theme.muted} />
-          </TouchableOpacity>
-        )}
+        <SettingsSearchBar value={query} onChangeText={setQuery} />
 
-        {/* ── Collapsible sections ──────────────────────────────────────── */}
-        {SECTIONS.map(({ key, title, icon, items }) => {
-          const isOpen = expanded[key];
-          return (
-            <View key={key} style={s.section}>
-              <TouchableOpacity
-                style={s.sectionHeader}
-                onPress={() => toggleSection(key)}
-                activeOpacity={0.7}
-              >
-                <View style={s.sectionHeaderLeft}>
-                   <Feather name={icon} size={13} color={theme.subtle} />
-                  <Text style={s.sectionTitle}>{title.toUpperCase()}</Text>
-                </View>
-                  <Feather name={isOpen ? 'chevron-up' : 'chevron-down'} size={15} color={theme.subtle} />
-              </TouchableOpacity>
-
-              {isOpen && (
-                <>
-                  {key === 'account' && <StripeConnectWarning />}
-                  <View style={s.sectionItems}>
-                    {items.map((item) => (
-                      <NavigationCard
-                        key={item.label}
-                        icon={item.icon}
-                        label={item.label}
-                        description={item.desc}
-                        accent={resolveNavAccent(item.accent, theme)}
-                        badge={item.badge}
-                        onPress={() => handleNavPress(item)}
-                      />
-                    ))}
-                  </View>
-                </>
-              )}
-            </View>
-          );
-        })}
-
-        {/* ── Sign out ──────────────────────────────────────────────────── */}
-        <View style={s.signOutWrap}>
-          <SecondaryButton label="Sign out" accent={theme.error} onPress={handleSignOut} />
+        <View style={{ marginBottom: 18 }}>
+          <StripeConnectWarning />
         </View>
 
+        {groups.map((group) => (
+          <SettingsSection key={group.title} title={group.title}>
+            {group.items.map((item, i) => (
+              <SettingsRow
+                key={item.label}
+                icon={item.icon}
+                label={item.label}
+                subtitle={item.description}
+                destructive={item.destructive}
+                soon={item.soon}
+                badge={item.requiresGrowth && GROWTH_PLAN_ENFORCEMENT_ENABLED && !planLoading && !hasPlan('growth') ? 'Growth' : undefined}
+                last={i === group.items.length - 1}
+                onPress={() => handleItem(item)}
+              />
+            ))}
+          </SettingsSection>
+        ))}
+
+        <Text style={s.version}>Brandthread v1.0.0</Text>
       </ScrollView>
+
+      <PlanUpsellModal
+        visible={upsellFeature !== null}
+        featureName={upsellFeature ?? ''}
+        requiredPlan="growth"
+        onClose={() => setUpsellFeature(null)}
+        onUpgrade={() => { setUpsellFeature(null); router.push('/subscription' as never); }}
+      />
+
+      <ConfirmSheet
+        visible={signOutVisible}
+        title="Sign out?"
+        message="You can sign back in to this Brandthread account anytime."
+        confirmLabel="Sign out"
+        loading={signingOut}
+        onConfirm={confirmSignOut}
+        onCancel={() => setSignOutVisible(false)}
+      />
+
+      <AccountScopeSheet
+        visible={scopeVisible}
+        loading={scopeLoading}
+        saving={scopeSaving}
+        value={accountScope}
+        onChoose={chooseAccountScope}
+        onClose={() => { if (!scopeSaving) setScopeVisible(false); }}
+      />
     </View>
   );
 }
 
-function resolveNavAccent(value: string, theme: ReturnType<typeof useAppTheme>['theme']): string {
-  if ([PURPLE, PURPLE_LIGHT, PURPLE_DIM].includes(value)) return value === PURPLE_LIGHT ? theme.accentLight : value === PURPLE_DIM ? theme.accentDim : theme.accent;
-  if ([CYAN, CYAN_DIM, BLUE].includes(value)) return value === CYAN_DIM ? theme.secondaryDim : theme.secondary;
-  if (value === SUCCESS) return theme.success;
-  if (value === ORANGE || value === GOLD) return theme.warning;
-  if (value === RED) return theme.error;
-  if (value === MUTED) return theme.muted;
-  return theme.accent;
+function AccountScopeSheet({
+  visible, loading, saving, value, onChoose, onClose,
+}: {
+  visible: boolean;
+  loading: boolean;
+  saving: 'global' | 'us' | null;
+  value: 'global' | 'us';
+  onChoose: (v: 'global' | 'us') => void;
+  onClose: () => void;
+}) {
+  const colors = useColors();
+  const s = useMemo(() => makeScopeStyles(colors), [colors]);
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={s.backdrop}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close account reach options" />
+        <View style={s.card}>
+          <View style={s.headerRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.title}>Account reach</Text>
+              <Text style={s.subtitle}>Choose where your seller account is available.</Text>
+            </View>
+            <TouchableOpacity style={s.close} onPress={onClose} disabled={!!saving} accessibilityRole="button" accessibilityLabel="Close">
+              <Feather name="x" size={18} color={colors.foreground} />
+            </TouchableOpacity>
+          </View>
+          {loading ? (
+            <View style={{ minHeight: 150, alignItems: 'center', justifyContent: 'center' }}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : (
+            <View style={{ gap: 10 }} accessibilityRole="radiogroup">
+              {([
+                { value: 'global' as const, label: 'Global account', description: 'Make your account available worldwide.', icon: 'globe' as const },
+                { value: 'us' as const, label: 'United States only', description: 'Limit your account to the United States.', icon: 'map-pin' as const },
+              ]).map((option) => {
+                const selected = value === option.value;
+                const isSaving = saving === option.value;
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    activeOpacity={0.75}
+                    disabled={!!saving}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected, disabled: !!saving }}
+                    onPress={() => onChoose(option.value)}
+                    style={[s.option, { borderColor: selected ? colors.primary : colors.border }, selected && { backgroundColor: colors.secondary }]}
+                  >
+                    <View style={s.optionIcon}>
+                      <Feather name={option.icon} size={18} color={colors.foreground} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.optionTitle}>{option.label}</Text>
+                      <Text style={s.optionDescription}>{option.description}</Text>
+                    </View>
+                    {isSaving ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <Feather name={selected ? 'check-circle' : 'circle'} size={20} color={selected ? colors.primary : colors.mutedForeground} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+function makeStyles(colors: ReturnType<typeof useColors>) {
   return StyleSheet.create({
-  root:        { flex: 1, backgroundColor: theme.background },
-  scrollContent: { paddingBottom: 120, paddingTop: SP.sm },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SP.md,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.border,
-  },
-  backBtn: {
-    width: 36, height: 36, borderRadius: 10,
-    backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: FS.md,
-    fontFamily: FONT.bold,
-    color: theme.text,
-    letterSpacing: -0.3,
-  },
-
-  // Setup strip
-  progressStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.md,
-    marginHorizontal: SP.md,
-    marginBottom: SP.md,
-    backgroundColor: theme.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: theme.border,
-    padding: SP.md,
-  },
-  progressLabel: {
-    fontSize: FS.xs,
-    fontFamily: FONT.medium,
-    color: theme.muted,
-  },
-  track: {
-    height: 3,
-    backgroundColor: theme.secondaryDim,
-    borderRadius: 99,
-    overflow: 'hidden',
-  },
-  fill: {
-    height: '100%',
-    backgroundColor: PURPLE,
-    borderRadius: 99,
-  },
-
-  // Sections
-  section:      { marginBottom: 4 },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginHorizontal: SP.md,
-    paddingVertical: 10,
-  },
-  sectionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  sectionTitle: {
-    fontSize: FS.xs,
-    fontFamily: FONT.bold,
-    color: theme.subtle,
-    letterSpacing: 1.5,
-  },
-  sectionItems: {
-    marginHorizontal: SP.md,
-    gap: SP.sm,
-    marginBottom: SP.sm,
-  },
-
-  // Sign out
-  signOutWrap: {
-    marginHorizontal: SP.md,
-    marginTop: SP.sm,
-    marginBottom: 32,
-  },
+    page: { flex: 1, backgroundColor: colors.background },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingBottom: 20 },
+    headerTitle: { fontSize: 30, fontFamily: FONT.bold, color: colors.foreground },
+    version: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginTop: 4 },
   });
-};
+}
+
+function makeScopeStyles(colors: ReturnType<typeof useColors>) {
+  return StyleSheet.create({
+    backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: (colors as any).overlay ?? 'rgba(0,0,0,0.68)' },
+    card: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 32 },
+    headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 16, marginBottom: 18 },
+    title: { fontSize: 20, fontFamily: FONT.bold, color: colors.foreground },
+    subtitle: { fontSize: 13, lineHeight: 18, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 4 },
+    close: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+    option: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },
+    optionIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.secondary },
+    optionTitle: { fontSize: 15, fontFamily: FONT.semibold, color: colors.foreground },
+    optionDescription: { fontSize: 12, lineHeight: 17, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
+  });
+}

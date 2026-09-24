@@ -220,10 +220,10 @@ describe('StripeConnectWarning screen placement', () => {
     expect(payouts).toMatch(/<StripeConnectWarning[\s\S]*connectStatus=\{connectStatus\}/);
   });
 
-  it('remains mounted in the seller Settings Account section', () => {
+  it('remains mounted on the seller Settings hub', () => {
     const settings = source('seller-settings.tsx');
 
     expect(settings).toContain("import StripeConnectWarning from '@/components/StripeConnectWarning';");
-    expect(settings).toMatch(/key\s*===\s*['"]account['"][\s\S]{0,120}<StripeConnectWarning\s*\/>/);
+    expect(settings).toMatch(/<StripeConnectWarning\s*\/>/);
   });
 });
