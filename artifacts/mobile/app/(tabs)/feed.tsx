@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
-  Animated, TextInput, Modal,
+  Animated, TextInput, Modal, Pressable, PanResponder,
   AccessibilityInfo, Platform, ScrollView, RefreshControl, ActivityIndicator, KeyboardAvoidingView, Image,
   useWindowDimensions,
 } from 'react-native';
@@ -735,6 +735,92 @@ const DEFAULT_ENGAGEMENT: EngagementState = {
 
 // ─── Full-screen media page ───────────────────────────────────────────────────
 
+/** mm:ss (or h:mm:ss past an hour) for the scrub bubble. */
+function formatPlaybackTime(totalSeconds: number): string {
+  const s = Math.max(0, Math.round(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const mm = h > 0 ? String(m).padStart(2, '0') : String(m);
+  return h > 0 ? `${h}:${mm}:${String(sec).padStart(2, '0')}` : `${mm}:${String(sec).padStart(2, '0')}`;
+}
+
+/** Scrubbable playback bar: tap/drag to seek, thickens while dragging, shows
+ * a time bubble, and gives haptic feedback on grab and release. */
+function ScrubProgressBar({
+  player, progress, bottom,
+}: {
+  player: ReturnType<typeof useVideoPlayer>;
+  progress: number;
+  bottom: number;
+}) {
+  const [dragging, setDragging] = useState(false);
+  const [dragProgress, setDragProgress] = useState(progress);
+  const [trackWidth, setTrackWidth] = useState(0);
+  const thickness = useRef(new Animated.Value(2)).current;
+  const trackWidthRef = useRef(0);
+
+  useEffect(() => { trackWidthRef.current = trackWidth; }, [trackWidth]);
+  useEffect(() => { if (!dragging) setDragProgress(progress); }, [progress, dragging]);
+
+  const seekToLocationX = useRef((x: number) => {
+    const width = trackWidthRef.current;
+    if (width <= 0) return;
+    const fraction = Math.min(1, Math.max(0, x / width));
+    setDragProgress(fraction);
+    const duration = player.duration;
+    if (duration > 0) player.currentTime = fraction * duration;
+  }).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        setDragging(true);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        Animated.timing(thickness, { toValue: 6, duration: 120, useNativeDriver: false }).start();
+        seekToLocationX(evt.nativeEvent.locationX);
+      },
+      onPanResponderMove: (evt) => {
+        seekToLocationX(evt.nativeEvent.locationX);
+      },
+      onPanResponderRelease: () => {
+        setDragging(false);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        Animated.timing(thickness, { toValue: 2, duration: 150, useNativeDriver: false }).start();
+      },
+      onPanResponderTerminate: () => {
+        setDragging(false);
+        Animated.timing(thickness, { toValue: 2, duration: 150, useNativeDriver: false }).start();
+      },
+    }),
+  ).current;
+
+  const shown = dragging ? dragProgress : progress;
+  const bubbleLeft = trackWidth > 0 ? Math.min(Math.max(shown * trackWidth - 20, 0), Math.max(trackWidth - 40, 0)) : 0;
+
+  return (
+    <View
+      style={[styles.progressHitArea, { bottom: bottom - 13 }]}
+      onLayout={e => setTrackWidth(e.nativeEvent.layout.width)}
+      {...panResponder.panHandlers}
+      accessibilityRole="adjustable"
+      accessibilityLabel="Video progress"
+      accessibilityValue={{ min: 0, max: 100, now: Math.round(shown * 100) }}
+    >
+      {dragging && (
+        <View style={[styles.scrubBubble, { left: bubbleLeft }]} pointerEvents="none">
+          <Text style={styles.scrubBubbleText}>{formatPlaybackTime(shown * (player.duration || 0))}</Text>
+        </View>
+      )}
+      <Animated.View style={[styles.progressTrack, { height: thickness }]}>
+        <View style={[styles.progressFill, { width: `${shown * 100}%` }]} />
+      </Animated.View>
+    </View>
+  );
+}
+
 function VideoVisual({
   source,
   isActive,
@@ -745,6 +831,7 @@ function VideoVisual({
   immersive = false,
   progressBottom,
   pageAspect = 9 / 16,
+  rate = 1,
 }: {
   source: VideoSource;
   isActive: boolean;
@@ -758,6 +845,8 @@ function VideoVisual({
   progressBottom?: number;
   /** Width / height of the page the clip is shown in. */
   pageAspect?: number;
+  /** Playback rate — 2 while the right side of the video is pressed and held. */
+  rate?: number;
 }) {
   const player = useVideoPlayer(source, p => {
     p.loop = true;
@@ -796,6 +885,9 @@ function VideoVisual({
     if (isActive && !paused) player.play();
     else player.pause();
   }, [isActive, paused, player]);
+  React.useEffect(() => {
+    player.playbackRate = rate;
+  }, [player, rate]);
   return (
     <>
       {immersive && fit === 'contain' && posterImage && (
@@ -829,14 +921,7 @@ function VideoVisual({
         </View>
       )}
       {progressBottom != null && isActive && (
-        <View
-          style={[styles.progressTrack, { bottom: progressBottom }]}
-          accessibilityRole="progressbar"
-          accessibilityLabel="Video progress"
-          accessibilityValue={{ min: 0, max: 100, now: Math.round(progress * 100) }}
-        >
-          <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
-        </View>
+        <ScrubProgressBar player={player} progress={progress} bottom={progressBottom} />
       )}
     </>
   );
@@ -892,12 +977,19 @@ function SpotlightPage({
   const router = useRouter();
   const { push } = useThreadPull();
   const [paused, setPaused] = useState(false);
+  /** Pause while the buyer is holding down on the left/center of the video — distinct from the tap-to-toggle `paused` above, so releasing always resumes rather than fighting a manual pause. */
+  const [holdPaused, setHoldPaused] = useState(false);
+  /** 2x while holding the right side of the video. */
+  const [speedActive, setSpeedActive] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const { showToast } = useFeedToast();
   const heartBurst = useRef(new Animated.Value(0)).current;
   const heartScale = useRef(new Animated.Value(1)).current;
+  const speedPillOpacity = useRef(new Animated.Value(0)).current;
   const lastTap = useRef(0);
   const pauseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdTriggered = useRef(false);
   const friendReposts = item.friendReposts ?? [];
   const hasRepostIdentity = engagement?.reposted === true || friendReposts.length > 0;
   const repostLabel = engagement?.reposted
@@ -908,7 +1000,10 @@ function SpotlightPage({
       ? `${friendReposts[0].displayName} and ${friendReposts.length - 1} friend${friendReposts.length === 2 ? '' : 's'} reposted`
       : `${friendReposts[0]?.displayName ?? 'A friend'} reposted`;
 
-  React.useEffect(() => () => { if (pauseTimer.current) clearTimeout(pauseTimer.current); }, []);
+  React.useEffect(() => () => {
+    if (pauseTimer.current) clearTimeout(pauseTimer.current);
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+  }, []);
 
   function burstHeart() {
     heartBurst.setValue(1);
@@ -922,7 +1017,7 @@ function SpotlightPage({
     ]).start();
   }
 
-  function handlePress() {
+  function handleQuickTap() {
     const now = Date.now();
     if (now - lastTap.current < 280) {
       lastTap.current = 0;
@@ -941,16 +1036,54 @@ function SpotlightPage({
     }
   }
 
+  /** Press and hold the right ~40% of the video = 2x speed with a small
+   * "2x" pill; holding anywhere else pauses. Releasing restores 1x / plays.
+   * A quick tap (release before the hold threshold) falls through to the
+   * existing single/double-tap handling above. */
+  function handlePressIn(evt: { nativeEvent: { locationX: number } }) {
+    holdTriggered.current = false;
+    const x = evt.nativeEvent.locationX;
+    holdTimer.current = setTimeout(() => {
+      holdTriggered.current = true;
+      // A tap already queued for "toggle pause" must not also fire once the hold resolves.
+      if (pauseTimer.current) { clearTimeout(pauseTimer.current); pauseTimer.current = null; }
+      lastTap.current = 0;
+      if (x > pageWidth * 0.6) {
+        setSpeedActive(true);
+        Animated.timing(speedPillOpacity, { toValue: 1, duration: 120, useNativeDriver: true }).start();
+      } else {
+        setHoldPaused(true);
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }, 250);
+  }
+
+  function handlePressOut() {
+    if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; }
+    if (holdTriggered.current) {
+      holdTriggered.current = false;
+      if (speedActive) {
+        setSpeedActive(false);
+        Animated.timing(speedPillOpacity, { toValue: 0, duration: 120, useNativeDriver: true }).start();
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+      if (holdPaused) setHoldPaused(false);
+      return;
+    }
+    handleQuickTap();
+  }
+
   return (
     <View style={{ width: pageWidth, height: pageHeight, backgroundColor: '#000' }}>
-      <TouchableWithoutFeedback onPress={handlePress}>
+      <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut}>
         <View style={StyleSheet.absoluteFill}>
           {item.contentType === 'video'
             ? (
               <VideoVisual
                 source={item.videoSource ?? item.mediaUris[0]}
                 isActive={isActive}
-                paused={paused}
+                paused={paused || holdPaused}
+                rate={speedActive ? 2 : 1}
                 muted={item.videoSource != null}
                 posterUri={item.videoPosterUri}
                 posterSource={item.videoPosterSource}
@@ -974,8 +1107,19 @@ function SpotlightPage({
           >
             <Feather name="heart" size={110} color="#FFFFFF" />
           </Animated.View>
+          {item.contentType === 'video' && (
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.speedPill, { opacity: speedPillOpacity, transform: [{ scale: speedPillOpacity.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] }]}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            >
+              <Feather name="fast-forward" size={12} color="#FFFFFF" />
+              <Text style={styles.speedPillText}>2x</Text>
+            </Animated.View>
+          )}
         </View>
-      </TouchableWithoutFeedback>
+      </Pressable>
 
       {/* ─ Legibility scrims: header and bottom overlays stay readable over bright footage ─ */}
       {immersive && (
@@ -1344,7 +1488,7 @@ export default function FeedScreen({
   // topBar's own paddingTop + paddingBottom, plus the buyerTopRow's height.
   // Single source of truth so BuyerHighDemandPage's content never renders
   // underneath it (see styles.topBar / styles.buyerTopRow below).
-  const buyerHeaderHeight = previewTopInset + 2 + 44 + 4;
+  const buyerHeaderHeight = Math.max(0, previewTopInset - 4) + 44 + 4;
   const buyerBarInset = useBuyerTabBarInset();
   const router = useRouter();
   const { userId } = useAuth();
@@ -1927,7 +2071,7 @@ export default function FeedScreen({
 
       {/* ─ Top bar overlay ─ */}
       {isBuyerSurface ? (
-        <View style={[styles.topBar, { paddingTop: previewTopInset + 2 }]} pointerEvents="box-none">
+        <View style={[styles.topBar, { paddingTop: Math.max(0, previewTopInset - 4) }]} pointerEvents="box-none">
           {/* Buyer Home: Friends · Following | For You · Cart. Search lives in the tab bar. */}
           <View style={styles.buyerTopRow}>
             <TouchableOpacity
@@ -1946,7 +2090,7 @@ export default function FeedScreen({
             <View style={styles.buyerFeedTabs}>
                 {([
                   ['following', 'Following'],
-                  ['for-you', 'For You'],
+                  ['for-you', 'Threads'],
                 ] as const).map(([key, label]) => (
                   <TouchableOpacity
                     key={key}
@@ -2062,7 +2206,7 @@ export default function FeedScreen({
           <View style={styles.feedTabs}>
             {([
               ['following', 'Following'],
-              ['for-you', 'For You'],
+              ['for-you', 'Threads'],
             ] as const).map(([key, label]) => (
               <TouchableOpacity
                 key={key}
@@ -2175,11 +2319,26 @@ const styles = StyleSheet.create({
   letterboxBackdrop: { opacity: 0.55 },
   topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
   bottomScrim: { position: 'absolute', bottom: 0, left: 0, right: 0 },
-  progressTrack: {
-    position: 'absolute', left: 16, right: 16, height: 2, borderRadius: 1,
-    backgroundColor: 'rgba(255,255,255,0.22)', overflow: 'hidden',
+  progressHitArea: {
+    position: 'absolute', left: 16, right: 16, height: 28, justifyContent: 'center',
   },
-  progressFill: { height: 2, borderRadius: 1, backgroundColor: 'rgba(255,255,255,0.92)' },
+  progressTrack: {
+    borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.22)', overflow: 'hidden',
+  },
+  progressFill: { height: '100%', borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.92)' },
+  scrubBubble: {
+    position: 'absolute', bottom: 22, minWidth: 40, alignItems: 'center',
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.sm,
+    backgroundColor: 'rgba(0,0,0,0.78)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)',
+  },
+  scrubBubbleText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 11 },
+  speedPill: {
+    position: 'absolute', top: '42%', alignSelf: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: RADIUS.pill,
+    backgroundColor: 'rgba(0,0,0,0.62)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
+  },
+  speedPillText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 13 },
   mediaDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#FFFFFF80' },
   mediaDotActive: { width: 18, backgroundColor: '#FFFFFF' },
   mediaTags: { position: 'absolute', left: 16, right: 86, alignItems: 'flex-start' },
