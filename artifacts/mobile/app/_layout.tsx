@@ -184,6 +184,15 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // Seller livestream — real full-screen camera/broadcast controls.
   'seller-go-live',
   'seller-live',
+  // Brandthread AI screen — immersive full-screen chat takeover with its own
+  // floating composer pinned to the safe-area bottom inset. The floating
+  // seller tab bar previously stayed mounted on top of it (this route wasn't
+  // deny-listed), which sat directly behind the AI composer since that
+  // screen's layout only accounted for the home indicator, not the tab bar's
+  // own height — the composer, suggestion chips, and message list were
+  // rendered underneath the bar. Deny-listing it here removes the overlap
+  // outright and matches the other full-bleed screens above.
+  'ai-brain',
 ]);
 
 // ─── SellerBarGate ────────────────────────────────────────────────────────────
