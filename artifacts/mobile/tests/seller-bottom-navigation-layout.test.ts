@@ -352,6 +352,14 @@ describe('PREVIEW_ROLE seller bypass', () => {
     expect(rootLayout).toContain('isPreviewSeller');
   });
 
+  it('SellerBarGate also shows the bar for the native seller dev preview', () => {
+    const barGateBlock = rootLayout.match(
+      /function SellerBarGate\(\)([\s\S]*?)^}/m,
+    );
+    expect(barGateBlock).toBeTruthy();
+    expect(barGateBlock![1]).toContain("DEV_BYPASS_ROLE === 'seller'");
+  });
+
   it('showBar is true when either isActiveSeller or isPreviewSeller', () => {
     const barGateBlock = rootLayout.match(
       /function SellerBarGate\(\)([\s\S]*?)^}/m,

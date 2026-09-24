@@ -200,7 +200,7 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
 // Renders the global seller tab bar + Studio radial menu when:
 //   1. SellerShellContext reports an active seller session (set by AuthGate after
 //      it resolves onboarding completion and role from AsyncStorage/server), OR
-//   2. PREVIEW_ROLE === 'seller' in the dev web bypass (no Clerk required).
+//   2. The development seller preview is active on web or device (no Clerk required).
 //
 // AuthGate is the single authority that reads AsyncStorage and the server
 // profile. SellerBarGate consumes SellerShellContext — no parallel read.
@@ -214,10 +214,10 @@ function SellerBarGate() {
   const segments = useSegments();
   const [studioOpenRequestKey, setStudioOpenRequestKey] = useState(0);
 
-  // Honor the dev web preview bypass: PREVIEW_ROLE is evaluated at module load
-  // time (before Clerk resolves) so it must be checked independently of
-  // isActiveSeller. It is inert in production builds (__DEV__ guard in PREVIEW_ROLE).
-  const isPreviewSeller = PREVIEW_ROLE === 'seller';
+  // Preview navigation must not depend on Clerk or completed onboarding.
+  // PREVIEW_ROLE covers web; DEV_BYPASS_ROLE covers the Expo Go device preview
+  // and is null in production builds.
+  const isPreviewSeller = PREVIEW_ROLE === 'seller' || DEV_BYPASS_ROLE === 'seller';
 
   const showBar = isActiveSeller || isPreviewSeller;
 
