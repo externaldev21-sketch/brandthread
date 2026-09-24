@@ -22,6 +22,38 @@ const BASE =
   process.env.EXPO_PUBLIC_API_BASE_URL ??
   `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
+/**
+ * Every request gets a hard ceiling so a hung connection (dead server, black
+ * hole route, a device that fell asleep mid-request) always resolves into an
+ * error a screen can show instead of leaving loading state stuck forever.
+ */
+const REQUEST_TIMEOUT_MS = 15_000;
+
+/**
+ * fetch() with a hard timeout. Expo/RN's fetch never rejects or resolves on
+ * its own if the connection just hangs — AbortController is the only way to
+ * bound it. A timeout surfaces as ApiError(408) so it flows through the same
+ * classification/retry path as a real server timeout.
+ */
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number = REQUEST_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new ApiError(408, JSON.stringify({ error: { message: 'Request timed out. Please try again.', code: 'timeout' } }));
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 type GetToken = () => Promise<string | null>;
 type GetCacheScope = () => string | Promise<string>;
 
@@ -232,7 +264,7 @@ async function request<T = any>(
   };
   let res: Response;
   try {
-    res = await fetch(`${BASE}${resolvedPath}`, { ...options, headers });
+    res = await fetchWithTimeout(`${BASE}${resolvedPath}`, { ...options, headers });
   } catch (error) {
     const retry = isRead
       ? () => request<T>(path, options, getToken, asText, getCacheScope, reportErrors)

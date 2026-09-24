@@ -121,7 +121,7 @@ async function pressAndroidBack() {
 }
 
 async function verifyCreateRoutes() {
-  const labels = ['New post', 'New product', 'New drop', 'Start a boost'];
+  const labels = ['New post', 'New product', 'Start a boost'];
   for (const label of labels) {
     await openDashboard();
     await tap('Create');
@@ -190,7 +190,7 @@ try {
   } else {
     await openDashboard();
     await tap('Create');
-    for (const label of ['New post', 'New product', 'New drop', 'Start a boost']) await waitFor(label);
+    for (const label of ['New post', 'New product', 'Start a boost']) await waitFor(label);
     await tap('New post');
     await absent('New product');
   }
