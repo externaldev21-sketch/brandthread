@@ -19,6 +19,7 @@ import {
   parsePagination,
   setPaginationHeaders,
 } from "../lib/pagination";
+import { setPublicCacheHeaders } from "../lib/httpCache";
 
 // ─── In-flight guard for synchronous cache-miss computation ──────────────────
 // Prevents concurrent requests from each triggering an independent full
@@ -108,6 +109,7 @@ export function rankRelatedProducts<T extends {
 // Optional query params: ?category=apparel&tag=streetwear&ownerId=user_xxx&limit=50&offset=0
 router.get("/products", async (req, res) => {
   try {
+    setPublicCacheHeaders(res);
     const category = singleQueryValue(req.query.category);
     const tag = singleQueryValue(req.query.tag);
     const ownerId = singleQueryValue(req.query.ownerId);
@@ -229,6 +231,7 @@ router.get("/products/high-demand", async (req, res) => {
   const lim = Math.min(parsedLimit, 24);
 
   try {
+    setPublicCacheHeaders(res);
     const activeProducts = await db.select().from(products)
       .where(and(eq(products.status, "active"), isNull(products.deletedAt)));
     if (activeProducts.length === 0) return res.json([]);
@@ -314,6 +317,7 @@ router.get("/products/:id/related", async (req, res) => {
   const lim = Math.min(parsedLimit, 24);
 
   try {
+    setPublicCacheHeaders(res);
     const [current] = await db.select().from(products)
       .where(and(eq(products.id, req.params.id), eq(products.status, "active"), isNull(products.deletedAt))).limit(1);
     if (!current) return res.status(404).json({ error: "Product not found" });
@@ -350,6 +354,7 @@ router.get("/products/:id/related", async (req, res) => {
 // GET /api/public/products/:id
 router.get("/products/:id", async (req, res) => {
   try {
+    setPublicCacheHeaders(res);
     const [product] = await db
       .select()
       .from(products)
@@ -662,6 +667,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
 
 // ─── GET /api/public/drops — buyer-facing active drops with countdown ─────────
 router.get("/drops", async (req, res) => {
+  setPublicCacheHeaders(res);
   const activeDrops = await db
     .select({
       id:                drops.id,
@@ -694,6 +700,7 @@ router.get("/drops", async (req, res) => {
 
 // ─── GET /api/public/drops/:id — single active drop detail ────────────────────
 router.get("/drops/:id", async (req, res) => {
+  setPublicCacheHeaders(res);
   const [drop] = await db
     .select()
     .from(drops)
@@ -959,6 +966,9 @@ router.get("/posts", async (req, res) => {
 // Query params: ?limit=20
 router.get("/trending", async (req, res) => {
   try {
+    // Trending is recomputed at most once a day server-side; a longer client
+    // cache window is safe and cuts repeat load meaningfully.
+    setPublicCacheHeaders(res, { maxAgeSeconds: 60, staleWhileRevalidateSeconds: 300 });
     const page = parsePagination(req.query, { limit: 20 });
     if (!page.success || page.data.limit > 50 || page.data.offset !== 0) {
       return res.status(400).json({ error: "Invalid trending query", code: "VALIDATION_ERROR" });
