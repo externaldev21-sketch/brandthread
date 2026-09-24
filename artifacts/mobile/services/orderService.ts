@@ -562,6 +562,47 @@ export async function purchaseShippingLabel(
   };
 }
 
+// ─── Fulfillment wizard: checklist & package presets ───────────────────────────
+
+export interface PackagePreset {
+  id: string;
+  name: string;
+  weightOz: number;
+  lengthIn: string;
+  widthIn: string;
+  heightIn: string;
+}
+
+/** Persist the seller's pick/pack checklist state for one order. */
+export async function updateFulfillmentChecklist(
+  orderId: string,
+  body: { isPicked?: boolean; isPacked?: boolean },
+): Promise<void> {
+  await serviceRequest(`/api/orders/${encodeURIComponent(orderId)}/fulfillment-checklist`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function getPackagePresets(): Promise<PackagePreset[]> {
+  const result = await serviceRequest('/api/package-presets') as { presets: PackagePreset[] };
+  return result.presets ?? [];
+}
+
+export async function createPackagePreset(preset: {
+  name: string; weightOz: number; lengthIn: number; widthIn: number; heightIn: number;
+}): Promise<PackagePreset> {
+  const result = await serviceRequest('/api/package-presets', {
+    method: 'POST',
+    body: JSON.stringify(preset),
+  }) as { preset: PackagePreset };
+  return result.preset;
+}
+
+export async function deletePackagePreset(id: string): Promise<void> {
+  await serviceRequest(`/api/package-presets/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
 export async function voidShippingLabel(orderId: string, labelId: string): Promise<ShippingLabel> {
   const result = await serviceRequest(
     `/api/shipping-labels/${encodeURIComponent(orderId)}/${encodeURIComponent(labelId)}/void`,

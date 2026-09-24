@@ -939,13 +939,13 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
         {order.status === 'processing' && (
           <View style={s.actionRow}>
             <PrimaryButton label="Mark Ready to Ship" onPress={onMarkReadyToShip} icon="package" style={{ flex: 1 }} />
-            <SecondaryButton label="Buy Shipping Label" onPress={() => router.push(`/shipping-label?orderId=${order.id}`)} icon="tag" style={{ flex: 1 }} />
+            <SecondaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" style={{ flex: 1 }} />
           </View>
         )}
         {order.status === 'ready_to_ship' && (
           <View style={s.actionCol}>
             <View style={s.actionRow}>
-              <PrimaryButton label="Buy Label" onPress={() => router.push(`/shipping-label?orderId=${order.id}`)} icon="tag" style={{ flex: 1 }} />
+              <PrimaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" style={{ flex: 1 }} />
               <SecondaryButton label="Add Tracking" onPress={() => setAddingTracking(!addingTracking)} icon="map-pin" style={{ flex: 1 }} />
             </View>
             {addingTracking && (

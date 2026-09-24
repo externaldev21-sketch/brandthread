@@ -307,6 +307,10 @@ export const orders = pgTable('orders', {
   // Fulfillment timestamps
   packedAt:  timestamp('packed_at'),
   shippedAt: timestamp('shipped_at'),
+  // Seller packing-checklist state for the fulfillment wizard (mobile
+  // Fulfillment.isPicked/isPacked). Not a money-path field.
+  fulfillmentPicked: boolean('fulfillment_picked').notNull().default(false),
+  fulfillmentPacked: boolean('fulfillment_packed').notNull().default(false),
   // Discount code applied at checkout
   discountCode:        text('discount_code'),
   discountAmountCents: integer('discount_amount_cents').notNull().default(0),
@@ -1501,6 +1505,34 @@ export const orderFundReservations = pgTable('order_fund_reservations', {
   ownerIdx: index('order_fund_reservations_owner_idx').on(table.ownerId),
   labelUnique: uniqueIndex('order_fund_reservations_label_unique').on(table.shippingLabelId),
 }));
+
+// Saved box/parcel presets a seller can reuse across the fulfillment wizard.
+// Units: ounces for weight, inches for dimensions — kept consistent with the
+// shipping-label rate request body (`weight` in lb string, but presets store
+// the finer-grained oz here and the fulfillment screen converts to lb before
+// calling /rates, matching shipping-label.tsx's existing lb-based inputs).
+export const sellerPackagePresets = pgTable('seller_package_presets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerId: text('owner_id').notNull(),
+  name: text('name').notNull(),
+  weightOz: integer('weight_oz').notNull(),
+  lengthIn: numeric('length_in', { precision: 6, scale: 2 }).notNull(),
+  widthIn: numeric('width_in', { precision: 6, scale: 2 }).notNull(),
+  heightIn: numeric('height_in', { precision: 6, scale: 2 }).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  ownerIdx: index('seller_package_presets_owner_idx').on(table.ownerId),
+}));
+
+// Dedup ledger for Shippo tracking webhook deliveries — a delivery's
+// (transaction id + tracking status) pair is claimed once so a retried or
+// duplicate delivery from the carrier is a no-op.
+export const shippoWebhookEvents = pgTable('shippo_webhook_events', {
+  id: text('id').primaryKey(), // `${transactionId}:${status}`
+  orderId: uuid('order_id'),
+  receivedAt: timestamp('received_at').defaultNow().notNull(),
+});
 
 export const sellerCashoutAttempts = pgTable('seller_cashout_attempts', {
   id: uuid('id').primaryKey().defaultRandom(),
