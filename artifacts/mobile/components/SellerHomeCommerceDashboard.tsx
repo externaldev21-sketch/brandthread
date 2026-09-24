@@ -28,6 +28,7 @@ import {
 import { skipTask, type SetupState, type SetupTask } from '@/lib/setupStore';
 import { withSellerSetupOrigin } from '@/lib/setupNavigation';
 import { KpiRowSkeleton, ResponsiveContainer, useBreakpoint } from '@/components/layout';
+import { bucketLabel } from '@/lib/sellerHomeChartLabels';
 import {
   BG,
   BORDER,
@@ -81,17 +82,6 @@ const RANGES: Array<{ id: TimeRange; label: string }> = [
   { id: 'week', label: 'This week' },
 ];
 
-function bucketLabel(value: string, range: TimeRange): string {
-  const date = new Date(value);
-  if (range === 'week') {
-    return date.toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 2);
-  }
-  return date.toLocaleTimeString(undefined, {
-    hour: 'numeric',
-    minute: range === 'live' ? '2-digit' : undefined,
-  });
-}
-
 // ─── Skeleton shimmer row ────────────────────────────────────────────────────
 function SkeletonBlock({ width, height, style }: { width?: number | string; height: number; style?: object }) {
   return (
@@ -135,27 +125,27 @@ function ChartSkeleton({ count = 10 }: { count?: number }) {
 }
 
 // ─── Empty chart state ────────────────────────────────────────────────────────
-function ChartEmptyState({ range }: { range: TimeRange }) {
+function ChartEmptyState({ range, bucketCount }: { range: TimeRange; bucketCount: number }) {
   const rangeLabel = RANGES.find((r) => r.id === range)?.label ?? range;
-  const ghost = [18, 28, 14, 35, 22, 42, 16, 30, 20, 26];
+  // A flat zero line, not fabricated bar heights — this state means "no sales yet",
+  // and the bars must not imply activity that didn't happen.
+  const columns = Math.max(bucketCount, 1);
   return (
     <View style={styles.chartEmptyWrap}>
-      {/* Ghost bars — visually suggest the chart shape without implying real data */}
       <View style={[styles.chart, styles.chartGhost]}>
-        {ghost.map((h, i) => (
+        {Array.from({ length: columns }).map((_, i) => (
           <View key={i} style={styles.barColumn}>
             <View style={styles.barTrack}>
               <View
                 style={[
                   styles.bar,
                   {
-                    height: `${h}%`,
+                    height: 4,
                     backgroundColor: BORDER_SUBTLE,
                   },
                 ]}
               />
             </View>
-            <View style={{ width: 14, height: 8, borderRadius: 3, backgroundColor: BORDER_SUBTLE }} />
           </View>
         ))}
       </View>
@@ -599,7 +589,7 @@ export default function SellerHomeCommerceDashboard({
           ) : !data ? (
             <ChartSkeleton />
           ) : !hasActivity || maxBucket === 0 ? (
-            <ChartEmptyState range={range} />
+            <ChartEmptyState range={range} bucketCount={data?.buckets.length ?? 0} />
           ) : (
             <View style={styles.chart}>
               {(data?.buckets ?? []).map((bucket) => {

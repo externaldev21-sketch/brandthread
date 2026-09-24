@@ -3,6 +3,7 @@ import { db, orders, customers, productVariants, drops, products, orderItems, us
 import { sql, gte, lt, and, eq } from "drizzle-orm";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { buildCustomerAnalyticsResponse } from "./analyticsCustomers";
+import { DAY_MS, TEN_MIN_MS, floorToLocalStep, parseTzOffsetMinutes } from "../lib/analyticsTime";
 
 const router = Router();
 router.use(requireAuth);
@@ -112,17 +113,23 @@ router.get("/home", async (req, res) => {
   const range = ["live", "today", "yesterday", "week"].includes(String(req.query.range))
     ? String(req.query.range)
     : "today";
+  const tzOffsetMinutes = parseTzOffsetMinutes(req.query.tz);
   const now = new Date();
-  const today = daysAgo(0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const weekStart = daysAgo(6);
-  const liveStart = new Date(now.getTime() - 60 * 60 * 1000);
+
+  // Local-midnight-anchored boundaries, so "today"/"yesterday"/"this week" match the
+  // seller's own calendar day rather than the server's timezone.
+  const today = floorToLocalStep(now, DAY_MS, tzOffsetMinutes);
+  const tomorrow = new Date(today.getTime() + DAY_MS);
+  const yesterday = new Date(today.getTime() - DAY_MS);
+  const weekStart = new Date(today.getTime() - 6 * DAY_MS);
+  // Rounded to a clean 10-minute mark so bucket boundaries (and their labels) never
+  // land on an arbitrary minute like ":53" — the last live bucket covers up to the
+  // most recent completed 10-minute window.
+  const liveEnd = floorToLocalStep(now, TEN_MIN_MS, tzOffsetMinutes);
+  const liveStart = new Date(liveEnd.getTime() - 60 * 60 * 1000);
 
   const start = range === "live" ? liveStart : range === "yesterday" ? yesterday : range === "week" ? weekStart : today;
-  const end = range === "live" ? now : range === "yesterday" ? today : tomorrow;
+  const end = range === "live" ? liveEnd : range === "yesterday" ? today : range === "week" ? tomorrow : tomorrow;
   const step = range === "live" ? "10 minutes" : range === "week" ? "1 day" : "4 hours";
 
   const [salesRow, visitorRow, fulfillRow, captureRow] = await Promise.all([

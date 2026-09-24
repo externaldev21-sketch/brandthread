@@ -666,7 +666,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           toFulfill: number;
           toCapture: number;
           buckets: Array<{ bucket: string; totalCents: number; orderCount: number }>;
-        }>(`/api/analytics/home?range=${range}`),
+          // `tz` is minutes east of UTC (-Date#getTimezoneOffset()) so day/hour
+          // buckets land on the seller's local calendar day, not the server's.
+        }>(`/api/analytics/home?range=${range}&tz=${-new Date().getTimezoneOffset()}`),
       revenue:    (period: string) => get(`/api/analytics/revenue?period=${period}`),
       products:   () => get<any[]>('/api/analytics/products'),
       /** Top customers by spend + repeat-buyer stats — derived from real orders */
