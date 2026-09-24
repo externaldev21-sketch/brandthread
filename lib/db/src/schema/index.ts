@@ -5,7 +5,7 @@ export * from './subscriptionEntitlements';
 export * from './security';
 export * from './money';
 export * from './threadCash';
-import { manufacturers } from './manufacturers';
+import { manufacturers, sellerRfqs } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
 
 // ─── Users (brand team members + buyers, linked to Clerk) ─────────────────────
@@ -559,6 +559,9 @@ export const sellerQuoteRequests = pgTable('seller_quote_requests', {
   id:               uuid('id').primaryKey().defaultRandom(),
   sellerId:         text('seller_id').notNull(),
   manufacturerId:   uuid('manufacturer_id').notNull().references(() => manufacturers.id, { onDelete: 'cascade' }),
+  // Set when this quote request was fanned out from a broadcast RFQ
+  // (seller_rfqs); null for a direct 1:1 quote/sample request.
+  rfqId:            uuid('rfq_id').references(() => sellerRfqs.id, { onDelete: 'set null' }),
   // 'quote' | 'sample'
   type:             text('type').notNull().default('quote'),
   productName:      text('product_name').notNull(),
@@ -586,6 +589,7 @@ export const sellerQuoteRequests = pgTable('seller_quote_requests', {
 }, (table) => ({
   manufacturerIdx: index('seller_quote_requests_mfr_idx').on(table.manufacturerId),
   sellerIdx: index('seller_quote_requests_seller_idx').on(table.sellerId),
+  rfqIdx: index('seller_quote_requests_rfq_idx').on(table.rfqId),
 }));
 
 // ─── Relations ────────────────────────────────────────────────────────────────
