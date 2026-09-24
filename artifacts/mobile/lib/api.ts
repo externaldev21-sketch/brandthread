@@ -16,6 +16,7 @@ import {
   reportNetworkError,
 } from '@/lib/networkNotice';
 import type { FinanceSummary } from '@/lib/financeSummary';
+import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 
 const BASE =
   process.env.EXPO_PUBLIC_API_BASE_URL ??
@@ -1000,6 +1001,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             clientIdempotencyKey?: string;
             /** One-time rewards token created by /api/loyalty/redeem. */
             loyaltyToken?: string;
+            /** THREAD CASH HOOK POINT: one-time token from /api/thread-cash/redeem.
+             *  The server currently rejects any request that includes this (see
+             *  routes/buyer.ts) until the checkout money flow can fund it without
+             *  changing seller payout — see docs/payments/thread-cash-checkout-todo.md. */
+            threadCashToken?: string;
           },
         ) =>
           post<{ sessionId: string; url: string }>('/api/buyer/checkout/session', {
@@ -1011,6 +1017,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             ...(opts.shippingAddress       ? { shippingAddress:       opts.shippingAddress       } : {}),
             ...(opts.clientIdempotencyKey  ? { clientIdempotencyKey:  opts.clientIdempotencyKey  } : {}),
             ...(opts.loyaltyToken          ? { loyaltyToken:          opts.loyaltyToken          } : {}),
+            ...(opts.threadCashToken       ? { threadCashToken:       opts.threadCashToken       } : {}),
           }),
         /** Verify payment status after Stripe redirect.
          *  Returns { status, paymentStatus, amountTotal, orderId?, orderNumber?, declineReason? }. */
@@ -1121,6 +1128,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Upload a base64-encoded image/video/audio file and get back a public URL. */
       uploadMedia: (body: { data: string; mimeType: string; extension: string }) =>
         post<{ url: string }>('/api/conversations/upload-media', body),
+      /** Set (or replace) my reaction on a message — one active reaction per user per message. */
+      addReaction: (conversationId: string, messageId: string, reactionType: string) =>
+        put<{ userId: string; userName: string; reactionType: string; createdAt: string }>(
+          `/api/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/reactions`,
+          { reactionType },
+        ),
+      /** Remove my reaction from a message. */
+      removeReaction: (conversationId: string, messageId: string) =>
+        del<{ ok: boolean }>(
+          `/api/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/reactions`,
+        ),
     },
     /** 1:1 voice / video call tokens (Agora RTC). */
     call: {
@@ -1180,7 +1198,24 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         if (opts.category) params.set('category', opts.category);
         if (opts.limit) params.set('limit', String(opts.limit));
         return get<{ results: any[] }>(`/api/public/search?${params.toString()}`);
-      }
+      },
+      /** Trending search terms (categories + brands) for the search empty state. */
+      trending: (limit = 8) =>
+        get<{ trending: Array<{ term: string; type: 'category' | 'brand' }> }>(
+          `/api/public/search/trending?limit=${encodeURIComponent(String(limit))}`
+        ),
+      /** Suggested brands + products for the search empty state. */
+      suggested: (limit = 6) =>
+        get<{
+          brands: Array<{
+            id: string; sellerId: string; name: string; handle: string;
+            color: string; initials: string; followerCount: number;
+          }>;
+          products: Array<{
+            id: string; productId: string; name: string; brand: string;
+            category: string; imageUri: string | null; color: string; initials: string;
+          }>;
+        }>(`/api/public/search/suggested?limit=${encodeURIComponent(String(limit))}`),
     },
     reviews: {
       /** List reviews for a product (public). Returns { reviews, avgRating, totalCount }. */
@@ -2070,6 +2105,21 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<any>('/api/loyalty/earn', body),
       redeem: (body: { points: number }) =>
         post<{ ok: boolean; pointsUsed: number; discountCents: number; token: string }>('/api/loyalty/redeem', body),
+    },
+    /** Thread Cash — platform-funded reward credit (daily check-in, streaks, wallet). */
+    threadCash: {
+      get: () =>
+        get<ThreadCashStatus>('/api/thread-cash'),
+      checkIn: (body: { timezone: string; deviceId?: string }) =>
+        post<ThreadCashCheckInResult>('/api/thread-cash/check-in', body),
+      history: (limit = 50) =>
+        get<{ history: ThreadCashEntry[] }>(`/api/thread-cash/history?limit=${limit}`),
+      redeem: (body: { amountCents: number }) =>
+        post<{ ok: boolean; discountCents: number; token: string }>('/api/thread-cash/redeem', body),
+      send: (body: { recipientId: string; conversationId?: string; amountCents: number }) =>
+        post<{ ok: boolean; transferId: string }>('/api/thread-cash/send', body),
+      claim: (body: { transferId: string }) =>
+        post<{ ok: boolean; amountCents: number }>('/api/thread-cash/claim', body),
     },
     /** Public trending feed — no auth required. */
     publicTrending: {

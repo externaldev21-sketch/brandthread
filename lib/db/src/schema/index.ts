@@ -4,6 +4,7 @@ export * from './freelancers';
 export * from './subscriptionEntitlements';
 export * from './security';
 export * from './money';
+export * from './threadCash';
 import { manufacturers } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
 
@@ -753,6 +754,22 @@ export const messageReports = pgTable('message_reports', {
   messageIdx: index('message_reports_message_idx').on(table.messageId, table.createdAt),
 }));
 
+// ─── Message reactions ─────────────────────────────────────────────────────────
+// A small fixed reaction bar (no free-form emoji picker). One active reaction
+// per user per message — re-reacting replaces the previous one via the unique
+// constraint below.
+export const messageReactions = pgTable('message_reactions', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  messageId:    uuid('message_id').notNull().references(() => messages.id, { onDelete: 'cascade' }),
+  userId:       text('user_id').notNull(),
+  // 'like' | 'love' | 'haha' | 'wow' | 'sad' | 'fire'
+  reactionType: text('reaction_type').notNull(),
+  createdAt:    timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  messageUserUnique: unique('message_reactions_message_user_unique').on(table.messageId, table.userId),
+  messageIdx:        index('message_reactions_message_idx').on(table.messageId),
+}));
+
 // ─── Saved collections (buyer boards, à la Pinterest) ─────────────────────────
 
 export const savedCollections = pgTable('saved_collections', {
@@ -829,8 +846,17 @@ export const notificationsFeed = pgTable('notifications_feed', {
   targetId:      text('target_id'),
   targetType:    text('target_type'),
   cta:           text('cta'),
+  // Clerk user ID of whoever caused the event (liker, commenter, follower,
+  // brand). Lets the Activity Center aggregate distinct actors and lets
+  // publishers skip repeat like/unlike toggles from the same person.
+  actorId:       text('actor_id'),
+  // Thumbnail of the related post/product/order. Either an absolute URL or a
+  // private `/objects/…` path that the feed route signs at read time.
+  targetImageUrl: text('target_image_url'),
   createdAt:     timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
+  userCreatedIdx: index('notifications_feed_user_created_idx')
+    .on(table.userId, table.createdAt),
   subscriptionPaymentFailureUnique: uniqueIndex('notifications_feed_subscription_payment_failed_unique')
     .on(table.userId, table.type, table.targetId)
     .where(sql`${table.type} = 'subscription_payment_failed' AND ${table.targetId} IS NOT NULL`),
@@ -840,6 +866,11 @@ export const notificationsFeed = pgTable('notifications_feed', {
   subscriptionTrialDayFourUnique: uniqueIndex('notifications_feed_subscription_trial_day_4_unique')
     .on(table.userId, table.type, table.targetId)
     .where(sql`${table.type} = 'subscription_trial_day_4' AND ${table.targetId} IS NOT NULL`),
+  // A follower hears about a brand's new product once, even if the seller
+  // toggles the listing between draft and active.
+  newProductUnique: uniqueIndex('notifications_feed_new_product_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} = 'new_product' AND ${table.targetId} IS NOT NULL`),
   dropLiveUnique: uniqueIndex('notifications_feed_drop_live_unique')
     .on(table.userId, table.type, table.targetId)
     .where(sql`${table.type} = 'drop_live' AND ${table.targetId} IS NOT NULL`),
@@ -852,6 +883,7 @@ export const notificationsFeed = pgTable('notifications_feed', {
   lowStockUnique: uniqueIndex('notifications_feed_low_stock_unique')
     .on(table.userId, table.type, table.targetId)
     .where(sql`${table.type} = 'low_stock' AND ${table.targetId} IS NOT NULL`),
+  // Stripe may redeliver a Connect payout webhook; one alert per payout.
   payoutSentUnique: uniqueIndex('notifications_feed_payout_sent_unique')
     .on(table.userId, table.type, table.targetId)
     .where(sql`${table.type} = 'payout_sent' AND ${table.targetId} IS NOT NULL`),

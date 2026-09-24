@@ -67,7 +67,7 @@ export const BUYER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
   {
     title: 'Thread Cash',
     items: [
-      { label: 'Thread Cash', description: 'Your Brandthread wallet and store credit — coming soon', aliases: ['wallet', 'credit', 'balance'], icon: 'dollar-sign', audience: 'buyer', soon: true },
+      { label: 'Thread Cash', description: 'Your Brandthread wallet, streaks, and store credit', aliases: ['wallet', 'credit', 'balance', 'streak', 'rewards'], icon: 'dollar-sign', route: '/thread-cash', audience: 'buyer' },
     ],
   },
   {

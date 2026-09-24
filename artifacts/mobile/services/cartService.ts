@@ -10,7 +10,7 @@ import {
   CheckoutSession, CheckoutContact, CheckoutAddress,
   CheckoutDeliveryGroup, CheckoutShippingMethod, CheckoutDiscount,
   CheckoutTax, CheckoutSummary,
-  CheckoutLoyaltyRedemption,
+  CheckoutLoyaltyRedemption, CheckoutThreadCashRedemption,
   CheckoutAcknowledgment, CheckoutAttribution,
   CartValidationResult, CartValidationIssue,
   BuyerProduct, BuyerProductOption, BuyerProductVariant,
@@ -579,6 +579,11 @@ export async function createCheckoutSession(
   isBuyNow = false,
   buyNowItems?: CartItem[],
   loyaltyRedemption?: CheckoutLoyaltyRedemption,
+  // THREAD CASH HOOK POINT: additive trailing param, mirrors loyaltyRedemption.
+  // Not yet sent to the server as a real discount — see
+  // docs/payments/thread-cash-checkout-todo.md — but already flows through the
+  // session/summary math so the UI can be built and reviewed ahead of that.
+  threadCashRedemption?: CheckoutThreadCashRedemption,
 ): Promise<CheckoutSession> {
   const items = isBuyNow && buyNowItems ? buyNowItems : cart.items;
   const groups = groupCartBySeller(items);
@@ -610,11 +615,11 @@ export async function createCheckoutSession(
     const selected = group.availableMethods.find(method => method.id === group.selectedMethodId);
     return total + (selected?.priceCents ?? 0);
   }, 0);
-  const loyaltyDiscountCents = Math.min(
-    loyaltyRedemption?.discountCents ?? 0,
+  const rewardsDiscountCents = Math.min(
+    (loyaltyRedemption?.discountCents ?? 0) + (threadCashRedemption?.discountCents ?? 0),
     items.reduce((total, item) => total + item.priceCents * item.quantity, 0) + shippingTotalCents,
   );
-  const summary = calculateCartSummary(items, loyaltyDiscountCents, shippingTotalCents);
+  const summary = calculateCartSummary(items, rewardsDiscountCents, shippingTotalCents);
 
   const acks: CheckoutAcknowledgment[] = [];
   const hasPreOrder = items.some(i => i.isPreOrder);
@@ -647,6 +652,7 @@ export async function createCheckoutSession(
     deliveryGroups,
     discounts: [],
     loyaltyRedemption,
+    threadCashRedemption,
     summary,
     acknowledgments: acks,
     isBuyNow,

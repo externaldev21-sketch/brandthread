@@ -2,26 +2,22 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   KeyboardAvoidingView, Alert, Platform, StyleSheet, Dimensions,
-  ListRenderItemInfo, Modal, ScrollView, ActivityIndicator, Image,
+  ListRenderItemInfo, Modal, ScrollView, ActivityIndicator, Image, Animated,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
-import {
-  BG, CARD, CARD_ELEVATED, BORDER,
-  FG, MUTED, SUBTLE,
-  ORANGE, RED, ON_DARK, FONT, FS, SP, RADIUS, COMP, ICON,
-} from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
   getConversation, createOrGetConversation, getMessages,
   sendMessage, retryMessage, addReaction, deleteMessageForMe,
   markConversationRead, subscribeSocial,
-  MY_USER_ID, MY_NAME, MY_INITIALS, MY_COLOR,
+  MY_USER_ID,
 } from '@/services/socialService';
 import type {
-  Conversation, Message, MessageAttachment, ConversationParticipant,
+  Conversation, Message, MessageAttachment, ConversationParticipant, ReactionType,
 } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 import * as ImagePicker from 'expo-image-picker';
@@ -33,13 +29,20 @@ import {
   useAudioPlayerStatus,
   useAudioRecorder,
 } from 'expo-audio';
-import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@clerk/expo';
 import { apiErrorMessage, confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
 import { BlockedComposer, type DmMessagingState } from '@/components/safety/DmSafety';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { SheetRise } from '@/components/motion/SheetRise';
+import ChatWallpaper from '@/components/chat/ChatWallpaper';
+import UploadRing from '@/components/chat/UploadRing';
+import MediaViewer from '@/components/chat/MediaViewer';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+import { ThreadCashAttachButton } from '@/components/thread-cash/ChatAttachThreadCash';
+import {
+  ReactionChipsRow, ReactionGlyph, reactionAuthorId, reactionAuthorName, reactionKind,
+} from '@/components/chat/ReactionBar';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -83,21 +86,47 @@ function formatDate(ts: number): string {
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-type DateRow = { type: 'date'; date: string };
-type MsgRow  = { type: 'message'; msg: Message };
-type ListRow = DateRow | MsgRow;
+function formatTime(ts: number): string {
+  const d = new Date(ts);
+  const h = d.getHours();
+  const m = String(d.getMinutes()).padStart(2, '0');
+  return `${h % 12 || 12}:${m} ${h < 12 ? 'AM' : 'PM'}`;
+}
 
-function groupMessagesByDate(msgs: Message[]): ListRow[] {
+// Consecutive messages from the same sender within this gap are visually
+// grouped: tighter spacing, a shared "tail" only on the run's last bubble,
+// and only the last bubble in a run carries the inline timestamp/receipt.
+const GROUP_GAP_MS = 5 * 60_000;
+function sameSenderClose(a: Message, b: Message): boolean {
+  return a.fromId === b.fromId && Math.abs(a.ts - b.ts) < GROUP_GAP_MS && formatDate(a.ts) === formatDate(b.ts);
+}
+
+type DateRow = { type: 'date'; date: string; key: string };
+type UnreadRow = { type: 'unread'; key: string };
+type MsgRow = { type: 'message'; msg: Message; isFirstInGroup: boolean; isLastInGroup: boolean };
+type ListRow = DateRow | UnreadRow | MsgRow;
+
+function buildListRows(msgs: Message[], unreadDividerId: string | null): ListRow[] {
   const rows: ListRow[] = [];
   let lastDate = '';
-  for (const msg of msgs) {
+  msgs.forEach((msg, i) => {
     const d = formatDate(msg.ts);
+    if (msg.id === unreadDividerId) {
+      rows.push({ type: 'unread', key: `unread-${msg.id}` });
+    }
     if (d !== lastDate) {
-      rows.push({ type: 'date', date: d });
+      rows.push({ type: 'date', date: d, key: `date-${d}-${i}` });
       lastDate = d;
     }
-    rows.push({ type: 'message', msg });
-  }
+    const prev = msgs[i - 1];
+    const next = msgs[i + 1];
+    rows.push({
+      type: 'message',
+      msg,
+      isFirstInGroup: !prev || !sameSenderClose(msg, prev),
+      isLastInGroup: !next || !sameSenderClose(msg, next),
+    });
+  });
   return rows;
 }
 
@@ -117,15 +146,12 @@ function attachmentIcon(type: MessageAttachment['type']): keyof typeof Feather.g
 
 const SCREEN_W = Dimensions.get('window').width;
 const BUBBLE_MAX = SCREEN_W * 0.75;
+const DOUBLE_TAP_MS = 300;
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function BuyerConversationScreen() {
-  const colors = useColors();
   const { theme } = useAppTheme();
-  const PURPLE = colors.primary, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = colors.accent, CYAN = theme.secondary, CYAN_DIM = theme.secondaryDim;
-  const BORDER_ACTIVE = `${theme.accent}73`;
-  const GRAD_PRIMARY = theme.primaryGradient;
   const s = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -148,6 +174,8 @@ export default function BuyerConversationScreen() {
   const flatListRef = useRef<FlatList<ListRow>>(null);
   const api = useApi();
   const { userId } = useAuth();
+  // THREAD CASH HOOK POINT — see components/thread-cash/ChatAttachThreadCash.tsx.
+  const threadCashSendEnabled = useFeatureFlag('threadCashSend');
   /** The signed-in Clerk user; legacy local records used the literal 'me'. */
   const myId = userId ?? MY_USER_ID;
   const [messaging, setMessaging] = useState<DmMessagingState>({ blockedByMe: false, unavailable: false });
@@ -163,9 +191,22 @@ export default function BuyerConversationScreen() {
   const [isUploading, setIsUploading]         = useState(false);
   const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
   const [showMediaSheet, setShowMediaSheet]   = useState(false);
+  const [activeSheetMsg, setActiveSheetMsg]   = useState<Message | null>(null);
+  const [viewerUri, setViewerUri]             = useState<string | null>(null);
+  const [likeBurst, setLikeBurst] = useState<{ key: number; x: number; y: number } | null>(null);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const voicePlayer = useAudioPlayer(null);
   const voicePlayerStatus = useAudioPlayerStatus(voicePlayer);
+
+  // Unread-on-open divider: computed once from the conversation's unreadCount
+  // *before* markConversationRead() clears it server-side, then held fixed for
+  // the lifetime of this screen visit (re-focusing doesn't re-show it).
+  const [unreadDividerId, setUnreadDividerId] = useState<string | null>(null);
+  const hasComputedUnreadRef = useRef(false);
+  const hasScrolledToUnreadRef = useRef(false);
+
+  const lastTapRef = useRef<{ id: string; at: number }>({ id: '', at: 0 });
+  const micSendMorph = useRef(new Animated.Value(0)).current;
 
   // Attachment state
   const [selectedAttachment, setSelectedAttachment] = useState<MessageAttachment | null>(null);
@@ -187,10 +228,14 @@ export default function BuyerConversationScreen() {
     }
     try {
       let loadedConv: Conversation | null = null;
+      let unreadBeforeRead = 0;
 
       if (params.id) {
         loadedConv = await getConversation(params.id);
-        if (loadedConv) await markConversationRead(loadedConv.id);
+        if (loadedConv) {
+          unreadBeforeRead = loadedConv.unreadCount ?? 0;
+          await markConversationRead(loadedConv.id);
+        }
       } else if (params.participantId) {
         loadedConv = await createOrGetConversation({
           type: (params.type as Conversation['type']) ?? 'buyer_to_buyer',
@@ -199,7 +244,7 @@ export default function BuyerConversationScreen() {
             name:   params.participantName   ?? '',
             handle: params.participantHandle ?? '',
             initials: params.participantInitials ?? '',
-            color:  params.participantColor   ?? PURPLE,
+            color:  params.participantColor   ?? theme.accent,
             accountType: (params.participantAccountType as 'buyer' | 'seller') ?? 'buyer',
           },
           contextOrderId:     params.contextOrderId,
@@ -216,6 +261,15 @@ export default function BuyerConversationScreen() {
       if (loadedConv) {
         const msgs = await getMessages(loadedConv.id);
         setMessages(msgs);
+
+        if (!hasComputedUnreadRef.current) {
+          hasComputedUnreadRef.current = true;
+          const incoming = msgs.filter(m => m.fromId !== myId && m.fromId !== MY_USER_ID);
+          if (unreadBeforeRead > 0 && incoming.length > 0) {
+            const idx = Math.max(0, incoming.length - unreadBeforeRead);
+            setUnreadDividerId(incoming[idx].id);
+          }
+        }
       }
     } catch (e) {
       console.error('Failed to load conversation', e);
@@ -237,16 +291,38 @@ export default function BuyerConversationScreen() {
     return unsub;
   }, [conv?.id]);
 
-  // Scroll to end after messages load
+  // No websocket/realtime layer exists for this conversation yet, so a
+  // reaction or reply added by the other participant only appears once we
+  // refetch. Poll at a light cadence while the screen is focused — mirrors
+  // the refetch-on-local-change pattern `subscribeSocial` already uses.
+  useFocusEffect(useCallback(() => {
+    if (!conv?.id) return;
+    const interval = setInterval(() => {
+      getMessages(conv.id).then(setMessages).catch(() => {});
+    }, 12000);
+    return () => clearInterval(interval);
+  }, [conv?.id]));
+
+  // Scroll to end after messages load — unless there's an unread divider we
+  // still need to scroll to first (handled by the effect below).
   useEffect(() => {
-    if (messages.length > 0) {
+    if (messages.length > 0 && (!unreadDividerId || hasScrolledToUnreadRef.current)) {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
     }
-  }, [messages.length]);
+  }, [messages.length, unreadDividerId]);
 
   useEffect(() => {
     if (voicePlayerStatus.didJustFinish) setPlayingVoiceUri(null);
   }, [voicePlayerStatus.didJustFinish]);
+
+  useEffect(() => {
+    const showSend = text.trim().length > 0 || selectedAttachment != null;
+    Animated.timing(micSendMorph, {
+      toValue: showSend ? 1 : 0,
+      duration: 160,
+      useNativeDriver: true,
+    }).start();
+  }, [text, selectedAttachment, micSendMorph]);
 
   // ── Derived ─────────────────────────────────────────────────────────────────
 
@@ -260,9 +336,14 @@ export default function BuyerConversationScreen() {
     ?? conv?.participants[0]
     ?? null;
   const displayName = participant?.name ?? params.participantName ?? 'Unknown';
-  const displayHandle = participant?.handle ?? params.participantHandle ?? '';
   const isDisabled = conv?.isFriendshipActive === false;
   const canSend = (text.trim().length > 0 || selectedAttachment != null) && !isDisabled && !isSending;
+
+  // Presence line under the header name. `isOnline`/`lastSeenAt` are the only
+  // presence signals ConversationParticipant carries; the backend does not
+  // currently populate them (see socialTypes.ts), so this line is simply
+  // omitted rather than fabricating an "online"/"typing…" state from nothing.
+  const statusLine = statusLineFor(participant);
 
   // Show "View store" button for any seller conversation (resolved or pre-created)
   const convType = conv?.type ?? params.type ?? '';
@@ -300,6 +381,7 @@ export default function BuyerConversationScreen() {
   }
 
   function openAttachmentPicker() {
+    setShowMediaSheet(false);
     if (!isSellerConv || !sellerUserId) {
       Alert.alert('Attachments', 'You can attach products or posts when messaging a seller.');
       return;
@@ -329,10 +411,24 @@ export default function BuyerConversationScreen() {
       conversationId: conv.id,
       participantName: displayName,
       participantInitials: p?.initials ?? '?',
-      participantColor: p?.color ?? PURPLE,
+      participantColor: p?.color ?? theme.accent,
       mode,
     });
     router.push(('/call-screen?' + qs.toString()) as never);
+  }
+
+  // ── Other-participant profile ─────────────────────────────────────────────────
+
+  function openParticipantProfile() {
+    if (!participant) return;
+    const qs = new URLSearchParams({
+      userId: participant.userId,
+      name: participant.name,
+      handle: participant.handle,
+      initials: participant.initials,
+      color: participant.color,
+    });
+    router.push(('/buyer-other-profile?' + qs.toString()) as never);
   }
 
   // ── Photo / video picker ──────────────────────────────────────────────────────
@@ -393,42 +489,44 @@ export default function BuyerConversationScreen() {
     finally { setIsUploading(false); }
   }
 
-  // ── Voice recording ───────────────────────────────────────────────────────────
+  // ── Voice recording (hold-to-record) ──────────────────────────────────────────
 
-  async function handleToggleRecording() {
-    if (isRecording) {
-      setIsRecording(false);
-      try {
-        await recorder.stop();
-        const status = recorder.getStatus();
-        const uri = recorder.uri ?? status.url;
-        if (!uri) return;
-        setIsUploading(true);
-        const response = await fetch(uri);
-        const buf = await response.arrayBuffer();
-        const bytes = new Uint8Array(buf);
-        let binary = '';
-        const CHUNK = 8192;
-        for (let i = 0; i < bytes.byteLength; i += CHUNK) {
-          binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + CHUNK, bytes.byteLength)));
-        }
-        const url = await uploadMedia(btoa(binary), 'audio/m4a', 'm4a');
-        const dur = Math.round(status.durationMillis / 1000);
-        setSelectedAttachment({ type: 'voice', uri: url, title: 'Voice message', meta: { duration: String(dur) } });
-      } catch { Alert.alert('Recording error', 'Could not save voice message. Please try again.'); }
-      finally {
-        setIsUploading(false);
-        void setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+  async function startRecording() {
+    if (isRecording || isUploading || isSending) return;
+    try {
+      const permission = await requestRecordingPermissionsAsync();
+      if (!permission.granted) throw new Error('Microphone permission denied');
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      setIsRecording(true);
+    } catch { Alert.alert('Mic unavailable', 'Could not access microphone. Check permissions in Settings.'); }
+  }
+
+  async function stopRecording() {
+    if (!isRecording) return;
+    setIsRecording(false);
+    try {
+      await recorder.stop();
+      const status = recorder.getStatus();
+      const uri = recorder.uri ?? status.url;
+      if (!uri) return;
+      setIsUploading(true);
+      const response = await fetch(uri);
+      const buf = await response.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let binary = '';
+      const CHUNK = 8192;
+      for (let i = 0; i < bytes.byteLength; i += CHUNK) {
+        binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + CHUNK, bytes.byteLength)));
       }
-    } else {
-      try {
-        const permission = await requestRecordingPermissionsAsync();
-        if (!permission.granted) throw new Error('Microphone permission denied');
-        await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-        await recorder.prepareToRecordAsync();
-        recorder.record();
-        setIsRecording(true);
-      } catch { Alert.alert('Mic unavailable', 'Could not access microphone. Check permissions in Settings.'); }
+      const url = await uploadMedia(btoa(binary), 'audio/m4a', 'm4a');
+      const dur = Math.round(status.durationMillis / 1000);
+      setSelectedAttachment({ type: 'voice', uri: url, title: 'Voice message', meta: { duration: String(dur) } });
+    } catch { Alert.alert('Recording error', 'Could not save voice message. Please try again.'); }
+    finally {
+      setIsUploading(false);
+      void setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
     }
   }
 
@@ -449,6 +547,41 @@ export default function BuyerConversationScreen() {
     } catch { setPlayingVoiceUri(null); }
   }
 
+  // ── Reactions ──────────────────────────────────────────────────────────────────
+
+  function myReaction(msg: Message): ReactionType | null {
+    const mine = msg.reactions.find(r => reactionAuthorId(r) === myId || reactionAuthorId(r) === MY_USER_ID);
+    return mine ? reactionKind(mine) : null;
+  }
+
+  async function handleReact(msg: Message, type: ReactionType) {
+    if (!conv) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    try {
+      await addReaction(conv.id, msg.id, type);
+      const msgs = await getMessages(conv.id);
+      setMessages(msgs);
+    } catch {
+      // Best-effort — the reaction bar/summary simply won't reflect it.
+    }
+  }
+
+  function triggerDoubleTapLike(msg: Message, pageX: number, pageY: number) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setLikeBurst({ key: Date.now(), x: pageX, y: pageY });
+    void handleReact(msg, 'like');
+  }
+
+  function handleBubblePress(msg: Message, event: { nativeEvent: { pageX: number; pageY: number } }) {
+    const now = Date.now();
+    if (lastTapRef.current.id === msg.id && now - lastTapRef.current.at < DOUBLE_TAP_MS) {
+      lastTapRef.current = { id: '', at: 0 };
+      triggerDoubleTapLike(msg, event.nativeEvent.pageX, event.nativeEvent.pageY);
+    } else {
+      lastTapRef.current = { id: msg.id, at: now };
+    }
+  }
+
   // ── Attachment renderer (handles image / video / voice inline) ────────────────
 
   function renderAttachment(att: MessageAttachment) {
@@ -460,12 +593,17 @@ export default function BuyerConversationScreen() {
       return (
         <View style={s.photoGrid}>
           {uris.slice(0, 4).map((uri, idx) => (
-            <View key={idx} style={[s.photoCell, uris.length === 1 && s.photoCellSingle]}>
+            <TouchableOpacity
+              key={idx}
+              style={[s.photoCell, uris.length === 1 && s.photoCellSingle]}
+              activeOpacity={0.9}
+              onPress={() => setViewerUri(uri)}
+            >
               <Image source={{ uri }} style={s.photoImg} resizeMode="cover" />
               {idx === 3 && uris.length > 4 && (
                 <View style={s.photoMore}><Text style={s.photoMoreText}>+{uris.length - 4}</Text></View>
               )}
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
       );
@@ -515,10 +653,10 @@ export default function BuyerConversationScreen() {
                 'postId=' + encodeURIComponent(postId),
                 'postAuthorName=' + encodeURIComponent(postAuthorName),
                 'postAuthorInitials=' + encodeURIComponent(participant?.initials ?? '?'),
-                'postAuthorColor=' + encodeURIComponent(participant?.color ?? PURPLE),
+                'postAuthorColor=' + encodeURIComponent(participant?.color ?? theme.accent),
                 'postCaption=' + encodeURIComponent(att.title ?? ''),
-                'postMediaColor1=' + encodeURIComponent(PURPLE_DIM),
-                'postMediaColor2=' + encodeURIComponent(BG),
+                'postMediaColor1=' + encodeURIComponent(theme.accentDim),
+                'postMediaColor2=' + encodeURIComponent(theme.background),
                 'postType=' + encodeURIComponent(att.meta?.mediaType ?? 'photo'),
               ].join('&');
               router.push(('/buyer-post-viewer?' + qs) as never);
@@ -526,13 +664,13 @@ export default function BuyerConversationScreen() {
           }
         }}
       >
-        <Feather name={attachmentIcon(att.type)} size={ICON.sm} color={PURPLE} />
+        <Feather name={attachmentIcon(att.type)} size={ICON.sm} color={theme.accent} />
         <View style={{ flex: 1, marginLeft: SP.sm }}>
           {att.title ? <Text style={s.attachTitle} numberOfLines={1}>{att.title}</Text> : null}
           {att.subtitle ? <Text style={s.attachSubtitle} numberOfLines={1}>{att.subtitle}</Text> : null}
         </View>
         {(att.type === 'product' || att.type === 'order' || att.type === 'post') && (
-          <Feather name="chevron-right" size={ICON.xs} color={MUTED} />
+          <Feather name="chevron-right" size={ICON.xs} color={theme.muted} />
         )}
       </TouchableOpacity>
     );
@@ -547,7 +685,7 @@ export default function BuyerConversationScreen() {
       type: 'product',
       title: product.name,
       subtitle: `${lowestPriceCents == null ? 'Product' : formatCents(lowestPriceCents)}${product.category ? ` · ${product.category}` : ''}`,
-      accentColor: PURPLE,
+      accentColor: theme.accent,
       uri: product.images?.[0] ?? undefined,
       meta: { productId: product.id },
     };
@@ -560,7 +698,7 @@ export default function BuyerConversationScreen() {
       type: 'post',
       title: post.caption?.trim() || 'Seller post',
       subtitle: `${displayName} · ${post.mediaType ?? 'post'}`,
-      accentColor: PURPLE,
+      accentColor: theme.accent,
       uri: post.mediaUrl ?? undefined,
       meta: {
         postId: post.id,
@@ -645,63 +783,43 @@ export default function BuyerConversationScreen() {
     ]);
   }
 
-  // ── Message long press ──────────────────────────────────────────────────────
+  // ── Message long press → reaction bar + actions sheet ───────────────────────
 
-  function longPressMessage(msg: Message) {
-    const isOwn = msg.fromId === myId || msg.fromId === MY_USER_ID;
-    const options: Alert['alert'] extends (t: string, m: string | undefined, b: infer B) => void ? B : never = [
-      {
-        text: 'Reply',
-        onPress: () => setReplyTo(msg),
-      },
-      {
-        text: 'React',
-        onPress: () => {
-          const EMOJIS = ['❤️', '😂', '😮', '😢', '👏', '🔥'];
-          Alert.alert('React', undefined, [
-            ...EMOJIS.map(emoji => ({
-              text: emoji,
-              onPress: () => { if (conv) addReaction(conv.id, msg.id, emoji); },
-            })),
-            { text: 'Cancel', style: 'cancel' as const },
-          ]
-          );
-        },
-      },
-      {
-        text: 'Copy',
-        onPress: () => {
-          Clipboard.setStringAsync(msg.text);
-          setCopiedToast(true);
-          setTimeout(() => setCopiedToast(false), 1600);
-        },
-      },
-    ];
-    if (isOwn) {
-      options.push({
-        text: 'Delete for me',
-        style: 'destructive' as const,
-        onPress: () => conv && deleteMessageForMe(conv.id, msg.id).then(() =>
-          getMessages(conv.id).then(setMessages)
-        ),
-      });
+  function closeMessageSheet() {
+    setActiveSheetMsg(null);
+  }
+
+  function sheetReply() {
+    if (activeSheetMsg) setReplyTo(activeSheetMsg);
+    closeMessageSheet();
+  }
+
+  function sheetCopy() {
+    if (activeSheetMsg) {
+      Clipboard.setStringAsync(activeSheetMsg.text);
+      setCopiedToast(true);
+      setTimeout(() => setCopiedToast(false), 1600);
     }
-    if (!isOwn) {
-      options.push({
-        text: 'Report message',
-        onPress: () => {
-          router.push(reportHref({
-            targetType: 'message',
-            targetId: msg.id,
-            label: participant ? `Message from ${participant.name}` : 'Message',
-            ownerId: participant?.userId,
-            ownerName: participant?.name,
-          }) as never);
-        },
-      });
-    }
-    options.push({ text: 'Cancel', style: 'cancel' as const, onPress: () => {} });
-    Alert.alert('Message Options', undefined, options as any);
+    closeMessageSheet();
+  }
+
+  function sheetDelete() {
+    const msg = activeSheetMsg;
+    closeMessageSheet();
+    if (conv && msg) deleteMessageForMe(conv.id, msg.id).then(() => getMessages(conv.id).then(setMessages));
+  }
+
+  function sheetReport() {
+    const msg = activeSheetMsg;
+    closeMessageSheet();
+    if (!msg) return;
+    router.push(reportHref({
+      targetType: 'message',
+      targetId: msg.id,
+      label: participant ? `Message from ${participant.name}` : 'Message',
+      ownerId: participant?.userId,
+      ownerName: participant?.name,
+    }) as never);
   }
 
   // ── Render list item ────────────────────────────────────────────────────────
@@ -717,97 +835,135 @@ export default function BuyerConversationScreen() {
       );
     }
 
-    const { msg } = item;
+    if (item.type === 'unread') {
+      return (
+        <View style={s.unreadDividerWrap}>
+          <View style={s.unreadDividerLine} />
+          <Text style={s.unreadDividerText}>Unread Messages</Text>
+          <View style={s.unreadDividerLine} />
+        </View>
+      );
+    }
+
+    const { msg, isFirstInGroup, isLastInGroup } = item;
     const isOwn = msg.fromId === myId || msg.fromId === MY_USER_ID;
 
-    // Count reactions
-    const reactionMap: Record<string, number> = {};
+    // Group reactions by kind for the chip summary under the bubble.
+    const grouped = new Map<ReactionType, number>();
     for (const r of msg.reactions) {
-      reactionMap[r.emoji] = (reactionMap[r.emoji] ?? 0) + 1;
+      const kind = reactionKind(r);
+      if (!kind) continue;
+      grouped.set(kind, (grouped.get(kind) ?? 0) + 1);
     }
-    const reactionEntries = Object.entries(reactionMap);
+    const reactionEntries = Array.from(grouped.entries());
+    const mine = myReaction(msg);
+    const topReactor = msg.reactions[msg.reactions.length - 1];
+
+    const isRead = msg.status === 'read' || !!msg.readAt;
 
     return (
       <View style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start' }]}>
-        {/* Other-user avatar */}
+        {/* Other-user avatar — only on the last bubble of a run */}
         {!isOwn && (
-          <View style={[s.msgAvatar, { backgroundColor: msg.fromColor }]}>
-            <Text style={s.msgAvatarInitials}>{msg.fromInitials}</Text>
-          </View>
+          isLastInGroup ? (
+            <View style={[s.msgAvatar, { backgroundColor: msg.fromColor }]}>
+              <Text style={s.msgAvatarInitials}>{msg.fromInitials}</Text>
+            </View>
+          ) : <View style={s.msgAvatarSpacer} />
         )}
 
-        {/* Bubble */}
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onLongPress={() => longPressMessage(msg)}
-          style={[
-            s.bubble,
-            {
-              backgroundColor: isOwn ? PURPLE_DIM : CARD,
-              borderColor: isOwn ? BORDER_ACTIVE : BORDER,
-              borderBottomRightRadius: isOwn ? 4 : RADIUS.lg,
-              borderBottomLeftRadius: isOwn ? RADIUS.lg : 4,
-              maxWidth: BUBBLE_MAX,
-              alignSelf: isOwn ? 'flex-end' : 'flex-start',
-            },
-          ]}
-        >
-          {/* Quoted reply */}
-          {msg.replyToId ? (
-            <View style={s.replyQuote}>
-              <Text style={s.replyQuoteText} numberOfLines={1}>
-                {msg.replyPreview ?? messages.find(m => m.id === msg.replyToId)?.text ?? 'Message'}
-              </Text>
-            </View>
-          ) : null}
+        <View style={{ maxWidth: BUBBLE_MAX }}>
+          {/* Bubble */}
+          <TouchableOpacity
+            testID={`conversation-bubble-${msg.id}`}
+            activeOpacity={0.88}
+            onPress={(e) => handleBubblePress(msg, e)}
+            onLongPress={() => setActiveSheetMsg(msg)}
+            delayLongPress={280}
+            style={[
+              s.bubble,
+              {
+                backgroundColor: isOwn ? theme.accent : theme.cardElevated,
+                borderTopLeftRadius: (!isOwn && !isFirstInGroup) ? RADIUS.sm : RADIUS.lg,
+                borderTopRightRadius: (isOwn && !isFirstInGroup) ? RADIUS.sm : RADIUS.lg,
+                borderBottomRightRadius: isOwn ? (isLastInGroup ? 4 : RADIUS.lg) : RADIUS.lg,
+                borderBottomLeftRadius: !isOwn ? (isLastInGroup ? 4 : RADIUS.lg) : RADIUS.lg,
+                alignSelf: isOwn ? 'flex-end' : 'flex-start',
+              },
+            ]}
+          >
+            {/* Quoted reply */}
+            {msg.replyToId ? (
+              <View style={[s.replyQuote, { borderLeftColor: isOwn ? theme.onAccent : theme.accent }]}>
+                <Text style={[s.replyQuoteText, { color: isOwn ? `${theme.onAccent}CC` : theme.muted }]} numberOfLines={1}>
+                  {msg.replyPreview ?? messages.find(m => m.id === msg.replyToId)?.text ?? 'Message'}
+                </Text>
+              </View>
+            ) : null}
 
-          {/* Attachment */}
-          {msg.attachment && renderAttachment(msg.attachment)}
+            {/* Attachment */}
+            {msg.attachment && renderAttachment(msg.attachment)}
 
-          {/* Text */}
-          {msg.text ? (
-            <Text style={s.msgText}>{msg.text}</Text>
-          ) : null}
+            {/* Text */}
+            {msg.text ? (
+              <Text style={[s.msgText, { color: isOwn ? theme.onAccent : theme.text }]}>{msg.text}</Text>
+            ) : null}
 
-          {/* Reactions */}
+            {/* Inline bottom-right timestamp + read receipt (last bubble of a run) */}
+            {isLastInGroup && (
+              <View style={s.bubbleMeta}>
+                <Text style={[s.bubbleTime, { color: isOwn ? `${theme.onAccent}B0` : theme.muted }]}>
+                  {formatTime(msg.ts)}
+                </Text>
+                {isOwn && msg.status !== 'failed' && (
+                  msg.status === 'sending' ? (
+                    <Feather name="clock" size={11} color={`${theme.onAccent}B0`} style={s.receiptIcon} />
+                  ) : (
+                    <View style={s.receiptChecks}>
+                      <Feather name="check" size={11} color={isRead ? theme.onAccent : `${theme.onAccent}B0`} />
+                      {isRead && <Feather name="check" size={11} color={theme.onAccent} style={{ marginLeft: -7 }} />}
+                    </View>
+                  )
+                )}
+              </View>
+            )}
+
+            {/* Failed / retry */}
+            {isOwn && msg.status === 'failed' && (
+              <TouchableOpacity
+                onPress={() => conv && retryMessage(conv.id, msg.id)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={s.retryRow}
+              >
+                <Feather name="alert-circle" size={11} color={theme.error} />
+                <Text style={[s.retryText, { color: theme.error }]}>Tap to retry</Text>
+              </TouchableOpacity>
+            )}
+          </TouchableOpacity>
+
+          {/* Reaction chip summary */}
           {reactionEntries.length > 0 && (
-            <View style={s.reactionsRow}>
-              {reactionEntries.map(([emoji, count]) => (
+            <View style={[s.reactionsRow, isOwn ? { alignSelf: 'flex-end' } : { alignSelf: 'flex-start' }]}>
+              {reactionEntries.map(([kind, count]) => (
                 <TouchableOpacity
-                  key={emoji}
-                  style={s.reactionChip}
-                  onPress={() => conv && addReaction(conv.id, msg.id, emoji)}
+                  key={kind}
+                  style={[
+                    s.reactionChip,
+                    { backgroundColor: mine === kind ? theme.accentDim : theme.card, borderColor: mine === kind ? theme.accent : theme.border },
+                  ]}
+                  onPress={() => handleReact(msg, kind)}
                   activeOpacity={0.7}
+                  testID={`reaction-chip-${msg.id}-${kind}`}
                 >
-                  <Text style={s.reactionEmoji}>{emoji}{count > 1 ? ` ${count}` : ''}</Text>
+                  <ReactionGlyph type={kind} size={12} color={mine === kind ? theme.accent : theme.muted} />
+                  <Text style={[s.reactionCount, { color: mine === kind ? theme.accent : theme.muted }]}>
+                    {count > 1 ? count : reactionAuthorName(topReactor ?? { fromName: '' }).split(' ')[0]}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
           )}
-
-          {/* Status (own messages only) */}
-          {isOwn && (
-            <View style={s.msgStatus}>
-              {msg.status === 'sending' && (
-                <Feather name="clock" size={10} color={SUBTLE} />
-              )}
-              {msg.status === 'sent' && (
-                <Feather name="check" size={10} color={MUTED} />
-              )}
-              {msg.status === 'delivered' && (
-                <Feather name="check-circle" size={10} color={MUTED} />
-              )}
-              {msg.status === 'failed' && (
-                <TouchableOpacity
-                  onPress={() => conv && retryMessage(conv.id, msg.id)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Text style={s.retryText}>Tap to retry</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-        </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -815,7 +971,30 @@ export default function BuyerConversationScreen() {
   // ── Main render ─────────────────────────────────────────────────────────────
 
   const visibleMessages = messages.filter(m => !m.deletedForMe);
-  const listData = groupMessagesByDate(visibleMessages);
+  const listData = buildListRows(visibleMessages, unreadDividerId);
+
+  useEffect(() => {
+    if (!unreadDividerId || hasScrolledToUnreadRef.current) return;
+    const idx = listData.findIndex(r => r.type === 'unread');
+    if (idx < 0) return;
+    hasScrolledToUnreadRef.current = true;
+    const timer = setTimeout(() => {
+      flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.25 });
+    }, 150);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unreadDividerId, listData.length]);
+
+  const myReactionOnSheet = activeSheetMsg ? myReaction(activeSheetMsg) : null;
+  const isOwnSheetMsg = activeSheetMsg
+    ? (activeSheetMsg.fromId === myId || activeSheetMsg.fromId === MY_USER_ID)
+    : false;
+
+  const showSendButton = text.trim().length > 0 || selectedAttachment != null;
+  const micOpacity = micSendMorph.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+  const sendOpacity = micSendMorph.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+  const micScale = micSendMorph.interpolate({ inputRange: [0, 1], outputRange: [1, 0.4] });
+  const sendScale = micSendMorph.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] });
 
   return (
     <KeyboardAvoidingView
@@ -823,67 +1002,66 @@ export default function BuyerConversationScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
-      {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={s.headerBack}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Feather name="arrow-left" size={ICON.lg} color={FG} />
-        </TouchableOpacity>
+      <ChatWallpaper />
 
-        {participant && (
-          <View style={s.headerAvatarSmall}>
-            <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
-              <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
-            </View>
-          </View>
-        )}
-
-        <View style={s.headerCenter}>
-          <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
-          {displayHandle ? (
-            <Text style={s.headerHandle} numberOfLines={1}>{displayHandle}</Text>
-          ) : null}
-        </View>
-
-        {/* View Store — only for seller conversations */}
-        {isSellerConv && sellerUserId && (
+      {/* Floating glass header */}
+      <View style={[s.headerWrap, { paddingTop: insets.top + SP.sm }]}>
+        <View style={s.headerPill}>
           <TouchableOpacity
-            style={s.headerShop}
-            onPress={() => router.push(('/seller-profile?id=' + sellerUserId) as never)}
+            onPress={() => router.back()}
+            style={s.roundBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            testID="conversation-back"
+          >
+            <Feather name="arrow-left" size={ICON.md} color={theme.text} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={s.headerCenter}
+            activeOpacity={participant ? 0.7 : 1}
+            disabled={!participant}
+            onPress={openParticipantProfile}
+          >
+            <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
+            {statusLine ? <Text style={s.headerStatusLine} numberOfLines={1}>{statusLine}</Text> : null}
+          </TouchableOpacity>
+
+          {participant && (
+            <TouchableOpacity onPress={openParticipantProfile} testID="conversation-avatar">
+              <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
+                <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+
+          {conv && (
+            <>
+              <TouchableOpacity
+                style={s.roundBtn}
+                onPress={() => handleStartCall('voice')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                testID="conversation-call-voice"
+              >
+                <Feather name="phone" size={ICON.sm} color={theme.muted} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.roundBtn}
+                onPress={() => handleStartCall('video')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                testID="conversation-call-video"
+              >
+                <Feather name="video" size={ICON.sm} color={theme.muted} />
+              </TouchableOpacity>
+            </>
+          )}
+          <TouchableOpacity
+            style={s.roundBtn}
+            onPress={openOptions}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Feather name="shopping-bag" size={ICON.lg} color={PURPLE} />
+            <Feather name="more-horizontal" size={ICON.sm} color={theme.muted} />
           </TouchableOpacity>
-        )}
-
-        {conv && (
-          <>
-            <TouchableOpacity
-              style={s.headerCallBtn}
-              onPress={() => handleStartCall('voice')}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Feather name="phone" size={ICON.md} color={MUTED} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={s.headerCallBtn}
-              onPress={() => handleStartCall('video')}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Feather name="video" size={ICON.md} color={MUTED} />
-            </TouchableOpacity>
-          </>
-        )}
-        <TouchableOpacity
-          style={s.headerMore}
-          onPress={openOptions}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Feather name="more-horizontal" size={ICON.lg} color={MUTED} />
-        </TouchableOpacity>
+        </View>
       </View>
 
       {/* Order context card */}
@@ -893,7 +1071,7 @@ export default function BuyerConversationScreen() {
           onPress={() => router.push('/(buyer)/orders' as never)}
           activeOpacity={0.8}
         >
-          <Feather name="package" size={ICON.md} color={PURPLE} />
+          <Feather name="package" size={ICON.md} color={theme.accent} />
           <View style={{ flex: 1, marginLeft: SP.sm }}>
             <Text style={s.orderCardNumber}>{conv.contextOrderNumber ?? 'Order'}</Text>
             {conv.contextProductName ? (
@@ -919,7 +1097,7 @@ export default function BuyerConversationScreen() {
           }}
           activeOpacity={0.8}
         >
-          <Feather name="shopping-bag" size={ICON.md} color={PURPLE} />
+          <Feather name="shopping-bag" size={ICON.md} color={theme.accent} />
           <View style={{ flex: 1, marginLeft: SP.sm }}>
             <Text style={s.orderCardNumber} numberOfLines={1}>{conv.contextProductName}</Text>
             {conv.contextSellerName ? (
@@ -935,7 +1113,7 @@ export default function BuyerConversationScreen() {
       {/* Friendship inactive banner */}
       {isDisabled && (
         <View style={s.disabledBanner}>
-          <Feather name="info" size={ICON.sm} color={ORANGE} />
+          <Feather name="info" size={ICON.sm} color={theme.warning} />
           <Text style={s.disabledBannerText}>
             Messaging disabled — friendship was removed.
           </Text>
@@ -947,19 +1125,33 @@ export default function BuyerConversationScreen() {
         ref={flatListRef}
         data={listData}
         keyExtractor={(item, i) =>
-          item.type === 'date' ? `date-${item.date}-${i}` : item.msg.id
+          item.type === 'message' ? item.msg.id : `${item.type}-${i}-${'key' in item ? item.key : ''}`
         }
         renderItem={renderItem}
         contentContainerStyle={s.listContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+        onContentSizeChange={() => {
+          if (!unreadDividerId || hasScrolledToUnreadRef.current) {
+            flatListRef.current?.scrollToEnd({ animated: false });
+          }
+        }}
+        onScrollToIndexFailed={() => {
+          setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 50);
+        }}
+        // Windowing kept at RN defaults (10/21) — the history stays performant
+        // without extra tuning since bubbles are lightweight rows.
       />
+
+      {/* Double-tap heart burst */}
+      {likeBurst && (
+        <LikeBurst key={likeBurst.key} x={likeBurst.x} y={likeBurst.y} color={theme.accent} onDone={() => setLikeBurst(null)} />
+      )}
 
       {/* Reply preview */}
       {replyTo && (
         <View style={s.replyBar}>
-          <Feather name="corner-up-left" size={ICON.sm} color={PURPLE} />
+          <Feather name="corner-up-left" size={ICON.sm} color={theme.accent} />
           <View style={{ flex: 1, marginLeft: SP.sm }}>
             <Text style={s.replyFromName}>{replyTo.fromName}</Text>
             <Text style={s.replyPreviewText} numberOfLines={1}>{replyTo.text}</Text>
@@ -989,16 +1181,20 @@ export default function BuyerConversationScreen() {
         <View>
           {selectedAttachment && (
             <View style={s.selectedAttachment}>
-              <Feather
-                name={
-                  selectedAttachment.type === 'image' ? 'image' :
-                  selectedAttachment.type === 'video' ? 'video' :
-                  selectedAttachment.type === 'voice' ? 'mic' :
-                  selectedAttachment.type === 'post'  ? 'image' : 'shopping-bag'
-                }
-                size={ICON.sm}
-                color={PURPLE}
-              />
+              {isUploading ? (
+                <UploadRing size={22} color={theme.accent} trackColor={theme.border} />
+              ) : (
+                <Feather
+                  name={
+                    selectedAttachment.type === 'image' ? 'image' :
+                    selectedAttachment.type === 'video' ? 'video' :
+                    selectedAttachment.type === 'voice' ? 'mic' :
+                    selectedAttachment.type === 'post'  ? 'image' : 'shopping-bag'
+                  }
+                  size={ICON.sm}
+                  color={theme.accent}
+                />
+              )}
               <View style={{ flex: 1, marginLeft: SP.sm }}>
                 <Text style={s.selectedAttachmentLabel}>
                   {
@@ -1016,68 +1212,82 @@ export default function BuyerConversationScreen() {
                 onPress={() => setSelectedAttachment(null)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Feather name="x" size={ICON.sm} color={MUTED} />
+                <Feather name="x" size={ICON.sm} color={theme.muted} />
               </TouchableOpacity>
             </View>
           )}
           <View style={[s.inputRow, { paddingBottom: insets.bottom + SP.sm }]}>
-          {/* Attach */}
-          <TouchableOpacity
-            onPress={openAttachmentPicker}
-            style={s.attachBtn}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Feather name="paperclip" size={ICON.lg} color={MUTED} />
-          </TouchableOpacity>
+            {/* Attach — photos, video, and (for seller chats) products/posts */}
+            <TouchableOpacity
+              onPress={() => setShowMediaSheet(true)}
+              style={s.roundInputBtn}
+              disabled={isUploading || isSending}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              testID="conversation-attach"
+            >
+              {isUploading
+                ? <UploadRing size={24} color={theme.accent} />
+                : <Feather name="plus" size={ICON.md} color={theme.muted} />
+              }
+            </TouchableOpacity>
 
-          {/* Media */}
-          <TouchableOpacity
-            onPress={() => setShowMediaSheet(true)}
-            style={s.attachBtn}
-            disabled={isUploading || isSending}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            {isUploading
-              ? <ActivityIndicator size="small" color={PURPLE} />
-              : <Feather name="camera" size={ICON.lg} color={MUTED} />
-            }
-          </TouchableOpacity>
+            {/* THREAD CASH HOOK POINT: minimal attach entry, OFF by default
+                behind the 'threadCashSend' flag. Rendering a sent Thread Cash
+                message in the thread above is left for this screen's own
+                renderAttachment/message-list logic to wire up. */}
+            {threadCashSendEnabled && sellerUserId ? (
+              <ThreadCashAttachButton
+                recipientId={sellerUserId}
+                conversationId={conv?.id ?? ''}
+                onSent={() => {}}
+              />
+            ) : null}
 
-          {/* Voice */}
-          <TouchableOpacity
-            onPress={handleToggleRecording}
-            style={[s.attachBtn, isRecording && s.recordingBtn]}
-            disabled={isUploading || isSending}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Feather name={isRecording ? 'stop-circle' : 'mic'} size={ICON.lg} color={isRecording ? RED : MUTED} />
-          </TouchableOpacity>
+            {/* Text input */}
+            <TextInput
+              style={s.textInput}
+              value={text}
+              onChangeText={setText}
+              placeholder="Message..."
+              placeholderTextColor={theme.muted}
+              multiline
+              returnKeyType="default"
+            />
 
-          {/* Text input */}
-          <TextInput
-            style={s.textInput}
-            value={text}
-            onChangeText={setText}
-            placeholder="Message..."
-            placeholderTextColor={SUBTLE}
-            multiline
-            returnKeyType="default"
-          />
-
-          {/* Send */}
-          <TouchableOpacity
-            style={[
-              s.sendBtn,
-              canSend
-                ? { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE }
-                : { backgroundColor: CARD, borderColor: BORDER },
-            ]}
-            onPress={handleSend}
-            disabled={!canSend}
-            activeOpacity={0.8}
-          >
-            <Feather name="send" size={ICON.sm} color={canSend ? PURPLE : MUTED} />
-          </TouchableOpacity>
+            {/* Mic ⇄ Send morph */}
+            <View style={s.morphContainer}>
+              <Animated.View
+                pointerEvents={showSendButton ? 'none' : 'auto'}
+                style={[StyleSheet.absoluteFill, s.morphFace, { opacity: micOpacity, transform: [{ scale: micScale }] }]}
+              >
+                <TouchableOpacity
+                  onPressIn={startRecording}
+                  onPressOut={stopRecording}
+                  disabled={isUploading || isSending}
+                  style={s.morphFaceInner}
+                  testID="conversation-mic"
+                >
+                  <Feather name={isRecording ? 'stop-circle' : 'mic'} size={ICON.md} color={isRecording ? theme.error : theme.muted} />
+                </TouchableOpacity>
+              </Animated.View>
+              <Animated.View
+                pointerEvents={showSendButton ? 'auto' : 'none'}
+                style={[
+                  StyleSheet.absoluteFill, s.morphFace,
+                  { opacity: sendOpacity, transform: [{ scale: sendScale }], backgroundColor: canSend ? theme.accent : theme.cardElevated },
+                ]}
+              >
+                <TouchableOpacity
+                  onPress={handleSend}
+                  disabled={!canSend}
+                  style={s.morphFaceInner}
+                  activeOpacity={0.8}
+                  testID="conversation-send"
+                >
+                  <Feather name="send" size={ICON.sm} color={canSend ? theme.onAccent : theme.muted} />
+                </TouchableOpacity>
+              </Animated.View>
+            </View>
           </View>
         </View>
       ) : (
@@ -1098,19 +1308,28 @@ export default function BuyerConversationScreen() {
           <View style={s.mediaSheetHandle} />
           <Text style={s.mediaSheetTitle}>Add to message</Text>
           <TouchableOpacity style={s.mediaSheetOption} onPress={handlePickPhoto}>
-            <View style={s.mediaSheetIcon}><Feather name="image" size={ICON.md} color={PURPLE} /></View>
+            <View style={s.mediaSheetIcon}><Feather name="image" size={ICON.md} color={theme.accent} /></View>
             <View>
               <Text style={s.mediaSheetLabel}>Photos</Text>
               <Text style={s.mediaSheetDesc}>Up to 15 at once</Text>
             </View>
           </TouchableOpacity>
           <TouchableOpacity style={s.mediaSheetOption} onPress={handlePickVideo}>
-            <View style={s.mediaSheetIcon}><Feather name="video" size={ICON.md} color={PURPLE} /></View>
+            <View style={s.mediaSheetIcon}><Feather name="video" size={ICON.md} color={theme.accent} /></View>
             <View>
               <Text style={s.mediaSheetLabel}>Video clip</Text>
               <Text style={s.mediaSheetDesc}>Under 1 minute</Text>
             </View>
           </TouchableOpacity>
+          {isSellerConv && (
+            <TouchableOpacity style={s.mediaSheetOption} onPress={openAttachmentPicker}>
+              <View style={s.mediaSheetIcon}><Feather name="shopping-bag" size={ICON.md} color={theme.accent} /></View>
+              <View>
+                <Text style={s.mediaSheetLabel}>Product or post</Text>
+                <Text style={s.mediaSheetDesc}>Share from {displayName}'s store</Text>
+              </View>
+            </TouchableOpacity>
+          )}
           <View style={{ height: 20 }} />
         </SheetRise>
       </Modal>
@@ -1132,7 +1351,7 @@ export default function BuyerConversationScreen() {
                 onPress={() => setShowAttachmentPicker(false)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Feather name="x" size={ICON.md} color={MUTED} />
+                <Feather name="x" size={ICON.md} color={theme.muted} />
               </TouchableOpacity>
             </View>
             <View style={s.attachmentTabs}>
@@ -1140,7 +1359,7 @@ export default function BuyerConversationScreen() {
                 style={[s.attachmentTab, attachmentTab === 'product' && s.attachmentTabActive]}
                 onPress={() => setAttachmentTab('product')}
               >
-                <Feather name="shopping-bag" size={ICON.sm} color={attachmentTab === 'product' ? PURPLE : MUTED} />
+                <Feather name="shopping-bag" size={ICON.sm} color={attachmentTab === 'product' ? theme.accent : theme.muted} />
                 <Text style={[s.attachmentTabText, attachmentTab === 'product' && s.attachmentTabTextActive]}>
                   Products
                 </Text>
@@ -1149,7 +1368,7 @@ export default function BuyerConversationScreen() {
                 style={[s.attachmentTab, attachmentTab === 'post' && s.attachmentTabActive]}
                 onPress={() => setAttachmentTab('post')}
               >
-                <Feather name="image" size={ICON.sm} color={attachmentTab === 'post' ? PURPLE : MUTED} />
+                <Feather name="image" size={ICON.sm} color={attachmentTab === 'post' ? theme.accent : theme.muted} />
                 <Text style={[s.attachmentTabText, attachmentTab === 'post' && s.attachmentTabTextActive]}>
                   Posts
                 </Text>
@@ -1158,12 +1377,12 @@ export default function BuyerConversationScreen() {
             {attachmentTab === 'product' ? (
               productsLoading ? (
                 <View style={s.pickerLoading}>
-                  <ActivityIndicator color={PURPLE} />
+                  <ActivityIndicator color={theme.accent} />
                   <Text style={s.pickerEmptyText}>Loading products…</Text>
                 </View>
               ) : sellerProducts.length === 0 ? (
                 <View style={s.pickerLoading}>
-                  <Feather name="shopping-bag" size={ICON.lg} color={SUBTLE} />
+                  <Feather name="shopping-bag" size={ICON.lg} color={theme.subtle} />
                   <Text style={s.pickerEmptyText}>No active products available.</Text>
                 </View>
               ) : (
@@ -1188,7 +1407,7 @@ export default function BuyerConversationScreen() {
                           <Image source={{ uri: product.images[0] }} style={s.productThumb} />
                         ) : (
                           <View style={s.productThumbPlaceholder}>
-                            <Feather name="shopping-bag" size={ICON.md} color={PURPLE} />
+                            <Feather name="shopping-bag" size={ICON.md} color={theme.accent} />
                           </View>
                         )}
                         <View style={{ flex: 1, marginLeft: SP.sm }}>
@@ -1198,7 +1417,7 @@ export default function BuyerConversationScreen() {
                             {product.category ? ` · ${product.category}` : ''}
                           </Text>
                         </View>
-                        <Feather name="plus-circle" size={ICON.md} color={PURPLE} />
+                        <Feather name="plus-circle" size={ICON.md} color={theme.accent} />
                       </TouchableOpacity>
                     );
                   })}
@@ -1207,12 +1426,12 @@ export default function BuyerConversationScreen() {
             ) : (
               postsLoading ? (
                 <View style={s.pickerLoading}>
-                  <ActivityIndicator color={PURPLE} />
+                  <ActivityIndicator color={theme.accent} />
                   <Text style={s.pickerEmptyText}>Loading posts…</Text>
                 </View>
               ) : sellerPosts.length === 0 ? (
                 <View style={s.pickerLoading}>
-                  <Feather name="image" size={ICON.lg} color={SUBTLE} />
+                  <Feather name="image" size={ICON.lg} color={theme.subtle} />
                   <Text style={s.pickerEmptyText}>No published posts available.</Text>
                 </View>
               ) : (
@@ -1232,7 +1451,7 @@ export default function BuyerConversationScreen() {
                         <Image source={{ uri: post.mediaUrl }} style={s.productThumb} />
                       ) : (
                         <View style={s.productThumbPlaceholder}>
-                          <Feather name="image" size={ICON.md} color={PURPLE} />
+                          <Feather name="image" size={ICON.md} color={theme.accent} />
                         </View>
                       )}
                       <View style={{ flex: 1, marginLeft: SP.sm }}>
@@ -1243,7 +1462,7 @@ export default function BuyerConversationScreen() {
                           {post.mediaType ?? 'post'} · {displayName}
                         </Text>
                       </View>
-                      <Feather name="plus-circle" size={ICON.md} color={PURPLE} />
+                      <Feather name="plus-circle" size={ICON.md} color={theme.accent} />
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
@@ -1252,6 +1471,50 @@ export default function BuyerConversationScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Long-press reactions + actions sheet */}
+      <Modal
+        visible={activeSheetMsg != null}
+        transparent
+        animationType="fade"
+        onRequestClose={closeMessageSheet}
+      >
+        <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={closeMessageSheet} />
+        <SheetRise style={s.reactionSheet}>
+          <View style={s.mediaSheetHandle} />
+          <ReactionChipsRow
+            selected={myReactionOnSheet}
+            testIDPrefix="reaction-bar"
+            onSelect={(type) => {
+              if (activeSheetMsg) void handleReact(activeSheetMsg, type);
+              closeMessageSheet();
+            }}
+          />
+          <View style={s.sheetDivider} />
+          <TouchableOpacity style={s.sheetAction} onPress={sheetReply}>
+            <Feather name="corner-up-left" size={ICON.sm} color={theme.text} />
+            <Text style={s.sheetActionText}>Reply</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.sheetAction} onPress={sheetCopy}>
+            <Feather name="copy" size={ICON.sm} color={theme.text} />
+            <Text style={s.sheetActionText}>Copy</Text>
+          </TouchableOpacity>
+          {isOwnSheetMsg ? (
+            <TouchableOpacity style={s.sheetAction} onPress={sheetDelete}>
+              <Feather name="trash-2" size={ICON.sm} color={theme.error} />
+              <Text style={[s.sheetActionText, { color: theme.error }]}>Delete for me</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={s.sheetAction} onPress={sheetReport}>
+              <Feather name="flag" size={ICON.sm} color={theme.error} />
+              <Text style={[s.sheetActionText, { color: theme.error }]}>Report message</Text>
+            </TouchableOpacity>
+          )}
+          <View style={{ height: 12 }} />
+        </SheetRise>
+      </Modal>
+
+      <MediaViewer visible={viewerUri != null} uri={viewerUri} onClose={() => setViewerUri(null)} />
 
       {copiedToast && (
         <View pointerEvents="none" style={s.copiedToast} accessibilityLiveRegion="polite">
@@ -1262,60 +1525,97 @@ export default function BuyerConversationScreen() {
   );
 }
 
+// ─── Presence line ────────────────────────────────────────────────────────────
+
+function statusLineFor(participant: ConversationParticipant | null): string | null {
+  if (!participant) return null;
+  if (participant.isOnline) return 'online';
+  if (participant.lastSeenAt) {
+    const ts = new Date(participant.lastSeenAt).getTime();
+    if (!Number.isNaN(ts)) return `last seen ${timeAgo(ts)} ago`;
+  }
+  return null;
+}
+
+// ─── Double-tap heart burst ───────────────────────────────────────────────────
+
+function LikeBurst({ x, y, color, onDone }: { x: number; y: number; color: string; onDone: () => void }) {
+  const progress = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(progress, { toValue: 1, duration: 650, useNativeDriver: true }).start(({ finished }) => {
+      if (finished) onDone();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const scale = progress.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0.4, 1.3, 1] });
+  const opacity = progress.interpolate({ inputRange: [0, 0.1, 0.7, 1], outputRange: [0, 1, 1, 0] });
+  const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [0, -30] });
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <Animated.View style={{ position: 'absolute', left: x - 24, top: y - 24, opacity, transform: [{ scale }, { translateY }] }}>
+        <Feather name="heart" size={48} color={color} />
+      </Animated.View>
+    </View>
+  );
+}
+
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const PURPLE = theme.accent, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = theme.accentDim, CYAN = theme.secondary, CYAN_DIM = theme.secondaryDim;
-  const BORDER_ACTIVE = `${theme.accent}73`;
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: 'transparent' },
+  root: { flex: 1, backgroundColor: theme.background },
 
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  // Floating glass header
+  headerWrap: {
     paddingHorizontal: SP.md,
     paddingBottom: SP.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
+    zIndex: 5,
   },
-  headerBack: {
-    marginRight: SP.sm,
+  headerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.cardGlass,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: theme.border,
+    paddingHorizontal: SP.xs,
+    paddingVertical: SP.xs,
+    gap: 2,
   },
-  headerAvatarSmall: {
-    marginRight: SP.sm,
-  },
-  headerAvatarCircle: {
+  roundBtn: {
     width: 34,
     height: 34,
     borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerAvatarInitials: {
-    fontSize: FS.xs,
-    fontFamily: FONT.bold,
-    color: ON_DARK,
-  },
   headerCenter: {
     flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: SP.xs,
   },
   headerName: {
     fontSize: FS.base,
     fontFamily: FONT.semibold,
-    color: FG,
+    color: theme.text,
   },
-  headerHandle: {
+  headerStatusLine: {
     fontSize: FS.xs,
     fontFamily: FONT.regular,
-    color: MUTED,
+    color: theme.muted,
     marginTop: 1,
   },
-  headerShop: {
-    marginLeft: SP.sm,
+  headerAvatarCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  headerMore: {
-    marginLeft: SP.xs,
+  headerAvatarInitials: {
+    fontSize: FS.xs,
+    fontFamily: FONT.bold,
+    color: '#FFFFFF',
   },
 
   // Order context card
@@ -1323,26 +1623,26 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: SP.md,
-    marginVertical: SP.sm,
+    marginBottom: SP.sm,
     padding: SP.sm,
-    backgroundColor: CARD,
+    backgroundColor: theme.cardGlass,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
   },
   orderCardNumber: {
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
-    color: FG,
+    color: theme.text,
   },
   orderCardProduct: {
     fontSize: FS.xs,
     fontFamily: FONT.regular,
-    color: MUTED,
+    color: theme.muted,
     marginTop: 2,
   },
   orderStatusBadge: {
-    backgroundColor: PURPLE_DIM,
+    backgroundColor: theme.accentDim,
     borderRadius: RADIUS.pill,
     paddingHorizontal: SP.sm,
     paddingVertical: SP.xs,
@@ -1350,7 +1650,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   orderStatusText: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    color: PURPLE,
+    color: theme.accent,
   },
 
   // Disabled banner
@@ -1359,15 +1659,15 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     paddingHorizontal: SP.md,
     paddingVertical: SP.sm,
-    backgroundColor: 'rgba(249,115,22,0.12)',
+    backgroundColor: `${theme.warning}1F`,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(249,115,22,0.3)',
+    borderBottomColor: `${theme.warning}4D`,
   },
   disabledBannerText: {
     flex: 1,
     fontSize: FS.sm,
     fontFamily: FONT.regular,
-    color: ORANGE,
+    color: theme.warning,
     marginLeft: SP.sm,
   },
 
@@ -1383,17 +1683,37 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginVertical: SP.md,
   },
   dateSeparator: {
-    backgroundColor: CARD,
+    backgroundColor: theme.cardGlass,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
     paddingHorizontal: SP.sm,
     paddingVertical: SP.xs,
   },
   dateSeparatorText: {
     fontSize: FS.xs,
     fontFamily: FONT.medium,
-    color: MUTED,
+    color: theme.muted,
+  },
+
+  // Unread divider
+  unreadDividerWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    marginVertical: SP.md,
+    paddingHorizontal: SP.lg,
+  },
+  unreadDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: theme.error,
+    opacity: 0.4,
+  },
+  unreadDividerText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: theme.error,
   },
 
   // Message row
@@ -1401,50 +1721,82 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: SP.md,
-    marginBottom: SP.xs,
+    marginBottom: 2,
   },
   msgAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SP.sm,
     marginBottom: 2,
   },
+  msgAvatarSpacer: {
+    width: 26,
+    marginRight: SP.sm,
+  },
   msgAvatarInitials: {
-    fontSize: FS.xs,
+    fontSize: 10,
     fontFamily: FONT.bold,
-    color: ON_DARK,
+    color: '#FFFFFF',
   },
 
   // Bubble
   bubble: {
-    borderWidth: 1,
     borderRadius: RADIUS.lg,
     padding: SP.md,
+  },
+  bubbleMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    marginTop: 4,
+    gap: 3,
+  },
+  bubbleTime: {
+    fontSize: 10,
+    fontFamily: FONT.regular,
+  },
+  receiptIcon: {
+    marginLeft: 2,
+  },
+  receiptChecks: {
+    flexDirection: 'row',
+    marginLeft: 2,
+  },
+  retryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+    alignSelf: 'flex-end',
+  },
+  retryText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
   },
 
   // Attachment
   attachCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: CARD_ELEVATED,
+    backgroundColor: theme.card,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
     padding: SP.sm,
     marginBottom: SP.xs,
   },
   attachTitle: {
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
-    color: FG,
+    color: theme.text,
   },
   attachSubtitle: {
     fontSize: FS.xs,
     fontFamily: FONT.regular,
-    color: MUTED,
+    color: theme.muted,
     marginTop: 1,
   },
   selectedAttachment: {
@@ -1452,19 +1804,19 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     paddingHorizontal: SP.md,
     paddingVertical: SP.sm,
-    backgroundColor: CARD,
+    backgroundColor: theme.card,
     borderTopWidth: 1,
-    borderTopColor: BORDER,
+    borderTopColor: theme.border,
   },
   selectedAttachmentLabel: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    color: PURPLE,
+    color: theme.accent,
   },
   selectedAttachmentTitle: {
     fontSize: FS.sm,
     fontFamily: FONT.regular,
-    color: FG,
+    color: theme.text,
     marginTop: 1,
   },
 
@@ -1472,7 +1824,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   msgText: {
     fontSize: FS.base,
     fontFamily: FONT.regular,
-    color: FG,
   },
 
   copiedToast: {
@@ -1482,27 +1833,25 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingHorizontal: SP.md,
     paddingVertical: SP.sm,
     borderRadius: RADIUS.pill,
-    backgroundColor: CARD_ELEVATED,
+    backgroundColor: theme.cardElevated,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
   },
   copiedToastText: {
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
-    color: FG,
+    color: theme.text,
   },
 
   // Quoted reply snippet
   replyQuote: {
     borderLeftWidth: 2,
-    borderLeftColor: BORDER_ACTIVE,
     paddingLeft: 8,
     marginBottom: 4,
   },
   replyQuoteText: {
     fontSize: FS.xs,
     fontFamily: FONT.regular,
-    color: MUTED,
   },
 
   // Reactions
@@ -1510,29 +1859,22 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: SP.xs,
-    marginTop: SP.xs,
+    marginTop: 4,
   },
   reactionChip: {
-    backgroundColor: CARD_ELEVATED,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: theme.card,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
     paddingHorizontal: SP.xs,
     paddingVertical: 2,
   },
-  reactionEmoji: {
+  reactionCount: {
     fontSize: FS.xs,
-  },
-
-  // Status
-  msgStatus: {
-    alignSelf: 'flex-end',
-    marginTop: SP.xs,
-  },
-  retryText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: RED,
+    fontFamily: FONT.semibold,
   },
 
   // Reply bar
@@ -1541,25 +1883,25 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     paddingHorizontal: SP.md,
     paddingVertical: SP.sm,
-    backgroundColor: CARD,
+    backgroundColor: theme.card,
     borderTopWidth: 1,
-    borderTopColor: BORDER,
+    borderTopColor: theme.border,
   },
   replyFromName: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    color: PURPLE,
+    color: theme.accent,
   },
   replyPreviewText: {
     fontSize: FS.xs,
     fontFamily: FONT.regular,
-    color: MUTED,
+    color: theme.muted,
     marginTop: 1,
   },
   replyClose: {
     fontSize: FS.md,
     fontFamily: FONT.regular,
-    color: MUTED,
+    color: theme.muted,
     marginLeft: SP.sm,
   },
 
@@ -1570,34 +1912,44 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingHorizontal: SP.md,
     paddingTop: SP.sm,
     gap: SP.sm,
-    borderTopWidth: 1,
-    borderTopColor: BORDER,
-    backgroundColor: BG,
   },
-  attachBtn: {
-    paddingBottom: SP.xs,
+  roundInputBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.cardElevated,
+    marginBottom: 2,
   },
   textInput: {
     flex: 1,
-    backgroundColor: CARD,
+    backgroundColor: theme.cardElevated,
     borderRadius: RADIUS.xl,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
     paddingHorizontal: SP.md,
     paddingVertical: SP.sm,
     fontSize: FS.base,
     fontFamily: FONT.regular,
-    color: FG,
+    color: theme.text,
     maxHeight: 120,
   },
-  sendBtn: {
+  morphContainer: {
     width: 44,
     height: 44,
+    marginBottom: 0,
+  },
+  morphFace: {
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    marginBottom: 2,
+  },
+  morphFaceInner: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalBackdrop: {
     flex: 1,
@@ -1606,11 +1958,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   },
   productPicker: {
     maxHeight: '78%',
-    backgroundColor: BG,
+    backgroundColor: theme.background,
     borderTopLeftRadius: RADIUS.xl,
     borderTopRightRadius: RADIUS.xl,
     borderTopWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
     paddingBottom: SP.xl,
   },
   pickerHeader: {
@@ -1620,17 +1972,17 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingHorizontal: SP.md,
     paddingVertical: SP.md,
     borderBottomWidth: 1,
-    borderBottomColor: BORDER,
+    borderBottomColor: theme.border,
   },
   pickerTitle: {
     fontSize: FS.lg,
     fontFamily: FONT.semibold,
-    color: FG,
+    color: theme.text,
   },
   pickerSubtitle: {
     fontSize: FS.xs,
     fontFamily: FONT.regular,
-    color: MUTED,
+    color: theme.muted,
     marginTop: 2,
   },
   attachmentTabs: {
@@ -1647,21 +1999,21 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     gap: SP.xs,
     paddingVertical: SP.sm,
     borderRadius: RADIUS.md,
-    backgroundColor: CARD,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
   },
   attachmentTabActive: {
-    backgroundColor: PURPLE_DIM,
-    borderColor: BORDER_ACTIVE,
+    backgroundColor: theme.accentDim,
+    borderColor: theme.accent,
   },
   attachmentTabText: {
     fontSize: FS.sm,
     fontFamily: FONT.medium,
-    color: MUTED,
+    color: theme.muted,
   },
   attachmentTabTextActive: {
-    color: PURPLE,
+    color: theme.accent,
   },
   pickerLoading: {
     alignItems: 'center',
@@ -1672,7 +2024,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   pickerEmptyText: {
     fontSize: FS.sm,
     fontFamily: FONT.regular,
-    color: MUTED,
+    color: theme.muted,
   },
   productList: {
     padding: SP.md,
@@ -1682,51 +2034,72 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flexDirection: 'row',
     alignItems: 'center',
     padding: SP.sm,
-    backgroundColor: CARD,
+    backgroundColor: theme.card,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
   },
   productThumb: {
     width: 52,
     height: 52,
     borderRadius: RADIUS.sm,
-    backgroundColor: CARD_ELEVATED,
+    backgroundColor: theme.cardElevated,
   },
   productThumbPlaceholder: {
     width: 52,
     height: 52,
     borderRadius: RADIUS.sm,
-    backgroundColor: PURPLE_DIM,
+    backgroundColor: theme.accentDim,
     alignItems: 'center',
     justifyContent: 'center',
   },
   productOptionName: {
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
-    color: FG,
+    color: theme.text,
   },
   productOptionMeta: {
     fontSize: FS.xs,
     fontFamily: FONT.regular,
-    color: MUTED,
+    color: theme.muted,
     marginTop: 3,
   },
 
-  // ── Call + media styles ──────────────────────────────────────────────────────
-  headerCallBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', marginLeft: SP.xs },
-  recordingBtn:  { backgroundColor: 'rgba(255,59,48,0.12)', borderRadius: RADIUS.pill },
-  mediaSheet: {
+  // Reaction / actions sheet
+  reactionSheet: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: CARD, borderTopLeftRadius: RADIUS.lg, borderTopRightRadius: RADIUS.lg,
+    backgroundColor: theme.card, borderTopLeftRadius: RADIUS.lg, borderTopRightRadius: RADIUS.lg,
     paddingHorizontal: SP.md, paddingTop: SP.sm,
   },
-  mediaSheetHandle: { width: 36, height: 4, backgroundColor: BORDER, borderRadius: 2, alignSelf: 'center', marginBottom: SP.md },
-  mediaSheetTitle:  { fontSize: FS.lg, fontFamily: FONT.semibold, color: FG, marginBottom: SP.md },
+  sheetDivider: {
+    height: 1,
+    backgroundColor: theme.border,
+    marginVertical: SP.sm,
+  },
+  sheetAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    paddingVertical: SP.sm,
+  },
+  sheetActionText: {
+    fontSize: FS.base,
+    fontFamily: FONT.medium,
+    color: theme.text,
+  },
+
+  // Media sheet
+  mediaSheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: theme.card, borderTopLeftRadius: RADIUS.lg, borderTopRightRadius: RADIUS.lg,
+    paddingHorizontal: SP.md, paddingTop: SP.sm,
+  },
+  mediaSheetHandle: { width: 36, height: 4, backgroundColor: theme.border, borderRadius: 2, alignSelf: 'center', marginBottom: SP.md },
+  mediaSheetTitle:  { fontSize: FS.lg, fontFamily: FONT.semibold, color: theme.text, marginBottom: SP.md },
   mediaSheetOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: SP.md, gap: SP.sm },
-  mediaSheetIcon:   { width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
-  mediaSheetLabel:  { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  mediaSheetDesc:   { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  mediaSheetIcon:   { width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: theme.accentDim, alignItems: 'center', justifyContent: 'center' },
+  mediaSheetLabel:  { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
+  mediaSheetDesc:   { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
 
   // Photo grid
   photoGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 2, borderRadius: RADIUS.md, overflow: 'hidden' },
@@ -1745,11 +2118,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   // Voice player
   voiceRow:         { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.xs, minWidth: 160 },
-  voicePlayBtn:     { width: 28, height: 28, borderRadius: 14, backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center' },
-  voicePlayBtnActive: { backgroundColor: RED },
+  voicePlayBtn:     { width: 28, height: 28, borderRadius: 14, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center' },
+  voicePlayBtnActive: { backgroundColor: theme.error },
   voiceWave:        { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 3 },
-  voiceBar:         { width: 3, backgroundColor: PURPLE_DIM, borderRadius: 2 },
-  voiceDur:         { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
+  voiceBar:         { width: 3, backgroundColor: theme.accentDim, borderRadius: 2 },
+  voiceDur:         { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted },
 
   // Disabled input
   disabledInputRow: {
@@ -1758,7 +2131,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   disabledInputText: {
     fontSize: FS.sm,
     fontFamily: FONT.regular,
-    color: SUBTLE,
+    color: theme.subtle,
     textAlign: 'center',
   },
   });

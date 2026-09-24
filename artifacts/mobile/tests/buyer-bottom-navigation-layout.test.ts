@@ -142,7 +142,7 @@ describe('buyer search morph', () => {
     expect(search).not.toContain('router.setParams');
     expect(bar).toContain('onChangeText={setQuery}');
     expect(search).toContain('useBuyerSearch()');
-    expect(search).toContain('handledFiltersRequest');
+    expect(search).toContain('handledSubmitRequest');
     expect(searchContext).toContain('keyboardHeight: SharedValue<number>');
     expect(layout).toContain('<BuyerSearchProvider>');
   });

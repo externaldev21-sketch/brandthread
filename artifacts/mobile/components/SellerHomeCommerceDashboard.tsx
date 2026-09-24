@@ -26,7 +26,8 @@ import {
 } from '@/lib/sellerHomeAnalytics';
 import { skipTask, type SetupState, type SetupTask } from '@/lib/setupStore';
 import { withSellerSetupOrigin } from '@/lib/setupNavigation';
-import { ResponsiveContainer, SkeletonBlock as LayoutSkeletonBlock, useBreakpoint } from '@/components/layout';
+import { KpiRowSkeleton, ResponsiveContainer, SkeletonBlock as LayoutSkeletonBlock, useBreakpoint } from '@/components/layout';
+import ActivityBellButton from '@/components/ActivityBellButton';
 import { bucketLabel } from '@/lib/sellerHomeChartLabels';
 import { SellerMetricCarousel, type SellerMetricPage } from '@/components/SellerMetricCarousel';
 import {
@@ -455,13 +456,21 @@ export default function SellerHomeCommerceDashboard({
       >
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
         {/* ── Top bar ──────────────────────────────────────────────────── */}
-        <View
-          testID="seller-dashboard-scroll-position"
-          accessibilityLabel="Seller dashboard scroll position"
-          accessible
-          style={styles.topBar}
-        >
-          <Text style={[styles.screenTitle, { color: palette.foreground ?? FG }]}>Dashboard</Text>
+        <View style={styles.topBar}>
+          <View
+            testID="seller-dashboard-scroll-position"
+            accessibilityLabel="Seller dashboard scroll position"
+            accessible
+          >
+            <Text style={[styles.screenTitle, { color: palette.foreground ?? FG }]}>Dashboard</Text>
+          </View>
+          <ActivityBellButton
+            testID="seller-dashboard-activity"
+            color={palette.foreground ?? FG}
+            size={22}
+            style={styles.topBarAction}
+            badgeBorderColor={palette.background ?? palette.surface ?? BG}
+          />
         </View>
 
         {/* ── Time range pills ─────────────────────────────────────────── */}
@@ -739,8 +748,15 @@ const styles = StyleSheet.create({
   // ── Top bar
   topBar: {
     minHeight: 52,
-    justifyContent: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
     paddingBottom: SP.xs,
+  },
+  topBarAction: {
+    width: 44,
+    height: 44,
+    marginRight: -SP.sm,
   },
   screenTitle: {
     color: FG,

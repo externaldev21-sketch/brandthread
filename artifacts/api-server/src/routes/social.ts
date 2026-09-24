@@ -26,6 +26,7 @@ import {
   profilesById,
   publishingRestriction,
 } from "../lib/safety";
+import { actorFieldsFromProfile } from "../lib/activityEvents";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 
 const router = Router();
@@ -220,24 +221,24 @@ router.post("/follow", rateLimit("follow"), async (req, res) => {
   if (result.inserted.length > 0) {
     (async () => {
       try {
-        const [follower] = await db
-          .select({ name: users.name, displayName: users.displayName, username: users.username })
-          .from(users).where(eq(users.clerkId, myId)).limit(1);
-        if (follower) {
-          const displayName = follower.displayName || follower.name || "Someone";
-          const handle = follower.username ? `@${follower.username}` : undefined;
-          const inits = displayName.split(" ").slice(0, 2).map((w: string) => w[0]?.toUpperCase() ?? "").join("") || "?";
+        const profile = (await profilesById([myId])).get(myId);
+        if (profile && !profile.deleted && !profile.suspended) {
+          const actor = actorFieldsFromProfile(profile);
+          // Offer "Follow back" only when the relationship is one-way.
+          const [alreadyFollowing] = await db
+            .select({ followerId: follows.followerId })
+            .from(follows)
+            .where(and(eq(follows.followerId, userId), eq(follows.followingId, myId)))
+            .limit(1);
           await publishNotification({
             userId:        userId,
             category:      "social",
             type:          "new_follower",
-            title:         `${displayName} started following you`,
-            actorName:     displayName,
-            actorHandle:   handle,
-            actorInitials: inits,
-            actorColor:    "#8B5CF6",
+            title:         `${actor.actorName} started following you`,
+            ...actor,
             targetId:      myId,
             targetType:    "user",
+            cta:           alreadyFollowing ? undefined : "Follow back",
           });
         }
       } catch { /* non-critical */ }

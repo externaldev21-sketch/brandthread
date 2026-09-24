@@ -145,6 +145,11 @@ export interface ConversationParticipant {
   initials: string;
   color: string;
   accountType: AccountType;
+  /** Optional live-presence flag. Not populated by the current backend —
+   *  UI reading this field must treat it as absent/false when undefined. */
+  isOnline?: boolean;
+  /** Optional last-seen timestamp (ISO), for future presence UI. */
+  lastSeenAt?: string;
 }
 
 export type MessageAttachmentType =
@@ -160,12 +165,26 @@ export interface MessageAttachment {
   meta?: Record<string, string>;
 }
 
-export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'failed';
+export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+
+/** Small fixed reaction bar (no free-form emoji picker). One of REACTION_TYPES. */
+export type ReactionType = 'like' | 'love' | 'haha' | 'wow' | 'sad' | 'fire';
 
 export interface MessageReaction {
+  /** The reaction chosen — `emoji` is a legacy name kept for existing call sites;
+   *  its value is always one of ReactionType, not a free-form emoji string. */
   emoji: string;
   fromId: string;
   fromName: string;
+  /** Same value as `emoji`, explicitly typed. */
+  reactionType?: ReactionType;
+  createdAt?: string;
+  /** The API's own field names (see `GET/POST /api/conversations/:id/messages`).
+   *  Present on reactions that came straight from the server; local/optimistic
+   *  reactions use `fromId`/`fromName`/`emoji` instead. Readers should fall
+   *  back through both naming schemes. */
+  userId?: string;
+  userName?: string;
 }
 
 export interface Message {
@@ -181,6 +200,11 @@ export interface Message {
   replyPreview?: string;
   reactions: MessageReaction[];
   status: MessageStatus;   // delivered/read only shown with backend confirmation
+  /** ISO timestamp the recipient's device received the message, when known. */
+  deliveredAt?: string;
+  /** ISO timestamp the recipient read the message, when known — drives the
+   *  double-check "read" receipt. */
+  readAt?: string;
   ts: number;              // Unix ms
   deletedForMe: boolean;
 }
@@ -191,6 +215,11 @@ export interface Conversation {
   participants: ConversationParticipant[];
   lastMessage?: string;
   lastMessageTs?: number;
+  /** Optional id of who sent the last message ('me'/MY_USER_ID for the buyer).
+   *  Not populated by the current backend — UI must treat undefined as unknown. */
+  lastMessageSenderId?: string;
+  /** Optional attachment kind of the last message, for a non-text preview icon. */
+  lastMessageType?: MessageAttachmentType;
   unreadCount: number;
   isFriendshipActive: boolean;  // buyer_to_buyer: false = new messages disabled
   isArchived: boolean;

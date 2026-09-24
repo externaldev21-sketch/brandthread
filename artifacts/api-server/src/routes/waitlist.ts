@@ -14,6 +14,7 @@ import { Router } from "express";
 import { db, waitlistEntries, products, productVariants, notificationsFeed, pushTokens } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { productThumbnail } from "../lib/activityEvents";
 
 const router = Router();
 router.use(requireAuth);
@@ -144,7 +145,7 @@ router.post("/seller/notify/:variantId", async (req, res) => {
 
   // Verify the variant belongs to this seller
   const [v] = await db
-    .select({ productId: productVariants.productId })
+    .select({ productId: productVariants.productId, images: products.images })
     .from(productVariants)
     .leftJoin(products, eq(products.id, productVariants.productId))
     .where(
@@ -184,6 +185,10 @@ router.post("/seller/notify/:variantId", async (req, res) => {
     type:     "waitlist_restock",
     title:    "Back in stock!",
     body:     `${e.productName}${e.variantLabel ? ` (${e.variantLabel})` : ""} is available again. Grab it before it sells out.`,
+    // Lets the Activity Center open the product and show its photo.
+    targetId:       v.productId,
+    targetType:     "product",
+    targetImageUrl: productThumbnail(v.images),
   }));
 
   await db.insert(notificationsFeed).values(notifications);
