@@ -262,7 +262,6 @@ export function BuyerTabBar({
   }, [dismissKeyboard, requestFilters]);
 
   const profileFocused = activeSlot === 'profile';
-
   return (
     <Animated.View
       testID="buyer-bottom-tab-bar"
