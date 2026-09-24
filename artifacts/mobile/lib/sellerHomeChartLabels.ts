@@ -14,6 +14,32 @@ export type SellerHomeTimeRange = 'live' | 'today' | 'yesterday' | 'week';
 
 export const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
+const HAS_EXPLICIT_ZONE = /(?:[Zz]|[+-]\d{2}:?\d{2})$/;
+
+/**
+ * Parses a bucket timestamp from the analytics API into a `Date` that
+ * represents the exact same instant the server meant, regardless of engine.
+ *
+ * The server always computes bucket boundaries as real UTC instants (see
+ * `floorToLocalStep` in the API), but depending on the DB driver/serializer
+ * the value can arrive as a strict ISO string with a `Z`/offset, or as a
+ * Postgres-style "YYYY-MM-DD HH:mm:ss" string with a space separator and no
+ * zone at all. `new Date(...)` on that second shape is ambiguous: it is
+ * engine-dependent whether it's parsed as UTC or as the device's local time,
+ * and Hermes and V8 (used in Metro's dev tooling / web preview) do not agree.
+ * That mismatch is exactly what caused "This week" to bucket every day onto
+ * the same one or two weekdays for some devices/timezones. Normalizing to an
+ * explicit UTC ISO string before parsing removes the ambiguity so day/hour
+ * derivation below is always correct, and always in the *device's* local
+ * time zone (via the plain Date getters), not the server's.
+ */
+export function parseBucketTimestamp(value: string): Date {
+  const trimmed = value.trim();
+  const isoLike = trimmed.includes('T') ? trimmed : trimmed.replace(' ', 'T');
+  const normalized = HAS_EXPLICIT_ZONE.test(isoLike) ? isoLike : `${isoLike}Z`;
+  return new Date(normalized);
+}
+
 export function formatClockLabel(date: Date, includeMinutes: boolean): string {
   const hour24 = date.getHours();
   const period = hour24 < 12 ? 'AM' : 'PM';
@@ -23,7 +49,7 @@ export function formatClockLabel(date: Date, includeMinutes: boolean): string {
 }
 
 export function bucketLabel(value: string, range: SellerHomeTimeRange): string {
-  const date = new Date(value);
+  const date = parseBucketTimestamp(value);
   if (range === 'week') {
     return WEEKDAY_LABELS[date.getDay()];
   }

@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import Svg, { Polyline } from 'react-native-svg';
+import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
@@ -34,18 +34,55 @@ export interface SellerMetricPage {
 
 // ─── Sparkline ──────────────────────────────────────────────────────────────
 
+/** Catmull-Rom -> cubic Bezier smoothing, so the trend reads as a soft curve
+ * instead of jagged straight segments between buckets — a small but very
+ * visible "premium" touch on the primary dashboard number. */
+function smoothPath(points: Array<{ x: number; y: number }>): string {
+  if (points.length < 2) return '';
+  if (points.length === 2) {
+    return `M${points[0].x},${points[0].y} L${points[1].x},${points[1].y}`;
+  }
+  let d = `M${points[0].x},${points[0].y}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] ?? points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] ?? p2;
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+  }
+  return d;
+}
+
 function Sparkline({ values, width, height, color }: { values: number[]; width: number; height: number; color: string }) {
   if (values.length < 2 || width <= 0) return null;
   const max = Math.max(...values, 0);
   const min = Math.min(...values, 0);
   const range = max - min || 1;
   const stepX = width / (values.length - 1);
-  const points = values
-    .map((v, i) => `${i * stepX},${height - ((v - min) / range) * height}`)
-    .join(' ');
+  // Keep a hairline of padding at top/bottom so the curve never clips.
+  const pad = height * 0.08;
+  const usableHeight = height - pad * 2;
+  const points = values.map((v, i) => ({
+    x: i * stepX,
+    y: pad + usableHeight - ((v - min) / range) * usableHeight,
+  }));
+  const linePath = smoothPath(points);
+  const gradientId = `sellerMetricSparklineFill-${color.replace(/[^a-zA-Z0-9]/g, '')}`;
+  const areaPath = `${linePath} L${points[points.length - 1].x},${height} L${points[0].x},${height} Z`;
   return (
     <Svg width={width} height={height}>
-      <Polyline points={points} fill="none" stroke={color} strokeWidth={1.75} strokeLinejoin="round" strokeLinecap="round" />
+      <Defs>
+        <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={color} stopOpacity={0.28} />
+          <Stop offset="1" stopColor={color} stopOpacity={0} />
+        </LinearGradient>
+      </Defs>
+      <Path d={areaPath} fill={`url(#${gradientId})`} stroke="none" />
+      <Path d={linePath} fill="none" stroke={color} strokeWidth={1.75} strokeLinejoin="round" strokeLinecap="round" />
     </Svg>
   );
 }
