@@ -1,9 +1,15 @@
 /**
  * Seller Go Live — pre-broadcast setup screen.
- * Sets title, optional product tags, then calls POST /api/live/start.
+ * Full-bleed live camera preview (front by default), title/description over a
+ * bottom gradient, then hands off into the existing /seller-live broadcast flow.
  */
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator, Image } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator,
+  Animated, KeyboardAvoidingView, Platform, Linking,
+} from 'react-native';
+import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -11,63 +17,87 @@ import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { formatCents } from '@/lib/money';
+import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 
 const LIVE_RED = '#FF3B30';
-const LIVE_DIM = '#FF3B3020';
+const FG = '#FFFFFF';
+const GLASS = 'rgba(0,0,0,0.5)';
 
 export default function SellerGoLiveScreen() {
+  if (Platform.OS === 'web') {
+    return (
+      <NativeOnlyFeature
+        icon="video-off"
+        title="Going live is mobile-only"
+        description="Start a Brandthread live broadcast from the iOS or Android app, where camera and microphone access are available."
+      />
+    );
+  }
+  return <SellerGoLiveNativeScreen />;
+}
+
+function SellerGoLiveNativeScreen() {
   const { theme } = useAppTheme();
   const s = makeStyles(theme);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
 
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const [micPermission, requestMicPermission] = useMicrophonePermissions();
+  const [permissionsRequested, setPermissionsRequested] = useState(false);
+
+  const [facing, setFacing] = useState<'front' | 'back'>('front');
+  const [torch, setTorch] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [products, setProducts] = useState<any[]>([]);
-  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
   const [starting, setStarting] = useState(false);
 
+  const flipAnim = useRef(new Animated.Value(1)).current;
+  const goLiveScale = useRef(new Animated.Value(1)).current;
+
   useEffect(() => {
-    // Load seller's products for tagging
-    (api as any).seller?.getProducts?.()
-      .then((r: any) => setProducts(r?.products ?? []))
-      .catch(() => {});
+    void (async () => {
+      if (!cameraPermission?.granted) await requestCameraPermission();
+      if (!micPermission?.granted) await requestMicPermission();
+      setPermissionsRequested(true);
+    })();
   }, []);
 
-  function toggleProduct(product: any) {
+  const flipCamera = useCallback(() => {
     Haptics.selectionAsync();
-    setSelectedProductIds(prev => {
-      const next = new Set(prev);
-      if (next.has(product.id)) next.delete(product.id);
-      else next.add(product.id);
+    Animated.sequence([
+      Animated.timing(flipAnim, { toValue: 0, duration: 140, useNativeDriver: true }),
+      Animated.timing(flipAnim, { toValue: 1, duration: 140, useNativeDriver: true }),
+    ]).start();
+    setFacing(v => {
+      const next = v === 'front' ? 'back' : 'front';
+      if (next === 'front') setTorch(false);
       return next;
     });
-  }
+  }, [flipAnim]);
+
+  const toggleTorch = useCallback(() => {
+    Haptics.selectionAsync();
+    setTorch(v => !v);
+  }, []);
+
+  const onGoLivePressIn = useCallback(() => {
+    Animated.spring(goLiveScale, { toValue: 0.96, useNativeDriver: true, speed: 40, bounciness: 0 }).start();
+  }, [goLiveScale]);
+
+  const onGoLivePressOut = useCallback(() => {
+    Animated.spring(goLiveScale, { toValue: 1, useNativeDriver: true, speed: 40, bounciness: 6 }).start();
+  }, [goLiveScale]);
 
   async function handleGoLive() {
-    if (!title.trim()) {
-      Alert.alert('Title required', 'Give your live stream a title so viewers know what to expect.');
-      return;
-    }
+    if (!title.trim() || starting) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setStarting(true);
     try {
-      const selectedProducts = products
-        .filter(p => selectedProductIds.has(p.id))
-        .map((p, index) => ({
-          productId: p.id,
-          productName: p.name,
-          priceCents: p.priceCents ?? 0,
-          variantId: p.variants?.[0]?.id ?? null,
-          highlighted: index === 0,
-        }));
-
       const result = await (api as any).live.start({
         title: title.trim(),
         description: description.trim() || undefined,
-        productTags: selectedProducts,
       }) as any;
 
       router.replace({
@@ -79,6 +109,7 @@ export default function SellerGoLiveScreen() {
           agoraAppId:  result.agoraAppId,
           token:       result.token ?? '',
           title:       title.trim(),
+          facing,
         },
       } as any);
     } catch (e: any) {
@@ -88,157 +119,162 @@ export default function SellerGoLiveScreen() {
     }
   }
 
-  return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={[s.header, { borderBottomColor: theme.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={s.closeBtn}>
-          <Feather name="x" size={22} color={theme.text} />
+  const camGranted = cameraPermission?.granted ?? false;
+  const micGranted = micPermission?.granted ?? false;
+  const camBlocked = cameraPermission !== null && !cameraPermission?.granted && cameraPermission?.canAskAgain === false;
+  const micBlocked = micPermission !== null && !micPermission?.granted && micPermission?.canAskAgain === false;
+
+  // ─── Permissions gate ────────────────────────────────────────────────────
+  if (permissionsRequested && (!camGranted || !micGranted)) {
+    const blocked = camBlocked || micBlocked;
+    return (
+      <View style={[s.permRoot, { paddingTop: insets.top, paddingBottom: insets.bottom + 24 }]}>
+        <TouchableOpacity onPress={() => router.back()} style={[s.closeBtn, { top: insets.top + 8 }]} accessibilityLabel="Close">
+          <Feather name="x" size={22} color={FG} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Go Live</Text>
-        <View style={{ width: 40 }} />
+        <View style={s.permBox}>
+          <View style={s.permIconWrap}>
+            <Feather name="camera-off" size={30} color="rgba(255,255,255,0.7)" />
+          </View>
+          <Text style={s.permTitle}>Camera & microphone access needed</Text>
+          <Text style={s.permSub}>
+            Brandthread needs your camera and microphone to go live, so viewers can see and hear your stream.
+          </Text>
+          {blocked ? (
+            <TouchableOpacity
+              style={[s.permBtn, { backgroundColor: theme.accent }]}
+              onPress={() => Linking.openSettings()}
+            >
+              <Text style={[s.permBtnText, { color: theme.onAccent }]}>Open Settings</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[s.permBtn, { backgroundColor: theme.accent }]}
+              onPress={async () => {
+                await requestCameraPermission();
+                await requestMicPermission();
+              }}
+            >
+              <Text style={[s.permBtnText, { color: theme.onAccent }]}>Allow camera</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={s.permCancel}>Not now</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <KeyboardAvoidingView
+      style={s.root}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={0}
+    >
+      {/* Live camera preview, full-bleed */}
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: flipAnim, transform: [{ scaleX: flipAnim }] }]}>
+        {camGranted && micGranted ? (
+          <CameraView style={StyleSheet.absoluteFill} facing={facing} enableTorch={facing === 'back' && torch} />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, s.cameraPlaceholder]} />
+        )}
+      </Animated.View>
+
+      {/* Top bar */}
+      <View style={[s.topBar, { paddingTop: insets.top + 8 }]}>
+        <TouchableOpacity onPress={() => router.back()} style={s.iconBtn} accessibilityLabel="Close">
+          <Feather name="x" size={20} color={FG} />
+        </TouchableOpacity>
+        <View style={s.topRight}>
+          {facing === 'back' && (
+            <TouchableOpacity onPress={toggleTorch} style={s.iconBtn} accessibilityLabel={torch ? 'Turn flash off' : 'Turn flash on'}>
+              <Feather name={torch ? 'zap' : 'zap-off'} size={19} color={torch ? '#FBBF24' : FG} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={flipCamera} style={s.iconBtn} accessibilityLabel="Flip camera">
+            <Feather name="refresh-cw" size={19} color={FG} />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <ScrollView contentContainerStyle={s.body} showsVerticalScrollIndicator={false}>
-        {/* Live badge */}
-        <View style={s.liveHero}>
-          <View style={[s.liveBadge, { backgroundColor: LIVE_RED }]}>
-            <View style={s.liveDot} />
-            <Text style={s.liveBadgeText}>LIVE</Text>
-          </View>
-          <Text style={[s.liveHint, { color: theme.muted }]}>
-            Your followers will see your stream in the Thread feed and get notified.
-          </Text>
-        </View>
-
-        {/* Title */}
-        <View style={s.field}>
-          <Text style={[s.label, { color: theme.muted }]}>Stream title *</Text>
+      {/* Bottom gradient + setup fields */}
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.88)']}
+        style={s.bottomGradient}
+        pointerEvents="box-none"
+      >
+        <View style={s.fields} pointerEvents="box-none">
           <TextInput
             value={title}
             onChangeText={setTitle}
-            placeholder="e.g. New drop preview, styling tips…"
-            placeholderTextColor={theme.subtle}
+            placeholder="Add a title…"
+            placeholderTextColor="rgba(255,255,255,0.6)"
             maxLength={80}
-            style={[s.input, { backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
+            style={s.titleInput}
           />
-          <Text style={[s.charCount, { color: theme.subtle }]}>{title.length}/80</Text>
-        </View>
-
-        {/* Description */}
-        <View style={s.field}>
-          <Text style={[s.label, { color: theme.muted }]}>Description (optional)</Text>
           <TextInput
             value={description}
             onChangeText={setDescription}
-            placeholder="Tell viewers what the stream is about…"
-            placeholderTextColor={theme.subtle}
-            multiline
+            placeholder="Add a description (optional)…"
+            placeholderTextColor="rgba(255,255,255,0.5)"
             maxLength={200}
-            style={[s.inputMulti, { backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
+            multiline
+            style={s.descInput}
           />
+
+          <Animated.View style={{ transform: [{ scale: goLiveScale }] }}>
+            <TouchableOpacity
+              onPress={handleGoLive}
+              onPressIn={onGoLivePressIn}
+              onPressOut={onGoLivePressOut}
+              disabled={starting || !title.trim()}
+              activeOpacity={0.9}
+              style={[s.goLiveBtn, { backgroundColor: LIVE_RED, opacity: starting || !title.trim() ? 0.5 : 1 }]}
+            >
+              {starting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <View style={s.liveDot} />
+                  <Text style={s.goLiveBtnText}>Go Live</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </Animated.View>
         </View>
-
-        {/* Product tags */}
-        {products.length > 0 && (
-          <View style={s.field}>
-            <Text style={[s.label, { color: theme.muted }]}>Tag products (optional)</Text>
-            <Text style={[s.sublabel, { color: theme.subtle }]}>
-              Viewers can tap to shop these during your stream. You can also add/remove them while live.
-            </Text>
-            <View style={[s.productList, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              {products.slice(0, 20).map((p, i) => {
-                const selected = selectedProductIds.has(p.id);
-                return (
-                  <TouchableOpacity
-                    key={p.id}
-                    onPress={() => toggleProduct(p)}
-                    activeOpacity={0.7}
-                    style={[
-                      s.productRow,
-                      i > 0 && { borderTopWidth: 1, borderTopColor: theme.border },
-                      selected && { backgroundColor: theme.accentDim },
-                    ]}
-                  >
-                    {p.imageUrl ? (
-                      <Image source={{ uri: p.imageUrl }} style={s.productThumb} />
-                    ) : (
-                      <View style={[s.productThumb, { backgroundColor: theme.border }]}>
-                        <Feather name="package" size={14} color={theme.muted} />
-                      </View>
-                    )}
-                    <View style={{ flex: 1 }}>
-                      <Text style={[s.productName, { color: theme.text }]} numberOfLines={1}>{p.name}</Text>
-                      <Text style={[s.productPrice, { color: theme.muted }]}>
-                        {typeof p.priceCents === 'number' ? formatCents(p.priceCents) : '—'}
-                      </Text>
-                    </View>
-                    <View style={[s.checkbox, selected && { backgroundColor: theme.accent, borderColor: theme.accent }]}>
-                      {selected && <Feather name="check" size={13} color={theme.onAccent} />}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            {selectedProductIds.size > 0 && (
-              <Text style={[s.selCount, { color: theme.accent }]}>
-                {selectedProductIds.size} product{selectedProductIds.size !== 1 ? 's' : ''} tagged
-              </Text>
-            )}
-          </View>
-        )}
-
-      </ScrollView>
-
-      {/* Go Live CTA */}
-      <View style={[s.footer, { paddingBottom: insets.bottom + 12, borderTopColor: theme.border }]}>
-        <TouchableOpacity
-          onPress={handleGoLive}
-          disabled={starting || !title.trim()}
-          activeOpacity={0.85}
-          style={[s.goLiveBtn, { backgroundColor: LIVE_RED, opacity: starting || !title.trim() ? 0.5 : 1 }]}
-        >
-          {starting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <>
-              <View style={s.liveDot} />
-              <Text style={s.goLiveBtnText}>Go Live</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
-    </View>
+      </LinearGradient>
+    </KeyboardAvoidingView>
   );
 }
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   return StyleSheet.create({
-  root:           { flex: 1, backgroundColor: 'transparent' },
-  header:         { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1 },
-  closeBtn:       { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:    { fontSize: FS.base, fontFamily: FONT.bold, color: theme.text },
-  body:           { padding: SP.md, gap: SP.lg, paddingBottom: 100 },
-  liveHero:       { alignItems: 'center', paddingVertical: SP.md },
-  liveBadge:      { flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: RADIUS.pill, paddingHorizontal: 14, paddingVertical: 7, marginBottom: 10 },
-  liveDot:        { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
-  liveBadgeText:  { color: '#fff', fontFamily: FONT.bold, fontSize: FS.sm, letterSpacing: 1.5 },
-  liveHint:       { fontSize: FS.xs, fontFamily: FONT.regular, textAlign: 'center', lineHeight: 18 },
-  field:          { gap: SP.xs },
-  label:          { fontSize: FS.xs, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.6 },
-  sublabel:       { fontSize: FS.xs, fontFamily: FONT.regular, lineHeight: 17 },
-  charCount:      { fontSize: FS.xs, fontFamily: FONT.regular, textAlign: 'right' },
-  input:          { borderRadius: RADIUS.sm, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, fontSize: FS.sm, fontFamily: FONT.regular },
-  inputMulti:     { borderRadius: RADIUS.sm, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, fontSize: FS.sm, fontFamily: FONT.regular, minHeight: 80, textAlignVertical: 'top' },
-  productList:    { borderRadius: RADIUS.lg, borderWidth: 1, overflow: 'hidden' },
-  productRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
-  productThumb:   { width: 38, height: 38, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
-  productName:    { fontSize: FS.sm, fontFamily: FONT.semibold },
-  productPrice:   { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-  checkbox:       { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
-  selCount:       { fontSize: FS.xs, fontFamily: FONT.semibold, textAlign: 'right' },
-  footer:         { borderTopWidth: 1, padding: SP.md },
-  goLiveBtn:      { borderRadius: RADIUS.pill, height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  goLiveBtnText:  { color: '#fff', fontFamily: FONT.bold, fontSize: FS.base, letterSpacing: 0.5 },
+    root:              { flex: 1, backgroundColor: '#000' },
+    cameraPlaceholder: { backgroundColor: '#0a0a0a' },
+
+    topBar:            { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md },
+    topRight:          { flexDirection: 'row', gap: 10 },
+    iconBtn:           { width: 40, height: 40, borderRadius: 20, backgroundColor: GLASS, alignItems: 'center', justifyContent: 'center' },
+
+    bottomGradient:    { position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: 100 },
+    fields:            { paddingHorizontal: SP.md, paddingBottom: SP.md, gap: SP.sm },
+    titleInput:        { color: FG, fontSize: FS.md, fontFamily: FONT.bold, paddingVertical: 6 },
+    descInput:         { color: 'rgba(255,255,255,0.9)', fontSize: FS.sm, fontFamily: FONT.regular, paddingVertical: 2, maxHeight: 60 },
+
+    goLiveBtn:         { marginTop: SP.xs, borderRadius: RADIUS.pill, height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+    liveDot:           { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
+    goLiveBtnText:      { color: '#fff', fontFamily: FONT.bold, fontSize: FS.base, letterSpacing: 0.5 },
+
+    // Permissions gate
+    permRoot:          { flex: 1, backgroundColor: '#000' },
+    closeBtn:          { position: 'absolute', left: SP.md, width: 40, height: 40, borderRadius: 20, backgroundColor: GLASS, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+    permBox:           { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: SP.md },
+    permIconWrap:      { width: 68, height: 68, borderRadius: RADIUS.xl, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
+    permTitle:         { color: FG, fontSize: FS.md, fontFamily: FONT.bold, textAlign: 'center' },
+    permSub:           { color: 'rgba(255,255,255,0.65)', fontSize: FS.sm, textAlign: 'center', lineHeight: 22 },
+    permBtn:           { paddingHorizontal: 28, paddingVertical: 13, borderRadius: RADIUS.md, marginTop: SP.sm },
+    permBtnText:       { fontSize: FS.base, fontFamily: FONT.semibold },
+    permCancel:        { color: 'rgba(255,255,255,0.55)', fontSize: FS.sm },
   });
 };
