@@ -8,6 +8,7 @@ import crypto from "crypto";
 import { canRestoreProduct, PRODUCT_DELETE_RECOVERY_WINDOW_MS } from "../lib/productRecovery";
 import { getVerifiedPlanAccess, sendPlanLimitReached, sendPlanLookupUnavailable } from "../lib/planAccess";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { notifyBackInStock, notifyNewProduct, notifyPriceDrop } from "../lib/activityEvents";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -213,6 +214,8 @@ router.post("/", requireRole("manager"), async (req, res) => {
     );
   }
 
+  if (product.status === "active") void notifyNewProduct({ productId: product.id });
+
   res.status(201).json(product);
 });
 
@@ -265,13 +268,13 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
       .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId)))
       .limit(1)
       .for("update");
-    if (!existing) return { updated: null, limited: false, moderationLocked: false };
+    if (!existing) return { updated: null, limited: false, moderationLocked: false, published: false };
     if (
       existing.removalKind?.startsWith("moderation_")
       && status !== undefined
       && status !== "archived"
     ) {
-      return { updated: null, limited: false, moderationLocked: true };
+      return { updated: null, limited: false, moderationLocked: true, published: false };
     }
     if (
       !existing.deletedAt
@@ -281,14 +284,20 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
       && access
       && !await hasProductCapacity(tx, ownerId, access.limits.products, 1)
     ) {
-      return { updated: null, limited: true, moderationLocked: false };
+      return { updated: null, limited: true, moderationLocked: false, published: false };
     }
     const [updated] = await tx
       .update(products)
       .set(updateValues)
       .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId)))
       .returning();
-    return { updated, limited: false, moderationLocked: false };
+    return {
+      updated,
+      limited: false,
+      moderationLocked: false,
+      // Going live (draft/archived → active) is what followers hear about.
+      published: !!updated && updated.status === "active" && existing.status !== "active" && !updated.deletedAt,
+    };
   });
   if (result.moderationLocked) {
     res.status(409).json({
@@ -317,6 +326,8 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
       "product", updated.id,
     );
   }
+
+  if (result.published) void notifyNewProduct({ productId: updated.id });
 
   res.json(updated);
 });
@@ -445,6 +456,11 @@ router.patch("/:id/variants/:variantId", requireRole("manager"), async (req, res
   if (stock !== undefined && (!Number.isInteger(stock) || stock < 0)) {
     res.status(400).json({ error: "stock must be a non-negative integer" }); return;
   }
+  const [previous] = await db
+    .select({ stock: productVariants.stock, priceCents: productVariants.priceCents })
+    .from(productVariants)
+    .where(and(eq(productVariants.id, req.params.variantId), eq(productVariants.productId, req.params.id)))
+    .limit(1);
   const [updated] = await db.update(productVariants)
     .set({
       ...(stock             !== undefined && { stock }),
@@ -463,6 +479,20 @@ router.patch("/:id/variants/:variantId", requireRole("manager"), async (req, res
       `Updated variant ${updated.sku}`,
       "product", req.params.id, { variantId: updated.id },
     );
+  }
+
+  // Shoppers who saved this product hear about cheaper prices and restocks.
+  if (previous) {
+    if (updated.priceCents < previous.priceCents) {
+      void notifyPriceDrop({
+        productId: req.params.id,
+        oldPriceCents: previous.priceCents,
+        newPriceCents: updated.priceCents,
+      });
+    }
+    if (previous.stock <= 0 && updated.stock > 0) {
+      void notifyBackInStock({ productId: req.params.id });
+    }
   }
 
   res.json(updated);

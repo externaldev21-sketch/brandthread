@@ -21,6 +21,7 @@ import postVideoRouter, {
 } from "./post-video";
 import postSlideRouter from "./post-slide";
 import { validateSlideOverlays, MAX_SLIDES } from "../lib/slideValidation";
+import { notifyPostLike } from "../lib/activityEvents";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
 import {
@@ -1179,13 +1180,16 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
         eq(interactions.type, type),
       ));
     } else {
-      await db
+      const inserted = await db
         .insert(interactions)
         .values({ userId: clerkId, postId: id, type, value: null })
         .onConflictDoNothing({
           target: [interactions.userId, interactions.postId],
           where: sql`type = 'like' AND post_id IS NOT NULL`,
-        });
+        })
+        .returning({ id: interactions.id });
+      // Only a genuinely new like notifies the owner; retries are silent.
+      if (inserted.length > 0) void notifyPostLike({ postId: id, likerId: clerkId });
     }
 
     const [{ count: newCount }] = await db

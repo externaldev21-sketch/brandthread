@@ -4,6 +4,7 @@ import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext, requireRole } from "../middlewares/requireRole";
 import { logActivity, reqActor } from "../lib/activityLog";
+import { notifyBackInStock } from "../lib/activityEvents";
 
 const router = Router();
 router.use(requireAuth);
@@ -65,7 +66,11 @@ router.patch("/:variantId/adjust", requireRole("manager"), async (req, res) => {
 
   // Verify ownership via join
   const [row] = await db
-    .select({ stock: productVariants.stock, threshold: productVariants.lowStockThreshold })
+    .select({
+      stock: productVariants.stock,
+      threshold: productVariants.lowStockThreshold,
+      productId: productVariants.productId,
+    })
     .from(productVariants)
     .innerJoin(
       products,
@@ -98,6 +103,8 @@ router.patch("/:variantId/adjust", requireRole("manager"), async (req, res) => {
       "inventory", variantId, { delta: delta ?? null, newStock: updatedStock },
     );
   }
+
+  if (row.stock <= 0 && updatedStock > 0) void notifyBackInStock({ productId: row.productId });
 
   return res.json({
     ...updated,
