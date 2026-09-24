@@ -15,7 +15,7 @@ router.use(requireAuth);
 
 // List all locations for the authenticated seller
 router.get("/", async (req, res) => {
-  const ownerId = (req as any).userId as string;
+  const ownerId = (req as any).clerkUserId as string;
   try {
     const rows = await db.execute(sql`
       SELECT id, owner_id, name, address, city, state, country, zip, phone,
@@ -32,7 +32,7 @@ router.get("/", async (req, res) => {
 
 // Create a new location
 router.post("/", async (req, res) => {
-  const ownerId = (req as any).userId as string;
+  const ownerId = (req as any).clerkUserId as string;
   const {
     name = "New Location",
     address,
@@ -80,7 +80,7 @@ router.post("/", async (req, res) => {
 
 // Update a location
 router.patch("/:id", async (req, res) => {
-  const ownerId = (req as any).userId as string;
+  const ownerId = (req as any).clerkUserId as string;
   const { id } = req.params;
   const {
     name, address, city, state, country, zip, phone,
@@ -124,7 +124,7 @@ router.patch("/:id", async (req, res) => {
 
 // Delete a location (cannot delete the only primary)
 router.delete("/:id", async (req, res) => {
-  const ownerId = (req as any).userId as string;
+  const ownerId = (req as any).clerkUserId as string;
   const { id } = req.params;
 
   try {
