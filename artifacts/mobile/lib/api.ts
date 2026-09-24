@@ -627,6 +627,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         trackingStatus: 'label_created' | 'accepted' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'exception' | 'returned_to_sender';
         estimatedDelivery?: string | null;
       }) => patch(`/api/orders/${id}/tracking`, body),
+      /** Persist the seller's pick/pack checklist state for the fulfillment wizard. */
+      updateFulfillmentChecklist: (id: string, body: { isPicked?: boolean; isPacked?: boolean }) =>
+        patch(`/api/orders/${id}/fulfillment-checklist`, body),
+    },
+    packagePresets: {
+      list:   () => get<{ presets: any[] }>('/api/package-presets'),
+      create: (body: { name: string; weightOz: number; lengthIn: number; widthIn: number; heightIn: number }) =>
+        post<{ preset: any }>('/api/package-presets', body),
+      update: (id: string, body: Partial<{ name: string; weightOz: number; lengthIn: number; widthIn: number; heightIn: number }>) =>
+        patch<{ preset: any }>(`/api/package-presets/${encodeURIComponent(id)}`, body),
+      remove: (id: string) => del<{ ok: boolean }>(`/api/package-presets/${encodeURIComponent(id)}`),
     },
     customers: {
       list:    (search?: string) => get(`/api/customers${search ? `?search=${encodeURIComponent(search)}` : ''}`),
