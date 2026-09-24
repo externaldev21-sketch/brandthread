@@ -10,7 +10,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { useAuth, useUser } from '@clerk/expo';
+import { CachedImage } from '@/components/CachedImage';
 import * as Haptics from 'expo-haptics';
 import {
   BG, SCREEN_BG, CARD, CARD_ELEVATED, BORDER,
@@ -182,6 +183,10 @@ export default function FriendsScreen() {
   const router  = useRouter();
   const api     = useApi();
   const { userId } = useAuth();
+  const { user: clerkUser } = useUser();
+  const myName = clerkUser?.fullName || clerkUser?.firstName || clerkUser?.username || 'You';
+  const myInitials = myName.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'Y';
+  const myAvatarUrl = clerkUser?.hasImage ? clerkUser.imageUrl : null;
 
   const [friends,      setFriends]      = useState<Friendship[]>([]);
   const [apiFollowing, setApiFollowing] = useState<ApiFollowing[]>([]);
@@ -368,14 +373,16 @@ export default function FriendsScreen() {
                 activeOpacity={0.8}
                 onPress={() => router.push('/buyer-story-create' as never)}
               >
-                <View style={[s.storyCircle, { backgroundColor: MY_COLOR }]}>
-                  <Text style={s.storyInitials}>{MY_INITIALS}</Text>
+                <View style={[s.storyCircle, { backgroundColor: theme.cardElevated, overflow: 'hidden' }]}>
+                  {myAvatarUrl
+                    ? <CachedImage source={{ uri: myAvatarUrl }} style={StyleSheet.absoluteFill} />
+                    : <Text style={[s.storyInitials, { color: theme.text }]}>{myInitials}</Text>}
                   <View style={[s.plusBadge, { backgroundColor: theme.accent }]}>
                     <Feather name="plus" size={10} color={theme.onAccent} />
                   </View>
                 </View>
                 <Text style={s.storyLabel} numberOfLines={1}>
-                  Your Story
+                  Your story
                 </Text>
               </TouchableOpacity>
 

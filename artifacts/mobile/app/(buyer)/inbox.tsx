@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, TouchableOpacity,
-  Alert, StyleSheet,
+  View, Text, FlatList, TouchableOpacity,
+  Alert, StyleSheet, Modal, TextInput, ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,8 +19,9 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   getConversations, markConversationRead, archiveConversation,
   subscribeSocial, getNotifications, markNotificationRead,
+  searchProfiles, createOrGetConversation,
 } from '@/services/socialService';
-import type { Conversation, Notification } from '@/services/socialTypes';
+import type { Conversation, Notification, ProfileSearchResult } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 import SwipeActionRow from '@/components/SwipeActionRow';
 
@@ -75,6 +76,12 @@ export default function InboxScreen() {
   const [requestActionLoading, setRequestActionLoading] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [composeVisible, setComposeVisible] = useState(false);
+  const [composeQuery, setComposeQuery] = useState('');
+  const [composeResults, setComposeResults] = useState<ProfileSearchResult[]>([]);
+  const [composeLoading, setComposeLoading] = useState(false);
+  const [composeStartingId, setComposeStartingId] = useState<string | null>(null);
+  const composeSearchSeq = useRef(0);
 
   const loadData = useCallback(async () => {
     if (!userId) {
@@ -197,11 +204,67 @@ export default function InboxScreen() {
 
   function openCompose() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert(
-      'New Conversation',
-      'Start a conversation with:',
-      [{ text: 'Cancel', style: 'cancel' }],
-    );
+    setComposeQuery('');
+    setComposeResults([]);
+    setComposeVisible(true);
+  }
+
+  function closeCompose() {
+    setComposeVisible(false);
+    setComposeQuery('');
+    setComposeResults([]);
+  }
+
+  useEffect(() => {
+    if (!composeVisible) return;
+    const q = composeQuery.trim();
+    if (!q) {
+      setComposeResults([]);
+      setComposeLoading(false);
+      return;
+    }
+    const seq = ++composeSearchSeq.current;
+    setComposeLoading(true);
+    const timer = setTimeout(() => {
+      searchProfiles(q)
+        .then(results => {
+          if (composeSearchSeq.current !== seq) return;
+          setComposeResults(results);
+        })
+        .catch(() => {
+          if (composeSearchSeq.current !== seq) return;
+          setComposeResults([]);
+        })
+        .finally(() => {
+          if (composeSearchSeq.current !== seq) return;
+          setComposeLoading(false);
+        });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [composeQuery, composeVisible]);
+
+  async function startConversationWith(person: ProfileSearchResult) {
+    if (composeStartingId) return;
+    setComposeStartingId(person.userId);
+    try {
+      const conv = await createOrGetConversation({
+        type: 'buyer_to_buyer',
+        participant: {
+          userId: person.userId,
+          name: person.name,
+          handle: person.handle,
+          initials: person.initials,
+          color: person.color,
+          accountType: person.accountType,
+        },
+      });
+      closeCompose();
+      router.push(`/buyer-conversation?id=${conv.id}` as never);
+    } catch {
+      Alert.alert('Couldn’t start conversation', 'Try again.');
+    } finally {
+      setComposeStartingId(null);
+    }
   }
 
   function openFollow(notif: Notification) {
@@ -460,6 +523,71 @@ export default function InboxScreen() {
           />
         </View>
       )}
+
+      <Modal
+        visible={composeVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={closeCompose}
+      >
+        <View style={s.composeBackdrop}>
+          <View style={[s.composeSheet, { paddingBottom: insets.bottom + SP.md, backgroundColor: theme.card }]}>
+            <View style={s.composeHandle} />
+            <View style={s.composeHeader}>
+              <Text style={s.composeTitle}>New message</Text>
+              <TouchableOpacity
+                onPress={closeCompose}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Feather name="x" size={22} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={[s.composeSearchRow, { borderColor: theme.border }]}>
+              <Feather name="search" size={16} color={theme.muted} />
+              <TextInput
+                style={[s.composeSearchInput, { color: theme.text }]}
+                value={composeQuery}
+                onChangeText={setComposeQuery}
+                placeholder="Search people"
+                placeholderTextColor={theme.muted}
+                autoFocus
+                autoCorrect={false}
+              />
+            </View>
+            {composeLoading ? (
+              <View style={s.composeCenter}><ActivityIndicator color={theme.accent} /></View>
+            ) : composeQuery.trim() && composeResults.length === 0 ? (
+              <View style={s.composeCenter}><Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm }}>No one found</Text></View>
+            ) : (
+              <FlatList
+                data={composeResults}
+                keyExtractor={item => item.userId}
+                keyboardShouldPersistTaps="handled"
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={s.composeResultRow}
+                    onPress={() => startConversationWith(item)}
+                    disabled={!!composeStartingId}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Message ${item.name}`}
+                  >
+                    <View style={[s.composeAvatar, { backgroundColor: theme.cardElevated }]}>
+                      <Text style={{ color: theme.text, fontFamily: FONT.bold, fontSize: FS.sm }}>{item.initials}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }} numberOfLines={1}>{item.name}</Text>
+                      <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs }} numberOfLines={1}>{item.handle}</Text>
+                    </View>
+                    {composeStartingId === item.userId && <ActivityIndicator color={theme.accent} size="small" />}
+                  </TouchableOpacity>
+                )}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -468,6 +596,36 @@ export default function InboxScreen() {
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: SCREEN_BG },
+
+  // Compose modal
+  composeBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  composeSheet: {
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    paddingTop: SP.sm,
+    paddingHorizontal: SP.md,
+    height: '70%',
+  },
+  composeHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: SP.sm },
+  composeHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: SP.sm,
+  },
+  composeTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
+  composeSearchRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: SP.sm, height: 44,
+    marginBottom: SP.sm,
+  },
+  composeSearchInput: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, height: 44 },
+  composeCenter: { paddingVertical: SP.xl, alignItems: 'center' },
+  composeResultRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: SP.sm, minHeight: 52,
+  },
+  composeAvatar: {
+    width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
+  },
 
   // Header
   header: {

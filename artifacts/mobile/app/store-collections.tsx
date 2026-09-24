@@ -4,7 +4,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import * as ImagePicker from 'expo-image-picker';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Switch, Modal,
+  StyleSheet, Alert, Switch, Modal, Image, ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -27,6 +27,7 @@ import {
   getCollections, createCollection, updateCollection, deleteCollection,
   getStorefront,
 } from '@/services/storeService';
+import { useApi } from '@/lib/api';
 import {
   StoreCollection, CollectionType, CollectionStatus,
   CollectionCondition, CollectionConditionField, CollectionConditionOperator,
@@ -87,6 +88,7 @@ interface FormState {
   status: CollectionStatus;
   scheduledAt: string;
   seoExpanded: boolean;
+  coverImage?: string;
 }
 
 function defaultForm(): FormState {
@@ -117,6 +119,8 @@ export default function StoreCollectionsScreen() {
   const [selectedCollection, setSelectedCollection] = useState<StoreCollection | null>(null);
   const [form, setForm] = useState<FormState>(defaultForm());
   const [saving, setSaving] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const api = useApi();
 
   useFocusEffect(
     useCallback(() => {
@@ -384,22 +388,39 @@ export default function StoreCollectionsScreen() {
         <View style={styles.formSection}>
           <Text style={styles.fieldLabel}>Cover Image</Text>
           <View style={styles.coverPlaceholder}>
-            <Feather name="image" size={ICON.lg} color={MUTED} />
-            <Text style={styles.coverPlaceholderText}>No cover image</Text>
+            {coverUploading ? (
+              <ActivityIndicator color={PURPLE} />
+            ) : form.coverImage ? (
+              <Image source={{ uri: form.coverImage }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            ) : (
+              <>
+                <Feather name="image" size={ICON.lg} color={MUTED} />
+                <Text style={styles.coverPlaceholderText}>No cover image</Text>
+              </>
+            )}
           </View>
           <TouchableOpacity
             style={styles.uploadBtn}
+            disabled={coverUploading}
             onPress={async () => {
               const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
               if (!perm.granted) { Alert.alert('Permission required', 'Allow access to your photo library.'); return; }
               const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.85, aspect: [16, 9], allowsEditing: true });
-              if (!result.canceled && result.assets[0]) {
-                setForm(prev => ({ ...prev, coverImage: result.assets[0].uri }));
+              if (result.canceled || !result.assets[0]) return;
+              setCoverUploading(true);
+              try {
+                const uploaded = await api.products.uploadImage({ uri: result.assets[0].uri, mimeType: result.assets[0].mimeType });
+                const remoteUri = (uploaded as any)?.objectPath || result.assets[0].uri;
+                setForm(prev => ({ ...prev, coverImage: remoteUri }));
+              } catch {
+                Alert.alert("Couldn't upload cover", 'Try again.');
+              } finally {
+                setCoverUploading(false);
               }
             }}
           >
             <Feather name="upload" size={ICON.sm} color={PURPLE} />
-            <Text style={styles.uploadBtnText}>Upload Cover</Text>
+            <Text style={styles.uploadBtnText}>{form.coverImage ? 'Change cover' : 'Upload Cover'}</Text>
           </TouchableOpacity>
         </View>
 
@@ -735,6 +756,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     alignItems: 'center',
     justifyContent: 'center',
     gap: SP.sm,
+    overflow: 'hidden',
   },
   coverPlaceholderText: {
     fontSize: FS.sm,

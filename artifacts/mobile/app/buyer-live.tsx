@@ -137,7 +137,7 @@ function BuyerLiveNativeScreen() {
         }
       }
     } catch (e: any) {
-      Alert.alert('Could not join stream', e?.message ?? 'Please try again.');
+      Alert.alert('Couldn’t join the live', 'Try again.');
     } finally {
       setLoading(false);
     }
@@ -272,7 +272,7 @@ function BuyerLiveNativeScreen() {
       const firstAvailable = (product?.variants ?? []).find((variant: any) => (variant.stock ?? 0) > 0);
       setSelectedVariantId(firstAvailable?.id ?? '');
     } catch (error: any) {
-      setCheckoutError(error?.message ?? 'This product could not be loaded.');
+      setCheckoutError('Couldn’t load this piece.');
     } finally {
       setPurchaseLoading(false);
     }
@@ -327,7 +327,7 @@ function BuyerLiveNativeScreen() {
         : 'Your order was placed without leaving the live stream.');
       setPurchaseTag(null);
     } catch (error: any) {
-      setCheckoutError(error?.message ?? 'Checkout could not be started.');
+      setCheckoutError('Couldn’t start checkout. Try again.');
     } finally {
       setCheckoutBusy(false);
     }

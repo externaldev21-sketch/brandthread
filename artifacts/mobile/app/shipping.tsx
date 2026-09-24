@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, Platform, TextInput } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
@@ -9,19 +9,29 @@ import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
-import { FS } from '@/lib/theme';
+import { FS, SP, RADIUS } from '@/lib/theme';
+import { dbStatusToOrderStatus } from '@/lib/orderStatusAdapter';
+import { parseDecimalToCents } from '@/lib/money';
 
-const SHIPMENTS = [
-  { id: 'SH-8821', customer: 'Jordan Lee', carrier: 'UPS', status: 'In Transit', eta: 'Jul 10', progress: 70 },
-  { id: 'SH-8820', customer: 'Maya Chen', carrier: 'FedEx', status: 'Out for Delivery', eta: 'Today', progress: 90 },
-  { id: 'SH-8819', customer: 'Amir Patel', carrier: 'USPS', status: 'Label Created', eta: 'Jul 12', progress: 15 },
-  { id: 'SH-8818', customer: 'Sofia Reyes', carrier: 'DHL', status: 'Delivered', eta: 'Jul 6', progress: 100 },
-];
+function shipmentProgress(status: string): number {
+  // Order → Label → Pickup → Transit → Delivered, derived from the real
+  // order status — never fabricated.
+  switch (status) {
+    case 'ready_to_ship': return 25;
+    case 'shipped':       return 70;
+    case 'delivered':     return 100;
+    default:              return 10;
+  }
+}
 
-const WAREHOUSES = [
-  { name: 'East Coast Hub', location: 'Newark, NJ', stock: 2840, capacity: 85 },
-  { name: 'West Coast Hub', location: 'Los Angeles, CA', stock: 1420, capacity: 60 },
-];
+function shipmentStatusLabel(status: string): string {
+  switch (status) {
+    case 'ready_to_ship': return 'Label Created';
+    case 'shipped':       return 'In Transit';
+    case 'delivered':     return 'Delivered';
+    default:              return 'Processing';
+  }
+}
 
 function capitalize(s: string) {
   if (!s) return '';
@@ -39,6 +49,10 @@ export default function ShippingScreen() {
   const [sellerReturns, setSellerReturns] = useState<any[]>([]);
   const [shippingRates, setShippingRates] = useState<any[]>([]);
   const [ratesLoading, setRatesLoading] = useState(false);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [addRateVisible, setAddRateVisible] = useState(false);
+  const [newRateName, setNewRateName] = useState('');
+  const [newRatePrice, setNewRatePrice] = useState('');
 
   function leaveSetupDestination() {
     if (launchedFromSellerSetup) {
@@ -51,7 +65,17 @@ export default function ShippingScreen() {
   useEffect(() => {
     api.returns.listSeller().then(data => setSellerReturns(data ?? [])).catch(() => {});
     api.shippingRates.list().then(data => setShippingRates(data ?? [])).catch(() => {});
+    api.orders.list().then(data => setOrders(Array.isArray(data) ? data : [])).catch(() => {});
   }, []);
+
+  const orderStatuses = orders.map(o => dbStatusToOrderStatus(o.status));
+  const pendingCount = orderStatuses.filter(s => s === 'new' || s === 'processing').length;
+  const inTransitCount = orderStatuses.filter(s => s === 'shipped').length;
+  const deliveredCount = orderStatuses.filter(s => s === 'delivered').length;
+  const activeShipments = orders
+    .map(o => ({ row: o, status: dbStatusToOrderStatus(o.status) }))
+    .filter(({ row, status }) => !!row.trackingNumber && (status === 'ready_to_ship' || status === 'shipped'))
+    .slice(0, 10);
 
   function shipmentBadge(status: string) {
     if (status === 'Delivered') return 'success';
@@ -68,40 +92,35 @@ export default function ShippingScreen() {
   }
 
   function handleAddRate() {
-    Alert.prompt(
-      'Add Shipping Rate',
-      'Enter a name for this rate (e.g. "Standard Shipping"):',
-      (name) => {
-        if (!name?.trim()) return;
-        Alert.prompt(
-          'Flat Rate (cents)',
-          'Enter the flat rate in cents (e.g. 499 for $4.99):',
-          async (centsStr) => {
-            const cents = parseInt(centsStr ?? '', 10);
-            if (isNaN(cents) || cents < 0) {
-              Alert.alert('Invalid amount', 'Please enter a valid number of cents.');
-              return;
-            }
-            try {
-              setRatesLoading(true);
-              const newRate = await completeSetupTaskAfter(
-                'shipping_rates',
-                () => api.shippingRates.create({ name: name.trim(), flatRateCents: cents }),
-              );
-              setShippingRates(prev => [...prev, newRate]);
-            } catch (e: any) {
-              Alert.alert('Error', e?.message ?? 'Could not create shipping rate.');
-            } finally {
-              setRatesLoading(false);
-            }
-          },
-          'plain-text',
-          '499',
-        );
-      },
-      'plain-text',
-      'Standard Shipping',
-    );
+    setNewRateName('');
+    setNewRatePrice('');
+    setAddRateVisible(true);
+  }
+
+  async function handleSaveRate() {
+    const name = newRateName.trim();
+    const cents = parseDecimalToCents(newRatePrice);
+    if (!name) {
+      Alert.alert('Name required', 'Enter a name for this rate.');
+      return;
+    }
+    if (cents == null || cents < 0) {
+      Alert.alert('Invalid price', 'Enter a valid price, like 4.99.');
+      return;
+    }
+    try {
+      setRatesLoading(true);
+      const newRate = await completeSetupTaskAfter(
+        'shipping_rates',
+        () => api.shippingRates.create({ name, flatRateCents: cents }),
+      );
+      setShippingRates(prev => [...prev, newRate]);
+      setAddRateVisible(false);
+    } catch (e: any) {
+      Alert.alert('Couldn’t add this rate', 'Check your connection and try again.');
+    } finally {
+      setRatesLoading(false);
+    }
   }
 
   return (
@@ -137,10 +156,10 @@ export default function ShippingScreen() {
       {/* Stats */}
       <View style={styles.statsRow}>
         {[
-          { label: 'Pending', value: '8', color: colors.warning },
-          { label: 'In Transit', value: '24', color: colors.primary },
-          { label: 'Delivered', value: '384', color: colors.success },
-          { label: 'Returns', value: String(sellerReturns.length || '6'), color: colors.destructive },
+          { label: 'Pending', value: String(pendingCount), color: colors.warning },
+          { label: 'In Transit', value: String(inTransitCount), color: colors.primary },
+          { label: 'Delivered', value: String(deliveredCount), color: colors.success },
+          { label: 'Returns', value: String(sellerReturns.length), color: colors.destructive },
         ].map((s) => (
           <View key={s.label} style={[styles.stat, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.statVal, { color: s.color }]}>{s.value}</Text>
@@ -149,43 +168,38 @@ export default function ShippingScreen() {
         ))}
       </View>
 
-      {/* Quick Actions */}
-      <View style={styles.actionsRow}>
-        {[
-          { label: 'Print Labels', icon: 'printer' as const },
-          { label: 'Add Carrier', icon: 'truck' as const },
-          { label: 'Returns', icon: 'rotate-ccw' as const },
-          { label: 'Pickup', icon: 'map-pin' as const },
-        ].map((a) => (
-          <TouchableOpacity key={a.label} activeOpacity={0.75} style={[styles.action, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name={a.icon} size={18} color={colors.primary} />
-            <Text style={[styles.actionLabel, { color: colors.foreground }]}>{a.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
       {/* Shipments */}
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Active Shipments</Text>
-      {SHIPMENTS.map((s) => (
-        <View key={s.id} style={[styles.shipCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      {activeShipments.length === 0 ? (
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.emptySection}>
+            <Feather name="truck" size={20} color={colors.mutedForeground} />
+            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No active shipments</Text>
+            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Buy a label on an order to start tracking.</Text>
+          </View>
+        </View>
+      ) : activeShipments.map(({ row, status }) => (
+        <View key={row.id} style={[styles.shipCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.shipHeader}>
             <View>
-              <Text style={[styles.shipId, { color: colors.primary }]}>{s.id}</Text>
-              <Text style={[styles.shipCustomer, { color: colors.foreground }]}>{s.customer}</Text>
-              <Text style={[styles.shipCarrier, { color: colors.mutedForeground }]}>{s.carrier} · ETA {s.eta}</Text>
+              <Text style={[styles.shipId, { color: colors.primary }]}>{row.orderNumber ?? row.id}</Text>
+              <Text style={[styles.shipCustomer, { color: colors.foreground }]}>{row.customerName ?? 'Customer'}</Text>
+              <Text style={[styles.shipCarrier, { color: colors.mutedForeground }]}>
+                {row.carrier ?? 'Carrier'}{row.trackingNumber ? ` · ${row.trackingNumber}` : ''}
+              </Text>
             </View>
-            <Badge label={s.status} variant={shipmentBadge(s.status) as any} />
+            <Badge label={shipmentStatusLabel(status)} variant={shipmentBadge(shipmentStatusLabel(status)) as any} />
           </View>
           <View style={[styles.progressBar, { backgroundColor: colors.secondary }]}>
             <View style={[styles.progressFill, {
-              width: `${s.progress}%`,
-              backgroundColor: s.progress === 100 ? colors.success : colors.primary,
+              width: `${shipmentProgress(status)}%`,
+              backgroundColor: shipmentProgress(status) === 100 ? colors.success : colors.primary,
             }]} />
           </View>
           <View style={styles.shipSteps}>
             {['Order', 'Label', 'Pickup', 'Transit', 'Delivered'].map((step, i) => {
               const stepPct = (i / 4) * 100;
-              const active = s.progress >= stepPct;
+              const active = shipmentProgress(status) >= stepPct;
               return (
                 <View key={step} style={styles.stepItem}>
                   <View style={[styles.stepDot, { backgroundColor: active ? colors.primary : colors.secondary }]} />
@@ -263,32 +277,84 @@ export default function ShippingScreen() {
           ))
         )}
       </View>
-
-      {/* Warehouses */}
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Fulfillment Locations</Text>
-      {WAREHOUSES.map((w) => (
-        <View key={w.name} style={[styles.warehouseCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.warehouseHeader}>
-            <Feather name="map-pin" size={16} color={colors.primary} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.warehouseName, { color: colors.foreground }]}>{w.name}</Text>
-              <Text style={[styles.warehouseLoc, { color: colors.mutedForeground }]}>{w.location}</Text>
-            </View>
-            <Text style={[styles.warehouseStock, { color: colors.foreground }]}>{w.stock.toLocaleString()} units</Text>
-          </View>
-          <View style={[styles.capacityBar, { backgroundColor: colors.secondary }]}>
-            <View style={[styles.capacityFill, { width: `${w.capacity}%`, backgroundColor: w.capacity > 80 ? colors.warning : colors.success }]} />
-          </View>
-          <Text style={[styles.capacityLabel, { color: colors.mutedForeground }]}>Capacity: {w.capacity}% full</Text>
-        </View>
-      ))}
     </ScrollView>
+
+    {addRateVisible && (
+      <View style={styles.sheetBackdrop}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setAddRateVisible(false)} />
+        <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border, paddingBottom: insets.bottom + 20 }]}>
+          <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Add shipping rate</Text>
+          <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>Name</Text>
+          <TextInput
+            value={newRateName}
+            onChangeText={setNewRateName}
+            placeholder="Standard Shipping"
+            placeholderTextColor={colors.mutedForeground}
+            style={[styles.sheetInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+          />
+          <Text style={[styles.sheetLabel, { color: colors.mutedForeground }]}>Price</Text>
+          <TextInput
+            value={newRatePrice}
+            onChangeText={setNewRatePrice}
+            placeholder="$4.99"
+            placeholderTextColor={colors.mutedForeground}
+            keyboardType="decimal-pad"
+            style={[styles.sheetInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+          />
+          <View style={styles.sheetActions}>
+            <TouchableOpacity
+              onPress={() => setAddRateVisible(false)}
+              style={[styles.sheetBtn, { borderColor: colors.border }]}
+            >
+              <Text style={[styles.sheetBtnText, { color: colors.foreground }]}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleSaveRate}
+              disabled={ratesLoading}
+              style={[styles.sheetBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}
+            >
+              <Text style={[styles.sheetBtnText, { color: colors.primaryForeground }]}>{ratesLoading ? 'Saving…' : 'Save rate'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  sheetBackdrop: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)', // theme-exempt: modal scrim over the whole screen
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    borderWidth: 1,
+    padding: SP.md,
+    gap: SP.xs,
+  },
+  sheetTitle: { fontSize: FS.lg, fontWeight: '700', marginBottom: SP.sm },
+  sheetLabel: { fontSize: FS.xs, fontWeight: '500', marginTop: SP.xs },
+  sheetInput: {
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SP.sm,
+    paddingVertical: 12,
+    fontSize: FS.md,
+  },
+  sheetActions: { flexDirection: 'row', gap: SP.sm, marginTop: SP.md },
+  sheetBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  sheetBtnText: { fontSize: FS.md, fontWeight: '600' },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-end',

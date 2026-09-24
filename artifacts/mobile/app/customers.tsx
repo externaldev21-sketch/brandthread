@@ -8,9 +8,7 @@ import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { FS } from '@/lib/theme';
-
-const SEGMENTS = ['All', 'VIP', 'Returning', 'At-Risk'] as const;
-type Segment = typeof SEGMENTS[number];
+import { formatCents } from '@/lib/money';
 
 type ApiCustomer = {
   id: string;
@@ -42,7 +40,6 @@ function getAvatarColor(id: string): string {
 export default function CustomersScreen() {
   const colors = useColors();
   const router = useRouter();
-  const [segment, setSegment] = useState<Segment>('All');
   const [search, setSearch] = useState('');
   const [customers, setCustomers] = useState<ApiCustomer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,11 +70,16 @@ export default function CustomersScreen() {
     return () => clearTimeout(timer);
   }, [search, fetchCustomers]);
 
+  const totalCustomers = customers.length;
+  const avgSpendCents = totalCustomers > 0
+    ? Math.round(customers.reduce((sum, c) => sum + (c.totalSpentCents ?? 0), 0) / totalCustomers)
+    : 0;
+
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader
         title="Customers"
-        subtitle="CRM, loyalty & rewards"
+        subtitle="Your customer list"
         rightElement={
           <TouchableOpacity
             onPress={() => router.push('/(tabs)/analytics' as never)}
@@ -98,10 +100,8 @@ export default function CustomersScreen() {
       {/* Stats */}
       <View style={styles.statsRow}>
         {[
-          { label: 'Total', value: '1,240', icon: 'users' as const },
-          { label: 'VIP', value: '84', icon: 'star' as const },
-          { label: 'CLV', value: '$480', icon: 'heart' as const },
-          { label: 'Retention', value: '42%', icon: 'refresh-cw' as const },
+          { label: 'Total', value: totalCustomers.toLocaleString(), icon: 'users' as const },
+          { label: 'Avg. spend', value: formatCents(avgSpendCents), icon: 'heart' as const },
         ].map((s) => (
           <View key={s.label} style={[styles.stat, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name={s.icon} size={14} color={colors.primary} />
@@ -109,20 +109,6 @@ export default function CustomersScreen() {
             <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
           </View>
         ))}
-      </View>
-
-      {/* Loyalty Card */}
-      <View style={[styles.loyaltyCard, { backgroundColor: colors.card, borderColor: colors.primary }]}>
-        <View style={styles.loyaltyLeft}>
-          <Feather name="star" size={20} color={colors.primary} />
-          <View>
-            <Text style={[styles.loyaltyTitle, { color: colors.foreground }]}>Loyalty Program</Text>
-            <Text style={[styles.loyaltySub, { color: colors.mutedForeground }]}>840 customers enrolled · $3.2k rewards issued</Text>
-          </View>
-        </View>
-        <TouchableOpacity style={[styles.loyaltyBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8}>
-          <Text style={[styles.loyaltyBtnText, { color: colors.primaryForeground }]}>Manage</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Search */}
@@ -136,20 +122,6 @@ export default function CustomersScreen() {
           onChangeText={setSearch}
         />
       </View>
-
-      {/* Segments */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.segments} contentContainerStyle={{ gap: 8 }}>
-        {SEGMENTS.map((s) => (
-          <TouchableOpacity
-            key={s}
-            onPress={() => setSegment(s)}
-            activeOpacity={0.7}
-            style={[styles.segChip, { backgroundColor: segment === s ? colors.primary : colors.card, borderColor: segment === s ? colors.primary : colors.border }]}
-          >
-            <Text style={[styles.segText, { color: segment === s ? colors.primaryForeground : colors.mutedForeground }]}>{s}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
 
       {/* Customer List */}
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -199,25 +171,6 @@ export default function CustomersScreen() {
             );
           })
         )}
-      </View>
-
-      {/* Wishlists & Gift Cards */}
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Rewards & Gifts</Text>
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {[
-          { label: 'Active Wishlists', value: '312', icon: 'heart' as const },
-          { label: 'Gift Cards Issued', value: '$4,800', icon: 'gift' as const },
-          { label: 'Points Redeemed', value: '18,400 pts', icon: 'award' as const },
-          { label: 'Referrals Active', value: '124', icon: 'share-2' as const },
-        ].map((r, i) => (
-          <View key={r.label} style={[styles.rewardRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-            <View style={[styles.rewardIcon, { backgroundColor: colors.secondary }]}>
-              <Feather name={r.icon} size={15} color={colors.primary} />
-            </View>
-            <Text style={[styles.rewardLabel, { color: colors.foreground }]}>{r.label}</Text>
-            <Text style={[styles.rewardVal, { color: colors.mutedForeground }]}>{r.value}</Text>
-          </View>
-        ))}
       </View>
     </ScrollView>
       <AIBrainFAB context={{ screen: 'customers' as const }} bottomOffset={0} />

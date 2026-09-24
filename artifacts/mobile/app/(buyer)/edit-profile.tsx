@@ -390,7 +390,7 @@ export default function BuyerEditProfileScreen() {
               <Text style={styles.rowHint}>Add this label if your content often uses AI.</Text>
             </View>
             <View style={[styles.newPill, { backgroundColor: theme.secondary }]}>
-              <Text style={styles.newPillText}>New</Text>
+              <Text style={[styles.newPillText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>New</Text>
             </View>
             <Switch
               value={fields.aiCreator}
@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
   rowInput: { flex: 1, fontSize: 15, fontFamily: FONT.regular, color: FG, padding: 0, textAlign: 'right' },
   chevronLabel: { fontSize: 13.5, fontFamily: FONT.regular, color: MUTED },
   newPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
-  newPillText: { fontSize: FS.xs, fontFamily: FONT.bold, color: '#FFFFFF' },
+  newPillText: { fontSize: FS.xs, fontFamily: FONT.bold },
   avatarSection: { alignItems: 'center', paddingVertical: 20, gap: 10 },
   avatar: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 28, color: '#FFF', fontFamily: FONT.bold },

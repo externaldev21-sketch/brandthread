@@ -49,7 +49,7 @@ export default function BuyerSecurity() {
         <TouchableOpacity style={s.iconBtn} onPress={() => router.back()}>
           <Feather name="arrow-left" size={21} color={FG} />
         </TouchableOpacity>
-        <Text style={s.title}>Password & Security</Text>
+        <Text style={s.title}>Password and security</Text>
         <View style={s.iconBtn} />
       </View>
 
@@ -57,17 +57,21 @@ export default function BuyerSecurity() {
         {/* Protection toggles */}
         <Text style={s.groupLabel}>Protection</Text>
         <View style={s.card}>
-          {/* 2FA — informational only; actual enrollment is managed by Clerk */}
-          <View style={s.rowInfo}>
+          {/* 2FA — enrollment happens in Login methods */}
+          <TouchableOpacity
+            style={s.rowInfo}
+            onPress={() => { Haptics.selectionAsync(); router.push('/login-methods' as never); }}
+            activeOpacity={0.7}
+          >
             <View style={s.iconWrap}>
               <Feather name="shield" size={18} color={PURPLE} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.label}>Two-factor authentication</Text>
-              <Text style={s.sub}>Managed by your sign-in provider. Set up in Clerk account settings.</Text>
+              <Text style={s.sub}>Add a second step when you sign in.</Text>
             </View>
-            <Feather name="external-link" size={16} color={SUBTLE} />
-          </View>
+            <Feather name="chevron-right" size={16} color={SUBTLE} />
+          </TouchableOpacity>
           <View style={s.divider} />
           <View style={s.row}>
             <View style={s.iconWrap}>
@@ -81,7 +85,7 @@ export default function BuyerSecurity() {
               value={loginAlerts}
               onValueChange={onToggleLoginAlerts}
               trackColor={{ false: CARD_ELEVATED, true: PURPLE }}
-              thumbColor={ON_DARK}
+              thumbColor={theme.onAccent}
             />
           </View>
           <View style={s.divider} />
@@ -97,7 +101,7 @@ export default function BuyerSecurity() {
               value={saveLogin}
               onValueChange={onToggleSaveLogin}
               trackColor={{ false: CARD_ELEVATED, true: PURPLE }}
-              thumbColor={ON_DARK}
+              thumbColor={theme.onAccent}
             />
           </View>
         </View>

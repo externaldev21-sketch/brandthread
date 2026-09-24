@@ -50,7 +50,7 @@ const MAX_GARMENTS = 4;
 const INITIAL_MSG: Message = {
   id: '0',
   role: 'assistant',
-  content: "Hi! I'm your AI product photographer, powered by Nano Banana 3. Upload one or more photos of your clothing product — plus any reference photos of the look you're going for — and describe the shot you want. I'll generate a studio-quality photo with an AI model wearing your product.",
+  content: "Add photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio.",
 };
 
 export default function AIPhotographyChatScreen() {
@@ -181,7 +181,7 @@ export default function AIPhotographyChatScreen() {
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: err?.message ?? 'Something went wrong generating your photo. Please try again.',
+        content: "Couldn't create that photo. Try different photos.",
         error: true,
       };
       setMessages((prev) => [aiMsg, ...prev]);
@@ -269,7 +269,7 @@ export default function AIPhotographyChatScreen() {
       setMessages((prev) => [{
         id: `${Date.now()}-outfit-error`,
         role: 'assistant',
-        content: err?.message ?? 'Something went wrong generating the outfit swaps. Please try again.',
+        content: "Couldn't create that photo. Try different photos.",
         error: true,
       }, ...prev]);
     } finally {
@@ -310,7 +310,7 @@ export default function AIPhotographyChatScreen() {
       setMessages((prev) => prev.map((item) => item.id === message.id
         ? {
             ...item,
-            content: err?.message ?? 'This garment could not be generated. Please try again.',
+            content: `Garment ${message.garmentIndex ?? 1} didn't work. Tap Retry.`,
             error: true,
           }
         : item));
@@ -335,7 +335,7 @@ export default function AIPhotographyChatScreen() {
     >
       <ScreenHeader
         title="AI Product Photography"
-        subtitle="Powered by Nano Banana 3"
+        subtitle="AI-generated photos"
         rightElement={
           <View style={[styles.statusBadge, { backgroundColor: colors.accent }]}>
             <Text style={[styles.statusText, { color: colors.success }]}>Online</Text>
@@ -343,31 +343,34 @@ export default function AIPhotographyChatScreen() {
         }
       />
 
-      {/* Chat mode switch — both modes share the same thread and composer. */}
-      <View style={[styles.modeSwitch, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
-        {outfitSwapEnabled && <TouchableOpacity
-          activeOpacity={0.82}
-          onPress={() => setMode('free')}
-          testID="ai-photography-mode-free"
-          style={[styles.modeChip, mode === 'free' && { backgroundColor: colors.primary }]}
-        >
-          <Feather name="edit-3" size={14} color={mode === 'free' ? colors.primaryForeground : colors.mutedForeground} />
-          <Text style={[styles.modeChipText, { color: mode === 'free' ? colors.primaryForeground : colors.mutedForeground }]}>
-            Product Photography
-          </Text>
-        </TouchableOpacity>}
-        <TouchableOpacity
-          activeOpacity={0.82}
-          onPress={() => setMode('outfitSwap')}
-          testID="ai-photography-mode-outfit-swap"
-          style={[styles.modeChip, mode === 'outfitSwap' && { backgroundColor: colors.primary }]}
-        >
-          <Feather name="refresh-cw" size={14} color={mode === 'outfitSwap' ? colors.primaryForeground : colors.mutedForeground} />
-          <Text style={[styles.modeChipText, { color: mode === 'outfitSwap' ? colors.primaryForeground : colors.mutedForeground }]}>
-            Outfit Swap
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {/* Chat mode switch — both modes share the same thread and composer.
+          Only shown when Outfit Swap is enabled; otherwise Product Photography is the only mode. */}
+      {outfitSwapEnabled && (
+        <View style={[styles.modeSwitch, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
+          <TouchableOpacity
+            activeOpacity={0.82}
+            onPress={() => setMode('free')}
+            testID="ai-photography-mode-free"
+            style={[styles.modeChip, mode === 'free' && { backgroundColor: colors.primary }]}
+          >
+            <Feather name="edit-3" size={14} color={mode === 'free' ? colors.primaryForeground : colors.mutedForeground} />
+            <Text style={[styles.modeChipText, { color: mode === 'free' ? colors.primaryForeground : colors.mutedForeground }]}>
+              Product Photography
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.82}
+            onPress={() => setMode('outfitSwap')}
+            testID="ai-photography-mode-outfit-swap"
+            style={[styles.modeChip, mode === 'outfitSwap' && { backgroundColor: colors.primary }]}
+          >
+            <Feather name="refresh-cw" size={14} color={mode === 'outfitSwap' ? colors.primaryForeground : colors.mutedForeground} />
+            <Text style={[styles.modeChipText, { color: mode === 'outfitSwap' ? colors.primaryForeground : colors.mutedForeground }]}>
+              Outfit Swap
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {mode === 'outfitSwap' && (
         <View style={[styles.outfitNotice, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>

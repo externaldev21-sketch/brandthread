@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   BrandthreadScreen, BrandthreadHeader, BrandthreadCard, GradientCard,
   PrimaryButton, SecondaryButton, StatusBadge, SectionHeader, FormInput,
-  LoadingSkeleton,
+  LoadingSkeleton, EmptyState,
 } from '@/components/BrandthreadUI';
 
 import {
@@ -278,7 +278,7 @@ export default function QuoteDetailScreen() {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(quote.manufacturerId)) {
       Alert.alert(
         'Sample unavailable',
-        'This quote is a local preview and cannot start a real sample order. Choose a manufacturer from the live directory and request a fresh quote.',
+        "This quote can't start a sample. Request a new quote from the manufacturer's profile.",
       );
       return;
     }
@@ -316,7 +316,14 @@ export default function QuoteDetailScreen() {
     return (
       <BrandthreadScreen>
         <BrandthreadHeader title="Quote Details" onBack={() => router.back()} />
-        <View style={s.centered} />
+        <View style={s.centered}>
+          <EmptyState
+            icon="file-text"
+            title="Quote not found"
+            description="It may have been withdrawn."
+            action={{ label: 'Back to quotes', onPress: () => router.back() }}
+          />
+        </View>
       </BrandthreadScreen>
     );
   }

@@ -7,12 +7,15 @@ import React, { useState } from 'react';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, ActivityIndicator, Image, TextInput,
+  Alert, ActivityIndicator, Image, TextInput, Modal, FlatList,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import * as Sharing from 'expo-sharing';
+import { File, Paths } from 'expo-file-system';
 
 import {
   BG, SURFACE, CARD, CARD_ELEVATED,
@@ -25,6 +28,8 @@ import {
   GradientCard, PrimaryButton, SecondaryButton, SectionHeader, FormInput,
 } from '@/components/BrandthreadUI';
 import { replaceBackground } from '@/services/designService';
+import { getProducts, updateProduct } from '@/services/productService';
+import type { Product, ProductMedia } from '@/services/productTypes';
 
 type BgTab = 'color' | 'gradient' | 'upload' | 'ai';
 
@@ -83,6 +88,11 @@ export default function DesignBgReplaceScreen({
   const [customPrompt, setCustomPrompt] = useState('');
   const [resultUri, setResultUri] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [showProductPicker, setShowProductPicker] = useState(false);
+  const [pickerProducts, setPickerProducts] = useState<Product[]>([]);
+  const [loadingPickerProducts, setLoadingPickerProducts] = useState(false);
 
   async function pickSourceImage() {
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.9 });
@@ -130,6 +140,103 @@ export default function DesignBgReplaceScreen({
     }
   }
 
+  async function writeResultToTempFile(): Promise<string | null> {
+    if (!resultUri) return null;
+    if (resultUri.startsWith('data:')) {
+      const b64 = resultUri.replace(/^data:image\/[a-z]+;base64,/, '');
+      const file = new File(Paths.cache, `bg-replace-${Date.now()}.png`);
+      file.write(b64, { encoding: 'base64' });
+      return file.uri;
+    }
+    return resultUri;
+  }
+
+  async function handleSaveResult() {
+    if (!resultUri) return;
+    setIsSaving(true);
+    try {
+      const MediaLibrary = await import('expo-media-library');
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission required', 'Allow photo library access to save this image.');
+        return;
+      }
+      const fileUri = await writeResultToTempFile();
+      if (!fileUri) return;
+      await MediaLibrary.saveToLibraryAsync(fileUri);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Saved', 'Saved to Photos.');
+    } catch {
+      Alert.alert('Save failed', 'Could not save this image. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleExportResult() {
+    if (!resultUri) return;
+    setIsExporting(true);
+    try {
+      const fileUri = await writeResultToTempFile();
+      if (!fileUri) return;
+      const available = await Sharing.isAvailableAsync();
+      if (!available) {
+        Alert.alert('Sharing unavailable', 'System share sheet is not available.');
+        return;
+      }
+      await Sharing.shareAsync(fileUri, { mimeType: 'image/png', UTI: 'public.png' });
+    } catch {
+      Alert.alert('Couldn’t open sharing', 'Try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  async function handleAddToProduct() {
+    if (!resultUri) return;
+    setLoadingPickerProducts(true);
+    try {
+      const all = await getProducts();
+      const active = all.filter(p => p.status !== 'archived');
+      if (active.length === 0) {
+        Alert.alert('No products', 'Create a product first, then add this image to its media gallery.');
+        return;
+      }
+      setPickerProducts(active);
+      setShowProductPicker(true);
+    } catch {
+      Alert.alert('Couldn’t load products', 'Try again.');
+    } finally {
+      setLoadingPickerProducts(false);
+    }
+  }
+
+  async function confirmAddToProduct(product: Product) {
+    if (!resultUri) return;
+    setShowProductPicker(false);
+    try {
+      const existing = product.media ?? [];
+      const newMedia: ProductMedia = {
+        id: `bg-replace-${Date.now()}`,
+        type: 'image',
+        uri: resultUri,
+        altText: 'Background replaced image',
+        isCover: false,
+        sortOrder: existing.length,
+        createdAt: new Date().toISOString(),
+      };
+      const updated = await updateProduct(product.id, { media: [...existing, newMedia] });
+      if (updated) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert('Added', `Added to "${product.name ?? 'product'}" media gallery.`);
+      } else {
+        Alert.alert('Couldn’t update product', 'Try again.');
+      }
+    } catch {
+      Alert.alert('Couldn’t add to product', 'Try again.');
+    }
+  }
+
   return (
     <BrandthreadScreen>
       <BrandthreadHeader title="Background Tools" onBack={() => router.back()} />
@@ -152,10 +259,13 @@ export default function DesignBgReplaceScreen({
         <View style={s.ph}>
           <TouchableOpacity onPress={pickSourceImage} activeOpacity={0.85}>
             {imageUri ? (
-              <LinearGradient colors={theme.glowGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.sourcePreview}>
-                <Feather name="image" size={ICON.xl} color={PURPLE_LIGHT} />
-                <Text style={s.sourceLoaded}>Source image loaded — tap to change</Text>
-              </LinearGradient>
+              <View style={s.sourcePreview}>
+                <Image source={{ uri: imageUri }} style={s.sourceImage} resizeMode="cover" />
+                <View style={s.sourceChip}>
+                  <Feather name="edit-2" size={ICON.xs} color={FG} />
+                  <Text style={s.sourceChipText}>Change</Text>
+                </View>
+              </View>
             ) : (
               <View style={s.uploadZone}>
                 <Feather name="upload-cloud" size={ICON.xxl} color={MUTED} />
@@ -280,10 +390,10 @@ export default function DesignBgReplaceScreen({
               <Image source={{ uri: resultUri }} style={s.resultPlaceholder} resizeMode="cover" />
             </View>
             <View style={s.resultActions}>
-              <PrimaryButton label="Save" onPress={() => Alert.alert('Saved', 'Result saved.')} icon="save" style={s.actionBtn} />
+              <PrimaryButton label="Save" onPress={handleSaveResult} icon="save" loading={isSaving} style={s.actionBtn} />
               <SecondaryButton label="Try another" onPress={handleGenerate} icon="refresh-cw" style={s.actionBtn} />
-              <SecondaryButton label="Add to product" onPress={() => Alert.alert('Add to Product', 'Choose a product to attach this image to.')} icon="package" style={s.actionBtn} />
-              <SecondaryButton label="Export" onPress={() => Alert.alert('Export', 'Exporting result image.')} icon="download" style={s.actionBtn} />
+              <SecondaryButton label="Add to product" onPress={handleAddToProduct} icon="package" style={s.actionBtn} />
+              <SecondaryButton label={isExporting ? 'Exporting…' : 'Export'} onPress={handleExportResult} icon="download" disabled={isExporting} style={s.actionBtn} />
             </View>
           </>
         )}
@@ -302,6 +412,48 @@ export default function DesignBgReplaceScreen({
           </BrandthreadCard>
         </View>
       )}
+
+      <Modal
+        visible={showProductPicker}
+        animationType="slide"
+        presentationStyle="formSheet"
+        onRequestClose={() => setShowProductPicker(false)}
+      >
+        <View style={s.pickerRoot}>
+          <View style={s.pickerHeader}>
+            <Text style={s.pickerTitle}>Choose a product</Text>
+            <TouchableOpacity onPress={() => setShowProductPicker(false)} activeOpacity={0.7}>
+              <Feather name="x" size={ICON.sm} color={FG} />
+            </TouchableOpacity>
+          </View>
+          <Text style={s.pickerSub}>The image will be added to the product's media gallery.</Text>
+          {loadingPickerProducts ? (
+            <ActivityIndicator style={{ marginTop: 40 }} color={PURPLE} />
+          ) : (
+            <FlatList
+              data={pickerProducts}
+              keyExtractor={p => p.id}
+              contentContainerStyle={{ padding: SP.md }}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={s.productRow} onPress={() => confirmAddToProduct(item)} activeOpacity={0.82}>
+                  {item.media?.[0]?.uri ? (
+                    <Image source={{ uri: item.media[0].uri }} style={s.productThumb} resizeMode="cover" />
+                  ) : (
+                    <View style={[s.productThumb, s.productThumbEmpty]}>
+                      <Feather name="package" size={ICON.md} color={SUBTLE} />
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.productName} numberOfLines={1}>{item.name}</Text>
+                    <Text style={s.productStatus}>{item.status}</Text>
+                  </View>
+                  <Feather name="chevron-right" size={ICON.xs} color={MUTED} />
+                </TouchableOpacity>
+              )}
+            />
+          )}
+        </View>
+      </Modal>
     </BrandthreadScreen>
   );
 }
@@ -318,8 +470,10 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   scroll:             { paddingBottom: 40 },
   ph:                 { paddingHorizontal: SP.md },
   sectionHdr:         { marginTop: SP.lg, marginBottom: SP.sm },
-  sourcePreview:      { height: 200, borderRadius: RADIUS.lg, alignItems: 'center', justifyContent: 'center', gap: SP.sm, borderWidth: 1, borderColor: BORDER_ACTIVE },
-  sourceLoaded:       { fontSize: FS.sm, fontFamily: FONT.medium, color: PURPLE_LIGHT, textAlign: 'center' },
+  sourcePreview:      { height: 200, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER_ACTIVE, overflow: 'hidden', position: 'relative' },
+  sourceImage:        { width: '100%', height: '100%' },
+  sourceChip:         { position: 'absolute', right: SP.sm, bottom: SP.sm, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: OVERLAY, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 6 },
+  sourceChipText:     { fontSize: FS.xs, fontFamily: FONT.semibold, color: FG },
   uploadZone:         { height: 200, borderWidth: 1.5, borderColor: BORDER, borderStyle: 'dashed', borderRadius: RADIUS.lg, alignItems: 'center', justifyContent: 'center', gap: SP.sm, backgroundColor: CARD },
   uploadTitle:        { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   uploadSub:          { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
@@ -364,5 +518,14 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   overlayTitle:       { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
   overlaySub:         { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
   bottomPad:          { height: 40 },
+  pickerRoot:         { flex: 1, backgroundColor: BG, paddingTop: SP.md },
+  pickerHeader:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.lg },
+  pickerTitle:        { fontFamily: FONT.bold, fontSize: FS.lg, color: FG },
+  pickerSub:          { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, paddingHorizontal: SP.lg, marginTop: SP.xs, marginBottom: SP.sm },
+  productRow:         { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: SP.sm, marginBottom: SP.sm },
+  productThumb:       { width: 52, height: 52, borderRadius: RADIUS.sm },
+  productThumbEmpty:  { backgroundColor: CARD_ELEVATED, alignItems: 'center', justifyContent: 'center' },
+  productName:        { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, marginBottom: 4 },
+  productStatus:      { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
   });
 };

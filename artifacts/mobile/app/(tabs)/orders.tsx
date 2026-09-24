@@ -15,6 +15,7 @@ import { FONT, FS, SP, RADIUS, COMP, ICON, ANIM } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { IconButton, FilterChip, StatusBadge, SearchBar, EmptyState } from '@/components/BrandthreadUI';
 import { filterOrders, sortOrders } from '@/services/orderService';
+import { dbStatusToOrderStatus, dbStatusToPaymentStatus } from '@/lib/orderStatusAdapter';
 import { Order, OrderFilterKey, OrderSortKey, OrderAddress, OrderCustomer, FulfillmentStatus, FulfillmentType, OrderStatus, PaymentStatus, CancellationReason, CANCELLATION_REASONS } from '@/services/orderTypes';
 import { useApi } from '@/hooks/useApi';
 import { useAuth } from '@clerk/expo';
@@ -176,15 +177,9 @@ function groupByDate(orders: Order[]): OrderSection[] {
 }
 
 // ─── API → Order adapter ──────────────────────────────────────────────────────
-
-const DB_STATUS_MAP: Record<string, OrderStatus> = {
-  pending:        'new',
-  processing:     'processing',
-  fulfilled:      'ready_to_ship',
-  shipped:        'shipped',
-  cancelled:      'cancelled',
-  refund_pending: 'refunded',
-};
+// Status and payment-status mapping is shared with order-detail.tsx via
+// lib/orderStatusAdapter.ts so this list can never disagree with the detail
+// screen about whether an order is new, delivered, refunded or disputed.
 
 const FULFILLMENT_MAP: Partial<Record<OrderStatus, FulfillmentStatus>> = {
   new:           'unfulfilled',
@@ -198,7 +193,8 @@ const FULFILLMENT_MAP: Partial<Record<OrderStatus, FulfillmentStatus>> = {
 };
 
 export function apiRowToOrder(row: any): OrderListOrder {
-  const ordStatus: OrderStatus = DB_STATUS_MAP[row.status as string] ?? 'new';
+  const ordStatus: OrderStatus = dbStatusToOrderStatus(row.status as string);
+  const rowPaymentStatus: PaymentStatus = dbStatusToPaymentStatus(row.status as string) as PaymentStatus;
   const fStatus: FulfillmentStatus = FULFILLMENT_MAP[ordStatus] ?? 'unfulfilled';
   const initials = ((row.customerName as string | undefined) ?? 'C')
     .split(/\s+/).map((w: string) => w[0] ?? '').slice(0, 2).join('').toUpperCase();
@@ -216,7 +212,7 @@ export function apiRowToOrder(row: any): OrderListOrder {
     id: row.id, orderNumber: row.orderNumber ?? '',
     sellerId: '', sellerName: '', sellerHandle: '',
     source: 'online', salesChannel: 'online',
-    status: ordStatus, paymentStatus: 'paid' as PaymentStatus,
+    status: ordStatus, paymentStatus: rowPaymentStatus,
     fulfillmentStatus: fStatus, fulfillmentType: 'seller' as FulfillmentType,
     riskLevel: 'low', riskFlags: [], customer,
     lineItems: [],
@@ -665,6 +661,7 @@ export default function OrdersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatesPaused, setUpdatesPaused] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<OrderListFilter>('all');
   const [sort, setSort] = useState<OrderSortKey>('newest');
@@ -693,13 +690,15 @@ export default function OrdersScreen() {
       setOrdersOwnerId(requestOwnerId);
       setStats(computeStats(all));
       setUpdatesPaused(false);
+      setLoadError(false);
       consecutiveFailuresRef.current = 0;
     } catch (e) {
       if (generationRef.current !== generation) return;
-      if (__DEV__) console.warn('[seller-orders] refresh unavailable; showing empty state', e);
-      setOrders([]);
+      if (__DEV__) console.warn('[seller-orders] refresh failed; keeping last known orders', e);
+      // Never clear the list or show a fake empty state on a fetch failure —
+      // keep whatever orders we already had and surface a retry banner.
       setOrdersOwnerId(requestOwnerId);
-      setStats(computeStats([]));
+      setLoadError(true);
       consecutiveFailuresRef.current += 1;
       if (consecutiveFailuresRef.current >= 3) {
         setUpdatesPaused(true);
@@ -946,6 +945,18 @@ export default function OrdersScreen() {
 
   const ListHeaderComponent = useCallback(() => (
     <View style={s.listHeader}>
+      {(loadError || updatesPaused) && (
+        <TouchableOpacity
+          style={s.retryBanner}
+          onPress={onRefresh}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Couldn't refresh orders. Tap to try again."
+        >
+          <Feather name="alert-circle" size={14} color={theme.error} />
+          <Text style={s.retryBannerText}>Couldn{'’'}t refresh orders. Pull to try again.</Text>
+        </TouchableOpacity>
+      )}
       {/* Results count */}
       <View style={s.resultsRow}>
         <Text style={s.resultsText}>
@@ -961,17 +972,25 @@ export default function OrdersScreen() {
         )}
       </View>
     </View>
-  ), [filtered.length, activeFilter, sort, currentSortLabel]);
+  ), [filtered.length, activeFilter, sort, currentSortLabel, loadError, updatesPaused, theme.error]);
 
   const ListEmptyComponent = useCallback(() => (
     <View style={s.emptyStateContainer}>
-      <EmptyState
-        icon="shopping-bag"
-        title="Your orders will show up here."
-        description="When a customer places an order, you can manage payment and fulfillment here."
-      />
+      {loadError ? (
+        <EmptyState
+          icon="alert-circle"
+          title="Couldn't load orders"
+          description="Check your connection and pull to refresh."
+        />
+      ) : (
+        <EmptyState
+          icon="shopping-bag"
+          title="Your orders will show up here."
+          description="When a customer places an order, you can manage payment and fulfillment here."
+        />
+      )}
     </View>
-  ), []);
+  ), [loadError]);
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -1230,6 +1249,24 @@ const createStyles = (theme: any) => {
   // List header
   listHeader: {
     paddingTop: SP.sm,
+  },
+  retryBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
+    marginHorizontal: SP.md,
+    marginBottom: SP.sm,
+    padding: SP.sm,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: theme.error,
+    backgroundColor: theme.cardElevated ?? theme.card,
+  },
+  retryBannerText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: theme.error,
+    flex: 1,
   },
   resultsRow: {
     flexDirection: 'row',

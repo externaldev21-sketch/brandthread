@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Switch } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SectionHeader } from '@/components/SectionHeader';
@@ -7,34 +7,11 @@ import { Badge } from '@/components/Badge';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
 import { FS } from '@/lib/theme';
 import { useApi } from '@/hooks/useApi';
-
-const CAMPAIGNS = [
-  { id: '1', name: 'Summer Drop 2025', type: 'Email', status: 'active', opens: '48%', revenue: '$2,840', sent: '4,200' },
-  { id: '2', name: 'Flash Sale – 24hrs', type: 'SMS', status: 'scheduled', opens: '—', revenue: '—', sent: '—' },
-  { id: '3', name: 'New Collection Teaser', type: 'Email', status: 'draft', opens: '—', revenue: '—', sent: '—' },
-  { id: '4', name: 'Loyalty Reward Blast', type: 'Push', status: 'completed', opens: '62%', revenue: '$1,210', sent: '1,800' },
-];
-
-const DISCOUNTS = [
-  { code: 'SUMMER20', type: '20% off', uses: 142, limit: 500, expires: 'Jul 31' },
-  { code: 'FIRSTORDER', type: '$10 off', uses: 892, limit: null, expires: 'No expiry' },
-  { code: 'VIP50', type: '50% off', uses: 28, limit: 100, expires: 'Jul 15' },
-];
-
-const SOCIAL_POSTS = [
-  { day: 'Mon', platform: 'Instagram', text: 'New drop teaser', status: 'scheduled' },
-  { day: 'Wed', platform: 'TikTok', text: 'Behind-the-scenes', status: 'scheduled' },
-  { day: 'Fri', platform: 'Instagram', text: 'Product launch', status: 'draft' },
-];
-
-const AUTOMATIONS = [
-  { name: 'Abandoned Cart Recovery', enabled: true, triggers: '3h after cart abandonment' },
-  { name: 'Post-Purchase Review', enabled: true, triggers: '14 days after delivery' },
-  { name: 'Win-Back Campaign', enabled: false, triggers: '60 days inactive' },
-  { name: 'VIP Tier Upgrade', enabled: true, triggers: 'When spend > $500' },
-];
+import { formatCents } from '@/lib/money';
+import type { AdCampaign } from '@/lib/api';
 
 type KlaviyoStatus = {
   connected: boolean;
@@ -43,9 +20,46 @@ type KlaviyoStatus = {
   smsSubscriberCount?: number;
 };
 
+type DiscountCode = {
+  id: string;
+  code: string;
+  type: 'percentage' | 'fixed';
+  value: number;
+  usageCount: number;
+  usageLimit?: number;
+  expiresAt?: string;
+};
+
+type ReferralStats = {
+  total: number;
+  pointsEarned: number;
+};
+
 function formatCount(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
   return String(n);
+}
+
+function campaignStatusVariant(s: AdCampaign['status']) {
+  if (s === 'active') return 'success';
+  if (s === 'pending_payment') return 'info';
+  if (s === 'failed' || s === 'cancelled') return 'warning';
+  return 'default';
+}
+
+function campaignStatusLabel(s: AdCampaign['status']) {
+  if (s === 'pending_payment') return 'pending payment';
+  return s;
+}
+
+function discountValueLabel(d: DiscountCode) {
+  return d.type === 'percentage' ? `${d.value}% off` : `${formatCents(d.value)} off`;
+}
+
+function discountExpiryLabel(d: DiscountCode) {
+  if (!d.expiresAt) return 'No expiry';
+  const date = new Date(d.expiresAt);
+  return `${date < new Date() ? 'Expired' : 'Expires'} ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
 }
 
 export default function MarketingScreen() {
@@ -53,8 +67,10 @@ export default function MarketingScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
-  const [automations, setAutomations] = useState(AUTOMATIONS.map((a) => a.enabled));
   const [klaviyo, setKlaviyo] = useState<KlaviyoStatus | null>(null);
+  const [campaigns, setCampaigns] = useState<AdCampaign[]>([]);
+  const [discounts, setDiscounts] = useState<DiscountCode[]>([]);
+  const [referrals, setReferrals] = useState<ReferralStats | null>(null);
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPad = Platform.OS === 'web' ? 34 : 0;
@@ -65,16 +81,23 @@ export default function MarketingScreen() {
       api.integrations.klaviyoStatus()
         .then((res) => { if (!cancelled) setKlaviyo(res); })
         .catch(() => { if (!cancelled) setKlaviyo({ connected: false }); });
+      api.adCampaigns.list()
+        .then((res) => { if (!cancelled) setCampaigns(Array.isArray(res?.campaigns) ? res.campaigns : []); })
+        .catch(() => { if (!cancelled) setCampaigns([]); });
+      api.discounts.list()
+        .then((res) => { if (!cancelled) setDiscounts(Array.isArray(res) ? (res as DiscountCode[]) : []); })
+        .catch(() => { if (!cancelled) setDiscounts([]); });
+      api.referrals.stats()
+        .then((res) => { if (!cancelled) setReferrals({ total: res.total ?? 0, pointsEarned: res.pointsEarned ?? 0 }); })
+        .catch(() => { if (!cancelled) setReferrals(null); });
       return () => { cancelled = true; };
     }, [api]),
   );
 
-  const statusVariant = (s: string) => {
-    if (s === 'active') return 'success';
-    if (s === 'scheduled') return 'info';
-    if (s === 'completed') return 'default';
-    return 'warning';
-  };
+  const copyDiscountCode = useCallback(async (code: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await Clipboard.setStringAsync(code);
+  }, []);
 
   return (
     <View style={{ flex: 1 }}>
@@ -111,7 +134,6 @@ export default function MarketingScreen() {
         {[
           { label: 'Email Subs', value: klaviyo == null ? '—' : klaviyo.connected ? formatCount(klaviyo.emailSubscriberCount ?? 0) : '0', icon: 'mail' as const },
           { label: 'SMS Subs', value: klaviyo == null ? '—' : klaviyo.connected ? formatCount(klaviyo.smsSubscriberCount ?? 0) : '0', icon: 'message-square' as const },
-          { label: 'Push Subs', value: '8.1k', icon: 'bell' as const },
         ].map((s) => (
           <View key={s.label} style={[styles.statChip, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name={s.icon} size={14} color={colors.primary} />
@@ -137,102 +159,97 @@ export default function MarketingScreen() {
       </TouchableOpacity>
 
       {/* Campaigns */}
-      <SectionHeader title="Campaigns" action="New +" />
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {CAMPAIGNS.map((c, i) => (
-          <View key={c.id} style={[styles.campaignRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-            <View style={[styles.campaignIcon, { backgroundColor: c.type === 'Email' ? 'rgba(59,130,246,0.13)' : colors.accent }]}>
-              <Feather
-                name={c.type === 'Email' ? 'mail' : c.type === 'SMS' ? 'message-square' : 'bell'}
-                size={16}
-                color={c.type === 'Email' ? colors.info : c.type === 'SMS' ? colors.success : colors.primary}
-              />
-            </View>
-            <View style={styles.campaignInfo}>
-              <Text style={[styles.campaignName, { color: colors.foreground }]} numberOfLines={1}>{c.name}</Text>
-              <View style={styles.campaignMeta}>
-                <Badge label={c.status} variant={statusVariant(c.status) as any} />
-                {c.opens !== '—' && (
-                  <Text style={[styles.campaignStat, { color: colors.mutedForeground }]}>↗ {c.opens} opens</Text>
-                )}
+      <SectionHeader
+        title="Campaigns"
+        action="New +"
+        onAction={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/design-campaign' as never); }}
+      />
+      {campaigns.length === 0 ? (
+        <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No campaigns yet</Text>
+        </View>
+      ) : (
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          {campaigns.map((c, i) => (
+            <TouchableOpacity
+              key={c.id}
+              activeOpacity={0.8}
+              onPress={() => router.push(`/design-campaign?campaignId=${c.id}` as never)}
+              style={[styles.campaignRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
+            >
+              <View style={[styles.campaignIcon, { backgroundColor: colors.accent }]}>
+                <Feather name="tv" size={16} color={colors.primary} />
               </View>
-            </View>
-            {c.revenue !== '—' && (
-              <Text style={[styles.campaignRevenue, { color: colors.primary }]}>{c.revenue}</Text>
-            )}
-          </View>
-        ))}
-      </View>
+              <View style={styles.campaignInfo}>
+                <Text style={[styles.campaignName, { color: colors.foreground }]} numberOfLines={1}>
+                  {c.headline?.trim() || 'Untitled campaign'}
+                </Text>
+                <View style={styles.campaignMeta}>
+                  <Badge label={campaignStatusLabel(c.status)} variant={campaignStatusVariant(c.status) as any} />
+                </View>
+              </View>
+              <Text style={[styles.campaignRevenue, { color: colors.primary }]}>{formatCents(c.budgetCents)}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       {/* Discount Codes */}
-      <SectionHeader title="Discount Codes" action="New +" />
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {DISCOUNTS.map((d, i) => (
-          <View key={d.code} style={[styles.discountRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-            <View style={[styles.codeWrap, { backgroundColor: colors.accent }]}>
-              <Text style={[styles.code, { color: colors.primary }]}>{d.code}</Text>
+      <SectionHeader
+        title="Discount Codes"
+        action="New +"
+        onAction={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/discounts' as never); }}
+      />
+      {discounts.length === 0 ? (
+        <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No discount codes yet</Text>
+        </View>
+      ) : (
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          {discounts.slice(0, 5).map((d, i) => (
+            <View key={d.id} style={[styles.discountRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+              <View style={[styles.codeWrap, { backgroundColor: colors.accent }]}>
+                <Text style={[styles.code, { color: colors.primary }]}>{d.code}</Text>
+              </View>
+              <View style={styles.discountInfo}>
+                <Text style={[styles.discountType, { color: colors.foreground }]}>{discountValueLabel(d)}</Text>
+                <Text style={[styles.discountMeta, { color: colors.mutedForeground }]}>
+                  {d.usageCount} uses{d.usageLimit != null ? ` / ${d.usageLimit}` : ''} · {discountExpiryLabel(d)}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => copyDiscountCode(d.code)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={`Copy code ${d.code}`}
+              >
+                <Feather name="copy" size={15} color={colors.mutedForeground} />
+              </TouchableOpacity>
             </View>
-            <View style={styles.discountInfo}>
-              <Text style={[styles.discountType, { color: colors.foreground }]}>{d.type}</Text>
-              <Text style={[styles.discountMeta, { color: colors.mutedForeground }]}>
-                {d.uses} uses{d.limit != null ? ` / ${d.limit}` : ''} · {d.expires}
-              </Text>
-            </View>
-            <Feather name="copy" size={15} color={colors.mutedForeground} />
-          </View>
-        ))}
-      </View>
-
-      {/* Social Calendar */}
-      <SectionHeader title="Social Calendar" action="Add Post" />
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {SOCIAL_POSTS.map((p, i) => (
-          <View key={`${p.day}-${i}`} style={[styles.postRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-            <View style={[styles.dayBadge, { backgroundColor: colors.secondary }]}>
-              <Text style={[styles.dayText, { color: colors.mutedForeground }]}>{p.day}</Text>
-            </View>
-            <Feather name={p.platform === 'Instagram' ? 'instagram' : 'video'} size={16} color={colors.mutedForeground} />
-            <View style={styles.postInfo}>
-              <Text style={[styles.postText, { color: colors.foreground }]}>{p.text}</Text>
-              <Text style={[styles.postPlatform, { color: colors.mutedForeground }]}>{p.platform}</Text>
-            </View>
-            <Badge label={p.status} variant={p.status === 'scheduled' ? 'info' : 'warning'} />
-          </View>
-        ))}
-      </View>
-
-      {/* Automations */}
-      <SectionHeader title="Automations" />
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {AUTOMATIONS.map((a, i) => (
-          <View key={a.name} style={[styles.autoRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-            <View style={styles.autoInfo}>
-              <Text style={[styles.autoName, { color: colors.foreground }]}>{a.name}</Text>
-              <Text style={[styles.autoTrigger, { color: colors.mutedForeground }]}>{a.triggers}</Text>
-            </View>
-            <Switch
-              value={automations[i]}
-              onValueChange={(v) => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setAutomations((prev) => prev.map((val, idx) => (idx === i ? v : val)));
-              }}
-              trackColor={{ false: colors.secondary, true: colors.primary }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-        ))}
-      </View>
+          ))}
+        </View>
+      )}
 
       {/* Referral */}
       <SectionHeader title="Referral Program" />
-      <View style={[styles.referralCard, { backgroundColor: colors.card, borderColor: colors.primary }]}>
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/buyer-invite' as never); }}
+        style={[styles.referralCard, { backgroundColor: colors.card, borderColor: colors.primary }]}
+      >
         <Feather name="share-2" size={24} color={colors.primary} />
         <View style={{ flex: 1 }}>
-          <Text style={[styles.referralTitle, { color: colors.foreground }]}>Earn $10 per referral</Text>
-          <Text style={[styles.referralSub, { color: colors.mutedForeground }]}>124 active referrers · $3,240 earned total</Text>
+          <Text style={[styles.referralTitle, { color: colors.foreground }]}>Invite and earn</Text>
+          <Text style={[styles.referralSub, { color: colors.mutedForeground }]}>
+            {referrals == null
+              ? 'Share your invite link'
+              : referrals.total > 0
+                ? `${referrals.total} ${referrals.total === 1 ? 'referral' : 'referrals'} · ${referrals.pointsEarned} pts earned`
+                : 'No referrals yet'}
+          </Text>
         </View>
         <Feather name="chevron-right" size={16} color={colors.primary} />
-      </View>
+      </TouchableOpacity>
     </ScrollView>
     </View>
   );
@@ -251,6 +268,8 @@ const styles = StyleSheet.create({
   klaviyoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, paddingVertical: 14, marginBottom: 24 },
   klaviyoText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
+  emptyCard: { borderRadius: 14, borderWidth: 1, marginBottom: 24, padding: 20, alignItems: 'center' },
+  emptyText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
   campaignRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   campaignIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   campaignInfo: { flex: 1, gap: 4 },

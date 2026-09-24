@@ -48,6 +48,22 @@ type ThemeAliases = {
   ORANGE: string; ORANGE_DIM: string;
 };
 
+// Maps known Stripe decline reason codes to plain-language copy. Falls back to a
+// generic decline message when the code is unrecognized, and to a "still
+// confirming" message when there's no decline reason at all (e.g. a timeout).
+function humanDeclineReason(reason?: string | null): string {
+  if (!reason) return "We're still confirming your payment. This can take a minute — check your order status shortly.";
+  const known: Record<string, string> = {
+    card_declined: 'Your card was declined. Try another card or contact your bank.',
+    insufficient_funds: 'Your card was declined for insufficient funds. Try another card.',
+    expired_card: 'That card has expired. Try another card.',
+    incorrect_cvc: 'The security code didn’t match. Check it and try again.',
+    processing_error: 'Something went wrong processing your card. Try again.',
+    incorrect_number: 'That card number looks incorrect. Check it and try again.',
+  };
+  return known[reason] ?? 'Your card was declined. Try another card or contact your bank.';
+}
+
 function useThemeAliases(): ThemeAliases {
   const { theme } = useAppTheme();
   return {
@@ -911,11 +927,11 @@ function Review({
         </View>
         <View style={s.line}>
           <Text style={s.muted}>Tax</Text>
-          <Text style={s.lineName}>{money(session.summary.taxTotalCents)}</Text>
+          <Text style={s.lineName}>Calculated at payment</Text>
         </View>
         <View style={s.divider} />
         <View style={s.line}>
-          <Text style={s.total}>Total</Text>
+          <Text style={s.total}>Estimated total</Text>
           <Text style={s.total}>{money(session.summary.totalCents)}</Text>
         </View>
       </Card>
@@ -957,7 +973,7 @@ function Review({
           accessibilityHint={ack.required ? 'Required before payment' : undefined}
         >
           <View style={[s.checkbox, ack.acknowledged && { backgroundColor: PURPLE, borderColor: PURPLE }]}>
-            {ack.acknowledged && <Feather name="check" size={12} color={ON_DARK} />}
+            {ack.acknowledged && <Feather name="check" size={12} color={theme.onAccent} />}
           </View>
           <Text style={s.ackText}>{ack.label}</Text>
         </TouchableOpacity>
@@ -1529,7 +1545,7 @@ export default function BuyerCheckoutScreen() {
         }
 
         if (verification?.paymentStatus !== 'paid') {
-          setError(verification?.declineReason ?? 'Your payment was declined. Please try a different card or contact your card issuer.');
+          setError(humanDeclineReason(verification?.declineReason));
           setCanRetryPayment(true);
           setPlacing(false);
           return;
@@ -1656,7 +1672,7 @@ export default function BuyerCheckoutScreen() {
   const reviewComplete = current.acknowledgments.every(ack => !ack.required || ack.acknowledged);
 
   const ctaLabel = current.step === 'review'
-    ? canRetryPayment ? 'Try a different card' : `Pay securely · ${money(current.summary.totalCents)}`
+    ? canRetryPayment ? 'Try a different card' : 'Continue to payment'
     : 'Continue';
 
   return (
@@ -2042,7 +2058,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     },
     actionBtnOutlineText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
     createAccountBtn: { backgroundColor: PURPLE, height: COMP.buttonH, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
-    createAccountText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.base },
+    createAccountText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: FS.base },
     continueShopBtn: { borderWidth: 1, borderColor: BORDER, height: COMP.buttonH, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
     continueShopText: { color: FG, fontFamily: FONT.bold, fontSize: FS.base },
 

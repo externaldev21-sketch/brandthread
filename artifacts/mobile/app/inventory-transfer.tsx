@@ -199,15 +199,6 @@ export default function InventoryTransferScreen() {
 
   // ── View transfer actions ─────────────────────────────────────────────────
 
-  async function handleMarkReady() {
-    if (!transfer) return;
-    // Mark ready = ship with no tracking (status -> ready)
-    // There's no direct markReady in service, so we update status manually via shipTransfer
-    // Actually there's no markReady, use a workaround: set transfer status to ready
-    // The service only has shipTransfer (in_transit). We'll treat "Mark Ready" as an Alert stub.
-    Alert.alert('Mark Ready', 'Transfer marked as ready to ship.');
-  }
-
   async function handleShip() {
     if (!transfer) return;
     setSubmitting(true);
@@ -407,11 +398,7 @@ export default function InventoryTransferScreen() {
 
           {transfer.status === 'draft' && (
             <View style={styles.actionsWrap}>
-              <PrimaryButton
-                label="Mark Ready"
-                onPress={handleMarkReady}
-                icon="check-circle"
-              />
+              <Text style={styles.actionLabel}>Marking transfers ready isn't available yet.</Text>
             </View>
           )}
 
@@ -499,13 +486,6 @@ export default function InventoryTransferScreen() {
                   </View>
                 ))}
               </BrandthreadCard>
-              <View style={styles.actionsWrap}>
-                <SecondaryButton
-                  label="Mark Resolved"
-                  onPress={() => Alert.alert('Resolved', 'Discrepancy marked as resolved.')}
-                  accent={ORANGE}
-                />
-              </View>
             </>
           )}
 

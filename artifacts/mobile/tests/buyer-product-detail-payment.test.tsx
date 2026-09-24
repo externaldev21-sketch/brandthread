@@ -124,6 +124,7 @@ vi.mock('@/contexts/AppThemeContext', () => ({
       accent: '#C7CDD5',
       accentDim: '#34383E',
       accentLight: '#F8FAFC',
+      onAccent: '#0A0A0B',
       primaryGradient: ['#727A84', '#F8FAFC'],
       secondary: '#22D3EE',
       secondaryDim: '#164E63',
@@ -132,6 +133,7 @@ vi.mock('@/contexts/AppThemeContext', () => ({
       shadowColor: '#C7CDD5',
     },
   }),
+  getOnAccentTextStyle: () => ({}),
 }));
 
 vi.mock('@/hooks/useApi', () => ({

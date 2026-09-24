@@ -899,8 +899,8 @@ async function loadRefunds(k: CartKeys = keys()): Promise<BuyerRefundRequest[]> 
 // ─── Problem reports ──────────────────────────────────────────────────────────
 
 export async function createProblemReport(params: {
-  orderId: string;
-  orderNumber: string;
+  orderId?: string;
+  orderNumber?: string;
   type: BuyerProblemType;
   description: string;
   evidenceUris: string[];

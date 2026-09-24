@@ -15,7 +15,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
@@ -55,9 +55,30 @@ export default function SignInScreen() {
   const [loading, setLoading]       = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
+  // Second-factor (TOTP) step, shown when the account has 2FA turned on.
+  const [needsTotp, setNeedsTotp]   = useState(false);
+  const [totpCode, setTotpCode]     = useState('');
+  const [totpError, setTotpError]   = useState('');
+  const [totpLoading, setTotpLoading] = useState(false);
+
   const isFetching   = fetchStatus === 'fetching' || loading;
   const canSubmit    = email.includes('@') && password.length >= 1;
+  const canVerifyTotp = totpCode.length === 6;
   const currentEmail = user?.primaryEmailAddress?.emailAddress ?? '';
+
+  function finalizeSignIn() {
+    return signIn.finalize({
+      navigate: ({ decorateUrl }) => {
+        const destination = isAddAccount ? '/account-switcher' : '/';
+        const url = decorateUrl(destination);
+        if (url.startsWith('http') && typeof window !== 'undefined') {
+          window.location.href = url;
+        } else {
+          router.replace(destination as Href);
+        }
+      },
+    });
+  }
 
   // ─── Email sign-in ───────────────────────────────────────────────────────────
   async function handleSignIn() {
@@ -72,22 +93,37 @@ export default function SignInScreen() {
       });
       if (err) { setError(mapError(err)); return; }
       if (signIn.status === 'complete') {
-        await signIn.finalize({
-          navigate: ({ decorateUrl }) => {
-            const destination = isAddAccount ? '/account-switcher' : '/';
-            const url = decorateUrl(destination);
-            if (url.startsWith('http') && typeof window !== 'undefined') {
-              window.location.href = url;
-            } else {
-              router.replace(destination as Href);
-            }
-          },
-        });
+        await finalizeSignIn();
+      } else if (signIn.status === 'needs_second_factor') {
+        setNeedsTotp(true);
+      } else {
+        setError("Couldn't sign you in. Try again.");
       }
     } catch (e: any) {
       setError(mapError(e));
     } finally {
       setLoading(false);
+    }
+  }
+
+  // ─── 2FA (TOTP) ───────────────────────────────────────────────────────────────
+  async function handleVerifyTotp() {
+    if (!canVerifyTotp || totpLoading) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setTotpLoading(true);
+    setTotpError('');
+    try {
+      const { error: err } = await signIn.mfa.verifyTOTP({ code: totpCode });
+      if (err) { setTotpError("That code isn't right. Try again."); return; }
+      if (signIn.status === 'complete') {
+        await finalizeSignIn();
+      } else {
+        setTotpError("Couldn't sign you in. Try again.");
+      }
+    } catch (e: any) {
+      setTotpError(mapError(e));
+    } finally {
+      setTotpLoading(false);
     }
   }
 
@@ -214,6 +250,78 @@ export default function SignInScreen() {
     );
   }
 
+  // ─── Two-factor (TOTP) screen ─────────────────────────────────────────────────
+  if (needsTotp) {
+    return (
+      <View style={[s.root, { paddingTop: insets.top }]}>
+        <StatusBar barStyle="light-content" />
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView
+            contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 36 }]}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <TouchableOpacity
+              style={s.backBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              onPress={() => { Haptics.selectionAsync(); setNeedsTotp(false); setTotpCode(''); setTotpError(''); }}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <Feather name="arrow-left" size={20} color={theme.muted} />
+            </TouchableOpacity>
+
+            <View style={s.logoRow}>
+              <BrandthreadLogo size={36} />
+              <Text style={s.logoText}>BRANDTHREAD</Text>
+            </View>
+
+            <Text style={s.headline}>Two-factor authentication</Text>
+            <Text style={s.subtitle}>Enter the 6-digit code from your authenticator app.</Text>
+
+            <View style={s.fieldWrap}>
+              <Text style={s.label}>Code</Text>
+              <TextInput
+                style={s.input}
+                placeholder="000000"
+                placeholderTextColor={theme.subtle}
+                value={totpCode}
+                onChangeText={t => { setTotpCode(t.replace(/[^0-9]/g, '').slice(0, 6)); setTotpError(''); }}
+                keyboardType="number-pad"
+                maxLength={6}
+                autoFocus
+                returnKeyType="go"
+                onSubmitEditing={handleVerifyTotp}
+              />
+            </View>
+
+            {totpError ? (
+              <View style={s.errorBox}>
+                <Feather name="alert-circle" size={14} color={theme.error} />
+                <Text style={s.errorText}>{totpError}</Text>
+              </View>
+            ) : null}
+
+            <TouchableOpacity
+              style={[s.primaryWrap, (!canVerifyTotp || totpLoading) && { opacity: 0.5 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Verify code"
+              onPress={handleVerifyTotp}
+              disabled={!canVerifyTotp || totpLoading}
+              activeOpacity={0.88}
+            >
+              <LinearGradient colors={[theme.accent, theme.secondary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.primaryBtn}>
+                {totpLoading
+                  ? <ActivityIndicator color={theme.onAccent} size="small" />
+                  : <Text style={[s.primaryBtnText, getOnAccentTextStyle(theme)]}>Verify code</Text>}
+              </LinearGradient>
+            </TouchableOpacity>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
+    );
+  }
+
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
       <StatusBar barStyle="light-content" />
@@ -282,7 +390,7 @@ export default function SignInScreen() {
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <>
-                  <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 18, color: '#FFFFFF', lineHeight: 20 }}></Text>
+                  <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
                   <Text style={[s.oauthText, { color: '#FFFFFF' }]}>Continue with Apple</Text>
                 </>
               )}

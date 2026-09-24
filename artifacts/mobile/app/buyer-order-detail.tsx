@@ -20,8 +20,9 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet,
   ActivityIndicator, Modal, TextInput, RefreshControl, Image,
-  Animated, Platform,
+  Animated, Platform, Linking,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
@@ -57,6 +58,18 @@ const GRAD_CARD_GLOW = ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.01)'] as c
 
 function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// Builds a real carrier tracking URL from the carrier name + tracking number.
+// Falls back to a tracking-number web search when the carrier isn't recognized.
+function carrierTrackingUrl(carrier: string | undefined, trackingNumber: string): string {
+  const key = (carrier ?? '').toLowerCase();
+  const encoded = encodeURIComponent(trackingNumber);
+  if (key.includes('usps')) return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${encoded}`;
+  if (key.includes('ups')) return `https://www.ups.com/track?tracknum=${encoded}`;
+  if (key.includes('fedex')) return `https://www.fedex.com/fedextrack/?trknbr=${encoded}`;
+  if (key.includes('dhl')) return `https://www.dhl.com/en/express/tracking.html?AWB=${encoded}`;
+  return `https://www.google.com/search?q=${encoded}+tracking`;
 }
 
 function formatRelativeUpdate(timestamp: number): string {
@@ -298,6 +311,7 @@ function ReviewSheet({
   submitting: boolean;
 }) {
   const insets = useSafeAreaInsets();
+  const { theme } = useAppTheme();
   const [rating, setRating] = useState(0);
   const [body, setBody] = useState('');
 
@@ -369,7 +383,7 @@ function ReviewSheet({
             <Text style={rvs.cancelBtnText}>Not now</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[rvs.submitBtn, !canSubmit && rvs.submitBtnDisabled]}
+            style={[rvs.submitBtn, { backgroundColor: theme.accent }, !canSubmit && rvs.submitBtnDisabled]}
             onPress={canSubmit ? () => onSubmit(rating, body) : undefined}
             disabled={!canSubmit}
             activeOpacity={0.8}
@@ -378,8 +392,8 @@ function ReviewSheet({
             accessibilityState={{ disabled: !canSubmit, busy: submitting }}
           >
             {submitting
-              ? <ActivityIndicator color={ON_DARK} size="small" />
-              : <Text style={rvs.submitBtnText}>Submit review</Text>
+              ? <ActivityIndicator color={theme.onAccent} size="small" />
+              : <Text style={[rvs.submitBtnText, { color: theme.onAccent }]}>Submit review</Text>
             }
           </TouchableOpacity>
         </View>
@@ -541,6 +555,7 @@ export default function BuyerOrderDetailScreen() {
   const [submittingReview, setSubmittingReview] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [trackingCopied, setTrackingCopied] = useState(false);
   const [returnRequest, setReturnRequest] = useState<any | null>(null);
 
   const consecutiveFailuresRef = useRef(0);
@@ -648,8 +663,19 @@ export default function BuyerOrderDetailScreen() {
 
   function handleCopyTracking() {
     if (!order?.trackingNumber) return;
+    Clipboard.setStringAsync(order.trackingNumber);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert('Tracking Number', order.trackingNumber);
+    setTrackingCopied(true);
+    setTimeout(() => setTrackingCopied(false), 2000);
+  }
+
+  function handleTrackOnCarrier() {
+    if (!order?.trackingNumber) return;
+    const url = carrierTrackingUrl(order.trackingCarrier, order.trackingNumber);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Linking.openURL(url).catch(() => {
+      Alert.alert("Couldn't open tracking", 'Try again in a moment.');
+    });
   }
 
   function handleContactSeller() {
@@ -695,7 +721,7 @@ export default function BuyerOrderDetailScreen() {
       setShowReviewSheet(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: any) {
-      Alert.alert('Error', err?.message ?? 'Could not submit review');
+      Alert.alert('Error', "Couldn't post your review. Try again.");
     } finally {
       setSubmittingReview(false);
     }
@@ -730,7 +756,7 @@ export default function BuyerOrderDetailScreen() {
       }
     } catch (err: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Cannot Cancel', err?.message ?? 'Could not cancel this order. Please contact the seller.');
+      Alert.alert('Cannot Cancel', "This order can't be cancelled now. Message the seller for help.");
     } finally {
       setCancelling(false);
     }
@@ -950,7 +976,11 @@ export default function BuyerOrderDetailScreen() {
         <SectionCard title="Payment Summary">
           <Row label="Subtotal" value={formatCents(order.payment.subtotalCents)} />
           <Row label="Shipping" value={formatCents(order.payment.shippingTotalCents)} />
-          <Row label="Tax"      value={formatCents(order.payment.taxTotalCents)} />
+          {/* Tax is hidden rather than shown as "$0.00" when it isn't known/charged —
+              display-only guard; the underlying total is unchanged. */}
+          {!!order.payment.taxTotalCents && (
+            <Row label="Tax" value={formatCents(order.payment.taxTotalCents)} />
+          )}
           <View style={styles.divider} />
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total</Text>
@@ -980,11 +1010,16 @@ export default function BuyerOrderDetailScreen() {
               </View>
             )}
             <View style={{ flexDirection: 'row', gap: SP.sm, marginTop: SP.md }}>
-              <SecondaryButton label="Copy tracking" icon="copy" onPress={handleCopyTracking} small style={{ flex: 1 }} />
+              <SecondaryButton
+                label={trackingCopied ? 'Copied' : 'Copy tracking'}
+                icon={trackingCopied ? 'check' : 'copy'}
+                onPress={handleCopyTracking}
+                small style={{ flex: 1 }}
+              />
               <SecondaryButton
                 label="Track on carrier"
                 icon="external-link"
-                onPress={() => Alert.alert('Track Shipment', `Track ${order.trackingNumber} on the carrier's website.`)}
+                onPress={handleTrackOnCarrier}
                 small style={{ flex: 1 }}
               />
             </View>
@@ -1071,7 +1106,7 @@ export default function BuyerOrderDetailScreen() {
           </TouchableOpacity>
         )}
 
-        <SecondaryButton label="Help Center" icon="help-circle" onPress={() => Alert.alert('Help Center', 'Visit help.brandthread.com for support with your order.')} small />
+        <SecondaryButton label="Help Center" icon="help-circle" onPress={() => router.push('/help' as never)} small />
         <PrimaryButton label="Contact Seller" icon="message-circle" onPress={handleContactSeller} />
       </View>
 

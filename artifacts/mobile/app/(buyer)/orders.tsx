@@ -229,9 +229,12 @@ export default function BuyerOrdersScreen() {
     try {
       const result = await getBuyerOrdersWithStatus(userId);
       if (generationRef.current !== generation) return; // stale focus cycle
+      // A failed fetch still returns cached/previous orders (see
+      // getBuyerOrdersWithStatus). Never replace real orders with an empty
+      // list just because this fetch failed — show an error banner instead.
       setOrders(result.orders);
       setOrdersOwnerId(userId);
-      setLoadError(false);
+      setLoadError(!!result.error);
       if (!result.error) consecutiveFailuresRef.current = 0;
       else consecutiveFailuresRef.current += 1;
       if (result.error && consecutiveFailuresRef.current >= 3 && timerRef.current !== null) {
@@ -240,9 +243,10 @@ export default function BuyerOrdersScreen() {
       }
     } catch {
       if (generationRef.current !== generation) return; // stale focus cycle
-      setOrders([]);
+      // Keep whatever orders were already loaded — an error is never shown
+      // as an empty state.
       setOrdersOwnerId(userId);
-      setLoadError(false);
+      setLoadError(true);
       consecutiveFailuresRef.current += 1;
       if (consecutiveFailuresRef.current >= 3 && timerRef.current !== null) {
         clearInterval(timerRef.current);
@@ -324,18 +328,44 @@ export default function BuyerOrdersScreen() {
         <BrandedLoader label="Checking in with your orders…" />
       ) : (
         <>
+          {loadError && orders.length > 0 && (
+            <View style={styles.loadErrorBanner}>
+              <Feather name="alert-triangle" size={16} color={ORANGE} />
+              <View style={styles.loadErrorCopy}>
+                <Text style={styles.loadErrorBannerTitle}>Couldn't load your orders</Text>
+                <Text style={styles.loadErrorBannerText}>Showing your last saved orders. Pull to refresh.</Text>
+              </View>
+              <TouchableOpacity onPress={retry} accessibilityRole="button" accessibilityLabel="Retry">
+                <Text style={styles.bannerRetryText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           {filtered.length === 0 ? (
-            <EmptyState
-              icon="shopping-bag"
-              title="Your first find is still out there."
-              description="When something catches your eye, every update from checkout to doorstep will live here."
-              action={{
-                label: 'Discover Products',
-                icon: 'compass',
-                onPress: () => router.push('/(buyer)/discover' as never),
-              }}
-              style={{ flex: 1 }}
-            />
+            loadError ? (
+              <EmptyState
+                icon="alert-triangle"
+                title="Couldn't load your orders."
+                description="Pull to refresh, or tap try again."
+                action={{
+                  label: 'Try again',
+                  icon: 'refresh-cw',
+                  onPress: retry,
+                }}
+                style={{ flex: 1 }}
+              />
+            ) : (
+              <EmptyState
+                icon="shopping-bag"
+                title="Your first find is still out there."
+                description="When something catches your eye, every update from checkout to doorstep will live here."
+                action={{
+                  label: 'Discover Products',
+                  icon: 'compass',
+                  onPress: () => router.push('/(buyer)/discover' as never),
+                }}
+                style={{ flex: 1 }}
+              />
+            )
           ) : (
             <FlashList
               data={filtered}

@@ -482,7 +482,7 @@ export default function TechPackGeneratorScreen() {
         {step === 'result' && (
           <>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-              {loading ? 'Building your tech pack…' : pdfBase64 ? 'Your tech pack is ready' : 'Something went wrong'}
+              {loading ? 'Building your tech pack…' : pdfBase64 ? 'Your tech pack is ready' : "Couldn't build your tech pack"}
             </Text>
             <View style={[styles.resultCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {loading ? (
@@ -511,6 +511,17 @@ export default function TechPackGeneratorScreen() {
                     <Feather name="share" size={16} color={colors.primaryForeground} />
                     <Text style={[styles.primaryBtnText, { color: colors.primaryForeground }]}>Send to manufacturer</Text>
                   </TouchableOpacity>
+                )}
+                {!pdfBase64 && (
+                  <>
+                    <TouchableOpacity onPress={generate} activeOpacity={0.85} style={[styles.primaryBtn, { backgroundColor: colors.primary }]}>
+                      <Feather name="refresh-cw" size={16} color={colors.primaryForeground} />
+                      <Text style={[styles.primaryBtnText, { color: colors.primaryForeground }]}>Try again</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setStep('details')} activeOpacity={0.7} style={styles.secondaryBtn}>
+                      <Text style={[styles.secondaryBtnText, { color: colors.mutedForeground }]}>Edit details</Text>
+                    </TouchableOpacity>
+                  </>
                 )}
                 <TouchableOpacity onPress={startOver} activeOpacity={0.7} style={styles.secondaryBtn}>
                   <Text style={[styles.secondaryBtnText, { color: colors.mutedForeground }]}>Start a new tech pack</Text>

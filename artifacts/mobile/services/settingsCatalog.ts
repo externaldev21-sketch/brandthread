@@ -32,7 +32,7 @@ export const SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     items: [
       { label: 'Edit buyer profile', description: 'Update your name, photo, bio, and public profile', aliases: ['profile', 'personal details', 'buyer profile'], icon: 'user', route: '/(buyer)/edit-profile', audience: 'buyer' },
       { label: 'Edit seller profile', description: 'Update your brand name, photo, bio, and public profile', aliases: ['profile', 'brand details', 'seller profile'], icon: 'user', route: '/edit-profile', audience: 'seller' },
-      { label: 'General settings', description: 'Manage your brand setup and general preferences', aliases: ['general', 'brand setup', 'business details'], icon: 'briefcase', route: '/general-settings', audience: 'shared' },
+      { label: 'Store details', description: 'Manage your brand setup and general preferences', aliases: ['general', 'brand setup', 'business details'], icon: 'briefcase', route: '/general-settings', audience: 'seller' },
       { label: 'Account type', description: 'Switch between buyer and seller account experiences', aliases: ['role', 'buyer seller', 'account role'], icon: 'layers', route: '/account-type-settings', audience: 'shared' },
       { label: 'Login methods', description: 'Password, connected accounts, and two-factor authentication', aliases: ['security', 'password', '2fa', 'two factor'], icon: 'key', route: '/login-methods', audience: 'shared' },
       { label: 'Login activity', description: 'Review devices signed into your account', aliases: ['sessions', 'devices', 'signed in'], icon: 'monitor', route: '/login-activity', audience: 'shared' },

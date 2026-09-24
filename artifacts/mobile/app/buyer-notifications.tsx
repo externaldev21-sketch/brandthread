@@ -110,6 +110,19 @@ function notifIconColor(cat: NotificationCategory, accent: string, accentLight: 
   }
 }
 
+function categoryLabel(cat: NotificationCategory): string {
+  switch (cat) {
+    case 'social': return 'Social';
+    case 'orders': return 'Orders';
+    case 'messages': return 'Messages';
+    case 'seller_updates': return 'Seller updates';
+    case 'products': return 'Products';
+    case 'marketing': return 'Offers';
+    case 'system': return 'System';
+    default: return 'These';
+  }
+}
+
 function notifNavigation(notif: Notification, router: ReturnType<typeof useRouter>): void {
   // Server notifications can target shared manufacturer orders. Resolve these
   // first so list taps agree with native push/deep-link routing.
@@ -286,7 +299,7 @@ export default function BuyerNotifications() {
         },
       },
       {
-        text: `Mute ${notif.category} notifications`,
+        text: `Mute ${categoryLabel(notif.category)} alerts`,
         onPress: async () => {
           await muteNotificationCategory(notif.category);
           await loadNotifs();
@@ -513,6 +526,12 @@ const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.
   },
   pillsScroll: {
     flexGrow: 0,
+    // flexShrink defaults to 1, so a sibling flex:1 element (the loading
+    // state / empty state below) was compressing this horizontal ScrollView
+    // and clipping the pills vertically. minHeight guarantees room for the
+    // pill row even before it has measured its own content.
+    flexShrink: 0,
+    minHeight: 44,
   },
   pillsContent: {
     paddingHorizontal: SP.md,

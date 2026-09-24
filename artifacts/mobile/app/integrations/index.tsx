@@ -19,18 +19,22 @@ interface IntegrationDef {
   iconBg: string;
   description: string;
   route?: string;
+  /** No real OAuth flow exists yet — show a non-tappable "Coming soon" chip instead of a fake Connect action. */
+  comingSoon?: boolean;
+  /** Auto-connected by the platform; never offers a Connect/Disconnect action. */
+  autoConnected?: boolean;
 }
 
 const INTEGRATION_DEFS: IntegrationDef[] = [
   { key: 'klaviyo',     label: 'Klaviyo',      icon: 'mail',         iconBg: '#1A1A1A', description: 'Email & SMS marketing automation', route: '/integrations/klaviyo' },
-  { key: 'instagram',   label: 'Instagram',    icon: 'instagram',    iconBg: '#D62976', description: 'Sync products to Instagram Shopping' },
-  { key: 'tiktok',      label: 'TikTok Shop',  icon: 'music',        iconBg: '#0B0B0B', description: 'Sell through TikTok\'s shopping channel' },
-  { key: 'shopify',     label: 'Shopify',      icon: 'shopping-bag', iconBg: '#95BF47', description: 'Import your Shopify catalog and orders' },
-  { key: 'stripe',      label: 'Stripe',       icon: 'credit-card',  iconBg: '#635BFF', description: 'Payments and payouts (auto-connected)' },
-  { key: 'shipstation', label: 'ShipStation',  icon: 'truck',        iconBg: '#4A5568', description: 'Multi-carrier shipping management' },
-  { key: 'mailchimp',   label: 'Mailchimp',    icon: 'mail',         iconBg: '#FFE01B', description: 'Email campaigns and audience management' },
-  { key: 'google',      label: 'Google Ads',   icon: 'search',       iconBg: '#4285F4', description: 'Track conversions and run shopping ads' },
-  { key: 'meta',        label: 'Meta Ads',     icon: 'target',       iconBg: '#1877F2', description: 'Facebook and Instagram ad integration' },
+  { key: 'instagram',   label: 'Instagram',    icon: 'instagram',    iconBg: '#D62976', description: 'Sync products to Instagram Shopping', comingSoon: true },
+  { key: 'tiktok',      label: 'TikTok Shop',  icon: 'music',        iconBg: '#0B0B0B', description: 'Sell through TikTok\'s shopping channel', comingSoon: true },
+  { key: 'shopify',     label: 'Shopify',      icon: 'shopping-bag', iconBg: '#95BF47', description: 'Import your Shopify catalog and orders', comingSoon: true },
+  { key: 'stripe',      label: 'Stripe',       icon: 'credit-card',  iconBg: '#635BFF', description: 'Payments and payouts (auto-connected)', autoConnected: true },
+  { key: 'shipstation', label: 'ShipStation',  icon: 'truck',        iconBg: '#4A5568', description: 'Multi-carrier shipping management', comingSoon: true },
+  { key: 'mailchimp',   label: 'Mailchimp',    icon: 'mail',         iconBg: '#FFE01B', description: 'Email campaigns and audience management', comingSoon: true },
+  { key: 'google',      label: 'Google Ads',   icon: 'search',       iconBg: '#4285F4', description: 'Track conversions and run shopping ads', comingSoon: true },
+  { key: 'meta',        label: 'Meta Ads',     icon: 'target',       iconBg: '#1877F2', description: 'Facebook and Instagram ad integration', comingSoon: true },
 ];
 
 export default function IntegrationsScreen() {
@@ -57,6 +61,7 @@ export default function IntegrationsScreen() {
   useFocusEffect(useCallback(() => { load(); }, []));
 
   async function handleConnect(item: IntegrationDef) {
+    if (item.comingSoon || item.autoConnected) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (item.route) { router.push(item.route as never); return; }
 
@@ -114,23 +119,29 @@ export default function IntegrationsScreen() {
               {INTEGRATION_DEFS.map((item, i) => {
                 const connected = connectedKeys.has(item.key);
                 const isToggling = toggling === item.key;
+                const isInert = item.comingSoon || item.autoConnected;
                 return (
                   <TouchableOpacity
                     key={item.key}
                     onPress={() => handleConnect(item)}
-                    activeOpacity={0.7}
+                    activeOpacity={isInert ? 1 : 0.7}
+                    disabled={item.comingSoon}
                     style={[s.row, i !== INTEGRATION_DEFS.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
                   >
-                    <View style={[s.iconWrap, { backgroundColor: item.iconBg }]}>
+                    <View style={[s.iconWrap, { backgroundColor: item.iconBg }, item.comingSoon && { opacity: 0.5 }]}>
                       <Feather name={item.icon} size={15} color="#FFFFFF" />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[s.rowLabel, { color: colors.foreground }]}>{item.label}</Text>
+                      <Text style={[s.rowLabel, { color: colors.foreground }, item.comingSoon && { color: colors.mutedForeground }]}>{item.label}</Text>
                       <Text style={[s.rowDesc, { color: colors.mutedForeground }]} numberOfLines={1}>{item.description}</Text>
                     </View>
-                    {isToggling ? (
+                    {item.comingSoon ? (
+                      <View style={[s.connectBtn, { borderColor: colors.border }]}>
+                        <Text style={[s.connectBtnText, { color: colors.mutedForeground }]}>Coming soon</Text>
+                      </View>
+                    ) : isToggling ? (
                       <ActivityIndicator size="small" color={colors.primary} />
-                    ) : connected ? (
+                    ) : (connected || item.autoConnected) ? (
                        <View style={[s.connectedPill, { backgroundColor: `${colors.success}26` }]}>
                          <View style={[s.dot, { backgroundColor: colors.success }]} />
                          <Text style={[s.connectedText, { color: colors.success }]}>Connected</Text>

@@ -14,14 +14,6 @@ import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
-// ─── Import History Demo Data ─────────────────────────────────────────────────
-
-const IMPORT_HISTORY = [
-  { date: 'Today', method: 'CSV', count: 12, status: 'success' },
-  { date: 'Last week', method: 'Manual', count: 3, status: 'success' },
-  { date: '2 weeks ago', method: 'CSV', count: 8, status: 'failed' },
-] as const;
-
 function parseCsvLine(line: string): string[] {
   const values: string[] = [];
   let value = '';
@@ -230,33 +222,21 @@ export default function ProductImportScreen() {
           )}
         </GradientCard>
 
-        {/* ── METHOD B: Shopify Import ── */}
+        {/* ── METHOD B: Shopify transfer (routes to the working transfer flow in Store Builder) ── */}
         <GradientCard
           style={s.methodCard}
-          onPress={() => selectMethod('shopify')}
-          glow={selectedMethod === 'shopify'}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/store-builder' as never); }}
         >
           <View style={s.methodRow}>
             <View style={[s.methodIconWrap, { backgroundColor: GOLD + '22' }]}>
               <Feather name="shopping-bag" size={ICON.md} color={GOLD} />
             </View>
             <View style={s.methodInfo}>
-              <Text style={s.methodTitle}>Shopify</Text>
-              <Text style={s.methodDesc}>Sync your existing Shopify catalogue into Brandthread</Text>
+              <Text style={s.methodTitle}>Transfer from Shopify</Text>
+              <Text style={s.methodDesc}>Copy your public products in a few minutes</Text>
             </View>
-            <StatusBadge label="Coming soon" variant="neutral" />
+            <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
           </View>
-
-          {selectedMethod === 'shopify' && (
-            <View style={s.expanded}>
-              <View style={s.divider} />
-              <BrandthreadCard>
-                <Text style={s.noticeText}>
-                  Connect your Shopify store for automatic product sync. Shopify import is coming in the next update.
-                </Text>
-              </BrandthreadCard>
-            </View>
-          )}
         </GradientCard>
 
         {/* ── METHOD C: Manual Bulk Entry ── */}
@@ -315,28 +295,11 @@ export default function ProductImportScreen() {
         {/* ── Import History ── */}
         <SectionHeader title="Recent imports" style={s.sectionHeader} />
 
-        {IMPORT_HISTORY.map((item, idx) => (
-          <BrandthreadCard key={idx} style={s.historyCard}>
-            <View style={s.historyRow}>
-              <View style={[s.historyIconWrap, { backgroundColor: item.status === 'success' ? SUCCESS + '18' : RED + '18' }]}>
-                <Feather
-                  name={methodIcon(item.method)}
-                  size={ICON.sm}
-                  color={item.status === 'success' ? SUCCESS : RED}
-                />
-              </View>
-              <View style={s.historyInfo}>
-                <Text style={s.historyLabel}>Imported {item.count} products</Text>
-                <Text style={s.historyDate}>{item.date} · {item.method}</Text>
-              </View>
-              <StatusBadge
-                label={item.status === 'success' ? 'Success' : 'Failed'}
-                variant={item.status === 'success' ? 'success' : 'error'}
-                small
-              />
-            </View>
-          </BrandthreadCard>
-        ))}
+        <EmptyState
+          icon="clock"
+          title="No imports yet"
+          description="Products you import will show up here."
+        />
       </ScrollView>
 
       {/* ── CSV Paste Modal ── */}

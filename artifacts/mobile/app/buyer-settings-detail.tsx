@@ -13,15 +13,15 @@ import { useApi } from '@/hooks/useApi';
 type ToggleKey = keyof { [K in keyof BuyerSettingsState as BuyerSettingsState[K] extends boolean ? K : never]: true };
 type Item = { label: string; sub?: string; icon?: keyof typeof Feather.glyphMap; toggle?: ToggleKey; value?: string; action?: () => void };
 
-type Config = { title: string; intro?: string; items: (s: BuyerSettingsState) => Item[] };
+type Config = { title: string; intro?: string; items: (s: BuyerSettingsState, router?: ReturnType<typeof useRouter>) => Item[] };
 
 const CONFIG: Record<string, Config> = {
   activity: { title: 'Your activity', intro: 'Review and manage the things you do on Brandthread.', items: () => [
     { label: 'Likes', icon: 'heart' }, { label: 'Comments', icon: 'message-square' }, { label: 'Story replies', icon: 'corner-up-left' }, { label: 'Search history', icon: 'search' }, { label: 'Links you visited', icon: 'link' }, { label: 'Recently deleted', icon: 'trash-2' }, { label: 'Time spent', icon: 'clock', value: 'Daily average' },
   ]},
   archive: { title: 'Archive', items: () => [{ label: 'Posts archive', icon: 'grid' }, { label: 'Stories archive', icon: 'clock' }, { label: 'Live archive', icon: 'video' }] },
-  qr: { title: 'QR code', intro: 'Your unique profile code. Share it so people can find you on Brandthread.', items: () => [{ label: '@jordan', icon: 'user', value: 'Profile QR ready' }, { label: 'Share QR code', icon: 'share-2' }] },
-  'close-friends': { title: 'Close Friends', intro: 'Only people you add can see Close Friends stories and posts.', items: () => [{ label: 'Maya Chen', icon: 'user', value: 'Added' }, { label: 'Kai Nakamura', icon: 'user', value: 'Added' }, { label: 'Add people', icon: 'user-plus' }] },
+  qr: { title: 'QR code', intro: 'Your unique profile code. Share it so people can find you on Brandthread.', items: (_s, router) => [{ label: 'Share QR code', icon: 'share-2', action: () => router?.push('/buyer-qr-code' as never) }] },
+  'close-friends': { title: 'Close Friends', intro: 'Only people you add can see Close Friends stories and posts.', items: (_s, router) => [{ label: 'Manage close friends', icon: 'user-plus', action: () => router?.push('/buyer-close-friends' as never) }] },
   story: { title: 'Story and live', items: s => [{ label: 'Allow story replies', icon: 'message-circle', value: s.storyReplies }, { label: 'Allow sharing to messages', toggle: 'storySharing' }, { label: 'Hide story from people', icon: 'eye-off', value: '0 people' }, { label: 'Close Friends', icon: 'star' }] },
   messages: { title: 'Messages and story replies', items: s => [{ label: 'Message requests', toggle: 'messageRequests' }, { label: 'Read receipts', toggle: 'readReceipts' }, { label: 'Show activity status', toggle: 'activityStatus' }, { label: 'Who can add you to groups', value: s.groupAdds }, { label: 'Story replies', value: s.storyReplies }] },
   tags: { title: 'Tags and mentions', items: s => [{ label: 'Who can mention you', value: s.allowMentions }, { label: 'Who can tag you', value: s.allowTags }, { label: 'Manually approve tags', toggle: 'manualTagApproval' }, { label: 'Pending tags', value: '0' }] },
@@ -30,7 +30,7 @@ const CONFIG: Record<string, Config> = {
   'hidden-words': { title: 'Hidden Words', intro: 'Automatically filter comments and message requests containing offensive or custom words.', items: s => [{ label: 'Hide offensive comments', toggle: 'hiddenWords' }, { label: 'Advanced comment filtering', toggle: 'hiddenWords' }, { label: 'Custom words and phrases', value: 'Manage list' }] },
   muted: { title: 'Muted accounts', items: () => [{ label: 'No muted accounts', sub: 'People you mute will appear here.', icon: 'volume-x' }] },
   restricted: { title: 'Restricted accounts', items: () => [{ label: 'No restricted accounts', sub: 'Restricted people cannot see when you are online or when you read their messages.', icon: 'user-x' }] },
-  favorites: { title: 'Favorites', intro: 'Posts and drops from favorites are shown higher in Discover and your following views.', items: () => [{ label: 'Vault Studios', icon: 'star', value: 'Brand' }, { label: 'NxGen', icon: 'star', value: 'Brand' }, { label: 'Add favorites', icon: 'plus' }] },
+  favorites: { title: 'Favorites', intro: 'Favoriting sellers and brands is coming soon. Follow them for now to see more from them in Discover.', items: () => [] },
   content: { title: 'Content preferences', items: s => [{ label: 'Hide like and share counts', toggle: 'hideLikeCounts' }, { label: 'Sensitive content', value: s.sensitiveContent }, { label: 'Personalized recommendations', toggle: 'personalizedRecommendations' }, { label: 'Reset suggested content', icon: 'refresh-cw' }] },
   suggested: { title: 'Suggested content', items: s => [{ label: 'Personalized recommendations', toggle: 'personalizedRecommendations' }, { label: 'Snooze suggested posts', value: 'Off' }, { label: 'Specific words and phrases', value: 'Manage' }, { label: 'Reset recommendations', icon: 'refresh-cw' }] },
   payments: { title: 'Addresses and payments', items: () => [{ label: 'Shipping addresses', icon: 'map-pin', value: '1 saved' }, { label: 'Payment methods', icon: 'credit-card', value: 'Manage' }, { label: 'Autofill checkout info', icon: 'zap', value: 'On' }, { label: 'Purchase protection', icon: 'shield', value: 'Brandthread protected' }] },
@@ -101,17 +101,20 @@ export default function BuyerSettingsDetail() {
       Alert.alert('Could not update setting', 'Try again.');
     }
   }, [api, section, settings]);
-  const items = useMemo(() => settings ? cfg.items(settings) : [], [cfg, settings]);
+  const items = useMemo(() => settings ? cfg.items(settings, router) : [], [cfg, settings, router]);
 
   return <View style={[styles.page, { paddingTop: insets.top }]}>
      <View style={styles.header}><TouchableOpacity style={styles.back} onPress={() => router.back()}><Feather name="arrow-left" size={21} color={theme.text}/></TouchableOpacity><Text style={styles.title}>{cfg.title}</Text><View style={styles.back}/></View>
     <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}>
       {cfg.intro ? <Text style={styles.intro}>{cfg.intro}</Text> : null}
-      {loading ? <Text style={styles.intro}>Loading settings…</Text> : settings ? <View style={styles.card}>{items.map((item, i) => <TouchableOpacity key={`${item.label}-${i}`} activeOpacity={item.toggle ? 1 : 0.7} style={[styles.row, i < items.length - 1 && styles.divider]} onPress={() => { if (!item.toggle) { Haptics.selectionAsync(); item.action?.(); if (!item.action && !item.value?.toLowerCase().includes('off')) Alert.alert(item.label, 'This control is ready for backend wiring.'); } }}>
+      {loading ? <Text style={styles.intro}>Loading settings…</Text> : settings && items.length > 0 ? <View style={styles.card}>{items.map((item, i) => {
+        const isActionable = !!item.toggle || !!item.action;
+        return <TouchableOpacity key={`${item.label}-${i}`} activeOpacity={isActionable ? (item.toggle ? 1 : 0.7) : 1} disabled={!isActionable} style={[styles.row, i < items.length - 1 && styles.divider]} onPress={() => { if (item.action) { Haptics.selectionAsync(); item.action(); } }}>
          {item.icon ? <View style={styles.itemIcon}><Feather name={item.icon} size={19} color={theme.text}/></View> : null}
         <View style={{ flex: 1 }}><Text style={styles.label}>{item.label}</Text>{item.sub ? <Text style={styles.sub}>{item.sub}</Text> : null}</View>
-         {item.toggle && settings ? <Switch value={Boolean(settings[item.toggle])} onValueChange={(v) => toggle(item.toggle!, v)} trackColor={{ false: theme.cardElevated, true: PURPLE }} thumbColor={theme.onAccent} /> : <><Text style={styles.value}>{item.value}</Text><Feather name="chevron-right" size={18} color={theme.subtle}/></>}
-      </TouchableOpacity>)}</View> : null}
+         {item.toggle && settings ? <Switch value={Boolean(settings[item.toggle])} onValueChange={(v) => toggle(item.toggle!, v)} trackColor={{ false: theme.cardElevated, true: PURPLE }} thumbColor={theme.onAccent} /> : <>{item.value ? <Text style={styles.value}>{item.value}</Text> : null}{item.action ? <Feather name="chevron-right" size={18} color={theme.subtle}/> : null}</>}
+      </TouchableOpacity>;
+      })}</View> : null}
     </ScrollView>
   </View>;
 }

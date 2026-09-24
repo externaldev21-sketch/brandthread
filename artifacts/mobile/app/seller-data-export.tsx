@@ -60,7 +60,7 @@ export default function SellerDataExportScreen() {
         if (canShare) {
           await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: 'Export Data' });
         } else {
-          Alert.alert('Export ready', `Saved to ${uri}`);
+          Alert.alert('Export ready', 'Open it from the share sheet.');
         }
         setResult({ counts: data.counts ?? {}, exportedAt: data.exportedAt ?? new Date().toISOString() });
       } else {
@@ -73,7 +73,7 @@ export default function SellerDataExportScreen() {
         if (canShare) {
           await Sharing.shareAsync(uri, { mimeType: 'text/csv', dialogTitle: 'Export CSV' });
         } else {
-          Alert.alert('Export ready', `Saved to ${uri}`);
+          Alert.alert('Export ready', 'Open it from the share sheet.');
         }
         setResult({ counts: {}, exportedAt: new Date().toISOString() });
       }

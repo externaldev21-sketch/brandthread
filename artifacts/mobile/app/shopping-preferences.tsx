@@ -185,7 +185,7 @@ export default function ShoppingPreferences() {
         </View>
 
         {/* Alerts */}
-        <Text style={s.sectionTitle}>Alerts &amp; Notifications</Text>
+        <Text style={s.sectionTitle}>Alerts and notifications</Text>
         <Text style={s.sectionDesc}>Stay in the loop on products you care about.</Text>
         <View style={s.card}>
           {([

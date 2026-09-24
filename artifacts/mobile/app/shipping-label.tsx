@@ -12,9 +12,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader } from '@/components/BrandthreadUI';
-import { getOrder, getShippingRates, purchaseShippingLabel, voidShippingLabel } from '@/services/orderService';
+import { getShippingRates, purchaseShippingLabel, voidShippingLabel } from '@/services/orderService';
 import { Order, ShippingRate, ShippingLabel } from '@/services/orderTypes';
 import { formatCents } from '@/lib/money';
+import { useApi } from '@/lib/api';
+import { adaptApiOrder } from '@/app/order-detail';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,7 +52,9 @@ export default function ShippingLabelScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
+  const api = useApi();
   const [order, setOrder] = useState<Order | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [rates, setRates] = useState<ShippingRate[]>([]);
   const [selectedRateId, setSelectedRateId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,11 +76,18 @@ export default function ShippingLabelScreen() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const o = await getOrder(orderId);
-    setOrder(o ?? null);
-    setLoading(false);
-
-  }, [orderId]);
+    setLoadError(false);
+    try {
+      const raw = await api.orders.get(orderId);
+      setOrder(raw ? adaptApiOrder(raw) : null);
+    } catch (err) {
+      if (__DEV__) console.warn('[shipping-label] failed to load order', err);
+      setOrder(null);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [api, orderId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -168,7 +179,9 @@ export default function ShippingLabelScreen() {
           <Text style={s.headerTitle}>Shipping Label</Text>
         </View>
         <View style={s.centered}>
-          <Text style={s.errorText}>Order not found.</Text>
+          <Text style={s.errorText}>
+            {loadError ? 'Couldn’t load this order. Check your connection and try again.' : 'Order not found.'}
+          </Text>
         </View>
       </View>
     );

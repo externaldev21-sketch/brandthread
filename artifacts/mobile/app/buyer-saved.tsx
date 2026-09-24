@@ -78,27 +78,51 @@ export default function BuyerSaved() {
     }
   }
 
-  function handleItemPress(item: SavedItem) {
+  function openSavedItem(item: SavedItem) {
+    switch (item.type) {
+      case 'post':
+        router.push(`/buyer-post-viewer?postId=${encodeURIComponent(item.targetId)}&postAuthorColor=${encodeURIComponent(item.accentColor ?? '')}` as never);
+        return;
+      case 'product':
+        router.push(`/thread-product-detail?productId=${encodeURIComponent(item.targetId)}&productName=${encodeURIComponent(item.title)}` as never);
+        return;
+      case 'store':
+        router.push(`/seller-profile?sellerId=${encodeURIComponent(item.targetId)}` as never);
+        return;
+      case 'collection':
+        // No dedicated buyer collection viewer exists yet — don't fake a route.
+        return;
+    }
+  }
+
+  function removeSaved(item: SavedItem) {
     Alert.alert(
-      'Saved Item',
+      'Remove from saved?',
       item.title,
       [
-        { text: 'View', onPress: () => {} },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Remove from saved',
+          text: 'Remove',
           style: 'destructive',
           onPress: async () => {
             try {
               await removeSavedItem(item.targetId);
               await loadData();
             } catch {
-              Alert.alert('Could not remove saved item', 'Try again.');
+              Alert.alert('Couldn’t remove item', 'Try again.');
             }
           },
         },
-        { text: 'Cancel', style: 'cancel' },
       ]
     );
+  }
+
+  function handleItemPress(item: SavedItem) {
+    openSavedItem(item);
+  }
+
+  function handleItemLongPress(item: SavedItem) {
+    removeSaved(item);
   }
 
   function renderTile({ item }: { item: SavedItem }) {
@@ -106,7 +130,7 @@ export default function BuyerSaved() {
       <TouchableOpacity
         style={styles.tile}
         onPress={() => handleItemPress(item)}
-        onLongPress={() => handleItemPress(item)}
+        onLongPress={() => handleItemLongPress(item)}
         activeOpacity={0.85}
       >
         <LinearGradient
@@ -139,7 +163,7 @@ export default function BuyerSaved() {
       <TouchableOpacity
         style={styles.listRow}
         onPress={() => handleItemPress(item)}
-        onLongPress={() => handleItemPress(item)}
+        onLongPress={() => handleItemLongPress(item)}
         activeOpacity={0.7}
       >
         <View style={[styles.rowIcon, { backgroundColor: item.accentColor || PURPLE }]}>

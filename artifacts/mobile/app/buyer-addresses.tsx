@@ -115,7 +115,7 @@ export default function BuyerAddressesScreen() {
       await load();
       handleCancel();
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Could not save address.');
+      Alert.alert('Error', "Couldn't save this address. Try again.");
     } finally {
       setSaving(false);
     }
