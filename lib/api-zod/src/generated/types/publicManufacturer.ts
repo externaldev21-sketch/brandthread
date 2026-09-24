@@ -23,9 +23,12 @@ export interface PublicManufacturer {
   photos: string[];
   /** @nullable */
   website?: string | null;
+  /** @nullable */
+  timeZone?: string | null;
   isVerified: boolean;
   /** @nullable */
   rating?: number | null;
+  reviewCount?: number;
   /** @nullable */
   responseTime?: string | null;
   createdAt: Date;

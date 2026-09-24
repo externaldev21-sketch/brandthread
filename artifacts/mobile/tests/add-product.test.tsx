@@ -27,6 +27,7 @@ vi.mock('react-native', () => {
   };
 
   return {
+    ActivityIndicator: nativeComponent('ActivityIndicator'),
     Alert: { alert: alertMock },
     Image: nativeComponent('Image'),
     KeyboardAvoidingView: nativeComponent('KeyboardAvoidingView'),
@@ -60,7 +61,27 @@ vi.mock('expo-haptics', () => ({
 
 vi.mock('expo-image-picker', () => ({
   launchImageLibraryAsync: vi.fn(),
+  requestMediaLibraryPermissionsAsync: vi.fn(async () => ({ granted: true })),
   MediaTypeOptions: { Images: 'Images' },
+}));
+
+vi.mock('expo-image-manipulator', () => ({
+  manipulateAsync: vi.fn(async () => ({ uri: 'file:///cropped.jpg', width: 100, height: 100, base64: 'abc' })),
+  SaveFormat: { JPEG: 'jpeg' },
+}));
+
+vi.mock('expo-file-system', () => ({
+  File: class FakeFile {
+    uri: string;
+    exists = false;
+    constructor(dirOrUri: string, filename?: string) {
+      this.uri = filename ? `${dirOrUri}/${filename}` : dirOrUri;
+    }
+    write() {}
+    create() {}
+    delete() {}
+  },
+  Paths: { document: 'file:///documents', cache: 'file:///cache' },
 }));
 
 vi.mock('expo-router', () => ({
@@ -152,9 +173,13 @@ vi.mock('@/lib/productUtils', () => ({
     netProfitCents: undefined,
     marginPercent: undefined,
     breakEvenPriceCents: undefined,
+    isOnSale: false,
+    discountPercent: undefined,
+    retailPriceCents: 0,
   })),
   generateVariantCombinations: vi.fn(() => []),
   validateForPublish: vi.fn(() => []),
+  applyBulkEditToVariants: vi.fn((variants: any[]) => variants),
 }));
 
 vi.mock('@/lib/money', () => ({
@@ -207,6 +232,11 @@ describe('AddProduct draft exit protection', () => {
   it('warns after an immediate edit, then skips the warning once that edit is saved', async () => {
     renderer = await renderScreen();
 
+    // The flow now opens on the Photos step — jump to Details to reach the name field.
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'add-product-step-details' }).props.onPress();
+    });
+
     const nameInput = renderer.root.findByProps({ testID: 'product-input-Product name *' });
     await act(async () => {
       nameInput.props.onChangeText('Last-second product edit');
@@ -251,6 +281,10 @@ describe('AddProduct draft exit protection', () => {
 
   it('prevents native back navigation after an immediate edit until the seller chooses to leave', async () => {
     renderer = await renderScreen();
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'add-product-step-details' }).props.onPress();
+    });
 
     const nameInput = renderer.root.findByProps({ testID: 'product-input-Product name *' });
     await act(async () => {

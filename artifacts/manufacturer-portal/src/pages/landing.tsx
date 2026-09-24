@@ -16,12 +16,15 @@ export default function Landing() {
             B
           </div>
           <span className="font-semibold tracking-tight uppercase opacity-90">Brandthread</span>
-          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-secondary text-muted-foreground border border-border ml-2">PORTAL</span>
+          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-secondary text-muted-foreground border border-border ml-2">MANUFACTURERS</span>
         </div>
         <div>
-          <Link href="/onboard" className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-2">
-            Join the Network <ArrowRight className="w-4 h-4" />
-          </Link>
+          <div className="flex items-center gap-6">
+            <Link href="/sign-in" className="text-sm text-muted-foreground hover:text-foreground">Sign in</Link>
+            <Link href="/join" className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-2">
+              List your factory <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -38,17 +41,17 @@ export default function Landing() {
           </h1>
           
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            A precise, authoritative command center for vetted garment manufacturers. 
-            Receive orders, handle sampling, communicate with buyers, and get paid 
-            through our secure escrow system.
+            Get found by new fashion brands, price samples and bulk orders right in
+            the chat, update production as you go, and get paid to your bank
+            through Stripe — wherever your factory is.
           </p>
           
           <div className="pt-8">
             <Link 
-              href="/onboard" 
+              href="/join" 
               className="inline-flex items-center justify-center gap-3 h-14 px-8 rounded bg-primary text-primary-foreground text-base font-semibold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 active:scale-[0.98]"
             >
-              Create your account <ArrowRight className="w-5 h-5" />
+              List your factory — free <ArrowRight className="w-5 h-5" />
             </Link>
           </div>
         </div>
@@ -58,22 +61,22 @@ export default function Landing() {
             <div className="w-12 h-12 bg-secondary border border-border rounded flex items-center justify-center">
               <Globe2 className="w-6 h-6 text-primary" />
             </div>
-            <h3 className="font-semibold text-lg">Earn New Customers</h3>
-            <p className="text-sm text-muted-foreground">Get discovered by serious, vetted brands actively looking for production partners. Your profile works for you 24/7.</p>
+            <h3 className="font-semibold text-lg">Get discovered</h3>
+            <p className="text-sm text-muted-foreground">Your listing goes live the moment you finish signing up — photos, years in business, MOQ and turnaround.</p>
           </div>
           <div className="p-6 border border-border bg-card rounded-lg flex flex-col items-center text-center gap-4">
             <div className="w-12 h-12 bg-secondary border border-border rounded flex items-center justify-center">
               <Zap className="w-6 h-6 text-primary" />
             </div>
-            <h3 className="font-semibold text-lg">Streamlined Ops</h3>
-            <p className="text-sm text-muted-foreground">Manage sample requests, bulk orders, and buyer comms in one unified dashboard.</p>
+            <h3 className="font-semibold text-lg">One thread per brand</h3>
+            <p className="text-sm text-muted-foreground">Chat, share photos, send priced sample and bulk cards, and update each production stage.</p>
           </div>
           <div className="p-6 border border-border bg-card rounded-lg flex flex-col items-center text-center gap-4">
             <div className="w-12 h-12 bg-secondary border border-border rounded flex items-center justify-center">
-              <Globe2 className="w-6 h-6 text-primary" />
+              <ShieldCheck className="w-6 h-6 text-primary" />
             </div>
-            <h3 className="font-semibold text-lg">Global Reach</h3>
-            <p className="text-sm text-muted-foreground">Get discovered by vetted, serious brands looking for high-quality production partners.</p>
+            <h3 className="font-semibold text-lg">Paid through Stripe</h3>
+            <p className="text-sm text-muted-foreground">Sellers pay by card or Apple Pay. Stripe pays out to your bank in your local currency.</p>
           </div>
         </div>
       </main>

@@ -25,6 +25,9 @@ import { useAuth } from '@clerk/expo';
 import { confirmBlock, reportHref } from '@/lib/safety';
 import type { Story, StoryMedia } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
+import StoryGestureGuide from '@/components/social/StoryGestureGuide';
+import { shouldShowStoryGestureGuide } from '@/lib/storyGestureGuideStorage';
+import { advance as navAdvance, retreat as navRetreat, nextUser as navNextUser, prevUser as navPrevUser, classifyGesture } from '@/lib/storyViewerNav';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -79,6 +82,9 @@ export default function BuyerStoryViewer() {
   const [likedSet, setLikedSet] = useState<Set<string>>(new Set());
   const [likesCounts, setLikesCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [showGestureGuide, setShowGestureGuide] = useState(false);
+  const [serverViewers, setServerViewers] = useState<Array<{ userId: string; name: string; handle: string; viewedAt: string }>>([]);
+  const [viewersLoading, setViewersLoading] = useState(false);
   const loadGeneration = useRef(0);
 
   const progress = useRef(new Animated.Value(0)).current;
@@ -113,6 +119,9 @@ export default function BuyerStoryViewer() {
       trackStoryView(storyId).catch(() => {});
       // Also record view server-side (fire-and-forget)
       api.social.viewStory(storyId).catch(() => {});
+    }
+    if (myUserId) {
+      shouldShowStoryGestureGuide(myUserId).then(show => { if (show) setShowGestureGuide(true); });
     }
   }, []);
 
@@ -182,31 +191,36 @@ export default function BuyerStoryViewer() {
     }
   };
 
+  const slideCounts = stories.map(s => s.media.length);
+
+  const applyNav = useCallback((result: { storyIdx: number; slideIdx: number; shouldClose: boolean }) => {
+    if (result.shouldClose) { router.back(); return; }
+    setStoryIdx(result.storyIdx);
+    setSlideIdx(result.slideIdx);
+  }, [router]);
+
   const advanceSlide = useCallback(() => {
     if (!currentStory) return;
-    if (slideIdx < currentStory.media.length - 1) {
-      setSlideIdx(i => i + 1);
-    } else if (storyIdx < stories.length - 1) {
-      setStoryIdx(i => i + 1);
-      setSlideIdx(0);
-    } else {
-      router.back();
-    }
-  }, [slideIdx, storyIdx, stories, currentStory, router]);
+    applyNav(navAdvance(storyIdx, slideIdx, slideCounts));
+  }, [slideIdx, storyIdx, slideCounts, currentStory, applyNav]);
 
   const retreatSlide = useCallback(() => {
-    if (slideIdx > 0) {
-      setSlideIdx(i => i - 1);
-    } else if (storyIdx > 0) {
-      const prevStory = stories[storyIdx - 1];
-      setStoryIdx(i => i - 1);
-      setSlideIdx(prevStory ? prevStory.media.length - 1 : 0);
-    }
-  }, [slideIdx, storyIdx, stories]);
+    applyNav(navRetreat(storyIdx, slideIdx, slideCounts));
+  }, [slideIdx, storyIdx, slideCounts, applyNav]);
+
+  // Swipe left/right jumps straight to the next/previous user's story reel
+  // (distinct from tapping, which steps through the current user's slides).
+  const goToNextUser = useCallback(() => {
+    applyNav(navNextUser(storyIdx, stories.length));
+  }, [storyIdx, stories.length, applyNav]);
+
+  const goToPrevUser = useCallback(() => {
+    applyNav(navPrevUser(storyIdx));
+  }, [storyIdx, applyNav]);
 
   useEffect(() => {
     progress.setValue(0);
-    if (isPaused || !currentSlide) return;
+    if (isPaused || showGestureGuide || !currentSlide) return;
     const dur = currentSlide.duration * 1000;
     const anim = Animated.timing(progress, {
       toValue: 1,
@@ -216,13 +230,28 @@ export default function BuyerStoryViewer() {
     });
     anim.start(({ finished }) => { if (finished) advanceSlide(); });
     return () => progress.stopAnimation();
-  }, [storyIdx, slideIdx, isPaused]);
+  }, [storyIdx, slideIdx, isPaused, showGestureGuide]);
+
+  // Preload the next story's first slide so swiping/advancing to it feels instant.
+  useEffect(() => {
+    const nextStory = stories[storyIdx + 1];
+    const nextSlide = nextStory?.media[0];
+    if (nextSlide?.imageUri && nextSlide.type !== 'text') {
+      Image.prefetch(nextSlide.imageUri).catch(() => {});
+    }
+  }, [storyIdx, stories]);
 
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) =>
-        Math.abs(g.dy) > Math.abs(g.dx) && g.dy > 10,
-      onPanResponderRelease: (_, g) => { if (g.dy > 80) router.back(); },
+        Math.abs(g.dx) > 12 || Math.abs(g.dy) > 12,
+      onPanResponderRelease: (_, g) => {
+        switch (classifyGesture(g.dx, g.dy)) {
+          case 'next-user': goToNextUser(); break;
+          case 'prev-user': goToPrevUser(); break;
+          case 'close': router.back(); break;
+        }
+      },
     })
   ).current;
 
@@ -232,7 +261,21 @@ export default function BuyerStoryViewer() {
     </View>;
   }
 
-  const isMyStory = false; // Viewer perspective
+  const isMyStory = !!myUserId && currentStory.authorId === myUserId;
+
+  const openViewersModal = async () => {
+    setViewerModalVisible(true);
+    if (!currentStory) return;
+    setViewersLoading(true);
+    try {
+      const rows = await api.social.storyViewers(currentStory.id);
+      setServerViewers(rows);
+    } catch {
+      setServerViewers([]);
+    } finally {
+      setViewersLoading(false);
+    }
+  };
 
   return (
     <View style={styles.container} {...panResponder.panHandlers}>
@@ -483,10 +526,12 @@ export default function BuyerStoryViewer() {
             {isMyStory && (
               <TouchableOpacity
                 style={styles.viewerBtn}
-                onPress={() => setViewerModalVisible(true)}
+                onPress={openViewersModal}
+                accessibilityRole="button"
+                accessibilityLabel="See who viewed this story"
               >
                 <Feather name="eye" size={ICON.lg} color={ON_DARK} />
-                <Text style={styles.viewerCount}>{currentStory.viewers.length}</Text>
+                <Text style={styles.viewerCount}>{(currentStory as any).viewsCount ?? currentStory.viewers.length}</Text>
               </TouchableOpacity>
             )}
           </>
@@ -510,14 +555,14 @@ export default function BuyerStoryViewer() {
         <View style={[styles.viewerModal, { paddingBottom: insets.bottom + SP.md }]}>
           <View style={styles.viewerModalHeader}>
             <Text style={styles.viewerModalTitle}>
-              {currentStory.viewers.length} viewers
+              {serverViewers.length} {serverViewers.length === 1 ? 'viewer' : 'viewers'}
             </Text>
             <TouchableOpacity onPress={() => setViewerModalVisible(false)}>
               <Feather name="x" size={ICON.lg} color={FG} />
             </TouchableOpacity>
           </View>
           <FlatList
-            data={currentStory.viewers}
+            data={serverViewers}
             keyExtractor={item => item.userId}
             renderItem={({ item }) => (
               <View style={styles.viewerRow}>
@@ -528,15 +573,19 @@ export default function BuyerStoryViewer() {
                   <Text style={styles.viewerName}>{item.name}</Text>
                   <Text style={styles.viewerHandle}>{item.handle}</Text>
                 </View>
-                <Text style={styles.viewerTime}>{timeAgo(item.viewedAt)}</Text>
+                <Text style={styles.viewerTime}>{timeAgo(new Date(item.viewedAt).getTime())}</Text>
               </View>
             )}
             ListEmptyComponent={
-              <Text style={styles.noViewers}>No viewers yet</Text>
+              <Text style={styles.noViewers}>{viewersLoading ? 'Loading…' : 'No viewers yet'}</Text>
             }
           />
         </View>
       </Modal>
+
+      {showGestureGuide && myUserId && (
+        <StoryGestureGuide userId={myUserId} onDismiss={() => setShowGestureGuide(false)} />
+      )}
     </View>
   );
 }
@@ -647,11 +696,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flexDirection: 'row',
   },
   tapLeft: {
-    width: '30%',
+    width: '22%',
     height: '100%',
   },
   tapRight: {
-    width: '70%',
+    width: '78%',
     height: '100%',
   },
   bottomBar: {

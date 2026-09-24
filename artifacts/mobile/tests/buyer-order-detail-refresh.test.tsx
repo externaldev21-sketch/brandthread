@@ -38,11 +38,21 @@ vi.mock('react-native', () => {
     Modal: nativeComponent('Modal'),
     RefreshControl: nativeComponent('RefreshControl'),
     ScrollView: nativeComponent('ScrollView'),
-    StyleSheet: { create: (styles: unknown) => styles },
+    StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
     Text: nativeComponent('Text'),
     TextInput: nativeComponent('TextInput'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),
     View: nativeComponent('View'),
+    Animated: {
+      Value: class { constructor(_v?: number) {} },
+      View: nativeComponent('Animated.View'),
+      event: () => () => {},
+      timing: () => ({ start: (cb?: () => void) => cb?.() }),
+      sequence: () => ({ start: (cb?: () => void) => cb?.() }),
+      loop: () => ({ start: () => {}, stop: () => {} }),
+    },
+    Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
+    useWindowDimensions: () => ({ width: 393, height: 852, scale: 3, fontScale: 1 }),
   };
 });
 
@@ -97,12 +107,23 @@ vi.mock('@/hooks/useColors', () => ({
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({
     theme: {
+      background: '#0A0A0B',
+      card: '#18181B',
+      cardElevated: '#222226',
+      border: '#303044',
+      text: '#F7F7FA',
+      muted: '#AAAABC',
+      subtle: '#77778A',
       accent: '#C7CDD5',
       accentDim: '#34383E',
       accentLight: '#F8FAFC',
+      onAccent: '#FFFFFF',
       secondary: '#7D8793',
       secondaryDim: '#172554',
       primaryGradient: ['#17191D', '#727A84'],
+      success: '#10B981',
+      warning: '#F97316',
+      error: '#F87171',
     },
   }),
 }));
@@ -149,6 +170,10 @@ vi.mock('@/lib/theme', () => ({
   RADIUS: { xs: 6, sm: 10, md: 14, lg: 18, pill: 999 },
   COMP: { buttonH: 52, tabBarH: 64 },
   ICON: { xs: 12, sm: 16, md: 20, lg: 24, xxl: 40 },
+  GUTTER: 16,
+  CONTENT_MAX_WIDTH: 720,
+  GRID_MAX_WIDTH: 1080,
+  BREAKPOINT: { tablet: 768, desktopWeb: 1024 },
 }));
 
 import BuyerOrderDetailScreen from '@/app/buyer-order-detail';

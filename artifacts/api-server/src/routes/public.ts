@@ -3,9 +3,10 @@
  * Mounted at /api/public — no requireAuth middleware.
  */
 import { Router } from "express";
-import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, boosts, orders, orderItems } from "@workspace/db";
+import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems } from "@workspace/db";
 import { eq, and, asc, desc, ne, inArray, notInArray, or, ilike, sql, count, gte, lte, isNull, isNotNull } from "drizzle-orm";
 import { computeTrendingForToday, isCacheFresh } from "../jobs/computeTrending";
+import { computeSellerRankingForToday, isSellerRankingCacheFresh } from "../jobs/computeSellerRanking";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { requireAuth } from "../middlewares/requireAuth";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
@@ -27,6 +28,9 @@ import { setPublicCacheHeaders } from "../lib/httpCache";
 // a fresh deploy before the 2-min warm job fires).  All concurrent waiters
 // share the same Promise and get the result once it resolves.
 let trendingInflight: Promise<void> | null = null;
+
+// Same pattern for the Discover seller-ranking cache — see computeSellerRanking.ts.
+let sellerRankingInflight: Promise<void> | null = null;
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -548,6 +552,74 @@ router.get("/search", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "Public search failed");
     res.status(500).json({ error: "Search failed" });
+  }
+});
+
+// ─── GET /api/public/brands/discover — newest active sellers to follow ────────
+// Unauthenticated, lightweight "browse brands" list used by buyer onboarding's
+// Brands-to-follow step (there is no full search term at that point, so the
+// existing /search endpoint — which requires a query — doesn't fit). Returns
+// active, non-restricted sellers newest-first. No style/category column
+// exists on `users` today, so this intentionally returns a flat list; any
+// future style/category filter should extend this query, not add a second
+// endpoint.
+export function rankDiscoverBrands<T extends { createdAt: Date; clerkId: string }>(sellers: T[]): T[] {
+  return [...sellers].sort((a, b) =>
+    b.createdAt.getTime() - a.createdAt.getTime() || a.clerkId.localeCompare(b.clerkId));
+}
+
+router.get("/brands/discover", async (req, res) => {
+  try {
+    const parsedLimit = parseNonNegativeInteger(req.query.limit, "limit", 24);
+    if (typeof parsedLimit !== "number" || parsedLimit < 1) {
+      res.status(400).json({
+        error: typeof parsedLimit === "number" ? "limit must be at least 1" : parsedLimit.error,
+      });
+      return;
+    }
+    const lim = Math.min(parsedLimit, 50);
+    const viewerId = optionalViewerId(req);
+
+    const sellers = await db
+      .select({
+        clerkId:         users.clerkId,
+        displayName:     users.displayName,
+        brandName:       users.brandName,
+        brandType:       users.brandType,
+        profileImageUrl: users.profileImageUrl,
+        avatarUrl:       users.avatarUrl,
+        verified:        users.verified,
+        verificationStatus: users.verificationStatus,
+        activeStanding:  users.activeStanding,
+        policyRestricted: users.policyRestricted,
+        createdAt:       users.createdAt,
+      })
+      .from(users)
+      .where(and(
+        eq(users.accountType, "seller"),
+        isNull(users.suspendedAt),
+        isNull(users.deletedAt),
+        eq(users.policyRestricted, false),
+        notBlockedWith(viewerId, users.clerkId),
+      ))
+      .orderBy(desc(users.createdAt), asc(users.clerkId))
+      .limit(lim * 2); // small buffer before app-side ranking/limit
+
+    const ranked = rankDiscoverBrands(sellers).slice(0, lim);
+
+    res.json({
+      brands: ranked.map((s) => ({
+        id:          s.clerkId,
+        sellerId:    s.clerkId,
+        name:        s.brandName || s.displayName || "Brand",
+        brandType:   s.brandType ?? null,
+        logoUrl:     s.profileImageUrl ?? s.avatarUrl ?? null,
+        verified:    deriveSellerVerified(s),
+      })),
+    });
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch discover brands");
+    res.status(500).json({ error: "Failed to fetch brands" });
   }
 });
 
@@ -1121,6 +1193,73 @@ router.get("/profiles/:username", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to resolve public profile by username");
     res.status(500).json({ error: "Failed to load profile" });
+  }
+});
+
+// ─── GET /api/public/discover/feed ────────────────────────────────────────────
+// Serves the pre-computed daily Discover seller ranking from
+// seller_ranking_cache. The list is calculated once per day by the
+// computeSellerRanking background job (recency-decayed engagement,
+// follower-normalized, rotation bonus, capped at 2 products per seller,
+// cold-start fallback to newest active brands). On a cache miss, computation
+// runs synchronously so the response is still correct (deduped via an
+// in-flight promise so concurrent requests share one computation).
+// Unauthenticated — signed-out buyers can browse Discover.
+// Query params: ?limit=20&offset=0 (limit capped at 50)
+router.get("/discover/feed", async (req, res) => {
+  try {
+    const page = parsePagination(req.query, { limit: 20 });
+    if (!page.success || page.data.limit > 50 || page.data.offset < 0) {
+      return res.status(400).json({ error: "Invalid discover query", code: "VALIDATION_ERROR" });
+    }
+    const { limit, offset } = page.data;
+    const today = new Date().toISOString().slice(0, 10); // 'YYYY-MM-DD' UTC
+
+    const paginate = (allItems: any[], source: "cache" | "computed") => {
+      const items = allItems.slice(offset, offset + limit).map((item, i) => ({
+        ...item,
+        rank: offset + i + 1,
+      }));
+      const nextOffset = offset + limit < allItems.length ? offset + limit : null;
+      return { items, nextOffset, source };
+    };
+
+    // ── Attempt cache read ───────────────────────────────────────────────────
+    const [cached] = await db
+      .select()
+      .from(sellerRankingCache)
+      .where(eq(sellerRankingCache.cacheDate, today))
+      .limit(1);
+
+    if (cached && isSellerRankingCacheFresh(cached.computedAt) && Array.isArray(cached.results) && cached.results.length > 0) {
+      const { items, nextOffset } = paginate(cached.results as any[], "cache");
+      return res.json({ items, computedAt: cached.computedAt, source: "cache", nextOffset });
+    }
+
+    // ── Cache miss — compute synchronously (once per day maximum) ───────────
+    req.log.info({ cacheDate: today }, "Discover feed cache miss; computing synchronously");
+    if (!sellerRankingInflight) {
+      sellerRankingInflight = computeSellerRankingForToday().finally(() => {
+        sellerRankingInflight = null;
+      });
+    }
+    await sellerRankingInflight;
+
+    const [fresh] = await db
+      .select()
+      .from(sellerRankingCache)
+      .where(eq(sellerRankingCache.cacheDate, today))
+      .limit(1);
+
+    if (fresh && Array.isArray(fresh.results) && fresh.results.length > 0) {
+      const { items, nextOffset } = paginate(fresh.results as any[], "computed");
+      return res.json({ items, computedAt: fresh.computedAt, source: "computed", nextOffset });
+    }
+
+    return res.json({ items: [], computedAt: fresh?.computedAt ?? new Date().toISOString(), source: "empty", nextOffset: null });
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch discover feed");
+    return res.status(500).json({ error: "Failed to fetch discover feed" });
   }
 });
 

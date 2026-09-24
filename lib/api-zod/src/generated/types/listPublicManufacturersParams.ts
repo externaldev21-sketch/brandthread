@@ -5,9 +5,21 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ListPublicManufacturersSort } from './listPublicManufacturersSort';
 
 export type ListPublicManufacturersParams = {
 q?: string;
 country?: string;
 specialty?: string;
+/**
+ * @minimum 0
+ */
+minYears?: number;
+/**
+ * @minimum 1
+ */
+maxMoq?: number;
+verified?: boolean;
+hasPhotos?: boolean;
+sort?: ListPublicManufacturersSort;
 };

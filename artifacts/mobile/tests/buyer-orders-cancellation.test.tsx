@@ -80,11 +80,22 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({
     theme: {
+      background: '#07070F',
+      card: '#12121F',
+      cardElevated: '#18182E',
+      border: '#303044',
+      text: '#F4F4FF',
+      muted: '#AAAABC',
+      subtle: '#77778A',
       accent: '#C7CDD5',
       accentDim: '#34383E',
       accentLight: '#F8FAFC',
+      onAccent: '#0A0A0B',
       secondary: '#22D3EE',
       secondaryDim: '#164E63',
+      success: '#10B981',
+      warning: '#F97316',
+      error: '#F87171',
     },
   }),
 }));
@@ -250,12 +261,17 @@ describe('buyer order cancellation banner', () => {
 
     renderer = await renderScreen();
 
+    // The card now also shows a compact OrderStatusTimeline, which renders its
+    // own 'x-circle' exception pill for a cancelled order alongside the
+    // cancellation banner's icon — both are red, so there are two now instead
+    // of one. The banner itself (checked below via its unique label/copy)
+    // still renders exactly once.
     const cancellationIcons = renderer.root.findAll(
       node => (node.type as unknown) === 'Feather'
         && node.props.name === 'x-circle'
         && node.props.color === '#F87171',
     );
-    expect(cancellationIcons).toHaveLength(1);
+    expect(cancellationIcons).toHaveLength(2);
 
     const cancellationReasons = renderer.root.findAll(
       node => (node.type as unknown) === 'Text'

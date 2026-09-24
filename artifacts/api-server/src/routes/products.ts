@@ -9,6 +9,7 @@ import { canRestoreProduct, PRODUCT_DELETE_RECOVERY_WINDOW_MS } from "../lib/pro
 import { getVerifiedPlanAccess, sendPlanLimitReached, sendPlanLookupUnavailable } from "../lib/planAccess";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
+import { notifyBackInStock, notifyPriceDrop, notifyStockLevelChanged } from "../lib/stockNotifications";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -139,7 +140,11 @@ router.get("/", async (req, res) => {
 // POST /api/products (manager+)
 router.post("/", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const { name, description, category = "apparel", status = "draft", images = [], tags = [], styleTags = [], variant, variants } = req.body;
+  const {
+    name, description, category = "apparel", status = "draft", images = [], tags = [], styleTags = [], variant, variants,
+    // Pre-order fields — mirrors PUT /:id so a listing can be created directly as a pre-order.
+    isPreOrder, preOrderClosingDate, preOrderEstShipDate, dropId,
+  } = req.body;
   if (!name || typeof name !== "string" || name.trim() === "") {
     res.status(400).json({ error: "name required" }); return;
   }
@@ -193,7 +198,13 @@ router.post("/", requireRole("manager"), async (req, res) => {
     if (!await hasProductCapacity(tx, ownerId, access.limits.products, status === "archived" ? 0 : 1)) return null;
     const [prod] = await tx
       .insert(products)
-      .values({ ownerId, name: name.trim(), description, category, status, images, tags, styleTags })
+      .values({
+        ownerId, name: name.trim(), description, category, status, images, tags, styleTags,
+        ...(isPreOrder !== undefined && { isPreOrder }),
+        ...(preOrderClosingDate ? { preOrderClosingDate: new Date(preOrderClosingDate) } : {}),
+        ...(preOrderEstShipDate ? { preOrderEstShipDate: new Date(preOrderEstShipDate) } : {}),
+        ...(dropId !== undefined && { dropId: dropId ?? null }),
+      })
       .returning();
 
     if (validatedVariants.length > 0) {
@@ -446,7 +457,7 @@ router.post("/:id/variants", requireRole("manager"), async (req, res) => {
 router.patch("/:id/variants/:variantId", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   // Verify product ownership
-  const [product] = await db.select({ id: products.id }).from(products)
+  const [product] = await db.select({ id: products.id, name: products.name }).from(products)
     .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId)))
     .limit(1);
   if (!product) { res.status(404).json({ error: "Product not found" }); return; }
@@ -455,6 +466,11 @@ router.patch("/:id/variants/:variantId", requireRole("manager"), async (req, res
   if (stock !== undefined && (!Number.isInteger(stock) || stock < 0)) {
     res.status(400).json({ error: "stock must be a non-negative integer" }); return;
   }
+
+  const [before] = await db.select({ stock: productVariants.stock, priceCents: productVariants.priceCents })
+    .from(productVariants)
+    .where(and(eq(productVariants.id, req.params.variantId), eq(productVariants.productId, req.params.id)));
+
   const [updated] = await db.update(productVariants)
     .set({
       ...(stock             !== undefined && { stock }),
@@ -473,6 +489,21 @@ router.patch("/:id/variants/:variantId", requireRole("manager"), async (req, res
       `Updated variant ${updated.sku}`,
       "product", req.params.id, { variantId: updated.id },
     );
+  }
+
+  if (before) {
+    void notifyStockLevelChanged({
+      productId: req.params.id, ownerId, productName: product.name,
+      previousStock: before.stock, newStock: updated.stock, lowStockThreshold: updated.lowStockThreshold,
+    });
+    void notifyBackInStock({
+      productId: req.params.id, ownerId, productName: product.name,
+      previousStock: before.stock, newStock: updated.stock,
+    });
+    void notifyPriceDrop({
+      productId: req.params.id, ownerId, productName: product.name,
+      previousPriceCents: before.priceCents, newPriceCents: updated.priceCents,
+    });
   }
 
   res.json(updated);

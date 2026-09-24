@@ -2,14 +2,17 @@
  * Public manufacturer directory — no auth required for reads.
  * Mounted at /api/manufacturers/public
  *
- * GET  /              list active public manufacturers (with optional filters)
- * POST /apply         public application — goes live immediately, no Clerk account needed
+ * GET  /              list active public manufacturers (search, country, specialty,
+ *                     minYears, maxMoq, verified, hasPhotos, sort)
+ * GET  /facets        countries and specialties in the live directory, with counts
+ * POST /apply         legacy anonymous application — stays private and pending; the
+ *                     portal's authenticated signup (POST /manufacturers/register) goes live instantly
  * GET  /:id           get a single public manufacturer profile
  */
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { db, manufacturers, manufacturerReviews, sampleOrders, users } from "@workspace/db";
-import { eq, and, ilike, sql, or, inArray, desc } from "drizzle-orm";
+import { eq, and, ilike, sql, or, inArray, desc, gte, lte, isNotNull, type SQL } from "drizzle-orm";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { ApplyAsManufacturerBody } from "@workspace/api-zod";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -31,6 +34,7 @@ const publicManufacturerFields = {
   moq:             manufacturers.moq,
   photos:          manufacturers.photos,
   website:         manufacturers.website,
+  timeZone:        manufacturers.timeZone,
   priceRange:      manufacturers.priceRange,
   sampleTurnaround: manufacturers.sampleTurnaround,
   bulkTurnaround:  manufacturers.bulkTurnaround,
@@ -130,18 +134,63 @@ async function serializePublicManufacturer(
 
 // ── GET /api/manufacturers/public ─────────────────────────────────────────────
 
+const DIRECTORY_SORTS: Record<string, SQL> = {
+  recommended: sql`${manufacturers.verifiedAt} DESC NULLS LAST, jsonb_array_length(COALESCE(${manufacturers.photos}::jsonb, '[]'::jsonb)) > 0 DESC, ${manufacturers.ratingBasisPoints} DESC, ${manufacturers.createdAt} DESC`,
+  newest: sql`${manufacturers.createdAt} DESC`,
+  experience: sql`${manufacturers.yearsInBusiness} DESC, ${manufacturers.createdAt} DESC`,
+  rating: sql`${manufacturers.ratingBasisPoints} DESC, ${manufacturers.createdAt} DESC`,
+  moq: sql`${manufacturers.moq} ASC, ${manufacturers.createdAt} DESC`,
+};
+
+function intParam(value: unknown, min: number, max: number): number | null {
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return null;
+  const parsed = Number(value);
+  return parsed >= min && parsed <= max ? parsed : null;
+}
+
+const HAS_PHOTOS = sql`jsonb_array_length(COALESCE(${manufacturers.photos}::jsonb, '[]'::jsonb)) > 0`;
+
+// ── GET /api/manufacturers/public/facets ──────────────────────────────────────
+
+router.get("/facets", async (req, res) => {
+  try {
+    const live = and(eq(manufacturers.isPublicDirectory, true), eq(manufacturers.status, "active"));
+    const [countries, specialties, [total]] = await Promise.all([
+      db.select({ name: manufacturers.country, count: sql<number>`count(*)::integer` })
+        .from(manufacturers).where(live).groupBy(manufacturers.country).orderBy(sql`count(*) DESC`, manufacturers.country),
+      db.select({ name: manufacturers.specialty, count: sql<number>`count(*)::integer` })
+        .from(manufacturers).where(live).groupBy(manufacturers.specialty).orderBy(sql`count(*) DESC`, manufacturers.specialty),
+      db.select({ count: sql<number>`count(*)::integer` }).from(manufacturers).where(live),
+    ]);
+    res.json({
+      total: total?.count ?? 0,
+      countries: countries.filter((row) => row.name?.trim()),
+      specialties: specialties.filter((row) => row.name?.trim()),
+    });
+  } catch (err) {
+    req.log.error({ err }, "Failed to load manufacturer directory facets");
+    res.status(500).json({ error: "Failed to load filters" });
+  }
+});
+
 router.get("/", async (req, res) => {
   try {
     setPublicCacheHeaders(res);
-    const { q, country, specialty } = req.query as Record<string, string>;
+    const { q, country, specialty, verified, hasPhotos, sort } = req.query as Record<string, string>;
     const searchTerm = normalizeSearchTerm(q);
     const countryTerm = normalizeSearchTerm(country, 80);
     const specialtyTerm = normalizeSearchTerm(specialty, 100);
+    const minYears = intParam(req.query.minYears, 0, 200);
+    const maxMoq = intParam(req.query.maxMoq, 1, 10_000_000);
 
-    const conditions = [
+    const conditions: SQL[] = [
       eq(manufacturers.isPublicDirectory, true),
       eq(manufacturers.status, "active"),
     ];
+    if (minYears != null) conditions.push(gte(manufacturers.yearsInBusiness, minYears));
+    if (maxMoq != null) conditions.push(lte(manufacturers.moq, maxMoq));
+    if (verified === "true") conditions.push(isNotNull(manufacturers.verifiedAt));
+    if (hasPhotos === "true") conditions.push(HAS_PHOTOS);
 
     if (countryTerm) {
       conditions.push(eq(manufacturers.country, countryTerm));
@@ -171,7 +220,7 @@ router.get("/", async (req, res) => {
       .select(publicManufacturerFields)
       .from(manufacturers)
       .where(and(...conditions))
-      .orderBy(sql`${manufacturers.verifiedAt} DESC NULLS LAST, ${manufacturers.createdAt} DESC`)
+      .orderBy(DIRECTORY_SORTS[sort] ?? DIRECTORY_SORTS.recommended)
       .limit(limit)
       .offset(offset);
     setPaginationHeaders(res, page.data, rows.length);

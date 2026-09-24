@@ -3,7 +3,7 @@
  * Sends push messages via the Expo Push Service (no APNs/FCM credentials needed in dev).
  * In production, upgrade to direct APNs/FCM for higher throughput.
  */
-import { db, notificationDeliveries, notificationEvents, pushTokens, users } from "@workspace/db";
+import { db, notificationBatchQueue, notificationDeliveries, notificationEvents, pushTokens, users } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
 import { logger } from "./logger";
 import { withRetry } from "./retry";
@@ -37,7 +37,10 @@ export type PushEventCategory =
   | "production"
   | "payout"
   | "dispute"
-  | "subscription";
+  | "subscription"
+  | "stock"
+  | "fulfillment"
+  | "return";
 
 const PUSH_CATEGORY_BY_FEED_CATEGORY: Readonly<Record<string, PushEventCategory>> = {
   drop: "drop",
@@ -53,6 +56,11 @@ const PUSH_CATEGORY_BY_FEED_CATEGORY: Readonly<Record<string, PushEventCategory>
   finance: "payout",
   dispute: "dispute",
   disputes: "dispute",
+  stock: "stock",
+  pricing: "stock",
+  fulfillment: "fulfillment",
+  return: "return",
+  returns: "return",
 };
 
 /**
@@ -100,6 +108,9 @@ export function preferenceKey(accountType: string | null, category: PushEventCat
       message: "customer_messages",
       dispute: "disputes",
       subscription: "subscription_trial",
+      stock: "inventory_alerts",
+      fulfillment: "new_orders",
+      social: "friend_activity",
     };
     return sellerPreferences[category] ?? null;
   }
@@ -108,6 +119,8 @@ export function preferenceKey(accountType: string | null, category: PushEventCat
     message: "messages",
     order: "order_updates",
     social: "friend_activity",
+    stock: "price_alerts",
+    return: "return_updates",
   };
   return buyerPreferences[category] ?? null;
 }
@@ -136,6 +149,42 @@ export function unsentPushTokens(
   return tokens.filter((token) => !sent.has(token.token));
 }
 
+/**
+ * True when `now` (a moment in the given IANA timezone) falls inside a
+ * quiet-hours window described as local "HH:MM" wall-clock bounds. Windows
+ * that wrap midnight (e.g. 22:00 → 07:00) are supported.
+ */
+export function isWithinQuietHours(
+  now: Date,
+  start: string | null | undefined,
+  end: string | null | undefined,
+  timezone: string | null | undefined,
+): boolean {
+  if (!start || !end) return false;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: timezone || "UTC",
+  }).formatToParts(now);
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+  const nowMinutes = hour * 60 + minute;
+  const toMinutes = (hhmm: string) => {
+    const [h, m] = hhmm.split(":").map(Number);
+    return (h || 0) * 60 + (m || 0);
+  };
+  const startMinutes = toMinutes(start);
+  const endMinutes = toMinutes(end);
+  if (Number.isNaN(startMinutes) || Number.isNaN(endMinutes)) return false;
+  if (startMinutes === endMinutes) return false;
+  if (startMinutes < endMinutes) {
+    return nowMinutes >= startMinutes && nowMinutes < endMinutes;
+  }
+  // Window wraps midnight, e.g. 22:00 → 07:00.
+  return nowMinutes >= startMinutes || nowMinutes < endMinutes;
+}
+
 export async function sendPushToUser(
   userId: string,
   payload: PushPayload,
@@ -144,22 +193,42 @@ export async function sendPushToUser(
 ): Promise<boolean> {
   let delivered = true;
   try {
+    const [recipient] = await db
+      .select({
+        accountType: users.accountType,
+        preferences: users.notificationPreferences,
+        pushEnabled: users.pushEnabled,
+        quietHoursStart: users.quietHoursStart,
+        quietHoursEnd: users.quietHoursEnd,
+        quietHoursTimezone: users.quietHoursTimezone,
+      })
+      .from(users)
+      .where(eq(users.clerkId, userId))
+      .limit(1);
+
+    // Master switch: skip push entirely (the in-app feed row still exists —
+    // that write happens in publishNotification() before this is called).
+    if (recipient?.pushEnabled === false) return false;
+
+    if (
+      isWithinQuietHours(
+        new Date(),
+        recipient?.quietHoursStart,
+        recipient?.quietHoursEnd,
+        recipient?.quietHoursTimezone,
+      )
+    ) {
+      return false;
+    }
+
     if (category) {
-      const [recipient] = await db
-        .select({
-          accountType: users.accountType,
-          preferences: users.notificationPreferences,
-        })
-        .from(users)
-        .where(eq(users.clerkId, userId))
-        .limit(1);
       const key = preferenceKey(recipient?.accountType ?? null, category);
       if (key && recipient?.preferences?.[key] === false) return false;
     }
     const tokens = await db
       .select({ token: pushTokens.token })
       .from(pushTokens)
-      .where(eq(pushTokens.userId, userId));
+      .where(and(eq(pushTokens.userId, userId), eq(pushTokens.isActive, true)));
 
     if (!tokens.length) return false;
 
@@ -263,6 +332,10 @@ export async function sendPushToUser(
           if (!ok) delivered = false;
           const providerError = result?.message ?? result?.details?.error
             ?? (!response.ok ? `Push provider returned HTTP ${response.status}` : "Push provider rejected notification");
+          if (result?.details?.error === "DeviceNotRegistered") {
+            deactivatePushToken(row.pushToken, "DeviceNotRegistered").catch((err) =>
+              logger.warn({ err, token: row.pushToken }, "Failed to deactivate unregistered push token"));
+          }
           return db.update(notificationDeliveries).set({
             status: ok ? "sent" : "provider_error",
             providerMessageId: result?.id ?? null,
@@ -281,6 +354,133 @@ export async function sendPushToUser(
     logger.warn({ err, category }, "Push notification delivery failed");
     return false;
   }
+}
+
+/** Mark a push token inactive so future sends skip it. Idempotent. */
+export async function deactivatePushToken(token: string, reason: string): Promise<void> {
+  await db.update(pushTokens).set({
+    isActive: false,
+    deactivatedAt: new Date(),
+    deactivatedReason: reason,
+    updatedAt: new Date(),
+  }).where(eq(pushTokens.token, token));
+}
+
+const EXPO_RECEIPT_BATCH_SIZE = 300;
+
+/**
+ * Poll Expo's push receipt API for deliveries whose Expo "ticket" was
+ * accepted (status "sent", we have a providerMessageId) but whose final
+ * receipt hasn't been checked yet. Expo recommends checking receipts
+ * 15 minutes to a few hours after sending. Deactivates tokens the receipt
+ * reports as DeviceNotRegistered. Returns counts for logging/tests.
+ */
+export async function reconcilePushReceipts(options?: { limit?: number }): Promise<{
+  checked: number;
+  deactivated: number;
+}> {
+  const limit = options?.limit ?? 500;
+  const pending = await db
+    .select({
+      id: notificationDeliveries.id,
+      pushToken: notificationDeliveries.pushToken,
+      providerMessageId: notificationDeliveries.providerMessageId,
+    })
+    .from(notificationDeliveries)
+    .where(and(
+      eq(notificationDeliveries.status, "sent"),
+      sql`${notificationDeliveries.providerMessageId} IS NOT NULL`,
+      sql`${notificationDeliveries.receiptCheckedAt} IS NULL`,
+    ))
+    .limit(limit);
+
+  if (!pending.length) return { checked: 0, deactivated: 0 };
+
+  let deactivated = 0;
+  for (let i = 0; i < pending.length; i += EXPO_RECEIPT_BATCH_SIZE) {
+    const chunk = pending.slice(i, i + EXPO_RECEIPT_BATCH_SIZE);
+    const ids = chunk.map((row) => row.providerMessageId!).filter(Boolean);
+    if (!ids.length) continue;
+
+    let receipts: Record<string, { status?: string; details?: { error?: string } }> = {};
+    try {
+      const response = await fetch("https://exp.host/--/api/v2/push/getReceipts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept-Encoding": "gzip, deflate" },
+        body: JSON.stringify({ ids }),
+      });
+      const body = await response.json() as { data?: typeof receipts };
+      receipts = body.data ?? {};
+    } catch (err) {
+      logger.warn({ err }, "Failed to fetch Expo push receipts");
+      continue;
+    }
+
+    await Promise.all(chunk.map(async (row) => {
+      const receipt = row.providerMessageId ? receipts[row.providerMessageId] : undefined;
+      if (!receipt) return; // Not ready yet — Expo may still be processing it.
+      const error = receipt.details?.error;
+      if (error === "DeviceNotRegistered") {
+        await deactivatePushToken(row.pushToken, "DeviceNotRegistered");
+        deactivated += 1;
+      }
+      await db.update(notificationDeliveries).set({
+        receiptCheckedAt: new Date(),
+        providerStatus: receipt.status ?? null,
+        providerError: error ?? null,
+      }).where(eq(notificationDeliveries.id, row.id));
+    }));
+  }
+
+  return { checked: pending.length, deactivated };
+}
+
+/**
+ * Batching for high-frequency, low-priority events (e.g. product likes).
+ * Enqueues a collapse-window row instead of publishing immediately; a
+ * periodic job (jobs/notificationBatchFlush.ts) later turns each row into a
+ * single publishNotification() call. Returns the row's running count.
+ */
+export async function enqueueBatchedNotification(input: {
+  userId: string;
+  category: string;
+  type: string;
+  targetId?: string;
+  targetType?: string;
+  actorName?: string;
+  cta?: string;
+}): Promise<number> {
+  const [row] = await db
+    .insert(notificationBatchQueue)
+    .values({
+      userId: input.userId,
+      category: input.category,
+      type: input.type,
+      targetId: input.targetId ?? null,
+      targetType: input.targetType ?? null,
+      cta: input.cta ?? null,
+      actorNames: input.actorName ? [input.actorName] : [],
+    })
+    .onConflictDoUpdate({
+      target: [
+        notificationBatchQueue.userId,
+        notificationBatchQueue.category,
+        notificationBatchQueue.type,
+        notificationBatchQueue.targetId,
+      ],
+      set: {
+        count: sql`${notificationBatchQueue.count} + 1`,
+        lastEventAt: new Date(),
+        actorNames: input.actorName
+          ? sql`(CASE WHEN jsonb_array_length(${notificationBatchQueue.actorNames}) < 3
+                 THEN ${notificationBatchQueue.actorNames} || ${JSON.stringify([input.actorName])}::jsonb
+                 ELSE ${notificationBatchQueue.actorNames} END)`
+          : notificationBatchQueue.actorNames,
+      },
+    })
+    .returning({ count: notificationBatchQueue.count });
+
+  return row?.count ?? 1;
 }
 
 export function stableNotificationId(...parts: string[]): string {
