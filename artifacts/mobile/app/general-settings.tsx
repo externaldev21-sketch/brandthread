@@ -6,6 +6,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
+import { FONT } from '@/lib/theme';
 
 export default function GeneralSettingsScreen() {
   const colors = useColors();
@@ -109,7 +110,7 @@ function ExternalRow({
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
-      style={[styles.listRow, !last && { borderBottomColor: colors.border, borderBottomWidth: 1 }]}
+      style={[styles.listRow, !last && { borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth }]}
     >
       <Feather name={icon} size={17} color={colors.foreground} style={styles.listIcon} />
       <Text style={[styles.cardTitle, { color: colors.foreground, flex: 1 }]}>{label}</Text>
@@ -121,14 +122,14 @@ function ExternalRow({
 const styles = StyleSheet.create({
   container: { flex: 1 },
   section: { paddingHorizontal: 20, paddingVertical: 18 },
-  sectionTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginBottom: 6 },
-  sectionSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 14, lineHeight: 17 },
+  sectionTitle: { fontSize: 15, lineHeight: 19, fontFamily: FONT.semibold, marginBottom: 6 },
+  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, marginBottom: 14, lineHeight: 17 },
   divider: { height: 10 },
   card: { borderRadius: 14, borderWidth: 1, padding: 14 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  cardTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  cardSub: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 3, lineHeight: 17 },
+  cardTitle: { fontSize: 14, lineHeight: 18, fontFamily: FONT.semibold },
+  cardSub: { fontSize: 12, fontFamily: FONT.regular, marginTop: 3, lineHeight: 17 },
   listCard: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
-  listRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
+  listRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, minHeight: 52 },
   listIcon: { width: 20 },
 });

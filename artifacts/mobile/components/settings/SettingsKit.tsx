@@ -173,15 +173,17 @@ export function SettingsRow({
   const isSwitch = onSwitchChange !== undefined;
   const inert = disabled || soon;
   const labelColor = destructive ? colors.destructive : inert ? colors.mutedForeground : colors.foreground;
+  const iconTint = inert ? colors.mutedForeground : destructive ? colors.destructive : iconColor ?? colors.foreground;
+  const iconChipBg = inert ? colors.secondary : iconBg ?? colors.secondary;
 
   const content = (
     <View style={[s.row, !last && s.rowDivider]}>
-      <View style={[s.rowIcon, { backgroundColor: iconBg ?? colors.secondary }]}>
-        <Feather name={icon} size={16} color={destructive ? colors.destructive : iconColor ?? colors.foreground} />
+      <View style={[s.rowIcon, { backgroundColor: iconChipBg }]}>
+        <Feather name={icon} size={16} color={iconTint} />
       </View>
       <View style={s.rowCopy}>
         <Text style={[s.rowLabel, { color: labelColor }]} numberOfLines={1}>{label}</Text>
-        {subtitle ? <Text style={s.rowSubtitle} numberOfLines={1}>{subtitle}</Text> : null}
+        {subtitle ? <Text style={[s.rowSubtitle, inert && { color: colors.mutedForeground }]} numberOfLines={1}>{subtitle}</Text> : null}
       </View>
       {badge ? (
         <View style={s.rowBadge}>
@@ -210,7 +212,7 @@ export function SettingsRow({
   );
 
   if (isSwitch || !onPress || inert) {
-    return <View style={inert ? { opacity: 0.5 } : undefined}>{content}</View>;
+    return <View>{content}</View>;
   }
 
   return (
@@ -342,19 +344,19 @@ function makeCardStyles(colors: Colors) {
     rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
     rowIcon: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
     rowCopy: { flex: 1 },
-    rowLabel: { fontSize: FS.sm, fontFamily: FONT.medium },
-    rowSubtitle: { fontSize: 11.5, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
-    rowValue: { fontSize: 13, fontFamily: FONT.regular, color: colors.mutedForeground, maxWidth: 120 },
+    rowLabel: { fontSize: FS.sm, lineHeight: 18, fontFamily: FONT.medium },
+    rowSubtitle: { fontSize: 12, lineHeight: 15, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
+    rowValue: { fontSize: 13, lineHeight: 17, fontFamily: FONT.regular, color: colors.mutedForeground, maxWidth: 120 },
     rowBadge: { backgroundColor: colors.destructive, borderRadius: RADIUS.pill, paddingHorizontal: 7, paddingVertical: 2, minWidth: 18, alignItems: 'center' },
-    rowBadgeText: { fontSize: 11, fontFamily: FONT.bold, color: '#FFFFFF' },
+    rowBadgeText: { fontSize: 11, lineHeight: 13, fontFamily: FONT.bold, color: '#FFFFFF' },
     rowSoonBadge: { backgroundColor: colors.secondary, borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: colors.border },
-    rowSoonBadgeText: { fontSize: 10.5, fontFamily: FONT.semibold, color: colors.mutedForeground, letterSpacing: 0.3 },
+    rowSoonBadgeText: { fontSize: 11, lineHeight: 13, fontFamily: FONT.semibold, color: colors.mutedForeground, letterSpacing: 0.3 },
 
     // Confirm sheet
     sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: (colors as any).overlay ?? 'rgba(0,0,0,0.68)' },
     sheetCard: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderColor: colors.border, borderBottomWidth: 0, paddingHorizontal: 22, paddingBottom: 36, paddingTop: 2 },
     sheetTitle: { fontSize: 19, fontFamily: FONT.bold, color: colors.foreground, textAlign: 'center', marginTop: 10 },
-    sheetMessage: { fontSize: 13.5, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginTop: 8, marginBottom: 22, lineHeight: 19, paddingHorizontal: 8 },
+    sheetMessage: { fontSize: 14, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginTop: 8, marginBottom: 22, lineHeight: 19, paddingHorizontal: 8 },
     sheetConfirmBtn: { borderRadius: RADIUS.md, paddingVertical: 15, alignItems: 'center', marginBottom: 10 },
     sheetConfirmText: { fontSize: FS.base, fontFamily: FONT.bold },
     sheetCancelBtn: { paddingVertical: 13, alignItems: 'center' },
