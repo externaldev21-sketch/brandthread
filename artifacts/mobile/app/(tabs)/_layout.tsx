@@ -41,6 +41,8 @@ export default function TabLayout() {
       screenOptions={{
         freezeOnBlur: true,
         headerShown: false,
+        // Same tab-switch motion as the buyer side.
+        animation: 'shift',
         sceneStyle: { backgroundColor: theme.background },
       }}
     >

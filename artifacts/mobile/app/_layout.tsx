@@ -760,8 +760,8 @@ function RootLayoutNav() {
         )}
         screenOptions={{
           headerShown: false,
-          animation: 'slide_from_right',
-          animationDuration: 220,
+          animation: 'ios_from_right',
+          animationDuration: 280,
           gestureEnabled: true,
           contentStyle: OPAQUE_SCREEN_CONTENT,
         }}
@@ -771,7 +771,7 @@ function RootLayoutNav() {
         {/* Auth & onboarding */}
         <Stack.Screen name="splash"         options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="sign-in"        options={{ headerShown: false }} />
-        <Stack.Screen name="forgot-password" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="forgot-password" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="onboarding"        options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="thread-explainer"  options={{ headerShown: false, animation: 'fade', gestureEnabled: false }} />
         {/* Main app */}
@@ -781,19 +781,19 @@ function RootLayoutNav() {
           <Stack.Screen name="navigation-isolation-probe" options={{ headerShown: false, animation: 'none', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         ) : null}
         {/* Feature screens */}
-        <Stack.Screen name="chat/[id]"        options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="chat/[id]"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="camera-capture"    options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="brand"            options={{ headerShown: false }} />
-        <Stack.Screen name="seller-profile"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="seller-verification" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="seller-profile"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-verification" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="create-post"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="post-analytics"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="setup"            options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="post-analytics"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="setup"            options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="ai-studio"        options={{ headerShown: false }} />
-        <Stack.Screen name="product-editor"   options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="plans"            options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="settings"         options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="design-canvas"    options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="product-editor"   options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="plans"            options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="settings"         options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="design-canvas"    options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="manufacturer"     options={{ headerShown: false }} />
         <Stack.Screen name="finance"          options={{ headerShown: false }} />
         <Stack.Screen name="customers"        options={{ headerShown: false }} />
@@ -805,188 +805,188 @@ function RootLayoutNav() {
         <Stack.Screen name="automation"       options={{ headerShown: false }} />
         <Stack.Screen name="payments"         options={{ headerShown: false }} />
         <Stack.Screen name="website"          options={{ headerShown: false }} />
-        <Stack.Screen name="integrations/klaviyo" options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="edit-profile"     options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="integrations/klaviyo" options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="edit-profile"     options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         {/* Seller dashboard screens */}
-        <Stack.Screen name="order-detail"     options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="add-product"      options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="drafts"           options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="product-detail"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="product-store"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="product-import"   options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="order-detail"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="add-product"      options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="drafts"           options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="product-detail"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="product-store"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="product-import"   options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="inventory"        options={{ headerShown: false }} />
         <Stack.Screen name="store-builder"    options={{ headerShown: false }} />
         <Stack.Screen name="content"          options={{ headerShown: false }} />
-        <Stack.Screen name="notifications-settings" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="notifications-settings" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="help"             options={{ headerShown: false }} />
         <Stack.Screen name="bg-removal"       options={{ headerShown: false }} />
         <Stack.Screen name="tech-pack-generator" options={{ headerShown: false }} />
         {/* Manufacturer Hub screens */}
-        <Stack.Screen name="manufacturer-hub"      options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="manufacturer-profile"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="quote-request"         options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="quote-detail"          options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="quote-compare"         options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="sample-detail"         options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="production-detail"     options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="manufacturer-messages" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="invite-manufacturer"   options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="shipping-label"      options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="return-detail"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="refund-detail"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="dispute-detail"      options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-order-detail"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="inventory-detail"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="inventory-adjust"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="inventory-transfer" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="inventory-incoming" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="inventory-count"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="inventory-location" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-generate"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-generating"     options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="store-theme-picker"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-preview"        options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-editor"         options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-sections"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-collections"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-pages"          options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-nav"            options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-settings"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-policies"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-seo"            options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-domain"         options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-publish"        options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="store-versions"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-from-logo"      options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-from-moodboard" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-from-social"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-ai-improve"     options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="manufacturer-hub"      options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="manufacturer-profile"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="quote-request"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="quote-detail"          options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="quote-compare"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="sample-detail"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="production-detail"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="manufacturer-messages" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="invite-manufacturer"   options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="shipping-label"      options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="return-detail"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="refund-detail"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="dispute-detail"      options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-order-detail"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="inventory-detail"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="inventory-adjust"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="inventory-transfer" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="inventory-incoming" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="inventory-count"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="inventory-location" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-generate"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-generating"     options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="store-theme-picker"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-preview"        options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-editor"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-sections"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-collections"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-pages"          options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-nav"            options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-settings"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-policies"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-seo"            options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-domain"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-publish"        options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="store-versions"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-from-logo"      options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-from-moodboard" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-from-social"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-ai-improve"     options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         {/* Analytics screens */}
-        <Stack.Screen name="analytics-sales"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="analytics-products"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="analytics-customers"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="analytics-content"     options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="analytics-store"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="analytics-marketing"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="analytics-inventory"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="analytics-production"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="analytics-profit"      options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="analytics-sales"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-products"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-customers"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-content"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-store"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-marketing"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-inventory"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-production"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-profit"      options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Buyer commerce screens */}
-        <Stack.Screen name="buyer-product-detail"  options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="buyer-product-detail"  options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="thread-product-detail" options={{ headerShown: false, animation: 'none', gestureEnabled: false }} />
-        <Stack.Screen name="ip-report"             options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-checkout"        options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="ip-report"             options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-checkout"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="thread-checkout"       options={{ headerShown: false, animation: 'none', gestureEnabled: false }} />
-        <Stack.Screen name="buyer-return-request"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-refund-request"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-problem-report"  options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-return-request"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-refund-request"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-problem-report"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* return-request is an alias used by existing buyer-order-detail */}
-        <Stack.Screen name="return-request"        options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="return-request"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Buyer social screens */}
-        <Stack.Screen name="buyer-conversation"      options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="seller-inbox"            options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="seller-conversation"     options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-other-profile"     options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-friend-requests"   options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-conversation"      options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-inbox"            options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-conversation"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-other-profile"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-friend-requests"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-story-viewer"      options={{ headerShown: false, animation: 'fade', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-story-create"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="buyer-notifications"     options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-privacy-settings"  options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-notifications"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-privacy-settings"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="privacy"                 options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="terms"                   options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="community-guidelines"    options={{ headerShown: false, animation: 'fade' }} />
-        <Stack.Screen name="buyer-saved"             options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-blocked"              options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-payment-methods"     options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-saved"             options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-blocked"              options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-payment-methods"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Live Shopping */}
         <Stack.Screen name="seller-go-live"  options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="seller-live"     options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', gestureEnabled: false, contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-live"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="buyer-muted"               options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-restricted"          options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-settings"        options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-addresses"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="app-theme"             options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-settings-detail" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-account-center"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-personal-details" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-security"        options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-login-activity"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-account-control" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-download-data"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="seller-data-export"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-close-friends"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-your-activity"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-archive"         options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-qr-code"              options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-post-viewer"         options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-drop-detail"        options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-highlights-manager"  options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-muted"               options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-restricted"          options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-settings"        options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-addresses"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="app-theme"             options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-settings-detail" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-account-center"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-personal-details" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-security"        options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-login-activity"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-account-control" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-download-data"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-data-export"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-close-friends"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-your-activity"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-archive"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-qr-code"              options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-post-viewer"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-drop-detail"        options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-highlights-manager"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-report"            options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-post-comments"     options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="ai-brain"         options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="ai-brand-memory"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="ai-settings"      options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="ai-brain"         options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="ai-brand-memory"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="ai-settings"      options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Design Studio screens */}
-        <Stack.Screen name="design"                   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-project"           options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-garment"           options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-templates"         options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-brand-assets"      options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-text-to-design"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-upload-sketch"     options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-mockup-to-model"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-ai-photoshoot"     options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-prompt-edit"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-bg-removal"        options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-bg-replace"        options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-campaign"          options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-mockup-preview"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-export"            options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="design-versions"          options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="design"                   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-project"           options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-garment"           options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-templates"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-brand-assets"      options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-text-to-design"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-upload-sketch"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-mockup-to-model"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-ai-photoshoot"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-prompt-edit"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-bg-removal"        options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-bg-replace"        options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-campaign"          options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-mockup-preview"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-export"            options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="design-versions"          options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Settings sub-screens */}
-        <Stack.Screen name="billing"            options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="users"              options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="roles"              options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="security"           options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="general-settings"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="push-notifications" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="biometric-unlock"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="app-icon"           options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="plan-details"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="payouts"            options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="subscription"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="share-store"        options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="product-size-chart" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="product-bundles"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="product-bundle-edit" options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="community-chat"     options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="freelancer-profile" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="billing"            options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="users"              options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="roles"              options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="security"           options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="general-settings"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="push-notifications" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="biometric-unlock"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="app-icon"           options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="plan-details"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="payouts"            options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="subscription"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="share-store"        options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="product-size-chart" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="product-bundles"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="product-bundle-edit" options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="community-chat"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="freelancer-profile" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="freelancer-apply"   options={{ headerShown: false, animation: 'slide_from_bottom' }} />
-        <Stack.Screen name="freelancer-jobs"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="manufacturer-onboard" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="request-sample"     options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="freelancer-jobs"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="manufacturer-onboard" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="request-sample"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* AI Studio sub-screens */}
-        <Stack.Screen name="ai-mockup-chat"     options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="ai-photography-chat" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="lifestyle-images"   options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="ai-mockup-chat"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="ai-photography-chat" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="lifestyle-images"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Store settings sub-screens */}
-        <Stack.Screen name="customer-accounts"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="customer-privacy"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="customer-events"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="taxes-duties"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="shipping-delivery"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="locations"          options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="languages"          options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="metafields"         options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="mobile-app-builder" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="orders"             options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="checkout"           options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="shopping-preferences"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="account-type-settings"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="login-methods"           options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="customer-accounts"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="customer-privacy"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="customer-events"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="taxes-duties"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="shipping-delivery"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="locations"          options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="languages"          options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="metafields"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="mobile-app-builder" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="orders"             options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="checkout"           options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="shopping-preferences"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="account-type-settings"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="login-methods"           options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Account management */}
-        <Stack.Screen name="account-switcher"       options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="account-switcher"       options={{ headerShown: false, animation: 'ios_from_right' }} />
       </Stack>
         </View>
       </Pressable>

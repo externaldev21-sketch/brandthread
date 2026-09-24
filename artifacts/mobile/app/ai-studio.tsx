@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { FS } from '@/lib/theme';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 type CanvasTile = {
   id: string;
@@ -239,12 +240,12 @@ export default function AIStudioScreen() {
       {/* New canvas sheet */}
       <Modal
         visible={newCanvasVisible}
-        animationType="slide"
+        animationType="fade"
         transparent
         onRequestClose={() => setNewCanvasVisible(false)}
       >
         <View style={styles.sheetOverlay}>
-          <View style={styles.sheetCard}>
+          <SheetRise style={styles.sheetCard}>
             <TouchableOpacity style={styles.sheetCancel} activeOpacity={0.7} onPress={() => setNewCanvasVisible(false)}>
               <Text style={styles.sheetCancelText}>Cancel</Text>
             </TouchableOpacity>
@@ -280,7 +281,7 @@ export default function AIStudioScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
+          </SheetRise>
         </View>
       </Modal>
     </View>

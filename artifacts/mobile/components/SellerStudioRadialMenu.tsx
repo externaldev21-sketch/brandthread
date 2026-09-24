@@ -30,6 +30,7 @@ import {
   saveCustomShortcut,
 } from '@/lib/studioShortcuts';
 import type { PickerDestination } from '@/lib/studioShortcuts';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 // Re-export pure helpers for external consumers / tests that import from this path
 export {
@@ -581,7 +582,7 @@ export default function SellerStudioRadialMenu({
       <Modal
         visible={pickerOpen}
         transparent
-        animationType="slide"
+        animationType="fade"
         statusBarTranslucent
         onRequestClose={() => setPickerOpen(false)}
       >
@@ -590,7 +591,7 @@ export default function SellerStudioRadialMenu({
           onPress={() => setPickerOpen(false)}
           testID="shortcut-picker-backdrop"
         />
-        <View
+        <SheetRise
           style={[
             styles.pickerSheet,
             { paddingBottom: Math.max(insets.bottom + 8, 24) },
@@ -657,7 +658,7 @@ export default function SellerStudioRadialMenu({
               </Pressable>
             )}
           </ScrollView>
-        </View>
+        </SheetRise>
       </Modal>
 
       <PlanUpsellModal

@@ -20,6 +20,7 @@ import { useAuth } from '@clerk/expo';
 import { clearBadge } from '@/lib/orderBadgeStore';
 import { formatCents } from '@/lib/money';
 import SwipeActionRow from '@/components/SwipeActionRow';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -498,9 +499,9 @@ function SortModal({
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const PURPLE_LIGHT = theme.accentLight;
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close sort menu" />
-      <View style={s.modalSheet}>
+      <SheetRise style={s.modalSheet}>
         <View style={s.modalHandle} />
         <Text style={s.modalTitle}>Sort Orders</Text>
         {SORTS.map(({ key, label }) => (
@@ -521,7 +522,7 @@ function SortModal({
         <TouchableOpacity style={s.modalCloseBtn} onPress={onClose} accessibilityRole="button" accessibilityLabel="Cancel sorting">
           <Text style={s.modalCloseBtnText}>Cancel</Text>
         </TouchableOpacity>
-      </View>
+      </SheetRise>
     </Modal>
   );
 }
@@ -540,9 +541,9 @@ function FilterSheet({
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const PURPLE_LIGHT = theme.accentLight;
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close filter menu" />
-      <View style={s.modalSheet}>
+      <SheetRise style={s.modalSheet}>
         <View style={s.modalHandle} />
         <Text style={s.modalTitle}>Filter Orders</Text>
         <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }}>
@@ -565,7 +566,7 @@ function FilterSheet({
         <TouchableOpacity style={s.modalCloseBtn} onPress={onClose} accessibilityRole="button" accessibilityLabel="Cancel filtering">
           <Text style={s.modalCloseBtnText}>Cancel</Text>
         </TouchableOpacity>
-      </View>
+      </SheetRise>
     </Modal>
   );
 }

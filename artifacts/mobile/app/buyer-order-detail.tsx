@@ -49,6 +49,7 @@ import {
 import { formatCents } from '@/lib/money';
 import { visibleOrderForBuyer } from '@/lib/buyerOrdersVisibility';
 import { canBuyerCancel } from '@/services/orderPolicy';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -315,14 +316,14 @@ function ReviewSheet({
   if (!visible) return null;
 
   return (
-    <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
       <TouchableOpacity
         style={{ ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.62)' } as any}
         activeOpacity={1}
         onPress={onClose}
         accessibilityLabel="Close review"
       />
-      <View style={[rvs.sheet, { paddingBottom: Math.max(insets.bottom, SP.lg) }]}>
+      <SheetRise style={[rvs.sheet, { paddingBottom: Math.max(insets.bottom, SP.lg) }]}>
         {/* Handle */}
         <View style={rvs.handle} />
 
@@ -382,7 +383,7 @@ function ReviewSheet({
             }
           </TouchableOpacity>
         </View>
-      </View>
+      </SheetRise>
     </Modal>
   );
 }
