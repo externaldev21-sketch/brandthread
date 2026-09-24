@@ -23,6 +23,7 @@ import postSlideRouter from "./post-slide";
 import { validateSlideOverlays, MAX_SLIDES } from "../lib/slideValidation";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
+import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import {
   enqueueAutoFilterReport,
   isBlockedEitherWay,
@@ -690,18 +691,26 @@ router.post("/", requireAuth, async (req, res) => {
 // ─── GET /api/posts/mine ─────────────────────────────────────────────────────
 // Authenticated seller library. Unlike /api/public/posts this includes only
 // the caller's own published, draft, and scheduled posts.
+// Query params: ?limit=&offset= (default 100, capped at MAX_PAGE_LIMIT) — a
+// long-lived seller's full post history was previously loaded unbounded.
 router.get("/mine", requireAuth, async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   if (!await sellerExists(clerkId)) {
     return res.status(403).json({ error: "Only seller accounts can manage posts.", code: "SELLER_ONLY" });
   }
+  const page = parsePagination(req.query, { limit: 100 });
+  if (!page.success) return res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" });
+  const { limit, offset } = page.data;
   try {
     const rows = await db.select().from(posts)
       .where(and(
         eq(posts.userId, clerkId),
         inArray(posts.postStatus, ["draft", "scheduled", "published", "archived"]),
       ))
-      .orderBy(desc(posts.createdAt));
+      .orderBy(desc(posts.createdAt))
+      .limit(limit)
+      .offset(offset);
+    setPaginationHeaders(res, page.data, rows.length);
     return res.json(await postDetails(rows));
   } catch (err) {
     req.log.error({ err, clerkId }, "Failed to fetch seller posts");

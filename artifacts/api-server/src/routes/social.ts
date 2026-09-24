@@ -25,6 +25,7 @@ import {
   profilesById,
   publishingRestriction,
 } from "../lib/safety";
+import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 
 const router = Router();
 router.use(requireAuth);
@@ -423,11 +424,18 @@ router.get("/friends/activity", async (req, res) => {
 });
 
 // ─── GET /api/social/following ────────────────────────────────────────────────
+// Query params: ?limit=&offset= (default 100, capped at MAX_PAGE_LIMIT).
 router.get("/following", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
+  const page = parsePagination(req.query, { limit: 100 });
+  if (!page.success) { res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" }); return; }
+  const { limit, offset } = page.data;
   const rows = await db
     .select({ followingId: follows.followingId, createdAt: follows.createdAt })
-    .from(follows).where(eq(follows.followerId, myId));
+    .from(follows).where(eq(follows.followerId, myId))
+    .orderBy(desc(follows.createdAt))
+    .limit(limit).offset(offset);
+  setPaginationHeaders(res, page.data, rows.length);
   if (!rows.length) { res.json([]); return; }
 
   const ids      = rows.map(r => r.followingId);
@@ -445,11 +453,18 @@ router.get("/following", async (req, res) => {
 });
 
 // ─── GET /api/social/followers ────────────────────────────────────────────────
+// Query params: ?limit=&offset= (default 100, capped at MAX_PAGE_LIMIT).
 router.get("/followers", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
+  const page = parsePagination(req.query, { limit: 100 });
+  if (!page.success) { res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" }); return; }
+  const { limit, offset } = page.data;
   const rows = await db
     .select({ followerId: follows.followerId, createdAt: follows.createdAt })
-    .from(follows).where(eq(follows.followingId, myId));
+    .from(follows).where(eq(follows.followingId, myId))
+    .orderBy(desc(follows.createdAt))
+    .limit(limit).offset(offset);
+  setPaginationHeaders(res, page.data, rows.length);
   if (!rows.length) { res.json([]); return; }
 
   const ids      = rows.map(r => r.followerId);

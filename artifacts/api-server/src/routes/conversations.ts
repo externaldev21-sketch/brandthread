@@ -25,6 +25,7 @@ import { moderateMessage } from "../lib/contentModerator";
 import { blockRelation, publishingRestriction } from "../lib/safety";
 import { publishNotification } from "./notifications-feed";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
+import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 
 const router = Router();
 router.use(requireAuth);
@@ -117,17 +118,29 @@ function adaptMessage(m: typeof messages.$inferSelect) {
 }
 
 // ─── GET /api/conversations ───────────────────────────────────────────────────
+// Query params: ?limit=&offset= (default 100, capped at MAX_PAGE_LIMIT). An
+// inbox is unbounded over time, so the id lookup itself is ordered + paged
+// before any per-conversation detail is fetched — avoids loading every
+// conversation a long-lived account has ever had on every inbox open.
 router.get("/", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
+  const page = parsePagination(req.query, { limit: 100 });
+  if (!page.success) return res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" });
+  const { limit, offset } = page.data;
 
   const myParts = await db
     .select({ conversationId: conversationParticipants.conversationId })
     .from(conversationParticipants)
-    .where(eq(conversationParticipants.userId, userId));
+    .innerJoin(conversations, eq(conversations.id, conversationParticipants.conversationId))
+    .where(eq(conversationParticipants.userId, userId))
+    .orderBy(desc(conversations.updatedAt))
+    .limit(limit)
+    .offset(offset);
 
-  if (myParts.length === 0) return res.json([]);
+  if (myParts.length === 0) { setPaginationHeaders(res, page.data, 0); return res.json([]); }
 
   const convIds = myParts.map((p) => p.conversationId);
+  setPaginationHeaders(res, page.data, convIds.length);
 
   const [convs, allParts, allMessages] = await Promise.all([
     db.select().from(conversations)
