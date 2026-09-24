@@ -326,6 +326,7 @@ const DEMO_BUYER_ORDERS: BuyerOrderView[] = DEMO_ORDERS_DATA.map(o => ({
   trackingCarrier: o.shipments[0]?.carrier,
   trackingStatus: o.shipments[0]?.trackingStatus,
   estimatedDelivery: o.shipments[0]?.estimatedDelivery,
+  shippedAt: o.shipments[0]?.shippedAt,
   isPreOrder: o.isPreOrder,
   preOrderEstShipDate: o.preOrder?.estimatedShipDate,
   hasReturnRequest: o.returns.length > 0,
@@ -559,6 +560,47 @@ export async function purchaseShippingLabel(
     fundingSource: result.fundingSource,
     purchasedAt: result.label.createdAt,
   };
+}
+
+// ─── Fulfillment wizard: checklist & package presets ───────────────────────────
+
+export interface PackagePreset {
+  id: string;
+  name: string;
+  weightOz: number;
+  lengthIn: string;
+  widthIn: string;
+  heightIn: string;
+}
+
+/** Persist the seller's pick/pack checklist state for one order. */
+export async function updateFulfillmentChecklist(
+  orderId: string,
+  body: { isPicked?: boolean; isPacked?: boolean },
+): Promise<void> {
+  await serviceRequest(`/api/orders/${encodeURIComponent(orderId)}/fulfillment-checklist`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function getPackagePresets(): Promise<PackagePreset[]> {
+  const result = await serviceRequest('/api/package-presets') as { presets: PackagePreset[] };
+  return result.presets ?? [];
+}
+
+export async function createPackagePreset(preset: {
+  name: string; weightOz: number; lengthIn: number; widthIn: number; heightIn: number;
+}): Promise<PackagePreset> {
+  const result = await serviceRequest('/api/package-presets', {
+    method: 'POST',
+    body: JSON.stringify(preset),
+  }) as { preset: PackagePreset };
+  return result.preset;
+}
+
+export async function deletePackagePreset(id: string): Promise<void> {
+  await serviceRequest(`/api/package-presets/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
 export async function voidShippingLabel(orderId: string, labelId: string): Promise<ShippingLabel> {
@@ -871,6 +913,7 @@ function mapApiBuyerOrder(o: any): BuyerOrderView {
     trackingCarrier:   o.carrier           ?? undefined,
     trackingStatus:    o.trackingStatus    ?? undefined,
     estimatedDelivery: o.estimatedDelivery ?? undefined,
+    shippedAt:         o.shippedAt         ?? undefined,
     isPreOrder:        false,
     hasReturnRequest: false,
     cancellationReason: o.cancellationReason ?? null,

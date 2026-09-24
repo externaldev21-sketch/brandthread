@@ -4,12 +4,15 @@ import { logger } from "./lib/logger";
 import { flushMonitoring } from "./lib/monitoring";
 import { startAbandonedCartJob } from "./jobs/abandonedCartRecovery";
 import { startTrendingJob }       from "./jobs/computeTrending";
+import { startSellerRankingJob }  from "./jobs/computeSellerRanking";
 import { startTeamInviteReminderJob } from "./jobs/teamInviteReminder";
 import { startScheduledDropBroadcastJob } from "./jobs/scheduledDropBroadcasts";
 import { startSellerTrialReminderJob } from "./jobs/sellerTrialReminder";
 import { startDesignStudioObjectCleanupJob } from "./jobs/designStudioObjectCleanup";
 import { startMoneySweepJob } from "./jobs/moneySweep";
 import { startStoryCleanupJob } from "./jobs/storyCleanup";
+import { startPushReceiptCleanupJob } from "./jobs/pushReceiptCleanup";
+import { startNotificationBatchFlushJob } from "./jobs/notificationBatchFlush";
 import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
 
 const rawPort = process.env["PORT"];
@@ -44,10 +47,13 @@ app.listen(port, (err) => {
   // Background jobs
   startAbandonedCartJob();
   startTrendingJob();
+  startSellerRankingJob();
   startTeamInviteReminderJob();
   startScheduledDropBroadcastJob();
   startSellerTrialReminderJob();
   startDesignStudioObjectCleanupJob();
   startMoneySweepJob();
   startStoryCleanupJob();
+  startPushReceiptCleanupJob();
+  startNotificationBatchFlushJob();
 });

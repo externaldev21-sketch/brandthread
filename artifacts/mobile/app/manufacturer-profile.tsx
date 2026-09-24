@@ -34,6 +34,7 @@ import {
 
 import { Manufacturer } from '@/services/manufacturerTypes';
 import { formatCents } from '@/lib/money';
+import { localTimeLabel } from '@workspace/manufacturer-flow';
 
 // ─── Star Rating ──────────────────────────────────────────────────────────────
 
@@ -151,7 +152,7 @@ export default function ManufacturerProfileScreen() {
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Feather name="arrow-left" size={ICON.md} color={FG} />
         </TouchableOpacity>
-        <EmptyState icon="alert-circle" title="Manufacturer unavailable" description="" />
+        <EmptyState icon="alert-circle" title="Manufacturer unavailable" description="This profile is no longer listed, or it's a private manufacturer you aren't connected to." action={{ label: 'Back to directory', onPress: () => router.back() }} />
       </View>
     );
   }
@@ -179,9 +180,13 @@ export default function ManufacturerProfileScreen() {
 
           {/* Factory icon */}
           <View style={s.factoryIconWrap}>
-            <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.factoryIconBg}>
-              <Feather name="settings" size={ICON.xxl} color={theme.onAccent} />
-            </LinearGradient>
+            {m.profileImageUri ? (
+              <Image source={{ uri: m.profileImageUri }} style={s.factoryIconBg} resizeMode="cover" accessibilityLabel={`${m.name} lead photo`} />
+            ) : (
+              <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.factoryIconBg}>
+                <Feather name="settings" size={ICON.xxl} color={theme.onAccent} />
+              </LinearGradient>
+            )}
           </View>
 
           {/* Name + verified */}
@@ -198,8 +203,24 @@ export default function ManufacturerProfileScreen() {
           {/* Location */}
           <View style={s.heroLocationRow}>
              <Feather name="map-pin" size={12} color={theme.onAccent} />
-             <Text style={[s.heroLocation, getOnAccentTextStyle(theme)]}>{m.city}, {m.country}</Text>
+             <Text style={[s.heroLocation, getOnAccentTextStyle(theme)]}>{[m.city, m.country].filter(Boolean).join(', ')}</Text>
           </View>
+          {(localTimeLabel(m.timeZone) || m.isPublicDirectory === false) && (
+            <View style={s.heroLocationRow}>
+              {localTimeLabel(m.timeZone) ? (
+                <>
+                  <Feather name="clock" size={12} color={theme.onAccent} />
+                  <Text style={[s.heroLocation, getOnAccentTextStyle(theme)]} testID="profile-local-time">{localTimeLabel(m.timeZone)}</Text>
+                </>
+              ) : null}
+              {m.isPublicDirectory === false && (
+                <View style={[s.verifiedBadge, { backgroundColor: 'rgba(0,0,0,0.35)' }]}>
+                  <Feather name="lock" size={12} color={theme.onAccent} />
+                  <Text style={[s.verifiedText, { color: theme.onAccent }]}>Private partner</Text>
+                </View>
+              )}
+            </View>
+          )}
 
           {/* Rating */}
           <View style={s.heroRatingRow}>
@@ -234,31 +255,20 @@ export default function ManufacturerProfileScreen() {
           {/* ── Overview ── */}
           <SectionCard title="Overview">
             <View style={s.overviewGrid}>
-              <View style={s.overviewItem}>
-                <Feather name="clock" size={ICON.sm} color={PURPLE_LIGHT} />
-                <Text style={s.overviewLabel}>Years in Business</Text>
-                <Text style={s.overviewValue}>{m.yearsInBusiness}</Text>
-              </View>
-              <View style={s.overviewItem}>
-                <Feather name="users" size={ICON.sm} color={CYAN} />
-                <Text style={s.overviewLabel}>Team Size</Text>
-                <Text style={s.overviewValue}>{m.teamSize}</Text>
-              </View>
-              <View style={s.overviewItem}>
-                <Feather name="package" size={ICON.sm} color={SUCCESS} />
-                <Text style={s.overviewLabel}>Capacity</Text>
-                <Text style={s.overviewValue}>{m.productionCapacity}</Text>
-              </View>
-              <View style={s.overviewItem}>
-                <Feather name="zap" size={ICON.sm} color={GOLD} />
-                <Text style={s.overviewLabel}>Response</Text>
-              <Text style={s.overviewValue}>{m.responseTimeHours > 0 ? `${m.responseTimeHours}h` : '—'}</Text>
-              </View>
-              <View style={s.overviewItem}>
-                <Feather name="calendar" size={ICON.sm} color={ORANGE} />
-                <Text style={s.overviewLabel}>Lead Time</Text>
-                <Text style={s.overviewValue}>{m.leadTimeDays}d</Text>
-              </View>
+              {([
+                { icon: 'clock', label: 'Years in business', value: m.yearsInBusiness > 0 ? `${m.yearsInBusiness} ${m.yearsInBusiness === 1 ? 'year' : 'years'}` : 'New' },
+                { icon: 'package', label: 'Minimum order', value: m.moq > 0 ? `${m.moq.toLocaleString('en-US')} pcs` : null },
+                { icon: 'tag', label: 'Price per piece', value: m.priceRangeLabel ?? null },
+                { icon: 'scissors', label: 'Sample time', value: m.sampleTurnaround ?? null },
+                { icon: 'calendar', label: 'Bulk time', value: m.bulkTurnaround ?? (m.leadTimeDays ? `${m.leadTimeDays} days` : null) },
+                { icon: 'zap', label: 'Replies in', value: m.responseTimeHours > 0 ? `~${m.responseTimeHours}h` : null },
+              ] as const).filter((item) => item.value).map((item) => (
+                <View key={item.label} style={s.overviewItem}>
+                  <Feather name={item.icon} size={ICON.sm} color={FG} />
+                  <Text style={s.overviewLabel}>{item.label}</Text>
+                  <Text style={s.overviewValue}>{item.value}</Text>
+                </View>
+              ))}
             </View>
             {!!m.description && <Text style={s.description}>{m.description}</Text>}
           </SectionCard>

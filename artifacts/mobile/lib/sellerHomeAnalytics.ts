@@ -5,7 +5,9 @@ export type SellerHomeAnalytics = {
   visitorCount: number;
   toFulfill: number;
   toCapture: number;
-  buckets: Array<{ bucket: string; totalCents: number; orderCount: number }>;
+  /** The immediately preceding period of the same length (e.g. yesterday for "today"). */
+  previous: { totalCents: number; orderCount: number; visitorCount: number };
+  buckets: Array<{ bucket: string; totalCents: number; orderCount: number; visitorCount: number }>;
 };
 
 export type SellerHomeAnalyticsSnapshot = {
@@ -21,6 +23,7 @@ export function zeroSellerHomeAnalytics(range: string): SellerHomeAnalytics {
     visitorCount: 0,
     toFulfill: 0,
     toCapture: 0,
+    previous: { totalCents: 0, orderCount: 0, visitorCount: 0 },
     buckets: [],
   };
 }

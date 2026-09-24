@@ -15,6 +15,7 @@ import {
 import { eq, and, inArray, count, sql, desc, lte, lt, gte, or } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
+import { enqueueBatchedNotification } from "../lib/push";
 import postVideoRouter, {
   mediaUrl as composedMediaUrl,
   setComposedMediaVisibility,
@@ -1175,14 +1176,19 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
     return res.status(404).json({ error: "Post not found" });
   }
   const { type, value } = req.body as {
-    type: "like" | "repost" | "view" | "watch_time" | "shop_click";
+    type: "like" | "repost" | "view" | "watch_time" | "shop_click" | "share";
     value?: string;
   };
 
-  if (!["like", "repost", "view", "watch_time", "shop_click"].includes(type)) {
-    return res.status(400).json({ error: "type must be like, repost, view, watch_time, or shop_click" });
+  // "share" is a new interaction type added for Discover's seller-ranking
+  // job (see jobs/computeSellerRanking.ts): it records a buyer sharing a
+  // post out of the app (share sheet, copy link, etc.), which previously had
+  // no tracking at all. Non-idempotent, like view/watch_time/shop_click —
+  // one row is recorded per share tap.
+  if (!["like", "repost", "view", "watch_time", "shop_click", "share"].includes(type)) {
+    return res.status(400).json({ error: "type must be like, repost, view, watch_time, shop_click, or share" });
   }
-  const [visiblePost] = await db.select({ id: posts.id, visibility: posts.visibility }).from(posts)
+  const [visiblePost] = await db.select({ id: posts.id, visibility: posts.visibility, ownerId: posts.userId }).from(posts)
     .where(and(eq(posts.id, id), visiblePostCondition()))
     .limit(1);
   if (!visiblePost) return res.status(404).json({ error: "Post not found" });
@@ -1190,7 +1196,7 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
     return res.status(403).json({ error: "Reposts are disabled for this post" });
   }
 
-  if (type === "view" || type === "watch_time" || type === "shop_click") {
+  if (type === "view" || type === "watch_time" || type === "shop_click" || type === "share") {
     await db.insert(interactions).values({ userId: clerkId, postId: id, type, value: value ?? null });
     return res.json({ action: "recorded" });
   }
@@ -1221,6 +1227,23 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
       .select({ count: count() })
       .from(interactions)
       .where(and(eq(interactions.postId, id), eq(interactions.type, type)));
+
+    if (!removing && visiblePost.ownerId && visiblePost.ownerId !== clerkId) {
+      const [liker] = await db.select({
+        name: sql<string>`COALESCE(${users.brandName}, ${users.displayName}, 'Someone')`,
+      }).from(users).where(eq(users.clerkId, clerkId)).limit(1);
+      // Likes are bursty and low-priority: collapse them into one notification
+      // instead of pushing on every tap (see jobs/notificationBatchFlush.ts).
+      void enqueueBatchedNotification({
+        userId: visiblePost.ownerId,
+        category: "social",
+        type: "post_liked",
+        targetId: id,
+        targetType: "post",
+        actorName: liker?.name ?? "Someone",
+        cta: "View post",
+      });
+    }
 
     return res.json({ action: removing ? "removed" : "added", count: newCount });
   }
