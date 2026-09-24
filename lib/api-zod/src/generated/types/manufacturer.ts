@@ -28,6 +28,9 @@ export interface Manufacturer {
   contactEmail?: string | null;
   /** @nullable */
   contactPhone?: string | null;
+  /** @nullable */
+  timeZone?: string | null;
+  isPublicDirectory?: boolean;
   status: string;
   /** @nullable */
   verifiedAt?: string | null;

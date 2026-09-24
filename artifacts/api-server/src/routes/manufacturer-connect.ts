@@ -11,6 +11,7 @@ import { desc, eq } from "drizzle-orm";
 import { requireStripe } from "../lib/stripe";
 import { getWebOrigin } from "../lib/webOrigin";
 import { isAllowedBrandthreadCallbackUrl } from "../lib/brandthreadCallbackUrls";
+import { findCountry } from "@workspace/manufacturer-flow";
 
 const router = Router();
 
@@ -27,16 +28,29 @@ export function isAllowedOnboardingUrl(value: unknown): value is string {
   return isAllowedBrandthreadCallbackUrl(value, "manufacturer_onboarding");
 }
 
+/** Country the platform's Stripe account is registered in. */
+export const PLATFORM_STRIPE_COUNTRY = (process.env.STRIPE_PLATFORM_COUNTRY ?? "US").toUpperCase();
+
 export function connectReadiness(account: {
   charges_enabled?: boolean;
   payouts_enabled?: boolean;
   details_submitted?: boolean;
+  capabilities?: { transfers?: string | null; card_payments?: string | null } | null;
+  tos_acceptance?: { service_agreement?: string | null } | null;
   requirements?: { currently_due?: string[] | null; past_due?: string[] | null; disabled_reason?: string | null };
 }) {
   const chargesEnabled = account.charges_enabled === true;
   const payoutsEnabled = account.payouts_enabled === true;
   const detailsSubmitted = account.details_submitted === true;
-  const ready = chargesEnabled && payoutsEnabled && detailsSubmitted;
+  // International manufacturers use Stripe's cross-border "recipient"
+  // agreement: they never process charges themselves, they receive the
+  // transfer from a destination charge. For them the transfers capability is
+  // what must be active.
+  const accountType = account.tos_acceptance?.service_agreement === "recipient" ? "recipient" as const : "full" as const;
+  const canReceiveFunds = accountType === "recipient"
+    ? account.capabilities?.transfers === "active"
+    : chargesEnabled;
+  const ready = canReceiveFunds && payoutsEnabled && detailsSubmitted;
   const requirementsDue = Array.from(new Set([
     ...(account.requirements?.currently_due ?? []),
     ...(account.requirements?.past_due ?? []),
@@ -49,7 +63,17 @@ export function connectReadiness(account: {
     status: ready ? "active" : detailsSubmitted ? "restricted" : "pending",
     requirementsDue,
     disabledReason: account.requirements?.disabled_reason ?? null,
+    accountType,
   };
+}
+
+/** Plain-English onboarding failure for an unsupported or unset country. */
+export function connectCountryProblem(country: string | null | undefined): string | null {
+  if (!country?.trim()) return "Add your country in Business Profile before setting up payouts.";
+  if (!findCountry(country)) {
+    return `We don't have payout details for "${country}" yet. Update your country in Business Profile or contact support.`;
+  }
+  return null;
 }
 
 // ── POST /api/manufacturers/connect/onboard ────────────────────────────────────
@@ -79,10 +103,41 @@ router.post("/onboard", async (req, res) => {
     let stripeAccountId = mfr.stripeAccountId;
 
     if (!stripeAccountId) {
-      const account = await stripe.accounts.create(
-        { type: "express", metadata: { manufacturerId: mfr.id } },
-        { idempotencyKey: `manufacturer-connect-account/${mfr.id}` },
-      );
+      const countryProblem = connectCountryProblem(mfr.country);
+      if (countryProblem) { res.status(422).json({ error: countryProblem, code: "COUNTRY_REQUIRED" }); return; }
+      const country = findCountry(mfr.country)!;
+      const recipient = country.code !== PLATFORM_STRIPE_COUNTRY;
+      let account;
+      try {
+        account = await stripe.accounts.create(
+          {
+            type: "express",
+            country: country.code,
+            email: mfr.contactEmail ?? undefined,
+            business_profile: {
+              name: mfr.businessName,
+              product_description: `Apparel manufacturing (${mfr.specialty}) for Brandthread sellers`,
+              url: mfr.website ?? undefined,
+            },
+            capabilities: recipient
+              ? { transfers: { requested: true } }
+              : { card_payments: { requested: true }, transfers: { requested: true } },
+            ...(recipient ? { tos_acceptance: { service_agreement: "recipient" as const } } : {}),
+            metadata: { manufacturerId: mfr.id },
+          },
+          { idempotencyKey: `manufacturer-connect-account/${mfr.id}/${country.code}` },
+        );
+      } catch (error: any) {
+        if (error?.type === "StripeInvalidRequestError") {
+          req.log.warn({ err: error, country: country.code }, "Stripe rejected manufacturer Connect account");
+          res.status(422).json({
+            error: `Stripe can't open payout accounts in ${country.name} for this platform yet. Contact support and we'll help you get paid another way.`,
+            code: "COUNTRY_NOT_SUPPORTED",
+          });
+          return;
+        }
+        throw error;
+      }
       stripeAccountId = account.id;
       await db
         .update(manufacturers)
@@ -132,6 +187,10 @@ router.get("/status", async (req, res) => {
         status:           "not_started",
         requirementsDue:  [],
         disabledReason:   null,
+        country:          findCountry(mfr.country)?.code ?? null,
+        payoutCurrency:   null,
+        accountType:      findCountry(mfr.country) && findCountry(mfr.country)!.code !== PLATFORM_STRIPE_COUNTRY ? "recipient" : "full",
+        countryProblem:   connectCountryProblem(mfr.country),
         recovery:         "Start Stripe onboarding and add an eligible bank account before accepting payments.",
       });
       return;
@@ -153,6 +212,8 @@ router.get("/status", async (req, res) => {
     res.json({
       connected:        true,
       stripeAccountId:  mfr.stripeAccountId,
+      country:          account.country ?? null,
+      payoutCurrency:   account.default_currency?.toUpperCase() ?? null,
       ...readiness,
       recovery: readiness.ready ? null : "Complete Stripe verification and add an eligible bank account before accepting payments.",
     });

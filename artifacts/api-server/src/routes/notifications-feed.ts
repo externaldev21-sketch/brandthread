@@ -126,6 +126,7 @@ export async function publishNotification(n: {
       data: {
         notificationId: notification.id,
         type: n.type,
+        category: n.category,
         targetId: n.targetId,
         targetType: n.targetType,
         cta: n.cta,

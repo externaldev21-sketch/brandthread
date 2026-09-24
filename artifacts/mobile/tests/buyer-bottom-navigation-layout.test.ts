@@ -168,7 +168,10 @@ describe('buyer and seller bars look like one app', () => {
       expect(source).toContain('bottom: metrics.bottomOffset');
     }
     expect(bar).toContain('useBuyerTabBarMetrics()');
-    expect(sellerBar).toContain('useTabBarMetrics()');
+    // The seller bar has two side circles (Studio + AI) instead of the
+    // buyer's one, so its capsule gets a narrower share of the same
+    // full-width bar — same shared metrics function, different circle count.
+    expect(sellerBar).toContain('useTabBarMetrics(2)');
   });
 
   it('the seller bar is icon-only too, with spoken labels', () => {

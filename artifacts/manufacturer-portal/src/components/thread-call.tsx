@@ -3,6 +3,8 @@ import { useAuth } from "@clerk/react";
 import AgoraRTC, { IAgoraRTCClient, ICameraVideoTrack, IMicrophoneAudioTrack } from "agora-rtc-sdk-ng";
 import { Camera, CameraOff, Mic, MicOff, Phone, PhoneOff, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useCallAvailability } from "@/hooks/use-call-availability";
 
 type CallMode = "voice" | "video";
 type CallEvent = "started" | "ended" | "declined" | "failed";
@@ -25,7 +27,43 @@ const errorMessage = (error: unknown) => {
   return `Call SDK error: ${message}`;
 };
 
+/**
+ * Voice/video controls for a seller conversation. When the server has no Agora
+ * credentials (AGORA_APP_ID / AGORA_APP_CERTIFICATE) this renders a "coming
+ * soon" state instead of buttons that would fail; setting the keys switches
+ * calling on with no portal release.
+ */
 export function ThreadCall({ threadId }: { threadId: string }) {
+  const { configured, loading } = useCallAvailability();
+  if (loading) return <div className="h-9 w-20" aria-hidden />;
+  if (!configured) return <CallsComingSoon />;
+  return <ThreadCallControls threadId={threadId} />;
+}
+
+function CallsComingSoon() {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" data-testid="button-calls-coming-soon">
+          <Phone className="h-4 w-4" />
+          <span className="hidden lg:inline">Calls</span>
+          <span className="rounded-full border border-border px-1.5 py-px text-[10px] uppercase tracking-wide">Soon</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary"><Video className="h-4 w-4" /></div>
+          <p className="font-semibold">Voice & video calls are coming soon</p>
+        </div>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Until then, keep everything in this conversation — photos, order cards and production updates all stay in one place for both of you.
+        </p>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function ThreadCallControls({ threadId }: { threadId: string }) {
   const { getToken } = useAuth();
   const getTokenRef = useRef(getToken);
   const threadIdRef = useRef(threadId);

@@ -13,8 +13,10 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, SP, RADIUS, COMP, ICON, ANIM } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
-import { IconButton, FilterChip, StatusBadge, SearchBar, EmptyState } from '@/components/BrandthreadUI';
-import { SkeletonBlock, useCenteredContentPadding } from '@/components/layout';
+import { FilterChip, SearchBar } from '@/components/BrandthreadUI';
+import { SkeletonBlock, EmptyState, useCenteredContentPadding } from '@/components/layout';
+import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
+import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { filterOrders, sortOrders } from '@/services/orderService';
 import { dbStatusToOrderStatus, dbStatusToPaymentStatus } from '@/lib/orderStatusAdapter';
 import { Order, OrderFilterKey, OrderSortKey, OrderAddress, OrderCustomer, FulfillmentStatus, FulfillmentType, OrderStatus, PaymentStatus, CancellationReason, CANCELLATION_REASONS } from '@/services/orderTypes';
@@ -355,10 +357,10 @@ export function OrderRow({
   return (
     <>
       <TouchableOpacity
-        activeOpacity={0.82}
+        activeOpacity={0.86}
         onPress={onPress}
         onLongPress={onLongPress}
-        style={[s.orderRow, selected && s.orderRowSelected, isHighRisk && s.orderRowRisk, isArchived && s.orderRowArchived]}
+        style={[s.orderCard, selected && s.orderRowSelected, isHighRisk && s.orderRowRisk, isArchived && s.orderRowArchived]}
         accessibilityRole="button"
         accessibilityLabel={`Order ${order.orderNumber}, ${order.customer.name}, ${fmtMoney(order.payment.totalCents)}`}
       >
@@ -501,8 +503,12 @@ export function OrderRow({
             </View>
           )}
         </View>
+
+        {/* Live status tracker — compact stepper mirrors the buyer + detail screens */}
+        <View style={s.cardTimelineWrap}>
+          <OrderStatusTimeline status={order.status} compact />
+        </View>
       </TouchableOpacity>
-      {!isLast && <View style={s.rowDivider} />}
     </>
   );
 }
@@ -646,11 +652,24 @@ const OrderListRow = React.memo(function OrderListRow({
   );
 });
 
-// ─── Order row skeleton — matches OrderRow's shape: order # row, customer +
-// item lines, then price/time and status pills ─────────────────────────────
+// ─── Order card skeleton — matches OrderRow's card shape: order # row,
+// customer + item lines, price/time, status pills, then the timeline strip ──
 function SellerOrderRowSkeleton() {
+  const { theme } = useAppTheme();
   return (
-    <View style={{ paddingHorizontal: SP.md, paddingVertical: SP.sm, gap: SP.xs }}>
+    <View
+      style={{
+        paddingHorizontal: SP.md,
+        paddingVertical: SP.md,
+        marginHorizontal: SP.md,
+        marginBottom: SP.sm,
+        borderRadius: RADIUS.lg,
+        borderWidth: 1,
+        borderColor: theme.border,
+        backgroundColor: theme.card,
+        gap: SP.xs,
+      }}
+    >
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
         <View style={{ gap: SP.xs, flex: 1 }}>
           <SkeletonBlock width={90} height={13} />
@@ -665,6 +684,9 @@ function SellerOrderRowSkeleton() {
       <View style={{ flexDirection: 'row', gap: SP.xs, marginTop: SP.xs }}>
         <SkeletonBlock width={64} height={16} radius={RADIUS.pill} />
         <SkeletonBlock width={72} height={16} radius={RADIUS.pill} />
+      </View>
+      <View style={{ flexDirection: 'row', gap: SP.sm, marginTop: SP.sm, paddingTop: SP.sm, borderTopWidth: 1, borderTopColor: theme.border }}>
+        {Array.from({ length: 5 }).map((_, i) => <SkeletonBlock key={i} width={10} height={10} radius={RADIUS.pill} />)}
       </View>
     </View>
   );
@@ -689,6 +711,7 @@ export default function OrdersScreen() {
   // Extra centering padding beyond each row's own SP.md gutter — 0 on phone,
   // grows on iPad so the list doesn't stretch edge to edge.
   const listSidePad = Math.max(0, useCenteredContentPadding() - SP.md);
+  const tabBarMetrics = useTabBarMetrics();
 
   const api = useApi();
   const { userId, isLoaded: authLoaded, isSignedIn } = useAuth();
@@ -850,8 +873,13 @@ export default function OrdersScreen() {
   }, [api, loadData]);
 
   const handleShip = useCallback((orderId: string) => {
-    router.push(('/order-detail?id=' + orderId + '&tab=shipping') as never);
+    router.push(('/fulfill-order?orderId=' + orderId) as never);
   }, [router]);
+
+  const handleBulkFulfill = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push(('/fulfill-batch?orderIds=' + selectedIds.join(',')) as never);
+  }, [router, selectedIds]);
 
   const handleCardPress = useCallback((order: Order) => {
     if (selectedIds.length > 0) {
@@ -1015,14 +1043,13 @@ export default function OrdersScreen() {
       {loadError ? (
         <EmptyState
           icon="alert-circle"
-          title="Couldn't load orders"
-          description="Check your connection and pull to refresh."
+          message="Couldn't load orders. Check your connection and pull to refresh."
+          variant="error"
         />
       ) : (
         <EmptyState
           icon="shopping-bag"
-          title="Your orders will show up here."
-          description="When a customer places an order, you can manage payment and fulfillment here."
+          message="Your orders will show up here."
         />
       )}
     </View>
@@ -1127,7 +1154,7 @@ export default function OrdersScreen() {
           contentContainerStyle={[
             s.listContent,
             filtered.length === 0 && { flexGrow: 1 },
-            { paddingHorizontal: listSidePad, paddingBottom: insets.bottom + COMP.tabBarH + (selectedIds.length > 0 ? 80 : SP.md) },
+            { paddingHorizontal: listSidePad, paddingBottom: tabBarMetrics.occupiedHeight + (selectedIds.length > 0 ? 80 : SP.md) },
           ]}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -1154,6 +1181,10 @@ export default function OrdersScreen() {
               <TouchableOpacity style={s.bulkBtn} onPress={handleBulkMarkReady} accessibilityRole="button" accessibilityLabel="Mark selected orders ready">
                 <Feather name="package" size={ICON.xs} color={SUCCESS} />
                 <Text style={[s.bulkBtnText, { color: SUCCESS }]}>Ready</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.bulkBtn} onPress={handleBulkFulfill} accessibilityRole="button" accessibilityLabel="Fulfill selected orders">
+                <Feather name="send" size={ICON.xs} color={BLUE} />
+                <Text style={[s.bulkBtnText, { color: BLUE }]}>Fulfill</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.bulkBtn} onPress={handleExportCsv} accessibilityRole="button" accessibilityLabel="Export selected orders">
                 <Feather name="download" size={ICON.xs} color={MUTED} />
@@ -1359,22 +1390,34 @@ const createStyles = (theme: any) => {
     color: SUBTLE,
   },
 
-  // Order row
-  orderRow: {
+  // Order card
+  orderCard: {
     paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
+    paddingVertical: SP.md,
+    marginHorizontal: SP.md,
+    marginBottom: SP.sm,
     backgroundColor: CARD,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: BORDER,
     minHeight: 44,
   },
   orderRowSelected: {
     backgroundColor: CARD_ELEVATED_GLASS,
+    borderColor: BORDER_ACTIVE,
   },
   orderRowRisk: {
-    borderLeftWidth: 2,
-    borderLeftColor: RED + '66',
+    borderLeftWidth: 3,
+    borderLeftColor: RED + '88',
   },
   orderRowArchived: {
     opacity: 0.68,
+  },
+  cardTimelineWrap: {
+    marginTop: SP.sm,
+    paddingTop: SP.sm,
+    borderTopWidth: 1,
+    borderTopColor: BORDER,
   },
 
   // Selection
