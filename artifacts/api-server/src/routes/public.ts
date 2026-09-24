@@ -3,7 +3,9 @@
  * Mounted at /api/public — no requireAuth middleware.
  */
 import { Router } from "express";
-import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems, follows } from "@workspace/db";
+import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems, follows, savedCollections, savedItems } from "@workspace/db";
+import { adaptSavedRows } from "../lib/savedItemAdapter";
+import { fetchProductBadgeInfo } from "../lib/savedProductBadges";
 import { eq, and, asc, desc, ne, inArray, notInArray, or, ilike, sql, count, gte, lte, isNull, isNotNull } from "drizzle-orm";
 import { computeTrendingForToday, isCacheFresh } from "../jobs/computeTrending";
 import { computeSellerRankingForToday, isSellerRankingCacheFresh } from "../jobs/computeSellerRanking";
@@ -20,6 +22,7 @@ import {
   parsePagination,
   setPaginationHeaders,
 } from "../lib/pagination";
+import { setPublicCacheHeaders } from "../lib/httpCache";
 
 // ─── In-flight guard for synchronous cache-miss computation ──────────────────
 // Prevents concurrent requests from each triggering an independent full
@@ -112,6 +115,7 @@ export function rankRelatedProducts<T extends {
 // Optional query params: ?category=apparel&tag=streetwear&ownerId=user_xxx&limit=50&offset=0
 router.get("/products", async (req, res) => {
   try {
+    setPublicCacheHeaders(res);
     const category = singleQueryValue(req.query.category);
     const tag = singleQueryValue(req.query.tag);
     const ownerId = singleQueryValue(req.query.ownerId);
@@ -233,6 +237,7 @@ router.get("/products/high-demand", async (req, res) => {
   const lim = Math.min(parsedLimit, 24);
 
   try {
+    setPublicCacheHeaders(res);
     const activeProducts = await db.select().from(products)
       .where(and(eq(products.status, "active"), isNull(products.deletedAt)));
     if (activeProducts.length === 0) return res.json([]);
@@ -318,6 +323,7 @@ router.get("/products/:id/related", async (req, res) => {
   const lim = Math.min(parsedLimit, 24);
 
   try {
+    setPublicCacheHeaders(res);
     const [current] = await db.select().from(products)
       .where(and(eq(products.id, req.params.id), eq(products.status, "active"), isNull(products.deletedAt))).limit(1);
     if (!current) return res.status(404).json({ error: "Product not found" });
@@ -354,6 +360,7 @@ router.get("/products/:id/related", async (req, res) => {
 // GET /api/public/products/:id
 router.get("/products/:id", async (req, res) => {
   try {
+    setPublicCacheHeaders(res);
     const [product] = await db
       .select()
       .from(products)
@@ -390,6 +397,51 @@ router.get("/products/:id", async (req, res) => {
   } catch (err) {
     req.log.error({ err, productId: req.params.id }, "Failed to fetch public product");
     res.status(500).json({ error: "Failed to fetch product" });
+  }
+});
+
+// GET /api/public/collections/:id — a shared "Save to collection" board (deep link).
+// Only ever returns collections the owner has explicitly marked public.
+router.get("/collections/:id", async (req, res) => {
+  try {
+    const [collection] = await db.select().from(savedCollections)
+      .where(and(eq(savedCollections.id, req.params.id), eq(savedCollections.isPublic, true)))
+      .limit(1);
+    if (!collection) {
+      res.status(404).json({ error: "Collection not found" });
+      return;
+    }
+
+    const [owner] = await db.select({ displayName: users.displayName, brandName: users.brandName })
+      .from(users)
+      .where(eq(users.clerkId, collection.userId))
+      .limit(1);
+
+    const items = await db.select().from(savedItems)
+      .where(eq(savedItems.collectionId, collection.id))
+      .orderBy(desc(savedItems.createdAt));
+    const adaptedItems = await adaptSavedRows(items);
+
+    let coverImageUrl = collection.coverImageUrl;
+    if (!coverImageUrl) {
+      const productIds = items.filter((i) => i.itemType === "product").map((i) => i.targetId);
+      const badgeInfo = await fetchProductBadgeInfo(productIds);
+      coverImageUrl = items.map((i) => badgeInfo.get(i.targetId)?.image).find(Boolean) ?? null;
+    }
+
+    res.json({
+      collection: {
+        id: collection.id,
+        name: collection.name,
+        coverImageUrl,
+        itemCount: items.length,
+        ownerName: owner?.brandName ?? owner?.displayName ?? "Brandthread",
+      },
+      items: adaptedItems,
+    });
+  } catch (err) {
+    req.log.error({ err, collectionId: req.params.id }, "Failed to fetch public collection");
+    res.status(500).json({ error: "Failed to fetch collection" });
   }
 });
 
@@ -681,6 +733,74 @@ router.get("/search/suggested", async (req, res) => {
   }
 });
 
+// ─── GET /api/public/brands/discover — newest active sellers to follow ────────
+// Unauthenticated, lightweight "browse brands" list used by buyer onboarding's
+// Brands-to-follow step (there is no full search term at that point, so the
+// existing /search endpoint — which requires a query — doesn't fit). Returns
+// active, non-restricted sellers newest-first. No style/category column
+// exists on `users` today, so this intentionally returns a flat list; any
+// future style/category filter should extend this query, not add a second
+// endpoint.
+export function rankDiscoverBrands<T extends { createdAt: Date; clerkId: string }>(sellers: T[]): T[] {
+  return [...sellers].sort((a, b) =>
+    b.createdAt.getTime() - a.createdAt.getTime() || a.clerkId.localeCompare(b.clerkId));
+}
+
+router.get("/brands/discover", async (req, res) => {
+  try {
+    const parsedLimit = parseNonNegativeInteger(req.query.limit, "limit", 24);
+    if (typeof parsedLimit !== "number" || parsedLimit < 1) {
+      res.status(400).json({
+        error: typeof parsedLimit === "number" ? "limit must be at least 1" : parsedLimit.error,
+      });
+      return;
+    }
+    const lim = Math.min(parsedLimit, 50);
+    const viewerId = optionalViewerId(req);
+
+    const sellers = await db
+      .select({
+        clerkId:         users.clerkId,
+        displayName:     users.displayName,
+        brandName:       users.brandName,
+        brandType:       users.brandType,
+        profileImageUrl: users.profileImageUrl,
+        avatarUrl:       users.avatarUrl,
+        verified:        users.verified,
+        verificationStatus: users.verificationStatus,
+        activeStanding:  users.activeStanding,
+        policyRestricted: users.policyRestricted,
+        createdAt:       users.createdAt,
+      })
+      .from(users)
+      .where(and(
+        eq(users.accountType, "seller"),
+        isNull(users.suspendedAt),
+        isNull(users.deletedAt),
+        eq(users.policyRestricted, false),
+        notBlockedWith(viewerId, users.clerkId),
+      ))
+      .orderBy(desc(users.createdAt), asc(users.clerkId))
+      .limit(lim * 2); // small buffer before app-side ranking/limit
+
+    const ranked = rankDiscoverBrands(sellers).slice(0, lim);
+
+    res.json({
+      brands: ranked.map((s) => ({
+        id:          s.clerkId,
+        sellerId:    s.clerkId,
+        name:        s.brandName || s.displayName || "Brand",
+        brandType:   s.brandType ?? null,
+        logoUrl:     s.profileImageUrl ?? s.avatarUrl ?? null,
+        verified:    deriveSellerVerified(s),
+      })),
+    });
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch discover brands");
+    res.status(500).json({ error: "Failed to fetch brands" });
+  }
+});
+
 // ─── GET /api/public/sellers/:sellerId — public seller storefront ─────────────
 // Accepts either users.clerkId or users.id (UUID) for backward-/forward-compatibility.
 router.get("/sellers/:sellerId", async (req, res) => {
@@ -797,6 +917,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
 
 // ─── GET /api/public/drops — buyer-facing active drops with countdown ─────────
 router.get("/drops", async (req, res) => {
+  setPublicCacheHeaders(res);
   const activeDrops = await db
     .select({
       id:                drops.id,
@@ -829,6 +950,7 @@ router.get("/drops", async (req, res) => {
 
 // ─── GET /api/public/drops/:id — single active drop detail ────────────────────
 router.get("/drops/:id", async (req, res) => {
+  setPublicCacheHeaders(res);
   const [drop] = await db
     .select()
     .from(drops)
@@ -1094,6 +1216,9 @@ router.get("/posts", async (req, res) => {
 // Query params: ?limit=20
 router.get("/trending", async (req, res) => {
   try {
+    // Trending is recomputed at most once a day server-side; a longer client
+    // cache window is safe and cuts repeat load meaningfully.
+    setPublicCacheHeaders(res, { maxAgeSeconds: 60, staleWhileRevalidateSeconds: 300 });
     const page = parsePagination(req.query, { limit: 20 });
     if (!page.success || page.data.limit > 50 || page.data.offset !== 0) {
       return res.status(400).json({ error: "Invalid trending query", code: "VALIDATION_ERROR" });

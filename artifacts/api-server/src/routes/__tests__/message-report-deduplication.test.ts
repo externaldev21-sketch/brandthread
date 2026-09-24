@@ -16,6 +16,14 @@ vi.mock("../../middlewares/requireAuth", () => ({
   requireModerator: (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 
+// Rate limiting is backed by a Postgres table (rate_limit_buckets); this test
+// mounts the router in isolation with no real DB, so stub it out rather than
+// have every request fail closed with a 503 from the unmocked db.execute call.
+vi.mock("../../middlewares/rateLimit", () => ({
+  rateLimit: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+  appRateLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
+}));
+
 vi.mock("drizzle-orm", () => ({
   and: (...conditions: unknown[]) => conditions,
   desc: (value: unknown) => value,

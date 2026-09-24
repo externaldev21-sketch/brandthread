@@ -7,8 +7,17 @@ import { PLATFORM_FEE_BPS, platformFeeCents } from "./money/fees";
 // endpoints will return 503 if the key is missing.
 const key = process.env.STRIPE_SECRET_KEY;
 
+// maxNetworkRetries lets the official SDK retry purely on transport failures
+// (connection errors, timeouts) with its own exponential backoff — it never
+// retries a request that actually reached Stripe and got an application-level
+// response (a decline, a validation error, etc). The SDK also auto-generates
+// an idempotency key per logical request when this is enabled, so a retried
+// POST (e.g. a charge) cannot be double-applied on Stripe's side. This is
+// deliberately the only retry behavior for Stripe calls in this codebase —
+// see src/lib/retry.ts's doc comment for why hand-rolled retries around
+// money-moving calls are not safe to add without an explicit idempotency key.
 export const stripe: Stripe | null = key
-  ? new Stripe(key, { apiVersion: "2026-07-29.dahlia" })
+  ? new Stripe(key, { apiVersion: "2026-07-29.dahlia", maxNetworkRetries: 2 })
   : null;
 
 export function requireStripe(): Stripe {

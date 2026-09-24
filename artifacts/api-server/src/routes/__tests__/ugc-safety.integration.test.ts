@@ -13,7 +13,7 @@ import type { Server } from "node:http";
 import crypto from "node:crypto";
 import { and, eq, inArray, like } from "drizzle-orm";
 import {
-  blocks, db, mutedWords, postComments, posts, products, reports, stories, users,
+  blocks, db, follows, mutedWords, postComments, posts, products, reports, stories, users,
 } from "@workspace/db";
 
 const clerk = vi.hoisted(() => ({ banned: [] as string[], unbanned: [] as string[] }));
@@ -126,6 +126,7 @@ afterAll(async () => {
   await db.delete(reports).where(inArray(reports.targetOwnerId, ids));
   await db.delete(reports).where(inArray(reports.reporterId, ids));
   await db.delete(blocks).where(inArray(blocks.blockerId, ids));
+  await db.delete(follows).where(inArray(follows.followerId, ids));
   await db.delete(mutedWords).where(inArray(mutedWords.userId, ids));
   await db.delete(stories).where(inArray(stories.authorId, ids));
   await db.delete(posts).where(eq(posts.userId, SELLER));
@@ -209,6 +210,9 @@ describe("comment filtering", () => {
 
 describe("block visibility", () => {
   it("hides blocked people's comments, profiles, search results and stories both ways", async () => {
+    // Stories are only visible to the author's followers, so BUYER must
+    // follow OTHER before OTHER's story shows up for them.
+    await db.insert(follows).values({ followerId: BUYER, followingId: OTHER }).onConflictDoNothing();
     await call("/api/social/stories", {
       method: "POST", user: OTHER,
       body: { authorName: "Other", media: [{ uri: "https://cdn.test/story.jpg", type: "image" }] },

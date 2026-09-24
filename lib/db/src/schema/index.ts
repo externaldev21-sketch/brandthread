@@ -760,18 +760,51 @@ export const messageReactions = pgTable('message_reactions', {
   messageIdx:        index('message_reactions_message_idx').on(table.messageId),
 }));
 
+// ─── Saved collections (buyer boards, à la Pinterest) ─────────────────────────
+
+export const savedCollections = pgTable('saved_collections', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  userId:        text('user_id').notNull(),
+  name:          text('name').notNull(),
+  // Explicit override; when null the cover is auto-picked (most-recent item) client-side.
+  coverImageUrl: text('cover_image_url'),
+  isPublic:      boolean('is_public').notNull().default(false),
+  sortOrder:     integer('sort_order').notNull().default(0),
+  createdAt:     timestamp('created_at').defaultNow().notNull(),
+  updatedAt:     timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdx: index('saved_collections_user_id_idx').on(table.userId, table.sortOrder),
+}));
+
 // ─── Saved / wishlisted items ─────────────────────────────────────────────────
 
 export const savedItems = pgTable('saved_items', {
-  id:          uuid('id').primaryKey().defaultRandom(),
-  userId:      text('user_id').notNull(),
-  itemType:    text('item_type').notNull().default('product'),
-  targetId:    text('target_id').notNull(),
-  title:       text('title').notNull().default(''),
-  subtitle:    text('subtitle'),
-  accentColor: text('accent_color'),
-  createdAt:   timestamp('created_at').defaultNow().notNull(),
-});
+  id:           uuid('id').primaryKey().defaultRandom(),
+  userId:       text('user_id').notNull(),
+  itemType:     text('item_type').notNull().default('product'),
+  targetId:     text('target_id').notNull(),
+  title:        text('title').notNull().default(''),
+  subtitle:     text('subtitle'),
+  accentColor:  text('accent_color'),
+  // Nullable — items can live loose in "All" without belonging to a board.
+  collectionId: uuid('collection_id').references(() => savedCollections.id, { onDelete: 'set null' }),
+  // ── Price / stock tracking (product items only) ─────────────────────────
+  // Snapshot of the lowest variant price at save time — the "old price" a
+  // price-drop badge strikes through. Never mutated after save.
+  savedPriceCents:      integer('saved_price_cents'),
+  // Guards re-notifying for the same drop; updated each time a lower price fires a push.
+  lastNotifiedPriceCents: integer('last_notified_price_cents'),
+  // True once the tracking job has observed zero stock — flips back to false
+  // (and fires a "back in stock" push) the next time stock is seen again.
+  wasOutOfStock: boolean('was_out_of_stock').notNull().default(false),
+  // When the back-in-stock transition last fired — badge shows for a window after this.
+  backInStockAt: timestamp('back_in_stock_at'),
+  notifyOnPriceDrop:  boolean('notify_on_price_drop').notNull().default(true),
+  createdAt:    timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  collectionIdx: index('saved_items_collection_id_idx').on(table.collectionId),
+  userTargetUnique: unique('saved_items_user_id_target_id_key').on(table.userId, table.targetId),
+}));
 
 // ─── Server-side cart (full-replace sync model) ───────────────────────────────
 
@@ -901,11 +934,18 @@ export const stories = pgTable('stories', {
   repliesDisabled:   boolean('replies_disabled').notNull().default(false),
   privacyVisibility: text('privacy_visibility').notNull().default('public'),
   privacyReplyPerm:  text('privacy_reply_perm').notNull().default('everyone'),
+  /** 'visible' | 'held' | 'removed' */
+  moderationStatus:  text('moderation_status').notNull().default('visible'),
+  moderationReason:  text('moderation_reason'),
+  moderatedAt:       timestamp('moderated_at'),
   likesCount:        integer('likes_count').notNull().default(0),
   viewsCount:        integer('views_count').notNull().default(0),
   createdAt:         timestamp('created_at').defaultNow().notNull(),
   expiresAt:         timestamp('expires_at').notNull(),
-});
+}, (t) => ({
+  expiresAtIdx: index('stories_expires_at_idx').on(t.expiresAt),
+  authorIdx:    index('stories_author_idx').on(t.authorId),
+}));
 
 export const storyLikes = pgTable('story_likes', {
   storyId:   uuid('story_id').notNull().references(() => stories.id, { onDelete: 'cascade' }),
@@ -920,7 +960,8 @@ export const storyViews = pgTable('story_views', {
   userId:   text('user_id').notNull(),
   viewedAt: timestamp('viewed_at').defaultNow().notNull(),
 }, (t) => ({
-  pk: primaryKey({ columns: [t.storyId, t.userId] }),
+  pk:      primaryKey({ columns: [t.storyId, t.userId] }),
+  userIdx: index('story_views_user_idx').on(t.userId),
 }));
 
 // ─── Buyer-to-buyer follows (social graph) ────────────────────────────────────
