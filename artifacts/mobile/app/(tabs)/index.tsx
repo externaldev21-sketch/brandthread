@@ -258,6 +258,8 @@ const DEFAULT_SETUP: SetupState = {
   tasks: [],
   dismissedTips: [],
   openedFeatures: [],
+  walkthroughShown: false,
+  celebrated: false,
   lastUpdated: Date.now(),
 };
 

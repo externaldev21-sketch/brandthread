@@ -233,8 +233,8 @@ export default function ProfileScreen() {
   });
 
   const heroStats: BrandHeroStat[] = [
-    { key: 'following', label: 'Following', value: socialCounts.following > 0 ? socialCounts.following.toLocaleString() : '—' },
-    { key: 'followers', label: 'Followers', value: socialCounts.followers > 0 ? socialCounts.followers.toLocaleString() : '—' },
+    { key: 'following', label: 'Following', value: socialCounts.following.toLocaleString() },
+    { key: 'followers', label: 'Followers', value: socialCounts.followers.toLocaleString() },
     { key: 'likes', label: 'Likes', value: socialCounts.likes.toLocaleString() },
   ];
 
