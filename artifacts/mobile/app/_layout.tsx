@@ -25,6 +25,7 @@ import { AppThemeProvider, useAppTheme } from '@/contexts/AppThemeContext';
 import { PrimaryButton } from '@/components/BrandthreadUI';
 import { AppIconProvider } from '@/contexts/AppIconContext';
 import BootScreen from '@/components/BootScreen';
+import AppIntroSplash from '@/components/splash/AppIntroSplash';
 import * as Notifications from 'expo-notifications';
 import { configureServices } from '@/lib/serviceConfig';
 import {
@@ -1119,10 +1120,6 @@ export default function RootLayout() {
 
   const appReady = Platform.OS === 'web' || fontsLoaded || !!fontError || fontGateExpired;
 
-  useEffect(() => {
-    if (appReady) SplashScreen.hideAsync();
-  }, [appReady]);
-
   const appTree = (
     <SafeAreaProvider>
       <ErrorBoundary>
@@ -1156,18 +1153,20 @@ export default function RootLayout() {
   );
 
   return (
-    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache} proxyUrl={proxyUrl}>
-      {PREVIEW_ROLE ? (
-        // DEV preview bypass: don't wait for clerk-js — render screens directly.
-        appTree
-      ) : (
-        <>
-          <ClerkLoading>
-            <BootScreen />
-          </ClerkLoading>
-          <ClerkLoaded>{appTree}</ClerkLoaded>
-        </>
-      )}
-    </ClerkProvider>
+    <AppIntroSplash ready={appReady}>
+      <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache} proxyUrl={proxyUrl}>
+        {PREVIEW_ROLE ? (
+          // DEV preview bypass: don't wait for clerk-js — render screens directly.
+          appTree
+        ) : (
+          <>
+            <ClerkLoading>
+              <BootScreen />
+            </ClerkLoading>
+            <ClerkLoaded>{appTree}</ClerkLoaded>
+          </>
+        )}
+      </ClerkProvider>
+    </AppIntroSplash>
   );
 }
