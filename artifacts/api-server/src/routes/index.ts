@@ -85,6 +85,8 @@ import featureFlagsRouter from "./feature-flags";
 import ipCasesRouter from "./ip-cases";
 import shopifyImportRouter from "./shopify-import";
 import designStudioRouter from "./design-studio";
+import packagePresetsRouter from "./package-presets";
+import webhooksShippoRouter from "./webhooks-shippo";
 
 const router = Router();
 
@@ -93,6 +95,7 @@ router.use("/config/features", featureFlagsRouter);
 router.use("/public",          publicRouter);
 router.use("/guest/checkout",  guestCheckoutRouter);
 router.use("/webhooks",        webhooksRouter);
+router.use("/webhooks/shippo", webhooksShippoRouter);
 router.use("/support",         supportRouter);
 router.use("/support-chat",    supportChatRouter);
 router.use("/ip-cases",        ipCasesRouter);
