@@ -4,6 +4,7 @@ import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@clerk/expo';
@@ -100,7 +101,8 @@ function applyFilter(orders: BuyerOrderView[], filter: BuyerFilterKey): BuyerOrd
 
 // ─── Order Card ───────────────────────────────────────────────────────────────
 
-function BuyerOrderCard({ order, onPress }: { order: BuyerOrderView; onPress: () => void }) {
+const BuyerOrderCard = React.memo(function BuyerOrderCard({ order, onOpen }: { order: BuyerOrderView; onOpen: (orderId: string) => void }) {
+  const onPress = () => onOpen(order.id);
   const { theme } = useAppTheme();
   const firstItem = order.lineItems[0];
   const extraCount = order.lineItems.length - 1;
@@ -185,7 +187,7 @@ function BuyerOrderCard({ order, onPress }: { order: BuyerOrderView; onPress: ()
       </View>
     </TouchableOpacity>
   );
-}
+});
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -194,6 +196,9 @@ export default function BuyerOrdersScreen() {
   const insets = useSafeAreaInsets();
   const barInset = useBuyerTabBarInset();
   const router = useRouter();
+  const openOrder = useCallback((orderId: string) => {
+    router.push(('/buyer-order-detail?id=' + orderId) as never);
+  }, [router]);
   const { userId } = useAuth();
 
   const [orders, setOrders] = useState<BuyerOrderView[]>([]);
@@ -332,7 +337,7 @@ export default function BuyerOrdersScreen() {
               style={{ flex: 1 }}
             />
           ) : (
-            <FlatList
+            <FlashList
               data={filtered}
               keyExtractor={o => o.id}
               showsVerticalScrollIndicator={false}
@@ -341,20 +346,19 @@ export default function BuyerOrdersScreen() {
                 paddingHorizontal: SP.md,
                 paddingTop: SP.sm,
                 paddingBottom: barInset + SP.md,
-                gap: SP.md,
               }}
-              renderItem={({ item }) => (
-                <BuyerOrderCard
-                  order={item}
-                  onPress={() => router.push(('/buyer-order-detail?id=' + item.id) as never)}
-                />
-              )}
+              ItemSeparatorComponent={OrderCardGap}
+              renderItem={({ item }) => <BuyerOrderCard order={item} onOpen={openOrder} />}
             />
           )}
         </>
       )}
     </BrandthreadScreen>
   );
+}
+
+function OrderCardGap() {
+  return <View style={{ height: SP.md }} />;
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────

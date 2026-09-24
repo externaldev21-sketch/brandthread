@@ -1,5 +1,6 @@
 import React, { Component, ComponentType, PropsWithChildren } from 'react';
 import { ErrorFallback, ErrorFallbackProps } from '@/components/ErrorFallback';
+import { reportError } from '@/lib/monitoring';
 
 export type ErrorBoundaryProps = PropsWithChildren<{
   FallbackComponent?: ComponentType<ErrorFallbackProps>;
@@ -32,6 +33,8 @@ export class ErrorBoundary extends Component<
     if (__DEV__) {
       console.error('[Brandthread error boundary]', error.message, info.componentStack);
     }
+    // Sends the crash to Sentry when it is configured; a no-op otherwise.
+    reportError(error, { componentStack: info.componentStack, tags: { source: 'error-boundary' } });
     if (typeof this.props.onError === 'function') {
       this.props.onError(error, info.componentStack);
     }

@@ -7,6 +7,14 @@
     "icon": "./assets/images/app-icons/monochrome.png",
     "scheme": "brandthread",
     "userInterfaceStyle": "dark",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "ios": {
       "bundleIdentifier": "com.brandthread.mobile",
       "usesAppleSignIn": true,
@@ -174,6 +182,22 @@
           {
             "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeOtherDiagnosticData",
             "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeCrashData",
+            "NSPrivacyCollectedDataTypeLinked": false,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypePerformanceData",
+            "NSPrivacyCollectedDataTypeLinked": false,
             "NSPrivacyCollectedDataTypeTracking": false,
             "NSPrivacyCollectedDataTypePurposes": [
               "NSPrivacyCollectedDataTypePurposeAppFunctionality"
@@ -351,7 +375,15 @@
         {
           "faceIDPermission": "Brandthread uses Face ID to unlock the app when App Lock is turned on."
         }
-      ]
+      ],
+      "expo-updates",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/"
+        }
+      ],
+      "./plugins/with-sentry-upload-guard"
     ],
     "experiments": {
       "typedRoutes": true,

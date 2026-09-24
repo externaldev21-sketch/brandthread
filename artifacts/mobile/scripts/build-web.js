@@ -206,10 +206,18 @@ if (fs.existsSync(outputDir)) {
   fs.rmSync(outputDir, { recursive: true, force: true });
 }
 
+// With Sentry credentials, emit source maps so web crash reports show real
+// file names and lines. They are uploaded to Sentry and then deleted, so they
+// are never served publicly.
+const uploadSourceMaps = ['SENTRY_AUTH_TOKEN', 'SENTRY_ORG', 'SENTRY_PROJECT'].every((name) => process.env[name]?.trim());
+
 console.log(`Exporting Brandthread web build for ${env.EXPO_PUBLIC_DOMAIN}…`);
 const result = spawnSync(
   'pnpm',
-  ['exec', 'expo', 'export', '--platform', 'web', '--output-dir', 'static-build'],
+  [
+    'exec', 'expo', 'export', '--platform', 'web', '--output-dir', 'static-build',
+    ...(uploadSourceMaps ? ['--source-maps', 'external'] : []),
+  ],
   {
     cwd: projectRoot,
     env,
@@ -229,6 +237,29 @@ if (!fs.existsSync(path.join(outputDir, 'index.html'))) {
   process.exit(1);
 }
 
+function sourceMapFilesIn(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const fullPath = path.join(directory, entry.name);
+    return entry.isDirectory() ? sourceMapFilesIn(fullPath) : entry.name.endsWith('.map') ? [fullPath] : [];
+  });
+}
+
+function uploadAndRemoveSourceMaps() {
+  if (!uploadSourceMaps) {
+    console.log('Sentry source maps: skipped (SENTRY_AUTH_TOKEN, SENTRY_ORG and SENTRY_PROJECT are not all set).');
+    return;
+  }
+  const upload = spawnSync(
+    process.execPath,
+    [require.resolve('@sentry/cli/bin/sentry-cli'), 'sourcemaps', 'upload', outputDir],
+    { cwd: projectRoot, env: process.env, stdio: 'inherit' },
+  );
+  // A failed upload only makes web stack traces harder to read; the site still deploys.
+  console.log(upload.status === 0 ? 'Sentry source maps: uploaded.' : 'Sentry source maps: upload failed (continuing).');
+  for (const file of sourceMapFilesIn(outputDir)) fs.rmSync(file);
+}
+
+uploadAndRemoveSourceMaps();
 addCanonicalMetadata();
 writePublicCrawlFiles();
 console.log('Web export complete.');

@@ -34,6 +34,8 @@ const REQUIRED_COLLECTED_TYPES = [
   'NSPrivacyCollectedDataTypeCustomerSupport',
   'NSPrivacyCollectedDataTypeProductInteraction',
   'NSPrivacyCollectedDataTypeOtherDiagnosticData',
+  'NSPrivacyCollectedDataTypeCrashData',
+  'NSPrivacyCollectedDataTypePerformanceData',
 ];
 
 // No feature collects these. Sensitive Info covers Apple's special categories
