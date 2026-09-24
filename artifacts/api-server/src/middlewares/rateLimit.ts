@@ -171,7 +171,7 @@ function middlewareForPolicy(explicitPolicy?: RateLimitPolicyName): RequestHandl
     if (
       req.method === "OPTIONS" ||
       req.path.endsWith("/health") ||
-      req.path.endsWith("/healthz")
+      /\/healthz(\/|$)/.test(req.path)
     ) {
       next();
       return;
