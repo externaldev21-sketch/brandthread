@@ -244,6 +244,7 @@ const COMMAND_ITEMS = [
   { label: 'Create post',       icon: 'video'        as const, route: '/create-post'     },
   { label: 'View orders',       icon: 'shopping-bag' as const, route: '/(tabs)/orders'   },
   { label: 'Manufacturer Hub',  icon: 'package'      as const, route: '/manufacturer-hub' },
+  { label: 'Drops',             icon: 'zap'          as const, route: '/seller-drops'    },
   { label: 'Inventory',         icon: 'layers'       as const, route: '/inventory'        },
   { label: 'Store Builder',     icon: 'layout'       as const, route: '/store-builder'    },
   { label: 'Analytics',         icon: 'bar-chart-2'  as const, route: '/(tabs)/analytics' },
