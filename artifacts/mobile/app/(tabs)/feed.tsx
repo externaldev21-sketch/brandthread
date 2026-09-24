@@ -1964,6 +1964,7 @@ export default function FeedScreen({
                   </TouchableOpacity>
                 ))}
             </View>
+            <ActivityBellButton color={ON_DARK} size={22} style={styles.buyerTopBtn} badgeBorderColor={BG} />
             <Animated.View ref={cartTargetRef} style={[styles.buyerTopBtn, { transform: [{ scale: cartPulse }] }]}>
             <TouchableOpacity
               style={styles.buyerTopBtn}
