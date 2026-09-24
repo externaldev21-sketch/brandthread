@@ -29,13 +29,22 @@ vi.mock('react-native', () => {
     ActivityIndicator: nativeComponent('ActivityIndicator'),
     Alert: { alert: alertMock },
     Modal: nativeComponent('Modal'),
-    Platform: { OS: 'ios' },
+    Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
     ScrollView: nativeComponent('ScrollView'),
-    StyleSheet: { create: (styles: unknown) => styles },
+    StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
     Text: nativeComponent('Text'),
     TextInput: nativeComponent('TextInput'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),
     View: nativeComponent('View'),
+    Animated: {
+      Value: class { constructor(_v?: number) {} },
+      View: nativeComponent('Animated.View'),
+      event: () => () => {},
+      timing: () => ({ start: (cb?: () => void) => cb?.() }),
+      sequence: () => ({ start: (cb?: () => void) => cb?.() }),
+      loop: () => ({ start: () => {}, stop: () => {} }),
+    },
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
   };
 });
 

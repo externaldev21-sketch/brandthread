@@ -30,6 +30,7 @@ import {
   FONT, FS, SP, RADIUS, COMP, ICON, SUCCESS,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { Header } from '@/components/layout';
 import { useApi } from '@/lib/api';
 import { buildCanonicalProfileUrl, normalizeUsername } from '@/lib/shareProfile';
 
@@ -165,24 +166,8 @@ export default function ShareProfileScreen() {
   const statusMsg = autoCopied ? 'Link copied' : copied ? 'Link copied' : null;
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => router.back()}
-          activeOpacity={0.75}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} accessibilityRole="header">
-          Share Profile
-        </Text>
-        <View style={{ width: COMP.iconBtn }} />
-      </View>
+    <View style={styles.root}>
+      <Header title="Share Profile" />
 
       <ScrollView
         contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + SP.xxl }]}

@@ -18,6 +18,7 @@ import { useAuth } from '@clerk/expo';
 import { getSetupState, completionPercent } from '@/lib/setupStore';
 import { FONT, FS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { Header } from '@/components/layout';
 import { NavigationCard } from '@/components/BrandthreadUI';
 import { SecondaryButton } from '@/components/BrandthreadUI';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
@@ -167,21 +168,9 @@ export default function SellerSettingsScreen() {
   };
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <View style={s.root}>
 
-      {/* ── Custom header with back button ─────────────────────────────── */}
-      <View style={s.header}>
-        <TouchableOpacity
-          style={s.backBtn}
-          onPress={() => router.back()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          activeOpacity={0.75}
-        >
-          <Feather name="arrow-left" size={20} color={theme.text} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Settings & Tools</Text>
-        <View style={{ width: 36 }} />
-      </View>
+      <Header title="Settings & Tools" />
 
       <ScrollView
         showsVerticalScrollIndicator={false}

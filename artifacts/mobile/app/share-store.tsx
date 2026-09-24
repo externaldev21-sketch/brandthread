@@ -17,6 +17,7 @@ import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
+import { Header } from '@/components/layout';
 
 const BASE_URL = 'https://brandthread.app/store';
 
@@ -66,15 +67,8 @@ export default function ShareStoreScreen() {
   }
 
   return (
-    <View style={[s.root, { backgroundColor: 'transparent', paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()} activeOpacity={0.75}>
-          <Feather name="arrow-left" size={20} color={colors.foreground} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Share Store</Text>
-        <View style={{ width: 38 }} />
-      </View>
+    <View style={[s.root, { backgroundColor: 'transparent' }]}>
+      <Header title="Share Store" />
 
       {/* Content */}
       <View style={s.body}>
