@@ -142,6 +142,21 @@ vi.mock('@/lib/theme', () => ({
   PURPLE_DIM: '#34383e',
   CYAN: '#22d3ee',
   CYAN_DIM: '#164e63',
+  GUTTER: 16,
+  SECTION_GAP: 24,
+  CONTENT_MAX_WIDTH: 720,
+  GRID_MAX_WIDTH: 1080,
+  BREAKPOINT: { tablet: 768, desktopWeb: 1024 },
+  TYPE: {
+    largeTitle: { fontSize: 36, fontFamily: 'System', lineHeight: 42 },
+    title: { fontSize: 30, fontFamily: 'System', lineHeight: 36 },
+    heading: { fontSize: 22, fontFamily: 'System', lineHeight: 28 },
+    subheading: { fontSize: 19, fontFamily: 'System', lineHeight: 24 },
+    body: { fontSize: 15, fontFamily: 'System', lineHeight: 22 },
+    bodyMedium: { fontSize: 15, fontFamily: 'System', lineHeight: 22 },
+    caption: { fontSize: 13, fontFamily: 'System', lineHeight: 18 },
+    label: { fontSize: 11, fontFamily: 'System', lineHeight: 14 },
+  },
 }));
 
 vi.mock('@/services/orderService', () => ({
