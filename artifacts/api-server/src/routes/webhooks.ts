@@ -36,6 +36,7 @@ import {
   sendOrderConfirmationEmail,
 } from "../lib/brandthreadEmail";
 import { publishNotification } from "./notifications-feed";
+import { productThumbnail } from "../lib/activityEvents";
 import { sendPushToUser, stableNotificationId } from "../lib/push";
 import { connectReadiness } from "./manufacturer-connect";
 import { recordPaidPhysicalOrder } from "../lib/sellerTaxLedger";
@@ -299,6 +300,11 @@ router.post("/stripe", async (req: Request, res: Response) => {
 
       case "account.updated":
         await handleAccountUpdated(event.data.object, event.id);
+        break;
+      // Connect payouts land on the seller's bank account. Only connected-
+      // account events (event.account set) belong to a seller.
+      case "payout.paid":
+        await handleSellerPayoutPaid(event.data.object, event.account);
         break;
       case "transfer.created":
       case "transfer.updated":
@@ -936,6 +942,13 @@ export async function handleCheckoutPaid(
 
       if (createdOrder) {
         try {
+          const [firstItem] = await db
+            .select({ images: products.images })
+            .from(orderItems)
+            .innerJoin(productVariants, eq(productVariants.id, orderItems.variantId))
+            .innerJoin(products, eq(products.id, productVariants.productId))
+            .where(eq(orderItems.orderId, createdOrderId))
+            .limit(1);
           await publishNotification({
             userId: createdOrder.ownerId,
             category: "orders",
@@ -944,6 +957,7 @@ export async function handleCheckoutPaid(
             body: `Order #${createdOrder.orderNumber} for $${(createdOrder.totalCents / 100).toFixed(2)} is ready to review.`,
             targetId: createdOrderId,
             targetType: "order",
+            targetImageUrl: productThumbnail(firstItem?.images),
             pushSound: "order-received.wav",
             pushChannelId: "orders",
           });
@@ -1504,6 +1518,41 @@ async function handleFreelancerJobPaid(session: any, jobIdOverride?: string) {
   }
 
   logger.info({ jobId, stripeSessionId: session.id }, "Freelancer job already paid or not found; skipping");
+}
+
+/**
+ * Handles payout.paid for a seller's connected account: the seller's money has
+ * reached their bank. Distinct from the manufacturer payout-readiness alerts.
+ * One alert per Stripe payout (partial unique index on payout_sent).
+ */
+async function handleSellerPayoutPaid(payout: any, connectedAccountId?: string | null) {
+  if (!connectedAccountId || typeof payout?.id !== "string") return;
+  const [seller] = await db
+    .select({ clerkId: users.clerkId })
+    .from(users)
+    .where(eq(users.stripeAccountId, connectedAccountId))
+    .limit(1);
+  if (!seller) return;
+
+  const amount = typeof payout.amount === "number" ? payout.amount : 0;
+  const currency = typeof payout.currency === "string" ? payout.currency.toUpperCase() : "USD";
+  const formatted = currency === "USD"
+    ? `$${(amount / 100).toFixed(2)}`
+    : `${(amount / 100).toFixed(2)} ${currency}`;
+  try {
+    await publishNotification({
+      userId: seller.clerkId,
+      category: "orders",
+      type: "payout_sent",
+      title: "Payout sent",
+      body: `${formatted} was sent to your bank account.`,
+      targetId: payout.id,
+      targetType: "payout",
+      pushCategory: "payout",
+    });
+  } catch (err) {
+    logger.error({ err, payoutId: payout.id }, "Seller payout notification failed");
+  }
 }
 
 async function handleAccountUpdated(account: any, providerEventId?: string) {

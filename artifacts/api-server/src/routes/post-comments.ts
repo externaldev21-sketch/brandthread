@@ -25,6 +25,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition } from "../lib/postVisibility";
+import { notifyCommentActivity } from "../lib/activityEvents";
 import {
   authorInGoodStanding,
   blockRelation,
@@ -231,6 +232,7 @@ router.post("/:postId/comments", requireAuth, rateLimit("comment"), async (req, 
     }
 
     let parentId: string | null = null;
+    let parentAuthorId: string | null = null;
     if (typeof rawParentId === "string") {
       const [parent] = await db
         .select({ id: postComments.id, parentId: postComments.parentId, authorId: postComments.authorId, status: postComments.moderationStatus })
@@ -245,6 +247,7 @@ router.post("/:postId/comments", requireAuth, rateLimit("comment"), async (req, 
       }
       // Threads are one level deep: replies to replies attach to the root.
       parentId = parent.parentId ?? parent.id;
+      parentAuthorId = parent.authorId;
     }
 
     const decision = evaluateContent(body, "public");
@@ -275,6 +278,12 @@ router.post("/:postId/comments", requireAuth, rateLimit("comment"), async (req, 
         category: decision.category,
         label: "Comment",
       });
+    }
+
+    // Held comments are invisible to everyone but their author, so nobody
+    // else is told about them until a moderator approves.
+    if (!held) {
+      void notifyCommentActivity({ postId, commentId: created.id, authorId, body, parentAuthorId });
     }
 
     const profiles = await profilesById([authorId]);

@@ -64,6 +64,7 @@ import { shouldAnimateCartSuccess } from '@/lib/cartFlight';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { BuyerNavIcon } from '@/components/buyer-nav/BuyerNavIcon';
 import { SheetRise } from '@/components/motion/SheetRise';
+import ActivityBellButton from '@/components/ActivityBellButton';
 
 const THREAD_PAGE_SIZE = 30;
 
@@ -2247,6 +2248,7 @@ export default function FeedScreen({
                   </TouchableOpacity>
                 ))}
             </View>
+            <ActivityBellButton color={ON_DARK} size={22} style={styles.buyerTopBtn} badgeBorderColor={BG} />
             <Animated.View ref={cartTargetRef} style={[styles.buyerTopBtn, { transform: [{ scale: cartPulse }] }]}>
             <TouchableOpacity
               style={styles.buyerTopBtn}
@@ -2316,6 +2318,8 @@ export default function FeedScreen({
             </TouchableOpacity>
 
             <Text style={styles.topTitle}>Home</Text>
+
+            <ActivityBellButton color={ON_DARK} size={20} badgeBorderColor={BG} />
 
             <Animated.View ref={cartTargetRef} style={{ transform: [{ scale: cartPulse }] }}>
             <TouchableOpacity
