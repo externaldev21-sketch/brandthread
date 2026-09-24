@@ -84,6 +84,7 @@ import { CheckoutSkeleton, HapticSwitch } from '@/components/BrandthreadUI';
 import { AddressAutocompleteInput } from '@/components/AddressAutocompleteInput';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { StickyFooter } from '@/components/layout';
+import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -1010,7 +1011,8 @@ function Confirmation({
 }) {
   const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
   const s = makeStyles(theme);
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, userId } = useAuth();
+  const api = useApi();
   const router = useRouter();
   const PURPLE = theme.accent;
   const PURPLE_LIGHT = theme.accentLight;
@@ -1031,6 +1033,12 @@ function Confirmation({
 
   // First verified order — used for navigation. Only set once we have a real server ID.
   const firstVerified = verifiedOrders[0] ?? null;
+
+  useEffect(() => {
+    // A completed purchase is a meaningful, server-backed moment — exactly
+    // when contextualPushPermission.ts wants to ask, never on first launch.
+    if (firstVerified?.id) void requestContextualPushPermission(userId, api);
+  }, [firstVerified?.id, userId, api]);
 
   useEffect(() => {
     Animated.parallel([

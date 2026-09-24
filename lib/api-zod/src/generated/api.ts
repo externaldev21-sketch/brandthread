@@ -39,6 +39,15 @@ export const CreateCallTokenResponse = zod.object({
 
 
 /**
+ * @summary Whether voice and video calling is configured on this server
+ */
+export const GetCallAvailabilityResponse = zod.object({
+  "configured": zod.boolean(),
+  "provider": zod.enum(['agora'])
+})
+
+
+/**
  * @summary Renew credentials after re-authorizing the same manufacturer thread participant
  */
 export const renewCallTokenBodyClientRenewalIdMin = 8;
@@ -109,6 +118,8 @@ export const GetMyManufacturerProfileResponse = zod.object({
   "website": zod.string().nullish(),
   "contactEmail": zod.string().nullish(),
   "contactPhone": zod.string().nullish(),
+  "timeZone": zod.string().nullish(),
+  "isPublicDirectory": zod.boolean().optional(),
   "status": zod.string(),
   "verifiedAt": zod.string().nullish(),
   "paymentSetup": zod.boolean().optional(),
@@ -121,6 +132,8 @@ export const GetMyManufacturerProfileResponse = zod.object({
 /**
  * @summary Update manufacturer profile
  */
+
+export const updateMyManufacturerProfileBodyTimeZoneMax = 64;
 
 
 
@@ -138,7 +151,9 @@ export const UpdateMyManufacturerProfileBody = zod.object({
   "sampleTurnaround": zod.string().optional(),
   "website": zod.string().optional(),
   "contactEmail": zod.string().optional(),
-  "contactPhone": zod.string().optional()
+  "contactPhone": zod.string().optional(),
+  "timeZone": zod.string().max(updateMyManufacturerProfileBodyTimeZoneMax).optional(),
+  "isPublicDirectory": zod.boolean().optional()
 })
 
 
@@ -161,6 +176,8 @@ export const UpdateMyManufacturerProfileResponse = zod.object({
   "website": zod.string().nullish(),
   "contactEmail": zod.string().nullish(),
   "contactPhone": zod.string().nullish(),
+  "timeZone": zod.string().nullish(),
+  "isPublicDirectory": zod.boolean().optional(),
   "status": zod.string(),
   "verifiedAt": zod.string().nullish(),
   "paymentSetup": zod.boolean().optional(),
@@ -201,6 +218,8 @@ export const ReorderMyManufacturerPhotosResponse = zod.object({
   "website": zod.string().nullish(),
   "contactEmail": zod.string().nullish(),
   "contactPhone": zod.string().nullish(),
+  "timeZone": zod.string().nullish(),
+  "isPublicDirectory": zod.boolean().optional(),
   "status": zod.string(),
   "verifiedAt": zod.string().nullish(),
   "paymentSetup": zod.boolean().optional(),
@@ -244,6 +263,8 @@ export const DeleteMyManufacturerPhotoResponse = zod.object({
   "website": zod.string().nullish(),
   "contactEmail": zod.string().nullish(),
   "contactPhone": zod.string().nullish(),
+  "timeZone": zod.string().nullish(),
+  "isPublicDirectory": zod.boolean().optional(),
   "status": zod.string(),
   "verifiedAt": zod.string().nullish(),
   "paymentSetup": zod.boolean().optional(),
@@ -256,6 +277,10 @@ export const DeleteMyManufacturerPhotoResponse = zod.object({
 /**
  * @summary Register as a manufacturer
  */
+export const registerManufacturerBodyTimeZoneMax = 64;
+
+
+
 export const RegisterManufacturerBody = zod.object({
   "businessName": zod.string(),
   "country": zod.string(),
@@ -269,7 +294,8 @@ export const RegisterManufacturerBody = zod.object({
   "sampleTurnaround": zod.string(),
   "website": zod.string().optional(),
   "contactEmail": zod.string().optional(),
-  "contactPhone": zod.string().optional()
+  "contactPhone": zod.string().optional(),
+  "timeZone": zod.string().max(registerManufacturerBodyTimeZoneMax).optional()
 })
 
 
@@ -292,6 +318,8 @@ export const RegisterManufacturerResponse = zod.object({
   "website": zod.string().nullish(),
   "contactEmail": zod.string().nullish(),
   "contactPhone": zod.string().nullish(),
+  "timeZone": zod.string().nullish(),
+  "isPublicDirectory": zod.boolean().optional(),
   "status": zod.string(),
   "verifiedAt": zod.string().nullish(),
   "paymentSetup": zod.boolean().optional(),
@@ -304,10 +332,20 @@ export const RegisterManufacturerResponse = zod.object({
 /**
  * @summary List approved public manufacturer profiles
  */
+export const listPublicManufacturersQueryMinYearsMin = 0;
+
+
+
+
 export const ListPublicManufacturersQueryParams = zod.object({
   "q": zod.coerce.string().optional(),
   "country": zod.coerce.string().optional(),
-  "specialty": zod.coerce.string().optional()
+  "specialty": zod.coerce.string().optional(),
+  "minYears": zod.coerce.number().min(listPublicManufacturersQueryMinYearsMin).optional(),
+  "maxMoq": zod.coerce.number().min(1).optional(),
+  "verified": zod.coerce.boolean().optional(),
+  "hasPhotos": zod.coerce.boolean().optional(),
+  "sort": zod.enum(['recommended', 'newest', 'experience', 'rating', 'moq']).optional()
 })
 
 
@@ -327,14 +365,32 @@ export const ListPublicManufacturersResponseItem = zod.object({
   "sampleTurnaround": zod.string(),
   "photos": zod.array(zod.string().url()),
   "website": zod.string().nullish(),
+  "timeZone": zod.string().nullish(),
   "isVerified": zod.boolean(),
   "rating": zod.number().nullish(),
+  "reviewCount": zod.number().optional(),
   "responseTime": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
   "revision": zod.number().min(1)
 })
 export const ListPublicManufacturersResponse = zod.array(ListPublicManufacturersResponseItem)
+
+
+/**
+ * @summary Countries and specialties present in the live public directory, with counts
+ */
+export const GetManufacturerDirectoryFacetsResponse = zod.object({
+  "total": zod.number(),
+  "countries": zod.array(zod.object({
+  "name": zod.string(),
+  "count": zod.number()
+})),
+  "specialties": zod.array(zod.object({
+  "name": zod.string(),
+  "count": zod.number()
+}))
+})
 
 
 export const GetPublicManufacturerParams = zod.object({
@@ -358,8 +414,10 @@ export const GetPublicManufacturerResponse = zod.object({
   "sampleTurnaround": zod.string(),
   "photos": zod.array(zod.string().url()),
   "website": zod.string().nullish(),
+  "timeZone": zod.string().nullish(),
   "isVerified": zod.boolean(),
   "rating": zod.number().nullish(),
+  "reviewCount": zod.number().optional(),
   "responseTime": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
@@ -370,6 +428,8 @@ export const GetPublicManufacturerResponse = zod.object({
 /**
  * @summary Submit an unauthenticated application for review
  */
+export const applyAsManufacturerBodyOneTimeZoneMax = 64;
+
 export const applyAsManufacturerBodyTwoClientRequestIdMax = 100;
 
 
@@ -387,7 +447,8 @@ export const ApplyAsManufacturerBody = zod.object({
   "sampleTurnaround": zod.string(),
   "website": zod.string().optional(),
   "contactEmail": zod.string().optional(),
-  "contactPhone": zod.string().optional()
+  "contactPhone": zod.string().optional(),
+  "timeZone": zod.string().max(applyAsManufacturerBodyOneTimeZoneMax).optional()
 }).and(zod.object({
   "clientRequestId": zod.string().min(1).max(applyAsManufacturerBodyTwoClientRequestIdMax)
 }))
@@ -397,6 +458,340 @@ export const ApplyAsManufacturerResponse = zod.object({
   "status": zod.enum(['pending']),
   "published": zod.boolean()
 })
+
+
+/**
+ * @summary Look up a private seller invite before signing up
+ */
+export const ResolveManufacturerInviteParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const ResolveManufacturerInviteResponse = zod.object({
+  "valid": zod.boolean(),
+  "sellerName": zod.string(),
+  "companyName": zod.string().nullish(),
+  "contactName": zod.string().nullish(),
+  "contactEmail": zod.string().nullish()
+})
+
+
+/**
+ * @summary Register (or link an existing profile) through a seller's private invite
+ */
+export const RegisterManufacturerViaInviteParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const registerManufacturerViaInviteBodyTimeZoneMax = 64;
+
+
+
+export const RegisterManufacturerViaInviteBody = zod.object({
+  "businessName": zod.string(),
+  "country": zod.string(),
+  "city": zod.string().optional(),
+  "specialty": zod.string(),
+  "description": zod.string().optional(),
+  "yearsInBusiness": zod.number().optional(),
+  "moq": zod.number(),
+  "priceRange": zod.string(),
+  "bulkTurnaround": zod.string(),
+  "sampleTurnaround": zod.string(),
+  "website": zod.string().optional(),
+  "contactEmail": zod.string().optional(),
+  "contactPhone": zod.string().optional(),
+  "timeZone": zod.string().max(registerManufacturerViaInviteBodyTimeZoneMax).optional()
+})
+
+
+
+
+export const RegisterManufacturerViaInviteResponse = zod.object({
+  "id": zod.string(),
+  "clerkId": zod.string(),
+  "businessName": zod.string(),
+  "country": zod.string(),
+  "city": zod.string().nullish(),
+  "specialty": zod.string(),
+  "description": zod.string().nullish(),
+  "yearsInBusiness": zod.number().optional(),
+  "moq": zod.number(),
+  "priceRange": zod.string(),
+  "bulkTurnaround": zod.string(),
+  "sampleTurnaround": zod.string(),
+  "photos": zod.array(zod.string().url()).optional(),
+  "website": zod.string().nullish(),
+  "contactEmail": zod.string().nullish(),
+  "contactPhone": zod.string().nullish(),
+  "timeZone": zod.string().nullish(),
+  "isPublicDirectory": zod.boolean().optional(),
+  "status": zod.string(),
+  "verifiedAt": zod.string().nullish(),
+  "paymentSetup": zod.boolean().optional(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "revision": zod.number().min(1)
+}).and(zod.object({
+  "invitedBySellerId": zod.string(),
+  "threadId": zod.string().uuid()
+}))
+
+
+/**
+ * @summary Price a sample or bulk order and send it to the seller as a payable card in chat
+ */
+export const SendManufacturerOrderCardParams = zod.object({
+  "threadId": zod.coerce.string().uuid()
+})
+
+export const sendManufacturerOrderCardBodyClientRequestIdMax = 100;
+
+export const sendManufacturerOrderCardBodyTitleMax = 120;
+
+export const sendManufacturerOrderCardBodyDescriptionMax = 2000;
+
+
+export const sendManufacturerOrderCardBodyPriceCentsMin = 100;
+
+
+
+export const SendManufacturerOrderCardBody = zod.object({
+  "clientRequestId": zod.string().min(1).max(sendManufacturerOrderCardBodyClientRequestIdMax),
+  "orderType": zod.enum(['sample', 'bulk']),
+  "title": zod.string().min(1).max(sendManufacturerOrderCardBodyTitleMax),
+  "description": zod.string().max(sendManufacturerOrderCardBodyDescriptionMax).nullish(),
+  "quantity": zod.number().min(1),
+  "priceCents": zod.number().min(sendManufacturerOrderCardBodyPriceCentsMin)
+})
+
+
+
+
+export const SendManufacturerOrderCardResponse = zod.object({
+  "order": zod.object({
+  "id": zod.string(),
+  "manufacturerId": zod.string(),
+  "sellerId": zod.string(),
+  "sellerName": zod.string().optional().describe('Seller brand name (manufacturer-facing endpoints)'),
+  "threadId": zod.string().nullish(),
+  "orderType": zod.enum(['sample', 'bulk']),
+  "issuedBy": zod.enum(['seller', 'manufacturer']).optional(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "quantity": zod.number(),
+  "priceCents": zod.number(),
+  "status": zod.string(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "shippedAt": zod.string().nullish(),
+  "deliveredAt": zod.string().nullish(),
+  "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "revision": zod.number().min(1)
+}),
+  "message": zod.object({
+  "id": zod.string(),
+  "threadId": zod.string(),
+  "senderRole": zod.string(),
+  "senderId": zod.string(),
+  "content": zod.string(),
+  "messageType": zod.enum(['text', 'image', 'sample_card', 'bulk_card', 'system']),
+  "mediaUrls": zod.array(zod.string()),
+  "cardData": zod.record(zod.string(), zod.unknown()).nullish(),
+  "order": zod.union([zod.object({
+  "id": zod.string().uuid(),
+  "orderType": zod.enum(['sample', 'bulk']),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "quantity": zod.number(),
+  "priceCents": zod.number(),
+  "currency": zod.string().optional(),
+  "status": zod.string(),
+  "issuedBy": zod.string().optional(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "paymentReviewState": zod.string().optional(),
+  "manufacturerPayoutReady": zod.boolean().optional(),
+  "revision": zod.number(),
+  "updatedAt": zod.coerce.date()
+}),zod.null()]).optional().describe('Live state of the order a sample\/bulk card refers to.'),
+  "sentAt": zod.string()
+})
+})
+
+
+/**
+ * @summary Six-stage tracker with stage timestamps and shipment tracking, for either participant
+ */
+export const GetManufacturerOrderTimelineParams = zod.object({
+  "orderId": zod.coerce.string().uuid()
+})
+
+export const GetManufacturerOrderTimelineResponse = zod.object({
+  "viewerRole": zod.enum(['seller', 'manufacturer']),
+  "order": zod.object({
+  "id": zod.string().uuid(),
+  "orderType": zod.enum(['sample', 'bulk']),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "quantity": zod.number(),
+  "priceCents": zod.number(),
+  "currency": zod.string().optional(),
+  "status": zod.string(),
+  "issuedBy": zod.string().optional(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "paymentReviewState": zod.string().optional(),
+  "manufacturerPayoutReady": zod.boolean().optional(),
+  "revision": zod.number(),
+  "updatedAt": zod.coerce.date()
+}),
+  "manufacturer": zod.object({
+  "id": zod.string().uuid(),
+  "businessName": zod.string(),
+  "country": zod.string(),
+  "timeZone": zod.string().nullish()
+}).optional(),
+  "steps": zod.array(zod.object({
+  "stage": zod.enum(['payment_received', 'processing', 'cut_and_sew', 'packing', 'shipped', 'delivered']),
+  "label": zod.string(),
+  "description": zod.string(),
+  "state": zod.enum(['done', 'current', 'upcoming']),
+  "at": zod.coerce.date().nullable()
+})),
+  "events": zod.array(zod.object({
+  "id": zod.string(),
+  "actorRole": zod.string(),
+  "fromStatus": zod.string().nullish(),
+  "toStatus": zod.string(),
+  "note": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})),
+  "createdAt": zod.coerce.date().optional(),
+  "paidAt": zod.coerce.date().nullish(),
+  "tracking": zod.object({
+  "carrier": zod.string().nullable(),
+  "carrierName": zod.string().nullable(),
+  "trackingNumber": zod.string().nullable(),
+  "url": zod.string().nullable()
+})
+})
+
+
+/**
+ * @summary Withdraw (manufacturer) or decline (seller) an unpaid order card
+ */
+export const CancelManufacturerOrderCardParams = zod.object({
+  "orderId": zod.coerce.string().uuid()
+})
+
+export const cancelManufacturerOrderCardBodyReasonMax = 500;
+
+
+
+export const CancelManufacturerOrderCardBody = zod.object({
+  "reason": zod.string().max(cancelManufacturerOrderCardBodyReasonMax).optional()
+})
+
+
+
+
+export const CancelManufacturerOrderCardResponse = zod.object({
+  "id": zod.string(),
+  "manufacturerId": zod.string(),
+  "sellerId": zod.string(),
+  "sellerName": zod.string().optional().describe('Seller brand name (manufacturer-facing endpoints)'),
+  "threadId": zod.string().nullish(),
+  "orderType": zod.enum(['sample', 'bulk']),
+  "issuedBy": zod.enum(['seller', 'manufacturer']).optional(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "quantity": zod.number(),
+  "priceCents": zod.number(),
+  "status": zod.string(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "shippedAt": zod.string().nullish(),
+  "deliveredAt": zod.string().nullish(),
+  "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "revision": zod.number().min(1)
+})
+
+
+/**
+ * @summary Seller confirms a shipped order arrived
+ */
+export const ConfirmManufacturerOrderDeliveryParams = zod.object({
+  "orderId": zod.coerce.string().uuid()
+})
+
+
+
+
+export const ConfirmManufacturerOrderDeliveryResponse = zod.object({
+  "id": zod.string(),
+  "manufacturerId": zod.string(),
+  "sellerId": zod.string(),
+  "sellerName": zod.string().optional().describe('Seller brand name (manufacturer-facing endpoints)'),
+  "threadId": zod.string().nullish(),
+  "orderType": zod.enum(['sample', 'bulk']),
+  "issuedBy": zod.enum(['seller', 'manufacturer']).optional(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "quantity": zod.number(),
+  "priceCents": zod.number(),
+  "status": zod.string(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "shippedAt": zod.string().nullish(),
+  "deliveredAt": zod.string().nullish(),
+  "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "revision": zod.number().min(1)
+})
+
+
+/**
+ * @summary Seller-scoped profile for a public manufacturer or a private one the seller is connected to
+ */
+export const GetPartnerManufacturerParams = zod.object({
+  "manufacturerId": zod.coerce.string().uuid()
+})
+
+
+
+
+export const GetPartnerManufacturerResponse = zod.object({
+  "id": zod.string().uuid(),
+  "businessName": zod.string(),
+  "country": zod.string(),
+  "city": zod.string().nullish(),
+  "specialty": zod.string(),
+  "description": zod.string().nullish(),
+  "yearsInBusiness": zod.number(),
+  "moq": zod.number(),
+  "priceRange": zod.string(),
+  "bulkTurnaround": zod.string(),
+  "sampleTurnaround": zod.string(),
+  "photos": zod.array(zod.string().url()),
+  "website": zod.string().nullish(),
+  "timeZone": zod.string().nullish(),
+  "isVerified": zod.boolean(),
+  "rating": zod.number().nullish(),
+  "reviewCount": zod.number().optional(),
+  "responseTime": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "revision": zod.number().min(1)
+}).and(zod.object({
+  "isConnected": zod.boolean(),
+  "isPublicDirectory": zod.boolean()
+}))
 
 
 /**
@@ -424,8 +819,10 @@ export const ListManufacturerRelationshipsResponseItem = zod.object({
   "sampleTurnaround": zod.string(),
   "photos": zod.array(zod.string().url()),
   "website": zod.string().nullish(),
+  "timeZone": zod.string().nullish(),
   "isVerified": zod.boolean(),
   "rating": zod.number().nullish(),
+  "reviewCount": zod.number().optional(),
   "responseTime": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
@@ -463,8 +860,10 @@ export const CreateManufacturerRelationshipResponse = zod.object({
   "sampleTurnaround": zod.string(),
   "photos": zod.array(zod.string().url()),
   "website": zod.string().nullish(),
+  "timeZone": zod.string().nullish(),
   "isVerified": zod.boolean(),
   "rating": zod.number().nullish(),
+  "reviewCount": zod.number().optional(),
   "responseTime": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
@@ -500,8 +899,10 @@ export const ListMyManufacturerRelationshipsResponseItem = zod.object({
   "sampleTurnaround": zod.string(),
   "photos": zod.array(zod.string().url()),
   "website": zod.string().nullish(),
+  "timeZone": zod.string().nullish(),
   "isVerified": zod.boolean(),
   "rating": zod.number().nullish(),
+  "reviewCount": zod.number().optional(),
   "responseTime": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
@@ -564,6 +965,23 @@ export const GetSellerManufacturerThreadMessagesResponseItem = zod.object({
   "messageType": zod.enum(['text', 'image', 'sample_card', 'bulk_card', 'system']),
   "mediaUrls": zod.array(zod.string()),
   "cardData": zod.record(zod.string(), zod.unknown()).nullish(),
+  "order": zod.union([zod.object({
+  "id": zod.string().uuid(),
+  "orderType": zod.enum(['sample', 'bulk']),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "quantity": zod.number(),
+  "priceCents": zod.number(),
+  "currency": zod.string().optional(),
+  "status": zod.string(),
+  "issuedBy": zod.string().optional(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "paymentReviewState": zod.string().optional(),
+  "manufacturerPayoutReady": zod.boolean().optional(),
+  "revision": zod.number(),
+  "updatedAt": zod.coerce.date()
+}),zod.null()]).optional().describe('Live state of the order a sample\/bulk card refers to.'),
   "sentAt": zod.string()
 })
 export const GetSellerManufacturerThreadMessagesResponse = zod.array(GetSellerManufacturerThreadMessagesResponseItem)
@@ -594,6 +1012,23 @@ export const SendSellerManufacturerThreadMessageResponse = zod.object({
   "messageType": zod.enum(['text', 'image', 'sample_card', 'bulk_card', 'system']),
   "mediaUrls": zod.array(zod.string()),
   "cardData": zod.record(zod.string(), zod.unknown()).nullish(),
+  "order": zod.union([zod.object({
+  "id": zod.string().uuid(),
+  "orderType": zod.enum(['sample', 'bulk']),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "quantity": zod.number(),
+  "priceCents": zod.number(),
+  "currency": zod.string().optional(),
+  "status": zod.string(),
+  "issuedBy": zod.string().optional(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "paymentReviewState": zod.string().optional(),
+  "manufacturerPayoutReady": zod.boolean().optional(),
+  "revision": zod.number(),
+  "updatedAt": zod.coerce.date()
+}),zod.null()]).optional().describe('Live state of the order a sample\/bulk card refers to.'),
   "sentAt": zod.string()
 })
 
@@ -630,12 +1065,19 @@ export const GetManufacturerDashboardResponse = zod.object({
   "id": zod.string(),
   "manufacturerId": zod.string(),
   "sellerId": zod.string(),
+  "sellerName": zod.string().optional().describe('Seller brand name (manufacturer-facing endpoints)'),
   "threadId": zod.string().nullish(),
   "orderType": zod.enum(['sample', 'bulk']),
+  "issuedBy": zod.enum(['seller', 'manufacturer']).optional(),
   "title": zod.string(),
+  "description": zod.string().nullish(),
   "quantity": zod.number(),
   "priceCents": zod.number(),
   "status": zod.string(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "shippedAt": zod.string().nullish(),
+  "deliveredAt": zod.string().nullish(),
   "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
@@ -659,12 +1101,19 @@ export const GetManufacturerDashboardResponse = zod.object({
   "id": zod.string(),
   "manufacturerId": zod.string(),
   "sellerId": zod.string(),
+  "sellerName": zod.string().optional().describe('Seller brand name (manufacturer-facing endpoints)'),
   "threadId": zod.string().nullish(),
   "orderType": zod.enum(['sample', 'bulk']),
+  "issuedBy": zod.enum(['seller', 'manufacturer']).optional(),
   "title": zod.string(),
+  "description": zod.string().nullish(),
   "quantity": zod.number(),
   "priceCents": zod.number(),
   "status": zod.string(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "shippedAt": zod.string().nullish(),
+  "deliveredAt": zod.string().nullish(),
   "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
@@ -674,12 +1123,19 @@ export const GetManufacturerDashboardResponse = zod.object({
   "id": zod.string(),
   "manufacturerId": zod.string(),
   "sellerId": zod.string(),
+  "sellerName": zod.string().optional().describe('Seller brand name (manufacturer-facing endpoints)'),
   "threadId": zod.string().nullish(),
   "orderType": zod.enum(['sample', 'bulk']),
+  "issuedBy": zod.enum(['seller', 'manufacturer']).optional(),
   "title": zod.string(),
+  "description": zod.string().nullish(),
   "quantity": zod.number(),
   "priceCents": zod.number(),
   "status": zod.string(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "shippedAt": zod.string().nullish(),
+  "deliveredAt": zod.string().nullish(),
   "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
@@ -691,12 +1147,19 @@ export const GetManufacturerDashboardResponse = zod.object({
   "id": zod.string(),
   "manufacturerId": zod.string(),
   "sellerId": zod.string(),
+  "sellerName": zod.string().optional().describe('Seller brand name (manufacturer-facing endpoints)'),
   "threadId": zod.string().nullish(),
   "orderType": zod.enum(['sample', 'bulk']),
+  "issuedBy": zod.enum(['seller', 'manufacturer']).optional(),
   "title": zod.string(),
+  "description": zod.string().nullish(),
   "quantity": zod.number(),
   "priceCents": zod.number(),
   "status": zod.string(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "shippedAt": zod.string().nullish(),
+  "deliveredAt": zod.string().nullish(),
   "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
@@ -706,12 +1169,19 @@ export const GetManufacturerDashboardResponse = zod.object({
   "id": zod.string(),
   "manufacturerId": zod.string(),
   "sellerId": zod.string(),
+  "sellerName": zod.string().optional().describe('Seller brand name (manufacturer-facing endpoints)'),
   "threadId": zod.string().nullish(),
   "orderType": zod.enum(['sample', 'bulk']),
+  "issuedBy": zod.enum(['seller', 'manufacturer']).optional(),
   "title": zod.string(),
+  "description": zod.string().nullish(),
   "quantity": zod.number(),
   "priceCents": zod.number(),
   "status": zod.string(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "shippedAt": zod.string().nullish(),
+  "deliveredAt": zod.string().nullish(),
   "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
@@ -722,12 +1192,19 @@ export const GetManufacturerDashboardResponse = zod.object({
   "id": zod.string(),
   "manufacturerId": zod.string(),
   "sellerId": zod.string(),
+  "sellerName": zod.string().optional().describe('Seller brand name (manufacturer-facing endpoints)'),
   "threadId": zod.string().nullish(),
   "orderType": zod.enum(['sample', 'bulk']),
+  "issuedBy": zod.enum(['seller', 'manufacturer']).optional(),
   "title": zod.string(),
+  "description": zod.string().nullish(),
   "quantity": zod.number(),
   "priceCents": zod.number(),
   "status": zod.string(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "shippedAt": zod.string().nullish(),
+  "deliveredAt": zod.string().nullish(),
   "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
@@ -770,6 +1247,23 @@ export const GetThreadMessagesResponseItem = zod.object({
   "messageType": zod.enum(['text', 'image', 'sample_card', 'bulk_card', 'system']),
   "mediaUrls": zod.array(zod.string()),
   "cardData": zod.record(zod.string(), zod.unknown()).nullish(),
+  "order": zod.union([zod.object({
+  "id": zod.string().uuid(),
+  "orderType": zod.enum(['sample', 'bulk']),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "quantity": zod.number(),
+  "priceCents": zod.number(),
+  "currency": zod.string().optional(),
+  "status": zod.string(),
+  "issuedBy": zod.string().optional(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "paymentReviewState": zod.string().optional(),
+  "manufacturerPayoutReady": zod.boolean().optional(),
+  "revision": zod.number(),
+  "updatedAt": zod.coerce.date()
+}),zod.null()]).optional().describe('Live state of the order a sample\/bulk card refers to.'),
   "sentAt": zod.string()
 })
 export const GetThreadMessagesResponse = zod.array(GetThreadMessagesResponseItem)
@@ -803,6 +1297,23 @@ export const SendThreadMessageResponse = zod.object({
   "messageType": zod.enum(['text', 'image', 'sample_card', 'bulk_card', 'system']),
   "mediaUrls": zod.array(zod.string()),
   "cardData": zod.record(zod.string(), zod.unknown()).nullish(),
+  "order": zod.union([zod.object({
+  "id": zod.string().uuid(),
+  "orderType": zod.enum(['sample', 'bulk']),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "quantity": zod.number(),
+  "priceCents": zod.number(),
+  "currency": zod.string().optional(),
+  "status": zod.string(),
+  "issuedBy": zod.string().optional(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "paymentReviewState": zod.string().optional(),
+  "manufacturerPayoutReady": zod.boolean().optional(),
+  "revision": zod.number(),
+  "updatedAt": zod.coerce.date()
+}),zod.null()]).optional().describe('Live state of the order a sample\/bulk card refers to.'),
   "sentAt": zod.string()
 })
 
@@ -826,12 +1337,19 @@ export const ListManufacturerSampleOrdersResponseItem = zod.object({
   "id": zod.string(),
   "manufacturerId": zod.string(),
   "sellerId": zod.string(),
+  "sellerName": zod.string().optional().describe('Seller brand name (manufacturer-facing endpoints)'),
   "threadId": zod.string().nullish(),
   "orderType": zod.enum(['sample', 'bulk']),
+  "issuedBy": zod.enum(['seller', 'manufacturer']).optional(),
   "title": zod.string(),
+  "description": zod.string().nullish(),
   "quantity": zod.number(),
   "priceCents": zod.number(),
   "status": zod.string(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "shippedAt": zod.string().nullish(),
+  "deliveredAt": zod.string().nullish(),
   "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
@@ -851,12 +1369,19 @@ export const GetManufacturerSampleOrderResponse = zod.object({
   "id": zod.string(),
   "manufacturerId": zod.string(),
   "sellerId": zod.string(),
+  "sellerName": zod.string().optional().describe('Seller brand name (manufacturer-facing endpoints)'),
   "threadId": zod.string().nullish(),
   "orderType": zod.enum(['sample', 'bulk']),
+  "issuedBy": zod.enum(['seller', 'manufacturer']).optional(),
   "title": zod.string(),
+  "description": zod.string().nullish(),
   "quantity": zod.number(),
   "priceCents": zod.number(),
   "status": zod.string(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "shippedAt": zod.string().nullish(),
+  "deliveredAt": zod.string().nullish(),
   "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
@@ -885,12 +1410,19 @@ export const AdvanceManufacturerSampleOrderResponse = zod.object({
   "id": zod.string(),
   "manufacturerId": zod.string(),
   "sellerId": zod.string(),
+  "sellerName": zod.string().optional().describe('Seller brand name (manufacturer-facing endpoints)'),
   "threadId": zod.string().nullish(),
   "orderType": zod.enum(['sample', 'bulk']),
+  "issuedBy": zod.enum(['seller', 'manufacturer']).optional(),
   "title": zod.string(),
+  "description": zod.string().nullish(),
   "quantity": zod.number(),
   "priceCents": zod.number(),
   "status": zod.string(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "shippedAt": zod.string().nullish(),
+  "deliveredAt": zod.string().nullish(),
   "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
@@ -912,12 +1444,19 @@ export const ConfirmSampleOrderPaymentResponse = zod.object({
   "id": zod.string(),
   "manufacturerId": zod.string(),
   "sellerId": zod.string(),
+  "sellerName": zod.string().optional().describe('Seller brand name (manufacturer-facing endpoints)'),
   "threadId": zod.string().nullish(),
   "orderType": zod.enum(['sample', 'bulk']),
+  "issuedBy": zod.enum(['seller', 'manufacturer']).optional(),
   "title": zod.string(),
+  "description": zod.string().nullish(),
   "quantity": zod.number(),
   "priceCents": zod.number(),
   "status": zod.string(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "shippedAt": zod.string().nullish(),
+  "deliveredAt": zod.string().nullish(),
   "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
@@ -932,12 +1471,19 @@ export const ListSellerProductionOrdersResponseItem = zod.object({
   "id": zod.string(),
   "manufacturerId": zod.string(),
   "sellerId": zod.string(),
+  "sellerName": zod.string().optional().describe('Seller brand name (manufacturer-facing endpoints)'),
   "threadId": zod.string().nullish(),
   "orderType": zod.enum(['sample', 'bulk']),
+  "issuedBy": zod.enum(['seller', 'manufacturer']).optional(),
   "title": zod.string(),
+  "description": zod.string().nullish(),
   "quantity": zod.number(),
   "priceCents": zod.number(),
   "status": zod.string(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "shippedAt": zod.string().nullish(),
+  "deliveredAt": zod.string().nullish(),
   "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
@@ -973,12 +1519,19 @@ export const CreateProductionOrderResponse = zod.object({
   "id": zod.string(),
   "manufacturerId": zod.string(),
   "sellerId": zod.string(),
+  "sellerName": zod.string().optional().describe('Seller brand name (manufacturer-facing endpoints)'),
   "threadId": zod.string().nullish(),
   "orderType": zod.enum(['sample', 'bulk']),
+  "issuedBy": zod.enum(['seller', 'manufacturer']).optional(),
   "title": zod.string(),
+  "description": zod.string().nullish(),
   "quantity": zod.number(),
   "priceCents": zod.number(),
   "status": zod.string(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "shippedAt": zod.string().nullish(),
+  "deliveredAt": zod.string().nullish(),
   "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
@@ -997,12 +1550,19 @@ export const GetProductionOrderResponse = zod.object({
   "id": zod.string(),
   "manufacturerId": zod.string(),
   "sellerId": zod.string(),
+  "sellerName": zod.string().optional().describe('Seller brand name (manufacturer-facing endpoints)'),
   "threadId": zod.string().nullish(),
   "orderType": zod.enum(['sample', 'bulk']),
+  "issuedBy": zod.enum(['seller', 'manufacturer']).optional(),
   "title": zod.string(),
+  "description": zod.string().nullish(),
   "quantity": zod.number(),
   "priceCents": zod.number(),
   "status": zod.string(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "shippedAt": zod.string().nullish(),
+  "deliveredAt": zod.string().nullish(),
   "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
@@ -1031,12 +1591,19 @@ export const UpdateSampleOrderDetailResponse = zod.object({
   "id": zod.string(),
   "manufacturerId": zod.string(),
   "sellerId": zod.string(),
+  "sellerName": zod.string().optional().describe('Seller brand name (manufacturer-facing endpoints)'),
   "threadId": zod.string().nullish(),
   "orderType": zod.enum(['sample', 'bulk']),
+  "issuedBy": zod.enum(['seller', 'manufacturer']).optional(),
   "title": zod.string(),
+  "description": zod.string().nullish(),
   "quantity": zod.number(),
   "priceCents": zod.number(),
   "status": zod.string(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "shippedAt": zod.string().nullish(),
+  "deliveredAt": zod.string().nullish(),
   "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
@@ -1103,12 +1670,19 @@ export const PayBulkOrderFromWalletResponse = zod.object({
   "id": zod.string(),
   "manufacturerId": zod.string(),
   "sellerId": zod.string(),
+  "sellerName": zod.string().optional().describe('Seller brand name (manufacturer-facing endpoints)'),
   "threadId": zod.string().nullish(),
   "orderType": zod.enum(['sample', 'bulk']),
+  "issuedBy": zod.enum(['seller', 'manufacturer']).optional(),
   "title": zod.string(),
+  "description": zod.string().nullish(),
   "quantity": zod.number(),
   "priceCents": zod.number(),
   "status": zod.string(),
+  "carrier": zod.string().nullish(),
+  "trackingNumber": zod.string().nullish(),
+  "shippedAt": zod.string().nullish(),
+  "deliveredAt": zod.string().nullish(),
   "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
   "createdAt": zod.string(),
   "updatedAt": zod.string(),
@@ -1162,7 +1736,10 @@ export const GetManufacturerConnectStatusResponse = zod.object({
   "detailsSubmitted": zod.boolean(),
   "requirementsDue": zod.array(zod.string()),
   "disabledReason": zod.string().nullish(),
-  "recovery": zod.string().nullish()
+  "recovery": zod.string().nullish(),
+  "country": zod.string().nullish(),
+  "payoutCurrency": zod.string().nullish(),
+  "accountType": zod.union([zod.literal('full'),zod.literal('recipient'),zod.literal(null)]).nullish()
 })
 
 

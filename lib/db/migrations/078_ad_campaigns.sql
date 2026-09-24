@@ -59,10 +59,21 @@ CREATE TABLE IF NOT EXISTS ad_campaigns (
 CREATE INDEX IF NOT EXISTS ad_campaigns_seller_id_idx
   ON ad_campaigns(seller_id, created_at DESC);
 
--- Status index for webhook activation queries
-CREATE INDEX IF NOT EXISTS ad_campaigns_pi_status_idx
-  ON ad_campaigns(stripe_payment_intent_id, status)
-  WHERE stripe_payment_intent_id IS NOT NULL;
+-- Status index for webhook activation queries. On a fresh database the
+-- drizzle push already creates ad_campaigns in its post-079 shape (no
+-- PaymentIntent column), so only build this index when the column exists;
+-- 079 drops it either way.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'ad_campaigns' AND column_name = 'stripe_payment_intent_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS ad_campaigns_pi_status_idx
+      ON ad_campaigns(stripe_payment_intent_id, status)
+      WHERE stripe_payment_intent_id IS NOT NULL;
+  END IF;
+END $$;
 
 -- GIN index so media_object_paths can be queried for cleanup
 CREATE INDEX IF NOT EXISTS ad_campaigns_media_paths_gin_idx

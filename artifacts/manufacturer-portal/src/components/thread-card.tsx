@@ -1,6 +1,7 @@
 import type { MessageThread } from "@workspace/api-client-react";
 import { formatDistanceToNow } from "date-fns";
 import { Link } from "wouter";
+import { orderStatusLabel } from "@workspace/manufacturer-flow";
 
 export function ThreadCard({ thread }: { thread: MessageThread }) {
   return (
@@ -38,7 +39,7 @@ export function ThreadCard({ thread }: { thread: MessageThread }) {
             <span className="truncate text-sm font-medium">{thread.subject}</span>
             {thread.orderStatus && (
               <span className="rounded border border-border bg-secondary px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                {thread.orderStatus.replaceAll("_", " ")}
+                {orderStatusLabel(thread.orderStatus)}
               </span>
             )}
           </div>

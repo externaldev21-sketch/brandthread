@@ -135,15 +135,23 @@ function apiRowToQuote(row: any): Quote | null {
   };
 }
 
+export type DirectorySort = 'recommended' | 'newest' | 'experience' | 'rating' | 'moq';
+
 export async function searchManufacturers(opts: {
   query?: string; country?: string; category?: string; moqMax?: number;
   unitPriceMaxCents?: number; leadTimeDaysMax?: number; verifiedOnly?: boolean;
-  ratingMin?: number; material?: string;
+  ratingMin?: number; material?: string; minYears?: number; hasPhotos?: boolean; sort?: DirectorySort;
 }): Promise<Manufacturer[]> {
   const params = new URLSearchParams();
   if (opts.query) params.set('q', opts.query);
   if (opts.country) params.set('country', opts.country);
   if (opts.category) params.set('specialty', opts.category);
+  // Server-side filters keep results complete (no client-side truncation).
+  if (opts.minYears) params.set('minYears', String(opts.minYears));
+  if (opts.moqMax !== undefined) params.set('maxMoq', String(opts.moqMax));
+  if (opts.verifiedOnly) params.set('verified', 'true');
+  if (opts.hasPhotos) params.set('hasPhotos', 'true');
+  if (opts.sort && opts.sort !== 'recommended') params.set('sort', opts.sort);
   const rows = await serviceRequest<any[]>(`/api/manufacturers/public${params.toString() ? `?${params}` : ''}`);
   if (!Array.isArray(rows)) throw new Error('Manufacturer directory returned an invalid response.');
   let results = rows.map(mapFreshPublicManufacturer);
@@ -151,12 +159,21 @@ export async function searchManufacturers(opts: {
   if (opts.unitPriceMaxCents !== undefined) results = results.filter((item) => item.unitPriceMinCents <= opts.unitPriceMaxCents!);
   if (opts.leadTimeDaysMax !== undefined) results = results.filter((item) => item.leadTimeDays <= opts.leadTimeDaysMax!);
   if (opts.verifiedOnly) results = results.filter((item) => item.isVerified);
+  if (opts.ratingMin !== undefined) results = results.filter((item) => item.reviewCount > 0 && item.rating >= opts.ratingMin!);
   return results;
 }
 
 export async function getManufacturer(id: string): Promise<Manufacturer | undefined> {
   assertCanonicalManufacturerId(id);
-  const row = await serviceRequest<any>(`/api/manufacturers/public/${encodeURIComponent(id)}`);
+  let row: any;
+  try {
+    row = await serviceRequest<any>(`/api/manufacturers/public/${encodeURIComponent(id)}`, {}, false);
+  } catch (error: any) {
+    if (error?.status !== 404) throw error;
+    // Private manufacturers (e.g. ones this seller invited) are only visible
+    // through the seller-scoped partner endpoint.
+    row = await serviceRequest<any>(`/api/manufacturers/partners/${encodeURIComponent(id)}`);
+  }
   // Public profile requests are intentionally uncached. Preserve the server's
   // array order so a refetch immediately picks up the manufacturer's new lead.
   return row?.id ? mapFreshPublicManufacturer(row) : undefined;
@@ -190,7 +207,12 @@ export async function getRelationships(): Promise<ManufacturerRelationship[]> {
       manufacturerId: row.manufacturerId,
       status,
       activeProductIds: [],
-      unreadCount: 0,
+      unreadCount: Number(row.unreadCount ?? 0),
+      activeOrders: Number(row.activeOrders ?? 0),
+      totalOrders: Number(row.totalOrders ?? 0),
+      awaitingPayment: Number(row.awaitingPayment ?? 0),
+      threadId: row.threadId ?? null,
+      manufacturer: row.manufacturer ?? undefined,
       createdAt: row.createdAt ?? '',
       updatedAt: row.updatedAt ?? '',
     };

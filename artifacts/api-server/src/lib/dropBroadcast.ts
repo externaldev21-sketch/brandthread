@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { db, dropAlertSubscriptions, dropBroadcasts, drops, follows } from "@workspace/db";
-import { sendPushToUser, stableNotificationId } from "./push";
+import { publishNotification } from "../routes/notifications-feed";
 
 export interface DropBroadcastResult {
   sent: number;
@@ -74,16 +74,18 @@ export async function deliverDropBroadcast(
   }
 
   const results = await Promise.allSettled(followerIds.map((followerId) =>
-    sendPushToUser(followerId, {
+    publishNotification({
+      userId: followerId,
+      category: "drops",
+      type: "drop_live",
       title: "Drop is live!",
       body: `${claimedDrop.name} is available now — limited stock. Tap to shop.`,
-      data: {
-        notificationId: stableNotificationId("drop-live", claimedDrop.claimId, followerId),
-        dropId: claimedDrop.id,
-        sellerId,
-        type: "drop_live",
-      },
-    }, "drop", sellerId)
+      targetId: claimedDrop.id,
+      targetType: "drop",
+      cta: "Shop the drop",
+      analyticsOwnerId: sellerId,
+      pushChannelId: "drops",
+    })
   ));
   const sent = results.filter((result) => result.status === "fulfilled").length;
   const errors = results.length - sent;

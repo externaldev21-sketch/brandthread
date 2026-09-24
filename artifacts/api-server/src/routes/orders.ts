@@ -752,4 +752,30 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
   res.json(updated);
 });
 
+// PATCH /api/orders/:id/fulfillment-checklist — seller packing checklist
+// (mobile Fulfillment.isPicked/isPacked). Not a money- or status-path field:
+// it only records whether the seller has checked off picking/packing the
+// order's line items in the fulfillment wizard.
+router.patch("/:id/fulfillment-checklist", requireRole("staff"), async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  const { isPicked, isPacked } = req.body ?? {};
+  if (isPicked === undefined && isPacked === undefined) {
+    res.status(400).json({ error: "isPicked or isPacked required" }); return;
+  }
+  if (isPicked !== undefined && typeof isPicked !== "boolean") {
+    res.status(400).json({ error: "isPicked must be a boolean" }); return;
+  }
+  if (isPacked !== undefined && typeof isPacked !== "boolean") {
+    res.status(400).json({ error: "isPacked must be a boolean" }); return;
+  }
+  const update: Record<string, unknown> = { updatedAt: new Date() };
+  if (isPicked !== undefined) update.fulfillmentPicked = isPicked;
+  if (isPacked !== undefined) update.fulfillmentPacked = isPacked;
+  const [updated] = await db.update(orders).set(update)
+    .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId)))
+    .returning();
+  if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(updated);
+});
+
 export default router;

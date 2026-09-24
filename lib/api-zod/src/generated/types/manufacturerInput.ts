@@ -20,4 +20,6 @@ export interface ManufacturerInput {
   website?: string;
   contactEmail?: string;
   contactPhone?: string;
+  /** @maxLength 64 */
+  timeZone?: string;
 }

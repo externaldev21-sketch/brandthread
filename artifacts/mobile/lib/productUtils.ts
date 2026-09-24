@@ -112,6 +112,27 @@ export function isOutOfStock(totalInventory: number, policy: 'deny' | 'continue'
   return policy === 'deny' && totalInventory <= 0;
 }
 
+/**
+ * Bulk-apply a price and/or stock quantity to a set of selected variants.
+ * Leaves unselected variants untouched; only overwrites fields explicitly
+ * provided (undefined = "don't change").
+ */
+export function applyBulkEditToVariants<T extends { id: string; price?: string; qty?: string }>(
+  variants: T[],
+  selectedIds: Set<string> | string[],
+  edit: { price?: string; qty?: string },
+): T[] {
+  const ids = selectedIds instanceof Set ? selectedIds : new Set(selectedIds);
+  return variants.map(v => {
+    if (!ids.has(v.id)) return v;
+    return {
+      ...v,
+      ...(edit.price !== undefined ? { price: edit.price } : {}),
+      ...(edit.qty !== undefined ? { qty: edit.qty } : {}),
+    };
+  });
+}
+
 /** Validate required fields for publishing */
 export function validateForPublish(product: {
   name: string;

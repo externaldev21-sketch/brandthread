@@ -627,6 +627,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         trackingStatus: 'label_created' | 'accepted' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'exception' | 'returned_to_sender';
         estimatedDelivery?: string | null;
       }) => patch(`/api/orders/${id}/tracking`, body),
+      /** Persist the seller's pick/pack checklist state for the fulfillment wizard. */
+      updateFulfillmentChecklist: (id: string, body: { isPicked?: boolean; isPacked?: boolean }) =>
+        patch(`/api/orders/${id}/fulfillment-checklist`, body),
+    },
+    packagePresets: {
+      list:   () => get<{ presets: any[] }>('/api/package-presets'),
+      create: (body: { name: string; weightOz: number; lengthIn: number; widthIn: number; heightIn: number }) =>
+        post<{ preset: any }>('/api/package-presets', body),
+      update: (id: string, body: Partial<{ name: string; weightOz: number; lengthIn: number; widthIn: number; heightIn: number }>) =>
+        patch<{ preset: any }>(`/api/package-presets/${encodeURIComponent(id)}`, body),
+      remove: (id: string) => del<{ ok: boolean }>(`/api/package-presets/${encodeURIComponent(id)}`),
     },
     customers: {
       list:    (search?: string) => get(`/api/customers${search ? `?search=${encodeURIComponent(search)}` : ''}`),
@@ -668,8 +679,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           visitorCount: number;
           toFulfill: number;
           toCapture: number;
-          buckets: Array<{ bucket: string; totalCents: number; orderCount: number }>;
-        }>(`/api/analytics/home?range=${range}`),
+          // The immediately preceding period of the same length (e.g. yesterday
+          // for "today"). No equivalent exists for balances — those are a
+          // point-in-time snapshot, not a period sum.
+          previous: { totalCents: number; orderCount: number; visitorCount: number };
+          buckets: Array<{ bucket: string; totalCents: number; orderCount: number; visitorCount: number }>;
+          // `tz` is minutes east of UTC (-Date#getTimezoneOffset()) so day/hour
+          // buckets land on the seller's local calendar day, not the server's.
+        }>(`/api/analytics/home?range=${range}&tz=${-new Date().getTimezoneOffset()}`),
       revenue:    (period: string) => get(`/api/analytics/revenue?period=${period}`),
       products:   () => get<any[]>('/api/analytics/products'),
       /** Top customers by spend + repeat-buyer stats — derived from real orders */
@@ -847,12 +864,21 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<{
           digest: 'realtime' | 'daily';
           role: 'buyer' | 'seller';
+          pushEnabled: boolean;
+          quietHours: { start: string | null; end: string | null; timezone: string };
           categories: Record<string, boolean>;
         }>('/api/notification-prefs'),
-      update: (body: { digest?: 'realtime' | 'daily'; categories?: Record<string, boolean> }) =>
+      update: (body: {
+        digest?: 'realtime' | 'daily';
+        categories?: Record<string, boolean>;
+        pushEnabled?: boolean;
+        quietHours?: { start: string; end: string; timezone?: string } | null;
+      }) =>
         put<{
           digest: 'realtime' | 'daily';
           role: 'buyer' | 'seller';
+          pushEnabled: boolean;
+          quietHours: { start: string | null; end: string | null; timezone: string };
           categories: Record<string, boolean>;
         }>('/api/notification-prefs', body),
     },
@@ -2041,6 +2067,38 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           likesCount: number; commentsCount: number; repostsCount: number; shopClicks: number;
           boosted: boolean; category: string; hype: string;
         }> }>(`/api/public/trending?limit=${limit}`),
+    },
+    /**
+     * Public "For You" ranked Discover feed — no auth required (an Authorization
+     * header is sent when available but the server does not require it).
+     * Contract (matched exactly against the backend ranking endpoint):
+     *   GET /api/public/discover/feed?limit=&offset=
+     *   -> { items: DiscoverFeedItem[]; computedAt: string; source: 'cache'|'computed'|'empty'; nextOffset: number | null }
+     */
+    discover: {
+      feed: (opts: { limit?: number; offset?: number } = {}) => {
+        const params = new URLSearchParams();
+        params.set('limit', String(opts.limit ?? 20));
+        params.set('offset', String(opts.offset ?? 0));
+        return get<{
+          items: Array<{
+            rank: number;
+            productId: string;
+            brandId: string;
+            brandName: string;
+            brandVerified: boolean;
+            productName: string;
+            priceCents: number;
+            compareAtPriceCents: number | null;
+            images: string[];
+            category: string;
+            sellerScore: number;
+          }>;
+          computedAt: string;
+          source: 'cache' | 'computed' | 'empty';
+          nextOffset: number | null;
+        }>(`/api/public/discover/feed?${params.toString()}`);
+      },
     },
     /** Stripe Connect Express onboarding for freelancer payouts. */
     freelancerConnect: {

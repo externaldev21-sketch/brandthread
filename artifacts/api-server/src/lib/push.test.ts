@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildExpoPushMessages,
+  isWithinQuietHours,
   normalizePushEventCategory,
   preferenceKey,
   unsentPushTokens,
@@ -53,5 +54,41 @@ describe("push notification delivery contract", () => {
       sound: "order-received.wav",
       channelId: "orders",
     });
+  });
+
+  it("maps new event categories to their buyer/seller preference keys", () => {
+    expect(preferenceKey("buyer", "stock")).toBe("price_alerts");
+    expect(preferenceKey("buyer", "return")).toBe("return_updates");
+    expect(preferenceKey("seller", "stock")).toBe("inventory_alerts");
+    expect(preferenceKey("seller", "fulfillment")).toBe("new_orders");
+    expect(normalizePushEventCategory("returns")).toBe("return");
+    expect(normalizePushEventCategory("pricing")).toBe("stock");
+  });
+});
+
+describe("quiet hours", () => {
+  const at = (hhmm: string) => new Date(`2026-01-15T${hhmm}:00Z`);
+
+  it("is off when start or end is unset", () => {
+    expect(isWithinQuietHours(at("23:00"), null, null, "UTC")).toBe(false);
+    expect(isWithinQuietHours(at("23:00"), "22:00", undefined, "UTC")).toBe(false);
+  });
+
+  it("matches a same-day window", () => {
+    expect(isWithinQuietHours(at("13:00"), "09:00", "17:00", "UTC")).toBe(true);
+    expect(isWithinQuietHours(at("08:00"), "09:00", "17:00", "UTC")).toBe(false);
+    expect(isWithinQuietHours(at("17:00"), "09:00", "17:00", "UTC")).toBe(false); // end exclusive
+  });
+
+  it("matches a window that wraps midnight", () => {
+    expect(isWithinQuietHours(at("23:30"), "22:00", "07:00", "UTC")).toBe(true);
+    expect(isWithinQuietHours(at("03:00"), "22:00", "07:00", "UTC")).toBe(true);
+    expect(isWithinQuietHours(at("12:00"), "22:00", "07:00", "UTC")).toBe(false);
+  });
+
+  it("evaluates the window in the recipient's timezone, not UTC", () => {
+    // 23:30 UTC is 15:30 in America/Los_Angeles (UTC-8 in January) — well
+    // outside a 22:00-07:00 LA-local quiet window.
+    expect(isWithinQuietHours(at("23:30"), "22:00", "07:00", "America/Los_Angeles")).toBe(false);
   });
 });

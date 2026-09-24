@@ -19,14 +19,14 @@ export default function Messages() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Inbox</h1>
-          <p className="text-muted-foreground mt-1">Communicate directly with brands and buyers.</p>
+          <p className="text-muted-foreground mt-1">One ongoing conversation per seller — messages, photos, order cards and production updates.</p>
         </div>
       </div>
 
       <div className="relative max-w-md shrink-0">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input 
-          placeholder="Search by buyer or subject..." 
+          placeholder="Search by seller or subject…" 
           className="pl-9 h-11 bg-card border-border"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -46,7 +46,7 @@ export default function Messages() {
             <QueryError title="Unable to load inbox" description="Your conversations could not be retrieved." onRetry={() => void refetch()} />
           </div>
         ) : filteredThreads.length === 0 ? (
-          <EmptyState icon={MessageSquare} title={searchTerm ? "No matching conversations" : "Your inbox is clear"} description={searchTerm ? "Try a different seller or subject." : "New seller conversations will appear here."} />
+          <EmptyState icon={MessageSquare} title={searchTerm ? "No matching conversations" : "Your inbox is clear"} description={searchTerm ? "Try a different seller or subject." : "When a seller messages you from the directory or accepts your invite, the conversation starts here."} />
         ) : (
           <div className="divide-y divide-border overflow-y-auto">
             {filteredThreads.map((thread) => <ThreadCard key={thread.id} thread={thread} />)}

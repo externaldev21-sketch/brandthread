@@ -104,6 +104,13 @@ export interface Manufacturer {
   website?: string;
   email?: string;
   phone?: string;
+  /** IANA zone of the factory, used to show the manufacturer's local time. */
+  timeZone?: string | null;
+  /** False for private manufacturers only visible to sellers they work with. */
+  isPublicDirectory?: boolean;
+  priceRangeLabel?: string;
+  sampleTurnaround?: string;
+  bulkTurnaround?: string;
   createdAt: string;
 }
 
@@ -115,6 +122,16 @@ export interface ManufacturerRelationship {
   manufacturerId: string;
   status: ManufacturerRelationshipStatus;
   activeProductIds: string[];
+  /** Live counts and a summary of the manufacturer, embedded by the API. */
+  activeOrders?: number;
+  totalOrders?: number;
+  awaitingPayment?: number;
+  threadId?: string | null;
+  manufacturer?: {
+    id: string; businessName: string; country: string; city: string | null; specialty: string;
+    yearsInBusiness: number; moq: number; timeZone: string | null; isPublicDirectory: boolean;
+    isVerified: boolean; payoutReady: boolean; photo: string | null;
+  };
   lastMessageAt?: string;
   lastMessagePreview?: string;
   unreadCount: number;

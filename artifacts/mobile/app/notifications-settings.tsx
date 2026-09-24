@@ -20,6 +20,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { HapticSwitch } from '@/components/BrandthreadUI';
 
 type DigestMode = 'realtime' | 'daily';
+type Role = 'buyer' | 'seller';
 
 interface NotifRow {
   key: string;
@@ -28,29 +29,58 @@ interface NotifRow {
   description: string;
 }
 
-const ROWS: NotifRow[] = [
+const SELLER_ROWS: NotifRow[] = [
   { key: 'new_orders',             icon: 'shopping-bag',   label: 'New orders',             description: 'Get notified when a customer places an order' },
   { key: 'production_milestones',  icon: 'package',        label: 'Production milestones',  description: 'Sampling, production, and fulfillment progress' },
   { key: 'payout_confirmations',   icon: 'credit-card',    label: 'Payout confirmations',   description: 'Payout sent, completed, or delayed updates' },
   { key: 'customer_messages',      icon: 'message-circle', label: 'Customer messages',      description: 'New messages and replies from customers' },
   { key: 'disputes',               icon: 'alert-triangle', label: 'Disputes',               description: 'New disputes and time-sensitive case updates' },
+  { key: 'inventory_alerts',       icon: 'archive',        label: 'Inventory alerts',       description: 'Low stock and out-of-stock warnings' },
   { key: 'subscription_trial',     icon: 'clock',          label: 'Trial reminders',        description: 'A reminder before your free trial converts to paid' },
+];
+
+const BUYER_ROWS: NotifRow[] = [
+  { key: 'order_updates',   icon: 'shopping-bag',   label: 'Order updates',      description: 'Confirmed, shipped, delivered, and return/refund updates' },
+  { key: 'messages',        icon: 'message-circle', label: 'Messages',          description: 'New messages from sellers and friends' },
+  { key: 'new_drops',       icon: 'zap',             label: 'Drops',             description: 'When a brand you follow launches a new drop' },
+  { key: 'friend_activity', icon: 'users',           label: 'Social',            description: 'New followers, likes, and friend activity' },
+  { key: 'price_alerts',    icon: 'tag',             label: 'Price & stock alerts', description: 'Price drops and back-in-stock alerts on saved items' },
+  { key: 'return_updates',  icon: 'refresh-ccw',     label: 'Returns',           description: 'Updates on your return and refund requests' },
+];
+
+const QUIET_HOURS_PRESETS: { start: string; end: string; label: string }[] = [
+  { start: '22:00', end: '07:00', label: '10 PM – 7 AM' },
+  { start: '23:00', end: '08:00', label: '11 PM – 8 AM' },
+  { start: '21:00', end: '06:00', label: '9 PM – 6 AM' },
 ];
 
 export default function NotificationsSettingsScreen() {
   const insets = useSafeAreaInsets();
   const api    = useApi();
   const { theme } = useAppTheme();
+  const [role, setRole] = useState<Role>('seller');
   const [digest, setDigest] = useState<DigestMode>('realtime');
+  const [pushEnabled, setPushEnabled] = useState(true);
+  const [quietHours, setQuietHours] = useState<{ start: string | null; end: string | null }>({ start: null, end: null });
   const [loading, setLoading] = useState(true);
   const [saving,  setSaving]  = useState(false);
   const [categories, setCategories] = useState<Record<string, boolean>>({});
 
-  // Load current preference from API
+  const rows = role === 'buyer' ? BUYER_ROWS : SELLER_ROWS;
+
+  // Load current preference from API. This screen adapts to whichever role
+  // the signed-in account has — the server resolves that from the auth
+  // token, so the same endpoint serves both buyer and seller accounts.
   useEffect(() => {
-    api.seller.notificationPrefs.get()
-      .then(data => { setDigest(data.digest); setCategories(data.categories); })
-      .catch(() => {/* fallback to realtime */})
+    api.notificationPrefs.get()
+      .then(data => {
+        setDigest(data.digest);
+        setCategories(data.categories);
+        setRole(data.role);
+        setPushEnabled(data.pushEnabled ?? true);
+        setQuietHours({ start: data.quietHours?.start ?? null, end: data.quietHours?.end ?? null });
+      })
+      .catch(() => {/* fallback to realtime, push on, quiet hours off */})
       .finally(() => setLoading(false));
   }, []);
 
@@ -60,7 +90,7 @@ export default function NotificationsSettingsScreen() {
     setDigest(next);
     setSaving(true);
     try {
-      await api.seller.notificationPrefs.update({ digest: next });
+      await api.notificationPrefs.update({ digest: next });
     } catch {
       // revert on error
       setDigest(val ? 'realtime' : 'daily');
@@ -69,8 +99,27 @@ export default function NotificationsSettingsScreen() {
     }
   }
 
-  function haptic() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  async function handleMasterToggle(value: boolean) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const prior = pushEnabled;
+    setPushEnabled(value);
+    try {
+      await api.notificationPrefs.update({ pushEnabled: value });
+    } catch {
+      setPushEnabled(prior);
+    }
+  }
+
+  async function handleQuietHoursPreset(preset: { start: string; end: string } | null) {
+    Haptics.selectionAsync();
+    const prior = quietHours;
+    const next = preset ? { start: preset.start, end: preset.end } : { start: null, end: null };
+    setQuietHours(next);
+    try {
+      await api.notificationPrefs.update({ quietHours: preset ? preset : null });
+    } catch {
+      setQuietHours(prior);
+    }
   }
 
   async function handleCategory(key: string, value: boolean) {
@@ -78,7 +127,7 @@ export default function NotificationsSettingsScreen() {
     const prior = categories;
     setCategories({ ...categories, [key]: value });
     try {
-      const result = await api.seller.notificationPrefs.update({ categories: { [key]: value } });
+      const result = await api.notificationPrefs.update({ categories: { [key]: value } });
       setCategories(result.categories);
     } catch {
       setCategories(prior);
@@ -89,6 +138,58 @@ export default function NotificationsSettingsScreen() {
     <View style={[s.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Notifications" />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+
+        {/* ── Master switch ── */}
+        <View style={s.section}>
+          <View style={[s.masterRow, { backgroundColor: CARD, borderColor: BORDER }]}>
+            <View style={[s.digestIconBox, { backgroundColor: pushEnabled ? theme.accentDim : SUBTLE + '60' }]}>
+              <Feather name={pushEnabled ? 'bell' : 'bell-off'} size={18} color={pushEnabled ? theme.accentLight : MUTED} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.digestOptionLabel, { color: FG }]}>Push notifications</Text>
+              <Text style={s.digestOptionDesc}>Turn all push notifications on or off for this device</Text>
+            </View>
+            <HapticSwitch
+              value={pushEnabled}
+              onValueChange={handleMasterToggle}
+              trackColor={{ false: SUBTLE, true: theme.accent }}
+              thumbColor={FG}
+              accessibilityLabel="All push notifications"
+            />
+          </View>
+        </View>
+
+        {/* ── Quiet hours ── */}
+        <View style={s.section}>
+          <Text style={s.sectionTitle}>Quiet hours</Text>
+          <Text style={s.sectionSubtitle}>
+            Push notifications are held silently during this window and delivered to your in-app feed instead. Time-sensitive events still show up when you open the app.
+          </Text>
+          <View style={s.presetRow}>
+            <TouchableOpacity
+              style={[s.presetChip, !quietHours.start && { backgroundColor: theme.accentDim, borderColor: theme.accent }, { borderColor: BORDER }]}
+              onPress={() => handleQuietHoursPreset(null)}
+              activeOpacity={0.8}
+            >
+              <Text style={[s.presetChipLabel, { color: !quietHours.start ? FG : MUTED }]}>Off</Text>
+            </TouchableOpacity>
+            {QUIET_HOURS_PRESETS.map((preset) => {
+              const active = quietHours.start === preset.start && quietHours.end === preset.end;
+              return (
+                <TouchableOpacity
+                  key={preset.label}
+                  style={[s.presetChip, active && { backgroundColor: theme.accentDim, borderColor: theme.accent }, { borderColor: BORDER }]}
+                  onPress={() => handleQuietHoursPreset(preset)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[s.presetChipLabel, { color: active ? FG : MUTED }]}>{preset.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={[s.divider, { backgroundColor: theme.borderSubtle }]} />
 
         {/* ── Push frequency ── */}
         <View style={s.section}>
@@ -156,10 +257,10 @@ export default function NotificationsSettingsScreen() {
         {/* ── Notification types ── */}
         <View style={s.section}>
           <View style={[s.listCard, { backgroundColor: CARD, borderColor: BORDER }]}>
-            {ROWS.map((row, i) => (
+            {rows.map((row, i) => (
               <View
                 key={row.key}
-                style={[s.row, i !== ROWS.length - 1 && { borderBottomWidth: 1, borderBottomColor: BORDER }]}
+                style={[s.row, i !== rows.length - 1 && { borderBottomWidth: 1, borderBottomColor: BORDER }]}
               >
                 <Feather name={row.icon} size={17} color={FG} style={s.rowIcon} />
                 <View style={{ flex: 1, paddingRight: 10 }}>
@@ -198,6 +299,11 @@ const s = StyleSheet.create({
   optionDivider:     { height: 1, marginHorizontal: 14 },
   savingRow:         { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, paddingTop: 4 },
   savingText:        { fontSize: 12, fontFamily: FONT.regular, color: MUTED },
+
+  masterRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1 },
+  presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  presetChip: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1 },
+  presetChipLabel: { fontSize: 13, fontFamily: FONT.medium },
 
   listCard:    { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
   row:         { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14 },

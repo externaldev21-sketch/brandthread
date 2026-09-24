@@ -7,6 +7,7 @@
  */
 import type { MessageCardData } from './messageCardData';
 import type { MessageMessageType } from './messageMessageType';
+import type { OrderCardSnapshot } from './orderCardSnapshot';
 
 export interface Message {
   id: string;
@@ -18,5 +19,7 @@ export interface Message {
   mediaUrls: string[];
   /** @nullable */
   cardData?: MessageCardData;
+  /** Live state of the order a sample/bulk card refers to. */
+  order?: OrderCardSnapshot | null;
   sentAt: string;
 }
