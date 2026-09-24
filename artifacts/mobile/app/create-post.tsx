@@ -33,7 +33,7 @@ import { formatCents } from '@/lib/money';
 import { useApi } from '@/lib/api';
 import {
   markVideoClipUploaded, normalizeTrimBounds,
-  createPhotoSlide, updateSlideUploadState, updateSlideOverlays, removePhotoSlide,
+  createPhotoSlide, updateSlideUploadState, updateSlideOverlays, removePhotoSlide, moveSlide,
   slidesToComposePayload,
   type EditablePhotoSlide, type ComposedSlideshowResult,
 } from '@/lib/videoEditing';
@@ -1265,29 +1265,61 @@ export default function CreatePostScreen() {
         <View style={[ts.slideStripContainer, { bottom: botPad + 80 }]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 12, paddingVertical: 8 }}>
-              {editableSlides.map((slide, idx) => (
-                <TouchableOpacity
-                  key={slide.id}
-                  style={[
-                    ts.slideThumb,
-                    idx === currentSlideIndex && { borderColor: ORANGE, borderWidth: 2 },
-                  ]}
-                  onPress={() => setCurrentSlideIndex(idx)}
-                  accessibilityLabel={`Slide ${idx + 1}`}
-                >
-                  <Image source={{ uri: slide.uri }} style={ts.slideThumbImg} resizeMode="cover" />
-                  {slide.overlays.length > 0 && (
-                    <View style={ts.slideOverlayBadge}>
-                      <Text style={ts.slideOverlayBadgeText}>{slide.overlays.length}</Text>
-                    </View>
-                  )}
-                  {slide.uploadState === 'error' && (
-                    <View style={[ts.slideOverlayBadge, { backgroundColor: '#ef4444' }]}>
-                      <Feather name="alert-circle" size={8} color="#fff" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
+              {editableSlides.map((slide, idx) => {
+                const isActive = idx === currentSlideIndex;
+                return (
+                  <View key={slide.id} style={{ alignItems: 'center' }}>
+                    <TouchableOpacity
+                      style={[
+                        ts.slideThumb,
+                        isActive && { borderColor: ORANGE, borderWidth: 2 },
+                      ]}
+                      onPress={() => setCurrentSlideIndex(idx)}
+                      accessibilityLabel={`Slide ${idx + 1}`}
+                    >
+                      <Image source={{ uri: slide.uri }} style={ts.slideThumbImg} resizeMode="cover" />
+                      {slide.overlays.length > 0 && (
+                        <View style={ts.slideOverlayBadge}>
+                          <Text style={ts.slideOverlayBadgeText}>{slide.overlays.length}</Text>
+                        </View>
+                      )}
+                      {slide.uploadState === 'error' && (
+                        <View style={[ts.slideOverlayBadge, { backgroundColor: '#ef4444' }]}>
+                          <Feather name="alert-circle" size={8} color="#fff" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                    {isActive && editableSlides.length > 1 && (
+                      <View style={ts.slideReorderRow}>
+                        <TouchableOpacity
+                          disabled={idx === 0}
+                          onPress={() => {
+                            setEditableSlides(prev => moveSlide(prev, idx, idx - 1));
+                            setCurrentSlideIndex(idx - 1);
+                            setComposedSlideshow(null);
+                          }}
+                          accessibilityLabel="Move slide earlier"
+                          style={[ts.slideReorderBtn, idx === 0 && { opacity: 0.3 }]}
+                        >
+                          <Feather name="chevron-left" size={14} color={FG} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          disabled={idx === editableSlides.length - 1}
+                          onPress={() => {
+                            setEditableSlides(prev => moveSlide(prev, idx, idx + 1));
+                            setCurrentSlideIndex(idx + 1);
+                            setComposedSlideshow(null);
+                          }}
+                          accessibilityLabel="Move slide later"
+                          style={[ts.slideReorderBtn, idx === editableSlides.length - 1 && { opacity: 0.3 }]}
+                        >
+                          <Feather name="chevron-right" size={14} color={FG} />
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
             </View>
           </ScrollView>
         </View>
@@ -2427,6 +2459,8 @@ const createTs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   slideThumb:    { width: 60, height: 80, borderRadius: 6, overflow: 'hidden', borderWidth: 2, borderColor: 'transparent', position: 'relative' },
   slideThumbImg: { width: 60, height: 80 },
   slideOverlayBadge: { position: 'absolute', top: 3, right: 3, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  slideReorderRow: { flexDirection: 'row', gap: 4, marginTop: 4 },
+  slideReorderBtn: { width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   slideOverlayBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: '#fff' },
   slideNextBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20,

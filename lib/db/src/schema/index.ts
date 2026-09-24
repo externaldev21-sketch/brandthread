@@ -885,11 +885,18 @@ export const stories = pgTable('stories', {
   repliesDisabled:   boolean('replies_disabled').notNull().default(false),
   privacyVisibility: text('privacy_visibility').notNull().default('public'),
   privacyReplyPerm:  text('privacy_reply_perm').notNull().default('everyone'),
+  /** 'visible' | 'held' | 'removed' */
+  moderationStatus:  text('moderation_status').notNull().default('visible'),
+  moderationReason:  text('moderation_reason'),
+  moderatedAt:       timestamp('moderated_at'),
   likesCount:        integer('likes_count').notNull().default(0),
   viewsCount:        integer('views_count').notNull().default(0),
   createdAt:         timestamp('created_at').defaultNow().notNull(),
   expiresAt:         timestamp('expires_at').notNull(),
-});
+}, (t) => ({
+  expiresAtIdx: index('stories_expires_at_idx').on(t.expiresAt),
+  authorIdx:    index('stories_author_idx').on(t.authorId),
+}));
 
 export const storyLikes = pgTable('story_likes', {
   storyId:   uuid('story_id').notNull().references(() => stories.id, { onDelete: 'cascade' }),
@@ -904,7 +911,8 @@ export const storyViews = pgTable('story_views', {
   userId:   text('user_id').notNull(),
   viewedAt: timestamp('viewed_at').defaultNow().notNull(),
 }, (t) => ({
-  pk: primaryKey({ columns: [t.storyId, t.userId] }),
+  pk:      primaryKey({ columns: [t.storyId, t.userId] }),
+  userIdx: index('story_views_user_idx').on(t.userId),
 }));
 
 // ─── Buyer-to-buyer follows (social graph) ────────────────────────────────────
