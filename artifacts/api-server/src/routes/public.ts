@@ -3,7 +3,9 @@
  * Mounted at /api/public — no requireAuth middleware.
  */
 import { Router } from "express";
-import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems } from "@workspace/db";
+import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems, savedCollections, savedItems } from "@workspace/db";
+import { adaptSavedRows } from "../lib/savedItemAdapter";
+import { fetchProductBadgeInfo } from "../lib/savedProductBadges";
 import { eq, and, asc, desc, ne, inArray, notInArray, or, ilike, sql, count, gte, lte, isNull, isNotNull } from "drizzle-orm";
 import { computeTrendingForToday, isCacheFresh } from "../jobs/computeTrending";
 import { computeSellerRankingForToday, isSellerRankingCacheFresh } from "../jobs/computeSellerRanking";
@@ -395,6 +397,51 @@ router.get("/products/:id", async (req, res) => {
   } catch (err) {
     req.log.error({ err, productId: req.params.id }, "Failed to fetch public product");
     res.status(500).json({ error: "Failed to fetch product" });
+  }
+});
+
+// GET /api/public/collections/:id — a shared "Save to collection" board (deep link).
+// Only ever returns collections the owner has explicitly marked public.
+router.get("/collections/:id", async (req, res) => {
+  try {
+    const [collection] = await db.select().from(savedCollections)
+      .where(and(eq(savedCollections.id, req.params.id), eq(savedCollections.isPublic, true)))
+      .limit(1);
+    if (!collection) {
+      res.status(404).json({ error: "Collection not found" });
+      return;
+    }
+
+    const [owner] = await db.select({ displayName: users.displayName, brandName: users.brandName })
+      .from(users)
+      .where(eq(users.clerkId, collection.userId))
+      .limit(1);
+
+    const items = await db.select().from(savedItems)
+      .where(eq(savedItems.collectionId, collection.id))
+      .orderBy(desc(savedItems.createdAt));
+    const adaptedItems = await adaptSavedRows(items);
+
+    let coverImageUrl = collection.coverImageUrl;
+    if (!coverImageUrl) {
+      const productIds = items.filter((i) => i.itemType === "product").map((i) => i.targetId);
+      const badgeInfo = await fetchProductBadgeInfo(productIds);
+      coverImageUrl = items.map((i) => badgeInfo.get(i.targetId)?.image).find(Boolean) ?? null;
+    }
+
+    res.json({
+      collection: {
+        id: collection.id,
+        name: collection.name,
+        coverImageUrl,
+        itemCount: items.length,
+        ownerName: owner?.brandName ?? owner?.displayName ?? "Brandthread",
+      },
+      items: adaptedItems,
+    });
+  } catch (err) {
+    req.log.error({ err, collectionId: req.params.id }, "Failed to fetch public collection");
+    res.status(500).json({ error: "Failed to fetch collection" });
   }
 });
 

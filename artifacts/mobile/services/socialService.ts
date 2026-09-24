@@ -14,7 +14,7 @@ import type {
   Story, StoryMedia, StoryPrivacySettings, StoryViewer,
   Notification, NotificationCategory, NotificationPreference,
   BlockRecord, MuteRecord, RestrictRecord,
-  SavedItem, SavedItemType, PrivacySettings, ProfileSearchResult,
+  SavedItem, SavedItemType, SavedCollection, PrivacySettings, ProfileSearchResult,
   Comment,
 } from './socialTypes';
 import { DEFAULT_PRIVACY_SETTINGS, DEFAULT_NOTIFICATION_PREFS } from './socialTypes';
@@ -1282,7 +1282,10 @@ export async function getSavedItems(k: SocialKeys = K()): Promise<SavedItem[]> {
   return authoritative;
 }
 export async function saveItem(
-  params: { type: SavedItemType; targetId: string; title: string; subtitle?: string; accentColor?: string; },
+  params: {
+    type: SavedItemType; targetId: string; title: string; subtitle?: string; accentColor?: string;
+    collectionId?: string | null; priceCents?: number;
+  },
   options?: { onRemoteSaved?: () => void },
 ): Promise<SavedItem> {
   const k = K();
@@ -1295,7 +1298,7 @@ export async function saveItem(
   const items = await getSavedItems(k);
   const existing = items.find(i => i.targetId === params.targetId);
   if (existing) return existing;
-  const item: SavedItem = { id: uid(), savedAt: iso(), ...params };
+  const item: SavedItem = { id: uid(), savedAt: iso(), ...params, collectionId: params.collectionId ?? undefined };
   await save(k.saved, [item, ...items]);
   const p = await getMyProfile(k);
   await updateMyProfile({ savedCount: p.savedCount + 1 }, k);
@@ -1319,6 +1322,62 @@ export async function isItemSaved(targetId: string): Promise<boolean> {
   const k = K();
   const items = await getSavedItems(k);
   return items.some(i => i.targetId === targetId);
+}
+/** Move (or un-file, with `collectionId: null`) an already-saved item between boards. */
+export async function moveSavedItemToCollection(targetId: string, collectionId: string | null): Promise<SavedItem> {
+  const updated = await serviceRequest<SavedItem>(
+    '/api/buyer/saved/' + encodeURIComponent(targetId),
+    { method: 'PATCH', body: JSON.stringify({ collectionId }) },
+  );
+  notify();
+  return updated;
+}
+
+// ─── Saved Collections (boards) ────────────────────────────────────────────────
+
+export async function getCollections(): Promise<SavedCollection[]> {
+  const remote = await serviceRequest<SavedCollection[]>('/api/buyer/collections');
+  return Array.isArray(remote) ? remote : [];
+}
+export async function getCollectionItems(collectionId: string): Promise<{ collection: SavedCollection; items: SavedItem[] }> {
+  return serviceRequest(`/api/buyer/collections/${encodeURIComponent(collectionId)}/items`);
+}
+export async function createCollection(name: string): Promise<SavedCollection> {
+  const collection = await serviceRequest<SavedCollection>('/api/buyer/collections', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+  notify();
+  return collection;
+}
+export async function updateCollection(
+  collectionId: string,
+  updates: { name?: string; coverImageUrl?: string | null; isPublic?: boolean },
+): Promise<SavedCollection> {
+  const collection = await serviceRequest<SavedCollection>(`/api/buyer/collections/${encodeURIComponent(collectionId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+  notify();
+  return collection;
+}
+export async function deleteCollection(collectionId: string): Promise<void> {
+  await serviceRequest(`/api/buyer/collections/${encodeURIComponent(collectionId)}`, { method: 'DELETE' });
+  notify();
+}
+export async function reorderCollections(orderedIds: string[]): Promise<void> {
+  await serviceRequest('/api/buyer/collections/reorder', {
+    method: 'POST',
+    body: JSON.stringify({ orderedIds }),
+  });
+  notify();
+}
+/** Unauthenticated read for a shared collection deep link — no token required. */
+export async function getPublicCollection(collectionId: string): Promise<{
+  collection: { id: string; name: string; coverImageUrl: string | null; itemCount: number; ownerName: string };
+  items: SavedItem[];
+}> {
+  return serviceRequest(`/api/public/collections/${encodeURIComponent(collectionId)}`, {}, false);
 }
 
 // ─── Privacy ──────────────────────────────────────────────────────────────────
