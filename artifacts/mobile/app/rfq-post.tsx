@@ -92,7 +92,7 @@ export default function RfqPostScreen() {
         category: category.trim() || undefined,
         description: description.trim() || undefined,
         quantity: qty,
-        targetPriceCents: targetPrice ? parseDecimalToCents(targetPrice) : undefined,
+        targetPriceCents: targetPrice ? (parseDecimalToCents(targetPrice) ?? undefined) : undefined,
         deadline: deadline.trim() ? new Date(deadline.trim()).toISOString() : undefined,
         manufacturerIds: [...selected],
       });
@@ -122,7 +122,7 @@ export default function RfqPostScreen() {
         <FormInput label="Description" value={description} onChange={setDescription} placeholder="Fabric, fit, print details…" multiline style={s.field} />
 
         <View style={s.row2}>
-          <FormInput label="Quantity" value={quantity} onChange={setQuantity} placeholder="500" keyboardType="number-pad" style={[s.field, s.half]} />
+          <FormInput label="Quantity" value={quantity} onChange={setQuantity} placeholder="500" keyboardType="numeric" style={[s.field, s.half]} />
           <FormInput label="Target price / unit" value={targetPrice} onChange={setTargetPrice} placeholder="$6.50" keyboardType="decimal-pad" style={[s.field, s.half]} />
         </View>
         <FormInput label="Deadline (optional)" value={deadline} onChange={setDeadline} placeholder="YYYY-MM-DD" style={s.field} />
