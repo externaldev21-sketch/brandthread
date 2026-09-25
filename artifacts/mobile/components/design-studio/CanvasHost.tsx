@@ -10,23 +10,41 @@
  * from the main canvas screen) never risks crashing Expo Go/web.
  */
 
-import React, { useMemo } from 'react';
+import React, { useImperativeHandle, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { isSkiaAvailable } from '@/lib/skiaAvailability';
 import SvgDrawingCanvas, { SvgDrawingCanvasProps } from './SvgDrawingCanvas';
+import type { SkiaDrawingCanvasHandle } from './SkiaDrawingCanvas';
 import { FONT, FS, MUTED, SP } from '@/lib/theme';
 
 export type CanvasHostProps = SvgDrawingCanvasProps; // same prop contract for both renderers
 
 export type CanvasRenderMode = 'skia' | 'svg';
 
+/**
+ * CanvasHostHandle — real pixel sampling for the eyedropper tool.
+ * `readPixelColor` only returns a value on the Skia render path (a genuine
+ * GPU-surface read via SkImage.readPixels); on the SVG fallback it returns
+ * null since react-native-svg exposes no surface to read from — the caller
+ * (design-canvas.tsx) falls back to its own layer-color approximation in
+ * that case, per lib/colorModel's documented eyedropper contract.
+ */
+export interface CanvasHostHandle {
+  readPixelColor(x: number, y: number): string | null;
+}
+
 /** Exposed for the host screen to show a "GPU acceleration active" indicator, if desired. */
 export function getCanvasRenderMode(): CanvasRenderMode {
   return isSkiaAvailable() ? 'skia' : 'svg';
 }
 
-export default function CanvasHost(props: CanvasHostProps) {
+function CanvasHostInner(props: CanvasHostProps, ref: React.ForwardedRef<CanvasHostHandle>) {
   const mode = useMemo(getCanvasRenderMode, []);
+  const skiaRef = useRef<SkiaDrawingCanvasHandle>(null);
+
+  useImperativeHandle(ref, () => ({
+    readPixelColor: (x: number, y: number) => skiaRef.current?.readPixelColor(x, y) ?? null,
+  }), []);
 
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const SkiaDrawingCanvas = useMemo(() => {
@@ -39,11 +57,14 @@ export default function CanvasHost(props: CanvasHostProps) {
   }, [mode]);
 
   if (mode === 'skia' && SkiaDrawingCanvas) {
-    return <SkiaDrawingCanvas {...props} />;
+    return <SkiaDrawingCanvas ref={skiaRef} {...props} />;
   }
 
   return <SvgDrawingCanvas {...props} />;
 }
+
+const CanvasHost = React.forwardRef(CanvasHostInner);
+export default CanvasHost;
 
 /** Small chrome badge — shown once, low-key, when running on the SVG fallback. */
 export function RenderModeBadge({ mode }: { mode: CanvasRenderMode }) {

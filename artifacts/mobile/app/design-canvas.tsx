@@ -28,7 +28,7 @@ import {
 } from 'react-native';
 import Svg, {
   Path, Rect, Circle, G, Line, Text as SvgText,
-  Image as SvgImage, Defs, Mask as SvgMask, Filter, FeColorMatrix,
+  Image as SvgImage, Defs, Mask as SvgMask, Filter, FeColorMatrix, FeBlend, FeComposite,
 } from 'react-native-svg';
 import { File, Paths, EncodingType } from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -101,7 +101,7 @@ import type {
   DrawPath, BlendModeKind,
 } from '@/services/designTypes';
 import { SheetRise } from '@/components/motion/SheetRise';
-import CanvasHost from '@/components/design-studio/CanvasHost';
+import CanvasHost, { type CanvasHostHandle } from '@/components/design-studio/CanvasHost';
 import CanvasGestureLayer from '@/components/design-studio/CanvasGestureLayer';
 import LayersPanelComponent from '@/components/design-studio/LayersPanel';
 import ColorPickerComponent from '@/components/design-studio/ColorPicker';
@@ -513,6 +513,19 @@ export default function DesignCanvasScreen() {
   const [pickerTab, setPickerTab]           = useState<'disc' | 'palette' | 'value'>('palette');
   const [hueDiscAngle, setHueDiscAngle]     = useState(0);
   const [discBrightness, setDiscBrightness] = useState(1.0);
+  // Real ColorPicker component (components/design-studio/ColorPicker.tsx):
+  // recents + brand palettes, persisted via designService's colorPicker store.
+  const [colorRecents, setColorRecents]     = useState<string[]>([]);
+  const [colorPalettes, setColorPalettes]   = useState<BrandPalette[]>([]);
+  const colorRecentsRef  = useRef(colorRecents);
+  const colorPalettesRef = useRef(colorPalettes);
+  colorRecentsRef.current  = colorRecents;
+  colorPalettesRef.current = colorPalettes;
+  // Eyedropper: active while the user is expected to tap the canvas to sample
+  // a color. The color sheet is closed while this is true so the canvas is
+  // tappable (it's rendered as a full-screen Modal otherwise).
+  const [eyedropperActive, setEyedropperActive] = useState(false);
+  const canvasHostRef = useRef<CanvasHostHandle>(null);
 
   // ── Layer options ──────────────────────────────────────────────────────────
   const [layerEditOpacity, setLayerEditOpacity] = useState(1.0);
@@ -536,6 +549,19 @@ export default function DesignCanvasScreen() {
 
   // kind is staged here by Pressable.onPressIn before pan responder fires
   const pendingHandleKindRef = useRef<HandleKind>('move');
+
+  // ─── Load persisted color picker state (recents + brand palettes) ─────────
+  useEffect(() => {
+    (async () => {
+      try {
+        const state = await getColorPickerState();
+        setColorRecents(state.recentColors);
+        setColorPalettes(state.palettes.length > 0 ? state.palettes : createPalette([], 'My Palette'));
+      } catch {
+        // Non-fatal: color picker just starts with no recents/palettes.
+      }
+    })();
+  }, []);
 
   // ─── Load project ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1521,6 +1547,70 @@ export default function DesignCanvasScreen() {
     });
   }
 
+  // ─── LayersPanel handlers (components/design-studio/LayersPanel.tsx) ──────
+  function handleRenameLayer(id: string, name: string) {
+    mutateLayer(prev => prev.map(l => l.id === id ? { ...l, name, updatedAt: new Date().toISOString() } : l));
+  }
+
+  function handleToggleVisible(id: string) {
+    mutateLayer(prev => prev.map(l => l.id === id ? { ...l, visible: !l.visible } : l));
+  }
+
+  function handleToggleLocked(id: string) {
+    mutateLayer(prev => prev.map(l => l.id === id ? { ...l, locked: !l.locked } : l));
+  }
+
+  function handleToggleAlphaLock(id: string) {
+    mutateLayer(prev => prev.map(l => l.id === id ? { ...l, alphaLocked: !l.alphaLocked } : l));
+  }
+
+  function handleToggleClippingMask(id: string) {
+    mutateLayer(prev => prev.map(l => l.id === id ? { ...l, clippingMask: !l.clippingMask } : l));
+  }
+
+  function handleSetLayerOpacity(id: string, opacity: number) {
+    mutateLayer(prev => prev.map(l => l.id === id ? { ...l, opacity: Math.max(0, Math.min(1, opacity)) } : l));
+  }
+
+  function handleSetLayerBlendMode(id: string, mode: BlendModeKind) {
+    mutateLayer(prev => prev.map(l => l.id === id ? { ...l, blendMode: mode } : l));
+  }
+
+  /** Reorders the TOP-FIRST (highest order = drawn last = visually on top) displayed, non-template layer list. */
+  function handleReorderLayers(fromIndex: number, toIndex: number) {
+    mutateLayer(prev => {
+      const nonTemplate = [...prev].filter(l => !l.isTemplate).sort((a, b) => b.order - a.order);
+      if (fromIndex < 0 || fromIndex >= nonTemplate.length || toIndex < 0 || toIndex >= nonTemplate.length) return prev;
+      const [moved] = nonTemplate.splice(fromIndex, 1);
+      nonTemplate.splice(toIndex, 0, moved);
+      const n = nonTemplate.length;
+      const orderById = new Map(nonTemplate.map((l, i) => [l.id, n - i]));
+      return prev.map(l => l.isTemplate ? l : { ...l, order: orderById.get(l.id) ?? l.order });
+    });
+  }
+
+  /** Merges `id`'s layer down into the layer directly below it (by displayed order). Drawing layers combine paths; other types show a friendly limit. */
+  function handleMergeLayerDown(id: string) {
+    const top = layers.find(l => l.id === id);
+    if (!top) return;
+    const below = findLayerBelow(top);
+    if (!below) return;
+    if (top.type !== 'drawing' || below.type !== 'drawing') {
+      Alert.alert('Merge down', 'Only two drawing layers can be merged right now.');
+      return;
+    }
+    const topPaths = (top.data as DesignDrawingLayer).paths;
+    const belowPaths = (below.data as DesignDrawingLayer).paths;
+    const merged: DesignLayer = {
+      ...below, id: uid(), name: below.name, order: below.order,
+      data: { kind: 'drawing', paths: [...belowPaths, ...topPaths] } as DesignDrawingLayer,
+      updatedAt: new Date().toISOString(),
+    };
+    mutateLayer(prev => [...prev.filter(l => l.id !== top.id && l.id !== below.id), merged]);
+    setSelectedLayerId(merged.id);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
+
   // ─── Text layer actions ────────────────────────────────────────────────────
   function handleAddText(
     content: string, fontSize: number, color: string,
@@ -2444,6 +2534,76 @@ export default function DesignCanvasScreen() {
   function applyColor(hex: string) {
     setPrevColor(drawColor); setDrawColor(hex);
     setPickerHex(hex.replace('#', '').toUpperCase());
+    setColorRecents(prev => {
+      const next = pushRecentColor(prev, hex);
+      saveColorPickerState({ recentColors: next, palettes: colorPalettesRef.current }).catch(() => {});
+      return next;
+    });
+  }
+
+  function handleSaveToPalette(paletteId: string, hex: string) {
+    setColorPalettes(prev => {
+      const next = addColorToPalette(prev, paletteId, hex);
+      saveColorPickerState({ recentColors: colorRecentsRef.current, palettes: next }).catch(() => {});
+      return next;
+    });
+  }
+
+  /**
+   * approximateColorAtPoint — SVG-fallback eyedropper: react-native-svg has no
+   * surface to read actual composited pixels from, so this approximates by
+   * walking layers top-first and returning the topmost visible layer's OWN
+   * draw color whose transform bounding box contains the point (for a
+   * drawing layer, its most-recently-drawn ink path color). This is a real
+   * limitation (it can't see anti-aliasing, blend results, or occluded
+   * sub-regions of a layer) but gives a usably-correct color for the common
+   * "pick the color of the shape/stroke I just drew" case. The Skia render
+   * path does NOT use this — it reads the real GPU surface via
+   * CanvasHostHandle.readPixelColor.
+   */
+  function approximateColorAtPoint(logicalX: number, logicalY: number): string | null {
+    const candidates = [...layersRef.current]
+      .filter(l => l.visible && !l.isTemplate)
+      .sort((a, b) => b.order - a.order); // topmost first
+    for (const l of candidates) {
+      const t = l.transform;
+      const inBounds = logicalX >= t.x && logicalX <= t.x + t.width
+        && logicalY >= t.y && logicalY <= t.y + t.height;
+      if (!inBounds) continue;
+      if (l.type === 'drawing') {
+        const paths = (l.data as DesignDrawingLayer).paths.filter(p => p.color !== 'erase');
+        const last = paths[paths.length - 1];
+        if (last && last.color !== 'smudge') return last.color;
+        continue;
+      }
+      if (l.type === 'shape') {
+        const d = l.data as DesignShapeLayer;
+        const fill = d.fill ?? d.fillColor;
+        if (fill && fill !== 'transparent') return fill;
+        continue;
+      }
+      if (l.type === 'text') {
+        const d = l.data as DesignTextLayer;
+        return d.color ?? d.textColor ?? null;
+      }
+    }
+    return null;
+  }
+
+  /** Samples a color at a canvas-local DISPLAY point (e.g. from a touch event) and applies it. */
+  function sampleEyedropperAt(displayX: number, displayY: number) {
+    const skiaHex = canvasHostRef.current?.readPixelColor(displayX, displayY);
+    if (skiaHex) {
+      applyColor(skiaHex);
+    } else {
+      const sx = dispScaleXRef.current || 1;
+      const sy = dispScaleYRef.current || 1;
+      const approx = approximateColorAtPoint(displayX / sx, displayY / sy);
+      if (approx) applyColor(approx);
+    }
+    setEyedropperActive(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    openSheet('color');
   }
 
   // ─── Sorted layers ─────────────────────────────────────────────────────────
@@ -2483,6 +2643,32 @@ export default function DesignCanvasScreen() {
    *   - Ink path group references mask via mask="url(#maskId)"
    * Stroke widths are stored in logical units; scaled by xScale/yScale for display.
    */
+  /**
+   * findLayerBelow — the next layer down in z-order (by `order`), ignoring
+   * template/guide layers, for `clippingMask` compositing. Independent of the
+   * below layer's own `visible` flag (a clip source that's hidden just clips
+   * to nothing, which is the same as Procreate's behaviour of the clipped
+   * layer disappearing when its base is hidden).
+   */
+  function findLayerBelow(layer: DesignLayer): DesignLayer | null {
+    let best: DesignLayer | null = null;
+    for (const l of sortedLayers) {
+      if (l.id === layer.id || l.isTemplate) continue;
+      if (l.order < layer.order && (!best || l.order > best.order)) best = l;
+    }
+    return best;
+  }
+
+  function safeSvgId(id: string): string { return id.replace(/[^a-zA-Z0-9]/g, '_'); }
+
+  // Blend modes react-native-svg's native FeBlend primitive supports directly.
+  // 'overlay' is NOT among them (RN-SVG's FeBlend type is limited to
+  // normal/multiply/screen/darken/lighten) — approximated below via a 50/50
+  // arithmetic blend of a multiply pass and a screen pass, which is the
+  // standard cheap overlay approximation when a true conditional per-pixel
+  // blend isn't available.
+  const FE_BLEND_NATIVE = new Set<BlendModeKind>(['multiply', 'screen', 'darken', 'lighten']);
+
   function renderLayerInSvg(
     layer: DesignLayer,
     xScale: number,
@@ -2498,14 +2684,61 @@ export default function DesignCanvasScreen() {
 
     // ── Curves filter: feColorMatrix applied to all layer types ──
     const curvesAdj = layer.adjustments?.curves;
-    const hasRealCurves = curvesAdj && !isIdentityCurves(curvesAdj);
-    const filterId = hasRealCurves ? `cf_${layer.id.replace(/[^a-zA-Z0-9]/g, '_')}` : null;
+    const hasRealCurves = !!curvesAdj && !isIdentityCurves(curvesAdj);
     const matrixValues = hasRealCurves ? curvesToColorMatrixString(curvesAdj!) : null;
-    // filterRef: typed as string (non-nullable) so it can be spread safely
-    const filterRef: string | undefined = filterId ? `url(#${filterId})` : undefined;
 
-    const blendModeForLayer = (bm: BlendModeKind | undefined): string | undefined =>
-      bm && RN_SVG_BLEND_MODES.has(bm) && bm !== 'normal' ? bm : undefined;
+    // ── Blend mode: canonical layer.blendMode, falling back to the legacy
+    // per-image data.blendMode for older projects saved before blendMode was
+    // promoted to a layer-level field. ──
+    const legacyImageBlend = layer.type === 'image' ? (layer.data as DesignImageLayer).blendMode : undefined;
+    const blendMode = (layer.blendMode ?? legacyImageBlend ?? 'normal') as BlendModeKind;
+    const hasBlend = blendMode !== 'normal' && RN_SVG_BLEND_MODES.has(blendMode);
+
+    // ── Combined filter (curves + blend), built once per layer. react-native-svg
+    // (both iOS/Apple and Android native filter pipelines) resolves a feBlend's
+    // in2="BackgroundImage" against whatever was already drawn below it in the
+    // same <Svg> tree, which is exactly the real backdrop compositing a CSS
+    // mix-blend-mode would use — this is real compositing, not a visual no-op. ──
+    const needsFilter = hasRealCurves || hasBlend;
+    const filterId = needsFilter ? `lf_${safeSvgId(layer.id)}` : null;
+    const filterRef: string | undefined = filterId ? `url(#${filterId})` : undefined;
+    const curvesResult = hasBlend ? 'curved' : undefined;
+    const blendIn = hasRealCurves ? 'curved' : 'SourceGraphic';
+    const filterDefs = needsFilter ? (
+      <Defs>
+        <Filter id={filterId!} x="-20%" y="-20%" width="140%" height="140%">
+          {hasRealCurves && (
+            <FeColorMatrix type="matrix" values={matrixValues!} result={curvesResult} />
+          )}
+          {hasBlend && blendMode === 'overlay' && (
+            <>
+              <FeBlend in={blendIn} in2="BackgroundImage" mode="multiply" result="ov_mul" />
+              <FeBlend in={blendIn} in2="BackgroundImage" mode="screen" result="ov_scr" />
+              <FeComposite in="ov_mul" in2="ov_scr" operator="arithmetic" k1={0} k2={0.5} k3={0.5} k4={0} />
+            </>
+          )}
+          {hasBlend && blendMode !== 'overlay' && FE_BLEND_NATIVE.has(blendMode) && (
+            <FeBlend in={blendIn} in2="BackgroundImage" mode={blendMode as 'multiply' | 'screen' | 'darken' | 'lighten'} />
+          )}
+        </Filter>
+      </Defs>
+    ) : null;
+
+    // ── Clipping mask: clip this layer's content to the alpha of the layer
+    // directly below it in the stack, via an SVG <Mask maskType="alpha">
+    // built by re-rendering the below layer's own content (recursing into
+    // this same function — every layer type already knows how to draw
+    // itself, so this reuses that instead of duplicating per-type logic). ──
+    const belowLayer = layer.clippingMask ? findLayerBelow(layer) : null;
+    const clipMaskId = belowLayer ? `clip_${safeSvgId(layer.id)}` : null;
+    const clipMaskRef: string | undefined = clipMaskId ? `url(#${clipMaskId})` : undefined;
+    const clipDefs = belowLayer ? (
+      <Defs>
+        <SvgMask id={clipMaskId!} maskType="alpha" x="-50%" y="-50%" width="200%" height="200%">
+          {renderLayerInSvg({ ...belowLayer, visible: true }, xScale, yScale, bgHex, isExport)}
+        </SvgMask>
+      </Defs>
+    ) : null;
 
     // ── Smudge overlay colour: use theme MUTED at low opacity, not hardcoded rgba ──
     const SMUDGE_STROKE = FG;
@@ -2513,30 +2746,54 @@ export default function DesignCanvasScreen() {
 
     if (layer.type === 'drawing') {
       const d = layer.data as DesignDrawingLayer;
-      const inkPaths   = d.paths.filter(p => p.color !== 'erase');
       const erasePaths = d.paths.filter(p => p.color === 'erase');
       const hasErase   = erasePaths.length > 0;
-      const maskId     = `emask_${layer.id.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      const maskId     = `emask_${safeSvgId(layer.id)}`;
       const scaledStroke = (w: number) => w * Math.min(xScale, yScale);
+      const alphaLocked = !!layer.alphaLocked;
 
+      // Alpha lock: each ink path (after the first) is masked to the UNION
+      // alpha of every path painted on this layer BEFORE it, so new strokes
+      // only affect pixels this layer had already painted opaque — the real
+      // "paint only where there's already something" alpha-lock behaviour,
+      // not just a static opacity clamp.
+      const priorAlphaMaskId = (pi: number) => `alock_${safeSvgId(layer.id)}_${pi}`;
       const renderedInkPaths = d.paths.map((p, pi) => {
         if (p.color === 'erase') return null;
-        if (p.color === 'smudge') return (
+        const pathEl = p.color === 'smudge' ? (
           <Path key={pi} d={p.d} stroke={SMUDGE_STROKE} strokeWidth={scaledStroke(p.width)}
             fill="none" strokeLinecap="round" strokeLinejoin="round"
             opacity={SMUDGE_OPACITY} />
-        );
-        return (
+        ) : (
           <Path key={pi} d={p.d} stroke={p.color} strokeWidth={scaledStroke(p.width)}
             fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={p.opacity} />
+        );
+        if (!alphaLocked || pi === 0) return pathEl;
+        const priorInk = d.paths.slice(0, pi).filter(pp => pp.color !== 'erase');
+        if (priorInk.length === 0) return null; // nothing opaque yet to lock onto
+        const mId = priorAlphaMaskId(pi);
+        return (
+          <G key={`al${pi}`}>
+            <Defs>
+              <SvgMask id={mId} maskType="alpha" x="-50%" y="-50%" width="200%" height="200%">
+                {priorInk.map((pp, ppi) => (
+                  <Path key={ppi} d={pp.d}
+                    stroke={pp.color === 'smudge' ? SMUDGE_STROKE : pp.color}
+                    strokeWidth={scaledStroke(pp.width)} fill="none"
+                    strokeLinecap="round" strokeLinejoin="round" />
+                ))}
+              </SvgMask>
+            </Defs>
+            <G mask={`url(#${mId})`}>{pathEl}</G>
+          </G>
         );
       });
 
       const LARGE = 99999;
       const innerContent = !hasErase ? (
-        <G transform={transformAttr} filter={filterRef}>{renderedInkPaths}</G>
+        <G transform={transformAttr} filter={filterRef} mask={clipMaskRef}>{renderedInkPaths}</G>
       ) : (
-        <G transform={transformAttr} filter={filterRef}>
+        <G transform={transformAttr} filter={filterRef} mask={clipMaskRef}>
           <Defs>
             <SvgMask id={maskId} x={0} y={0} width="100%" height="100%">
               <Rect x={-LARGE / 2} y={-LARGE / 2} width={LARGE} height={LARGE} fill="white" />
@@ -2552,20 +2809,8 @@ export default function DesignCanvasScreen() {
 
       return (
         <G key={layer.id} opacity={layer.opacity}>
-          {hasRealCurves && !isExport && (
-            <Defs>
-              <Filter id={filterId!} x="0%" y="0%" width="100%" height="100%">
-                <FeColorMatrix type="matrix" values={matrixValues!} />
-              </Filter>
-            </Defs>
-          )}
-          {hasRealCurves && isExport && (
-            <Defs>
-              <Filter id={filterId!} x="0%" y="0%" width="100%" height="100%">
-                <FeColorMatrix type="matrix" values={matrixValues!} />
-              </Filter>
-            </Defs>
-          )}
+          {filterDefs}
+          {clipDefs}
           {innerContent}
         </G>
       );
@@ -2573,17 +2818,11 @@ export default function DesignCanvasScreen() {
 
     if (layer.type === 'image') {
       const d  = layer.data as DesignImageLayer;
-      const bm = blendModeForLayer(d.blendMode as BlendModeKind | undefined);
       return (
         <G key={layer.id} opacity={layer.opacity * (d.opacity ?? 1)}>
-          {hasRealCurves && (
-            <Defs>
-              <Filter id={filterId!} x="0%" y="0%" width="100%" height="100%">
-                <FeColorMatrix type="matrix" values={matrixValues!} />
-              </Filter>
-            </Defs>
-          )}
-          <G transform={transformAttr} filter={filterRef} {...(bm ? { style: { mixBlendMode: bm } } : {})}>
+          {filterDefs}
+          {clipDefs}
+          <G transform={transformAttr} filter={filterRef} mask={clipMaskRef}>
             <SvgImage
               x={t.x * xScale} y={t.y * yScale}
               width={t.width * xScale} height={t.height * yScale}
@@ -2603,37 +2842,27 @@ export default function DesignCanvasScreen() {
       if (d.shape === 'circle') {
         return (
           <G key={layer.id} opacity={layer.opacity}>
-            {hasRealCurves && (
-              <Defs>
-                <Filter id={filterId!} x="0%" y="0%" width="100%" height="100%">
-                  <FeColorMatrix type="matrix" values={matrixValues!} />
-                </Filter>
-              </Defs>
-            )}
+            {filterDefs}
+            {clipDefs}
             <Circle
               cx={(t.x + t.width  / 2) * xScale} cy={(t.y + t.height / 2) * yScale}
               r={Math.min(t.width, t.height) / 2 * Math.min(xScale, yScale)}
               fill={fill} stroke={stroke} strokeWidth={sw}
-              transform={transformAttr} filter={filterRef}
+              transform={transformAttr} filter={filterRef} mask={clipMaskRef}
             />
           </G>
         );
       }
       return (
         <G key={layer.id} opacity={layer.opacity}>
-          {hasRealCurves && (
-            <Defs>
-              <Filter id={filterId!} x="0%" y="0%" width="100%" height="100%">
-                <FeColorMatrix type="matrix" values={matrixValues!} />
-              </Filter>
-            </Defs>
-          )}
+          {filterDefs}
+          {clipDefs}
           <Rect
             x={t.x * xScale} y={t.y * yScale}
             width={t.width * xScale} height={t.height * yScale}
             rx={d.cornerRadius ?? 0}
             fill={fill} stroke={stroke} strokeWidth={sw}
-            transform={transformAttr} filter={filterRef}
+            transform={transformAttr} filter={filterRef} mask={clipMaskRef}
           />
         </G>
       );
@@ -2643,13 +2872,8 @@ export default function DesignCanvasScreen() {
       const d = layer.data as DesignTextLayer;
       return (
         <G key={layer.id} opacity={layer.opacity}>
-          {hasRealCurves && (
-            <Defs>
-              <Filter id={filterId!} x="0%" y="0%" width="100%" height="100%">
-                <FeColorMatrix type="matrix" values={matrixValues!} />
-              </Filter>
-            </Defs>
-          )}
+          {filterDefs}
+          {clipDefs}
           <SvgText
             x={(t.x + t.width / 2) * xScale} y={(t.y + (d.fontSize ?? 24)) * yScale}
             fill={d.color ?? d.textColor ?? FG}
@@ -2657,7 +2881,7 @@ export default function DesignCanvasScreen() {
             textAnchor="middle"
             fontWeight={d.bold ? 'bold' : 'normal'}
             fontStyle={d.italic ? 'italic' : 'normal'}
-            transform={transformAttr} filter={filterRef}
+            transform={transformAttr} filter={filterRef} mask={clipMaskRef}
           >
             {d.content ?? d.text ?? ''}
           </SvgText>
@@ -3159,6 +3383,7 @@ export default function DesignCanvasScreen() {
               enabled
             >
               <CanvasHost
+                ref={canvasHostRef}
                 width={canvasSize.w}
                 height={canvasSize.h}
                 paths={[]}
@@ -3173,6 +3398,24 @@ export default function DesignCanvasScreen() {
                 onLivePoint={handleEngineLivePoint}
               />
             </CanvasGestureLayer>
+          )}
+
+          {/* ── EYEDROPPER SAMPLING OVERLAY ──
+              Shown while the ColorPicker's eyedropper is armed (the color
+              sheet is closed so the canvas underneath is tappable). Tapping
+              anywhere samples that point via CanvasHostHandle.readPixelColor
+              (real GPU surface read on the Skia path) or, on the SVG
+              fallback, approximateColorAtPoint's layer-color approximation. */}
+          {eyedropperActive && (
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={e => sampleEyedropperAt(e.nativeEvent.locationX, e.nativeEvent.locationY)}
+              testID="eyedropper-overlay"
+            >
+              <View style={styles.eyedropperHint} pointerEvents="none">
+                <Text style={styles.eyedropperHintText}>Tap anywhere to pick a color</Text>
+              </View>
+            </Pressable>
           )}
 
           {/* ── EXTENDED TRANSFORM HANDLE PRESSABLE OVERLAYS (8 handles) ── */}
@@ -3703,207 +3946,42 @@ export default function DesignCanvasScreen() {
       {/* ── COLOR PICKER ── */}
       <Modal visible={activeSheet === 'color'} transparent animationType="fade" onRequestClose={closeSheet}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <SheetRise style={[styles.sheet, { maxHeight: '70%' }]}>
-            <SheetHandle />
-            <View style={styles.sheetHeaderRow}>
-              <Text style={styles.sheetTitle}>Color</Text>
-              <TouchableOpacity onPress={closeSheet}>
-                <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.medium, fontSize: FS.sm }}>Done</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.colorSwatchRow}>
-              <View style={styles.colorSwatchGroup}>
-                <View style={[styles.colorSwatchBig, { backgroundColor: drawColor }]} />
-                <Text style={styles.colorSwatchLabel}>Current</Text>
-              </View>
-              <TouchableOpacity onPress={() => applyColor(prevColor)} style={styles.colorSwatchGroup}>
-                <View style={[styles.colorSwatchBig, { backgroundColor: prevColor, opacity: 0.7 }]} />
-                <Text style={styles.colorSwatchLabel}>Previous</Text>
-              </TouchableOpacity>
-              <View style={{ flex: 1 }} />
-              <View style={styles.hexRow}>
-                <Text style={styles.hexHash}>#</Text>
-                <TextInput
-                  style={styles.hexInput}
-                  value={pickerHex}
-                  onChangeText={v => {
-                    const clean = v.replace(/[^0-9A-Fa-f]/g, '').toUpperCase().slice(0, 6);
-                    setPickerHex(clean);
-                    if (clean.length === 6) applyColor('#' + clean);
-                  }}
-                  maxLength={6} autoCapitalize="characters"
-                  placeholder="FFFFFF" placeholderTextColor={SUBTLE}
-                />
-              </View>
-            </View>
-
-            <View style={styles.pickerTabRow}>
-              {(['disc', 'palette', 'value'] as const).map(tab => (
-                <TouchableOpacity
-                  key={tab}
-                  style={[styles.pickerTab, pickerTab === tab && styles.pickerTabActive]}
-                  onPress={() => setPickerTab(tab)}
-                >
-                  <Text style={[styles.pickerTabText, pickerTab === tab && { color: PURPLE_LIGHT }]}>
-                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {pickerTab === 'disc' && (
-              <View style={styles.hueDiscContainer}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hueRingRow}>
-                  {Array.from({ length: 36 }, (_, i) => {
-                    const hue = i * 10;
-                    const hex = hueToHex(hue);
-                    return (
-                      <TouchableOpacity key={i} style={[styles.hueCell, { backgroundColor: hex }]} onPress={() => applyColor(hex)} />
-                    );
-                  })}
-                </ScrollView>
-                <View style={[styles.sliderRow, { marginTop: SP.sm }]}>
-                  <Text style={styles.sliderLabel}>Brightness</Text>
-                  <TouchableOpacity onPress={() => {
-                    const nb = Math.max(0.05, +(discBrightness - 0.05).toFixed(2));
-                    setDiscBrightness(nb); applyColor(hueToHex(hueDiscAngle, 1, nb));
-                  }}>
-                    <Feather name="minus" size={14} color={MUTED} />
-                  </TouchableOpacity>
-                  <View style={styles.sliderTrack}>
-                    <View style={[styles.sliderFill, { width: `${discBrightness * 100}%` }]} />
-                  </View>
-                  <TouchableOpacity onPress={() => {
-                    const nb = Math.min(1, +(discBrightness + 0.05).toFixed(2));
-                    setDiscBrightness(nb); applyColor(hueToHex(hueDiscAngle, 1, nb));
-                  }}>
-                    <Feather name="plus" size={14} color={MUTED} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
-            {pickerTab === 'palette' && (
-              <View style={styles.paletteGrid}>
-                {DEFAULT_PALETTE.map(c => (
-                  <TouchableOpacity
-                    key={c}
-                    style={[styles.paletteDot, { backgroundColor: c }, drawColor === c && styles.paletteDotActive]}
-                    onPress={() => applyColor(c)}
-                  />
-                ))}
-              </View>
-            )}
-
-            {pickerTab === 'value' && (
-              <View style={{ gap: SP.xs }}>
-                {['R', 'G', 'B'].map((ch, ci) => {
-                  const hex6 = pickerHex.length === 6 ? pickerHex : 'FFFFFF';
-                  const val  = parseInt(hex6.slice(ci * 2, ci * 2 + 2), 16);
-                  return (
-                    <View key={ch} style={styles.sliderRow}>
-                      <Text style={[styles.sliderLabel, { width: 16 }]}>{ch}</Text>
-                      <TouchableOpacity onPress={() => {
-                        const h6 = pickerHex.length === 6 ? pickerHex : 'FFFFFF';
-                        const vals = [parseInt(h6.slice(0,2),16), parseInt(h6.slice(2,4),16), parseInt(h6.slice(4,6),16)];
-                        vals[ci] = Math.max(0, vals[ci] - 8);
-                        applyColor('#' + vals.map(v => v.toString(16).padStart(2,'0')).join('').toUpperCase());
-                      }}>
-                        <Feather name="minus" size={14} color={MUTED} />
-                      </TouchableOpacity>
-                      <View style={styles.sliderTrack}>
-                        <View style={[styles.sliderFill, { width: `${(val / 255) * 100}%` }]} />
-                      </View>
-                      <TouchableOpacity onPress={() => {
-                        const h6 = pickerHex.length === 6 ? pickerHex : 'FFFFFF';
-                        const vals = [parseInt(h6.slice(0,2),16), parseInt(h6.slice(2,4),16), parseInt(h6.slice(4,6),16)];
-                        vals[ci] = Math.min(255, vals[ci] + 8);
-                        applyColor('#' + vals.map(v => v.toString(16).padStart(2,'0')).join('').toUpperCase());
-                      }}>
-                        <Feather name="plus" size={14} color={MUTED} />
-                      </TouchableOpacity>
-                      <Text style={styles.sliderValue}>{val}</Text>
-                    </View>
-                  );
-                })}
-              </View>
-            )}
-          </SheetRise>
+          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+            <ColorPickerComponent
+              color={drawColor}
+              onChange={applyColor}
+              recentColors={colorRecents}
+              palettes={colorPalettes}
+              onSaveToPalette={handleSaveToPalette}
+              onRequestEyedropper={() => { closeSheet(); setEyedropperActive(true); }}
+              onClose={closeSheet}
+            />
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
-
       {/* ── LAYER MANAGER ── */}
       <Modal visible={activeSheet === 'layers'} transparent animationType="fade" onRequestClose={closeSheet}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeSheet}>
-          <SheetRise style={[styles.sheet, { maxHeight: '70%' }]}>
-            <SheetHandle />
-            <View style={styles.sheetHeaderRow}>
-              <Text style={styles.sheetTitle}>Layers</Text>
-              <TouchableOpacity style={styles.sheetIconBtn} onPress={handleAddDrawingLayer}>
-                <Feather name="plus" size={ICON.sm} color={PURPLE_LIGHT} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {sortedLayers.length === 0 && (
-                <Text style={styles.emptyText}>No layers yet. Start drawing or add text.</Text>
-              )}
-              {[...sortedLayers].reverse().map(layer => (
-                <View key={layer.id} style={[styles.layerRow, layer.id === selectedLayerId && styles.layerRowActive]}>
-                  <TouchableOpacity
-                    style={styles.layerThumb}
-                    onPress={() => { setSelectedLayerId(layer.id); setActiveTopTool('select'); closeSheet(); }}
-                  >
-                    <View style={[styles.layerThumbInner, { backgroundColor: layer.type === 'shape' ? ((layer.data as DesignShapeLayer).fill ?? CARD_ELEVATED) : CARD_ELEVATED }]}>
-                      <Feather
-                        name={layer.type === 'text' ? 'type' : layer.type === 'image' ? 'image' : layer.type === 'drawing' ? 'edit-2' : 'square'}
-                        size={12} color={MUTED}
-                      />
-                    </View>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.layerInfo}
-                    onPress={() => { setSelectedLayerId(layer.id); setActiveTopTool('select'); closeSheet(); }}
-                  >
-                    <Text style={[styles.layerName, layer.id === selectedLayerId && { color: PURPLE_LIGHT }]} numberOfLines={1}>
-                      {layer.name}
-                    </Text>
-                    <Text style={styles.layerSub}>
-                      {layer.type} · {Math.round(layer.opacity * 100)}%
-                      {layer.id === selectedLayerId && ' · active'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.layerActionBtn}
-                    onPress={() => mutateLayer(prev => prev.map(l => l.id === layer.id ? { ...l, visible: !l.visible } : l))}
-                  >
-                    <Feather name={layer.visible ? 'eye' : 'eye-off'} size={14} color={layer.visible ? FG : SUBTLE} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.layerActionBtn}
-                    onPress={() => mutateLayer(prev => prev.map(l => l.id === layer.id ? { ...l, locked: !l.locked } : l))}
-                  >
-                    <Feather name={layer.locked ? 'lock' : 'unlock'} size={14} color={layer.locked ? PURPLE_LIGHT : SUBTLE} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.layerActionBtn}
-                    onPress={() => {
-                      setLayerOptionsTarget(layer.id);
-                      setLayerEditOpacity(layer.opacity);
-                      const bm = (layer.data as DesignImageLayer).blendMode ?? 'normal';
-                      setLayerEditBlend(bm as BlendModeKind);
-                      closeSheet(); openSheet('layerOptions');
-                    }}
-                  >
-                    <Feather name="more-vertical" size={14} color={MUTED} />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </ScrollView>
-          </SheetRise>
+          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+            <LayersPanelComponent
+              layers={layers}
+              selectedLayerId={selectedLayerId}
+              onSelect={id => { setSelectedLayerId(id); setActiveTopTool('select'); }}
+              onAddLayer={handleAddDrawingLayer}
+              onDuplicateLayer={handleDuplicateLayer}
+              onDeleteLayer={handleDeleteLayer}
+              onRenameLayer={handleRenameLayer}
+              onToggleVisible={handleToggleVisible}
+              onToggleLocked={handleToggleLocked}
+              onToggleAlphaLock={handleToggleAlphaLock}
+              onToggleClippingMask={handleToggleClippingMask}
+              onSetOpacity={handleSetLayerOpacity}
+              onSetBlendMode={handleSetLayerBlendMode}
+              onReorder={handleReorderLayers}
+              onMergeDown={handleMergeLayerDown}
+              onClose={closeSheet}
+            />
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
 
@@ -5140,6 +5218,13 @@ const { width: SW } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
+
+  eyedropperHint: {
+    position: 'absolute', top: SP.md, alignSelf: 'center',
+    paddingHorizontal: SP.md, paddingVertical: SP.xs, borderRadius: RADIUS.pill,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  eyedropperHintText: { fontFamily: FONT.medium, fontSize: FS.xs, color: '#FFFFFF', includeFontPadding: false },
 
   topBar: {
     flexDirection: 'row', alignItems: 'center',

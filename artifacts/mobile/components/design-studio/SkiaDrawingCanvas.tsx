@@ -16,10 +16,10 @@
  * width so the stroke geometry logic is shared with the SVG fallback path.
  */
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import {
-  Canvas, Path, Skia, Group,
+  Canvas, Path, Skia, Group, useCanvasRef, ColorType, AlphaType,
 } from '@shopify/react-native-skia';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -48,6 +48,16 @@ export interface SkiaDrawingCanvasProps {
   onLivePoint?: (pt: { x: number; y: number } | null) => void;
 }
 
+/** Imperative handle exposing real GPU-surface pixel sampling for the eyedropper tool. */
+export interface SkiaDrawingCanvasHandle {
+  /** Reads the actual composited pixel at (x, y) in this Canvas's local coordinate space. Returns a `#RRGGBB` hex string, or null if the read failed (e.g. surface not yet painted). */
+  readPixelColor(x: number, y: number): string | null;
+}
+
+function toHex2(n: number): string {
+  return Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
+}
+
 function pointsToSkiaPath(points: { x: number; y: number }[]) {
   const skPath = Skia.Path.Make();
   if (points.length === 0) return skPath;
@@ -59,13 +69,30 @@ function pointsToSkiaPath(points: { x: number; y: number }[]) {
   return skPath;
 }
 
-export default function SkiaDrawingCanvas({
+function SkiaDrawingCanvasInner({
   width, height, paths, brushKind, color, size, opacity,
   pressureCurve = DEFAULT_PRESSURE_CURVE, streamline = 0.3, tool, onStrokeEnd, disabled, onLivePoint,
-}: SkiaDrawingCanvasProps) {
+}: SkiaDrawingCanvasProps, ref: React.ForwardedRef<SkiaDrawingCanvasHandle>) {
   const rawPointsRef = useRef<StrokeInputPoint[]>([]);
   const [livePoints, setLivePoints] = useState<{ x: number; y: number }[]>([]);
   const [liveWidth, setLiveWidth] = useState(size);
+  const canvasRef = useCanvasRef();
+
+  useImperativeHandle(ref, () => ({
+    readPixelColor(x: number, y: number): string | null {
+      try {
+        const image = canvasRef.current?.makeImageSnapshot();
+        if (!image) return null;
+        const px = image.readPixels(Math.round(x), Math.round(y), {
+          width: 1, height: 1, colorType: ColorType.RGBA_8888, alphaType: AlphaType.Unpremul,
+        });
+        if (!px || px.length < 3) return null;
+        return `#${toHex2(px[0])}${toHex2(px[1])}${toHex2(px[2])}`.toUpperCase();
+      } catch {
+        return null;
+      }
+    },
+  }), [canvasRef]);
 
   const brush = BRUSH_LIBRARY[brushKind];
 
@@ -117,7 +144,7 @@ export default function SkiaDrawingCanvas({
 
   return (
     <GestureDetector gesture={pan}>
-      <Canvas style={[StyleSheet.absoluteFill, { width, height }]} testID="skia-drawing-canvas">
+      <Canvas ref={canvasRef} style={[StyleSheet.absoluteFill, { width, height }]} testID="skia-drawing-canvas">
         <Group>
           {paths.map((p, i) => {
             const isErase = p.color === 'erase';
@@ -153,3 +180,6 @@ export default function SkiaDrawingCanvas({
     </GestureDetector>
   );
 }
+
+const SkiaDrawingCanvas = React.forwardRef(SkiaDrawingCanvasInner);
+export default SkiaDrawingCanvas;
