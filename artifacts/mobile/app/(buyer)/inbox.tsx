@@ -995,7 +995,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
   },
 
   // Followers rail
-  railSection: { marginBottom: SP.lg, marginTop: SP.xs },
+  railSection: { marginBottom: SP.lg, marginTop: SP.sm },
   railHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
