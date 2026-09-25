@@ -42,6 +42,12 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { hapticToggle, hapticPrimaryAction, hapticWarning } from '@/lib/haptics';
+import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
+import {
+  messageSellerAboutProductHref, profileHref, profileVideosHref,
+} from '@/lib/profileNavigation';
+import { formatProfileCount, getProductVideosPage, posterForPost } from '@/services/profileService';
+import type { SellerThreadPost } from '@/services/socialService';
 
 type ThemeAliases = {
   theme: AppThemePreset;
@@ -724,6 +730,29 @@ export default function BuyerProductDetailScreen() {
     }
   }
 
+  // DM the seller about this product: opens (or reuses) the buyer↔seller
+  // product thread with this product's card staged in the composer.
+  function handleMessageSeller() {
+    if (!product) return;
+    if (sellerVacationMessage) {
+      Alert.alert('Seller is away', sellerVacationMessage);
+      return;
+    }
+    if (!isSignedIn) {
+      router.push('/sign-in' as never);
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push(messageSellerAboutProductHref({
+      sellerId: product.sellerId,
+      sellerName: product.sellerName,
+      productId: product.id,
+      productName: product.name,
+      productPriceCents: variantPrice,
+      productImageUri: product.imageUris[0] ?? null,
+    }) as never);
+  }
+
   async function handleBuyNow() {
     if (sellerVacationMessage) {
       Alert.alert('Seller is away', sellerVacationMessage);
@@ -830,12 +859,22 @@ export default function BuyerProductDetailScreen() {
 
           {/* Title & Seller */}
           <Text style={s.productName} numberOfLines={3}>{product.name}</Text>
-          <TouchableOpacity style={s.sellerRow} onPress={() => router.push(('/seller-profile?id=' + product.sellerId) as never)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`View seller ${product.sellerName}`}>
+          <TouchableOpacity style={s.sellerRow} onPress={() => router.push(profileHref({ userId: product.sellerId, accountType: 'seller' }) as never)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`View seller ${product.sellerName}`} testID="product-seller-link">
             <View style={s.sellerAvatar}><Text style={s.sellerInitial}>{product.sellerName.charAt(0)}</Text></View>
             <Text style={s.sellerName} numberOfLines={1}>{product.sellerName}</Text>
             <Text style={s.sellerHandle} numberOfLines={1}>{product.sellerHandle}</Text>
             <Feather name="chevron-right" size={14} color={MUTED} />
           </TouchableOpacity>
+          <Button
+            label="Message seller"
+            icon="message-circle"
+            onPress={handleMessageSeller}
+            variant="secondary"
+            size="small"
+            accessibilityHint="Opens a chat with the seller about this product"
+            style={{ alignSelf: 'flex-start', marginBottom: SP.sm }}
+            testID="product-message-seller"
+          />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: SP.md, marginBottom: SP.md }}>
             <TouchableOpacity
               onPress={() => router.push(reportHref({
@@ -1016,10 +1055,14 @@ export default function BuyerProductDetailScreen() {
           <Text style={s.descTitle}>About this piece</Text>
           <Text style={s.desc}>{product.description}</Text>
 
+          {/* Videos that feature this product — opens the feed player on them */}
+          <ProductVideosStrip productId={product.id} productName={product.name} />
+
           {/* Policies */}
           <View style={s.divider} />
           <PolicyRow icon="refresh-ccw" label="Returns" value={product.refundPolicy} />
           <PolicyRow icon="x-circle" label="Cancellation" value={product.cancellationPolicy} />
+          <BuyerProtectionNote preorder={product.isPreOrder} style={{ marginTop: SP.sm }} />
 
           {/* Size Chart — expandable table */}
           {!!(product as any).sizeChart && (
@@ -1145,6 +1188,77 @@ export default function BuyerProductDetailScreen() {
         )}
       </View>
       </StickyFooter>
+    </View>
+  );
+}
+
+// ─── Featured in videos ───────────────────────────────────────────────────────
+
+const PRODUCT_VIDEO_TILE_W = 96;
+const PRODUCT_VIDEO_TILE_H = Math.round((PRODUCT_VIDEO_TILE_W * 16) / 9);
+
+/**
+ * "Featured in" — the public videos that tag this product. Tapping one opens
+ * the feed player on exactly these videos, at the tapped one. Hidden (not an
+ * empty box) when no video features the product or the request fails.
+ */
+function ProductVideosStrip({ productId, productName }: { productId: string; productName: string }) {
+  const { theme } = useAppTheme();
+  const router = useRouter();
+  const [videos, setVideos] = useState<SellerThreadPost[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setVideos(null);
+    getProductVideosPage(productId, 0, 10)
+      .then((page) => { if (!cancelled) setVideos(page.posts); })
+      .catch(() => { if (!cancelled) setVideos([]); });
+    return () => { cancelled = true; };
+  }, [productId]);
+
+  if (videos !== null && videos.length === 0) return null;
+
+  return (
+    <View testID="product-featured-videos">
+      <View style={{ height: 1, backgroundColor: theme.border, marginVertical: SP.md }} />
+      <Text style={{ fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text, marginBottom: SP.sm }}>Featured in</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -SP.md }} contentContainerStyle={{ paddingHorizontal: SP.md, gap: SP.sm }}>
+        {videos === null
+          ? [0, 1, 2].map((index) => (
+              <View key={index} style={{ width: PRODUCT_VIDEO_TILE_W, height: PRODUCT_VIDEO_TILE_H, borderRadius: RADIUS.sm, backgroundColor: theme.cardElevated }} />
+            ))
+          : videos.map((video) => {
+              const poster = posterForPost(video);
+              return (
+                <TouchableOpacity
+                  key={video.id}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Play video by ${video.authorName}`}
+                  testID={`product-video-${video.id}`}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    router.push(profileVideosHref({ source: 'product', id: productId, startPostId: video.id, title: productName }) as never);
+                  }}
+                  style={{ width: PRODUCT_VIDEO_TILE_W, height: PRODUCT_VIDEO_TILE_H, borderRadius: RADIUS.sm, overflow: 'hidden', backgroundColor: theme.cardElevated }}
+                >
+                  {poster ? (
+                    <Image source={{ uri: poster }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                  ) : (
+                    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                      <Feather name="film" size={20} color={theme.muted} />
+                    </View>
+                  )}
+                  <View style={{ position: 'absolute', left: 6, bottom: 6, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    <Feather name="play" size={10} color={ON_DARK} />
+                    <Text style={{ color: ON_DARK, fontFamily: FONT.bold, fontSize: 11 }}>
+                      {typeof video.viewsCount === 'number' ? formatProfileCount(video.viewsCount) : video.authorName}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+      </ScrollView>
     </View>
   );
 }

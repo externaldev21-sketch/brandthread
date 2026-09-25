@@ -8,10 +8,9 @@
  * source of truth — so this note can never drift from what the Terms say.
  */
 import React from 'react';
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { PressableScale } from '@/components/BrandthreadUI';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { LEGAL_DOCUMENTS } from '@/content/legal';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
@@ -67,15 +66,16 @@ export function BuyerProtectionNote({
       {(compact ? lines.slice(0, 1) : lines).map((line) => (
         <Text key={line} style={[styles.body, { color: theme.muted }]}>{line}</Text>
       ))}
-      <PressableScale
+      <TouchableOpacity
         onPress={() => router.push(terms.route as never)}
         accessibilityRole="link"
         accessibilityLabel={`Read the ${terms.title}`}
+        activeOpacity={0.7}
         style={styles.link}
       >
         <Text style={[styles.linkText, { color: theme.accent }]}>{terms.title}</Text>
         <Feather name="chevron-right" size={14} color={theme.accent} />
-      </PressableScale>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -88,6 +88,6 @@ const styles = StyleSheet.create({
   title: { fontFamily: FONT.semibold, fontSize: FS.sm },
   status: { fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 1 },
   body: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 18 },
-  link: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
+  link: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', minHeight: 44 },
   linkText: { fontFamily: FONT.semibold, fontSize: FS.xs },
 });
