@@ -20,6 +20,10 @@ The bare development web preview opens a synthetic Demo Seller session with popu
 **Why:** the owner wants Replit’s phone-frame preview optimized for reviewing populated seller screens without repeating authentication or onboarding.
 **How to apply:** use the bare preview URL for seller review and `?bt_preview=buyer` for buyer review. Keep the bypass, synthetic identities, and demo financial values limited to development web; native/device and production users must retain real auth and onboarding.
 
+The dev-web account switcher's selected demo side must survive Expo Router removing query parameters and browser reloads, scoped to the current browser tab. This is preview navigation, not a Clerk account switch.
+**Why:** clicking Demo Buyer opened the buyer home, but the root redirect dropped the query; reloading silently returned to Demo Seller.
+**How to apply:** explicit preview URLs override the tab's selection, and seller/buyer preview detection, root redirects, and displayed account state must all resolve the same selected role.
+
 Authenticated seller tools cannot treat this navigation bypass as a real Clerk session. In dev web seller preview, initialize review-only UI state synchronously from the route role and skip protected API calls; keep uploads, writes, checkout, and activation behind real authentication.
 
 **Why:** paid promotion screens entered generic error states because the preview bypass opened them without a token, so every protected request returned 401. Async-only fallbacks also flashed or remained on loading states during direct web captures.

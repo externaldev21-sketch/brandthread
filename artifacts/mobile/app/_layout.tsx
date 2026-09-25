@@ -58,6 +58,7 @@ import { useCanUseMarketing } from '@/contexts/CookieConsentContext';
 import { setMarketingPixelConsent, trackMarketingPixelEvent } from '@/lib/marketingPixels';
 import { captureNotificationEvent, flushNotificationEvents } from '@/lib/notificationEventOutbox';
 import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
+import { getDevWebPreviewRole } from '@/lib/devPreview';
 import NotificationBanner from '@/components/notifications/NotificationBanner';
 import { showNotificationBanner } from '@/lib/notificationBannerBus';
 import { getNotifications as getFeedNotifications } from '@/services/socialService';
@@ -316,6 +317,7 @@ const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_T
 
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
   if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  if (__DEV__) return getDevWebPreviewRole();
   const v = new URLSearchParams(window.location.search).get('bt_preview');
   return v === 'buyer' ? 'buyer' : 'seller';
 })();

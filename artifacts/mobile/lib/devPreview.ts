@@ -17,6 +17,37 @@
  */
 
 import { Platform } from 'react-native';
+import { resolvePreviewRole, type PreviewRole } from './previewRoleSelection';
+
+const PREVIEW_ROLE_KEY = 'bt:previewRole';
+
+export function getDevWebPreviewRole(searchOverride?: string): PreviewRole | null {
+  if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined') return null;
+
+  const search = searchOverride ?? window.location.search;
+  if (searchOverride !== undefined) return resolvePreviewRole(search, null);
+
+  let savedRole: string | null = null;
+  try {
+    savedRole = window.sessionStorage.getItem(PREVIEW_ROLE_KEY);
+  } catch {
+    // Private browsing can disable storage; explicit preview URLs still work.
+  }
+  const role = resolvePreviewRole(search, savedRole);
+  if (new URLSearchParams(search).has('bt_preview')) {
+    setDevWebPreviewRole(role);
+  }
+  return role;
+}
+
+export function setDevWebPreviewRole(role: PreviewRole): void {
+  if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(PREVIEW_ROLE_KEY, role);
+  } catch {
+    // The URL parameter remains a usable fallback without session storage.
+  }
+}
 
 /**
  * Returns true only in the dev-web seller preview context.
@@ -30,20 +61,7 @@ export function isSellerDevPreview(searchOverride?: string): boolean {
 
   // Native (iOS / Android): never activate
   if (Platform.OS !== 'web') return false;
-
-  // Resolve the search string: explicit override > window.location.search > ''
-  let search = searchOverride ?? '';
-  if (searchOverride === undefined) {
-    if (typeof window === 'undefined') return false;
-    search = window.location.search;
-  }
-
-  // ?bt_preview=buyer → this is a buyer review session, not a seller preview
-  const v = new URLSearchParams(search).get('bt_preview');
-  if (v === 'buyer') return false;
-
-  // Default (no param) or ?bt_preview=seller → seller preview
-  return true;
+  return getDevWebPreviewRole(searchOverride) === 'seller';
 }
 
 /**
@@ -53,13 +71,5 @@ export function isSellerDevPreview(searchOverride?: string): boolean {
 export function isBuyerDevPreview(searchOverride?: string): boolean {
   if (!__DEV__) return false;
   if (Platform.OS !== 'web') return false;
-
-  let search = searchOverride ?? '';
-  if (searchOverride === undefined) {
-    if (typeof window === 'undefined') return false;
-    search = window.location.search;
-  }
-
-  const v = new URLSearchParams(search).get('bt_preview');
-  return v === 'buyer';
+  return getDevWebPreviewRole(searchOverride) === 'buyer';
 }

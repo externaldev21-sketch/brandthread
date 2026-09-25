@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth, useSessionList } from '@clerk/expo';
+import { getDevWebPreviewRole, setDevWebPreviewRole } from '@/lib/devPreview';
 import * as Haptics from 'expo-haptics';
 import { Header } from '@/components/layout';
 import {
@@ -66,13 +67,12 @@ export default function AccountSwitcherScreen() {
   const { sessions, isLoaded, setActive } = useSessionList();
   const [switchingId, setSwitchingId] = useState<string | null>(null);
   const isDevWebPreview = __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined';
-  const previewRole = isDevWebPreview
-    ? new URLSearchParams(window.location.search).get('bt_preview') === 'buyer' ? 'buyer' : 'seller'
-    : null;
+  const previewRole = isDevWebPreview ? getDevWebPreviewRole() : null;
 
   function handlePreviewRoleSwitch(role: 'buyer' | 'seller') {
     if (!isDevWebPreview || role === previewRole) return;
     Haptics.selectionAsync();
+    setDevWebPreviewRole(role);
     window.location.assign(`/?bt_preview=${role}`);
   }
 
