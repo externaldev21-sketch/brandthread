@@ -6,6 +6,14 @@ const state = vi.hoisted(() => ({
   updates: [] as Array<Record<string, unknown>>,
 }));
 
+// vi.importActual below loads the real @workspace/db module (for its schema
+// table objects), which throws at import time if DATABASE_URL is unset —
+// this file never actually connects (db.select/update are replaced below),
+// so a placeholder is enough. Must run before the hoisted vi.mock factory.
+vi.hoisted(() => {
+  process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
+});
+
 vi.mock("@workspace/db", async () => {
   const actual = await vi.importActual<typeof import("@workspace/db")>("@workspace/db");
 
