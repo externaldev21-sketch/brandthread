@@ -21,10 +21,13 @@ import { IconButton } from '@/components/ui/IconButton';
 import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ProductCard } from '@/components/products/ProductCard';
-import { getProducts, getProductStats, archiveProduct, unarchiveProduct, deleteProduct, restoreProduct, duplicateProduct } from '@/services/productService';
+import { getProducts, getProductStats, getProduct, archiveProduct, unarchiveProduct, deleteProduct, restoreProduct, duplicateProduct } from '@/services/productService';
 import { Product, ProductFilter } from '@/services/productTypes';
 import { formatCents } from '@/lib/money';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryClient';
+import { prefetchOnPressIn } from '@/lib/prefetch';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -439,18 +442,29 @@ export default function ProductsScreen() {
     setActionSheetVisible(true);
   }, []);
 
+  const queryClient = useQueryClient();
+  const onProductPressIn = useCallback((product: Product) => {
+    prefetchOnPressIn(
+      queryClient,
+      queryKeys.product(product.id),
+      () => getProduct(product.id),
+      product.media.find(m => m.isCover)?.uri ?? product.media[0]?.uri,
+    )();
+  }, [queryClient]);
+
   const renderProduct = useCallback(({ item }: { item: Product }) => (
     <View style={{ paddingHorizontal: gridGap / 2 }}>
       <ProductCard
         product={item}
         width={cardWidth}
         onPress={openProduct}
+        onPressIn={onProductPressIn}
         onMore={openActionSheet}
         onQuickArchive={handleQuickArchive}
         onQuickDelete={handleDelete}
       />
     </View>
-  ), [openProduct, openActionSheet, cardWidth, gridGap]);
+  ), [openProduct, onProductPressIn, openActionSheet, cardWidth, gridGap]);
 
   const keyExtractor = useCallback((item: Product) => item.id, []);
 

@@ -6,6 +6,7 @@ export * from './security';
 export * from './money';
 export * from './threadCash';
 export * from './shopifyFulfillment';
+export * from './metaAds';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
 
@@ -32,6 +33,8 @@ export const users = pgTable('users', {
   referredByCode: text('referred_by_code'),       // code used when this user signed up
   // DM privacy: 'requests' (default) | 'followers_only'
   dmPrivacy:      text('dm_privacy').notNull().default('requests'),
+  // Buyer onboarding style picks (cold start for the For You ranking pipeline).
+  buyerStyleInterests: jsonb('buyer_style_interests').$type<string[]>().notNull().default([]),
   // Brand onboarding fields (seller side)
   brandName: text('brand_name'),
   brandType: text('brand_type'),
@@ -151,7 +154,9 @@ export const products = pgTable('products', {
   removalKind: text('removal_kind'),
   images: json('images').$type<string[]>().notNull().default([]),
   tags: json('tags').$type<string[]>().notNull().default([]),
-  styleTags:             json('style_tags').$type<string[]>().notNull().default([]),
+  // jsonb (not json): 090_style_tags_jsonb_alignment.sql GIN-indexes this
+  // column with jsonb_path_ops for the "for you" ranking feed (088).
+  styleTags:             jsonb('style_tags').$type<string[]>().notNull().default([]),
   // ── Pre-order / demand gauging ───────────────────────────────────────────
   isPreOrder:            boolean('is_pre_order').notNull().default(false),
   preOrderClosingDate:   timestamp('pre_order_closing_date'),
@@ -427,7 +432,9 @@ export const posts = pgTable('posts', {
   aspectRatio: text('aspect_ratio').notNull().default('9:16'),
   caption: text('caption'),
   hashtags: json('hashtags').$type<string[]>().notNull().default([]),
-  styleTags: json('style_tags').$type<string[]>().notNull().default([]),
+  // jsonb (not json): 090_style_tags_jsonb_alignment.sql GIN-indexes this
+  // column with jsonb_path_ops for the "for you" ranking feed (088).
+  styleTags: jsonb('style_tags').$type<string[]>().notNull().default([]),
   sound: json('sound').$type<{
     soundId: string;
     soundTitle: string;
@@ -455,7 +462,14 @@ export const posts = pgTable('posts', {
   publishedAt: timestamp('published_at', { withTimezone: true }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  userCreatedPublishedIdx: index('posts_user_created_published_idx')
+    .on(table.userId, table.createdAt)
+    .where(sql`${table.postStatus} = 'published'`),
+  createdPublishedIdx: index('posts_created_published_idx')
+    .on(table.createdAt)
+    .where(sql`${table.postStatus} = 'published'`),
+}));
 
 // ─── Interactions ─────────────────────────────────────────────────────────────
 
@@ -463,11 +477,22 @@ export const interactions = pgTable('interactions', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: text('user_id').notNull(),   // Clerk user ID of actor
   postId: uuid('post_id').references(() => posts.id, { onDelete: 'cascade' }),
-  type: text('type').notNull(),        // 'like' | 'comment' | 'follow' | 'watch_time'
+  // 'like' | 'comment' | 'follow' | 'watch_time' | 'view' | 'repost' | 'share' |
+  // 'shop_click' | 'add_to_bag' | 'rewatch' | 'skip' | 'not_interested'
+  type: text('type').notNull(),
   value: text('value'),               // e.g. comment text, seconds watched, followed user ID
+  // Client-supplied idempotency key for batched event ingestion
+  // (POST /api/feed/events). Null for interactions recorded elsewhere.
+  clientEventId: text('client_event_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   postIdx: index('interactions_post_id_idx').on(table.postId),
+  postTypeIdx: index('interactions_post_type_idx').on(table.postId, table.type),
+  userCreatedIdx: index('interactions_user_created_idx').on(table.userId, table.createdAt),
+  userTypeCreatedIdx: index('interactions_user_type_created_idx').on(table.userId, table.type, table.createdAt),
+  userClientEventUnique: uniqueIndex('interactions_user_client_event_unique')
+    .on(table.userId, table.clientEventId)
+    .where(sql`${table.clientEventId} IS NOT NULL`),
 }));
 
 // ─── Checkout Sessions (server-side cart record for Stripe webhook reconstruction)
@@ -843,6 +868,19 @@ export const savedItems = pgTable('saved_items', {
   userTargetUnique: unique('saved_items_user_id_target_id_key').on(table.userId, table.targetId),
 }));
 
+// ─── Recently viewed products ──────────────────────────────────────────────────
+// One row per (buyer, product); viewing again bumps viewedAt via upsert
+// rather than creating a duplicate.
+export const recentlyViewedProducts = pgTable('recently_viewed_products', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  userId:    text('user_id').notNull(),
+  productId: uuid('product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
+  viewedAt:  timestamp('viewed_at').defaultNow().notNull(),
+}, (table) => ({
+  userProductUnique: uniqueIndex('recently_viewed_products_user_product_unique').on(table.userId, table.productId),
+  userViewedIdx: index('recently_viewed_products_user_viewed_idx').on(table.userId, table.viewedAt),
+}));
+
 // ─── Server-side cart (full-replace sync model) ───────────────────────────────
 
 export const cartItems = pgTable('cart_items', {
@@ -957,6 +995,9 @@ export const reviews = pgTable('reviews', {
 }, (table) => ({
   orderIdx: index('reviews_order_id_idx').on(table.orderId),
   productIdx: index('reviews_product_id_idx').on(table.productId),
+  buyerOrderUnique: uniqueIndex('reviews_buyer_order_unique')
+    .on(table.buyerId, table.orderId)
+    .where(sql`${table.orderId} IS NOT NULL`),
 }));
 
 // ─── Shoppable post tagging ────────────────────────────────────────────────────
@@ -1541,6 +1582,83 @@ export const sellerRankingCache = pgTable('seller_ranking_cache', {
   results:     json('results').$type<any[]>().notNull().default([]),
   itemCount:   integer('item_count').notNull().default(0),
 });
+
+// ─── For You feed (per-user ranking) ──────────────────────────────────────────
+
+/** Incrementally-updated per-user taste vector driving the For You feed. */
+export const buyerTasteProfiles = pgTable('buyer_taste_profiles', {
+  userId:            text('user_id').primaryKey(),
+  categoryAffinity:  jsonb('category_affinity').$type<Record<string, number>>().notNull().default({}),
+  styleTagAffinity:  jsonb('style_tag_affinity').$type<Record<string, number>>().notNull().default({}),
+  sellerAffinity:    jsonb('seller_affinity').$type<Record<string, number>>().notNull().default({}),
+  eventCount:        integer('event_count').notNull().default(0),
+  updatedAt:         timestamp('updated_at').defaultNow().notNull(),
+  createdAt:         timestamp('created_at').defaultNow().notNull(),
+});
+
+/** Short-TTL per-user cache of the last computed For You ranking (mirrors
+ *  trending_cache / seller_ranking_cache's shape, one row per user instead
+ *  of one row per day). */
+export const forYouFeedCache = pgTable('for_you_feed_cache', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  userId:      text('user_id').notNull().unique(),
+  computedAt:  timestamp('computed_at').defaultNow().notNull(),
+  results:     jsonb('results').$type<any[]>().notNull().default([]),
+  itemCount:   integer('item_count').notNull().default(0),
+});
+
+// ─── Search query log ──────────────────────────────────────────────────────────
+
+export const searchLog = pgTable('search_log', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  userId:       text('user_id'),
+  query:        text('query').notNull(),
+  normalized:   text('normalized').notNull(),
+  resultCount:  integer('result_count').notNull().default(0),
+  createdAt:    timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  userCreatedIdx: index('search_log_user_created_idx').on(table.userId, table.createdAt)
+    .where(sql`${table.userId} IS NOT NULL`),
+  normalizedCreatedIdx: index('search_log_normalized_created_idx').on(table.normalized, table.createdAt),
+}));
+
+// ─── Live shopping ─────────────────────────────────────────────────────────────
+
+export const liveStreams = pgTable('live_streams', {
+  id:               uuid('id').primaryKey().defaultRandom(),
+  sellerId:         text('seller_id').notNull(),
+  channelName:      text('channel_name').notNull().unique(),
+  title:            text('title').notNull(),
+  description:      text('description'),
+  status:           text('status').notNull().default('live'), // 'live' | 'ended'
+  productTags:      jsonb('product_tags').$type<any[]>().notNull().default([]),
+  agoraUid:         integer('agora_uid'),
+  thumbnailUrl:     text('thumbnail_url'),
+  viewerCount:      integer('viewer_count').notNull().default(0),
+  peakViewerCount:  integer('peak_viewer_count').notNull().default(0),
+  startedAt:        timestamp('started_at', { withTimezone: true }).defaultNow().notNull(),
+  endedAt:          timestamp('ended_at', { withTimezone: true }),
+  replayPostId:     uuid('replay_post_id').references(() => posts.id, { onDelete: 'set null' }),
+  replayUrl:        text('replay_url'),
+  createdAt:        timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  statusViewerIdx: index('live_streams_status_viewer_idx')
+    .on(table.status, table.viewerCount, table.startedAt)
+    .where(sql`${table.status} = 'live'`),
+  sellerStatusIdx: index('live_streams_seller_status_idx').on(table.sellerId, table.status),
+}));
+
+export const liveComments = pgTable('live_comments', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  streamId:     uuid('stream_id').notNull().references(() => liveStreams.id, { onDelete: 'cascade' }),
+  userId:       text('user_id').notNull(),
+  displayName:  text('display_name').notNull().default('Viewer'),
+  avatarUrl:    text('avatar_url'),
+  message:      text('message').notNull(),
+  createdAt:    timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  streamCreatedIdx: index('live_comments_stream_created_idx').on(table.streamId, table.createdAt),
+}));
 
 // ─── Seller Tax Configuration ─────────────────────────────────────────────────
 export const sellerTaxConfig = pgTable('seller_tax_config', {

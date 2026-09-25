@@ -21,7 +21,7 @@ import { getEntitlementRejection } from '@/lib/entitlementError';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter, completeSetupTaskWhen } from '@/lib/setupCompletion';
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
-import { Header } from '@/components/layout';
+import { Header, ListSkeleton } from '@/components/layout';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState,
@@ -1570,7 +1570,7 @@ function MessagesTab({ router }: { router: ReturnType<typeof useRouter> }) {
     return () => clearInterval(timer);
   }, [load]);
 
-  if (loading) return <View style={s.centered}><ActivityIndicator color={theme.accent} /></View>;
+  if (loading) return <View style={{ padding: SP.md }}><ListSkeleton rows={6} /></View>;
   if (error) {
     return (
       <EmptyState

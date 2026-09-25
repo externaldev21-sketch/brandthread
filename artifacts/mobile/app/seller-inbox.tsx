@@ -285,14 +285,15 @@ const createStyles = (theme: AppThemePreset) => {
   listPad: { paddingHorizontal: SP.md },
   centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
 
-  // Row — flat Instagram-style, no card chrome
+  // Row — flat, roomy list row (Bumble-style spacing, no card chrome)
   row: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: SP.md, paddingVertical: SP.sm + 2,
+    paddingHorizontal: SP.md, paddingVertical: SP.md,
+    minHeight: 88,
   },
   avatar: {
-    width: 48, height: 48, borderRadius: 24,
-    alignItems: 'center', justifyContent: 'center', marginRight: SP.sm,
+    width: 56, height: 56, borderRadius: 28,
+    alignItems: 'center', justifyContent: 'center', marginRight: SP.md,
   },
   avatarInitials: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.onAccent },
   rowCenter: { flex: 1 },

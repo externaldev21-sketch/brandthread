@@ -19,6 +19,7 @@ import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, ReturnStatus, RETURN_REASONS, OrderStatus, TrackingStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent, PaymentSummary } from '@/services/orderTypes';
 import { dbStatusToOrderStatus, dbStatusToPaymentStatus, type DbPaymentStatus } from '@/lib/orderStatusAdapter';
+import { productDetailHref, profileHref } from '@/lib/profileNavigation';
 
 function useThemeAliases() {
   const { theme } = useAppTheme();
@@ -67,6 +68,7 @@ export function adaptApiOrder(raw: any): Order {
   const customer = {
     ...rawCustomer,
     id: rawCustomer.id ?? raw.customerId ?? raw.buyerId ?? '',
+    buyerUserId: typeof raw.buyerId === 'string' && raw.buyerId ? raw.buyerId : null,
     name: customerName,
     email: customerEmail,
   };
@@ -105,7 +107,9 @@ export function adaptApiOrder(raw: any): Order {
   // Line items
   const lineItems: OrderLineItem[] = items.map((item: any) => ({
     id:               item.id,
-    productId:        item.variantId ?? item.id,
+    // Real product id from the API (the variant id is not a product id);
+    // empty when the product no longer exists.
+    productId:        typeof item.productId === 'string' ? item.productId : '',
     productName:      item.productName,
     variant:          item.variantLabel ?? '',
     sku:              undefined,
@@ -1041,7 +1045,11 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
       <View style={s.section}>
         <SectionHeader title="Items" />
         {order.lineItems.map(li => (
-          <BrandthreadCard key={li.id} style={s.lineItemCard}>
+          <BrandthreadCard
+            key={li.id}
+            style={s.lineItemCard}
+            onPress={li.productId ? () => router.push(productDetailHref(li.productId, { isOwner: true }) as never) : undefined}
+          >
             <View style={s.lineItemRow}>
               <View style={{ flex: 1 }}>
                 <Text style={s.lineItemName}>{li.productName}</Text>
@@ -1052,6 +1060,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
                 <Text style={s.lineItemQty}>×{li.quantity}</Text>
                 <Text style={s.lineItemTotal}>{usd(li.totalCents)}</Text>
               </View>
+              {li.productId ? <Feather name="chevron-right" size={ICON.sm} color={theme.muted} /> : null}
             </View>
           </BrandthreadCard>
         ))}
@@ -1103,14 +1112,24 @@ function CustomerTab({ order }: { order: Order }) {
         <AddressCard title="Billing Address" addr={c.billingAddress} />
       </View>
 
-      {!!c.id && (
+      {(!!c.id || !!c.buyerUserId) && (
         <View style={[s.actionRow, { marginHorizontal: SP.md }]}>
-          <SecondaryButton
-            label="View customer"
-            onPress={() => router.push(`/customer-orders?customerId=${encodeURIComponent(c.id)}` as never)}
-            icon="user"
-            style={{ flex: 1 }}
-          />
+          {!!c.id && (
+            <SecondaryButton
+              label="View customer"
+              onPress={() => router.push(`/customer-orders?customerId=${encodeURIComponent(c.id)}` as never)}
+              icon="user"
+              style={{ flex: 1 }}
+            />
+          )}
+          {!!c.buyerUserId && (
+            <SecondaryButton
+              label="View profile"
+              onPress={() => router.push(profileHref({ userId: c.buyerUserId!, accountType: 'buyer', name: c.name, initials: c.initials }) as never)}
+              icon="external-link"
+              style={{ flex: 1 }}
+            />
+          )}
         </View>
       )}
     </View>
@@ -1352,7 +1371,7 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
                 )}
 
                 <View style={s.actionRow}>
-                  <SecondaryButton label="Buy Label" onPress={() => router.push(`/shipping-label?orderId=${order.id}&groupId=${group.id}`)} icon="tag" small style={{ flex: 1 }} />
+                  <SecondaryButton label="Buy Label" onPress={() => router.push(`/fulfill-order?orderId=${order.id}&step=3`)} icon="tag" small style={{ flex: 1 }} />
                   <SecondaryButton label="Add Tracking" onPress={() => toggleForm(group.id)} icon="map-pin" small style={{ flex: 1 }} />
                 </View>
               </BrandthreadCard>

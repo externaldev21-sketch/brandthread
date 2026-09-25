@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { db, orders, orderItems, customers, drops, productVariants, products, notificationsFeed, users, dropWallets, dropWalletTransactions, shopifyOrderLinks } from "@workspace/db";
 import { eq, desc, sql, and, inArray } from "drizzle-orm";
 import { executeOrderRelease, requestOrderRelease } from "../lib/money/escrow";
+import { withItemProductIds } from "../lib/orderItemProducts";
 import { refundOrder, RefundError } from "../lib/money/refunds";
 import { orderStatusMachine, type OrderStatus } from "../lib/money/stateMachines";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -267,7 +268,9 @@ router.get("/:id", async (req, res) => {
     .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId)))
     .limit(1);
   if (!order) { res.status(404).json({ error: "Not found" }); return; }
-  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+  const items = await withItemProductIds(
+    await db.select().from(orderItems).where(eq(orderItems.orderId, order.id)),
+  );
 
   // Resolve customer: prefer the customers record, fall back to the buyer's user row
   let customer: any = null;

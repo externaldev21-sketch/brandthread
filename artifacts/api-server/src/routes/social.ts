@@ -11,7 +11,7 @@
  */
 import { Router } from "express";
 import { db, users, follows, stories, storyLikes, storyViews, blocks, posts, interactions } from "@workspace/db";
-import { eq, and, or, ilike, ne, inArray, sql, gt, desc, count, isNull } from "drizzle-orm";
+import { eq, and, or, ilike, ne, inArray, sql, gt, desc, asc, count, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { rateLimit } from "../middlewares/rateLimit";
 import { publishNotification } from "./notifications-feed";
@@ -28,6 +28,22 @@ import {
 } from "../lib/safety";
 import { actorFieldsFromProfile } from "../lib/activityEvents";
 import { parsePagination, setPaginationHeaders } from "../lib/pagination";
+import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
+
+// Typo-tolerance threshold for pg_trgm similarity() — mirrors public.ts's
+// search endpoint so people search behaves consistently with product/brand
+// search (near-miss spellings still match, exact substrings still win).
+const PEOPLE_SIMILARITY_THRESHOLD = 0.25;
+
+/** SQL predicate: substring match OR trigram-similarity match (typo tolerance). */
+function fuzzyMatch(column: any, term: string, pattern: string) {
+  return sql`(${ilike(column, pattern)} OR similarity(${column}, ${term}) > ${PEOPLE_SIMILARITY_THRESHOLD})`;
+}
+
+/** Best-of(substring exactness, trigram similarity) — used to rank people-search relevance. */
+function relevanceScore(column: any, term: string) {
+  return sql<number>`GREATEST(similarity(${column}, ${term}), CASE WHEN ${column} ILIKE ${"%" + term + "%"} THEN 0.999 ELSE 0 END)`;
+}
 
 const router = Router();
 router.use(requireAuth);
@@ -59,7 +75,11 @@ function formatUser(u: UserRow) {
     username:    u.username ?? null,
     displayName: u.displayName ?? null,
     bio:         u.bio ?? null,
-    avatarUrl:   (u as any).avatarUrl ?? null,
+    // Uploaded profile photos win over the Clerk avatar; private /objects/
+    // storage paths are never exposed.
+    avatarUrl:   (typeof u.profileImageUrl === "string" && u.profileImageUrl.startsWith("http")
+      ? u.profileImageUrl
+      : (u as any).avatarUrl) ?? null,
     accountType: u.accountType,
     initials:    initials(nm),
     color:       avatarColor(u.clerkId),
@@ -83,7 +103,13 @@ function relationshipLockKey(firstUserId: string, secondUserId: string): string 
   return JSON.stringify([firstUserId, secondUserId].sort());
 }
 
-async function buildBuyerPosts(viewerId: string, authorIds: string[], limit: number, offset: number) {
+async function buildBuyerPosts(
+  viewerId: string,
+  authorIds: string[],
+  limit: number,
+  offset: number,
+  postId?: string,
+) {
   if (authorIds.length === 0) return [];
   const pageRows = await db.select({
     id: posts.id,
@@ -107,6 +133,7 @@ async function buildBuyerPosts(viewerId: string, authorIds: string[], limit: num
       eq(posts.moderationStatus, "visible"),
       authorInGoodStanding(posts.userId),
       notBlockedWith(viewerId, posts.userId),
+      ...(postId ? [eq(posts.id, postId)] : []),
     ))
     .orderBy(desc(posts.createdAt))
     .limit(limit)
@@ -374,6 +401,45 @@ router.get("/profile/:userId", async (req, res) => {
   });
 });
 
+// ─── GET /api/social/posts/:postId ───────────────────────────────────────────
+// A single post by id, in the same normalized BuyerPost shape as
+// /profile/:userId/posts — for opening a specific post (e.g. from a saved
+// item or collection) without knowing the author in advance. Applies the
+// same visibility rule as the list route: viewable if it's the viewer's own
+// post, or the author is a mutual friend.
+router.get("/posts/:postId", async (req, res) => {
+  const myId = (req as any).clerkUserId as string;
+  const { postId } = req.params;
+
+  const [row] = await db.select({ userId: posts.userId }).from(posts)
+    .where(eq(posts.id, postId)).limit(1);
+  if (!row) { res.status(404).json({ error: "Post not found" }); return; }
+  const authorId = row.userId;
+
+  if (authorId !== myId) {
+    if ((await blockRelation(myId, authorId)) !== "none") {
+      res.status(404).json({ error: "Post not found" }); return;
+    }
+    const mutual = await db.execute(sql`
+      SELECT 1
+      FROM follows mine
+      JOIN follows theirs
+        ON theirs.follower_id = mine.following_id
+       AND theirs.following_id = ${myId}
+      WHERE mine.follower_id = ${myId}
+        AND mine.following_id = ${authorId}
+      LIMIT 1
+    `);
+    if ((((mutual as any).rows ?? []) as any[]).length === 0) {
+      res.status(403).json({ error: "Posts are available to friends only" }); return;
+    }
+  }
+
+  const [found] = await buildBuyerPosts(myId, [authorId], 1, 0, postId);
+  if (!found) { res.status(404).json({ error: "Post not found" }); return; }
+  res.json(found);
+});
+
 // Accepts users.clerkId or users.id (UUID) — resolves before block/friend checks.
 router.get("/profile/:userId/posts", async (req, res) => {
   const myId  = (req as any).clerkUserId as string;
@@ -425,16 +491,46 @@ router.get("/friends/activity", async (req, res) => {
   res.json(await buildBuyerPosts(myId, authorIds, limit, offset));
 });
 
+/**
+ * Whose follower/following list is being read: the viewer by default, or the
+ * profile named by `?userId=` (Clerk ID or users.id alias). Another person's
+ * list is hidden (404) when either side has blocked the other. Returns null
+ * after sending the error response.
+ */
+async function resolveListOwner(req: any, res: any, myId: string): Promise<string | null> {
+  const raw = typeof req.query.userId === "string" ? req.query.userId.trim() : "";
+  if (!raw || raw === myId) return myId;
+  const owner = await resolveToClerkId(raw);
+  if (!owner) { res.status(404).json({ error: "User not found" }); return null; }
+  if (owner !== myId && (await blockRelation(myId, owner)) !== "none") {
+    res.status(404).json({ error: "User not found" }); return null;
+  }
+  return owner;
+}
+
+/** Which of `ids` the viewer follows — drives the list's Follow / Following state. */
+async function viewerFollowsSet(myId: string, ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const rows = await db
+    .select({ followingId: follows.followingId })
+    .from(follows)
+    .where(and(eq(follows.followerId, myId), inArray(follows.followingId, ids)));
+  return new Set(rows.map(r => r.followingId));
+}
+
 // ─── GET /api/social/following ────────────────────────────────────────────────
-// Query params: ?limit=&offset= (default 100, capped at MAX_PAGE_LIMIT).
+// Query params: ?userId=&limit=&offset= (default 100, capped at MAX_PAGE_LIMIT).
+// Without userId the list is the viewer's own.
 router.get("/following", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const page = parsePagination(req.query, { limit: 100 });
   if (!page.success) { res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" }); return; }
+  const ownerId = await resolveListOwner(req, res, myId);
+  if (!ownerId) return;
   const { limit, offset } = page.data;
   const rows = await db
     .select({ followingId: follows.followingId, createdAt: follows.createdAt })
-    .from(follows).where(eq(follows.followerId, myId))
+    .from(follows).where(eq(follows.followerId, ownerId))
     .orderBy(desc(follows.createdAt))
     .limit(limit).offset(offset);
   setPaginationHeaders(res, page.data, rows.length);
@@ -443,6 +539,7 @@ router.get("/following", async (req, res) => {
   const ids      = rows.map(r => r.followingId);
   const userRows = await db.select().from(users).where(inArray(users.clerkId, ids));
   const byId     = Object.fromEntries(userRows.map(u => [u.clerkId, u]));
+  const iFollow  = ownerId === myId ? new Set(ids) : await viewerFollowsSet(myId, ids);
 
   res.json(rows.map(r => ({
     ...(byId[r.followingId] ? formatUser(byId[r.followingId]) : {
@@ -451,19 +548,23 @@ router.get("/following", async (req, res) => {
       initials: "?", color: avatarColor(r.followingId), handle: "@unknown",
     }),
     followedAt: r.createdAt,
+    isFollowing: iFollow.has(r.followingId),
   })));
 });
 
 // ─── GET /api/social/followers ────────────────────────────────────────────────
-// Query params: ?limit=&offset= (default 100, capped at MAX_PAGE_LIMIT).
+// Query params: ?userId=&limit=&offset= (default 100, capped at MAX_PAGE_LIMIT).
+// Without userId the list is the viewer's own.
 router.get("/followers", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const page = parsePagination(req.query, { limit: 100 });
   if (!page.success) { res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" }); return; }
+  const ownerId = await resolveListOwner(req, res, myId);
+  if (!ownerId) return;
   const { limit, offset } = page.data;
   const rows = await db
     .select({ followerId: follows.followerId, createdAt: follows.createdAt })
-    .from(follows).where(eq(follows.followingId, myId))
+    .from(follows).where(eq(follows.followingId, ownerId))
     .orderBy(desc(follows.createdAt))
     .limit(limit).offset(offset);
   setPaginationHeaders(res, page.data, rows.length);
@@ -473,14 +574,8 @@ router.get("/followers", async (req, res) => {
   const userRows = await db.select().from(users).where(inArray(users.clerkId, ids));
   const byId     = Object.fromEntries(userRows.map(u => [u.clerkId, u]));
 
-  // Who I already follow back
-  const iFollowBack = new Set(
-    (await db
-      .select({ followingId: follows.followingId })
-      .from(follows)
-      .where(and(eq(follows.followerId, myId), inArray(follows.followingId, ids)))
-    ).map(r => r.followingId)
-  );
+  // Who the viewer already follows (on their own list: who they follow back)
+  const iFollowBack = await viewerFollowsSet(myId, ids);
 
   res.json(rows.map(r => ({
     ...(byId[r.followerId] ? formatUser(byId[r.followerId]) : {
@@ -490,6 +585,7 @@ router.get("/followers", async (req, res) => {
     }),
     followedAt:       r.createdAt,
     isFollowingBack:  iFollowBack.has(r.followerId),
+    isFollowing:      iFollowBack.has(r.followerId),
   })));
 });
 
@@ -500,7 +596,11 @@ router.get("/search", async (req, res) => {
   const limit = Math.min(parseInt((req.query.limit as string) || "20", 10), 50);
   if (q.length < 1) { res.json([]); return; }
 
-  const pattern = `%${q}%`;
+  const term = normalizeSearchTerm(q);
+  if (term.length < 2) { res.json([]); return; }
+  const pattern = containsSearchPattern(term);
+  const nameCol = sql`COALESCE(${users.displayName}, ${users.name}, ${users.username}, '')`;
+  const relevance = relevanceScore(nameCol, term);
   const rows = await db.select().from(users)
     .where(
       and(
@@ -510,12 +610,13 @@ router.get("/search", async (req, res) => {
         isNull(users.deletedAt),
         notBlockedWith(myId, users.clerkId),
         or(
-          ilike(users.name,        pattern),
-          ilike(users.displayName, pattern),
-          ilike(users.username,    pattern),
+          fuzzyMatch(users.name,        term, pattern),
+          fuzzyMatch(users.displayName, term, pattern),
+          fuzzyMatch(users.username,    term, pattern),
         )
       )
     )
+    .orderBy(desc(relevance), asc(users.clerkId))
     .limit(limit);
 
   if (!rows.length) { res.json([]); return; }

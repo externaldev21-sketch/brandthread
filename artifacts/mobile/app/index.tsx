@@ -21,7 +21,7 @@ export default function Index() {
     if (!__DEV__) return;
     if (!rootNavigationState?.key) return;
     const effectivePreviewRole = Platform.OS === 'web'
-      ? (previewRole === 'seller' ? 'seller' : 'buyer')
+      ? (previewRole === 'seller' || previewRole === 'buyer' ? previewRole : null)
       : DEV_BYPASS_ROLE;
     if (!effectivePreviewRole) return;
     const redirect = setTimeout(() => {

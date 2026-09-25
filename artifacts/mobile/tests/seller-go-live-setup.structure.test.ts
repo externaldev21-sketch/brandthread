@@ -56,4 +56,13 @@ describe('Go Live setup screen (camera-first)', () => {
     expect(liveScreen).toContain("params.facing === 'front'");
     expect(liveScreen).toContain('engine.switchCamera()');
   });
+
+  it('lets a seller feature products from their own catalog before going live, not only mid-broadcast', () => {
+    // Previously only seller-live.tsx (mid-broadcast) could tag products;
+    // /api/live/start already accepted productTags but setup never sent any.
+    expect(source).toContain('setShowProductPicker(true)');
+    expect(source).toContain("(api as any).products?.list?.()");
+    expect(source).toContain('toggleFeaturedProduct');
+    expect(source).toContain('productTags: featuredProducts.map(p => ({');
+  });
 });

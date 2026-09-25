@@ -43,6 +43,8 @@ import { formatCents } from '@/lib/money';
 import { visibleOrderForBuyer } from '@/lib/buyerOrdersVisibility';
 import { canBuyerCancel } from '@/services/orderPolicy';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
+import { productDetailHref, profileHref } from '@/lib/profileNavigation';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -373,6 +375,7 @@ function adaptOrderDetail(row: any): BuyerOrderView {
     paymentStatus:     row.stripePaymentIntentId ? 'paid' : 'pending',
     fulfillmentStatus: 'unfulfilled',
     lineItems: items.map((item: any) => ({
+      productId:      typeof item.productId === 'string' ? item.productId : null,
       productName:    item.productName,
       variant:        item.variantLabel ?? '',
       quantity:       item.quantity,
@@ -619,6 +622,18 @@ export default function BuyerOrderDetailScreen() {
       '&contextOrderStatus=' + encodeURIComponent(order.status) +
       '&contextSellerName=' + encodeURIComponent(order.sellerName)
     ) as never);
+  }
+
+  function handleViewSeller() {
+    if (!order?.sellerId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push(profileHref({ userId: order.sellerId, accountType: 'seller' }) as never);
+  }
+
+  function handleViewProduct(productId: string | null | undefined) {
+    if (!productId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push(productDetailHref(productId) as never);
   }
 
   function handleReportSeller() {
@@ -870,8 +885,14 @@ export default function BuyerOrderDetailScreen() {
         {/* ── 2. Items (with thumbnails) ───────────────────────────────────── */}
         <SectionCard title={`Items (${order.lineItems.length})`}>
           {order.lineItems.map((item, idx) => (
-            <View
+            <TouchableOpacity
               key={idx}
+              disabled={!item.productId}
+              onPress={() => handleViewProduct(item.productId)}
+              activeOpacity={0.75}
+              accessibilityRole={item.productId ? 'button' : undefined}
+              accessibilityLabel={item.productId ? `View ${item.productName}` : undefined}
+              testID={item.productId ? `order-item-product-${item.productId}` : undefined}
               style={[
                 styles.lineItemRow,
                 idx < order.lineItems.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border, paddingBottom: SP.sm, marginBottom: SP.sm },
@@ -899,8 +920,21 @@ export default function BuyerOrderDetailScreen() {
                 <Text style={styles.lineItemPrice}>{formatCents(item.unitPriceCents * item.quantity)}</Text>
                 {item.quantity > 1 && <Text style={styles.lineItemVariant}>×{item.quantity}</Text>}
               </View>
-            </View>
+              {item.productId ? <Feather name="chevron-right" size={ICON.sm} color={theme.muted} /> : null}
+            </TouchableOpacity>
           ))}
+          <TouchableOpacity
+            onPress={handleViewSeller}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={`View ${order.sellerName}'s profile`}
+            testID="order-seller-profile"
+            style={styles.sellerLinkRow}
+          >
+            <Feather name="shopping-bag" size={ICON.sm} color={theme.muted} />
+            <Text style={styles.sellerLinkText} numberOfLines={1}>Sold by {order.sellerName}</Text>
+            <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
+          </TouchableOpacity>
         </SectionCard>
 
         {/* ── 3. Shipping address ──────────────────────────────────────────── */}
@@ -929,6 +963,11 @@ export default function BuyerOrderDetailScreen() {
           <Text style={styles.paymentNote}>Payment processed securely via Brandthread</Text>
         </SectionCard>
 
+        {/* ── Buyer protection (same note as product detail + checkout) ──── */}
+        <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
+          <BuyerProtectionNote preorder={order.isPreOrder} />
+        </View>
+
         {/* ── 5. Tracking ─────────────────────────────────────────────────── */}
         {order.trackingNumber && (
           <SectionCard title="Tracking">
@@ -936,7 +975,7 @@ export default function BuyerOrderDetailScreen() {
             <View style={{ flexDirection: 'row', gap: SP.sm, marginTop: SP.sm, flexWrap: 'wrap' }}>
               {order.trackingCarrier && (
                 <View style={styles.carrierChip}>
-                  <Text style={styles.carrierChipText}>{order.trackingCarrier}</Text>
+                  <Text style={styles.carrierChipText} numberOfLines={1}>{order.trackingCarrier}</Text>
                 </View>
               )}
               {order.trackingStatus && (
@@ -1115,6 +1154,11 @@ const makeStyles = (theme: AppThemePreset) => {
 
     // Item rows with thumbnail
     lineItemRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
+    sellerLinkRow: {
+      flexDirection: 'row', alignItems: 'center', gap: SP.sm, minHeight: 44,
+      marginTop: SP.sm, borderTopWidth: 1, borderTopColor: theme.border, paddingTop: SP.sm,
+    },
+    sellerLinkText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
     itemThumb: { width: 56, height: 70, borderRadius: RADIUS.sm, overflow: 'hidden', borderWidth: 1, borderColor: theme.border },
     itemThumbFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: theme.cardElevated },
     lineItemName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticToggle } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
@@ -7,21 +7,21 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 
-export type SearchTabKey = 'top' | 'brands' | 'products' | 'people';
+export type SearchTabKey = 'top' | 'brands' | 'products' | 'people' | 'videos';
 
 export const SEARCH_TABS: Array<{ key: SearchTabKey; label: string }> = [
   { key: 'top', label: 'Top' },
-  { key: 'brands', label: 'Brands' },
   { key: 'products', label: 'Products' },
+  { key: 'brands', label: 'Brands' },
   { key: 'people', label: 'People' },
+  { key: 'videos', label: 'Videos' },
 ];
 
 /**
- * Segmented control switching between search result tabs. Visually and
- * motion-aligned to `components/ui/SegmentedControl` (same track/pill radii,
- * type scale, spacing and selection haptic) — kept as its own lightweight
- * component rather than the animated-indicator version since these four tabs
- * are keyed by a fixed string union, not a generic option list.
+ * Horizontally-scrolling pill segmented control switching between result
+ * tabs (Alta-style "For you / Top this week / Recent" reference) — a
+ * scrolling pill row rather than fixed equal-width segments so a 5th tab
+ * (Videos) never crushes label text at 375pt width.
  */
 export function SegmentedTabs({
   active,
@@ -34,13 +34,18 @@ export function SegmentedTabs({
   const styles = makeStyles(theme);
 
   return (
-    <View style={styles.track} testID="search-tabs">
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.track}
+      testID="search-tabs"
+    >
       {SEARCH_TABS.map((tab) => {
         const isActive = tab.key === active;
         return (
           <TouchableOpacity
             key={tab.key}
-            style={[styles.segment, isActive && { backgroundColor: theme.accent }]}
+            style={[styles.segment, isActive && { backgroundColor: theme.accent, borderColor: theme.accent }]}
             onPress={() => {
               if (isActive) return;
               hapticToggle();
@@ -64,18 +69,17 @@ export function SegmentedTabs({
           </TouchableOpacity>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   track: {
-    flexDirection: 'row', gap: SPACING.xxs, padding: 3, borderRadius: RADII.pill,
-    backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border,
-    marginHorizontal: SCREEN_GUTTER, marginTop: SPACING.sm, marginBottom: SPACING.xxs,
+    flexDirection: 'row', gap: SPACING.xs,
+    paddingHorizontal: SCREEN_GUTTER, paddingVertical: SPACING.xxs,
   },
   segment: {
-    flex: 1, height: 34, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: SPACING.xs,
+    height: 44, minWidth: 44, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: SPACING.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface,
   },
 });

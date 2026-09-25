@@ -82,6 +82,8 @@ export interface OrderAddress {
 
 export interface OrderCustomer {
   id: string;
+  /** Buyer's account id (Clerk), when the order came from a signed-in buyer — links to their profile. */
+  buyerUserId?: string | null;
   name: string;
   email: string;
   phone?: string;
@@ -456,6 +458,8 @@ export interface BuyerOrderView {
   paymentStatus: PaymentStatus;
   fulfillmentStatus: FulfillmentStatus;
   lineItems: {
+    /** Product the purchased variant belongs to (null when it was since deleted). */
+    productId?: string | null;
     productName: string;
     variant: string;
     quantity: number;

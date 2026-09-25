@@ -6,6 +6,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '@/lib/serviceConfig';
+import { emitProfileEvent } from '@/lib/profileEvents';
 import type {
   BuyerSocialProfile, BuyerPost, RepostRecord,
   Friendship, FriendshipStatus, FriendRequest, FriendSuggestion,
@@ -216,6 +217,18 @@ export async function getMyPosts(k: SocialKeys = K()): Promise<BuyerPost[]> {
     `/api/social/profile/${encodeURIComponent(k.userId)}/posts`,
   );
   return Array.isArray(remote) ? remote : [];
+}
+/** A single post by id, regardless of author — for opening a specific post
+ *  (e.g. from Saved or a Collection) without already knowing who wrote it.
+ *  Returns null if it doesn't exist, isn't visible, or isn't shared with the
+ *  viewer (posts are friends-only unless they're the viewer's own). */
+export async function getPostById(postId: string, k: SocialKeys = K()): Promise<BuyerPost | null> {
+  if (k.userId === 'anon' || !postId) return null;
+  try {
+    return await serviceRequest<BuyerPost>(`/api/social/posts/${encodeURIComponent(postId)}`);
+  } catch {
+    return null;
+  }
 }
 export async function createPost(params: {
   type: BuyerPost['type'];
@@ -447,7 +460,8 @@ export interface SellerPostSound {
 export interface SellerThreadPost {
   id:                string;
   authorId:          string;
-  authorAccountType: 'seller';
+  /** Feed posts are seller-authored; profile video grids also carry buyer posts. */
+  authorAccountType: 'seller' | 'buyer';
   authorName:        string;
   authorHandle:      string;
   authorInitials:    string;
@@ -487,6 +501,8 @@ export interface SellerThreadPost {
     avatarUrl: string | null;
     createdAt: string;
   }>;
+  /** Recorded plays — present on profile video grids (GET /api/public/users/:id/videos). */
+  viewsCount?:       number;
   /** Ordered object storage paths for composed slideshow slides (empty for video/photo posts) */
   mediaPaths?:       string[];
   /** Per-slide overlay metadata — used to restore draft editors */
@@ -733,18 +749,24 @@ export async function getSellerPosts(): Promise<SellerThreadPost[]> {
   return mapped;
 }
 
-/** Maps a raw API post object from /api/posts/feed to a SellerThreadPost. */
-function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
+/**
+ * Maps a raw API post object (from /api/posts/feed, /api/public/posts or the
+ * profile video endpoints) to a SellerThreadPost. Exported so the profile video
+ * grid and the feed player read one shape.
+ */
+export function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
   const ACCENT_POOL = ['#7C3AED','#0F766E','#BE185D','#B45309','#1D4ED8','#0891B2','#059669'];
   const now = iso();
   const authorName     = p.seller?.brandName ?? p.seller?.displayName ?? 'Seller';
-  const authorHandle   = '@' + authorName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const authorHandle   = '@' + (typeof p.seller?.username === 'string' && p.seller.username
+    ? p.seller.username
+    : authorName.toLowerCase().replace(/[^a-z0-9]/g, ''));
   const authorInitials = authorName.slice(0, 2).toUpperCase();
   const authorColor    = ACCENT_POOL[idx % ACCENT_POOL.length];
   return {
     id:                p.id,
     authorId:          p.userId,
-    authorAccountType: 'seller' as const,
+    authorAccountType: p.authorAccountType === 'buyer' ? 'buyer' : 'seller',
     authorName,
     authorHandle,
     authorInitials,
@@ -779,6 +801,7 @@ function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
     commentsCount: p.commentsCount ?? 0,
     repostsCount:  p.repostsCount  ?? 0,
     savedCount:    0,
+    viewsCount:    typeof p.viewsCount === 'number' ? p.viewsCount : undefined,
     likedByMe:     false,
     savedByMe:     false,
     repostedByMe:  p.repostedByMe === true,
@@ -826,7 +849,7 @@ export async function setSellerFollowing(
   sellerId: string,
   following: boolean,
 ): Promise<SellerFollowState> {
-  return serviceRequest<SellerFollowState>(
+  const state = await serviceRequest<SellerFollowState>(
     following
       ? '/api/social/follow'
       : `/api/social/follow/${encodeURIComponent(sellerId)}`,
@@ -834,6 +857,16 @@ export async function setSellerFollowing(
       ? { method: 'POST', body: JSON.stringify({ userId: sellerId }) }
       : { method: 'DELETE' },
   );
+  // Every screen showing this seller's follower count (or the viewer's
+  // following count) updates from the server-confirmed state.
+  emitProfileEvent({
+    type: 'follow',
+    targetId: sellerId,
+    isFollowing: state?.isFollowing ?? following,
+    followersCount: typeof state?.followersCount === 'number' ? state.followersCount : undefined,
+    viewerId: _socialUserId === 'anon' ? null : _socialUserId,
+  });
+  return state;
 }
 
 /** Backwards-compatible one-shot page loader for non-paginated callers. */
@@ -1538,6 +1571,41 @@ export async function getThreadPostsPage(
     cursor: next,
     hasMore: !next.followedDone || !next.generalDone,
   };
+}
+
+/**
+ * Buyer's personalized For You ranking (GET /api/feed/for-you) — additive,
+ * does not replace `getThreadPostsPage`'s existing 'for-you'/'mixed' modes
+ * (those keep their current offset-paginated /api/public/posts behavior).
+ * Screens can opt into this real ranked feed independently. Live items in
+ * the response are passed through as-is (`kind: 'live'`) since they have no
+ * post shape to map through `mapApiPostToSellerThreadPost`.
+ */
+export type ForYouFeedEntry =
+  | { kind: 'post'; post: SellerThreadPost }
+  | { kind: 'live'; liveStreamId: string; sellerId: string; title: string; thumbnailUrl: string | null; viewerCount: number };
+
+export async function getForYouFeedPage(
+  offset = 0,
+  limit = 20,
+): Promise<{ entries: ForYouFeedEntry[]; nextOffset: number | null }> {
+  const response = await serviceRequest<{ items: any[]; nextOffset: number | null }>(
+    `/api/feed/for-you?limit=${limit}&offset=${offset}`,
+  );
+  const entries: ForYouFeedEntry[] = (response.items ?? []).map((item, index) => {
+    if (item?.type === 'live') {
+      return {
+        kind: 'live',
+        liveStreamId: item.liveStreamId,
+        sellerId: item.sellerId,
+        title: item.title,
+        thumbnailUrl: item.thumbnailUrl ?? null,
+        viewerCount: item.viewerCount ?? 0,
+      };
+    }
+    return { kind: 'post', post: mapApiPostToSellerThreadPost(item, index) };
+  });
+  return { entries, nextOffset: response.nextOffset ?? null };
 }
 
 export function createThreadFeedCursor(): ThreadFeedCursor {
