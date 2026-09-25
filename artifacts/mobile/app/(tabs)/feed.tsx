@@ -23,6 +23,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
 import { Asset } from 'expo-asset';
+import { Image as ExpoImage } from 'expo-image';
 import type { ViewToken } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 import { useApi } from '@/lib/api';
@@ -278,6 +279,8 @@ interface SpotlightItem {
   commentsCount?: number;
 }
 type SpotlightProductTag = NonNullable<SpotlightItem['productTags']>[number];
+
+const SOUND_PREF_KEY = 'bt:feed-sound-on:v1';
 
 const FASHION_PREVIEW_VIDEO_SOURCES: VideoSource[] = [
   require('../../assets/videos/fashion_runway_01.mp4'),
@@ -836,6 +839,7 @@ function VideoVisual({
   muted = false,
   posterUri,
   posterSource,
+  fallbackColor,
   immersive = false,
   progressBottom,
   pageAspect = 9 / 16,
@@ -850,6 +854,10 @@ function VideoVisual({
   muted?: boolean;
   posterUri?: string;
   posterSource?: ImageSourcePropType;
+  /** Solid cover shown pre-decode when there's no poster image at all — a
+   * black frame before the first decoded frame paints is otherwise visible
+   * for any clip whose post has no thumbnail. */
+  fallbackColor?: string;
   /** Buyer Home: portrait clips fill the screen edge to edge behind the bar. */
   immersive?: boolean;
   /** When set, a thin playback progress line sits this far above the bottom. */
@@ -881,6 +889,7 @@ function VideoVisual({
   const [videoAspect, setVideoAspect] = useState(9 / 16);
   const [progress, setProgress] = useState(0);
   const showPoster = Boolean(posterSource || posterUri) && !hasStarted;
+  const showFallbackCover = !showPoster && !hasStarted;
   const cropFraction = 1 - Math.min(videoAspect, pageAspect) / Math.max(videoAspect, pageAspect);
   const fit = immersive && cropFraction <= 0.3 ? 'cover' : 'contain';
   const posterImage = posterSource ?? (posterUri ? { uri: posterUri } : undefined);
@@ -945,11 +954,17 @@ function VideoVisual({
             contentFit={fit}
           />
         )}
+        {showFallbackCover && (
+          <View
+            style={[StyleSheet.absoluteFill, { backgroundColor: fallbackColor ?? '#0a0a0a' }]}
+            pointerEvents="none"
+          />
+        )}
         <VideoView
           player={player}
           // Explicit size: on web the style lands on a <video>, which ignores
           // inset-only sizing and would otherwise render at its intrinsic size.
-          style={[StyleSheet.absoluteFill, styles.videoFill, showPoster && { opacity: 0 }]}
+          style={[StyleSheet.absoluteFill, styles.videoFill, (showPoster || showFallbackCover) && { opacity: 0 }]}
           contentFit={fit}
           nativeControls={false}
         />
@@ -1085,7 +1100,7 @@ function ShopPill({
 }
 
 function SpotlightPage({
-  item, isActive, pageWidth, pageHeight, bottomClearance, immersive = false, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onNotInterested,
+  item, isActive, pageWidth, pageHeight, bottomClearance, immersive = false, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onNotInterested, soundOn, onToggleSound,
 }: {
   item: SpotlightItem;
   isActive: boolean;
@@ -1103,6 +1118,9 @@ function SpotlightPage({
   onOpenComments: (id: string) => void;
   onShopTag: (item: SpotlightItem, tag: SpotlightProductTag) => void;
   onNotInterested: (id: string) => void;
+  /** Whether the app-wide feed sound preference is on. */
+  soundOn: boolean;
+  onToggleSound: () => void;
 }) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -1242,9 +1260,10 @@ function SpotlightPage({
                 isActive={isActive}
                 paused={paused || holdPaused}
                 rate={speedActive ? 2 : 1}
-                muted={item.videoSource != null}
+                muted={!soundOn}
                 posterUri={item.videoPosterUri}
                 posterSource={item.videoPosterSource}
+                fallbackColor={item.accentColor}
                 immersive={immersive}
                 progressBottom={immersive ? bottomClearance - 10 : undefined}
                 pageAspect={pageHeight > 0 ? pageWidth / pageHeight : undefined}
@@ -1503,10 +1522,17 @@ function SpotlightPage({
             {item.caption.length > 86 && <Text style={styles.moreText}> more</Text>}
          </Text>
 
-        <View style={styles.soundRow}>
-           <Feather name="music" size={12} color={`${ON_DARK}CC`} />
+        <Pressable
+          style={styles.soundRow}
+          onPress={onToggleSound}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={soundOn ? 'Mute sound' : 'Unmute sound'}
+          accessibilityState={{ checked: soundOn }}
+        >
+           <Feather name={soundOn ? 'volume-2' : 'volume-x'} size={12} color={`${ON_DARK}CC`} />
           <Text style={styles.soundText} numberOfLines={1}>{item.sound}</Text>
-        </View>
+        </Pressable>
       </View>
     </View>
   );
@@ -1635,6 +1661,20 @@ export default function FeedScreen({
   const { showToast } = useFeedToast();
 
   const [engagements, setEngagements] = useState<Record<string, EngagementState>>({});
+  // The feed's sound on/off choice — a single app-wide preference (not
+  // per-post), persisted so it survives leaving and returning to the feed.
+  const [soundOn, setSoundOn] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem(SOUND_PREF_KEY).then(v => { if (v === 'on') setSoundOn(true); }).catch(() => {});
+  }, []);
+  const toggleSound = useCallback(() => {
+    setSoundOn(prev => {
+      const next = !prev;
+      AsyncStorage.setItem(SOUND_PREF_KEY, next ? 'on' : 'off').catch(() => {});
+      return next;
+    });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  }, []);
   const [showGestureGuide, setShowGestureGuide] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
@@ -2132,6 +2172,20 @@ export default function FeedScreen({
     }
   }).current;
 
+  // Prefetch the next 2 posts' poster images so the placeholder is already
+  // decoded by the time a swipe reaches them — the video players themselves
+  // are already buffering ahead of time via the FlatList's windowSize, but
+  // the poster (what actually covers the screen until playback starts) was
+  // only ever requested once its own cell mounted.
+  useEffect(() => {
+    for (let i = activeIndex + 1; i <= activeIndex + 2; i++) {
+      const next = displayItems[i];
+      if (!next || !('contentType' in next)) continue;
+      const uri = next.videoPosterUri ?? (next.contentType !== 'video' ? next.mediaUris[0] : undefined);
+      if (uri) ExpoImage.prefetch(uri).catch(() => {});
+    }
+  }, [activeIndex, displayItems]);
+
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
   // Buyer Home plays edge to edge behind the floating tab bar, so every
   // overlay (shop tag, caption, rail, progress) starts above the bar.
@@ -2262,6 +2316,8 @@ export default function FeedScreen({
               onOpenComments={handleOpenComments}
               onShopTag={handleShopTag}
               onNotInterested={handleNotInterested}
+              soundOn={soundOn}
+              onToggleSound={toggleSound}
             />
           );
         }}
