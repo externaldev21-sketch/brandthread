@@ -17,15 +17,45 @@ import { calcTotalInventory } from '@/lib/productUtils';
 import { centsAtBasisPoints } from '@/lib/money';
 import { serviceRequest } from '@/lib/serviceConfig';
 
-// ─── Storage Keys ─────────────────────────────────────────────────────────────
+// ─── Storage Keys (scoped by user ID so two accounts never share storage) ─────
 
-const PRODUCTS_KEY      = '@brandthread/products';
-const COLLECTIONS_KEY   = '@brandthread/collections';
-const DRAFT_PREFIX      = '@brandthread/draft_';
-const INVENTORY_ADJ_KEY = '@brandthread/inventory_adj';
+/** Legacy, unscoped keys from before per-account scoping. Migrated once into
+ *  the first user to initialize the service on a given device, then removed
+ *  so they can never leak into a different account afterward. */
+const LEGACY_PRODUCTS_KEY     = '@brandthread/products';
+const LEGACY_COLLECTIONS_KEY  = '@brandthread/collections';
+const LEGACY_MIGRATION_V1_KEY = '@brandthread/migration_v1_demo_purged';
 
-/** One-time migration marker — written after legacy demo records are purged. */
-const MIGRATION_V1_KEY  = '@brandthread/migration_v1_demo_purged';
+/** Set by initProductService() after sign-in. Falls back to 'anon' so the
+ *  service is safe to call before the user ID is available. */
+let _productUserId = 'anon';
+
+/** Call once after Clerk resolves the current user ID (and again on sign-out
+ *  with null, or when the signed-in user changes) so a different account
+ *  never reads/writes the previous account's cached products. */
+export function initProductService(userId: string | null): void {
+  const newUserId = userId ?? 'anon';
+  if (newUserId === _productUserId) return;
+  _productUserId = newUserId;
+  _initialized = false;
+  _products = [];
+  _collections = [];
+}
+
+function keys(uid = _productUserId) {
+  return {
+    products:    `@brandthread/products:${uid}`,
+    collections: `@brandthread/collections:${uid}`,
+    draftPrefix: `@brandthread/draft_${uid}_`,
+    migrated:    `@brandthread/migration_v2_scoped:${uid}`,
+  };
+}
+
+/** One-time migration marker for the legacy demo-record purge, kept per-user
+ *  now that storage is user-scoped. */
+function legacyDemoPurgedKey(uid: string): string {
+  return `${LEGACY_MIGRATION_V1_KEY}:${uid}`;
+}
 
 // ─── Known legacy demo IDs (seeded in v1 demo build) ─────────────────────────
 // These exact IDs are removed on first run to clear stale demo data from devices
@@ -41,49 +71,81 @@ let _products: Product[] = [];
 let _collections: ProductCollection[] = [];
 let _initialized = false;
 
+/** Move data written before per-account scoping existed into the first
+ *  account that initializes on this device, then delete the legacy key so
+ *  it can never be picked up by a second account later. */
+async function migrateLegacyStore(uid: string, k: ReturnType<typeof keys>): Promise<void> {
+  const already = await AsyncStorage.getItem(k.migrated).catch(() => null);
+  if (already) return;
+  try {
+    const [existingScoped, legacyProducts, legacyCollections] = await Promise.all([
+      AsyncStorage.getItem(k.products),
+      AsyncStorage.getItem(LEGACY_PRODUCTS_KEY),
+      AsyncStorage.getItem(LEGACY_COLLECTIONS_KEY),
+    ]);
+    if (!existingScoped && legacyProducts) {
+      await AsyncStorage.setItem(k.products, legacyProducts);
+    }
+    if (legacyCollections) {
+      const existingScopedCollections = await AsyncStorage.getItem(k.collections);
+      if (!existingScopedCollections) await AsyncStorage.setItem(k.collections, legacyCollections);
+    }
+    await AsyncStorage.multiRemove([LEGACY_PRODUCTS_KEY, LEGACY_COLLECTIONS_KEY]);
+  } catch { /* non-fatal — worst case the legacy data is left in place */ }
+  await AsyncStorage.setItem(k.migrated, '1').catch(() => {});
+}
+
 async function ensureInitialized() {
   if (_initialized) return;
+  const uid = _productUserId;
+  const k = keys(uid);
+
+  await migrateLegacyStore(uid, k);
 
   // One-time migration: remove known legacy demo records on existing devices.
   // Uses exact known IDs so no legitimate user record is touched.
-  const migrated = await AsyncStorage.getItem(MIGRATION_V1_KEY).catch(() => null);
+  const migrated = await AsyncStorage.getItem(legacyDemoPurgedKey(uid)).catch(() => null);
   if (!migrated) {
     try {
-      const rawProducts = await AsyncStorage.getItem(PRODUCTS_KEY);
+      const rawProducts = await AsyncStorage.getItem(k.products);
       if (rawProducts) {
         const stored: Product[] = JSON.parse(rawProducts);
         const cleaned = stored.filter(p => !LEGACY_DEMO_PRODUCT_IDS.has(p.id));
         if (cleaned.length !== stored.length) {
-          await AsyncStorage.setItem(PRODUCTS_KEY, JSON.stringify(cleaned));
+          await AsyncStorage.setItem(k.products, JSON.stringify(cleaned));
         }
       }
     } catch { /* non-fatal */ }
     try {
-      const rawCols = await AsyncStorage.getItem(COLLECTIONS_KEY);
+      const rawCols = await AsyncStorage.getItem(k.collections);
       if (rawCols) {
         const stored: ProductCollection[] = JSON.parse(rawCols);
         const cleaned = stored.filter(c => !LEGACY_DEMO_COLLECTION_IDS.has(c.id));
         if (cleaned.length !== stored.length) {
-          await AsyncStorage.setItem(COLLECTIONS_KEY, JSON.stringify(cleaned));
+          await AsyncStorage.setItem(k.collections, JSON.stringify(cleaned));
         }
       }
     } catch { /* non-fatal */ }
-    await AsyncStorage.setItem(MIGRATION_V1_KEY, '1').catch(() => {});
+    await AsyncStorage.setItem(legacyDemoPurgedKey(uid), '1').catch(() => {});
   }
 
+  // An init() call (account switch) may have landed while these awaits were
+  // in flight. Never hydrate a different account's data into the active one.
+  if (_productUserId !== uid) return;
+
   try {
-    const raw = await AsyncStorage.getItem(PRODUCTS_KEY);
+    const raw = await AsyncStorage.getItem(k.products);
     if (raw) _products = JSON.parse(raw);
   } catch { /* start empty */ }
   try {
-    const rawCols = await AsyncStorage.getItem(COLLECTIONS_KEY);
+    const rawCols = await AsyncStorage.getItem(k.collections);
     if (rawCols) _collections = JSON.parse(rawCols);
   } catch { /* start empty */ }
-  _initialized = true;
+  if (_productUserId === uid) _initialized = true;
 }
 
 async function persist() {
-  try { await AsyncStorage.setItem(PRODUCTS_KEY, JSON.stringify(_products)); } catch { /* non-fatal */ }
+  try { await AsyncStorage.setItem(keys().products, JSON.stringify(_products)); } catch { /* non-fatal */ }
 }
 
 function uid(): string {
@@ -347,25 +409,26 @@ export async function getCollections(): Promise<ProductCollection[]> {
 
 export async function saveDraft(draft: ProductDraft): Promise<void> {
   try {
-    await AsyncStorage.setItem(DRAFT_PREFIX + draft.id, JSON.stringify({ ...draft, lastSavedAt: new Date().toISOString() }));
+    await AsyncStorage.setItem(keys().draftPrefix + draft.id, JSON.stringify({ ...draft, lastSavedAt: new Date().toISOString() }));
   } catch { /* non-fatal */ }
 }
 
 export async function loadDraft(id: string): Promise<ProductDraft | null> {
   try {
-    const raw = await AsyncStorage.getItem(DRAFT_PREFIX + id);
+    const raw = await AsyncStorage.getItem(keys().draftPrefix + id);
     return raw ? JSON.parse(raw) : null;
   } catch { return null; }
 }
 
 export async function deleteDraft(id: string): Promise<void> {
-  try { await AsyncStorage.removeItem(DRAFT_PREFIX + id); } catch { /* non-fatal */ }
+  try { await AsyncStorage.removeItem(keys().draftPrefix + id); } catch { /* non-fatal */ }
 }
 
 export async function listDrafts(): Promise<ProductDraft[]> {
   try {
-    const keys = await AsyncStorage.getAllKeys();
-    const draftKeys = keys.filter(k => k.startsWith(DRAFT_PREFIX));
+    const draftPrefix = keys().draftPrefix;
+    const allKeys = await AsyncStorage.getAllKeys();
+    const draftKeys = allKeys.filter(k => k.startsWith(draftPrefix));
     if (draftKeys.length === 0) return [];
     const pairs = await AsyncStorage.multiGet(draftKeys);
     return pairs
