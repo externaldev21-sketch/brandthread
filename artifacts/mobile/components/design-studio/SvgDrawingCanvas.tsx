@@ -32,11 +32,13 @@ export interface SvgDrawingCanvasProps {
   tool: 'brush' | 'eraser' | 'smudge';
   onStrokeEnd: (path: DrawPath) => void;
   disabled?: boolean;
+  /** Live pointer position (canvas-local px), for an external brush-cursor overlay. Null when not touching. */
+  onLivePoint?: (pt: { x: number; y: number } | null) => void;
 }
 
 export default function SvgDrawingCanvas({
   width, height, paths, brushKind, color, size, opacity,
-  pressureCurve = DEFAULT_PRESSURE_CURVE, streamline = 0.3, tool, onStrokeEnd, disabled,
+  pressureCurve = DEFAULT_PRESSURE_CURVE, streamline = 0.3, tool, onStrokeEnd, disabled, onLivePoint,
 }: SvgDrawingCanvasProps) {
   const rawPointsRef = useRef<StrokeInputPoint[]>([]);
   const [liveD, setLiveD] = useState('');
@@ -57,11 +59,13 @@ export default function SvgDrawingCanvas({
         const { locationX, locationY } = e.nativeEvent;
         rawPointsRef.current = [{ x: locationX, y: locationY, t: Date.now() }];
         recomputeLive();
+        onLivePoint?.({ x: locationX, y: locationY });
       },
       onPanResponderMove: (e) => {
         const { locationX, locationY } = e.nativeEvent;
         rawPointsRef.current = [...rawPointsRef.current, { x: locationX, y: locationY, t: Date.now() }];
         recomputeLive();
+        onLivePoint?.({ x: locationX, y: locationY });
       },
       onPanResponderRelease: () => {
         const raw = rawPointsRef.current;
@@ -77,6 +81,7 @@ export default function SvgDrawingCanvas({
         }
         rawPointsRef.current = [];
         setLiveD('');
+        onLivePoint?.(null);
       },
     }),
   ).current;

@@ -101,6 +101,21 @@ import type {
   DrawPath, BlendModeKind,
 } from '@/services/designTypes';
 import { SheetRise } from '@/components/motion/SheetRise';
+import CanvasHost from '@/components/design-studio/CanvasHost';
+import CanvasGestureLayer from '@/components/design-studio/CanvasGestureLayer';
+import LayersPanelComponent from '@/components/design-studio/LayersPanel';
+import ColorPickerComponent from '@/components/design-studio/ColorPicker';
+import type { BrushKind as EngineBrushKind } from '@/lib/brushEngine';
+import {
+  UndoModel, type UndoCommand,
+} from '@/lib/undoModel';
+import {
+  getGarmentTemplates, buildGarmentTemplateLayer, type GarmentTemplateDef,
+} from '@/lib/garmentTemplates';
+import {
+  pushRecentColor, addColorToPalette, createPalette, type BrandPalette,
+} from '@/lib/colorModel';
+import { getColorPickerState, saveColorPickerState } from '@/services/designService';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -278,30 +293,47 @@ export default function DesignCanvasScreen() {
   saveStatusRef.current = saveStatus;
 
   // ── Undo/Redo ──────────────────────────────────────────────────────────────
-  const undoStack = useRef<string[]>([]);
-  const redoStack = useRef<string[]>([]);
+  // Backed by lib/undoModel.ts's generic UndoModel<DesignLayer[]> — a real
+  // command/patch stack (not JSON-snapshot diffing). `undoStack`/`redoStack`
+  // below are kept as thin depth-accessors (`.current.length`) so the many
+  // existing call sites (toolbar disabled-state checks) don't need touching.
+  const undoModelRef = useRef(new UndoModel<DesignLayer[]>({ maxHistory: 50 }));
+  // Bumped whenever the undo model pushes/undoes/redoes — lets other effects
+  // (e.g. autosave dirty tracking) observe undo activity if ever needed.
+  const undoGenRef = useRef(0);
 
-  function pushUndo(currentLayers: DesignLayer[]) {
-    undoStack.current = [...undoStack.current.slice(-49), JSON.stringify(currentLayers)];
-    redoStack.current = [];
+  /**
+   * pushUndo — records a command that can invert to `before` and re-apply to
+   * `after`. Both snapshots are captured synchronously by the caller (every
+   * call site here knows its "after" state at push time — either because it
+   * computes it before calling setLayers, or because mutateLayer computes it
+   * for its updater), so this is O(1) beyond the two array references, not a
+   * JSON.stringify snapshot.
+   */
+  function pushUndo(before: DesignLayer[], after: DesignLayer[] = before) {
+    const command: UndoCommand<DesignLayer[]> = {
+      label: 'Canvas edit',
+      apply: () => after,
+      invert: () => before,
+    };
+    undoModelRef.current.push(command);
+    undoGenRef.current = undoModelRef.current.generation;
   }
 
   function handleUndo() {
-    if (undoStack.current.length === 0) return;
-    const snap = undoStack.current[undoStack.current.length - 1];
-    redoStack.current = [...redoStack.current, JSON.stringify(layers)];
-    undoStack.current = undoStack.current.slice(0, -1);
-    setLayers(JSON.parse(snap));
+    if (!undoModelRef.current.canUndo) return;
+    const next = undoModelRef.current.undo(layers);
+    undoGenRef.current = undoModelRef.current.generation;
+    setLayers(next);
     markDirty();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
 
   function handleRedo() {
-    if (redoStack.current.length === 0) return;
-    const snap = redoStack.current[redoStack.current.length - 1];
-    undoStack.current = [...undoStack.current, JSON.stringify(layers)];
-    redoStack.current = redoStack.current.slice(0, -1);
-    setLayers(JSON.parse(snap));
+    if (!undoModelRef.current.canRedo) return;
+    const next = undoModelRef.current.redo(layers);
+    undoGenRef.current = undoModelRef.current.generation;
+    setLayers(next);
     markDirty();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
@@ -460,10 +492,9 @@ export default function DesignCanvasScreen() {
   smudgeSizeRef.current   = smudgeSize;
 
   // ── Draw state ─────────────────────────────────────────────────────────────
-  const [currentPath, setCurrentPath]             = useState('');
-  const [currentIsErase, setCurrentIsErase]       = useState(false);
-  const [currentEraseWidth, setCurrentEraseWidth] = useState(24);
-  const drawPointsRef = useRef<string[]>([]);
+  // Live in-progress stroke rendering + point smoothing now live inside
+  // CanvasHost (lib/brushEngine.ts) — this screen only needs the resulting
+  // committed DrawPath (handleEngineStrokeEnd) and the live cursor position.
   // Pressure tracking: last native force value for pressure-curve mapping
   const lastStrokeForceRef = useRef<number | undefined>(undefined);
   // Brush cursor position (display px), null when not actively drawing
@@ -775,8 +806,9 @@ export default function DesignCanvasScreen() {
   // ─── Helpers ───────────────────────────────────────────────────────────────
   function mutateLayer(updater: (prev: DesignLayer[]) => DesignLayer[]) {
     setLayers(prev => {
-      pushUndo(prev);
-      return updater(prev);
+      const next = updater(prev);
+      pushUndo(prev, next);
+      return next;
     });
     markDirty();
   }
@@ -883,109 +915,95 @@ export default function DesignCanvasScreen() {
     }
   }
 
-  // ─── Drawing PanResponder ──────────────────────────────────────────────────
-  // All points stored in LOGICAL coordinates: divide locationX/Y by dispScale.
-  const drawPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () =>
-        ['brush', 'smudge', 'eraser'].includes(activeTopToolRef.current),
-      onMoveShouldSetPanResponder: () =>
-        ['brush', 'smudge', 'eraser'].includes(activeTopToolRef.current),
+  // ─── Drawing surface (brush/eraser/smudge) — CanvasHost + brushEngine ─────
+  // Replaces the old raw PanResponder + manual M/L point-string builder: the
+  // live stroke AND its committed geometry now both go through
+  // lib/brushEngine.ts (streamline smoothing, Catmull-Rom resampling,
+  // pressure/velocity width profile), shared with SkiaDrawingCanvas (GPU) and
+  // SvgDrawingCanvas (fallback) via CanvasHost. CanvasHost is mounted at
+  // DISPLAY size (canvasSize.w/h) so its raw touch coordinates match what the
+  // old drawPanResponder received; `rescalePathXY` below converts the
+  // resulting `d` string from display → logical coordinates (the space every
+  // other layer's DrawPath.d already lives in) before it's committed.
 
-      onPanResponderGrant: (e) => {
-        // Map display coords → logical coords
-        const sx = dispScaleXRef.current || 1;
-        const sy = dispScaleYRef.current || 1;
-        const lx = (e.nativeEvent.locationX / sx).toFixed(2);
-        const ly = (e.nativeEvent.locationY / sy).toFixed(2);
-        const isErase = activeTopToolRef.current === 'eraser';
-        // Read native force for pressure-sensitive stroke width
-        const force = (e.nativeEvent as any).force as number | undefined;
-        lastStrokeForceRef.current = force;
-        drawPointsRef.current = [`M${lx},${ly}`];
-        setCurrentPath(drawPointsRef.current.join(' '));
-        setCurrentIsErase(isErase);
-        setCurrentEraseWidth(eraserSizeRef.current * ERASER_BRUSH.widthMult);
-        // Update brush cursor position
-        setBrushCursorPos({ x: e.nativeEvent.locationX, y: e.nativeEvent.locationY });
-      },
+  /** Maps the Procreate-style BRUSH_LIBRARY category to a brushEngine.BrushKind. */
+  function engineBrushKindFor(def: BrushDef): EngineBrushKind {
+    switch (def.category) {
+      case 'Sketching':   return 'pencil';
+      case 'Inking':       return def.name === 'Syrup' ? 'paint' : 'ink';
+      case 'Painting':     return 'paint';
+      case 'Airbrushing':  return 'airbrush';
+      case 'Marker':        return 'marker';
+      default:              return 'ink';
+    }
+  }
 
-      onPanResponderMove: (e) => {
-        const sx = dispScaleXRef.current || 1;
-        const sy = dispScaleYRef.current || 1;
-        const lx = (e.nativeEvent.locationX / sx).toFixed(2);
-        const ly = (e.nativeEvent.locationY / sy).toFixed(2);
-        const force = (e.nativeEvent as any).force as number | undefined;
-        if (force !== undefined) lastStrokeForceRef.current = force;
-        drawPointsRef.current.push(`L${lx},${ly}`);
-        setCurrentPath(drawPointsRef.current.join(' '));
-        // Update brush cursor position
-        setBrushCursorPos({ x: e.nativeEvent.locationX, y: e.nativeEvent.locationY });
-      },
+  /** Rescales every M/L coordinate pair in an SVG path `d` string by dividing x by sx and y by sy. */
+  function rescalePathXY(d: string, sx: number, sy: number): string {
+    if (sx === 1 && sy === 1) return d;
+    return d.replace(/([ML])(-?[\d.]+),(-?[\d.]+)/g, (_m, cmd: string, xs: string, ys: string) => {
+      const x = parseFloat(xs) / (sx || 1);
+      const y = parseFloat(ys) / (sy || 1);
+      return `${cmd}${x.toFixed(2)},${y.toFixed(2)}`;
+    });
+  }
 
-      onPanResponderRelease: () => {
-        setBrushCursorPos(null);
-        if (drawPointsRef.current.length < 2) {
-          drawPointsRef.current = []; setCurrentPath(''); return;
-        }
-        const brush  = resolveActiveBrush();
-        const baseSize = resolveActiveSize();     // logical stroke width
-        // Apply pressure curve to get pressure-adjusted size
-        const pressureMultiplier = samplePressureCurve(
-          prefsRef.current.pressureCurve,
-          lastStrokeForceRef.current,
-        );
-        const size = baseSize * pressureMultiplier;
-        const isErase  = brush.name === 'Eraser';
-        const isSmudge = brush.name === 'Smudge';
+  function handleEngineLivePoint(pt: { x: number; y: number } | null) {
+    setBrushCursorPos(pt);
+  }
 
-        const newPath: DrawPath = {
-          d:       drawPointsRef.current.join(' '),   // logical coords
-          color:   isErase ? 'erase' : isSmudge ? 'smudge' : drawColorRef.current,
-          width:   size * brush.widthMult,             // logical width, pressure-adjusted
-          opacity: brushOpacityRef.current * brush.opacityMult,
-          tool:    brush.name,
-        };
+  /** Commits a stroke produced by CanvasHost (display-space) into the active drawing layer (logical space). */
+  function handleEngineStrokeEnd(displayPath: DrawPath) {
+    setBrushCursorPos(null);
+    const sx = dispScaleXRef.current || 1;
+    const sy = dispScaleYRef.current || 1;
+    const brush = resolveActiveBrush();
+    const avgScale = (sx + sy) / 2 || 1;
 
-        const current = layersRef.current;
-        pushUndo(current);
+    const newPath: DrawPath = {
+      ...displayPath,
+      d: rescalePathXY(displayPath.d, sx, sy),
+      width: displayPath.width / avgScale,
+      tool: brush.name,
+    };
 
-        const targetId = resolveActiveDrawingLayerId(current);
+    const current = layersRef.current;
+    const targetId = resolveActiveDrawingLayerId(current);
 
-        if (targetId) {
-          const target = current.find(l => l.id === targetId)!;
-          const d = target.data as DesignDrawingLayer;
-          setLayers(current.map(l =>
-            l.id === targetId
-              ? { ...l, data: { ...d, paths: [...d.paths, newPath] } }
-              : l,
-          ));
-          selectedLayerIdRef.current = targetId;
-          setSelectedLayerId(targetId);
-        } else {
-          // No writable drawing layer — create one sized to logical canvas
-          const lw = projectRef.current?.canvas.width  || canvasSizeRef.current.w || 1080;
-          const lh = projectRef.current?.canvas.height || canvasSizeRef.current.h || 1080;
-          const maxOrder = current.reduce((m, l) => Math.max(m, l.order), 0);
-          const newLayer: DesignLayer = {
-            id: uid(), name: 'Drawing', type: 'drawing',
-            visible: true, locked: false, order: maxOrder + 1,
-            transform: { x: 0, y: 0, width: lw, height: lh, rotation: 0, scaleX: 1, scaleY: 1 },
-            data: { kind: 'drawing', paths: [newPath], brushType: brush.name } as DesignDrawingLayer,
-            opacity: 1,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          setLayers(prev => [...prev, newLayer]);
-          setSelectedLayerId(newLayer.id);
-        }
+    if (targetId) {
+      const target = current.find(l => l.id === targetId)!;
+      const d = target.data as DesignDrawingLayer;
+      const next = current.map(l =>
+        l.id === targetId
+          ? { ...l, data: { ...d, paths: [...d.paths, newPath] } }
+          : l,
+      );
+      pushUndo(current, next);
+      setLayers(next);
+      selectedLayerIdRef.current = targetId;
+      setSelectedLayerId(targetId);
+    } else {
+      // No writable drawing layer — create one sized to logical canvas
+      const lw = projectRef.current?.canvas.width  || canvasSizeRef.current.w || 1080;
+      const lh = projectRef.current?.canvas.height || canvasSizeRef.current.h || 1080;
+      const maxOrder = current.reduce((m, l) => Math.max(m, l.order), 0);
+      const newLayer: DesignLayer = {
+        id: uid(), name: 'Drawing', type: 'drawing',
+        visible: true, locked: false, order: maxOrder + 1,
+        transform: { x: 0, y: 0, width: lw, height: lh, rotation: 0, scaleX: 1, scaleY: 1 },
+        data: { kind: 'drawing', paths: [newPath], brushType: brush.name } as DesignDrawingLayer,
+        opacity: 1,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      const next = [...current, newLayer];
+      pushUndo(current, next);
+      setLayers(next);
+      setSelectedLayerId(newLayer.id);
+    }
 
-        drawPointsRef.current = [];
-        setCurrentPath('');
-        markDirty();
-      },
-    })
-  ).current;
+    markDirty();
+  }
 
   // ─── startHandle — called by Pressable overlays before pan responder fires ──
   // This sets the kind so transformPanResponder.onPanResponderGrant picks it up.
@@ -1699,7 +1717,7 @@ export default function DesignCanvasScreen() {
     const snap = frames[idx];
     try {
       const parsed: DesignLayer[] = JSON.parse(snap);
-      pushUndo(layersRef.current);
+      pushUndo(layersRef.current, parsed);
       setLayers(parsed);
       setAnimCurrentFrame(idx);
       animCurrentFrameRef.current = idx;
@@ -1857,7 +1875,7 @@ export default function DesignCanvasScreen() {
           order: maxOrder + i + 1,
         }));
 
-        pushUndo(layersRef.current);
+        // mutateLayer records its own before/after undo command.
         mutateLayer(prev => [...prev, ...incoming]);
         markDirty();
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -2718,16 +2736,16 @@ export default function DesignCanvasScreen() {
 
         <View style={styles.topGroup}>
           <TouchableOpacity
-            style={[styles.topBtn, undoStack.current.length === 0 && styles.topBtnDisabled]}
+            style={[styles.topBtn, !undoModelRef.current.canUndo && styles.topBtnDisabled]}
             onPress={handleUndo} testID="btn-undo"
           >
-            <Feather name="corner-up-left" size={ICON.sm} color={undoStack.current.length === 0 ? SUBTLE : FG} />
+            <Feather name="corner-up-left" size={ICON.sm} color={!undoModelRef.current.canUndo ? SUBTLE : FG} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.topBtn, redoStack.current.length === 0 && styles.topBtnDisabled]}
+            style={[styles.topBtn, !undoModelRef.current.canRedo && styles.topBtnDisabled]}
             onPress={handleRedo} testID="btn-redo"
           >
-            <Feather name="corner-up-right" size={ICON.sm} color={redoStack.current.length === 0 ? SUBTLE : FG} />
+            <Feather name="corner-up-right" size={ICON.sm} color={!undoModelRef.current.canRedo ? SUBTLE : FG} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.topBtn} onPress={handleManualSave} testID="btn-save">
             <Feather name="save" size={ICON.sm}
@@ -2879,7 +2897,9 @@ export default function DesignCanvasScreen() {
             activeTopTool === 'select'      ? selectionPanResponder.panHandlers :
             activeTopTool === 'transform'   ? extTransformPanResponder.panHandlers :
             activeTopTool === 'adjustments' ? selectionPanResponder.panHandlers :
-            drawPanResponder.panHandlers
+            // brush/smudge/eraser: gesture ownership belongs to the CanvasHost
+            // overlay mounted below (wrapped in CanvasGestureLayer), not this View.
+            {}
           )}
         >
           {/* Grid — uses guideSettings.gridEnabled; legacy showGrid also supported */}
@@ -2947,30 +2967,12 @@ export default function DesignCanvasScreen() {
                   renderLayerInSvg(layer, 1, 1, bgHex, false)
                 )}
 
-                {currentPath !== '' && (
-                  currentIsErase ? (
-                    <Path
-                      d={currentPath}
-                      stroke={BORDER_ACTIVE}
-                      strokeWidth={currentEraseWidth}
-                      fill="none"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeDasharray="4,4"
-                      opacity={0.6}
-                    />
-                  ) : (
-                    <Path
-                      d={currentPath}
-                      stroke={activeTopTool === 'smudge' ? FG : drawColor}
-                      strokeWidth={activeSize * activeBrush.widthMult}
-                      fill="none"
-                      strokeLinecap={activeBrush.linecap}
-                      strokeLinejoin="round"
-                      opacity={brushOpacity * activeBrush.opacityMult}
-                    />
-                  )
-                )}
+                {/* Live in-progress brush/eraser/smudge stroke is now rendered by
+                    CanvasHost itself (mounted below, display-space overlay) —
+                    it shows through here because the compositor's background
+                    Rect is drawn above but this whole <Svg> has
+                    pointerEvents="none" and CanvasHost mounts as a sibling on
+                    top, not inside this transformed <G>. */}
               </G>
 
               {/* Onion-skin: previous frame at reduced opacity (excluded from export) */}
@@ -3140,6 +3142,37 @@ export default function DesignCanvasScreen() {
                })()}
 
             </Svg>
+          )}
+
+          {/* ── BRUSH/ERASER/SMUDGE DRAWING SURFACE ──
+              CanvasHost owns the gesture (Skia GestureDetector or SVG
+              PanResponder, whichever is available) and renders the live
+              in-progress stroke; committed strokes are still drawn by the
+              unified compositor above via renderLayerInSvg once
+              handleEngineStrokeEnd appends them to the active layer.
+              CanvasGestureLayer wraps it to add two/three-finger tap
+              undo/redo without stealing single-finger draw gestures. */}
+          {canvasSize.w > 0 && ['brush', 'smudge', 'eraser'].includes(activeTopTool) && (
+            <CanvasGestureLayer
+              onUndo={handleUndo}
+              onRedo={handleRedo}
+              enabled
+            >
+              <CanvasHost
+                width={canvasSize.w}
+                height={canvasSize.h}
+                paths={[]}
+                brushKind={engineBrushKindFor(activeBrush)}
+                color={drawColor}
+                size={activeSize * activeBrush.widthMult * (dispScaleX + dispScaleY) / 2}
+                opacity={brushOpacity * activeBrush.opacityMult}
+                pressureCurve={prefs.pressureCurve}
+                streamline={0.3}
+                tool={activeTopTool as 'brush' | 'eraser' | 'smudge'}
+                onStrokeEnd={handleEngineStrokeEnd}
+                onLivePoint={handleEngineLivePoint}
+              />
+            </CanvasGestureLayer>
           )}
 
           {/* ── EXTENDED TRANSFORM HANDLE PRESSABLE OVERLAYS (8 handles) ── */}

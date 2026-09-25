@@ -44,6 +44,8 @@ export interface SkiaDrawingCanvasProps {
   tool: 'brush' | 'eraser' | 'smudge';
   onStrokeEnd: (path: DrawPath) => void;
   disabled?: boolean;
+  /** Live pointer position (canvas-local px), for an external brush-cursor overlay. Null when not touching. */
+  onLivePoint?: (pt: { x: number; y: number } | null) => void;
 }
 
 function pointsToSkiaPath(points: { x: number; y: number }[]) {
@@ -59,7 +61,7 @@ function pointsToSkiaPath(points: { x: number; y: number }[]) {
 
 export default function SkiaDrawingCanvas({
   width, height, paths, brushKind, color, size, opacity,
-  pressureCurve = DEFAULT_PRESSURE_CURVE, streamline = 0.3, tool, onStrokeEnd, disabled,
+  pressureCurve = DEFAULT_PRESSURE_CURVE, streamline = 0.3, tool, onStrokeEnd, disabled, onLivePoint,
 }: SkiaDrawingCanvasProps) {
   const rawPointsRef = useRef<StrokeInputPoint[]>([]);
   const [livePoints, setLivePoints] = useState<{ x: number; y: number }[]>([]);
@@ -84,6 +86,7 @@ export default function SkiaDrawingCanvas({
     });
     rawPointsRef.current = [];
     setLivePoints([]);
+    onLivePoint?.(null);
   }
 
   const pan = useMemo(() => Gesture.Pan()
@@ -95,6 +98,7 @@ export default function SkiaDrawingCanvas({
       runOnJS((p: StrokeInputPoint) => {
         rawPointsRef.current = [p];
         setLivePoints([{ x: p.x, y: p.y }]);
+        onLivePoint?.({ x: p.x, y: p.y });
       })(pt);
     })
     .onUpdate((e) => {
@@ -102,6 +106,7 @@ export default function SkiaDrawingCanvas({
       runOnJS((p: StrokeInputPoint) => {
         rawPointsRef.current = [...rawPointsRef.current, p];
         setLivePoints(prev => [...prev, { x: p.x, y: p.y }]);
+        onLivePoint?.({ x: p.x, y: p.y });
       })(pt);
     })
     .onEnd(() => {
