@@ -40,6 +40,8 @@ export interface ButtonProps {
   fullWidth?: boolean;
   style?: StyleProp<ViewStyle>;
   accessibilityHint?: string;
+  /** Overrides the default (the label) — useful when several buttons on one screen share a label, e.g. per-row "Follow". */
+  accessibilityLabel?: string;
   testID?: string;
 }
 
@@ -54,7 +56,7 @@ function usePressScale() {
 
 export function Button({
   label, onPress, variant = 'primary', size = 'default', icon,
-  loading = false, disabled = false, fullWidth = false, style, accessibilityHint, testID,
+  loading = false, disabled = false, fullWidth = false, style, accessibilityHint, accessibilityLabel, testID,
 }: ButtonProps) {
   const { theme } = useAppTheme();
   const palette = useColors();
@@ -83,7 +85,7 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: isDisabled, busy: loading }}
       disabled={isDisabled}
