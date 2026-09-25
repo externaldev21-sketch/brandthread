@@ -22,7 +22,30 @@ export interface SearchBrand {
   initials: string;
 }
 
-export type SearchResult = SearchProduct | SearchBrand;
+export interface SearchVideo {
+  id: string;
+  kind: 'video';
+  postId: string;
+  caption: string | null;
+  thumbnailUrl: string | null;
+  videoUrl: string;
+  authorId: string;
+  authorName: string;
+  authorHandle: string;
+  authorAvatarUrl: string | null;
+  color: string;
+  initials: string;
+  likesCount: number;
+}
+
+export type SearchResult = SearchProduct | SearchBrand | SearchVideo;
+
+export interface SearchCategory {
+  category: string;
+  productCount: number;
+  imageUri: string | null;
+  color: string;
+}
 
 // ─── Search-empty-state data (from /api/public/search/trending + /suggested) ──
 

@@ -18,3 +18,4 @@ export * from './Skeleton';
 export * from './ErrorState';
 export * from './MotionPrimitives';
 export * from './ThemedRefreshControl';
+export * from './GlassPanel';

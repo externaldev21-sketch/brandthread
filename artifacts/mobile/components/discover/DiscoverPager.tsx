@@ -76,8 +76,15 @@ export interface DiscoverFeedItem {
   priceCents: number;
   compareAtPriceCents: number | null;
   images: string[];
+  /** Background-removed PNG cutout, when the API supplies one. Preferred over `images[0]`. */
+  cutoutUri?: string;
   category: string;
   sellerScore: number;
+}
+
+/** Pick the best available product image: a cutout first, else the framed photo. */
+function pickImage(item: Pick<DiscoverFeedItem, 'cutoutUri' | 'images'>): string | undefined {
+  return item.cutoutUri ?? item.images?.[0];
 }
 
 export const DISCOVER_PAGE_LIMIT = 20;
@@ -158,7 +165,8 @@ export function DiscoverPager() {
     const lo = Math.max(0, activeIndex - PRELOAD_RADIUS);
     const hi = Math.min(items.length - 1, activeIndex + PRELOAD_RADIUS);
     for (let i = lo; i <= hi; i++) {
-      const uri = items[i]?.images?.[0];
+      const item = items[i];
+      const uri = item ? pickImage(item) : undefined;
       if (uri) ExpoImage.prefetch(uri).catch(() => {});
     }
   }, [activeIndex, items]);
@@ -372,7 +380,7 @@ function DiscoverBackground({
       {windowed.map(index => (
         <BackgroundLayer
           key={items[index].productId}
-          uri={items[index].images?.[0]}
+          uri={pickImage(items[index])}
           index={index}
           scrollX={scrollX}
           snapInterval={snapInterval}
@@ -474,9 +482,17 @@ function DiscoverCard({
   const priceRef = useRef<View>(null);
   const hasDiscount = item.compareAtPriceCents != null && item.compareAtPriceCents > item.priceCents;
 
+  const heroUri = pickImage(item);
+
   return (
     <View style={{ width: cardWidth }}>
       <View style={styles.brandRow}>
+        {item.rank <= 3 && (
+          <View style={styles.rankBadge}>
+            <Feather name="trending-up" size={11} color="#FFFFFF" />
+            <Text style={styles.rankBadgeText}>#{item.rank} TRENDING</Text>
+          </View>
+        )}
         <PressableScale
           onPress={() => { hapticPrimaryAction(); onBrandPress(); }}
           accessibilityLabel={`View ${item.brandName}'s shop`}
@@ -493,16 +509,14 @@ function DiscoverCard({
       <View style={styles.heroWrap}>
         <Animated.View style={[styles.heroFloat, floatStyle]}>
           <Animated.View style={imageStyle}>
-            {item.images?.[0] ? (
+            {heroUri ? (
               // Foreground is always pin-sharp — no blur ever applied here.
-              // NOTE (upgrade path): real product photos usually still carry a
-              // background since server-side cutout/bg-removal is a stretch
-              // goal. Until that lands (server-side at upload time, or an
-              // on-device segmentation pass here), we fall back to a large
-              // corner radius + soft shadow so the edges read as a floating
-              // card rather than a hard rectangle, instead of a true cutout.
+              // Prefers item.cutoutUri (background-removed PNG) when the API
+              // supplies one; falls back to the large corner radius + soft
+              // shadow treatment below so a still-framed photo reads as a
+              // floating card rather than a hard rectangle.
               <CachedImage
-                source={{ uri: item.images[0] }}
+                source={{ uri: heroUri }}
                 style={[styles.heroImage, { width: cardWidth * 0.72, height: cardWidth * 0.72 }]}
                 contentFit="contain"
               />
@@ -571,9 +585,15 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
   },
-  brandRow: { alignItems: 'center', marginBottom: SP.md },
+  brandRow: { alignItems: 'center', marginBottom: SP.md, gap: 8 },
   brandInner: { flexDirection: 'row', alignItems: 'center' },
   brandName: { ...TYPE_SCALE.body, fontFamily: FONT.semibold },
+  rankBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADII.pill,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
+  rankBadgeText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 10, letterSpacing: 0.6 },
   heroWrap: { alignItems: 'center', justifyContent: 'center', marginBottom: SP.lg },
   heroFloat: { alignItems: 'center', justifyContent: 'center' },
   heroImage: {
