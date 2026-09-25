@@ -997,6 +997,24 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       klaviyoSync:        () => post<any>('/api/integrations/klaviyo/sync', {}),
       klaviyoDisconnect:  () => del<any>('/api/integrations/klaviyo'),
     },
+    shopify: {
+      status:        () => get<any>('/api/shopify/status'),
+      connectStart:  (shopDomain: string, purpose: 'import' | 'fulfillment') =>
+        post<{ authorizeUrl: string }>('/api/shopify/connect/start', { shopDomain, purpose }),
+      connectCustomApp: (shopDomain: string, accessToken: string, purpose: 'import' | 'fulfillment') =>
+        post<any>('/api/shopify/connect/custom-app', { shopDomain, accessToken, purpose }),
+      disconnect:    () => post<any>('/api/shopify/disconnect', {}),
+      fulfillmentEnable:  () => post<any>('/api/shopify/fulfillment/enable', {}),
+      fulfillmentDisable: () => post<any>('/api/shopify/fulfillment/disable', {}),
+      products:      (pageInfo?: string) =>
+        get<{ products: Array<{ shopifyProductId: string; title: string; image: string | null; variantCount: number; alreadyImported: boolean }>; nextPageInfo: string | null }>(
+          `/api/shopify/products${pageInfo ? `?pageInfo=${encodeURIComponent(pageInfo)}` : ''}`,
+        ),
+      importProducts: (shopifyProductIds: string[], publishStatus: 'draft' | 'active') =>
+        post<{ imported: number; updated: number; skipped: Array<{ shopifyProductId: string; reason: string }> }>(
+          '/api/shopify/products/import', { shopifyProductIds, publishStatus },
+        ),
+    },
     buyer: {
       addresses: {
         list:   () => get<any[]>('/api/buyer/addresses'),

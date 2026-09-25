@@ -1,6 +1,6 @@
 import { Router } from "express";
 import crypto from "node:crypto";
-import { db, orders, orderItems, customers, drops, productVariants, products, notificationsFeed, users, dropWallets, dropWalletTransactions } from "@workspace/db";
+import { db, orders, orderItems, customers, drops, productVariants, products, notificationsFeed, users, dropWallets, dropWalletTransactions, shopifyOrderLinks } from "@workspace/db";
 import { eq, desc, sql, and, inArray } from "drizzle-orm";
 import { executeOrderRelease, requestOrderRelease } from "../lib/money/escrow";
 import { refundOrder, RefundError } from "../lib/money/refunds";
@@ -312,7 +312,20 @@ router.get("/:id", async (req, res) => {
     };
   }
 
-  res.json({ ...order, items, customer });
+  const [shopifyLink] = await db.select({
+    status: shopifyOrderLinks.status,
+    shopifyOrderName: shopifyOrderLinks.shopifyOrderName,
+  }).from(shopifyOrderLinks).where(eq(shopifyOrderLinks.brandthreadOrderId, order.id)).limit(1);
+  const shopifyFulfillment = shopifyLink ? {
+    sentToShopify: shopifyLink.status === "sent",
+    shopifyOrderName: shopifyLink.shopifyOrderName,
+    // Once tracking lands (via the Shopify fulfillment webhook), the order's
+    // own trackingNumber/carrier fields already reflect it — same fields the
+    // buyer/seller timeline reads for a manually-entered tracking number.
+    fulfilledByPartner: shopifyLink.status === "sent" && Boolean(order.trackingNumber),
+  } : null;
+
+  res.json({ ...order, items, customer, shopifyFulfillment });
 });
 
 // Recognized cancellation reasons — kept in sync with mobile orderTypes.ts

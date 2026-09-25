@@ -205,6 +205,7 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
     items: [
       { label: 'Integrations', description: 'Connect Shopify, email marketing, and other tools', aliases: ['shopify', 'import', 'connect', 'apps'], icon: 'link', route: '/integrations', audience: 'seller' },
       { label: 'Email marketing', description: 'Klaviyo and other marketing connections', aliases: ['klaviyo', 'email', 'marketing'], icon: 'mail', route: '/integrations/klaviyo', audience: 'seller' },
+      { label: 'Fulfillment connections', description: 'Fulfill orders through Shopify — Tapstitch, Printful, Printify', aliases: ['shopify', 'tapstitch', 'printful', 'printify', 'fulfillment', 'dropship'], icon: 'truck', route: '/integrations/shopify-fulfillment', audience: 'seller' },
     ],
   },
   {

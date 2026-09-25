@@ -436,6 +436,12 @@ export interface Order {
   tags: string[];
   createdAt: string;
   updatedAt: string;
+  /** Present only when this order contains a product linked to the seller's Shopify store (fulfillment via Shopify). */
+  shopifyFulfillment?: {
+    sentToShopify: boolean;
+    shopifyOrderName: string | null;
+    fulfilledByPartner: boolean;
+  } | null;
 }
 
 // ─── Buyer view ───────────────────────────────────────────────────────────────
