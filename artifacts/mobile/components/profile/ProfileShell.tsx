@@ -93,7 +93,7 @@ export interface ProfileShellProps<T> {
   onRefresh?: () => void;
   /** Floating call to action pinned above the bottom (e.g. the Shop pill); receives its bottom offset. */
   renderFloating?: (bottom: number) => React.ReactNode;
-  /** Extra bottom padding for a floating tab bar. */
+  /** Height a floating tab bar occupies at the bottom (including the home indicator). */
   bottomInset?: number;
 }
 
@@ -115,6 +115,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const [focused, setFocused] = useState(true);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [rightWidth, setRightWidth] = useState(0);
+  const [leftWidth, setLeftWidth] = useState(0);
 
   useFocusEffect(useCallback(() => {
     setFocused(true);
@@ -160,8 +161,16 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
   );
 
   const heroActive = focused && heroOnScreen && !reduceMotion;
+  // The compact identity sits between the floating controls; when a wide
+  // control (e.g. the account switcher) leaves no room, only the bar shows.
+  const compactLeft = SP.md + (leftWidth ? leftWidth + SP.sm : 0);
+  const compactRight = Math.max(SP.md, rightWidth + SP.md + SP.sm);
+  const compactRoom = columnWidth - compactLeft - compactRight;
   const floatingReserve = renderFloating ? SHOP_PILL_HEIGHT + SP.lg : 0;
-  const floatingBottom = bottomInset + Math.max(insets.bottom, SP.sm) + SP.sm;
+  // `bottomInset` is everything a floating tab bar occupies (it already
+  // includes the home indicator); without one, the safe area is the floor.
+  const bottomFloor = bottomInset > 0 ? bottomInset : Math.max(insets.bottom, SP.sm);
+  const floatingBottom = bottomFloor + SP.sm;
 
   const avatarNode = (
     <View style={[styles.avatarRing, avatar?.ring && { borderColor: theme.accent }]}>
@@ -258,7 +267,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
           onScroll={onScroll}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: bottomInset + insets.bottom + floatingReserve + SP.lg }}
+          contentContainerStyle={{ paddingBottom: bottomFloor + floatingReserve + SP.lg }}
           refreshControl={onRefresh ? (
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.muted} progressViewOffset={insets.top} />
           ) : undefined}
@@ -269,22 +278,31 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
           pointerEvents="none"
           style={[styles.compact, { height: insets.top + 60, paddingTop: insets.top, opacity: compactOpacity }]}
         >
-          <View style={[styles.compactInner, { paddingLeft: topLeft ? 68 : SP.md, paddingRight: Math.max(SP.md, rightWidth + SP.md + SP.sm) }]}>
-            <View style={styles.compactAvatar}>
-              {identity.avatarUrl ? (
-                <CachedImage source={{ uri: identity.avatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
-              ) : (
-                <Text style={styles.compactInitials}>{identity.initials}</Text>
-              )}
-            </View>
-            <Text style={styles.compactName} numberOfLines={1}>{identity.name}</Text>
-            {identity.verified ? <Feather name="check-circle" size={13} color={theme.accent} /> : null}
+          <View style={[styles.compactInner, { paddingLeft: compactLeft, paddingRight: compactRight }]}>
+            {compactRoom >= 96 ? (
+              <>
+                <View style={styles.compactAvatar}>
+                  {identity.avatarUrl ? (
+                    <CachedImage source={{ uri: identity.avatarUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                  ) : (
+                    <Text style={styles.compactInitials}>{identity.initials}</Text>
+                  )}
+                </View>
+                <Text style={styles.compactName} numberOfLines={1}>{identity.name}</Text>
+                {identity.verified ? <Feather name="check-circle" size={13} color={theme.accent} /> : null}
+              </>
+            ) : null}
           </View>
         </Animated.View>
 
         {/* Floating controls — always reachable, above the compact header */}
         <View pointerEvents="box-none" style={[styles.controls, { top: insets.top + SP.sm }]}>
-          <View style={styles.controlGroup}>{topLeft}</View>
+          <View
+            style={styles.controlGroup}
+            onLayout={(event) => setLeftWidth(Math.round(event.nativeEvent.layout.width))}
+          >
+            {topLeft}
+          </View>
           <View
             style={styles.controlGroup}
             onLayout={(event) => setRightWidth(Math.round(event.nativeEvent.layout.width))}

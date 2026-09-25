@@ -229,7 +229,7 @@ export function ProfileTabs({
               accessibilityRole="tab"
               accessibilityState={{ selected }}
               accessibilityLabel={`${tab.label} tab`}
-              testID={`profile-tab-${tab.key}`}
+              testID={`profile-tab-${tab.key.toLowerCase()}`}
             >
               {(state) => (
                 <>

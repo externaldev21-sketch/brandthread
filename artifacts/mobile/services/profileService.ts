@@ -180,6 +180,6 @@ export function formatProfileCount(value: number | null | undefined): string {
 /** The poster a grid tile shows: a video's thumbnail, or a photo post's first image. */
 export function posterForPost(post: Pick<SellerThreadPost, 'contentType' | 'thumbnailUri' | 'mediaUris'>): string | null {
   if (post.thumbnailUri) return post.thumbnailUri;
-  if (post.contentType !== 'video') return post.mediaUris[0] ?? null;
+  if (post.contentType !== 'video') return post.mediaUris?.[0] ?? null;
   return null;
 }

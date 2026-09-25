@@ -1093,7 +1093,7 @@ function ShopPill({
 }
 
 function SpotlightPage({
-  item, isActive, pageWidth, pageHeight, bottomClearance, immersive = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator,
+  item, isActive, pageWidth, pageHeight, bottomClearance, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator,
 }: {
   item: SpotlightItem;
   isActive: boolean;
@@ -1119,6 +1119,8 @@ function SpotlightPage({
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { push } = useThreadPull();
+  // The creator player (no tab bar) always plays edge to edge like Buyer Home.
+  const immersive = immersiveProp || !hasTabBar;
   const [paused, setPaused] = useState(false);
   /** Which page of a multi-photo post is currently visible, for the pager dots. */
   const [photoPageIndex, setPhotoPageIndex] = useState(0);
@@ -2214,8 +2216,9 @@ export default function FeedScreen({
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 5 }}
         />
       )}
-      {viewportReady && !(isCreatorFeed && feedLoading) && <FlatList
-        key={`thread-${pageWidth}x${pageHeight}`}
+      {viewportReady && <FlatList
+        // The creator player remounts once its videos load so it opens at the tapped one.
+        key={`thread-${pageWidth}x${pageHeight}${isCreatorFeed && feedLoading ? '-loading' : ''}`}
         data={displayItems}
         // Creator player opens at the tapped video (uniform page height via getItemLayout).
         initialScrollIndex={isCreatorFeed && creatorStartIndex > 0 && creatorStartIndex < displayItems.length ? creatorStartIndex : undefined}
@@ -2325,7 +2328,7 @@ export default function FeedScreen({
                 pageWidth={pageWidth}
               pageHeight={pageHeight}
               bottomClearance={bottomClearance}
-              immersive={isBuyerSurface || isCreatorFeed}
+              immersive={isBuyerSurface}
               hasTabBar={!isCreatorFeed}
               onOpenCreator={handleOpenCreator}
               engagement={engagements[spotlight.id] ?? initialEngagement(spotlight)}

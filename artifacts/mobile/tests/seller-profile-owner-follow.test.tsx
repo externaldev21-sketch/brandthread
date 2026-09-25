@@ -4,9 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
-// Covers the seller-profile.tsx redesign: the Follow (non-owner) vs Edit
-// Profile (owner) action branch, and Posts/Products tab switching, keep
-// working after moving the hero into the shared BrandHero component.
+// Covers the seller-profile.tsx redesign onto the shared ProfileShell:
+//  - Follow (non-owner) vs Edit profile (owner) action branch,
+//  - the videos grid is the main content: a tile opens the feed player for
+//    this creator, starting at the tapped video,
+//  - the floating "Shop N products" pill opens the seller's product list,
+//  - follow/unfollow updates the follower count immediately.
 
 const {
   routerMock,
@@ -14,18 +17,21 @@ const {
   followStateMock,
   setFollowingMock,
   searchParamsMock,
+  creatorVideosMock,
+  authMock,
 } = vi.hoisted(() => ({
   routerMock: { push: vi.fn(), back: vi.fn(), canGoBack: vi.fn(() => true), replace: vi.fn() },
   apiMock: {
     seller: { getProfile: vi.fn() },
-    posts: { publicList: vi.fn() },
     publicSellers: { get: vi.fn(), recordVisit: vi.fn() },
     reviews: { forSeller: vi.fn() },
-    social: { block: vi.fn() },
+    social: { block: vi.fn(), profile: vi.fn() },
   },
   followStateMock: vi.fn(),
   setFollowingMock: vi.fn(),
   searchParamsMock: vi.fn(() => ({ id: "seller-9" })),
+  creatorVideosMock: vi.fn(),
+  authMock: vi.fn(() => ({ isLoaded: true, userId: "buyer-1" })),
 }));
 
 vi.mock("react-native", () => {
@@ -42,10 +48,6 @@ vi.mock("react-native", () => {
     constructor(value: number) { this._value = value; }
     interpolate() { return this._value; }
   }
-  // Real RN Pressable supports a function-as-children render prop (used by the
-  // shared PressableScale/IconButton primitives to read the current press
-  // state). The generic `nativeComponent` helper just forwards `children`
-  // verbatim, which would leave that function unrendered — invoke it here.
   function MockPressable(props: Record<string, unknown>) {
     const { children, ...rest } = props;
     const content = typeof children === "function"
@@ -68,8 +70,6 @@ vi.mock("react-native", () => {
     Linking: { openURL: vi.fn() },
     Modal: nativeComponent("Modal"),
     Platform: { OS: "ios", select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
-    // Render-prop-aware mock — plain nativeComponent() would leave
-    // PressableScale's function child unrendered (see comment above).
     Pressable: MockPressable,
     RefreshControl: nativeComponent("RefreshControl"),
     ScrollView: nativeComponent("ScrollView"),
@@ -78,33 +78,27 @@ vi.mock("react-native", () => {
     Text: nativeComponent("Text"),
     TouchableOpacity: nativeComponent("TouchableOpacity"),
     View: nativeComponent("View"),
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
   };
 });
 
-vi.mock("@/components/profile/BrandHero", () => ({
-  BrandHero: ({ brandName, topBarLeft, topBarRight, actions, children }: any) =>
-    React.createElement(
-      "View",
-      null,
-      React.createElement("Text", { testID: "hero-brand-name" }, brandName),
-      topBarLeft,
-      topBarRight,
-      actions,
-      children,
-    ),
-  useBrandHeroScrollY: () => ({ interpolate: () => 0 }),
-  HERO_COMPACT_THRESHOLD: 150,
-}));
+vi.mock("@/components/profile/ProfileShell", async () =>
+  (await import("./helpers/profileShellMock")).profileShellMockModule);
 
+vi.mock("@/components/BrandDropsCard", () => ({ BrandDropsCard: () => null }));
+vi.mock("@/components/ShareProfileSheet", () => ({ ShareProfileSheet: () => null }));
+vi.mock("@/components/CachedImage", () => ({
+  CachedImage: (props: Record<string, unknown>) => React.createElement("CachedImage", props),
+}));
 vi.mock("@/components/layout", () => ({
-  GridSkeleton: () => React.createElement("View", { testID: "grid-skeleton" }),
-  ResponsiveContainer: ({ children }: any) => React.createElement("View", null, children),
-  useGridColumns: () => 2,
-  useBreakpoint: () => ({ width: 375, height: 800, isTablet: false, isLandscape: false }),
+  SkeletonBlock: () => React.createElement("View", { testID: "skeleton-block" }),
+}));
+vi.mock("@/components/ui/ErrorState", () => ({
+  ErrorState: ({ message }: { message: string }) => React.createElement("Text", null, message),
 }));
 
 vi.mock("@clerk/expo", () => ({
-  useAuth: () => ({ isLoaded: true, userId: "seller-1" }),
+  useAuth: () => authMock(),
 }));
 
 vi.mock("@expo/vector-icons", () => ({
@@ -112,8 +106,6 @@ vi.mock("@expo/vector-icons", () => ({
 }));
 
 vi.mock("expo-haptics", () => ({
-  // lib/haptics.ts calls `.catch()` on every one of these — plain vi.fn()
-  // returns undefined, which crashes there, so resolve like the real API.
   impactAsync: vi.fn().mockResolvedValue(undefined),
   notificationAsync: vi.fn().mockResolvedValue(undefined),
   selectionAsync: vi.fn().mockResolvedValue(undefined),
@@ -121,14 +113,8 @@ vi.mock("expo-haptics", () => ({
   NotificationFeedbackType: { Success: "success" },
 }));
 
-vi.mock("expo-clipboard", () => ({
-  setStringAsync: vi.fn(),
-}));
+vi.mock("expo-clipboard", () => ({ setStringAsync: vi.fn() }));
 
-// seller-profile.tsx now pulls in the shared PressableScale (components/BrandthreadUI.tsx)
-// and FollowMorphButton/Snackbar (components/ui/*), which in turn import these
-// native packages at module scope. Their real builds aren't parseable under
-// Vitest's SSR transform outside a Metro/RN runtime.
 vi.mock("expo-linear-gradient", () => ({
   LinearGradient: ({ children }: { children?: React.ReactNode }) =>
     React.createElement("LinearGradient", {}, children),
@@ -139,9 +125,6 @@ vi.mock("react-native-svg", () => ({
   Line: (props: Record<string, unknown>) => React.createElement("SvgLine", props),
 }));
 
-// FollowMorphButton (components/ui/MotionPrimitives.tsx) and Snackbar
-// (components/ui/Snackbar.tsx) animate with react-native-reanimated. This
-// mock resolves every worklet synchronously so tests read the final value.
 vi.mock("react-native-reanimated", () => {
   const makeAnimatedComponent = (name: string) =>
     (props: Record<string, unknown>) => React.createElement(name, props, props.children as React.ReactNode);
@@ -175,20 +158,19 @@ vi.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-vi.mock("@/hooks/useApi", () => ({
-  useApi: () => apiMock,
-}));
+vi.mock("@/hooks/useApi", () => ({ useApi: () => apiMock }));
 
 vi.mock("@/hooks/useColors", () => ({
-  useColors: () => ({ primary: "#C7CDD5" }),
+  useColors: () => ({ primary: "#C7CDD5", foreground: "#FAFAFA", mutedForeground: "#D7D7DB" }),
 }));
 
 vi.mock("@/contexts/AppThemeContext", () => ({
   useAppTheme: () => ({
     theme: {
-      background: "#09090B", text: "#FAFAFA", muted: "#D7D7DB", border: "#FFFFFF22",
-      card: "#18181B", surface: "#111113", cardGlass: "#18181BE8",
-      accent: "#C7CDD5", warning: "#FFD580", error: "#FFB4B4", secondary: "#172554",
+      background: "#09090B", text: "#FAFAFA", muted: "#D7D7DB", subtle: "#A8A8B1", border: "#FFFFFF22",
+      card: "#18181B", cardElevated: "#18181B", surface: "#111113", cardGlass: "#18181BE8",
+      accent: "#C7CDD5", onAccent: "#0A0A0B", accentDim: "#C7CDD52E", warning: "#FFD580",
+      error: "#FFB4B4", secondary: "#172554", shadowColor: "#000000",
     },
   }),
 }));
@@ -202,6 +184,11 @@ vi.mock("@/services/socialService", () => ({
   setSellerFollowing: setFollowingMock,
 }));
 
+vi.mock("@/services/profileService", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/profileService")>()),
+  getCreatorVideosPage: creatorVideosMock,
+}));
+
 vi.mock("@/lib/shareProfile", () => ({
   buildCanonicalProfileUrl: (username: string) => `https://brandthread.app/u/${username}`,
 }));
@@ -213,13 +200,15 @@ vi.mock("@/lib/safety", () => ({
 
 import SellerProfileScreen from "@/app/seller-profile";
 
+async function flush() {
+  for (let i = 0; i < 8; i += 1) await Promise.resolve();
+}
+
 async function renderScreen(): Promise<ReactTestRenderer> {
   let renderer!: ReactTestRenderer;
   await act(async () => {
     renderer = create(<SellerProfileScreen />);
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
+    await flush();
   });
   return renderer;
 }
@@ -232,73 +221,119 @@ function textContent(value: unknown): string {
   return textContent(node.children ?? node.props?.children);
 }
 
-describe("seller-profile.tsx owner vs. non-owner action branch", () => {
-  let renderer!: ReactTestRenderer;
+const sellerProfile = {
+  clerkId: "seller-9", brandName: "Acme Co", username: "acme", bio: "We make things.",
+  productsCount: 12, videosCount: 2,
+};
 
-  beforeEach(() => {
-    routerMock.push.mockReset();
-    searchParamsMock.mockReset().mockReturnValue({ id: "seller-9" });
-    apiMock.seller.getProfile.mockReset();
-    apiMock.posts.publicList.mockReset().mockResolvedValue([]);
-    apiMock.publicSellers.get.mockReset();
-    apiMock.publicSellers.recordVisit.mockReset().mockResolvedValue(undefined);
-    apiMock.reviews.forSeller.mockReset().mockResolvedValue({ avgRating: 0, totalCount: 0 });
-    followStateMock.mockReset().mockResolvedValue({ isFollowing: false, followersCount: 12 });
-    setFollowingMock.mockReset().mockResolvedValue({ isFollowing: true, followersCount: 13 });
-  });
+const videoRow = (id: string) => ({
+  id,
+  authorId: "seller-9",
+  authorAccountType: "seller",
+  authorName: "Acme Co",
+  contentType: "video",
+  caption: `Clip ${id}`,
+  mediaUris: [`https://cdn.example.com/${id}.mp4`],
+  thumbnailUri: `https://cdn.example.com/${id}.jpg`,
+  productTags: [],
+  likesCount: 3,
+  viewsCount: 1200,
+  isDraft: false,
+  scheduledAt: null,
+});
 
-  afterEach(async () => {
-    await act(async () => { renderer?.unmount(); });
-  });
-
-  it("shows Follow (not Edit Profile) for a non-owner viewing a seller", async () => {
-    apiMock.publicSellers.get.mockResolvedValue({
-      profile: { clerkId: "seller-9", brandName: "Acme Co", username: "acme", bio: "We make things." },
-      products: [],
-    });
-
-    // isOwner param unset => false, but a route id is present so the load path resolves.
-    renderer = await renderScreen();
-
-    const allText = textContent(renderer.toJSON());
-    expect(allText).toContain("Follow");
-    expect(allText).not.toContain("Edit Profile");
+beforeEach(() => {
+  routerMock.push.mockReset();
+  searchParamsMock.mockReset().mockReturnValue({ id: "seller-9" });
+  authMock.mockReset().mockReturnValue({ isLoaded: true, userId: "buyer-1" });
+  apiMock.seller.getProfile.mockReset();
+  apiMock.publicSellers.get.mockReset().mockResolvedValue({ profile: sellerProfile, products: [] });
+  apiMock.publicSellers.recordVisit.mockReset().mockResolvedValue(undefined);
+  apiMock.reviews.forSeller.mockReset().mockResolvedValue({ avgRating: 4.8, totalCount: 10 });
+  apiMock.social.profile.mockReset().mockResolvedValue({ followersCount: 12, followingCount: 3 });
+  followStateMock.mockReset().mockResolvedValue({ isFollowing: false, followersCount: 12 });
+  setFollowingMock.mockReset().mockResolvedValue({ isFollowing: true, followersCount: 13 });
+  creatorVideosMock.mockReset().mockResolvedValue({
+    posts: [videoRow("post-a"), videoRow("post-b")],
+    total: 2, hasMore: false, nextOffset: 2, restricted: null, user: null,
   });
 });
 
-describe("seller-profile.tsx Posts/Products tab switching", () => {
+describe("seller-profile.tsx owner vs. non-owner action branch", () => {
   let renderer!: ReactTestRenderer;
+  afterEach(async () => { await act(async () => { renderer?.unmount(); }); });
 
-  beforeEach(() => {
-    routerMock.push.mockReset();
-    searchParamsMock.mockReset().mockReturnValue({ id: "seller-9" });
-    apiMock.publicSellers.get.mockReset().mockResolvedValue({
-      profile: { clerkId: "seller-9", brandName: "Acme Co", username: "acme", bio: "We make things." },
-      products: [{
-        id: "p1", name: "Tee", status: "active", salesModel: "pre-made",
-        pricing: { priceCents: 2500 }, inventory: { totalStock: 10, lowStockThreshold: 2 }, media: [],
-      }],
-    });
-    apiMock.publicSellers.recordVisit.mockReset().mockResolvedValue(undefined);
-    apiMock.posts.publicList.mockReset().mockResolvedValue([]);
-    apiMock.reviews.forSeller.mockReset().mockResolvedValue({ avgRating: 0, totalCount: 0 });
-    followStateMock.mockReset().mockResolvedValue({ isFollowing: false, followersCount: 0 });
-  });
-
-  afterEach(async () => {
-    await act(async () => { renderer?.unmount(); });
-  });
-
-  it("switches from Posts to Products when the Products tab is pressed", async () => {
+  it("shows Follow (not Edit profile) for a non-owner viewing a seller", async () => {
     renderer = await renderScreen();
+    const allText = textContent(renderer.toJSON());
+    expect(allText).toContain("Follow");
+    expect(allText).not.toContain("Edit profile");
+    expect(renderer.root.findAllByProps({ testID: "seller-profile-follow-btn" }).length).toBeGreaterThan(0);
+  });
 
-    expect(textContent(renderer.toJSON())).not.toContain("Shop the collection");
+  it("shows Edit profile (not Follow) when the seller opens their own profile", async () => {
+    authMock.mockReturnValue({ isLoaded: true, userId: "seller-9" });
+    renderer = await renderScreen();
+    const allText = textContent(renderer.toJSON());
+    expect(allText).toContain("Edit profile");
+    expect(renderer.root.findAllByProps({ testID: "seller-profile-follow-btn" })).toHaveLength(0);
+  });
+});
 
-    await act(async () => {
-      renderer.root.findByProps({ testID: "seller-profile-tab-products" }).props.onPress();
-      await Promise.resolve();
-    });
+describe("seller-profile.tsx videos grid and shop", () => {
+  let renderer!: ReactTestRenderer;
+  afterEach(async () => { await act(async () => { renderer?.unmount(); }); });
 
-    expect(textContent(renderer.toJSON())).toContain("Shop the collection");
+  it("loads the creator's videos with the canonical seller id and renders a tile per video", async () => {
+    renderer = await renderScreen();
+    expect(creatorVideosMock).toHaveBeenCalled();
+    expect(creatorVideosMock.mock.calls[0][0]).toBe("seller-9");
+    expect(creatorVideosMock.mock.calls[0][1]).toBe(0);
+    expect(renderer.root.findAllByProps({ testID: "profile-video-tile-post-a" }).length).toBeGreaterThan(0);
+    expect(renderer.root.findAllByProps({ testID: "profile-video-tile-post-b" }).length).toBeGreaterThan(0);
+  });
+
+  it("opens the full-screen feed player for this creator at the tapped video", async () => {
+    renderer = await renderScreen();
+    const tile = renderer.root.findAll((node) => node.props.testID === "profile-video-tile-post-b" && typeof node.props.onPress === "function")[0];
+    await act(async () => { tile.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith(
+      "/profile-videos?source=creator&id=seller-9&startPostId=post-b&title=Acme%20Co",
+    );
+  });
+
+  it("opens the seller's product list from the Shop pill", async () => {
+    renderer = await renderScreen();
+    const pill = renderer.root.findAll((node) => node.props.testID === "profile-shop-pill" && typeof node.props.onPress === "function")[0];
+    expect(textContent(renderer.toJSON())).toContain("Shop 12 products");
+    await act(async () => { pill.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith("/profile-products?sellerId=seller-9&sellerName=Acme%20Co");
+  });
+
+  it("hides the Shop pill from visitors when the seller has no live products", async () => {
+    apiMock.publicSellers.get.mockResolvedValue({ profile: { ...sellerProfile, productsCount: 0 }, products: [] });
+    renderer = await renderScreen();
+    expect(renderer.root.findAllByProps({ testID: "profile-shop-pill" })).toHaveLength(0);
+  });
+
+  it("links follower / following counts to this seller's own lists", async () => {
+    renderer = await renderScreen();
+    const followers = renderer.root.findAll((node) => node.props.testID === "profile-stat-followers" && typeof node.props.onPress === "function")[0];
+    await act(async () => { followers.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith("/connections?type=followers&userId=seller-9");
+  });
+});
+
+describe("seller-profile.tsx follow", () => {
+  let renderer!: ReactTestRenderer;
+  afterEach(async () => { await act(async () => { renderer?.unmount(); }); });
+
+  it("updates the follower count from the server-confirmed follow", async () => {
+    renderer = await renderScreen();
+    expect(textContent(renderer.root.findByProps({ testID: "profile-stat-followers" }).props.children)).toContain("12");
+    const follow = renderer.root.findAll((node) => node.props.accessibilityLabel === "Follow" && typeof node.props.onPress === "function")[0];
+    await act(async () => { follow.props.onPress(); await flush(); });
+    expect(setFollowingMock).toHaveBeenCalledWith("seller-9", true);
+    expect(textContent(renderer.root.findByProps({ testID: "profile-stat-followers" }).props.children)).toContain("13");
   });
 });

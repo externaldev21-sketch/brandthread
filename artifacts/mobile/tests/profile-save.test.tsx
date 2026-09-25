@@ -64,7 +64,7 @@ vi.mock("react-native", () => {
     KeyboardAvoidingView: nativeComponent("KeyboardAvoidingView"),
     Modal: nativeComponent("Modal"),
     Pressable: nativeComponent("Pressable"),
-    Platform: { OS: "ios" },
+    Platform: { OS: "ios", select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
     RefreshControl: nativeComponent("RefreshControl"),
     ScrollView: nativeComponent("ScrollView"),
     StyleSheet: {
@@ -77,6 +77,7 @@ vi.mock("react-native", () => {
     TextInput: nativeComponent("TextInput"),
     TouchableOpacity: nativeComponent("TouchableOpacity"),
     View: nativeComponent("View"),
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
   };
 });
 
@@ -86,22 +87,48 @@ vi.mock("@/components/motion/SheetRise", () => ({
     React.createElement("View", props, children),
 }));
 
-// BrandHero's gradient/collapse chrome is visual only; render its slots as
-// plain Views so the account-switcher, edit-details and settings testIDs
-// passed through its slots are still reachable by the test.
-vi.mock("@/components/profile/BrandHero", () => ({
-  BrandHero: ({ brandName, topBarLeft, topBarRight, actions, children }: any) =>
-    React.createElement(
-      "View",
-      null,
-      React.createElement("Text", { testID: "profile-hero-brand-name" }, brandName),
-      topBarLeft,
-      topBarRight,
-      actions,
-      children,
-    ),
-  useBrandHeroScrollY: () => ({ interpolate: () => 0 }),
-  HERO_COMPACT_THRESHOLD: 150,
+// The profile renders into the shared ProfileShell; its hero video / scroll
+// chrome is visual only, so a stand-in renders every slot inline and the
+// account-switcher, edit-details, tab and grid testIDs stay reachable.
+vi.mock("@/components/profile/ProfileShell", async () =>
+  (await import("./helpers/profileShellMock")).profileShellMockModule);
+
+// Shared primitives: a render-prop-aware PressableScale that keeps every prop
+// (testID, onPress…) on a plain host node, and a simple EmptyState.
+vi.mock("@/components/BrandthreadUI", () => {
+  const ReactActual = require("react") as typeof import("react");
+  const PressableScale = ({ children, ...rest }: Record<string, unknown>) => {
+    const content = typeof children === "function"
+      ? (children as (state: { pressed: boolean }) => unknown)({ pressed: false })
+      : children;
+    return ReactActual.createElement("Pressable", rest, content as React.ReactNode);
+  };
+  return {
+    PressableScale,
+    EmptyState: ({ title, action }: { title: string; action?: { label: string; onPress: () => void } }) =>
+      ReactActual.createElement(
+        "View",
+        null,
+        ReactActual.createElement("Text", null, title),
+        action ? ReactActual.createElement("Pressable", { onPress: action.onPress }, action.label) : null,
+      ),
+  };
+});
+
+vi.mock("@/components/CachedImage", () => ({
+  CachedImage: (props: Record<string, unknown>) => React.createElement("CachedImage", props),
+}));
+
+vi.mock("@/components/layout", () => ({
+  SkeletonBlock: () => React.createElement("View", { testID: "skeleton-block" }),
+}));
+
+vi.mock("@/components/ui/ErrorState", () => ({
+  ErrorState: ({ message }: { message: string }) => React.createElement("Text", null, message),
+}));
+
+vi.mock("@/components/buyer-nav/buyerTabBarMetrics", () => ({
+  useTabBarMetrics: () => ({ occupiedHeight: 80 }),
 }));
 
 vi.mock("@clerk/expo", () => ({
@@ -113,8 +140,10 @@ vi.mock("@expo/vector-icons", () => ({
 }));
 
 vi.mock("expo-haptics", () => ({
-  impactAsync: vi.fn(),
-  notificationAsync: vi.fn(),
+  // lib/haptics.ts (used by the shared profile controls) chains `.catch()`.
+  impactAsync: vi.fn().mockResolvedValue(undefined),
+  notificationAsync: vi.fn().mockResolvedValue(undefined),
+  selectionAsync: vi.fn().mockResolvedValue(undefined),
   ImpactFeedbackStyle: { Light: "light", Medium: "medium" },
   NotificationFeedbackType: { Success: "success" },
 }));
@@ -131,6 +160,7 @@ vi.mock("expo-linear-gradient", () => ({
 
 vi.mock("expo-router", () => ({
   useRouter: () => routerMock,
+  useFocusEffect: () => {},
 }));
 
 vi.mock("react-native-safe-area-context", () => ({
@@ -174,7 +204,8 @@ vi.mock("@/contexts/AppThemeContext", () => ({
   }),
 }));
 
-vi.mock("@/lib/theme", () => ({
+vi.mock("@/lib/theme", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/theme")>()),
   BG: "#09090B",
   SCREEN_BG: "transparent",
   CARD: "#18181B",

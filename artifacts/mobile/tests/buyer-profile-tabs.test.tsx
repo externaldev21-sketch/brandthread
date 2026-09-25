@@ -84,8 +84,14 @@ vi.mock('react-native', () => {
       loop: () => ({ start: () => {}, stop: () => {} }),
     },
     Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
   };
 });
+
+// The redesigned profile renders into the shared ProfileShell; its native
+// hero/scroll chrome is replaced by a slot-rendering stand-in.
+vi.mock('@/components/profile/ProfileShell', async () =>
+  (await import('./helpers/profileShellMock')).profileShellMockModule);
 
 vi.mock('@clerk/expo', () => ({
   useAuth: () => ({ userId: 'buyer-1', signOut: vi.fn() }),
@@ -217,6 +223,7 @@ vi.mock('@/components/layout', () => {
   return {
     EmptyState: ({ message }: { message: string }) => ReactActual.createElement('Text', null, message),
     GridSkeleton: () => ReactActual.createElement('View', { testID: 'grid-skeleton' }),
+    SkeletonBlock: () => ReactActual.createElement('View', { testID: 'skeleton-block' }),
     ListSkeleton: () => ReactActual.createElement('View', { testID: 'list-skeleton' }),
     ResponsiveContainer: ({ children }: { children: React.ReactNode }) => ReactActual.createElement('View', null, children),
     useGridColumns: () => 3,
