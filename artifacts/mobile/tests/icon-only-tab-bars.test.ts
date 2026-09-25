@@ -8,10 +8,10 @@ const seller = read('components/SellerGlobalTabBar.tsx');
 
 describe('icon-only bottom navigation', () => {
   it('keeps buyer icons, selected state, accessible names, and glass without visual tab labels', () => {
-    expect(buyer).toContain('accessibilityLabel={accessibilityLabel}');
-    expect(buyer).toContain('accessibilityState={{ selected: focused }}');
+    expect(buyer).toContain('accessibilityLabel={label}');
+    expect(buyer).toContain('focused={focused}');
     expect(buyer).toContain("accessibilityLabel={searchActive ? 'Close search' : 'Profile tab'}");
-    expect(buyer).toContain('<BuyerNavIcon name={item.icon}');
+    expect(buyer).toMatch(/<BuyerNavIcon\s+name=\{item\.icon\}/);
     expect(buyer).toContain('<TabBarGlass theme={theme}');
     expect(buyer).not.toContain('{item.label}\n');
     expect(buyer).not.toContain('{circleLabel}');

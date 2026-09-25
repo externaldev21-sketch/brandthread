@@ -14,3 +14,9 @@ React Native `Alert.alert` is not a visible validation surface in Expo web. Form
 **Why:** A product form could reject an incomplete publish while appearing to do nothing in the browser preview, even though its native alert path worked.
 
 **How to apply:** On any cross-platform form, render publish/save errors in the page near the action. Verify an invalid submission visibly fails in the web preview, not just through a mocked native alert.
+
+The Expo development browser preview uses a different host from the API development proxy. Its exact runtime-provided origin must be accepted by credentialed API CORS in development only; a same-host assumption works for the other web artifacts but not Expo web.
+
+**Why:** Authenticated browser requests were blocked at preflight with a 401 and no CORS headers even though the API itself was running. Native clients do not send browser preflights, so native health checks did not reveal the problem.
+
+**How to apply:** Keep the allowlist exact, include the runtime Expo preview host only outside production, and verify an OPTIONS request with the Expo Origin returns CORS headers. Do not use a wildcard or bypass auth to make preflights pass.

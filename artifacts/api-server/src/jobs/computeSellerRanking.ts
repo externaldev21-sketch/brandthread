@@ -308,7 +308,10 @@ export async function computeSellerRankingForToday(): Promise<void> {
         ownerId:   products.ownerId,
       })
       .from(savedItems)
-      .innerJoin(products, eq(products.id, savedItems.targetId))
+      // saved_items.target_id is text (it also stores non-product IDs), while
+      // products.id is UUID. Cast the UUID side so malformed/non-product
+      // target IDs cannot fail the join before item_type is filtered.
+      .innerJoin(products, eq(sql<string>`${products.id}::text`, savedItems.targetId))
       .where(and(
         eq(savedItems.itemType, "product"),
         gte(savedItems.createdAt, since),

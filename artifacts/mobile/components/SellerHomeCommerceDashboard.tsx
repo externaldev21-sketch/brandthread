@@ -97,12 +97,14 @@ function previewSellerHomeAnalytics(range: TimeRange): SellerHomeAnalyticsSnapsh
     totalCents: totals.reduce((sum, value) => sum + value, 0),
     orderCount: 12,
     visitorCount: 684,
+    previous: { totalCents: 90500, orderCount: 9, visitorCount: 520 },
     toFulfill: 4,
     toCapture: 2,
     buckets: totals.map((totalCents, index) => ({
       bucket: new Date(now - (totals.length - index - 1) * 60 * 60 * 1000).toISOString(),
       totalCents,
       orderCount: index % 3 === 0 ? 2 : 1,
+      visitorCount: 70 + index * 5,
     })),
   };
 }

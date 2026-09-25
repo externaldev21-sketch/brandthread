@@ -11,7 +11,8 @@ describe('broken controls and error-state regressions', () => {
     expect(source).not.toContain('onPress={() => {}}');
     expect(source).toContain("accessibilityLabel={searchActive ? 'Close manufacturer search' : 'Search manufacturers'}");
     expect(source).toContain('accessibilityLabel="Filter manufacturers"');
-    expect(source).toContain('accessibilityLabel="Invite a manufacturer"');
+    expect(source).toContain("onPress: () => router.push('/invite-manufacturer'");
+    expect(source).toContain("accessibilityLabel: 'Invite a manufacturer'");
   });
 
   it('does not render unimplemented create-post tools', () => {

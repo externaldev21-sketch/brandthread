@@ -933,7 +933,6 @@ function RootLayoutNav() {
         <Stack.Screen name="community"        options={{ headerShown: false }} />
         <Stack.Screen name="automation"       options={{ headerShown: false }} />
         <Stack.Screen name="payments"         options={{ headerShown: false }} />
-        <Stack.Screen name="website"          options={{ headerShown: false }} />
         <Stack.Screen name="integrations/klaviyo" options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="edit-profile"     options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         {/* Seller dashboard screens */}
@@ -1088,7 +1087,6 @@ function RootLayoutNav() {
         <Stack.Screen name="push-notifications" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="biometric-unlock"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="app-icon"           options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="plan-details"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="payouts"            options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="subscription"       options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="share-store"        options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
