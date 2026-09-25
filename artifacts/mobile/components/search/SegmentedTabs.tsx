@@ -79,7 +79,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     paddingHorizontal: SCREEN_GUTTER, paddingVertical: SPACING.xxs,
   },
   segment: {
-    height: 38, minWidth: 44, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
+    height: 44, minWidth: 44, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: SPACING.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface,
   },
 });

@@ -907,7 +907,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   },
   filterButton: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.xxs,
-    height: 34, paddingHorizontal: SPACING.sm, borderRadius: RADII.pill, borderWidth: 1,
+    height: 44, paddingHorizontal: SPACING.sm, borderRadius: RADII.pill, borderWidth: 1,
   },
   suggestionRow: { paddingHorizontal: SCREEN_GUTTER },
   suggestionSkeletonRow: {
