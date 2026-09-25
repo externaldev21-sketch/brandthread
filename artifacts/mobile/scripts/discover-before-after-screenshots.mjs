@@ -5,8 +5,14 @@
  * demo-data harness as scripts/store-screenshots.
  *
  * Captures the AFTER build first (the working tree as it stands), then
- * temporarily reverts the three files this redesign touched, rebuilds, and
- * captures BEFORE — restoring the working tree afterward either way.
+ * temporarily checks out the three files this redesign touched back to
+ * BASE_REF (the commit right before this redesign), rebuilds, and captures
+ * BEFORE — restoring the working tree to HEAD afterward either way.
+ *
+ * Uses `git checkout <ref> -- <paths>` + `git checkout HEAD -- <paths>`
+ * rather than `git stash`, so it works whether or not those files currently
+ * differ from HEAD (a plain stash is a no-op — and silently captures two
+ * identical "before"/"after" screenshots — once the redesign is committed).
  *
  *   node scripts/discover-before-after-screenshots.mjs
  */
@@ -34,12 +40,16 @@ const VIEWPORTS = [
   { id: '1440x900', width: 1440, height: 900, isMobile: false },
 ];
 
-// Files this redesign changed in the mobile app — reverted for the BEFORE capture.
+// Files this redesign changed in the mobile app — reverted to BASE_REF for the BEFORE capture.
 const REVERT_PATHS = [
   'artifacts/mobile/app/(buyer)/discover.tsx',
   'artifacts/mobile/components/discover/DiscoverPager.tsx',
   'artifacts/mobile/components/ui/index.ts',
 ];
+
+// The commit immediately before this redesign — i.e. "dev" as it stood when
+// this branch started (many other PRs had just merged into it).
+const BASE_REF = 'a4786e6';
 
 function git(args) {
   return execFileSync('git', args, { cwd: REPO_ROOT, stdio: ['ignore', 'pipe', 'inherit'] }).toString();
@@ -91,13 +101,13 @@ async function main() {
 
   await captureVariant('after');
 
-  console.log('Reverting redesigned files for the BEFORE capture...');
-  git(['stash', 'push', '--', ...REVERT_PATHS]);
+  console.log(`Checking out redesigned files to ${BASE_REF} for the BEFORE capture...`);
+  git(['checkout', BASE_REF, '--', ...REVERT_PATHS]);
   try {
     await captureVariant('before');
   } finally {
-    console.log('Restoring the working tree...');
-    git(['stash', 'pop']);
+    console.log('Restoring the working tree to HEAD...');
+    git(['checkout', 'HEAD', '--', ...REVERT_PATHS]);
   }
 }
 
