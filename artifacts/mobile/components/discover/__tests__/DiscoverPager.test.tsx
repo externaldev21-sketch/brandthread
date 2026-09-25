@@ -31,6 +31,15 @@ vi.mock('react-native', () => {
     return React.forwardRef(C);
   };
 
+  // Real RN Pressable accepts a function-as-children render prop (passed a
+  // press/hover/focus state); PressableScale (components/BrandthreadUI.tsx)
+  // relies on that to animate its wrapper, so the mock must support it too.
+  const Pressable = React.forwardRef((props: any, ref: unknown) => {
+    const { children, ...rest } = props;
+    const content = typeof children === 'function' ? children({ pressed: false }) : children;
+    return React.createElement('Pressable', { ...rest, ref }, content);
+  });
+
   function FlatList(props: any) {
     const { data, renderItem, keyExtractor, ListHeaderComponent, ListFooterComponent, ItemSeparatorComponent, ...rest } = props;
     const items = (data ?? []).map((item: any, index: number) =>
@@ -54,6 +63,7 @@ vi.mock('react-native', () => {
     },
     View: el('View'),
     Text: el('Text'),
+    Pressable,
     TouchableOpacity: el('TouchableOpacity'),
     TouchableWithoutFeedback: el('TouchableWithoutFeedback'),
     ActivityIndicator: el('ActivityIndicator'),
@@ -113,6 +123,7 @@ vi.mock('react-native-reanimated', () => {
 
 vi.mock('expo-blur', () => ({ BlurView: () => null }));
 vi.mock('expo-linear-gradient', () => ({ LinearGradient: () => null }));
+vi.mock('react-native-svg', () => ({ default: () => null, Line: () => null }));
 vi.mock('expo-image', () => ({ Image: { prefetch: vi.fn(async () => {}) } }));
 vi.mock('expo-haptics', () => ({
   impactAsync: vi.fn(async () => {}),

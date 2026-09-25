@@ -7,7 +7,6 @@
 import React from 'react';
 import { Animated, Platform, Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import { useColors } from '@/hooks/useColors';
 import { hapticLight } from '@/lib/haptics';
 import { COMP } from '@/lib/theme';
@@ -70,9 +69,7 @@ export function IconButton({
       >
         {variant === 'glass' && (
           <>
-            {Platform.OS !== 'android' && (
-              <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
-            )}
+            {Platform.OS !== 'android' && <GlassBlur style={StyleSheet.absoluteFill} />}
             <View style={[StyleSheet.absoluteFill, styles.glassTint]} />
           </>
         )}
@@ -87,6 +84,22 @@ export function IconButton({
       </Animated.View>
     </Pressable>
   );
+}
+
+/**
+ * Requires expo-blur lazily, at first render of a glass-variant button,
+ * instead of at module load — so screens/tests that never render a glass
+ * IconButton (the common case) don't pull the native blur module into their
+ * bundle/module graph at all.
+ */
+function GlassBlur({ style }: { style: StyleProp<ViewStyle> }) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { BlurView } = require('expo-blur') as { BlurView: typeof import('expo-blur').BlurView };
+    return <BlurView intensity={50} tint="dark" style={style} />;
+  } catch {
+    return null;
+  }
 }
 
 const styles = StyleSheet.create({
