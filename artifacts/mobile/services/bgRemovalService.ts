@@ -106,6 +106,28 @@ export async function saveResult(params: {
   return result;
 }
 
+/**
+ * Overwrite a result's PNG in place with a hand-edited version (from the
+ * erase/restore brush) and refresh its recorded size. The id, original
+ * source, and storage key are unchanged — only the pixels and size update.
+ */
+export async function updateResultPixels(id: string, b64Json: string): Promise<BgRemovalResult | null> {
+  const all = await load();
+  const idx = all.findIndex((r) => r.id === id);
+  if (idx === -1) return null;
+
+  const file = new File(all[idx].localPath);
+  file.write(b64Json, { encoding: 'base64' });
+
+  const updated: BgRemovalResult = {
+    ...all[idx],
+    size: Math.ceil((b64Json.length * 3) / 4),
+  };
+  all[idx] = updated;
+  await persist(all);
+  return updated;
+}
+
 /** Retrieve all saved results, most-recent first. */
 export async function getResults(): Promise<BgRemovalResult[]> {
   return load();

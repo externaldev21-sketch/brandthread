@@ -8,13 +8,13 @@
  *   3. Sticky "Create" button
  * After Create: per-reference generation progress → results grid with partial-failure retry.
  */
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert, Image,
-  Dimensions, Platform,
+  Dimensions, Platform, Modal, FlatList,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -34,15 +34,18 @@ import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
 import {
   generateMockupToModel,
   retryMockupToModelRef,
+  createBrandAsset,
   MockupToModelBatchResult,
   MockupToModelRefResult,
   MockupToModelRefError,
 } from '@/services/designService';
+import { getProducts, updateProduct } from '@/services/productService';
+import type { Product } from '@/services/productTypes';
 
 const { width: SW } = Dimensions.get('window');
 const THUMB_SIZE = 72;
 const COL_W = (SW - SP.lg * 2 - SP.sm) / 2;
-const MAX_REFS = 5;
+const MAX_REFS = 4;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -63,10 +66,20 @@ export default function MockupToModelScreen() {
   const s = createStyles(theme);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ seedMockupUri?: string }>();
 
   // Form state
   const [mockupUri, setMockupUri] = useState<string | null>(null);
   const [refUris, setRefUris] = useState<string[]>([]);
+
+  // Prefill the mockup when arriving from another AI tool (e.g. AI Design's
+  // "Send to Mockup to Model"). Only applies once, on first arrival.
+  useEffect(() => {
+    if (params.seedMockupUri && !mockupUri) {
+      setMockupUri(params.seedMockupUri);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.seedMockupUri]);
 
   // Generation state
   const [slots, setSlots] = useState<RefSlot[]>([]);
@@ -79,6 +92,13 @@ export default function MockupToModelScreen() {
 
   // Track per-slot saving state for the Save icon
   const [savingIndex, setSavingIndex] = useState<number | null>(null);
+  const [libraryIndex, setLibraryIndex] = useState<number | null>(null);
+
+  // Use-as-product-photo picker
+  const [showProductPicker, setShowProductPicker] = useState(false);
+  const [pickerProducts, setPickerProducts] = useState<Product[]>([]);
+  const [loadingPickerProducts, setLoadingPickerProducts] = useState(false);
+  const [pickerImageUri, setPickerImageUri] = useState<string | null>(null);
 
   async function saveImageToMediaLibrary(imageUri: string): Promise<boolean> {
     try {
@@ -108,9 +128,73 @@ export default function MockupToModelScreen() {
     setSavingIndex(null);
     if (ok) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Saved', 'Saved to Photos.');
+      Alert.alert('Downloaded', 'Saved to Photos.');
     } else {
-      Alert.alert('Save failed', 'Could not save this image. Please try again.');
+      Alert.alert('Download failed', 'Could not save this image. Please try again.');
+    }
+  }
+
+  async function handleSaveToLibrary(refIndex: number, imageUri: string) {
+    setLibraryIndex(refIndex);
+    try {
+      await createBrandAsset({
+        name: `Mockup to Model #${refIndex + 1}`,
+        type: 'graphic',
+        uri: imageUri,
+        tags: ['ai-generated', 'mockup-to-model'],
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Saved', 'Saved to your design library.');
+    } catch {
+      Alert.alert('Save failed', 'Could not save to your library. Please try again.');
+    } finally {
+      setLibraryIndex(null);
+    }
+  }
+
+  async function handleUseAsProduct(imageUri: string) {
+    setPickerImageUri(imageUri);
+    setLoadingPickerProducts(true);
+    try {
+      const all = await getProducts();
+      const active = all.filter(p => p.status !== 'archived');
+      if (active.length === 0) {
+        Alert.alert('No products', 'Create a product first, then use this photo as its product photo.');
+        return;
+      }
+      setPickerProducts(active);
+      setShowProductPicker(true);
+    } catch {
+      Alert.alert("Couldn't load products", 'Try again.');
+    } finally {
+      setLoadingPickerProducts(false);
+    }
+  }
+
+  async function confirmUseAsProduct(product: Product) {
+    setShowProductPicker(false);
+    const uri = pickerImageUri;
+    if (!uri) return;
+    try {
+      const existing = product.media ?? [];
+      const newMedia = {
+        id: `mockup-to-model-${Date.now()}`,
+        type: 'image' as const,
+        uri,
+        altText: 'AI-generated model photo',
+        isCover: true,
+        sortOrder: existing.length,
+        createdAt: new Date().toISOString(),
+      };
+      const updated = await updateProduct(product.id, { media: [...existing, newMedia] });
+      if (updated) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert('Set', `"${product.name ?? 'Product'}" now uses this as its product photo.`);
+      } else {
+        Alert.alert("Couldn't update product", 'Try again.');
+      }
+    } catch {
+      Alert.alert("Couldn't set product photo", 'Try again.');
     }
   }
 
@@ -302,8 +386,11 @@ export default function MockupToModelScreen() {
                 slot={slot}
                 refIndex={idx}
                 onRetry={handleRetry}
-                onSave={handleSaveSlot}
-                saving={savingIndex === idx}
+                onDownload={handleSaveSlot}
+                onSaveToLibrary={handleSaveToLibrary}
+                onUseAsProduct={handleUseAsProduct}
+                downloading={savingIndex === idx}
+                savingToLibrary={libraryIndex === idx}
                 styles={s}
                 PURPLE={PURPLE}
               />
@@ -322,6 +409,48 @@ export default function MockupToModelScreen() {
             </TouchableOpacity>
           </View>
         </ScrollView>
+
+        <Modal
+          visible={showProductPicker}
+          animationType="slide"
+          presentationStyle="formSheet"
+          onRequestClose={() => setShowProductPicker(false)}
+        >
+          <View style={s.pickerRoot}>
+            <View style={s.pickerHeader}>
+              <Text style={s.pickerTitle}>Choose a product</Text>
+              <TouchableOpacity onPress={() => setShowProductPicker(false)} activeOpacity={0.7}>
+                <Feather name="x" size={ICON.sm} color={FG} />
+              </TouchableOpacity>
+            </View>
+            <Text style={s.pickerSub}>This photo will become the product's cover photo.</Text>
+            {loadingPickerProducts ? (
+              <ActivityIndicator style={{ marginTop: 40 }} color={PURPLE} />
+            ) : (
+              <FlatList
+                data={pickerProducts}
+                keyExtractor={p => p.id}
+                contentContainerStyle={{ padding: SP.md }}
+                renderItem={({ item }) => (
+                  <TouchableOpacity style={s.productRow} onPress={() => confirmUseAsProduct(item)} activeOpacity={0.82}>
+                    {item.media?.[0]?.uri ? (
+                      <Image source={{ uri: item.media[0].uri }} style={s.productThumb} resizeMode="cover" />
+                    ) : (
+                      <View style={[s.productThumb, s.productThumbEmpty]}>
+                        <Feather name="package" size={ICON.md} color={SUBTLE} />
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.productName} numberOfLines={1}>{item.name}</Text>
+                      <Text style={s.productStatus}>{item.status}</Text>
+                    </View>
+                    <Feather name="chevron-right" size={ICON.xs} color={MUTED} />
+                  </TouchableOpacity>
+                )}
+              />
+            )}
+          </View>
+        </Modal>
       </BrandthreadScreen>
     );
   }
@@ -340,6 +469,16 @@ export default function MockupToModelScreen() {
         keyboardShouldPersistTaps="handled"
         accessibilityLabel="Mockup to Model form"
       >
+        {/* ── How it works ── */}
+        <View style={s.howToCard}>
+          <Feather name="info" size={ICON.sm} color={PURPLE} />
+          <Text style={s.howToText}>
+            Upload a mockup or photo of your garment, then add 1–4 reference photos showing the model,
+            pose, lighting, and background you want. We'll generate photoreal shots of a model in that
+            exact look and setting — wearing your garment.
+          </Text>
+        </View>
+
         {/* ── Section 1: Garment Mockup ── */}
         <Text style={s.sectionLabel}>Garment mockup</Text>
         <Text style={s.sectionSub}>
@@ -375,7 +514,7 @@ export default function MockupToModelScreen() {
           <View style={{ flex: 1 }}>
             <Text style={s.sectionLabel}>Reference model images</Text>
             <Text style={s.sectionSub}>
-              Add 1–5 photos. Each reference produces one distinct AI photo of a model wearing your piece.
+              Add 1–4 photos. Each reference produces one distinct AI photo of a model wearing your piece.
             </Text>
           </View>
           <View style={s.refCountBadge}>
@@ -423,7 +562,7 @@ export default function MockupToModelScreen() {
           >
             <Feather name="image" size={ICON.lg} color={PURPLE} />
             <Text style={s.refPickerBtnText}>Add reference photos</Text>
-            <Text style={s.refPickerBtnSub}>Select 1–5 images · multi-select supported</Text>
+            <Text style={s.refPickerBtnSub}>Select 1–4 images · multi-select supported</Text>
           </TouchableOpacity>
         )}
 
@@ -474,13 +613,20 @@ interface ResultCardProps {
   slot: RefSlot;
   refIndex: number;
   onRetry: (refIndex: number) => void;
-  onSave: (refIndex: number, imageUri: string) => void;
-  saving: boolean;
+  onDownload: (refIndex: number, imageUri: string) => void;
+  onSaveToLibrary: (refIndex: number, imageUri: string) => void;
+  onUseAsProduct: (imageUri: string) => void;
+  downloading: boolean;
+  savingToLibrary: boolean;
   styles: ReturnType<typeof createStyles>;
   PURPLE: string;
 }
 
-function ResultCard({ slot, refIndex, onRetry, onSave, saving, styles: s, PURPLE }: ResultCardProps) {
+function ResultCard({
+  slot, refIndex, onRetry, onDownload, onSaveToLibrary, onUseAsProduct,
+  downloading, savingToLibrary, styles: s, PURPLE,
+}: ResultCardProps) {
+  const [showBefore, setShowBefore] = useState(false);
   if (slot.status === 'generating') {
     return (
       <View style={s.resultCard}>
@@ -523,22 +669,55 @@ function ResultCard({ slot, refIndex, onRetry, onSave, saving, styles: s, PURPLE
   if (slot.status === 'done' && slot.imageUri) {
     return (
       <View style={s.resultCard}>
-        <Image source={{ uri: slot.imageUri }} style={s.resultImage} resizeMode="cover" />
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => setShowBefore(v => !v)}
+          accessibilityLabel={showBefore ? 'Show generated photo' : 'Show original reference photo'}
+          accessibilityRole="button"
+        >
+          <Image
+            source={{ uri: showBefore ? slot.uri : slot.imageUri }}
+            style={s.resultImage}
+            resizeMode="cover"
+          />
+          <View style={s.beforeAfterPill}>
+            <Text style={s.beforeAfterPillText}>{showBefore ? 'Before' : 'After'}</Text>
+          </View>
+        </TouchableOpacity>
         <View style={s.resultMeta}>
           <Text style={s.resultMetaText}>Reference {refIndex + 1}</Text>
         </View>
         <View style={s.resultActions}>
           <TouchableOpacity
             style={s.actionBtn}
-            onPress={() => onSave(refIndex, slot.imageUri!)}
-            accessibilityLabel="Save image"
-            disabled={saving}
+            onPress={() => onSaveToLibrary(refIndex, slot.imageUri!)}
+            accessibilityLabel="Save to library"
+            disabled={savingToLibrary}
           >
-            {saving ? (
+            {savingToLibrary ? (
               <ActivityIndicator size="small" color={PURPLE} />
             ) : (
               <Feather name="bookmark" size={ICON.sm} color={PURPLE} />
             )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={s.actionBtn}
+            onPress={() => onDownload(refIndex, slot.imageUri!)}
+            accessibilityLabel="Download to Photos"
+            disabled={downloading}
+          >
+            {downloading ? (
+              <ActivityIndicator size="small" color={FG} />
+            ) : (
+              <Feather name="download" size={ICON.sm} color={FG} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={s.actionBtn}
+            onPress={() => onUseAsProduct(slot.imageUri!)}
+            accessibilityLabel="Use as product photo"
+          >
+            <Feather name="package" size={ICON.sm} color={FG} />
           </TouchableOpacity>
           <TouchableOpacity
             style={s.actionBtn}
@@ -562,6 +741,22 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   return StyleSheet.create({
     content: {
       padding: SP.lg,
+    },
+    howToCard: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: SP.sm,
+      backgroundColor: PURPLE_DIM,
+      borderRadius: RADIUS.lg,
+      padding: SP.md,
+      marginBottom: SP.lg,
+    },
+    howToText: {
+      flex: 1,
+      fontFamily: FONT.regular,
+      fontSize: FS.sm,
+      color: FG,
+      lineHeight: 19,
     },
     sectionLabel: {
       fontFamily: FONT.bold,
@@ -787,6 +982,74 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     resultImage: {
       width: COL_W,
       height: COL_W * 1.3,
+    },
+    beforeAfterPill: {
+      position: 'absolute',
+      top: SP.xs,
+      left: SP.xs,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      borderRadius: RADIUS.pill,
+      paddingHorizontal: SP.sm,
+      paddingVertical: 2,
+    },
+    beforeAfterPillText: {
+      fontFamily: FONT.bold,
+      fontSize: FS.xs,
+      color: '#fff',
+    },
+    pickerRoot: {
+      flex: 1,
+      backgroundColor: BG,
+    },
+    pickerHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: SP.md,
+      borderBottomWidth: 1,
+      borderBottomColor: BORDER,
+    },
+    pickerTitle: {
+      fontFamily: FONT.bold,
+      fontSize: FS.md,
+      color: FG,
+    },
+    pickerSub: {
+      fontFamily: FONT.regular,
+      fontSize: FS.sm,
+      color: MUTED,
+      padding: SP.md,
+      paddingTop: SP.sm,
+      paddingBottom: 0,
+    },
+    productRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SP.sm,
+      paddingVertical: SP.sm,
+      borderBottomWidth: 1,
+      borderBottomColor: BORDER,
+    },
+    productThumb: {
+      width: 44,
+      height: 44,
+      borderRadius: RADIUS.sm,
+    },
+    productThumbEmpty: {
+      backgroundColor: SURFACE,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    productName: {
+      fontFamily: FONT.medium,
+      fontSize: FS.sm,
+      color: FG,
+    },
+    productStatus: {
+      fontFamily: FONT.regular,
+      fontSize: FS.xs,
+      color: SUBTLE,
+      textTransform: 'capitalize',
     },
     resultGenerating: {
       width: COL_W,
