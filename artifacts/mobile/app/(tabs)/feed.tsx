@@ -1958,9 +1958,15 @@ export default function FeedScreen({
       try {
         const { api: _api } = require('@/lib/api');
         if (willSave) {
-          await _api.saved.add({ targetId: id, targetType: 'post' });
+          // saved.save requires targetId + title (400 without one) — a post
+          // has no "title" field of its own, so fall back through caption
+          // then creator name the same way the saved-items list would want
+          // to display it.
+          const item = itemsById.get(id);
+          const title = item?.caption?.trim() || `${item?.creator ?? 'Post'}'s post`;
+          await _api.buyer.saved.save({ type: 'post', targetId: id, title, subtitle: item?.creator, accentColor: item?.accentColor });
         } else {
-          await _api.saved.remove(id);
+          await _api.buyer.saved.remove(id);
         }
       } catch {
         // Rollback
@@ -1968,7 +1974,7 @@ export default function FeedScreen({
         showToast('Could not update save. Try again.', 'error');
       }
     }
-  }, [engagements, engagementFor, showToast]);
+  }, [engagements, engagementFor, itemsById, showToast]);
 
   const showRepostEducationOnce = useCallback(async () => {
     const key = `bt:repost-education:${userId ?? 'preview'}:v1`;
