@@ -49,10 +49,22 @@ vi.mock("@workspace/db", () => {
       }),
     }),
   };
+  // This actor is purely a joined team member with no store of their own, so
+  // the default-context lookup should keep resolving to the joined store.
+  const onboardingQuery = {
+    from: () => ({
+      where: () => ({
+        limit: async () => [{ onboardingComplete: false }],
+      }),
+    }),
+  };
 
   return {
     db: {
-      select: () => membershipQuery,
+      select: (fields: Record<string, unknown> | undefined) =>
+        fields && Object.prototype.hasOwnProperty.call(fields, "onboardingComplete")
+          ? onboardingQuery
+          : membershipQuery,
       update: () => ({ set: () => ({ where: () => Promise.resolve() }) }),
     },
     teamMembers: columns,
