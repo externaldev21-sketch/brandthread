@@ -2,17 +2,17 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   View, Text, FlatList, SectionList,
   Alert, StyleSheet, ScrollView, RefreshControl,
-  Modal, TextInput, ActivityIndicator,
+  Modal, TextInput, ActivityIndicator, Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ListSkeleton } from '@/components/layout';
-import { EmptyState, SearchBar, SheetHandle } from '@/components/BrandthreadUI';
+import { EmptyState, SearchBar, SheetHandle, AnimatedEntrance, PressableScale } from '@/components/BrandthreadUI';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { FONT, FS, SP, RADIUS, ICON, SCREEN_BG } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON, SCREEN_BG, CONTENT_MAX_WIDTH } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   getConversations, markConversationRead, archiveConversation,
@@ -24,9 +24,9 @@ import type { Conversation, Notification, ProfileSearchResult, AccountType } fro
 import { useApi } from '@/lib/api';
 import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
 import { ConversationPreview } from '@/components/inbox/ConversationPreview';
+import { FollowerAvatarCard } from '@/components/inbox/FollowerAvatarCard';
 import { IconButton } from '@/components/ui/IconButton';
 import { Snackbar } from '@/components/ui/Snackbar';
-import { PressableScale } from '@/components/BrandthreadUI';
 import { hapticPrimaryAction, hapticDestructiveConfirm } from '@/lib/haptics';
 
 // ─── Compose sheet: unified "person" shape ────────────────────────────────────
@@ -86,17 +86,6 @@ function previewText(lastMessage: string | undefined, fallback: string): string 
   return lastMessage?.trim() || fallback;
 }
 
-// ─── Segment tabs ─────────────────────────────────────────────────────────────
-
-const TABS = ['Follows', 'Messages', 'Requests'] as const;
-type Tab = typeof TABS[number];
-
-const EMPTY_MESSAGES: Record<Tab, { icon: keyof typeof Feather.glyphMap; title: string; subtitle: string }> = {
-  Follows: { icon: 'user-plus', title: 'No new followers', subtitle: 'New followers appear here' },
-  Messages: { icon: 'message-circle', title: 'No messages yet', subtitle: 'Start a conversation' },
-  Requests: { icon: 'mail', title: 'No message requests', subtitle: 'Requests from new senders appear here' },
-};
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function InboxScreen() {
@@ -105,15 +94,18 @@ export default function InboxScreen() {
   const router = useRouter();
   const api = useApi();
   const { theme } = useAppTheme();
-  const s = React.useMemo(() => createStyles(theme), [theme]);
+  // The buyer tab shell already centers route content in a max-width column
+  // on wide/web viewports, so this only needs the ordinary phone gutter —
+  // an extra centered-padding calculation here would double up with that
+  // shell and over-constrain the header at very wide viewports.
+  const gutter = SP.md;
+  const s = React.useMemo(() => createStyles(theme, gutter), [theme, gutter]);
   const { userId } = useAuth();
   const accountRef = useRef(userId);
   accountRef.current = userId;
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [activeTab, setActiveTab] = useState<Tab>('Messages');
-  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [requestActionLoading, setRequestActionLoading] = useState<string | null>(null);
   const [messagingId, setMessagingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -134,6 +126,7 @@ export default function InboxScreen() {
   const [composeSuggested, setComposeSuggested] = useState<ComposePerson[]>([]);
   const [messagesSearchQuery, setMessagesSearchQuery] = useState('');
   const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
+  const [requestsSheetVisible, setRequestsSheetVisible] = useState(false);
   const snackbarTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showSnackbar = useCallback((message: string) => {
@@ -146,7 +139,6 @@ export default function InboxScreen() {
     if (!userId) {
       setConversations([]);
       setNotifications([]);
-      setUnreadNotifCount(0);
       setLoading(false);
       return;
     }
@@ -156,12 +148,10 @@ export default function InboxScreen() {
       if (accountRef.current !== userId) return;
       setConversations(convs);
       setNotifications(notifs);
-      setUnreadNotifCount(notifs.filter(n => !n.isRead).length);
     } catch {
       setLoadError(true);
       setConversations([]);
       setNotifications([]);
-      setUnreadNotifCount(0);
     } finally {
       setLoading(false);
     }
@@ -189,16 +179,11 @@ export default function InboxScreen() {
 
   const messagesSearchLower = messagesSearchQuery.trim().toLowerCase();
 
+  // The primary list: ordinary (non-request, non-archived) conversations,
+  // optionally filtered by the search bar.
   const filteredConvs = conversations.filter(conv => {
-    // Tab filter
-    let tabMatch = false;
-    switch (activeTab) {
-      case 'Follows': tabMatch = false; break;
-      case 'Messages': tabMatch = !conv.isArchived && !conv.isRequest; break;
-      case 'Requests': tabMatch = conv.isRequest === true && !conv.isArchived; break;
-    }
-    if (!tabMatch) return false;
-    if (activeTab === 'Messages' && messagesSearchLower) {
+    if (conv.isArchived || conv.isRequest) return false;
+    if (messagesSearchLower) {
       const participant = getParticipant(conv);
       const haystack = [
         participant?.name, participant?.handle, conv.lastMessage,
@@ -208,7 +193,9 @@ export default function InboxScreen() {
     return true;
   });
 
+  const requestConvs = conversations.filter(conv => conv.isRequest === true && !conv.isArchived);
   const followNotifications = notifications.filter(notif => notif.type === 'new_follower' && !notif.isMuted);
+  const unreadFollowCount = followNotifications.filter(notif => !notif.isRead).length;
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
@@ -228,6 +215,7 @@ export default function InboxScreen() {
       // Refresh conversation list
       const convs = await getConversations();
       setConversations(convs);
+      setRequestsSheetVisible(false);
       // Open the accepted conversation
       markConversationRead(conv.id);
       router.push(`/buyer-conversation?id=${conv.id}` as never);
@@ -471,57 +459,36 @@ export default function InboxScreen() {
     }
   }
 
+  async function messageFollower(notif: Notification) {
+    if (!notif.targetId || messagingId) return;
+    hapticPrimaryAction();
+    setMessagingId(notif.id);
+    try {
+      const conv = await createOrGetConversation({
+        type: 'buyer_to_buyer',
+        participant: {
+          userId: notif.targetId,
+          name: notif.actorName ?? 'this person',
+          handle: notif.actorName ?? '',
+          initials: notif.actorInitials ?? '?',
+          color: notif.actorColor ?? theme.cardElevated,
+          accountType: 'buyer',
+        },
+      });
+      router.push(`/buyer-conversation?id=${conv.id}` as never);
+    } catch {
+      Alert.alert('Could not start conversation', 'Check your connection and try again.');
+    } finally {
+      setMessagingId(null);
+    }
+  }
+
   // ── Render helpers ──────────────────────────────────────────────────────────
 
-  function renderConvRow({ item: conv }: { item: Conversation }) {
+  function renderConvRow({ item: conv, index }: { item: Conversation; index: number }) {
     const participant = getParticipant(conv);
     if (!participant) return null;
     const isUnread = conv.unreadCount > 0;
-    const isRequest = conv.isRequest === true;
-    const isLoadingAction = requestActionLoading === conv.id;
-
-    // Requests get a distinct card with Accept/Decline instead of the usual row
-    if (isRequest) {
-      return (
-        <View style={s.requestCard}>
-          {/* Avatar */}
-          <View style={[s.avatar48, { backgroundColor: participant.color }]}>
-            <Text style={s.avatarInitials}>{participant.initials}</Text>
-          </View>
-
-          {/* Info */}
-          <View style={s.convCenter}>
-            <View style={s.convNameRow}>
-              <Text style={[s.convName, { fontFamily: FONT.semibold }]} numberOfLines={1}>{participant.name}</Text>
-              {conv.lastMessageTs ? <Text style={s.convTime}>{timeAgo(conv.lastMessageTs)}</Text> : null}
-            </View>
-            <Text style={[s.convPreview]} numberOfLines={1}>
-              {previewText(conv.lastMessage, 'Sent you a message')}
-            </Text>
-
-            {/* Accept / Decline buttons */}
-            <View style={s.requestActions}>
-              <PressableScale
-                style={[s.requestAcceptBtn, { backgroundColor: theme.accent }, isLoadingAction && s.requestBtnDisabled]}
-                onPress={() => acceptRequest(conv)}
-                disabled={isLoadingAction}
-                activeOpacity={0.8}
-              >
-                <Text style={[s.requestAcceptText, { color: theme.onAccent }]}>Accept</Text>
-              </PressableScale>
-              <PressableScale
-                style={[s.requestDeclineBtn, isLoadingAction && s.requestBtnDisabled]}
-                onPress={() => declineRequest(conv)}
-                disabled={isLoadingAction}
-                activeOpacity={0.8}
-              >
-                <Text style={s.requestDeclineText}>Decline</Text>
-              </PressableScale>
-            </View>
-          </View>
-        </View>
-      );
-    }
 
     const swipeActions: InboxSwipeAction[] = [
       {
@@ -554,141 +521,114 @@ export default function InboxScreen() {
     ];
 
     return (
-      <InboxSwipeRow rowId={conv.id} actions={swipeActions}>
-        <PressableScale
-          style={s.convRow}
-          onPress={() => openConversation(conv)}
-          onLongPress={() => longPressConversation(conv)}
-          activeOpacity={0.75}
-          testID={`inbox-conversation-${conv.id}`}
-        >
-        {/* Avatar with unread + online dots */}
-        <View style={s.avatarContainer}>
-          <View style={[s.avatar48, { backgroundColor: participant.color }]}>
-            <Text style={s.avatarInitials}>{participant.initials}</Text>
-          </View>
-          {isUnread && <View style={[s.unreadDot, { backgroundColor: theme.accent, borderColor: theme.background }]} />}
-          {participant.isOnline && (
-            <View
-              style={[s.onlineDot, { backgroundColor: theme.success, borderColor: theme.background }]}
-              testID={`inbox-online-dot-${conv.id}`}
-            />
-          )}
-        </View>
-
-        {/* Center content */}
-        <View style={s.convCenter}>
-          <View style={s.convNameRow}>
-            <Text
-              style={[s.convName, { color: theme.text, fontFamily: isUnread ? FONT.bold : FONT.regular }]}
-              numberOfLines={1}
-            >
-              {participant.name}
-            </Text>
-            {conv.lastMessageTs ? (
-              <Text style={[s.convTime, { color: theme.muted }]}>{timeAgo(conv.lastMessageTs)}</Text>
-            ) : null}
-          </View>
-          {conv.contextOrderNumber ? (
-              <View style={[s.orderPill, { backgroundColor: theme.accentDim }]}>
-                <Text style={[s.orderPillText, { color: theme.accent }]}>{conv.contextOrderNumber}</Text>
+      <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10}>
+        <InboxSwipeRow rowId={conv.id} actions={swipeActions}>
+          <PressableScale
+            style={s.convRow}
+            onPress={() => openConversation(conv)}
+            onLongPress={() => longPressConversation(conv)}
+            activeOpacity={0.75}
+            testID={`inbox-conversation-${conv.id}`}
+          >
+            {/* Avatar with unread + online dots */}
+            <View style={s.avatarContainer}>
+              <View style={[s.avatar60, { backgroundColor: participant.color }]}>
+                <Text style={s.avatarInitials}>{participant.initials}</Text>
+              </View>
+              {isUnread && <View style={[s.unreadDot, { backgroundColor: theme.accent, borderColor: theme.background }]} />}
+              {participant.isOnline && (
+                <View
+                  style={[s.onlineDot, { backgroundColor: theme.success, borderColor: theme.background }]}
+                  testID={`inbox-online-dot-${conv.id}`}
+                />
+              )}
             </View>
-          ) : null}
-          <ConversationPreview
-            text={previewText(conv.lastMessage, 'No messages yet')}
-            attachmentType={conv.lastMessageType}
-            isFromMe={!!conv.lastMessageSenderId && conv.lastMessageSenderId === MY_USER_ID}
-            bold={isUnread}
-            color={isUnread ? theme.text : theme.muted}
-          />
-        </View>
 
-        {/* Trailing: unread pill badge, hidden when there is nothing unread */}
-        {isUnread ? (
-          <View style={[s.unreadBadge, { backgroundColor: theme.accent }]} testID={`inbox-unread-badge-${conv.id}`}>
-            <Text style={[s.unreadBadgeText, { color: theme.onAccent }]}>{conv.unreadCount > 99 ? '99+' : conv.unreadCount}</Text>
-          </View>
-        ) : (
-            <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
-        )}
-        </PressableScale>
-      </InboxSwipeRow>
+            {/* Center content */}
+            <View style={s.convCenter}>
+              <View style={s.convNameRow}>
+                <Text
+                  style={[s.convName, { color: theme.text, fontFamily: isUnread ? FONT.bold : FONT.regular }]}
+                  numberOfLines={1}
+                >
+                  {participant.name}
+                </Text>
+                {conv.lastMessageTs ? (
+                  <Text style={[s.convTime, { color: isUnread ? theme.accent : theme.muted }]}>{timeAgo(conv.lastMessageTs)}</Text>
+                ) : null}
+              </View>
+              {conv.contextOrderNumber ? (
+                <View style={[s.orderPill, { backgroundColor: theme.accentDim }]}>
+                  <Text style={[s.orderPillText, { color: theme.accent }]}>{conv.contextOrderNumber}</Text>
+                </View>
+              ) : null}
+              <ConversationPreview
+                text={previewText(conv.lastMessage, 'No messages yet')}
+                attachmentType={conv.lastMessageType}
+                isFromMe={!!conv.lastMessageSenderId && conv.lastMessageSenderId === MY_USER_ID}
+                bold={isUnread}
+                color={isUnread ? theme.text : theme.muted}
+              />
+            </View>
+
+            {/* Trailing: unread pill badge, hidden when there is nothing unread */}
+            {isUnread ? (
+              <View style={[s.unreadBadge, { backgroundColor: theme.accent }]} testID={`inbox-unread-badge-${conv.id}`}>
+                <Text style={[s.unreadBadgeText, { color: theme.onAccent }]}>{conv.unreadCount > 99 ? '99+' : conv.unreadCount}</Text>
+              </View>
+            ) : (
+              <Feather name="chevron-right" size={ICON.sm} color={theme.subtle} />
+            )}
+          </PressableScale>
+        </InboxSwipeRow>
+      </AnimatedEntrance>
     );
   }
 
-  async function messageFollower(notif: Notification) {
-    if (!notif.targetId || messagingId) return;
-    hapticPrimaryAction();
-    setMessagingId(notif.id);
-    try {
-      const conv = await createOrGetConversation({
-        type: 'buyer_to_buyer',
-        participant: {
-          userId: notif.targetId,
-          name: notif.actorName ?? 'this person',
-          handle: notif.actorName ?? '',
-          initials: notif.actorInitials ?? '?',
-          color: notif.actorColor ?? theme.cardElevated,
-          accountType: 'buyer',
-        },
-      });
-      router.push(`/buyer-conversation?id=${conv.id}` as never);
-    } catch {
-      Alert.alert('Could not start conversation', 'Check your connection and try again.');
-    } finally {
-      setMessagingId(null);
-    }
-  }
-
-  function renderFollowRow({ item: notif }: { item: Notification }) {
-    const isUnread = !notif.isRead;
+  function renderRequestRow(conv: Conversation) {
+    const participant = getParticipant(conv);
+    if (!participant) return null;
+    const isLoadingAction = requestActionLoading === conv.id;
     return (
-      <View style={s.followCard}>
-        <PressableScale
-          style={s.followCardTap}
-          onPress={() => openFollow(notif)}
-          accessibilityRole="button"
-          accessibilityLabel={notif.title}
-        >
-          <View style={s.avatarContainer}>
-            <View style={[s.avatar56, { backgroundColor: notif.actorColor ?? theme.cardElevated }]}>
-              <Text style={s.avatarInitials}>{notif.actorInitials ?? '?'}</Text>
-            </View>
-            {isUnread && <View style={[s.unreadDot, { backgroundColor: theme.accent }]} />}
+      <View key={conv.id} style={s.requestCard}>
+        <View style={[s.avatar56, { backgroundColor: participant.color }]}>
+          <Text style={s.avatarInitials}>{participant.initials}</Text>
+        </View>
+        <View style={s.convCenter}>
+          <View style={s.convNameRow}>
+            <Text style={[s.convName, { color: theme.text, fontFamily: FONT.semibold }]} numberOfLines={1}>{participant.name}</Text>
+            {conv.lastMessageTs ? <Text style={[s.convTime, { color: theme.muted }]}>{timeAgo(conv.lastMessageTs)}</Text> : null}
           </View>
-          <View style={s.convCenter}>
-            <View style={s.convNameRow}>
-              <Text style={[s.convName, { color: theme.text, fontFamily: isUnread ? FONT.bold : FONT.semibold }]} numberOfLines={1}>
-                {notif.actorName ?? notif.title}
-              </Text>
-              <Text style={s.convTime}>{timeAgo(new Date(notif.createdAt).getTime())}</Text>
-            </View>
-            <Text style={[s.convPreview, isUnread && { color: theme.text }]} numberOfLines={2}>
-              {notif.body || 'Started following you'}
-            </Text>
+          <Text style={[s.convPreview, { color: theme.muted }]} numberOfLines={1}>
+            {previewText(conv.lastMessage, 'Sent you a message')}
+          </Text>
+          <View style={s.requestActions}>
+            <PressableScale
+              style={[s.requestAcceptBtn, { backgroundColor: theme.accent }, isLoadingAction && s.requestBtnDisabled]}
+              onPress={() => acceptRequest(conv)}
+              disabled={isLoadingAction}
+              activeOpacity={0.8}
+              testID={`inbox-request-accept-${conv.id}`}
+            >
+              <Text style={[s.requestAcceptText, { color: theme.onAccent }]}>Accept</Text>
+            </PressableScale>
+            <PressableScale
+              style={[s.requestDeclineBtn, { borderColor: theme.border, backgroundColor: theme.card }, isLoadingAction && s.requestBtnDisabled]}
+              onPress={() => declineRequest(conv)}
+              disabled={isLoadingAction}
+              activeOpacity={0.8}
+              testID={`inbox-request-decline-${conv.id}`}
+            >
+              <Text style={[s.requestDeclineText, { color: theme.muted }]}>Decline</Text>
+            </PressableScale>
           </View>
-        </PressableScale>
-        {notif.targetId && (
-          <PressableScale
-            style={[s.followMessageBtn, { borderColor: theme.border }]}
-            onPress={() => messageFollower(notif)}
-            disabled={messagingId === notif.id}
-            accessibilityRole="button"
-            accessibilityLabel={`Message ${notif.actorName ?? 'this person'}`}
-          >
-            {messagingId === notif.id ? (
-              <ActivityIndicator size="small" color={theme.text} />
-            ) : (
-              <Text style={[s.followMessageBtnText, { color: theme.text }]}>Message</Text>
-            )}
-          </PressableScale>
-        )}
+        </View>
       </View>
     );
   }
 
   function renderEmptyState() {
-    if (activeTab === 'Messages' && messagesSearchLower && !loadError) {
+    if (messagesSearchLower && !loadError) {
       return (
         <EmptyState
           icon="search"
@@ -697,30 +637,99 @@ export default function InboxScreen() {
         />
       );
     }
-    const { icon, title, subtitle } = EMPTY_MESSAGES[activeTab];
-    const isMessages = activeTab === 'Messages';
     return (
       <EmptyState
-        icon={loadError ? 'alert-circle' : icon}
-        title={loadError ? 'Could not load your inbox' : title}
-        description={loadError ? 'Pull to refresh and try again.' : subtitle}
-        action={isMessages && !loadError ? { label: 'New message', onPress: openCompose } : undefined}
+        icon={loadError ? 'alert-circle' : 'message-circle'}
+        title={loadError ? 'Could not load your inbox' : 'No messages yet'}
+        description={loadError ? 'Pull to refresh and try again.' : 'Start a conversation with someone in your network'}
+        action={!loadError ? { label: 'New message', onPress: openCompose } : undefined}
       />
     );
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
+  const listHeader = (
+    <View>
+      {/* New followers / friends rail (Azar-style large avatar cards) */}
+      {followNotifications.length > 0 && (
+        <AnimatedEntrance distance={12}>
+          <View style={s.railSection}>
+            <View style={[s.railHeaderRow, { paddingHorizontal: gutter }]}>
+              <Text style={[s.railTitle, { color: theme.text }]}>New followers</Text>
+              {unreadFollowCount > 0 && (
+                <View style={[s.railCountPill, { backgroundColor: theme.accentDim }]}>
+                  <Text style={[s.railCountText, { color: theme.accent }]}>{unreadFollowCount}</Text>
+                </View>
+              )}
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: gutter, gap: SP.md }}
+            >
+              {followNotifications.map(notif => (
+                <FollowerAvatarCard
+                  key={notif.id}
+                  name={notif.actorName ?? notif.title}
+                  initials={notif.actorInitials ?? '?'}
+                  color={notif.actorColor ?? theme.cardElevated}
+                  unread={!notif.isRead}
+                  busy={messagingId === notif.id}
+                  onPress={() => openFollow(notif)}
+                  onMessage={() => messageFollower(notif)}
+                  testID={`inbox-follower-card-${notif.id}`}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        </AnimatedEntrance>
+      )}
+
+      {/* Message requests banner (Instagram-style) instead of a thin tab */}
+      {requestConvs.length > 0 && (
+        <AnimatedEntrance distance={12} delay={40}>
+          <View style={{ paddingHorizontal: gutter }}>
+            <PressableScale
+              style={[s.requestsBanner, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}
+              onPress={() => { hapticPrimaryAction(); setRequestsSheetVisible(true); }}
+              accessibilityRole="button"
+              accessibilityLabel={`Message requests, ${requestConvs.length}`}
+              testID="inbox-requests-banner"
+            >
+              <View style={[s.requestsIconCircle, { backgroundColor: theme.accentDim }]}>
+                <Feather name="mail" size={ICON.md} color={theme.accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.requestsBannerTitle, { color: theme.text }]}>Message requests</Text>
+                <Text style={[s.requestsBannerSubtitle, { color: theme.muted }]} numberOfLines={1}>
+                  {requestConvs.length} waiting for your response
+                </Text>
+              </View>
+              <View style={[s.requestsCountPill, { backgroundColor: theme.accent }]}>
+                <Text style={[s.requestsCountText, { color: theme.onAccent }]}>{requestConvs.length}</Text>
+              </View>
+              <Feather name="chevron-right" size={ICON.sm} color={theme.subtle} />
+            </PressableScale>
+          </View>
+        </AnimatedEntrance>
+      )}
+
+      {(followNotifications.length > 0 || requestConvs.length > 0) && (
+        <Text style={[s.messagesSectionLabel, { color: theme.subtle, paddingHorizontal: gutter }]}>Messages</Text>
+      )}
+    </View>
+  );
+
   return (
     <View style={[s.root, { backgroundColor: SCREEN_BG }]}>
-      {/* Header — tab root: no back arrow, just the title and the compose action */}
-      <View style={[s.header, { paddingTop: insets.top + SP.sm, borderBottomColor: theme.border }]}>
-        <View style={s.headerSide} />
-        <Text style={[s.headerTitle, { color: theme.text }]}>Inbox</Text>
+      {/* Header — big bold large-title style, no back arrow */}
+      <View style={[s.header, { paddingTop: insets.top + SP.sm, paddingHorizontal: gutter }]}>
+        <Text style={[s.headerTitle, { color: theme.text }]}>Messages</Text>
         <IconButton
           name="edit-3"
-          size={20}
-          variant="plain"
+          size={22}
+          variant="filled"
           color={theme.text}
           onPress={openCompose}
           accessibilityLabel="New message"
@@ -728,98 +737,56 @@ export default function InboxScreen() {
         />
       </View>
 
-      {/* Inbox categories */}
-      <View style={s.primaryTabs}>
-        {TABS.map(tab => {
-          const isActive = activeTab === tab;
-          const count = tab === 'Requests'
-            ? conversations.filter(conv => conv.isRequest && !conv.isArchived).length
-            : tab === 'Follows'
-              ? followNotifications.filter(notif => !notif.isRead).length
-              : conversations.filter(conv => !conv.isRequest && !conv.isArchived && conv.unreadCount > 0).length;
-          return (
-            <PressableScale
-              key={tab}
-              style={[
-                s.primaryTab,
-                {
-                  backgroundColor: isActive ? theme.cardElevated : 'transparent',
-                  borderColor: isActive ? theme.border : 'transparent',
-                },
-              ]}
-              onPress={() => { hapticPrimaryAction(); setActiveTab(tab); }}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: isActive }}
-              accessibilityLabel={tab}
-            >
-              <Text style={[s.primaryTabText, isActive && s.primaryTabTextActive, { color: isActive ? theme.text : theme.muted }]}>{tab}</Text>
-              {count > 0 && <Text style={[s.primaryTabCount, { color: theme.accent }]}>{count > 99 ? '99+' : count}</Text>}
-            </PressableScale>
-          );
-        })}
-      </View>
-
-      {/* Search conversations (Messages tab only) */}
-      {activeTab === 'Messages' && !loading && (
-        <View style={[s.searchRow, { borderColor: theme.border, backgroundColor: theme.cardElevated }]}>
-          <Feather name="search" size={15} color={theme.muted} />
-          <TextInput
-            style={[s.searchInput, { color: theme.text }]}
-            value={messagesSearchQuery}
-            onChangeText={setMessagesSearchQuery}
-            placeholder="Search conversations"
-            placeholderTextColor={theme.muted}
-            autoCorrect={false}
-            testID="inbox-search-input"
-            accessibilityLabel="Search conversations"
-          />
-          {messagesSearchQuery.length > 0 && (
-            <PressableScale
-              onPress={() => setMessagesSearchQuery('')}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityRole="button"
-              accessibilityLabel="Clear search"
-            >
-              <Feather name="x" size={15} color={theme.muted} />
-            </PressableScale>
-          )}
+      {/* Search — always available, not gated behind a tab */}
+      {!loading && (
+        <View style={{ paddingHorizontal: gutter }}>
+          <View style={[s.searchRow, { borderColor: theme.border, backgroundColor: theme.cardElevated }]}>
+            <Feather name="search" size={16} color={theme.muted} />
+            <TextInput
+              style={[s.searchInput, { color: theme.text }]}
+              value={messagesSearchQuery}
+              onChangeText={setMessagesSearchQuery}
+              placeholder="Search conversations"
+              placeholderTextColor={theme.muted}
+              autoCorrect={false}
+              testID="inbox-search-input"
+              accessibilityLabel="Search conversations"
+            />
+            {messagesSearchQuery.length > 0 && (
+              <PressableScale
+                onPress={() => setMessagesSearchQuery('')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+              >
+                <Feather name="x" size={16} color={theme.muted} />
+              </PressableScale>
+            )}
+          </View>
         </View>
       )}
 
       {/* Conversations list */}
       {loading ? (
-        <View style={[s.listSurface, s.listContent, { paddingBottom: barInset + SP.md }]}>
+        <View style={[s.listSurface, s.listContent, { paddingBottom: barInset + SP.md, paddingHorizontal: gutter }]}>
           <ListSkeleton rows={6} />
         </View>
-      ) : activeTab === 'Follows' ? (
-        followNotifications.length === 0 ? (
-          <ScrollView
-            style={s.listSurface}
-            contentContainerStyle={[s.listContent, { paddingBottom: barInset + SP.md }, s.listEmptyContainer]}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
-          >
-            {renderEmptyState()}
-          </ScrollView>
-        ) : (
-          <View style={s.listSurface}>
-            <FlashList
-              data={followNotifications}
-              keyExtractor={item => item.id}
-              renderItem={renderFollowRow}
-              contentContainerStyle={StyleSheet.flatten([s.listContent, { paddingBottom: barInset + SP.md }])}
-              showsVerticalScrollIndicator={false}
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-            />
-          </View>
-        )
+      ) : filteredConvs.length === 0 && !messagesSearchLower ? (
+        <ScrollView
+          style={s.listSurface}
+          contentContainerStyle={[s.listContent, { paddingBottom: barInset + SP.md }, s.listEmptyContainer]}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
+        >
+          {listHeader}
+          <View style={{ paddingHorizontal: gutter }}>{renderEmptyState()}</View>
+        </ScrollView>
       ) : filteredConvs.length === 0 ? (
         <ScrollView
           style={s.listSurface}
           contentContainerStyle={[s.listContent, { paddingBottom: barInset + SP.md }, s.listEmptyContainer]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
         >
-          {renderEmptyState()}
+          <View style={{ paddingHorizontal: gutter }}>{renderEmptyState()}</View>
         </ScrollView>
       ) : (
         <View style={s.listSurface}>
@@ -827,7 +794,8 @@ export default function InboxScreen() {
             data={filteredConvs}
             keyExtractor={item => item.id}
             renderItem={renderConvRow}
-            contentContainerStyle={StyleSheet.flatten([s.listContent, { paddingBottom: barInset + SP.md }])}
+            ListHeaderComponent={messagesSearchLower ? null : listHeader}
+            contentContainerStyle={StyleSheet.flatten([s.listContent, { paddingBottom: barInset + SP.md, paddingHorizontal: gutter }])}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             refreshing={refreshing}
@@ -837,7 +805,7 @@ export default function InboxScreen() {
       )}
 
       {/* New message FAB */}
-      {activeTab === 'Messages' && !loading && (
+      {!loading && (
         <PressableScale
           style={[s.fab, { bottom: barInset + SP.md, backgroundColor: theme.accent, shadowColor: theme.shadowColor }]}
           onPress={() => { hapticPrimaryAction(); openCompose(); }}
@@ -850,6 +818,40 @@ export default function InboxScreen() {
         </PressableScale>
       )}
 
+      {/* Message requests sheet */}
+      <Modal
+        visible={requestsSheetVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setRequestsSheetVisible(false)}
+      >
+        <View style={s.composeBackdrop}>
+          <View style={[s.composeSheet, { paddingBottom: insets.bottom + SP.md, backgroundColor: theme.card }]}>
+            <SheetHandle />
+            <View style={s.composeHeader}>
+              <Text style={[s.composeTitle, { color: theme.text }]}>Message requests</Text>
+              <PressableScale
+                onPress={() => setRequestsSheetVisible(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Feather name="x" size={22} color={theme.text} />
+              </PressableScale>
+            </View>
+            {requestConvs.length === 0 ? (
+              <View style={s.composeCenter}>
+                <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm }}>No message requests</Text>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {requestConvs.map(renderRequestRow)}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       <Modal
         visible={composeVisible}
         animationType="slide"
@@ -860,7 +862,7 @@ export default function InboxScreen() {
           <View style={[s.composeSheet, { paddingBottom: insets.bottom + SP.md, backgroundColor: theme.card }]}>
             <SheetHandle />
             <View style={s.composeHeader}>
-              <Text style={s.composeTitle}>New message</Text>
+              <Text style={[s.composeTitle, { color: theme.text }]}>New message</Text>
               <PressableScale
                 onPress={closeCompose}
                 accessibilityRole="button"
@@ -937,7 +939,7 @@ export default function InboxScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-function createStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
+function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: number) {
   return StyleSheet.create({
   root: { flex: 1 },
 
@@ -949,19 +951,15 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
     paddingTop: SP.sm,
     paddingHorizontal: SP.md,
     height: '70%',
+    maxWidth: Platform.OS === 'web' ? CONTENT_MAX_WIDTH + SP.xl * 2 : undefined,
+    width: '100%',
+    alignSelf: 'center',
   },
-  composeHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: 'center', marginBottom: SP.sm },
   composeHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     marginBottom: SP.sm,
   },
-  composeTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: theme.text },
-  composeSearchRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.md, paddingHorizontal: SP.sm, height: 44,
-    marginBottom: SP.sm,
-  },
-  composeSearchInput: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, height: 44 },
+  composeTitle: { fontSize: FS.lg, fontFamily: FONT.bold },
   composeSearchBar: { marginBottom: SP.sm },
   composeSectionTitle: {
     fontSize: FS.xs,
@@ -980,94 +978,71 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
     width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
   },
 
-  // Header
+  // Header — bold, large-title treatment (not a small centered header)
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SP.md,
     paddingBottom: SP.md,
     backgroundColor: 'transparent',
-  },
-  headerSide: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
   },
   headerTitle: {
-    fontSize: FS.lg,
-    fontFamily: FONT.bold,
-  },
-  // Roomy pill-segmented control (Bumble/Discord-style) instead of thin
-  // underline tabs crammed against the search row below it.
-  primaryTabs: {
-    flexDirection: 'row',
-    minHeight: 44,
-    backgroundColor: 'transparent',
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.md,
-    gap: SP.sm,
-  },
-  primaryTab: {
     flex: 1,
-    minHeight: 44,
+    fontSize: FS.h1,
+    fontFamily: FONT.bold,
+    letterSpacing: -0.5,
+    textAlign: 'left',
+  },
+
+  // Followers rail
+  railSection: { marginBottom: SP.lg, marginTop: SP.xs },
+  railHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
+    gap: SP.sm,
+    marginBottom: SP.sm,
   },
-  primaryTabText: { fontSize: FS.sm, fontFamily: FONT.medium },
-  primaryTabTextActive: { fontFamily: FONT.bold },
-  primaryTabCount: { fontSize: FS.xs, fontFamily: FONT.bold },
-  notifBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
+  railTitle: { fontSize: FS.md, fontFamily: FONT.bold },
+  railCountPill: {
+    minWidth: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6,
+  },
+  railCountText: { fontSize: FS.xs, fontFamily: FONT.bold },
+
+  // Message requests banner
+  requestsBanner: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 3,
+    gap: SP.sm,
+    borderWidth: 1,
+    borderRadius: RADIUS.lg,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.md,
+    marginBottom: SP.lg,
+    minHeight: 64,
   },
-  notifBadgeText: {
+  requestsIconCircle: {
+    width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
+  },
+  requestsBannerTitle: { fontSize: FS.base, fontFamily: FONT.semibold },
+  requestsBannerSubtitle: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
+  requestsCountPill: {
+    minWidth: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6,
+  },
+  requestsCountText: { fontSize: FS.xs, fontFamily: FONT.bold },
+
+  messagesSectionLabel: {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: theme.text,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: SP.sm,
   },
 
-  // Tabs
-  tabsRow: { flexGrow: 0, marginBottom: SP.sm },
-  tabsContent: {
-    paddingHorizontal: SP.md,
-    gap: SP.sm,
-  },
-  tabPill: {
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.xs,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-  },
-  tabText: {
-    fontSize: FS.sm,
-    fontFamily: FONT.medium,
-  },
-
-  // Request card (replaces convRow for Requests tab)
+  // Request card (inside the requests sheet)
   requestCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginHorizontal: 0,
-    marginTop: 0,
-    paddingHorizontal: SP.md,
     paddingVertical: SP.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
-    backgroundColor: 'transparent',
     gap: SP.md,
   },
   requestActions: {
@@ -1079,85 +1054,46 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 36,
+    minHeight: 40,
     paddingVertical: SP.xs,
     borderRadius: RADIUS.md,
   },
   requestAcceptText: {
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
-    color: theme.onAccent,
   },
   requestDeclineBtn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 36,
+    minHeight: 40,
     paddingVertical: SP.xs,
-    backgroundColor: theme.card,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: theme.border,
   },
   requestDeclineText: {
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
-    color: theme.muted,
   },
   requestBtnDisabled: {
     opacity: 0.5,
   },
 
-  // Conversation row
+  // Conversation row — roomier, no per-row hairline (rhythm from spacing,
+  // not chrome); bigger avatar for a real visual step up from the prior pass.
   convRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 0,
-    marginTop: 0,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.md + 4,
-    minHeight: 92,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
-    backgroundColor: 'transparent',
-  },
-  // Follows tab: roomy card (avatar + text tap area, plus an inline Message
-  // pill) rather than a plain list row — Azar/Discord "new friend" cards.
-  followCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.md + 4,
+    paddingVertical: SP.md,
     minHeight: 96,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
-    gap: SP.sm,
-  },
-  followCardTap: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  followMessageBtn: {
-    borderWidth: 1,
-    borderRadius: RADIUS.pill,
-    paddingHorizontal: SP.md,
-    height: 44,
-    minWidth: 88,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  followMessageBtnText: {
-    fontSize: FS.sm,
-    fontFamily: FONT.semibold,
   },
   avatarContainer: {
     position: 'relative',
   },
-  avatar48: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  avatar60: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1169,7 +1105,7 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
     justifyContent: 'center',
   },
   avatarInitials: {
-    fontSize: FS.base,
+    fontSize: FS.md,
     fontFamily: FONT.bold,
     color: '#FFFFFF',
   },
@@ -1177,18 +1113,18 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
     position: 'absolute',
     top: 0,
     right: 0,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     borderWidth: 2,
     borderColor: theme.background,
   },
   onlineDot: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 13,
-    height: 13,
+    bottom: 2,
+    right: 2,
+    width: 14,
+    height: 14,
     borderRadius: 7,
     borderWidth: 2,
   },
@@ -1196,11 +1132,9 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginHorizontal: SP.md,
-    marginTop: 0,
-    marginBottom: SP.sm,
+    marginBottom: SP.md,
     paddingHorizontal: SP.md,
-    height: 44,
+    height: 46,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
   },
@@ -1212,15 +1146,15 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
   },
   fab: {
     position: 'absolute',
-    right: SP.md,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    right: gutter,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
-    shadowRadius: 10,
+    shadowRadius: 12,
     elevation: 6,
   },
   convCenter: {
@@ -1230,16 +1164,15 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
   convNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 2,
+    marginBottom: 3,
   },
   convName: {
     flex: 1,
-    fontSize: FS.base,
+    fontSize: FS.md,
   },
   convTime: {
     fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: theme.muted,
+    fontFamily: FONT.medium,
     marginLeft: SP.xs,
   },
   orderPill: {
@@ -1256,12 +1189,11 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
   convPreview: {
     fontSize: FS.sm,
     fontFamily: FONT.regular,
-    color: theme.muted,
   },
   unreadBadge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: SP.xs,
@@ -1270,7 +1202,6 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
   unreadBadgeText: {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: theme.onAccent,
   },
 
   // Empty state
@@ -1279,24 +1210,5 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
   listEmptyContainer: {
     flex: 1,
   },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 60,
-    gap: SP.sm,
-  },
-  emptyTitle: {
-    fontSize: FS.base,
-    fontFamily: FONT.semibold,
-    color: theme.muted,
-    marginTop: SP.sm,
-  },
-  emptySubtitle: {
-    fontSize: FS.sm,
-    fontFamily: FONT.regular,
-    color: theme.subtle,
-  },
-  retryText: { fontSize: FS.sm, fontFamily: FONT.semibold, marginTop: SP.sm },
   });
 }
