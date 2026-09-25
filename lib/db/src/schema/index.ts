@@ -5,6 +5,7 @@ export * from './subscriptionEntitlements';
 export * from './security';
 export * from './money';
 export * from './threadCash';
+export * from './metaAds';
 import { manufacturers, sellerRfqs } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
 

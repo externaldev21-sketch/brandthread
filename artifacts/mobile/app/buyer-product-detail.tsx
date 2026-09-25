@@ -25,6 +25,7 @@ import { BuyerProduct, BuyerProductOption, BuyerProductVariant, CheckoutAttribut
 import { useApi } from '@/hooks/useApi';
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import { reportHref } from '@/lib/safety';
+import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
 import { useAuth } from '@clerk/expo';
 import {
   BG, CARD, CARD_ELEVATED, BORDER,
@@ -580,6 +581,18 @@ export default function BuyerProductDetailScreen() {
 
     return () => { cancelled = true; };
   }, [productId]);
+
+  // Meta Pixel + Conversions API — ViewContent, once per loaded product. This
+  // is the real buyer-facing product page (product-detail.tsx is the seller's
+  // own management view), so it's the correct place to fire ViewContent.
+  useEffect(() => {
+    if (!product?.id) return;
+    void trackAndRelayConversionEvent(
+      'ViewContent',
+      { content_ids: [product.id], content_type: 'product', value: product.priceCents / 100, currency: 'usd' },
+      { productId: product.id, valueCents: product.priceCents, currency: 'usd' },
+    );
+  }, [product?.id]);
 
   useEffect(() => {
     if (!product || !editVariantId) return;
