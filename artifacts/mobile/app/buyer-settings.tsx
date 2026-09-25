@@ -5,15 +5,16 @@
 import React, { useMemo, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
 import { FONT, FS, SP } from '@/lib/theme';
-import { hapticLight, hapticSuccess } from '@/lib/haptics';
+import { hapticSuccess } from '@/lib/haptics';
 import { BUYER_SETTINGS_CATALOG, SettingsCatalogItem } from '@/services/settingsCatalog';
-import { SettingsProfileCard, SettingsSearchBar, SettingsSection, SettingsRow, ConfirmSheet } from '@/components/settings/SettingsKit';
-import { IconButton } from '@/components/BrandthreadUI';
+import { SettingsProfileCard, SettingsSearchBar, ConfirmSheet } from '@/components/settings/SettingsKit';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { SectionHeader } from '@/components/BrandthreadUI';
+import { Card, ListRow } from '@/components/ui';
 
 export default function BuyerSettingsScreen() {
   const colors = useColors();
@@ -28,7 +29,6 @@ export default function BuyerSettingsScreen() {
 
   const profileName = user?.fullName || user?.username || 'Your Brandthread profile';
   const profileInitials = [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join('').toUpperCase() || 'BT';
-  const topPad = Platform.OS === 'web' ? 24 : insets.top;
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -44,7 +44,6 @@ export default function BuyerSettingsScreen() {
   }, [query]);
 
   async function handleItem(item: SettingsCatalogItem) {
-    hapticLight();
     if (item.soon) return;
     if (item.action === 'sign-out') {
       setSignOutVisible(true);
@@ -71,13 +70,10 @@ export default function BuyerSettingsScreen() {
 
   return (
     <View style={s.page}>
-      <View style={[s.header, { paddingTop: topPad + 12 }]}>
-        <Text style={s.headerTitle}>Settings</Text>
-        <IconButton name="x" color={colors.foreground} onPress={() => { hapticLight(); router.back(); }} accessibilityLabel="Close settings" />
-      </View>
+      <ScreenHeader title="Settings" variant="push" onBack={() => router.back()} />
 
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + 48 }}
+        contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: insets.bottom + 48 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -92,20 +88,26 @@ export default function BuyerSettingsScreen() {
         <SettingsSearchBar value={query} onChangeText={setQuery} />
 
         {groups.map((group) => (
-          <SettingsSection key={group.title} title={group.title}>
-            {group.items.map((item, i) => (
-              <SettingsRow
-                key={item.label}
-                icon={item.icon}
-                label={item.label}
-                subtitle={item.description}
-                destructive={item.destructive}
-                soon={item.soon}
-                last={i === group.items.length - 1}
-                onPress={() => handleItem(item)}
-              />
-            ))}
-          </SettingsSection>
+          <View key={group.title} style={s.group}>
+            <SectionHeader title={group.title.toUpperCase()} />
+            <Card style={s.card}>
+              {group.items.map((item, i) => (
+                <React.Fragment key={item.label}>
+                  <ListRow
+                    icon={item.icon}
+                    title={item.label}
+                    subtitle={item.description}
+                    destructive={item.destructive}
+                    value={item.soon ? 'Soon' : undefined}
+                    chevron={!item.soon}
+                    onPress={item.soon ? undefined : () => handleItem(item)}
+                    disabled={item.soon}
+                  />
+                  {i < group.items.length - 1 && <View style={s.divider} />}
+                </React.Fragment>
+              ))}
+            </Card>
+          </View>
         ))}
 
         <Text style={s.version}>Brandthread v1.0.0</Text>
@@ -127,8 +129,9 @@ export default function BuyerSettingsScreen() {
 function makeStyles(colors: ReturnType<typeof useColors>) {
   return StyleSheet.create({
     page: { flex: 1, backgroundColor: colors.background },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingBottom: 20 },
-    headerTitle: { fontSize: 30, fontFamily: FONT.bold, color: colors.foreground },
+    group: { marginBottom: SP.lg },
+    card: { padding: 0, paddingHorizontal: SP.md },
+    divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
     version: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginTop: 4 },
   });
 }
