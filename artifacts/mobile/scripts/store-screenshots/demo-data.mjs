@@ -154,6 +154,83 @@ const TRENDING = [
   { brand: 'field', caption: 'Clay or stone? Vote for the next colourway.' },
 ].map((row, i) => ({ id: `post_trending_${i + 1}`, rank: i + 1, brand: BRANDS[row.brand].name, brandId: BRANDS[row.brand].id, caption: row.caption }));
 
+// ─── Buyer Search screen (search / suggested / categories / people) ───────────
+
+const BRAND_COLORS = ['#8B5CF6', '#0891B2', '#0F766E', '#B45309'];
+const brandInitials = (name) => name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+
+function publicSearch(rawQuery) {
+  const q = rawQuery.trim().toLowerCase();
+  const matches = (...fields) => !q || fields.some((f) => f?.toLowerCase().includes(q));
+
+  const brandResults = Object.values(BRANDS)
+    .filter((b) => matches(b.name, b.handle))
+    .map((b, i) => ({
+      id: b.clerkId, kind: 'brand', name: b.name, handle: `@${b.handle}`,
+      color: BRAND_COLORS[i % BRAND_COLORS.length], initials: brandInitials(b.name), sellerId: b.clerkId,
+    }));
+
+  const productResults = PUBLIC_PRODUCTS
+    .filter((p) => matches(p.name, p.sellerDisplayName, p.category))
+    .map((p, i) => ({
+      id: p.id, kind: 'product', brand: p.sellerDisplayName, name: p.name,
+      price: `$${Math.round(p.priceCents / 100)}`, priceCents: p.priceCents, category: p.category,
+      imageUri: p.images[0], color: BRAND_COLORS[i % BRAND_COLORS.length], initials: brandInitials(p.sellerDisplayName),
+      productId: p.id,
+    }));
+
+  const videoResults = FEED_POSTS
+    .filter((post) => matches(post.caption, BRANDS[post.brand].name))
+    .map((post, i) => {
+      const brand = BRANDS[post.brand];
+      return {
+        id: `search_video_${i + 1}`, kind: 'video', postId: `search_video_${i + 1}`,
+        caption: post.caption, thumbnailUrl: img(post.image), videoUrl: img(post.image),
+        authorId: brand.clerkId, authorName: brand.name, authorHandle: `@${brand.handle}`,
+        authorAvatarUrl: brand.avatar, color: BRAND_COLORS[i % BRAND_COLORS.length],
+        initials: brandInitials(brand.name), likesCount: post.likes,
+      };
+    });
+
+  const results = [...brandResults, ...productResults, ...videoResults];
+  return { results, pagination: { limit: 30, offset: 0, returned: results.length, total: results.length, hasMore: false } };
+}
+
+function searchSuggested() {
+  return {
+    brands: Object.values(BRANDS).map((b, i) => ({
+      id: b.clerkId, sellerId: b.clerkId, name: b.name, handle: `@${b.handle}`,
+      color: BRAND_COLORS[i % BRAND_COLORS.length], initials: brandInitials(b.name),
+      followerCount: 12400 - i * 2100,
+    })),
+    products: PUBLIC_PRODUCTS.slice(0, 6).map((p, i) => ({
+      id: p.id, productId: p.id, name: p.name, brand: p.sellerDisplayName,
+      category: p.category, imageUri: p.images[0], color: BRAND_COLORS[i % BRAND_COLORS.length],
+      initials: brandInitials(p.sellerDisplayName),
+    })),
+  };
+}
+
+function searchCategories() {
+  const seen = new Map();
+  for (const p of PUBLIC_PRODUCTS) {
+    if (!seen.has(p.category)) seen.set(p.category, p);
+  }
+  return {
+    categories: [...seen.entries()].map(([category, p], i) => ({
+      category, productCount: PUBLIC_PRODUCTS.filter((x) => x.category === category).length,
+      imageUri: p.images[0], color: BRAND_COLORS[i % BRAND_COLORS.length],
+    })),
+  };
+}
+
+function searchPeople() {
+  return [
+    { userId: 'user_priya', name: 'Priya Nandan', username: 'priyan', handle: '@priyan', initials: 'PN', color: '#B45309', bio: 'Streetwear archive', isFollowing: false },
+    { userId: 'user_theo', name: 'Theo Marsh', username: 'theomarsh', handle: '@theomarsh', initials: 'TM', color: '#0F766E', bio: 'Trail running, always', isFollowing: true },
+  ];
+}
+
 // ─── Buyer data (Jordan Reyes) ────────────────────────────────────────────────
 
 const FEED_POSTS = [
@@ -453,6 +530,11 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/public/drops') return DROPS.map(publicDrop);
   if ((match = p.match(/^\/public\/drops\/([^/]+)$/))) return DROPS.map(publicDrop).find((d) => d.id === match[1]);
   if (p === '/public/trending') return { trending: TRENDING.slice(0, Number(query.get('limit') ?? 20)) };
+  if (p === '/public/search') return publicSearch(query.get('q') ?? '');
+  if (p === '/public/search/trending') return { trending: [{ term: 'Hoodies', type: 'category' }, { term: 'Northline Studio', type: 'brand' }, { term: 'trail runner', type: 'query' }, { term: 'Outerwear', type: 'category' }] };
+  if (p === '/public/search/suggested') return searchSuggested();
+  if (p === '/public/search/categories') return searchCategories();
+  if (p === '/social/search') return searchPeople();
   if ((match = p.match(/^\/public\/products\/([^/]+)\/related$/))) return PUBLIC_PRODUCTS.filter((item) => item.id !== match[1]).slice(0, 5);
   if ((match = p.match(/^\/public\/products\/([^/]+)$/))) return byId(PUBLIC_PRODUCTS)(match[1]);
   if (p.startsWith('/reviews/product/')) return REVIEWS;
