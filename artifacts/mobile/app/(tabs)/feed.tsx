@@ -1066,9 +1066,19 @@ function VideoVisual({
     // relying on isActive alone, which never changes across that round trip
     // and left the last decoded frame frozen/gray on web until some other
     // state change happened to re-run this effect.
-    if (isActive && !paused && isScreenFocused) player.play();
-    else player.pause();
-  }, [isActive, paused, isScreenFocused, player]);
+    //
+    // pageWidth/pageHeight are also dependencies: on web, this cell can
+    // mount (and this effect can first run) before the FlatList/parent has
+    // measured a non-zero size for it, which — combined with the container-
+    // sizing bug above — used to leave the player permanently paused with
+    // nothing ever re-triggering play() once a real size arrived. Re-running
+    // this effect when the page's measured size changes closes that gap.
+    if (isActive && !paused && isScreenFocused && (pageWidth ?? 0) > 0 && (pageHeight ?? 0) > 0) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [isActive, paused, isScreenFocused, player, pageWidth, pageHeight]);
   React.useEffect(() => {
     player.playbackRate = rate;
   }, [player, rate]);
@@ -1081,9 +1091,18 @@ function VideoVisual({
   const showBottomStrip = immersive && fit === 'cover' && bottomStripHeight > 0 && pageWidth != null && pageHeight != null;
   const sharpClipStyle = showBottomStrip ? { bottom: bottomStripHeight, overflow: 'hidden' as const } : null;
 
+  // Explicit size on the sharp-clip wrapper itself rather than trusting it
+  // to inherit height from an ancestor: on web, absoluteFill inside a
+  // virtualized FlatList cell can resolve against an ancestor whose own
+  // height collapsed to 0 (flex/auto sizing there doesn't behave like
+  // native), which silently zeroed the entire video area while the
+  // separately explicit-sized blurred mirror strip kept rendering fine —
+  // exactly the all-black-with-nothing-playing symptom this was causing.
+  const clipSize = pageWidth != null && pageHeight != null ? { width: pageWidth, height: pageHeight } : null;
+
   return (
     <>
-      <View style={[StyleSheet.absoluteFill, sharpClipStyle]}>
+      <View style={[StyleSheet.absoluteFill, clipSize, sharpClipStyle]}>
         {immersive && fit === 'contain' && posterImage && (
           <CachedImage
             source={posterImage}
@@ -1474,8 +1493,16 @@ function SpotlightPage({
 
   return (
     <View style={{ width: pageWidth, height: pageHeight, backgroundColor: '#000' }}>
-      <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut}>
-        <View style={StyleSheet.absoluteFill}>
+      {/* Explicit width/height on the Pressable itself, not just its
+          absoluteFill'd parent: on web, a plain Pressable/View with no
+          intrinsic content and only absolutely-positioned children can
+          collapse to 0 height inside a virtualized FlatList cell (flex/auto
+          sizing there doesn't reliably inherit the ancestor's height the way
+          native does) — which silently zeroed out the whole video area
+          (390x0) while the separately-sized blurred mirror strip kept
+          rendering, producing an all-black screen with nothing playing. */}
+      <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={{ width: pageWidth, height: pageHeight }}>
+        <View style={[StyleSheet.absoluteFill, { width: pageWidth, height: pageHeight }]}>
           {item.contentType === 'video'
             ? (
               <VideoVisual

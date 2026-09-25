@@ -90,3 +90,29 @@ describe('Press-and-hold 2x speed / hold-to-pause', () => {
     expect(feed).toContain('handleQuickTap();');
   });
 });
+
+describe('Feed page/video container sizing (web all-black bug)', () => {
+  // Regression coverage: the sharp video wrapper had no explicit
+  // width/height and relied on StyleSheet.absoluteFill resolving against an
+  // ancestor's height. Inside a virtualized FlatList cell on web that
+  // ancestor can measure 0 height, silently collapsing the whole video area
+  // to e.g. 390x0 while the separately explicit-sized blurred tab-bar
+  // mirror strip kept rendering fine — an all-black screen with nothing
+  // playing. Every layer in the chain must carry an explicit size, not just
+  // absoluteFill/flex.
+
+  it('gives the page-level Pressable and its inner view an explicit width/height, not just absoluteFill', () => {
+    expect(feed).toContain('<Pressable onPressIn={handlePressIn} onPressOut={handlePressOut} style={{ width: pageWidth, height: pageHeight }}>');
+    expect(feed).toContain('<View style={[StyleSheet.absoluteFill, { width: pageWidth, height: pageHeight }]}>');
+  });
+
+  it('gives the sharp-clip wrapper inside VideoVisual an explicit size, independent of its ancestor', () => {
+    expect(feed).toContain('const clipSize = pageWidth != null && pageHeight != null ? { width: pageWidth, height: pageHeight } : null;');
+    expect(feed).toContain('<View style={[StyleSheet.absoluteFill, clipSize, sharpClipStyle]}>');
+  });
+
+  it('re-fires the play effect once the page has a real measured size, not just on isActive/paused/focus', () => {
+    expect(feed).toMatch(/if \(isActive && !paused && isScreenFocused && \(pageWidth \?\? 0\) > 0 && \(pageHeight \?\? 0\) > 0\) \{\s*player\.play\(\);/);
+    expect(feed).toContain('}, [isActive, paused, isScreenFocused, player, pageWidth, pageHeight]);');
+  });
+});
