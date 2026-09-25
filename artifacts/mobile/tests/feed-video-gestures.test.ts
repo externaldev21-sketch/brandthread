@@ -25,20 +25,33 @@ describe('Scrubbable video progress bar', () => {
   });
 
   it('thickens the bar while dragging', () => {
-    expect(feed).toMatch(/thickness.*=.*useRef\(new Animated\.Value\(2\)\)/);
-    expect(feed).toContain("Animated.timing(thickness, { toValue: 6");
-    expect(feed).toContain("Animated.timing(thickness, { toValue: 2");
+    expect(feed).toMatch(/thickness.*=.*useRef\(new Animated\.Value\(3\)\)/);
+    expect(feed).toContain("Animated.timing(thickness, { toValue: 7");
+    expect(feed).toContain("Animated.timing(thickness, { toValue: 3");
   });
 
-  it('shows a time bubble only while dragging', () => {
+  it('shows a time bubble only while dragging, with current/total time', () => {
     expect(feed).toContain('formatPlaybackTime(');
     expect(feed).toContain('{dragging && (');
     expect(feed).toContain('styles.scrubBubble');
+    expect(feed).toContain('{formatPlaybackTime(shown * duration)} / {formatPlaybackTime(duration)}');
   });
 
-  it('gives haptic feedback on grab and release', () => {
-    expect(feed).toMatch(/onPanResponderGrant: \(evt\) => \{\s*setDragging\(true\);\s*Haptics\.impactAsync/);
-    expect(feed).toMatch(/onPanResponderRelease: \(\) => \{\s*setDragging\(false\);\s*Haptics\.impactAsync/);
+  it('shows a round thumb on the track while dragging', () => {
+    expect(feed).toContain('styles.scrubThumb');
+    expect(feed).toContain('thumbScale');
+  });
+
+  it('gives haptic feedback on grab and release, plus a tick every few percent while dragging', () => {
+    expect(feed).toMatch(/onPanResponderGrant: \(evt\) => \{\s*setDragging\(true\);[\s\S]*?hapticLight\(\);/);
+    expect(feed).toMatch(/onPanResponderRelease: \(\) => \{\s*setDragging\(false\);\s*hapticLight\(\);/);
+    expect(feed).toContain('hapticSelection();');
+  });
+
+  it('pauses the real player for the duration of the drag and resumes on release unless the post was already paused', () => {
+    expect(feed).toContain('player.pause();');
+    expect(feed).toContain('if (!externallyPaused) player.play();');
+    expect(feed).toContain('externallyPaused={paused}');
   });
 });
 
