@@ -469,6 +469,33 @@ describe('buyer profile tabs', () => {
     expect(routerMock.push).toHaveBeenCalledWith('/buyer-order-detail?id=order-active');
   });
 
+  it('opens the full-screen feed player on the buyer\'s own posts, starting at the tapped one', async () => {
+    renderer = await renderScreen();
+    const tile = renderer.root.findAll(
+      node => node.props.testID === 'profile-video-tile-post-1' && typeof node.props.onPress === 'function',
+    )[0];
+    await act(async () => { tile.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/profile-videos?source=creator&id=buyer-1&startPostId=post-1&title=Ava%20Buyer');
+  });
+
+  it('links the Followers / Following counts to the connection lists', async () => {
+    renderer = await renderScreen();
+    const followers = renderer.root.findAll(
+      node => node.props.testID === 'profile-stat-followers' && typeof node.props.onPress === 'function',
+    )[0];
+    await act(async () => { followers.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/connections?type=followers');
+  });
+
+  it('offers "Post your first video" when the buyer has no posts', async () => {
+    getMyPostsMock.mockResolvedValue([]);
+    renderer = await renderScreen();
+    const cta = renderer.root.findByProps({ testID: 'empty-state-action' });
+    expect(textContent(cta.props.children)).toContain('Post your first video');
+    await act(async () => { cta.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/create-post?accountType=buyer');
+  });
+
   it('renders no My Orders section when the buyer has no orders', async () => {
     getBuyerOrdersWithStatusMock.mockResolvedValue({ orders: [], fromCache: false });
     renderer = await renderScreen();

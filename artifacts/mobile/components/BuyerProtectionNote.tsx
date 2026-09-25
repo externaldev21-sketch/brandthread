@@ -13,24 +13,10 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { LEGAL_DOCUMENTS } from '@/content/legal';
+import { BUYER_PROTECTION_STATUS, BUYER_PROTECTION_TITLE, buyerProtectionLines } from '@/content/buyerProtection';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 
-export const BUYER_PROTECTION_TITLE = 'Purchase protection';
-export const BUYER_PROTECTION_STATUS = 'Brandthread protected';
-
-function termsBullet(sectionTitle: string, match: string): string | null {
-  const section = LEGAL_DOCUMENTS.terms.sections.find((candidate) => candidate.title === sectionTitle);
-  const bullet = section?.bullets?.find((text) => text.includes(match)) ?? null;
-  // Never surface an unresolved [OWNER/COUNSEL: …] drafting placeholder to buyers.
-  return bullet && !bullet.includes('[') ? bullet : null;
-}
-
-/** The Terms lines the note quotes (exported for tests). */
-export function buyerProtectionLines({ preorder = false }: { preorder?: boolean } = {}): string[] {
-  const lines = [termsBullet('Buying on Brandthread', 'return, exchange, cancellation')];
-  if (preorder) lines.push(termsBullet('Preorders and drops', 'held by Brandthread'));
-  return lines.filter((line): line is string => !!line);
-}
+export { BUYER_PROTECTION_STATUS, BUYER_PROTECTION_TITLE, buyerProtectionLines } from '@/content/buyerProtection';
 
 export function BuyerProtectionNote({
   preorder = false,
