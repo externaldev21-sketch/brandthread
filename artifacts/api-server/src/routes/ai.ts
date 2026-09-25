@@ -16,6 +16,7 @@ import { clerkClient } from "@clerk/express";
 import { db, products, productVariants, orders, posts, storefronts } from "@workspace/db";
 import { eq, and, desc, asc, inArray, sql } from "drizzle-orm";
 import { buildSellerSnapshot, type SellerSnapshot } from "../lib/sellerSnapshot";
+import { helpDocsForPrompt, matchHelpDocs, type HelpDoc } from "../lib/aiHelpDocs";
 import type { Logger } from "pino";
 
 const router = Router();
@@ -82,6 +83,9 @@ function buildSystemPrompt(
     "```json",
     snapshotJson,
     "```",
+    "",
+    "How Brandthread features work (reference material — use this to explain how-to questions, never as account data):",
+    helpDocsForPrompt(),
     "",
     "If you want to suggest a structured action the user can approve, include a JSON block at the end of your response in this exact format:",
     "```json:action",
@@ -185,6 +189,7 @@ router.post("/chat", requireAuth, async (req: Request, res: Response): Promise<v
       boosts: { activeBoosts: null, totalBudgetCents: null, totalSpentCents: null, available: false },
       manufacturerOrders: { pendingQuotes: null, activeRelationships: null, recentRequests: [], available: false },
       discountCodes: { activeCodes: 0, totalCodes: 0 },
+      shipping: { activeRateCount: 0, totalRateCount: 0, hasFreeShippingThreshold: false },
     };
   }
 
@@ -212,9 +217,13 @@ router.post("/chat", requireAuth, async (req: Request, res: Response): Promise<v
 
     log?.info({ reqId, tokensUsed: completion.usage?.total_tokens }, "ai.chat.success");
 
+    const lastUserMessage = [...safeMessages].reverse().find(m => m.role === "user")?.content ?? "";
+    const sources = matchHelpDocs(lastUserMessage).map(d => ({ title: d.title, route: d.route }));
+
     res.json({
       content,
       actionCard,
+      sources,
       tokensUsed: completion.usage?.total_tokens,
     });
   } catch (err: unknown) {
@@ -225,6 +234,106 @@ router.post("/chat", requireAuth, async (req: Request, res: Response): Promise<v
       res.status(429).json({ error: "AI provider rate limit reached. Please try again shortly." });
     } else {
       res.status(503).json({ error: "AI service temporarily unavailable." });
+    }
+  }
+});
+
+// ─── POST /api/ai/chat/stream ───────────────────────────────────────────────
+// Server-Sent Events variant of /chat. Same auth, validation, and
+// seller-scoped snapshot — only the transport differs, so a client can
+// render tokens as they arrive instead of waiting for the full reply.
+// Emits: {type:"delta", content} per token, then one final
+// {type:"done", content, actionCard?, sources} with the matched help-doc
+// links, then the stream closes.
+
+function writeSse(res: Response, payload: Record<string, unknown>): void {
+  res.write(`data: ${JSON.stringify(payload)}\n\n`);
+}
+
+router.post("/chat/stream", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = (req as Request & { clerkUserId?: string }).clerkUserId!;
+  const log = (req as Request & { log?: Logger }).log;
+  const reqId = (req as Request & { id?: string }).id ?? "unknown";
+
+  const { messages: rawMessages, context, brandMemory, maxTokens } = req.body as {
+    messages?: unknown;
+    context?: Record<string, unknown>;
+    brandMemory?: Record<string, string>;
+    maxTokens?: number;
+  };
+
+  const validation = validateAndSanitizeMessages(rawMessages);
+  if (validation.error) {
+    res.status(400).json({ error: validation.error });
+    return;
+  }
+  const safeMessages = validation.messages!;
+  const lastUserMessage = [...safeMessages].reverse().find(m => m.role === "user")?.content ?? "";
+  const sources: HelpDoc[] = matchHelpDocs(lastUserMessage);
+
+  let snapshot: SellerSnapshot;
+  try {
+    snapshot = await buildSellerSnapshot(userId);
+  } catch (snapshotErr) {
+    log?.error({ reqId, err: snapshotErr }, "ai.chat.stream.snapshot_error");
+    res.status(503).json({ error: "AI service temporarily unavailable." });
+    return;
+  }
+
+  const systemPrompt = buildSystemPrompt(snapshot, context ?? {}, brandMemory);
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders?.();
+
+  let full = "";
+  let closed = false;
+  req.on("close", () => { closed = true; });
+
+  try {
+    const stream = await openai.chat.completions.create({
+      model: CHAT_MODEL,
+      messages: [{ role: "system", content: systemPrompt }, ...safeMessages],
+      max_completion_tokens: Math.min(maxTokens ?? 700, 1500),
+      stream: true,
+    });
+
+    for await (const chunk of stream) {
+      if (closed) break;
+      const delta = chunk.choices?.[0]?.delta?.content ?? "";
+      if (delta) {
+        full += delta;
+        writeSse(res, { type: "delta", content: delta });
+      }
+    }
+
+    if (!closed) {
+      const cardMatch = full.match(/```json:action\n([\s\S]*?)\n```/);
+      let actionCard: Record<string, unknown> | undefined;
+      if (cardMatch) {
+        try { actionCard = JSON.parse(cardMatch[1]) as Record<string, unknown>; } catch { /* ignore malformed action */ }
+      }
+      const content = full.replace(/```json:action\n[\s\S]*?\n```/g, "").trim();
+      writeSse(res, {
+        type: "done",
+        content,
+        actionCard,
+        sources: sources.map(d => ({ title: d.title, route: d.route })),
+      });
+      res.end();
+    }
+  } catch (err: unknown) {
+    const e = err as { status?: number };
+    log?.error({ reqId, status: e?.status }, "ai.chat.stream.provider_error");
+    if (!closed) {
+      writeSse(res, {
+        type: "error",
+        error: e?.status === 429
+          ? "AI provider rate limit reached. Please try again shortly."
+          : "AI service temporarily unavailable.",
+      });
+      res.end();
     }
   }
 });

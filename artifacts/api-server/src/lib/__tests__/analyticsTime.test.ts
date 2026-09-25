@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { DAY_MS, TEN_MIN_MS, floorToLocalStep, parseTzOffsetMinutes, previousPeriod } from "../analyticsTime";
+import {
+  DAY_MS,
+  TEN_MIN_MS,
+  addLocalMonths,
+  floorToLocalMonth,
+  floorToLocalStep,
+  parseTzOffsetMinutes,
+  previousPeriod,
+} from "../analyticsTime";
 
 describe("parseTzOffsetMinutes", () => {
   it("passes through a valid offset", () => {
@@ -75,5 +83,46 @@ describe("previousPeriod", () => {
     const previous = previousPeriod(start, end);
     expect(previous.start.toISOString()).toBe("2026-01-15T14:00:00.000Z");
     expect(previous.end.toISOString()).toBe("2026-01-15T15:00:00.000Z");
+  });
+});
+
+describe("floorToLocalMonth", () => {
+  it("floors to the 1st of the local month at UTC", () => {
+    const date = new Date("2026-01-15T13:53:00Z");
+    expect(floorToLocalMonth(date, 0).toISOString()).toBe("2026-01-01T00:00:00.000Z");
+  });
+
+  it("floors to the local month even when UTC is already in the next month", () => {
+    // 2026-02-01T04:00:00Z is 2026-01-31T20:00:00 in UTC-8, so the local
+    // month is still January, not February.
+    const date = new Date("2026-02-01T04:00:00Z");
+    expect(floorToLocalMonth(date, -480).toISOString()).toBe("2026-01-01T08:00:00.000Z");
+  });
+
+  it("is idempotent on an exact month boundary", () => {
+    const date = new Date("2026-03-01T00:00:00.000Z");
+    expect(floorToLocalMonth(date, 0).getTime()).toBe(date.getTime());
+  });
+});
+
+describe("addLocalMonths", () => {
+  it("adds whole calendar months in the local timezone", () => {
+    const jan1 = new Date("2026-01-01T00:00:00.000Z");
+    expect(addLocalMonths(jan1, 1, 0).toISOString()).toBe("2026-02-01T00:00:00.000Z");
+    expect(addLocalMonths(jan1, 11, 0).toISOString()).toBe("2026-12-01T00:00:00.000Z");
+  });
+
+  it("subtracts months, crossing a year boundary correctly", () => {
+    const jan1 = new Date("2026-01-01T00:00:00.000Z");
+    expect(addLocalMonths(jan1, -1, 0).toISOString()).toBe("2025-12-01T00:00:00.000Z");
+    expect(addLocalMonths(jan1, -11, 0).toISOString()).toBe("2025-02-01T00:00:00.000Z");
+  });
+
+  it("stays anchored to the same local calendar day across a DST-adjacent offset", () => {
+    // A local timezone offset far from UTC should never shift the calendar
+    // day when only the month changes.
+    const start = floorToLocalMonth(new Date("2026-01-15T00:00:00Z"), -480);
+    const next = addLocalMonths(start, 1, -480);
+    expect(next.toISOString()).toBe("2026-02-01T08:00:00.000Z");
   });
 });

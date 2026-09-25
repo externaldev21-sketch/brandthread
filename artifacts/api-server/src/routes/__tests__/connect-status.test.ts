@@ -48,25 +48,32 @@ vi.mock("@workspace/db", () => {
   };
 });
 
-vi.mock("../../lib/stripe", () => ({
-  requireStripe: () => {
-    state.requireStripeCalls++;
-    return {
-      accounts: {
-        retrieve: async () => {
-          if (state.retrieveError) throw state.retrieveError;
-          return state.account;
-        },
-        listExternalAccounts: async () => ({
-          object: "list",
-          data: state.externalAccounts,
-          has_more: false,
-          url: "/v1/accounts/acct/external_accounts",
-        }),
+vi.mock("../../lib/stripe", () => {
+  const client = {
+    accounts: {
+      retrieve: async () => {
+        if (state.retrieveError) throw state.retrieveError;
+        return state.account;
       },
-    };
-  },
-}));
+      listExternalAccounts: async () => ({
+        object: "list",
+        data: state.externalAccounts,
+        has_more: false,
+        url: "/v1/accounts/acct/external_accounts",
+      }),
+    },
+  };
+  return {
+    // A truthy stub so `providerConfigured` reads true, like a real
+    // environment with STRIPE_SECRET_KEY set. The missing-key case is
+    // covered separately in connect-status-unconfigured.test.ts.
+    stripe: client,
+    requireStripe: () => {
+      state.requireStripeCalls++;
+      return client;
+    },
+  };
+});
 
 import connectRouter from "../connect";
 
@@ -124,6 +131,10 @@ describe("seller Connect status", () => {
       status: "not_started",
       verified: false,
       bankLast4: null,
+      providerConfigured: true,
+      payoutSchedule: null,
+      requirementsDue: [],
+      taxInfoStatus: "unknown",
     });
     expect(state.requireStripeCalls).toBe(0);
   });
@@ -177,6 +188,10 @@ describe("seller Connect status", () => {
       status: "active",
       verified: true,
       bankLast4: "6789",
+      providerConfigured: true,
+      payoutSchedule: null,
+      requirementsDue: [],
+      taxInfoStatus: "submitted",
     });
     expect(JSON.stringify(result.body)).not.toContain("sensitive");
   });
@@ -229,6 +244,28 @@ describe("seller Connect status", () => {
       payoutsEnabled: false,
     });
     expect(state.updates[0]).toMatchObject({ stripeAccountStatus: "restricted" });
+  });
+
+  it("surfaces the payout schedule and flags tax info still needed", async () => {
+    state.user = { stripeAccountId: "acct_needs_tax", stripeAccountStatus: "pending" };
+    state.account = {
+      charges_enabled: true,
+      payouts_enabled: false,
+      details_submitted: false,
+      default_currency: "usd",
+      settings: { payouts: { schedule: { interval: "weekly", delay_days: 2, weekly_anchor: "friday" } } },
+      requirements: { currently_due: ["individual.verification.document"], eventually_due: ["individual.id_number"] },
+    };
+
+    const result = await getStatus();
+
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({
+      payoutSchedule: { interval: "weekly", delayDays: 2, weeklyAnchor: "friday", monthlyAnchor: null },
+      requirementsDue: ["individual.verification.document"],
+      taxInfoStatus: "needed",
+      providerConfigured: true,
+    });
   });
 
   it("returns a safe error when Stripe retrieval fails", async () => {

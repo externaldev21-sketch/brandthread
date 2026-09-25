@@ -31,6 +31,7 @@ import {
   getManufacturer, getFavoriteManufacturerIds, saveManufacturer, unfavoriteManufacturer,
   getOrCreateConversation,
 } from '@/services/manufacturerService';
+import { getManufacturerProducts, lowestTierPriceCents, type ManufacturerProduct } from '@/services/manufacturerCatalog';
 
 import { Manufacturer } from '@/services/manufacturerTypes';
 import { formatCents } from '@/lib/money';
@@ -87,6 +88,9 @@ export default function ManufacturerProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [products, setProducts] = useState<ManufacturerProduct[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [productsError, setProductsError] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -101,6 +105,18 @@ export default function ManufacturerProfileScreen() {
       setManufacturer(null);
       setLoading(false);
     });
+    return () => { active = false; };
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    let active = true;
+    setProductsLoading(true);
+    setProductsError(false);
+    getManufacturerProducts(id)
+      .then((rows) => { if (active) setProducts(rows); })
+      .catch(() => { if (active) setProductsError(true); })
+      .finally(() => { if (active) setProductsLoading(false); });
     return () => { active = false; };
   }, [id]);
 
@@ -366,6 +382,57 @@ export default function ManufacturerProfileScreen() {
                 <Text style={s.pricingValue}>{m.leadTimeDays} days</Text>
               </View>
             </View>
+          </SectionCard>
+
+          {/* ── Product / Sample Catalog ── */}
+          <SectionCard title="Product Catalog">
+            {productsLoading ? (
+              <ActivityIndicator color={PURPLE} />
+            ) : productsError ? (
+              <EmptyState icon="wifi-off" title="Catalog unavailable" description="Could not load this manufacturer's product catalog." />
+            ) : products.length === 0 ? (
+              <EmptyState icon="grid" title="No catalog products yet" description="This manufacturer hasn't listed browsable products with quantity pricing." />
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.catalogRow}>
+                {products.map((product) => {
+                  const from = lowestTierPriceCents(product);
+                  return (
+                    <TouchableOpacity
+                      key={product.id}
+                      style={s.catalogCard}
+                      activeOpacity={0.85}
+                      onPress={() => router.push((`/manufacturer-product?manufacturerId=${m.id}&productId=${product.id}`) as never)}
+                      testID={`catalog-product-${product.id}`}
+                    >
+                      {product.images[0] ? (
+                        <Image source={{ uri: product.images[0] }} style={s.catalogImage} resizeMode="cover" />
+                      ) : (
+                        <View style={[s.catalogImage, s.catalogImageFallback]}>
+                          <Feather name="package" size={ICON.lg} color={SUBTLE} />
+                        </View>
+                      )}
+                      <Text style={s.catalogName} numberOfLines={2}>{product.name}</Text>
+                      {from !== undefined && (
+                        <Text style={s.catalogPrice}>from {formatCents(from)}/unit</Text>
+                      )}
+                      <Text style={s.catalogMeta}>MOQ {product.moq.toLocaleString('en-US')} · {product.leadTimeDays}d lead</Text>
+                      {product.priceTiers.length > 0 && (
+                        <View style={s.tierMiniTable}>
+                          {product.priceTiers.slice(0, 3).map((tier) => (
+                            <View key={tier.id} style={s.tierMiniRow}>
+                              <Text style={s.tierMiniQty}>
+                                {tier.minQuantity}{tier.maxQuantity ? `–${tier.maxQuantity}` : '+'}
+                              </Text>
+                              <Text style={s.tierMiniPrice}>{formatCents(tier.unitPriceCents)}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
           </SectionCard>
 
           {/* ── Gallery ── */}
@@ -642,5 +709,39 @@ const s = StyleSheet.create({
   stickyBottom: {
     backgroundColor: BG, borderTopWidth: 1, borderTopColor: BORDER,
     paddingTop: SP.sm,
+  },
+  catalogRow: {
+    gap: SP.sm, paddingRight: SP.sm,
+  },
+  catalogCard: {
+    width: 156, backgroundColor: SURFACE, borderRadius: RADIUS.md, borderWidth: 1,
+    borderColor: BORDER, padding: SP.sm, gap: 4,
+  },
+  catalogImage: {
+    width: '100%', height: 96, borderRadius: RADIUS.sm, backgroundColor: CARD_ELEVATED,
+  },
+  catalogImageFallback: {
+    alignItems: 'center', justifyContent: 'center',
+  },
+  catalogName: {
+    fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginTop: 4, minHeight: 32,
+  },
+  catalogPrice: {
+    fontSize: FS.sm, fontFamily: FONT.bold, color: PURPLE_LIGHT,
+  },
+  catalogMeta: {
+    fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED,
+  },
+  tierMiniTable: {
+    marginTop: 4, gap: 2, borderTopWidth: 1, borderTopColor: BORDER, paddingTop: 4,
+  },
+  tierMiniRow: {
+    flexDirection: 'row', justifyContent: 'space-between',
+  },
+  tierMiniQty: {
+    fontSize: 10, fontFamily: FONT.regular, color: SUBTLE,
+  },
+  tierMiniPrice: {
+    fontSize: 10, fontFamily: FONT.semibold, color: FG,
   },
 });

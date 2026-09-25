@@ -13,6 +13,8 @@ import {
   manufacturerRelationships,
   sellerQuoteRequests,
   manufacturerReviews,
+  manufacturerProducts,
+  manufacturerProductPriceTiers,
   users,
 } from "@workspace/db";
 import { eq, desc, and, sql, inArray, isNull } from "drizzle-orm";
@@ -566,6 +568,208 @@ router.patch("/me/quote-requests/:id", async (req, res) => {
   )).returning();
   if (!updated) return res.status(409).json({ error: "Quote request changed; refresh and try again" });
   return res.json(serializeQuoteRequest(updated));
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PRODUCT CATALOG — manufacturer-managed listings with quantity price tiers
+// ═══════════════════════════════════════════════════════════════════════════════
+
+type PriceTierInput = { minQuantity: number; maxQuantity?: number | null; unitPriceCents: number };
+
+function validatePriceTiers(input: unknown): PriceTierInput[] | null {
+  if (!Array.isArray(input) || input.length === 0) return null;
+  const tiers: PriceTierInput[] = [];
+  for (const raw of input) {
+    const minQuantity = Number((raw as any)?.minQuantity);
+    const maxQuantityRaw = (raw as any)?.maxQuantity;
+    const maxQuantity = maxQuantityRaw === null || maxQuantityRaw === undefined ? null : Number(maxQuantityRaw);
+    const unitPriceCents = Number((raw as any)?.unitPriceCents);
+    if (!Number.isInteger(minQuantity) || minQuantity < 1) return null;
+    if (maxQuantity !== null && (!Number.isInteger(maxQuantity) || maxQuantity < minQuantity)) return null;
+    if (!Number.isInteger(unitPriceCents) || unitPriceCents < 0) return null;
+    tiers.push({ minQuantity, maxQuantity, unitPriceCents });
+  }
+  return tiers.sort((a, b) => a.minQuantity - b.minQuantity);
+}
+
+async function getTiersForProducts(productIds: string[]) {
+  if (productIds.length === 0) return new Map<string, typeof manufacturerProductPriceTiers.$inferSelect[]>();
+  const rows = await db.select().from(manufacturerProductPriceTiers)
+    .where(inArray(manufacturerProductPriceTiers.productId, productIds))
+    .orderBy(manufacturerProductPriceTiers.productId, manufacturerProductPriceTiers.sortOrder);
+  const map = new Map<string, typeof manufacturerProductPriceTiers.$inferSelect[]>();
+  for (const row of rows) {
+    const list = map.get(row.productId) ?? [];
+    list.push(row);
+    map.set(row.productId, list);
+  }
+  return map;
+}
+
+function serializeTier(row: typeof manufacturerProductPriceTiers.$inferSelect) {
+  return {
+    id: row.id,
+    minQuantity: row.minQuantity,
+    maxQuantity: row.maxQuantity,
+    unitPriceCents: row.unitPriceCents,
+  };
+}
+
+function serializeProduct(
+  row: typeof manufacturerProducts.$inferSelect,
+  tiers: typeof manufacturerProductPriceTiers.$inferSelect[] = [],
+) {
+  return {
+    ...row,
+    priceTiers: tiers.map(serializeTier),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+async function replaceProductTiers(productId: string, tiers: PriceTierInput[]) {
+  await db.delete(manufacturerProductPriceTiers).where(eq(manufacturerProductPriceTiers.productId, productId));
+  await db.insert(manufacturerProductPriceTiers).values(
+    tiers.map((tier, index) => ({
+      productId,
+      minQuantity: tier.minQuantity,
+      maxQuantity: tier.maxQuantity ?? null,
+      unitPriceCents: tier.unitPriceCents,
+      sortOrder: index,
+    })),
+  );
+}
+
+router.get("/me/products", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  const mfr = await resolveManufacturer(userId);
+  if (!mfr) return res.status(404).json({ error: "Not registered" });
+  const rows = await db.select().from(manufacturerProducts)
+    .where(eq(manufacturerProducts.manufacturerId, mfr.id))
+    .orderBy(desc(manufacturerProducts.createdAt));
+  const tiersByProduct = await getTiersForProducts(rows.map((row) => row.id));
+  return res.json(rows.map((row) => serializeProduct(row, tiersByProduct.get(row.id) ?? [])));
+});
+
+router.post("/me/products", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  const mfr = await resolveManufacturer(userId);
+  if (!mfr) return res.status(404).json({ error: "Not registered" });
+
+  const {
+    name, description = "", category = "", images = [], moq = 1, leadTimeDays = 0,
+    samplePriceCents = 0, samplePriceLabel, customizationOptions = [], priceTiers,
+  } = req.body as {
+    name?: string; description?: string; category?: string; images?: string[];
+    moq?: number; leadTimeDays?: number; samplePriceCents?: number; samplePriceLabel?: string;
+    customizationOptions?: string[]; priceTiers?: unknown;
+  };
+
+  if (typeof name !== "string" || !name.trim()) {
+    return res.status(400).json({ error: "name is required" });
+  }
+  const tiers = validatePriceTiers(priceTiers);
+  if (!tiers) {
+    return res.status(400).json({ error: "priceTiers must be a non-empty array of { minQuantity, maxQuantity?, unitPriceCents }" });
+  }
+  if (!Number.isInteger(moq) || moq < 1) {
+    return res.status(400).json({ error: "moq must be a positive integer" });
+  }
+
+  const created = await db.transaction(async (tx) => {
+    const [product] = await tx.insert(manufacturerProducts).values({
+      manufacturerId: mfr.id,
+      name: name.trim(),
+      description: String(description ?? "").trim(),
+      category: String(category ?? "").trim(),
+      images: Array.isArray(images) ? images.filter((v): v is string => typeof v === "string") : [],
+      moq,
+      leadTimeDays: Number.isInteger(leadTimeDays) ? leadTimeDays : 0,
+      samplePriceCents: Number.isInteger(samplePriceCents) ? samplePriceCents : 0,
+      samplePriceLabel: samplePriceLabel?.trim() || null,
+      customizationOptions: Array.isArray(customizationOptions)
+        ? customizationOptions.filter((v): v is string => typeof v === "string") : [],
+    }).returning();
+    await tx.insert(manufacturerProductPriceTiers).values(
+      tiers.map((tier, index) => ({
+        productId: product.id,
+        minQuantity: tier.minQuantity,
+        maxQuantity: tier.maxQuantity ?? null,
+        unitPriceCents: tier.unitPriceCents,
+        sortOrder: index,
+      })),
+    );
+    return product;
+  });
+
+  return res.status(201).json(serializeProduct(created, await db.select().from(manufacturerProductPriceTiers)
+    .where(eq(manufacturerProductPriceTiers.productId, created.id))
+    .orderBy(manufacturerProductPriceTiers.sortOrder)));
+});
+
+router.patch("/me/products/:id", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  const mfr = await resolveManufacturer(userId);
+  if (!mfr) return res.status(404).json({ error: "Not registered" });
+  const [existing] = await db.select().from(manufacturerProducts).where(and(
+    eq(manufacturerProducts.id, req.params.id),
+    eq(manufacturerProducts.manufacturerId, mfr.id),
+  )).limit(1);
+  if (!existing) return res.status(404).json({ error: "Product not found" });
+
+  const {
+    name, description, category, images, moq, leadTimeDays,
+    samplePriceCents, samplePriceLabel, customizationOptions, status, priceTiers,
+  } = req.body as Record<string, unknown>;
+
+  if (status !== undefined && !["draft", "active", "archived"].includes(status as string)) {
+    return res.status(400).json({ error: "status must be draft, active, or archived" });
+  }
+  let tiers: PriceTierInput[] | null = null;
+  if (priceTiers !== undefined) {
+    tiers = validatePriceTiers(priceTiers);
+    if (!tiers) return res.status(400).json({ error: "priceTiers must be a non-empty array of { minQuantity, maxQuantity?, unitPriceCents }" });
+  }
+
+  const updated = await db.transaction(async (tx) => {
+    const [row] = await tx.update(manufacturerProducts).set({
+      name: typeof name === "string" && name.trim() ? name.trim() : existing.name,
+      description: typeof description === "string" ? description.trim() : existing.description,
+      category: typeof category === "string" ? category.trim() : existing.category,
+      images: Array.isArray(images) ? images.filter((v): v is string => typeof v === "string") : existing.images,
+      moq: Number.isInteger(moq) && (moq as number) >= 1 ? (moq as number) : existing.moq,
+      leadTimeDays: Number.isInteger(leadTimeDays) ? (leadTimeDays as number) : existing.leadTimeDays,
+      samplePriceCents: Number.isInteger(samplePriceCents) ? (samplePriceCents as number) : existing.samplePriceCents,
+      samplePriceLabel: samplePriceLabel === undefined ? existing.samplePriceLabel : (String(samplePriceLabel ?? "").trim() || null),
+      customizationOptions: Array.isArray(customizationOptions)
+        ? customizationOptions.filter((v): v is string => typeof v === "string") : existing.customizationOptions,
+      status: typeof status === "string" ? status : existing.status,
+      updatedAt: new Date(),
+    }).where(eq(manufacturerProducts.id, existing.id)).returning();
+    if (tiers) await replaceProductTiers(existing.id, tiers);
+    return row;
+  });
+
+  const finalTiers = await db.select().from(manufacturerProductPriceTiers)
+    .where(eq(manufacturerProductPriceTiers.productId, existing.id))
+    .orderBy(manufacturerProductPriceTiers.sortOrder);
+  return res.json(serializeProduct(updated, finalTiers));
+});
+
+router.delete("/me/products/:id", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  const mfr = await resolveManufacturer(userId);
+  if (!mfr) return res.status(404).json({ error: "Not registered" });
+  const deleted = await db.delete(manufacturerProducts).where(and(
+    eq(manufacturerProducts.id, req.params.id),
+    eq(manufacturerProducts.manufacturerId, mfr.id),
+  )).returning({ id: manufacturerProducts.id });
+  if (deleted.length === 0) return res.status(404).json({ error: "Product not found" });
+  return res.status(204).send();
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

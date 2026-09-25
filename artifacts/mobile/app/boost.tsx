@@ -40,7 +40,7 @@ import {
   BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE,
   PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  FONT, FS, SP, RADIUS, SHADOW_SM,
+  FONT, FS, SP, RADIUS, ICON, SHADOW_SM,
 } from '@/lib/theme';
 import { divideCents, formatCents } from '@/lib/money';
 import {
@@ -766,7 +766,7 @@ export default function BoostScreen() {
             <Image source={{ uri: thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
             <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: CARD_ELEVATED }]}>
-              <Feather name="film" size={14} color={MUTED} />
+              <Feather name="film" size={ICON.xs} color={MUTED} />
             </View>
           )}
         </View>
@@ -909,7 +909,7 @@ export default function BoostScreen() {
             </View>
           ) : targetsError ? (
             <View style={s.emptyState}>
-              <Feather name="lock" size={28} color={MUTED} />
+              <Feather name="lock" size={ICON.xl} color={MUTED} />
               <Text style={s.emptyTitle}>Sign in to continue</Text>
               <Text style={s.emptyBody}>
                 Your session may have expired. Sign in again to load your eligible posts.
@@ -920,7 +920,7 @@ export default function BoostScreen() {
             </View>
           ) : targets.length === 0 ? (
             <View style={s.emptyState}>
-              <Feather name="film" size={28} color={MUTED} />
+              <Feather name="film" size={ICON.xl} color={MUTED} />
               <Text style={s.emptyTitle}>No eligible posts yet</Text>
               <Text style={s.emptyBody}>
                 Publish a video or a slideshow with 2+ images, then come back to Promote.
@@ -1021,7 +1021,7 @@ export default function BoostScreen() {
           {/* Estimated reach */}
           <View style={s.reachCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs }}>
-              <Feather name="users" size={14} color={PURPLE_LIGHT} />
+              <Feather name="users" size={ICON.xs} color={PURPLE_LIGHT} />
               <Text style={s.reachLabel}>Estimated reach</Text>
             </View>
             <Text style={s.reachValue}>
@@ -1053,7 +1053,7 @@ export default function BoostScreen() {
             ) : (
               <>
                 <Text style={s.primaryBtnText}>Boost post · {formatCents(budgetCents)}</Text>
-                <Feather name="zap" size={16} color="#000" />
+                <Feather name="zap" size={ICON.sm} color="#000" />
               </>
             )}
           </TouchableOpacity>

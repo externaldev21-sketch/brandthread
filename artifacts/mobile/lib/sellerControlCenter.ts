@@ -116,13 +116,14 @@ export const SECTIONS: ControlCenterSection[] = [
     title: 'Store',
     icon: 'layout',
     items: [
-      { id: 'store-builder', label: 'Store Builder', icon: 'layout', route: '/store-builder', description: 'Customize your storefront' },
+      { id: 'store-builder', label: 'Store Builder', icon: 'layout', route: '/store-builder', description: 'Build your brand website' },
       { id: 'store-preview', label: 'Store Preview', icon: 'eye',    route: '/store-preview', description: 'See your live storefront' },
-      { id: 'collections',   label: 'Collections',   icon: 'grid',   route: '/store-collections', description: 'Group products' },
       { id: 'shipping',      label: 'Shipping',       icon: 'truck',  route: '/shipping', description: 'Rates, zones and carriers' },
       { id: 'manufacturer',  label: 'Manufacturer Hub', icon: 'tool', route: '/manufacturer-hub', description: 'Find and manage manufacturers' },
-      { id: 'brand-memory',  label: 'Brand Memory',  icon: 'cpu',    route: '/ai-brand-memory', description: 'Your AI brand guidelines' },
       ...STUDIO_ITEMS,
+      // 'collections' removed from the Store section (folded into Store Builder's
+      // collection-grid blocks). 'brand-memory' unlinked from the seller menu per
+      // product decision — screen/route/service kept intact, just unreachable from here.
     ],
   },
   {

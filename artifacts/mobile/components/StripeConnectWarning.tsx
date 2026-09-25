@@ -23,6 +23,15 @@ import {
   SP,
 } from '@/lib/theme';
 
+export interface PayoutSchedule {
+  interval: string | null;
+  delayDays: number | null;
+  weeklyAnchor: string | null;
+  monthlyAnchor: number | null;
+}
+
+export type TaxInfoStatus = 'submitted' | 'needed' | 'unknown';
+
 export interface ConnectStatus {
   connected: boolean;
   chargesEnabled: boolean;
@@ -30,11 +39,19 @@ export interface ConnectStatus {
   status: string;
   verified: boolean;
   bankLast4: string | null;
+  /** false when this environment has no payment provider configured at all. */
+  providerConfigured: boolean;
+  payoutSchedule: PayoutSchedule | null;
+  requirementsDue: string[];
+  taxInfoStatus: TaxInfoStatus;
 }
 
 export function normalizeConnectStatus(data: unknown): ConnectStatus | null {
   if (!data || typeof data !== 'object') return null;
   const value = data as Record<string, unknown>;
+  const schedule = value.payoutSchedule && typeof value.payoutSchedule === 'object'
+    ? value.payoutSchedule as Record<string, unknown>
+    : null;
   return {
     connected: value.connected === true,
     chargesEnabled: value.chargesEnabled === true,
@@ -44,6 +61,22 @@ export function normalizeConnectStatus(data: unknown): ConnectStatus | null {
     bankLast4: typeof value.bankLast4 === 'string' && /^\d{4}$/.test(value.bankLast4)
       ? value.bankLast4
       : null,
+    // Defaults to true (configured) when the field is absent so older API
+    // responses — and every existing test/mock that predates this field —
+    // keep behaving exactly as before.
+    providerConfigured: value.providerConfigured !== false,
+    payoutSchedule: schedule ? {
+      interval: typeof schedule.interval === 'string' ? schedule.interval : null,
+      delayDays: typeof schedule.delayDays === 'number' ? schedule.delayDays : null,
+      weeklyAnchor: typeof schedule.weeklyAnchor === 'string' ? schedule.weeklyAnchor : null,
+      monthlyAnchor: typeof schedule.monthlyAnchor === 'number' ? schedule.monthlyAnchor : null,
+    } : null,
+    requirementsDue: Array.isArray(value.requirementsDue)
+      ? value.requirementsDue.filter((entry): entry is string => typeof entry === 'string')
+      : [],
+    taxInfoStatus: value.taxInfoStatus === 'submitted' || value.taxInfoStatus === 'needed'
+      ? value.taxInfoStatus
+      : 'unknown',
   };
 }
 
@@ -134,6 +167,32 @@ export default function StripeConnectWarning({
       && connectStatus.status === 'active'
     )
   ) return null;
+
+  // The environment has no payment provider configured at all — a config
+  // problem on our side, not something the seller can fix. Show a clear,
+  // non-actionable "setup needed" state instead of a broken "Fix Now" flow.
+  if (!connectStatus.providerConfigured) {
+    return (
+      <View
+        style={[styles.connectBanner, useLargeTextLayout && styles.connectBannerLargeText]}
+        accessibilityRole="summary"
+      >
+        <View style={styles.connectBannerMain}>
+          <View style={styles.connectBannerIcon}>
+            <Feather name="tool" size={20} color={RED} />
+          </View>
+          <View style={styles.message}>
+            <Text style={styles.connectBannerTitle} maxFontSizeMultiplier={2}>
+              Payouts setup needed
+            </Text>
+            <Text style={styles.connectBannerSub} maxFontSizeMultiplier={2}>
+              This environment isn't connected to a payments provider yet. Try again later, or contact support if this continues.
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <TouchableOpacity

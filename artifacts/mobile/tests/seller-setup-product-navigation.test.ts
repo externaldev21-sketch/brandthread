@@ -33,11 +33,16 @@ describe('seller setup destination navigation', () => {
   });
 
   it('replaces transparent checklist scenes from both launch surfaces', () => {
-    const dashboard = read('app/(tabs)/index.tsx');
+    // The dashboard's own "add first product" shortcut still replaces (not
+    // pushes) into the setup origin; the full per-task checklist itself now
+    // lives in the guided walkthrough sheet the dashboard's "Continue setup"
+    // banner opens, rather than being duplicated inline in the dashboard.
+    const dashboard = read('components/SellerHomeCommerceDashboard.tsx');
+    const walkthrough = read('components/SetupWalkthroughSheet.tsx');
     const setup = read('app/setup.tsx');
 
     expect(dashboard).toContain('router.replace(withSellerSetupOrigin(task.route) as never)');
-    expect(dashboard).toContain('onPress={task.completed ? undefined : () => openSetupTask(task)}');
+    expect(walkthrough).toContain('onPress={() => openTask(task)}');
     expect(setup).toContain('router.replace(withSellerSetupOrigin(task.route) as never)');
   });
 
@@ -64,7 +69,7 @@ describe('seller setup destination navigation', () => {
       ['app/seller-verification.tsx', "data?.verificationStatus === 'verified'", "completeSetupTaskWhen('verify_account'"],
       ['app/payouts.tsx', 'normalized?.connected && normalized.chargesEnabled && normalized.payoutsEnabled', "'connect_payments'"],
       ['app/add-product.tsx', '() => api.products.create(serverCreatePayload)', "'first_product'"],
-      ['app/shipping.tsx', '() => api.shippingRates.create', "'shipping_rates'"],
+      ['app/shipping.tsx', '() => api.shippingZones.create(payload)', "'shipping_rates'"],
       ['app/store-builder.tsx', "() => applyTheme(THREAD_THEME_ID, 'light')", "'customize_store'"],
       ['app/store-domain.tsx', "verificationStatus === 'verified'", "'connect_domain'"],
       ['app/store-publish.tsx', 'result.success', "'publish_store'"],

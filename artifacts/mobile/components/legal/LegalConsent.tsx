@@ -50,11 +50,11 @@ export function LegalConsent({
         <View
           style={[
             styles.box,
-            { borderColor: showError && !checked ? theme.error : theme.muted },
-            checked && { backgroundColor: theme.accent, borderColor: theme.accent },
+            { borderColor: showError && !checked ? theme.error : theme.border },
+            checked && { backgroundColor: theme.text, borderColor: theme.text },
           ]}
         >
-          {checked ? <Feather name="check" size={13} color={theme.onAccent} /> : null}
+          {checked ? <Feather name="check" size={13} color={theme.background} /> : null}
         </View>
         <Text style={[styles.text, { color: theme.muted }]}>
           I agree to the {link('Terms of Service', '/terms')} and {link('Community Guidelines', '/community-guidelines')}, including zero tolerance for abusive or objectionable content, and I’ve read the {link('Privacy Policy', '/privacy')}.
@@ -68,10 +68,10 @@ export function LegalConsent({
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 4 },
   box: {
-    width: 22, height: 22, borderRadius: 6, borderWidth: 1.5,
-    alignItems: 'center', justifyContent: 'center', marginTop: 1,
+    width: 22, height: 22, borderRadius: 11, borderWidth: 1.5,
+    alignItems: 'center', justifyContent: 'center', marginTop: 0,
   },
   text: { flex: 1, fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 19 },
   link: { fontFamily: 'Inter_600SemiBold', textDecorationLine: 'underline' },

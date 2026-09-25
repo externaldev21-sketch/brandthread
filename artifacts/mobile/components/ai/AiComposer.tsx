@@ -6,7 +6,7 @@
  * generating. Purely presentational — sending/stopping/text state all stay
  * owned by app/ai-brain.tsx; this component never talks to the AI backend.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Feather } from '@expo/vector-icons';
@@ -16,7 +16,8 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { CARD, FG, SUBTLE, FONT, FS } from '@/lib/theme';
+import { FONT, FS } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 
 interface AiComposerProps {
   value: string;
@@ -41,6 +42,8 @@ export default function AiComposer({
   accentColor,
   bottomInset,
 }: AiComposerProps) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const reduceMotion = useReducedMotion();
   const [focused, setFocused] = useState(false);
   const focus = useSharedValue(0);
@@ -87,7 +90,7 @@ export default function AiComposer({
             value={value}
             onChangeText={onChangeText}
             placeholder={placeholder}
-            placeholderTextColor={SUBTLE}
+            placeholderTextColor={colors.subtle}
             multiline
             returnKeyType="send"
             submitBehavior="submit"
@@ -110,7 +113,7 @@ export default function AiComposer({
             testID="ai-composer-send"
           >
             <Animated.View style={[StyleSheet.absoluteFill, styles.sendIconWrap, sendIconStyle]}>
-              <Feather name="arrow-up" size={18} color={canSend ? accentColor : SUBTLE} />
+              <Feather name="arrow-up" size={18} color={canSend ? accentColor : colors.subtle} />
             </Animated.View>
             <Animated.View style={[StyleSheet.absoluteFill, styles.sendIconWrap, stopIconStyle]}>
               <Feather name="square" size={16} color={accentColor} />
@@ -122,7 +125,7 @@ export default function AiComposer({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   wrap: {
     paddingHorizontal: 16,
     paddingTop: 4,
@@ -153,7 +156,7 @@ const styles = StyleSheet.create({
   },
   pillTint: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: `${CARD}CC`,
+    backgroundColor: `${colors.card}CC`,
   },
   textInput: {
     flex: 1,
@@ -163,7 +166,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
     height: 36,
     minHeight: 36,
-    color: FG,
+    color: colors.text,
     fontSize: FS.base,
     fontFamily: FONT.regular,
     lineHeight: 20,

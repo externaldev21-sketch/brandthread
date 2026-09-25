@@ -21,6 +21,7 @@ import Reports from '@/pages/reports';
 import Sellers from '@/pages/sellers';
 import OrderTracker from '@/pages/order-tracker';
 import QuoteRequests from '@/pages/quote-requests';
+import Products from '@/pages/products';
 import NotFound from '@/pages/not-found';
 import { Layout } from '@/components/layout';
 import { useIsModerator } from '@/hooks/use-ip-cases';
@@ -258,6 +259,9 @@ function AppRouter() {
             </Route>
             <Route path="/quote-requests">
               <Protected><Layout><QuoteRequests /></Layout></Protected>
+            </Route>
+            <Route path="/products">
+              <Protected><Layout><Products /></Layout></Protected>
             </Route>
             <Route path="/payment">
               <Protected><Layout><Payment /></Layout></Protected>

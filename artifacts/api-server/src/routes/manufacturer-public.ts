@@ -11,7 +11,7 @@
  */
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
-import { db, manufacturers, manufacturerReviews, sampleOrders, users } from "@workspace/db";
+import { db, manufacturers, manufacturerReviews, sampleOrders, users, manufacturerProducts, manufacturerProductPriceTiers } from "@workspace/db";
 import { eq, and, ilike, sql, or, inArray, desc, gte, lte, isNotNull, type SQL } from "drizzle-orm";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { ApplyAsManufacturerBody } from "@workspace/api-zod";
@@ -382,6 +382,74 @@ router.post("/apply", async (req, res) => {
     req.log.error({ err }, "Failed to submit manufacturer application");
     res.status(500).json({ error: "Application failed" });
   }
+});
+
+// ── GET /api/manufacturers/public/:id/products ────────────────────────────────
+// Browsable catalog for an active, publicly-listed manufacturer, with
+// quantity price tiers (Alibaba/Faire style).
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function serializeTier(row: typeof manufacturerProductPriceTiers.$inferSelect) {
+  return { id: row.id, minQuantity: row.minQuantity, maxQuantity: row.maxQuantity, unitPriceCents: row.unitPriceCents };
+}
+
+async function assertActivePublicManufacturer(manufacturerId: string) {
+  if (!UUID_RE.test(manufacturerId)) return null;
+  const [mfr] = await db.select({ id: manufacturers.id }).from(manufacturers).where(and(
+    eq(manufacturers.id, manufacturerId),
+    eq(manufacturers.isPublicDirectory, true),
+    eq(manufacturers.status, "active"),
+  )).limit(1);
+  return mfr ?? null;
+}
+
+router.get("/:id/products", async (req, res) => {
+  const mfr = await assertActivePublicManufacturer(req.params.id);
+  if (!mfr) { res.status(404).json({ error: "Not found" }); return; }
+  setPublicCacheHeaders(res);
+  const products = await db.select().from(manufacturerProducts).where(and(
+    eq(manufacturerProducts.manufacturerId, mfr.id),
+    eq(manufacturerProducts.status, "active"),
+  )).orderBy(desc(manufacturerProducts.createdAt));
+  const productIds = products.map((p) => p.id);
+  const tiers = productIds.length === 0 ? [] : await db.select().from(manufacturerProductPriceTiers)
+    .where(inArray(manufacturerProductPriceTiers.productId, productIds))
+    .orderBy(manufacturerProductPriceTiers.sortOrder);
+  const tiersByProduct = new Map<string, ReturnType<typeof serializeTier>[]>();
+  for (const tier of tiers) {
+    const list = tiersByProduct.get(tier.productId) ?? [];
+    list.push(serializeTier(tier));
+    tiersByProduct.set(tier.productId, list);
+  }
+  res.json(products.map((p) => ({
+    ...p,
+    priceTiers: tiersByProduct.get(p.id) ?? [],
+    createdAt: p.createdAt.toISOString(),
+    updatedAt: p.updatedAt.toISOString(),
+  })));
+});
+
+router.get("/:id/products/:productId", async (req, res) => {
+  const mfr = await assertActivePublicManufacturer(req.params.id);
+  if (!mfr) { res.status(404).json({ error: "Not found" }); return; }
+  if (!UUID_RE.test(req.params.productId)) { res.status(400).json({ error: "Invalid product id" }); return; }
+  setPublicCacheHeaders(res);
+  const [product] = await db.select().from(manufacturerProducts).where(and(
+    eq(manufacturerProducts.id, req.params.productId),
+    eq(manufacturerProducts.manufacturerId, mfr.id),
+    eq(manufacturerProducts.status, "active"),
+  )).limit(1);
+  if (!product) { res.status(404).json({ error: "Not found" }); return; }
+  const tiers = await db.select().from(manufacturerProductPriceTiers)
+    .where(eq(manufacturerProductPriceTiers.productId, product.id))
+    .orderBy(manufacturerProductPriceTiers.sortOrder);
+  res.json({
+    ...product,
+    priceTiers: tiers.map(serializeTier),
+    createdAt: product.createdAt.toISOString(),
+    updatedAt: product.updatedAt.toISOString(),
+  });
 });
 
 // ── GET /api/manufacturers/public/:id ─────────────────────────────────────────

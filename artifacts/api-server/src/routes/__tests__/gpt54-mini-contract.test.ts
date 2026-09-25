@@ -22,8 +22,9 @@ describe("GPT-5.4-mini request contract", () => {
       ].map((match) => match[0]),
     );
 
-    // ai.ts: 2 create() calls using CHAT_MODEL; support-chat.ts: 1 literal
-    expect(migratedCalls).toHaveLength(3);
+    // ai.ts: 3 create() calls using CHAT_MODEL (chat, chat/stream, brand-memory/rebuild);
+    // support-chat.ts: 1 literal
+    expect(migratedCalls).toHaveLength(4);
     for (const call of migratedCalls) {
       expect(call).toContain("max_completion_tokens:");
       expect(call).not.toContain("max_tokens:");

@@ -1,137 +1,222 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, Linking } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { HapticSwitch } from '@/components/BrandthreadUI';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 
+const STRIPE_TAX_REGISTRATIONS_URL = 'https://dashboard.stripe.com/tax/registrations';
+
 export default function TaxesDutiesScreen() {
   const colors = useColors();
   const api    = useApi();
-  const [includeSalesTax,  setIncludeSalesTax]   = useState(false);
-  const [providerConfigured, setProviderConfigured] = useState(false);
-  const [annualReport, setAnnualReport] = useState<any>(null);
-  const [saving,           setSaving]            = useState(false);
 
-  // Load config on mount
+  const [loading,            setLoading]            = useState(true);
+  const [stripeTaxEnabled,   setStripeTaxEnabled]   = useState(false);
+  const [providerConfigured, setProviderConfigured] = useState(false);
+  const [chargeShippingTax,  setChargeShippingTax]  = useState(false);
+  const [annualReport,       setAnnualReport]       = useState<any>(null);
+
+  const [savingTax,      setSavingTax]      = useState(false);
+  const [savingShipping, setSavingShipping] = useState(false);
+
   const loadConfig = useCallback(async () => {
+    setLoading(true);
     try {
       const cfg = await api.taxes.status();
+      setStripeTaxEnabled(cfg.stripeTaxEnabled ?? false);
       setProviderConfigured(cfg.providerConfigured ?? false);
-      setIncludeSalesTax(cfg.providerConfigured ?? false);
-    } catch { /* no-op if not connected */ }
+      setChargeShippingTax(cfg.chargeShippingTax ?? false);
+    } catch { /* keep defaults if the config can't be reached */ }
     try {
       setAnnualReport(await api.taxes.forms1099());
     } catch { /* keep the explicit unavailable state */ }
+    setLoading(false);
   }, []);
 
   useEffect(() => { loadConfig(); }, [loadConfig]);
-
-  const handleSetup = async () => {
-    haptic();
-    setSaving(true);
-    try {
-      await api.taxes.enable();
-      setProviderConfigured(true);
-      setIncludeSalesTax(true);
-      Alert.alert('Automatic tax turned on', 'Tax will be calculated from the buyer destination when an applicable registration is active.');
-    } catch (err: any) {
-      Alert.alert("Couldn't turn on automatic tax. Try again.");
-    } finally {
-      setSaving(false);
-    }
-  };
 
   function haptic() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
 
+  const handleToggleTax = async (next: boolean) => {
+    const previous = stripeTaxEnabled;
+    setStripeTaxEnabled(next);
+    setSavingTax(true);
+    try {
+      if (next) {
+        await api.taxes.enable();
+        setProviderConfigured(true);
+        Alert.alert('Automatic tax turned on', "Tax will be calculated from the buyer's checkout destination when an applicable registration is active.");
+      } else {
+        await api.taxes.config({ stripeTaxEnabled: false });
+        Alert.alert('Automatic tax turned off', 'Brandthread will stop calculating tax at checkout for your store.');
+      }
+    } catch {
+      setStripeTaxEnabled(previous);
+      Alert.alert("Couldn't update", 'Something went wrong updating automatic tax. Try again.');
+    } finally {
+      setSavingTax(false);
+    }
+  };
+
+  const handleToggleShipping = async (next: boolean) => {
+    const previous = chargeShippingTax;
+    setChargeShippingTax(next);
+    setSavingShipping(true);
+    try {
+      await api.taxes.config({ chargeShippingTax: next });
+    } catch {
+      setChargeShippingTax(previous);
+      Alert.alert("Couldn't update", 'Something went wrong updating tax on shipping. Try again.');
+    } finally {
+      setSavingShipping(false);
+    }
+  };
+
+  const openStripeTaxRegistrations = async () => {
+    haptic();
+    try {
+      const supported = await Linking.canOpenURL(STRIPE_TAX_REGISTRATIONS_URL);
+      if (supported) {
+        await Linking.openURL(STRIPE_TAX_REGISTRATIONS_URL);
+      } else {
+        Alert.alert('Manage in Stripe', 'Open dashboard.stripe.com/tax/registrations from a browser to manage where you collect tax.');
+      }
+    } catch {
+      Alert.alert('Manage in Stripe', 'Open dashboard.stripe.com/tax/registrations from a browser to manage where you collect tax.');
+    }
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader title="Taxes and duties" />
+      <ScreenHeader title="Taxes and duties" subtitle="Powered by Stripe Tax" />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
-        <View style={styles.section}>
-          <View style={styles.rowStart}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Automatic sales tax</Text>
-            <Feather name="info" size={14} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
-          </View>
 
-          <View style={[styles.dutiesSetupRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {/* ── Collect sales tax ─────────────────────────────────────────── */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Collect sales tax</Text>
+
+          <View style={[styles.toggleRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Turn on automatic tax</Text>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Automatic tax at checkout</Text>
               <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
-                Sales tax is calculated from the buyer's checkout destination and your active tax registrations.
+                Stripe Tax calculates and collects sales tax automatically, based on the buyer's destination and your active tax registrations.
               </Text>
             </View>
-            <TouchableOpacity onPress={handleSetup} disabled={saving || providerConfigured} activeOpacity={0.7} style={[styles.manageBtn, { borderColor: colors.border }]}>
-              <Text style={[styles.manageBtnText, { color: providerConfigured ? colors.success : colors.foreground }]}>
-                {providerConfigured ? '✓ Configured' : (saving ? 'Enabling…' : 'Set up')}
-              </Text>
-            </TouchableOpacity>
+            <HapticSwitch
+              value={stripeTaxEnabled}
+              onValueChange={handleToggleTax}
+              disabled={savingTax || loading}
+              trackColor={{ false: colors.secondary, true: colors.primary }}
+              thumbColor={colors.background}
+            />
+          </View>
+
+          <View style={[styles.statusRow, { borderColor: colors.border }]}>
+            <View style={[styles.dot, { backgroundColor: providerConfigured ? colors.success : colors.mutedForeground }]} />
+            <Text style={[styles.statusText, { color: colors.mutedForeground }]}>
+              {providerConfigured ? 'Stripe Tax is configured on your connected account.' : 'Not yet configured — connect Stripe and turn this on to start.'}
+            </Text>
           </View>
 
           <View style={[styles.infoBox, { backgroundColor: colors.primary + '12' }]}>
             <Feather name="info" size={15} color={colors.primary} style={{ marginTop: 2 }} />
-             <Text style={[styles.infoText, { color: colors.foreground }]}>
-               Calculated and collected tax is not proof of nexus, registration, or filing compliance.
-             </Text>
+            <Text style={[styles.infoText, { color: colors.foreground }]}>
+              This calculates and collects tax — it is not proof of nexus, registration, or filing compliance. Product tax codes, registrations, and the checkout address determine the actual taxability; Brandthread does not apply a local rate table or override Stripe's result.
+            </Text>
           </View>
-
         </View>
 
         <View style={[styles.divider, { backgroundColor: colors.secondary }]} />
 
+        {/* ── Tax on shipping ───────────────────────────────────────────── */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 14 }]}>How checkout tax works</Text>
-
-          <Checkbox
-            label="Use destination-based automatic tax at checkout"
-            description="The calculated tax is added to the buyer's charged total when an applicable registration is active."
-            checked={includeSalesTax}
-            onPress={() => {
-              haptic();
-              if (!providerConfigured) handleSetup();
-            }}
-            colors={colors}
-          />
-          <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
-            Product tax codes, registrations, and the final address entered at checkout determine taxability. Brandthread does not apply a local rate table or override this result.
-          </Text>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Tax on shipping</Text>
+          <View style={[styles.toggleRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Charge tax on shipping cost</Text>
+              <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
+                When on, the shipping fee is included in the taxable amount Stripe calculates at checkout.
+              </Text>
+            </View>
+            <HapticSwitch
+              value={chargeShippingTax}
+              onValueChange={handleToggleShipping}
+              disabled={savingShipping || loading || !stripeTaxEnabled}
+              trackColor={{ false: colors.secondary, true: colors.primary }}
+              thumbColor={colors.background}
+            />
+          </View>
+          {!stripeTaxEnabled && (
+            <Text style={[styles.rowDescription, { color: colors.mutedForeground, marginTop: 8 }]}>
+              Turn on automatic tax above to set this.
+            </Text>
+          )}
         </View>
 
         <View style={[styles.divider, { backgroundColor: colors.secondary }]} />
 
+        {/* ── Regions / nexus ───────────────────────────────────────────── */}
         <View style={styles.section}>
           <View style={styles.rowBetween}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Tax service</Text>
-            <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.manageBtn, { borderColor: colors.border }]}>
-              <Text style={[styles.manageBtnText, { color: colors.foreground }]}>Manage</Text>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Tax regions and registrations</Text>
+            <TouchableOpacity onPress={openStripeTaxRegistrations} activeOpacity={0.7} style={[styles.manageBtn, { borderColor: colors.border }]}>
+              <Text style={[styles.manageBtnText, { color: colors.foreground }]}>Open Stripe</Text>
             </TouchableOpacity>
           </View>
-          <View style={[styles.serviceRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={[styles.serviceIcon, { backgroundColor: '#22C55E' }]}>
-              <Feather name="dollar-sign" size={13} color="#FFFFFF" />
-            </View>
-            <Text style={[styles.rowLabel, { color: colors.foreground, flex: 1 }]}>Automatic tax</Text>
-            <View style={[styles.onPill, { backgroundColor: providerConfigured ? colors.success + '26' : colors.secondary }]}>
-              <Text style={[styles.onPillText, { color: providerConfigured ? colors.success : colors.mutedForeground }]}>
-                {providerConfigured ? 'Configured' : 'Not configured'}
+          <View style={[styles.unavailableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="map-pin" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Not available directly in-app yet</Text>
+              <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
+                Adding, removing, or reviewing where you're registered to collect tax (your nexus) is managed in your Stripe Tax dashboard, not in Brandthread. Tap "Open Stripe" to manage it there.
               </Text>
             </View>
           </View>
-          <Text style={[styles.rowDescription, { color: colors.mutedForeground, marginTop: 8 }]}>
-            {providerConfigured
-              ? 'Tax is calculated from the checkout destination and your active registrations.'
-              : 'An app preference alone does not activate tax collection or prove compliance.'}
-          </Text>
-          <Text style={[styles.rowDescription, { color: colors.mutedForeground, marginTop: 6 }]}>
-            Nexus, registration, marketplace-facilitator, and filing obligations require professional review.
-          </Text>
         </View>
 
         <View style={[styles.divider, { backgroundColor: colors.secondary }]} />
 
+        {/* ── Tax-inclusive vs exclusive pricing ────────────────────────── */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Tax-inclusive pricing</Text>
+          <View style={[styles.unavailableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="tag" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Not available yet</Text>
+              <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
+                Your listed prices are currently tax-exclusive: calculated tax is added on top at checkout. Switching listings to tax-inclusive pricing isn't supported yet.
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={[styles.divider, { backgroundColor: colors.secondary }]} />
+
+        {/* ── DDP / DAP duties ──────────────────────────────────────────── */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>International duties</Text>
+          <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>
+            Delivered Duty Paid (DDP) collects import duties from the buyer at checkout and remits them for you. Delivered At Place (DAP) leaves the buyer responsible for customs duties on delivery.
+          </Text>
+          <View style={[styles.unavailableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="globe" size={17} color={colors.mutedForeground} style={styles.rowIcon} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Not available yet</Text>
+              <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
+                Brandthread doesn't calculate or collect customs duties at checkout. International orders currently ship DAP by default — buyers may be responsible for duties and import fees charged on delivery.
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={[styles.divider, { backgroundColor: colors.secondary }]} />
+
+        {/* ── 1099-K reporting ──────────────────────────────────────────── */}
         <View style={styles.section}>
           <View style={styles.rowStart}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Registrations and filing</Text>
@@ -172,39 +257,6 @@ export default function TaxesDutiesScreen() {
   );
 }
 
-function Checkbox({
-  label,
-  description,
-  checked,
-  onPress,
-  colors,
-  last,
-}: {
-  label: string;
-  description: React.ReactNode;
-  checked: boolean;
-  onPress: () => void;
-  colors: ReturnType<typeof useColors>;
-  last?: boolean;
-}) {
-  return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={[styles.checkboxRow, !last && { marginBottom: 16 }]}>
-      <View
-        style={[
-          styles.checkbox,
-          { borderColor: checked ? colors.primary : colors.border, backgroundColor: checked ? colors.primary : 'transparent' },
-        ]}
-      >
-        {checked && <Feather name="check" size={12} color={colors.primaryForeground} />}
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.rowLabel, { color: colors.foreground }]}>{label}</Text>
-        <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>{description}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1 },
   section: { paddingHorizontal: 20, paddingVertical: 18 },
@@ -215,33 +267,16 @@ const styles = StyleSheet.create({
   divider: { height: 10 },
   manageBtn: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
   manageBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  serviceRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 14, padding: 14 },
-  serviceIcon: { width: 22, height: 22, borderRadius: 5, alignItems: 'center', justifyContent: 'center' },
   rowLabel: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   rowDescription: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2, lineHeight: 17 },
-  onPill: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-  onPillText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  searchBox: { flex: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
-  searchInput: { fontSize: 14, fontFamily: 'Inter_400Regular', padding: 0 },
-  sortBtn: { width: 40, height: 40, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
-  listCard: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
-  regionRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
-  flag: { fontSize: 20 },
-  kindText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
-  pagerRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  pagerBtn: { width: 34, height: 34, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  reportRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14, marginTop: 14 },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 14, padding: 14, marginTop: 12 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingHorizontal: 2 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  statusText: { fontSize: 12, fontFamily: 'Inter_400Regular', flex: 1 },
   reportCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14, marginTop: 14 },
+  unavailableCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14, marginTop: 4 },
   disclaimer: { fontSize: 11, fontFamily: 'Inter_400Regular', lineHeight: 16, marginTop: 10, paddingHorizontal: 4 },
   rowIcon: { width: 20 },
-  dutiesRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14, marginTop: 4 },
-  dutiesSetupRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14, marginTop: 12 },
   infoBox: { flexDirection: 'row', gap: 10, borderRadius: 12, padding: 14, marginTop: 12 },
   infoText: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17, flex: 1 },
-  customsHeader: { flexDirection: 'row', alignItems: 'center', padding: 14 },
-  customsRow: { padding: 14, gap: 3 },
-  checkboxRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  checkbox: { width: 18, height: 18, borderRadius: 4, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  learnMore: { fontSize: 12, fontFamily: 'Inter_500Medium', textAlign: 'center' },
 });

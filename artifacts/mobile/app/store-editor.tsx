@@ -4,6 +4,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
   TextInput, StyleSheet, Alert, Switch, Animated, RefreshControl,
+  PanResponder, GestureResponderEvent, PanResponderGestureState,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -26,11 +27,12 @@ import {
   getStorefront, updateSection, toggleSection, deleteSection,
   duplicateSection, reorderSections, undoLastAction, redoLastAction,
   updateThemeSettings, updateBranding, saveDraftAnswers, autosaveStorefront,
-  createVersion,
+  createVersion, getThemeById, saveDraft,
 } from '@/services/storeService';
 import {
   Storefront, StoreSection, StoreSectionType,
   SECTION_TYPE_LABELS, StoreThemeSettings, THREAD_THEME_NAME,
+  TYPOGRAPHY_STYLES,
 } from '@/services/storeTypes';
 
 type EditorMode = 'sections' | 'branding' | 'header' | 'footer' | 'product_page' | 'collection_page';
@@ -184,6 +186,17 @@ export default function StoreEditor() {
   // Debounced local settings state for active section
   const [localSettings, setLocalSettings] = useState<Record<string, any>>({});
 
+  // Drag-to-reorder state for the Sections tab. `dragOrderIds` mirrors the
+  // committed order while a drag is live so the list can re-render instantly
+  // without waiting on the round-trip through reorderSections().
+  const ROW_HEIGHT = 96;
+  const [dragOrderIds, setDragOrderIds] = useState<string[] | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const dragY = useRef(new Animated.Value(0)).current;
+  const dragStartIndex = useRef(0);
+  const [inlineEditingId, setInlineEditingId] = useState<string | null>(null);
+  const [inlineHeadingDraft, setInlineHeadingDraft] = useState('');
+
   async function load() {
     const s = await getStorefront();
     setStore(s);
@@ -300,6 +313,18 @@ export default function StoreEditor() {
     setStore(s);
   }
 
+  async function handleSaveDraft() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSavingStatus('saving');
+    try {
+      const s = await saveDraft();
+      setStore(s);
+      setSavingStatus('saved');
+    } catch {
+      setSavingStatus('failed');
+    }
+  }
+
   async function handleThemeUpdate(partial: Partial<StoreThemeSettings>) {
     const s = await updateThemeSettings(partial);
     setStore(s);
@@ -318,9 +343,80 @@ export default function StoreEditor() {
     return '';
   }
 
-  const sortedSections = store
-    ? [...store.sections].sort((a, b) => a.order - b.order)
+  const committedOrder = store
+    ? [...store.sections].sort((a, b) => a.order - b.order).map(s => s.id)
     : [];
+  const displayOrder = dragOrderIds ?? committedOrder;
+  const sortedSections = store
+    ? displayOrder
+        .map(id => store.sections.find(s => s.id === id))
+        .filter((s): s is StoreSection => !!s)
+    : [];
+
+  async function commitReorder(orderedIds: string[]) {
+    setDragOrderIds(orderedIds);
+    try {
+      const s = await reorderSections(orderedIds);
+      setStore(s);
+    } finally {
+      setDragOrderIds(null);
+    }
+  }
+
+  function makeDragResponder(id: string) {
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: (_e, g) => Math.abs(g.dy) > 4,
+      onPanResponderGrant: () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        dragY.setValue(0);
+        setDraggingId(id);
+        dragStartIndex.current = displayOrder.indexOf(id);
+      },
+      onPanResponderMove: (_e: GestureResponderEvent, g: PanResponderGestureState) => {
+        dragY.setValue(g.dy);
+        const shift = Math.round(g.dy / ROW_HEIGHT);
+        const targetIndex = Math.min(displayOrder.length - 1, Math.max(0, dragStartIndex.current + shift));
+        const current = dragOrderIds ?? committedOrder;
+        const currentIndex = current.indexOf(id);
+        if (targetIndex !== currentIndex) {
+          const next = [...current];
+          next.splice(currentIndex, 1);
+          next.splice(targetIndex, 0, id);
+          setDragOrderIds(next);
+        }
+      },
+      onPanResponderRelease: () => {
+        Animated.timing(dragY, { toValue: 0, duration: 120, useNativeDriver: true }).start();
+        setDraggingId(null);
+        const finalOrder = dragOrderIds ?? committedOrder;
+        if (JSON.stringify(finalOrder) !== JSON.stringify(committedOrder)) {
+          commitReorder(finalOrder);
+        } else {
+          setDragOrderIds(null);
+        }
+      },
+      onPanResponderTerminate: () => {
+        dragY.setValue(0);
+        setDraggingId(null);
+        setDragOrderIds(null);
+      },
+    });
+  }
+
+  async function commitInlineHeading(id: string, heading: string) {
+    setInlineEditingId(null);
+    try {
+      const s = await updateSection(id, { heading });
+      setStore(s);
+      if (activeSection?.id === id) {
+        setActiveSection({ ...activeSection, settings: { ...activeSection.settings, heading } });
+        setLocalSettings(ls => ({ ...ls, heading }));
+      }
+    } catch {
+      setSavingStatus('failed');
+    }
+  }
 
   // ─── Section Settings Panel ─────────────────────────────────────────────────
   function renderSectionPanel() {
@@ -542,6 +638,7 @@ export default function StoreEditor() {
     const colors = store.branding.colors;
     const typo = store.branding.typography;
     const br = store.branding;
+    const activeTheme = getThemeById(store.themeSettings.themeId);
 
     async function updateBrandingField(partial: any) {
       const s = await updateBranding(partial);
@@ -550,6 +647,23 @@ export default function StoreEditor() {
 
     return (
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.tabContent}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => router.push('/store-theme-picker' as never)}
+          style={brandStyles.themeSwitchCard}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={brandStyles.themeSwitchLabel}>Theme</Text>
+            <Text style={brandStyles.themeSwitchName}>{activeTheme?.name ?? THREAD_THEME_NAME}</Text>
+          </View>
+          <View style={brandStyles.themeSwitchDots}>
+            {[colors.primary, colors.accent, colors.background].map((c, i) => (
+              <View key={i} style={[brandStyles.themeSwitchDot, { backgroundColor: c }]} />
+            ))}
+          </View>
+          <Feather name="chevron-right" size={ICON.md} color={MUTED} />
+        </TouchableOpacity>
+
         <BrandthreadCard style={brandStyles.personalizeCard}>
           <View style={brandStyles.personalizeHeader}>
             <View style={brandStyles.personalizeIcon}>
@@ -581,22 +695,36 @@ export default function StoreEditor() {
           </View>
         </BrandthreadCard>
 
-        <SectionHeader title="Thread Theme palette" style={{ marginTop: SP.md }} />
+        <SectionHeader title={`${activeTheme?.name ?? THREAD_THEME_NAME} palette`} style={{ marginTop: SP.md }} />
         <Text style={brandStyles.paletteNote}>
-          Black, white, and grayscale are locked to keep every storefront unmistakably Thread Theme.
+          Every Brandthread theme is monochrome-first — pick a different theme above for a different palette, or fine-tune it here.
         </Text>
         {(['primary', 'secondary', 'accent', 'background', 'text'] as const).map(key => (
           <View key={key} style={brandStyles.colorRow}>
             <View style={[brandStyles.colorSwatch, { backgroundColor: (colors as any)[key] }]} />
             <Text style={brandStyles.colorLabel}>{key.charAt(0).toUpperCase() + key.slice(1)}</Text>
-            <Text style={brandStyles.colorValue}>{(colors as any)[key]}</Text>
+            <StyledInput
+              value={(colors as any)[key]}
+              onChange={v => updateBrandingField({ colors: { ...colors, [key]: v } })}
+              placeholder="#111111"
+            />
           </View>
         ))}
 
         <SectionHeader title="Typography" style={{ marginTop: SP.md }} />
         <FieldRow>
           <FieldLabel>Style</FieldLabel>
-          <Text style={brandStyles.lockedValue}>Editorial · Cormorant Garamond / Raleway</Text>
+          <ChipGroup
+            options={TYPOGRAPHY_STYLES.map(t => t.value)}
+            value={typo.style}
+            onChange={v => {
+              const entry = TYPOGRAPHY_STYLES.find(t => t.value === v);
+              updateBrandingField({ typography: { ...typo, style: v, headingFont: entry?.heading ?? typo.headingFont, bodyFont: entry?.body ?? typo.bodyFont } });
+            }}
+          />
+          <Text style={brandStyles.paletteNote}>
+            {typo.headingFont} / {typo.bodyFont}
+          </Text>
         </FieldRow>
         <FieldRow>
           <FieldLabel>Text Case</FieldLabel>
@@ -856,6 +984,9 @@ export default function StoreEditor() {
   // ─── Sections Tab ───────────────────────────────────────────────────────────
   function renderSectionRow({ item: section }: { item: StoreSection }) {
     const isActive = activeSection?.id === section.id;
+    const isDragging = draggingId === section.id;
+    const isInlineEditing = inlineEditingId === section.id;
+    const panResponder = makeDragResponder(section.id);
 
     function getSummary() {
       const s = section.settings;
@@ -864,14 +995,43 @@ export default function StoreEditor() {
     }
 
     return (
-      <View style={[sectionStyles.row, isActive && sectionStyles.rowActive]}>
+      <Animated.View
+        style={[
+          sectionStyles.row, isActive && sectionStyles.rowActive,
+          isDragging && sectionStyles.rowDragging,
+          isDragging && { transform: [{ translateY: dragY }], zIndex: 10, elevation: 6 },
+        ]}
+      >
         <View style={sectionStyles.rowTop}>
           <View style={sectionStyles.rowLeft}>
-            <Feather name="menu" size={ICON.sm} color={SUBTLE} />
+            <View {...panResponder.panHandlers} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={sectionStyles.dragHandle}>
+              <Feather name="menu" size={ICON.sm} color={isDragging ? PURPLE_LIGHT : SUBTLE} />
+            </View>
             <View style={[sectionStyles.enabledDot, { backgroundColor: section.enabled ? SUCCESS : MUTED }]} />
             <View style={{ flex: 1 }}>
-              <Text style={sectionStyles.sectionLabel}>{section.label}</Text>
-              <Text style={sectionStyles.sectionSummary} numberOfLines={1}>{getSummary()}</Text>
+              {isInlineEditing ? (
+                <TextInput
+                  autoFocus
+                  value={inlineHeadingDraft}
+                  onChangeText={setInlineHeadingDraft}
+                  onBlur={() => commitInlineHeading(section.id, inlineHeadingDraft)}
+                  onSubmitEditing={() => commitInlineHeading(section.id, inlineHeadingDraft)}
+                  placeholder={section.label}
+                  placeholderTextColor={SUBTLE}
+                  style={sectionStyles.inlineInput}
+                />
+              ) : (
+                <TouchableOpacity
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setInlineHeadingDraft(section.settings.heading ?? '');
+                    setInlineEditingId(section.id);
+                  }}
+                >
+                  <Text style={sectionStyles.sectionLabel}>{section.label}</Text>
+                  <Text style={sectionStyles.sectionSummary} numberOfLines={1}>{getSummary()}</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
           <TouchableOpacity
@@ -912,7 +1072,7 @@ export default function StoreEditor() {
         </View>
 
         {isActive && renderSectionPanel()}
-      </View>
+      </Animated.View>
     );
   }
 
@@ -997,6 +1157,13 @@ export default function StoreEditor() {
               style={[styles.undoBtn, !redoAvailable && styles.undoBtnDisabled]}
             >
               <Feather name="corner-up-right" size={ICON.sm} color={redoAvailable ? FG : SUBTLE} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleSaveDraft}
+              disabled={savingStatus === 'saving'}
+              style={styles.headerBtn}
+            >
+              <Text style={styles.headerBtnText}>Save Draft</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => router.push('/store-preview' as never)}
@@ -1112,6 +1279,8 @@ const makeSectionStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     marginBottom: SP.sm, overflow: 'hidden',
   },
   rowActive: { borderColor: BORDER_ACTIVE },
+  rowDragging: { borderColor: BORDER_ACTIVE, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
+  dragHandle: { padding: 2 },
   rowTop: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: SP.sm, paddingVertical: SP.sm,
@@ -1121,6 +1290,10 @@ const makeSectionStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   enabledDot: { width: 8, height: 8, borderRadius: 4 },
   sectionLabel: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   sectionSummary: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
+  inlineInput: {
+    fontSize: FS.base, fontFamily: FONT.semibold, color: FG,
+    borderBottomWidth: 1, borderBottomColor: PURPLE_LIGHT, paddingVertical: 1,
+  },
   editBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: SP.sm, paddingVertical: SP.xs,
@@ -1178,6 +1351,42 @@ const makePanelStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 const makeBrandStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE_DIM = theme.accentDim;
   return StyleSheet.create({
+  themeSwitchCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    backgroundColor: CARD,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.md,
+    marginBottom: SP.md,
+  },
+  themeSwitchLabel: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: MUTED,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  themeSwitchName: {
+    fontSize: FS.base,
+    fontFamily: FONT.bold,
+    color: FG,
+    marginTop: 2,
+  },
+  themeSwitchDots: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  themeSwitchDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
   personalizeCard: {
     gap: SP.md,
   },

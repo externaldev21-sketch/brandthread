@@ -26,11 +26,6 @@ describe('dev web onboarding walkthrough', () => {
 
   it('keeps the account form scrollable without the light browser scrollbar', () => {
     const onboarding = read('../app/onboarding.tsx');
-    const accountForm = onboarding.slice(
-      onboarding.indexOf('// Main seller sign-up form'),
-      onboarding.indexOf('// ─── Shared Auth styles'),
-    );
-
-    expect(accountForm).toContain('showsVerticalScrollIndicator={false}');
+    expect(onboarding).toMatch(/contentContainerStyle=\{ssa\.scroll\}[\s\S]*?showsVerticalScrollIndicator=\{false\}/);
   });
 });

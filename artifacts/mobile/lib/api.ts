@@ -714,7 +714,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     analytics: {
       dashboard:  () => get('/api/analytics/dashboard'),
-      home: (range: 'live' | 'today' | 'yesterday' | 'week') =>
+      home: (range: 'live' | 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'all') =>
         get<{
           range: string;
           totalCents: number;
@@ -1367,6 +1367,16 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           status: string;
           verified: boolean;
           bankLast4: string | null;
+          /** false when this environment has no Stripe key configured. */
+          providerConfigured?: boolean;
+          payoutSchedule?: {
+            interval: string | null;
+            delayDays: number | null;
+            weeklyAnchor: string | null;
+            monthlyAnchor: number | null;
+          } | null;
+          requirementsDue?: string[];
+          taxInfoStatus?: 'submitted' | 'needed' | 'unknown';
         }>('/api/seller/connect/status'),
       },
       /** Update the current user's public profile. username must be letters/numbers/underscores, 3-30 chars. */
@@ -1813,6 +1823,33 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       calculate: (sellerId: string, subtotalCents: number) =>
         get<any>(`/api/shipping-rates/calculate?sellerId=${encodeURIComponent(sellerId)}&subtotalCents=${subtotalCents}`),
     },
+    /** Shipping zones — worldwide zone-based rates (domestic / country / rest-of-world), replacing the single flat rate above. */
+    shippingZones: {
+      list: () => get<any[]>('/api/shipping-zones'),
+      create: (data: {
+        name: string;
+        zoneType: 'domestic' | 'country' | 'rest_of_world';
+        countries?: string[];
+        pricingModel?: 'flat' | 'weight_tiered';
+        flatRateCents?: number;
+        freeAboveCents?: number | null;
+        processingDays?: number;
+        carrierLabel?: string | null;
+        shipsInternationally?: boolean;
+        dutiesHandling?: 'ddp' | 'dap';
+        sortOrder?: number;
+      }) => post<any>('/api/shipping-zones', data),
+      update: (id: string, data: Record<string, unknown>) =>
+        patch<any>(`/api/shipping-zones/${encodeURIComponent(id)}`, data),
+      delete: (id: string) => del<any>(`/api/shipping-zones/${encodeURIComponent(id)}`),
+      setWeightTiers: (id: string, tiers: Array<{ minWeightGrams: number; maxWeightGrams: number | null; rateCents: number }>) =>
+        put<any>(`/api/shipping-zones/${encodeURIComponent(id)}/weight-tiers`, { tiers }),
+      getSettings: () => get<{ shipFromCountry: string }>('/api/shipping-zones/settings'),
+      updateSettings: (shipFromCountry: string) =>
+        patch<{ shipFromCountry: string }>('/api/shipping-zones/settings', { shipFromCountry }),
+      resolve: (sellerId: string, country: string, subtotalCents: number, weightGrams = 0) =>
+        get<any>(`/api/shipping-zones/resolve?sellerId=${encodeURIComponent(sellerId)}&country=${encodeURIComponent(country)}&subtotalCents=${subtotalCents}&weightGrams=${weightGrams}`),
+    },
     // (products key defined earlier in this object — no duplicate)
     /** Waitlist — out-of-stock variant demand tracking. */
     waitlist: {
@@ -1971,7 +2008,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         chargeVat: boolean;
       }>('/api/taxes/status'),
       enable:    () => post<any>('/api/taxes/enable', {}),
-      config:    (data: { collectDuties?: boolean; chargeShippingTax?: boolean; chargeVat?: boolean }) =>
+      config:    (data: { stripeTaxEnabled?: boolean; collectDuties?: boolean; chargeShippingTax?: boolean; chargeVat?: boolean; taxCalculationMode?: string }) =>
         patch<any>('/api/taxes/config', data),
       forms1099: (year?: number) => get<any>(`/api/taxes/1099${year ? `?year=${year}` : ''}`),
       calculate: (data: { lineItems: any[]; shippingAddress: any; currency?: string; shippingCents?: number }) =>

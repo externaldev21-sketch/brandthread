@@ -159,6 +159,7 @@ vi.mock("@workspace/db", () => {
     manufacturers:            tableProxy(),
     drops:                    tableProxy(),
     discountCodes:            tableProxy(),
+    shippingRates:            tableProxy(),
   };
 });
 
@@ -168,7 +169,10 @@ vi.mock("@workspace/integrations-openai-ai-server", () => ({
   openai: {
     chat: {
       completions: {
-        create: async (opts: { messages: Array<{ role: string; content: string }> }) => {
+        create: async (opts: {
+          messages: Array<{ role: string; content: string }>;
+          stream?: boolean;
+        }) => {
           mockState.capturedMessages = opts.messages;
 
           if (mockState.openaiShouldThrow) {
@@ -178,8 +182,20 @@ vi.mock("@workspace/integrations-openai-ai-server", () => ({
             );
           }
 
+          const REPLY = "Mocked AI response about seller account.";
+
+          if (opts.stream) {
+            // Minimal async-iterable stub matching the OpenAI streaming shape
+            // consumed by `for await (const chunk of stream)` in ai.ts.
+            return {
+              [Symbol.asyncIterator]: async function* () {
+                yield { choices: [{ delta: { content: REPLY } }] };
+              },
+            };
+          }
+
           return {
-            choices: [{ message: { content: "Mocked AI response about seller account." } }],
+            choices: [{ message: { content: REPLY } }],
             usage: { total_tokens: 42 },
           };
         },
@@ -232,6 +248,26 @@ function resetMock(userId: string | null = "user_seller_a") {
   mockState.capturedMessages  = null;
   mockState.openaiShouldThrow = false;
   mockState.openaiError       = null;
+}
+
+function streamChatRequest(body: unknown, userId: string | null = "user_seller_a") {
+  mockState.authedUserId     = userId;
+  mockState.capturedMessages = null;
+  return fetch(`${baseUrl}/api/ai/chat/stream`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+/** Parses the SSE body into its individual `data:` JSON payloads. */
+async function readSseEvents(res: Response): Promise<Array<Record<string, unknown>>> {
+  const text = await res.text();
+  return text
+    .split("\n\n")
+    .map((chunk) => chunk.replace(/^data: /, "").trim())
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as Record<string, unknown>);
 }
 
 // ─── Tests: access control ────────────────────────────────────────────────────
@@ -294,6 +330,61 @@ describe("POST /api/ai/chat — snapshot isolation", () => {
 
     const systemMsg = mockState.capturedMessages!.find(m => m.role === "system");
     expect(systemMsg!.content).toContain("snapshotAt");
+  });
+});
+
+// ─── Tests: streaming endpoint isolation ──────────────────────────────────────
+// POST /api/ai/chat/stream must apply the exact same per-seller scoping as the
+// non-streaming endpoint — only the transport differs.
+
+describe("POST /api/ai/chat/stream — access control and isolation", () => {
+  it("rejects unauthenticated requests with 401", async () => {
+    const res = await streamChatRequest({ messages: [{ role: "user", content: "Hello" }] }, null);
+    expect(res.status).toBe(401);
+  });
+
+  it("streams seller A's brand name, never seller B's data", async () => {
+    const res = await streamChatRequest(
+      { messages: [{ role: "user", content: "What is my brand name?" }] },
+      "user_seller_a",
+    );
+    expect(res.status).toBe(200);
+
+    const systemMsg = mockState.capturedMessages!.find(m => m.role === "system");
+    expect(systemMsg!.content).toContain("Brand A");
+    expect(systemMsg!.content).not.toContain("Brand B");
+    expect(systemMsg!.content).not.toContain("B-999");
+
+    const events = await readSseEvents(res);
+    const done = events.find(e => e.type === "done");
+    expect(done).toBeDefined();
+    expect(typeof done!.content).toBe("string");
+  });
+
+  it("streams seller B's own data, never seller A's, when seller B is authenticated", async () => {
+    const res = await streamChatRequest(
+      { messages: [{ role: "user", content: "Tell me about my store." }] },
+      "user_seller_b",
+    );
+    expect(res.status).toBe(200);
+
+    const systemMsg = mockState.capturedMessages!.find(m => m.role === "system");
+    expect(systemMsg!.content).toContain("Brand B");
+    expect(systemMsg!.content).not.toContain("Brand A");
+    expect(systemMsg!.content).not.toContain("Store A");
+    expect(systemMsg!.content).not.toContain("A-001");
+  });
+
+  it("emits a done event carrying only route-based sources, never raw account data", async () => {
+    const res = await streamChatRequest(
+      { messages: [{ role: "user", content: "Why is my inventory low?" }] },
+      "user_seller_a",
+    );
+    const events = await readSseEvents(res);
+    const done = events.find(e => e.type === "done") as { sources?: Array<{ title: string; route: string }> };
+    expect(done?.sources?.length).toBeGreaterThan(0);
+    expect(done!.sources![0]).toHaveProperty("route");
+    expect(done!.sources![0]).toHaveProperty("title");
   });
 });
 

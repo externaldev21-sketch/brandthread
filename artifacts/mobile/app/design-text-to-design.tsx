@@ -1,744 +1,514 @@
 /**
- * Brandthread Design Studio — Text to Design
+ * Brandthread AI Design — chat-first design agent
  * Route: /design-text-to-design
+ *
+ * The seller describes a garment in chat; the design renders inline. Every
+ * follow-up message edits the same design iteratively (applyPromptEdit),
+ * with the current version pinned at the top and full version history below.
  */
-import React, { useState } from 'react';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, TextInput, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Alert, Image, Dimensions, Modal, FlatList,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, Image,
+  ActivityIndicator, Alert, Modal, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import * as ImagePicker from 'expo-image-picker';
-import {
-  BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
-  GradientCard, PrimaryButton, SecondaryButton,
-} from '@/components/BrandthreadUI';
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED,
-  BORDER, BORDER_ACTIVE, BORDER_SUBTLE,
-  FG, MUTED, SUBTLE,
-  FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
-import {
-  GARMENT_TYPES, PLACEMENT_TYPES, AI_STYLES,
-  AIStyleKind, GarmentType, PlacementType,
-} from '@/services/designTypes';
-import {
-  generateDesignFromText, GenerateDesignResult, createBrandAsset,
-} from '@/services/designService';
-import { getProducts, updateProduct } from '@/services/productService';
-import type { Product, ProductMedia } from '@/services/productTypes';
-import { File, Paths } from 'expo-file-system';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { File, Paths } from 'expo-file-system';
+import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
+import { useColors } from '@/hooks/useColors';
+import { BrandthreadScreen, BrandthreadHeader } from '@/components/BrandthreadUI';
+import AiComposer from '@/components/ai/AiComposer';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import {
+  generateDesignFromText, applyPromptEdit, createBrandAsset,
+} from '@/services/designService';
 
-const { width: SW } = Dimensions.get('window');
-const COL_W = (SW - SP.lg * 2 - SP.sm) / 2;
+// ─── Types ───────────────────────────────────────────────────────────────────
 
-const GRAD_PALETTES: Record<number, readonly [string, string]> = {
-  0: ['#0F766E', '#22D3EE'],
-  1: ['#F97316', '#0EA5E9'],
-  2: ['#22D3EE', '#3B82F6'],
-  3: ['#F59E0B', '#F97316'],
-};
+interface DesignVersion {
+  id: string;
+  imageUri: string;
+  prompt: string;
+  createdAt: string;
+}
 
-export default function TextToDesignScreen() {
+interface ChatTurn {
+  id: string;
+  role: 'user' | 'assistant';
+  text?: string;
+  versionId?: string;
+  error?: string;
+}
+
+let seq = 0;
+const uid = (prefix: string) => `${prefix}_${Date.now()}_${seq++}`;
+
+export default function AiDesignChatScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
-  const s = createStyles(theme);
+  const colors = useColors();
+  const s = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
-  // Form state
-  const [prompt, setPrompt] = useState('');
-  const [style, setStyle] = useState<AIStyleKind>('streetwear');
-  const [garmentType, setGarmentType] = useState<GarmentType | null>(null);
-  const [placement, setPlacement] = useState<PlacementType | null>(null);
-  const [colorPalette, setColorPalette] = useState('');
-  const [textContent, setTextContent] = useState('');
-  const [referenceUri, setReferenceUri] = useState<string | null>(null);
-  const [count, setCount] = useState(4);
+  const [turns, setTurns] = useState<ChatTurn[]>([]);
+  const [versions, setVersions] = useState<DesignVersion[]>([]);
+  const [currentId, setCurrentId] = useState<string | null>(null);
+  const [inputText, setInputText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [results, setResults] = useState<GenerateDesignResult | null>(null);
-  const [showProductPicker, setShowProductPicker] = useState(false);
-  const [pickerProducts, setPickerProducts] = useState<Product[]>([]);
-  const [loadingPickerProducts, setLoadingPickerProducts] = useState(false);
-  const [pickerImageUri, setPickerImageUri] = useState<string | null>(null);
+  const [pendingRetryText, setPendingRetryText] = useState('');
+  const [showHistory, setShowHistory] = useState(false);
+  const flatListRef = useRef<FlatList<ChatTurn>>(null);
 
-  async function pickReference() {
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-    });
-    if (!res.canceled && res.assets[0]) {
-      setReferenceUri(res.assets[0].uri);
-    }
-  }
+  const versionById = useMemo(() => {
+    const map = new Map<string, DesignVersion>();
+    for (const v of versions) map.set(v.id, v);
+    return map;
+  }, [versions]);
 
-  async function saveDataUriToDevice(dataUri: string): Promise<void> {
-    const MediaLibrary = await import('expo-media-library');
-    const { status } = await MediaLibrary.requestPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Allow photo library access to save images.');
-      return;
-    }
-    const b64 = dataUri.replace(/^data:image\/[a-z]+;base64,/, '');
-    const file = new File(Paths.cache, `design_${Date.now()}.png`);
-    file.write(b64, { encoding: 'base64' });
-    await MediaLibrary.saveToLibraryAsync(file.uri);
-  }
+  const current = currentId ? versionById.get(currentId) ?? null : null;
 
-  async function handleGenerate() {
-    if (!prompt.trim()) {
-      Alert.alert('Describe your design', 'Please enter a prompt first.');
-      return;
-    }
+  const handleSend = useCallback(async (override?: string) => {
+    const text = (override ?? inputText).trim();
+    if (!text || isGenerating) return;
+
+    setInputText('');
+    setPendingRetryText(text);
     setIsGenerating(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    const userTurn: ChatTurn = { id: uid('turn'), role: 'user', text };
+    setTurns(prev => [...prev, userTurn]);
+
     try {
-      const result = await generateDesignFromText({
-        prompt,
-        style,
-        garmentType,
-        placement,
-        colorPalette,
-        textContent,
-        referenceUri,
-        count,
-      });
-      setResults(result);
-    } catch (e) {
-      Alert.alert('Generation failed', 'Please try again.');
+      const imageUri = current
+        ? (await applyPromptEdit({ imageUri: current.imageUri, prompt: text })).imageUris[0]
+        : (await generateDesignFromText({ prompt: text, style: 'streetwear', count: 1 })).imageUris[0];
+
+      if (!imageUri) throw new Error('No design was returned. Please try again.');
+
+      const version: DesignVersion = { id: uid('ver'), imageUri, prompt: text, createdAt: new Date().toISOString() };
+      setVersions(prev => [...prev, version]);
+      setCurrentId(version.id);
+      setTurns(prev => [...prev, { id: uid('turn'), role: 'assistant', versionId: version.id }]);
+    } catch (err: any) {
+      const message = err?.message ?? 'Design generation failed. Please try again.';
+      setTurns(prev => [...prev, { id: uid('turn'), role: 'assistant', error: message }]);
     } finally {
       setIsGenerating(false);
     }
-  }
+  }, [inputText, isGenerating, current]);
 
-  async function handleAddToProduct(uri: string) {
-    if (!uri.startsWith('data:')) { Alert.alert('Nothing to add', 'Generate this design first.'); return; }
-    setPickerImageUri(uri);
-    setLoadingPickerProducts(true);
+  const handleRetry = useCallback(() => {
+    if (pendingRetryText) handleSend(pendingRetryText);
+  }, [pendingRetryText, handleSend]);
+
+  // ── Actions on the pinned current version ──────────────────────────────────
+
+  async function handleSave() {
+    if (!current) return;
     try {
-      const all = await getProducts();
-      const active = all.filter(p => p.status !== 'archived');
-      if (active.length === 0) {
-        Alert.alert('No products', 'Create a product first, then add this design to its media gallery.');
-        return;
-      }
-      setPickerProducts(active);
-      setShowProductPicker(true);
+      await createBrandAsset({
+        name: current.prompt.slice(0, 40) || 'AI design',
+        type: 'graphic',
+        uri: current.imageUri,
+        tags: ['ai-generated', 'ai-design-chat'],
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Saved', 'Saved to Brand Assets.');
     } catch {
-      Alert.alert('Couldn’t load products', 'Try again.');
-    } finally {
-      setLoadingPickerProducts(false);
+      Alert.alert('Save failed', 'Could not save this design. Please try again.');
     }
   }
 
-  async function confirmAddToProduct(product: Product) {
-    setShowProductPicker(false);
-    const uri = pickerImageUri;
-    if (!uri) return;
+  async function handleSendToDesignStudio() {
+    if (!current) return;
     try {
-      const existing = product.media ?? [];
-      const newMedia: ProductMedia = {
-        id: `text-to-design-${Date.now()}`,
-        type: 'image',
-        uri,
-        altText: 'AI-generated design',
-        isCover: false,
-        sortOrder: existing.length,
-        createdAt: new Date().toISOString(),
-      };
-      const updated = await updateProduct(product.id, { media: [...existing, newMedia] });
-      if (updated) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert('Added', `Added to "${product.name ?? 'product'}" media gallery.`);
-      } else {
-        Alert.alert('Couldn’t update product', 'Try again.');
-      }
+      await createBrandAsset({
+        name: current.prompt.slice(0, 40) || 'AI design',
+        type: 'graphic',
+        uri: current.imageUri,
+        tags: ['ai-generated', 'design-layer'],
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert(
+        'Added to Design Studio',
+        'Your design is now in Brand Assets. Open a design project and insert it as an image layer from the assets panel.',
+        [
+          { text: 'Open Design Studio', onPress: () => router.push('/design' as any) },
+          { text: 'OK' },
+        ],
+      );
     } catch {
-      Alert.alert('Couldn’t add to product', 'Try again.');
+      Alert.alert('Error', 'Could not send to Design Studio. Please try again.');
     }
   }
 
-  async function handleSaveAll() {
-    if (!results) return;
-    const realUris = results.imageUris.filter(u => u.startsWith('data:'));
-    if (realUris.length === 0) {
-      Alert.alert('Nothing to save', 'Generate designs first.');
-      return;
-    }
+  async function handleSendToMockupToModel() {
+    if (!current) return;
     try {
-      await Promise.all(realUris.map((uri, i) =>
-        createBrandAsset({
-          name: `${results.prompt.slice(0, 30)} #${i + 1}`,
-          type: 'graphic',
-          uri,
-          tags: ['ai-generated', 'text-to-design', results.style ?? ''].filter(Boolean),
-        }),
-      ));
-      Alert.alert('Saved', `${realUris.length} design${realUris.length !== 1 ? 's' : ''} saved to Brand Assets.`);
+      const b64 = current.imageUri.replace(/^data:image\/[a-z]+;base64,/, '');
+      const file = new File(Paths.cache, `ai-design-${Date.now()}.png`);
+      file.write(b64, { encoding: 'base64' });
+      router.push({ pathname: '/design-mockup-to-model', params: { seedMockupUri: file.uri } } as any);
     } catch {
-      Alert.alert('Save failed', 'Could not save designs. Please try again.');
+      Alert.alert('Error', 'Could not send to Mockup to Model. Please try again.');
     }
   }
 
-  // ─── Results screen ─────────────────────────────────────────────────────────
-  if (results !== null) {
+  // ── Render ───────────────────────────────────────────────────────────────
+
+  const renderTurn = useCallback(({ item }: { item: ChatTurn }) => {
+    if (item.role === 'user') {
+      return (
+        <View style={s.userRow}>
+          <View style={[s.userBubble, { backgroundColor: theme.accent }]}>
+            <Text style={[s.userText, getOnAccentTextStyle(theme)]}>{item.text}</Text>
+          </View>
+        </View>
+      );
+    }
+
+    if (item.error) {
+      return (
+        <View style={s.assistantRow}>
+          <View style={[s.assistantBubble, s.errorBubble]}>
+            <Feather name="alert-circle" size={14} color={colors.destructive} />
+            <Text style={s.errorText}>{item.error}</Text>
+            <TouchableOpacity onPress={handleRetry} style={s.retryBtn}>
+              <Feather name="refresh-cw" size={12} color={theme.accent} />
+              <Text style={[s.retryText, { color: theme.accent }]}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    const version = item.versionId ? versionById.get(item.versionId) : null;
+    if (!version) return null;
+    const isCurrent = version.id === currentId;
+
     return (
-      <BrandthreadScreen>
-        <BrandthreadHeader
-          title="Your designs"
-          onBack={() => setResults(null)}
-        />
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={s.resultsContent}
-          showsVerticalScrollIndicator={false}
+      <View style={s.assistantRow}>
+        <TouchableOpacity
+          style={[s.designThumbWrap, isCurrent && { borderColor: theme.accent }]}
+          onPress={() => setCurrentId(version.id)}
+          activeOpacity={0.9}
         >
-          <Text style={s.resultsPrompt} numberOfLines={2}>"{results.prompt}"</Text>
-          <View style={s.grid}>
-            {results.imageUris.map((uri, idx) => (
-              <View key={uri} style={s.resultCard}>
-                {uri.startsWith('data:') ? (
-                  <Image source={{ uri }} style={s.resultGradient} resizeMode="cover" />
-                ) : (
-                  <LinearGradient
-                    colors={GRAD_PALETTES[idx % 4]}
-                    style={s.resultGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                  >
-                    <Feather name="image" size={32} color="rgba(255,255,255,0.5)" />
-                    <Text style={s.resultLabel}>Design {idx + 1}</Text>
-                  </LinearGradient>
-                )}
-                {/* Style badge */}
-                <View style={s.styleBadge}>
-                  <Text style={s.styleBadgeText}>{results.style}</Text>
-                </View>
-                {/* Actions */}
-                <View style={s.resultActions}>
-                  <TouchableOpacity
-                    style={s.actionBtn}
-                    onPress={() => {
-                      if (!uri.startsWith('data:')) return;
-                      createBrandAsset({ name: results!.prompt.slice(0, 40), type: 'graphic', uri, tags: ['ai-generated'] })
-                        .then(() => Alert.alert('Saved', 'Saved to Brand Assets.'))
-                        .catch(() => Alert.alert('Error', 'Could not save.'));
-                    }}
-                  >
-                    <Feather name="bookmark" size={ICON.sm} color={PURPLE} />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.actionBtn} onPress={() => handleAddToProduct(uri)}>
-                    <Feather name="package" size={ICON.sm} color={FG} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={s.actionBtn}
-                    onPress={async () => {
-                      if (!uri.startsWith('data:')) { Alert.alert('Nothing to export', 'Generate first.'); return; }
-                      try { await saveDataUriToDevice(uri); Alert.alert('Saved', 'Design saved to photo library.'); }
-                      catch { Alert.alert('Export failed', 'Could not save.'); }
-                    }}
-                  >
-                    <Feather name="download" size={ICON.sm} color={FG} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-          </View>
-
-          <View style={s.resultsFooter}>
-            <TouchableOpacity style={s.footerBtn} onPress={() => { setResults(null); setPrompt(''); }}>
-              <Feather name="refresh-cw" size={ICON.sm} color={FG} />
-              <Text style={s.footerBtnText}>Try again</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.footerBtn} onPress={() => setResults(null)}>
-              <Feather name="edit-2" size={ICON.sm} color={CYAN} />
-              <Text style={[s.footerBtnText, { color: CYAN }]}>Edit prompt</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[s.footerBtn, { borderColor: PURPLE }]} onPress={handleSaveAll}>
-              <Feather name="save" size={ICON.sm} color={PURPLE} />
-              <Text style={[s.footerBtnText, { color: PURPLE }]}>Save all</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-
-        <Modal
-          visible={showProductPicker}
-          animationType="slide"
-          presentationStyle="formSheet"
-          onRequestClose={() => setShowProductPicker(false)}
-        >
-          <View style={s.pickerRoot}>
-            <View style={s.pickerHeader}>
-              <Text style={s.pickerTitle}>Choose a product</Text>
-              <TouchableOpacity onPress={() => setShowProductPicker(false)} activeOpacity={0.7}>
-                <Feather name="x" size={ICON.sm} color={FG} />
-              </TouchableOpacity>
+          <Image source={{ uri: version.imageUri }} style={s.designThumb} resizeMode="cover" />
+          {isCurrent && (
+            <View style={[s.currentBadge, { backgroundColor: theme.accent }]}>
+              <Text style={[s.currentBadgeText, getOnAccentTextStyle(theme)]}>Current</Text>
             </View>
-            <Text style={s.pickerSub}>The design will be added to the product's media gallery.</Text>
-            {loadingPickerProducts ? (
-              <ActivityIndicator style={{ marginTop: 40 }} color={PURPLE} />
-            ) : (
-              <FlatList
-                data={pickerProducts}
-                keyExtractor={p => p.id}
-                contentContainerStyle={{ padding: SP.md }}
-                renderItem={({ item }) => (
-                  <TouchableOpacity style={s.productRow} onPress={() => confirmAddToProduct(item)} activeOpacity={0.82}>
-                    {item.media?.[0]?.uri ? (
-                      <Image source={{ uri: item.media[0].uri }} style={s.productThumb} resizeMode="cover" />
-                    ) : (
-                      <View style={[s.productThumb, s.productThumbEmpty]}>
-                        <Feather name="package" size={ICON.md} color={SUBTLE} />
-                      </View>
-                    )}
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.productName} numberOfLines={1}>{item.name}</Text>
-                      <Text style={s.productStatus}>{item.status}</Text>
-                    </View>
-                    <Feather name="chevron-right" size={ICON.xs} color={MUTED} />
-                  </TouchableOpacity>
-                )}
-              />
-            )}
-          </View>
-        </Modal>
-      </BrandthreadScreen>
-    );
-  }
-
-  // ─── Input screen ────────────────────────────────────────────────────────────
-  return (
-    <BrandthreadScreen>
-      {isGenerating && (
-        <View style={s.loadingOverlay}>
-          <ActivityIndicator size="large" color={PURPLE} />
-          <Text style={s.loadingText}>Generating your design…</Text>
-          <Text style={s.loadingSubtext}>Usually under a minute.</Text>
-        </View>
-      )}
-      <BrandthreadHeader title="Text to Design" onBack={() => router.back()} />
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={s.formContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Prompt */}
-        <Text style={s.label}>Describe your design</Text>
-        <View style={s.textAreaWrap}>
-          <TextInput
-            style={s.textArea}
-            value={prompt}
-            onChangeText={setPrompt}
-            placeholder="A bold streetwear logo with urban typography..."
-            placeholderTextColor={SUBTLE}
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-          />
-        </View>
-
-        {/* Garment type */}
-        <Text style={s.label}>Garment type</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.pillRow}>
-          {GARMENT_TYPES.map(g => (
-            <TouchableOpacity
-              key={g.value}
-              style={[s.pill, garmentType === g.value && s.pillActive]}
-              onPress={() => setGarmentType(garmentType === g.value ? null : g.value)}
-            >
-              <Text style={[s.pillText, garmentType === g.value && s.pillTextActive]}>
-                {g.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Placement */}
-        <Text style={s.label}>Placement</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.pillRow}>
-          {PLACEMENT_TYPES.map(p => (
-            <TouchableOpacity
-              key={p.value}
-              style={[s.pill, placement === p.value && s.pillActive]}
-              onPress={() => setPlacement(placement === p.value ? null : p.value)}
-            >
-              <Text style={[s.pillText, placement === p.value && s.pillTextActive]}>
-                {p.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Style */}
-        <Text style={s.label}>Style</Text>
-        <View style={s.styleGrid}>
-          {AI_STYLES.map(st => (
-            <TouchableOpacity
-              key={st.value}
-              style={[s.styleCard, style === st.value && s.styleCardActive]}
-              onPress={() => setStyle(st.value)}
-            >
-              <Text style={[s.styleCardText, style === st.value && s.styleCardTextActive]}>
-                {st.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Color palette */}
-        <Text style={s.label}>Color palette</Text>
-        <View style={s.inputWrap}>
-          <TextInput
-            style={s.input}
-            value={colorPalette}
-            onChangeText={setColorPalette}
-            placeholder="Black and gold, neon green..."
-            placeholderTextColor={SUBTLE}
-          />
-        </View>
-
-        {/* Text content */}
-        <Text style={s.label}>Text to include <Text style={s.labelOptional}>(optional)</Text></Text>
-        <View style={s.inputWrap}>
-          <TextInput
-            style={s.input}
-            value={textContent}
-            onChangeText={setTextContent}
-            placeholder="Your brand name or slogan..."
-            placeholderTextColor={SUBTLE}
-          />
-        </View>
-
-        {/* Reference image */}
-        <Text style={s.label}>Reference image <Text style={s.labelOptional}>(optional)</Text></Text>
-        <TouchableOpacity style={s.uploadBtn} onPress={pickReference}>
-          {referenceUri ? (
-            <Image source={{ uri: referenceUri }} style={s.refThumb} />
-          ) : (
-            <>
-              <Feather name="upload" size={ICON.md} color={MUTED} />
-              <Text style={s.uploadBtnText}>Upload reference image</Text>
-            </>
           )}
         </TouchableOpacity>
+      </View>
+    );
+  }, [s, theme, colors, currentId, versionById, handleRetry]);
 
-        {/* Count stepper */}
-        <Text style={s.label}>Number of results</Text>
-        <View style={s.stepperRow}>
-          <TouchableOpacity
-            style={s.stepperBtn}
-            onPress={() => setCount(Math.max(1, count - 1))}
-          >
-            <Feather name="minus" size={ICON.md} color={FG} />
-          </TouchableOpacity>
-          <Text style={s.stepperVal}>{count}</Text>
-          <TouchableOpacity
-            style={s.stepperBtn}
-            onPress={() => setCount(Math.min(8, count + 1))}
-          >
-            <Feather name="plus" size={ICON.md} color={FG} />
-          </TouchableOpacity>
-        </View>
+  const canSend = inputText.trim().length > 0 && !isGenerating;
+  const bottomInset = Math.max(insets.bottom, 8);
 
-        {/* Generate button */}
-        <GradientCard colors={theme.primaryGradient} style={[s.generateCard, { shadowColor: theme.shadowColor }]} onPress={handleGenerate}>
-          <View style={s.generateInner}>
-          <Feather name="zap" size={ICON.md} color={theme.onAccent} />
-          <Text style={[s.generateText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Generate {count} design{count !== 1 ? 's' : ''}</Text>
+  return (
+    <BrandthreadScreen>
+      <BrandthreadHeader title="AI Design" onBack={() => router.back()} />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        {/* ── Pinned current version ── */}
+        {current && (
+          <View style={s.pinnedCard}>
+            <Image source={{ uri: current.imageUri }} style={s.pinnedThumb} resizeMode="cover" />
+            <View style={{ flex: 1 }}>
+              <Text style={s.pinnedLabel}>CURRENT VERSION</Text>
+              <Text style={s.pinnedPrompt} numberOfLines={2}>{current.prompt}</Text>
+              <View style={s.pinnedActions}>
+                <TouchableOpacity style={s.pinnedActionBtn} onPress={handleSave}>
+                  <Feather name="bookmark" size={ICON.xs} color={colors.text} />
+                  <Text style={s.pinnedActionText}>Save</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.pinnedActionBtn} onPress={handleSendToDesignStudio}>
+                  <Feather name="layers" size={ICON.xs} color={colors.text} />
+                  <Text style={s.pinnedActionText}>Design Studio</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.pinnedActionBtn} onPress={handleSendToMockupToModel}>
+                  <Feather name="user" size={ICON.xs} color={colors.text} />
+                  <Text style={s.pinnedActionText}>Mockup to Model</Text>
+                </TouchableOpacity>
+                {versions.length > 1 && (
+                  <TouchableOpacity style={s.pinnedActionBtn} onPress={() => setShowHistory(true)}>
+                    <Feather name="clock" size={ICON.xs} color={colors.text} />
+                    <Text style={s.pinnedActionText}>History ({versions.length})</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
           </View>
-        </GradientCard>
-      </ScrollView>
+        )}
+
+        {/* ── Chat ── */}
+        {turns.length === 0 ? (
+          <View style={s.emptyWrap}>
+            <Feather name="feather" size={28} color={theme.accent} />
+            <Text style={s.emptyTitle}>Describe the design you want</Text>
+            <Text style={s.emptySubtitle}>
+              "A heavyweight black hoodie with a distressed chrome logo on the back" — then keep
+              refining it with follow-ups like "make the logo bigger" or "try cream".
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={turns}
+            keyExtractor={t => t.id}
+            renderItem={renderTurn}
+            contentContainerStyle={s.listContent}
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+            ListFooterComponent={isGenerating ? (
+              <View style={s.assistantRow}>
+                <View style={s.generatingCard}>
+                  <ActivityIndicator size="small" color={theme.accent} />
+                  <Text style={s.generatingText}>Designing…</Text>
+                </View>
+              </View>
+            ) : null}
+          />
+        )}
+
+        <AiComposer
+          value={inputText}
+          onChangeText={setInputText}
+          onSend={() => handleSend()}
+          onStop={() => {}}
+          isGenerating={isGenerating}
+          canSend={canSend}
+          placeholder={current ? 'Describe the change…' : 'Describe your design…'}
+          accentColor={theme.accent}
+          bottomInset={bottomInset}
+        />
+      </KeyboardAvoidingView>
+
+      {/* ── Version history ── */}
+      <Modal visible={showHistory} animationType="slide" presentationStyle="formSheet" onRequestClose={() => setShowHistory(false)}>
+        <View style={s.historyRoot}>
+          <View style={s.historyHeader}>
+            <Text style={s.historyTitle}>Version history</Text>
+            <TouchableOpacity onPress={() => setShowHistory(false)}>
+              <Feather name="x" size={ICON.sm} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={[...versions].reverse()}
+            keyExtractor={v => v.id}
+            numColumns={2}
+            contentContainerStyle={{ padding: SP.md }}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[s.historyCard, item.id === currentId && { borderColor: theme.accent }]}
+                onPress={() => { setCurrentId(item.id); setShowHistory(false); }}
+                activeOpacity={0.85}
+              >
+                <Image source={{ uri: item.imageUri }} style={s.historyThumb} resizeMode="cover" />
+                <Text style={s.historyPrompt} numberOfLines={2}>{item.prompt}</Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </Modal>
     </BrandthreadScreen>
   );
 }
 
-const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
-  return StyleSheet.create({
-  formContent: {
-    padding: SP.lg,
-    paddingBottom: SP.xxl,
-  },
-  label: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.sm,
-    color: FG,
-    marginBottom: SP.sm,
-    marginTop: SP.lg,
-  },
-  labelOptional: {
-    fontFamily: FONT.regular,
-    color: MUTED,
-    fontSize: FS.xs,
-  },
-  textAreaWrap: {
-    backgroundColor: CARD,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: BORDER,
-  },
-  textArea: {
-    fontFamily: FONT.regular,
-    fontSize: FS.base,
-    color: FG,
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
+  pinnedCard: {
+    flexDirection: 'row',
+    gap: SP.md,
     padding: SP.md,
-    minHeight: 100,
+    margin: SP.md,
+    marginBottom: SP.sm,
+    borderRadius: RADIUS.lg,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  pillRow: {
-    flexGrow: 0,
+  pinnedThumb: {
+    width: 72,
+    height: 72,
+    borderRadius: RADIUS.md,
+  },
+  pinnedLabel: {
+    fontFamily: FONT.bold,
+    fontSize: FS.xs,
+    color: colors.subtle,
+    letterSpacing: 0.6,
+    marginBottom: 2,
+  },
+  pinnedPrompt: {
+    fontFamily: FONT.medium,
+    fontSize: FS.sm,
+    color: colors.text,
     marginBottom: SP.xs,
   },
-  pill: {
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm - 2,
+  pinnedActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SP.xs,
+  },
+  pinnedActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: SP.xs,
+    paddingVertical: 4,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: CARD,
-    marginRight: SP.sm,
+    borderColor: colors.border,
   },
-  pillActive: {
-    borderColor: PURPLE,
-    backgroundColor: PURPLE_DIM,
-  },
-  pillText: {
+  pinnedActionText: {
     fontFamily: FONT.medium,
-    fontSize: FS.sm,
-    color: MUTED,
+    fontSize: FS.xs,
+    color: colors.text,
   },
-  pillTextActive: {
-    color: PURPLE_LIGHT,
-  },
-  styleGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  emptyWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SP.xl,
     gap: SP.sm,
   },
-  styleCard: {
-    width: COL_W,
-    paddingVertical: SP.md,
-    paddingHorizontal: SP.sm,
-    backgroundColor: CARD,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: 'center',
-  },
-  styleCardActive: {
-    borderColor: PURPLE,
-    backgroundColor: PURPLE_DIM,
-  },
-  styleCardText: {
-    fontFamily: FONT.medium,
-    fontSize: FS.sm,
-    color: MUTED,
-  },
-  styleCardTextActive: {
-    color: PURPLE_LIGHT,
-  },
-  inputWrap: {
-    backgroundColor: CARD,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: BORDER,
-  },
-  input: {
-    fontFamily: FONT.regular,
-    fontSize: FS.base,
-    color: FG,
-    padding: SP.md,
-    height: 52,
-  },
-  uploadBtn: {
-    backgroundColor: CARD,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderStyle: 'dashed',
-    height: 100,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SP.sm,
-    overflow: 'hidden',
-  },
-  uploadBtnText: {
-    fontFamily: FONT.medium,
-    fontSize: FS.sm,
-    color: MUTED,
-  },
-  refThumb: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  stepperRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.lg,
-  },
-  stepperBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: RADIUS.md,
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepperVal: {
-    fontFamily: FONT.bold,
-    fontSize: FS.xl,
-    color: FG,
-    minWidth: 40,
-    textAlign: 'center',
-  },
-  generateCard: {
-    marginTop: SP.xl,
-    borderRadius: RADIUS.lg,
-    overflow: 'hidden',
-  },
-  generateInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SP.sm,
-    paddingVertical: SP.md,
-  },
-  generateText: {
-    fontFamily: FONT.bold,
-    fontSize: FS.md,
-    color: '#fff',
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(7,7,15,0.92)',
-    zIndex: 100,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SP.md,
-  },
-  loadingText: {
+  emptyTitle: {
     fontFamily: FONT.semibold,
     fontSize: FS.lg,
-    color: FG,
+    color: colors.text,
+    textAlign: 'center',
   },
-  loadingSubtext: {
+  emptySubtitle: {
     fontFamily: FONT.regular,
     fontSize: FS.sm,
-    color: MUTED,
+    color: colors.mutedForeground,
+    textAlign: 'center',
+    lineHeight: 20,
   },
-  // Results
-  resultsContent: {
-    padding: SP.lg,
-    paddingBottom: SP.xxl,
-  },
-  resultsPrompt: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: MUTED,
-    marginBottom: SP.lg,
-    fontStyle: 'italic',
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  listContent: {
+    padding: SP.md,
     gap: SP.sm,
   },
-  resultCard: {
-    width: COL_W,
-    backgroundColor: CARD,
+  userRow: {
+    alignItems: 'flex-end',
+    marginBottom: SP.xs,
+  },
+  userBubble: {
+    borderRadius: RADIUS.lg,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+    maxWidth: '80%',
+  },
+  userText: {
+    fontFamily: FONT.medium,
+    fontSize: FS.base,
+  },
+  assistantRow: {
+    alignItems: 'flex-start',
+    marginBottom: SP.xs,
+  },
+  designThumbWrap: {
     borderRadius: RADIUS.lg,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: BORDER,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
-  resultGradient: {
-    height: COL_W * 1.2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SP.sm,
+  designThumb: {
+    width: 220,
+    height: 220,
   },
-  resultLabel: {
-    fontFamily: FONT.medium,
-    fontSize: FS.sm,
-    color: 'rgba(255,255,255,0.7)',
-  },
-  styleBadge: {
-    margin: SP.sm,
-    alignSelf: 'flex-start',
-    backgroundColor: PURPLE_DIM,
+  currentBadge: {
+    position: 'absolute',
+    top: SP.xs,
+    left: SP.xs,
     borderRadius: RADIUS.pill,
     paddingHorizontal: SP.sm,
     paddingVertical: 2,
   },
-  styleBadgeText: {
-    fontFamily: FONT.medium,
+  currentBadgeText: {
+    fontFamily: FONT.bold,
     fontSize: FS.xs,
-    color: PURPLE_LIGHT,
   },
-  resultActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: SP.sm,
-    paddingBottom: SP.sm,
-  },
-  actionBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: RADIUS.sm,
-    backgroundColor: SURFACE,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  resultsFooter: {
-    flexDirection: 'row',
-    gap: SP.sm,
-    marginTop: SP.xl,
-  },
-  footerBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SP.xs,
-    paddingVertical: SP.md,
-    borderRadius: RADIUS.md,
+  assistantBubble: {
+    borderRadius: RADIUS.lg,
+    padding: SP.md,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: CARD,
+    borderColor: colors.border,
+    maxWidth: '85%',
   },
-  footerBtnText: {
+  errorBubble: {
+    gap: SP.xs,
+  },
+  errorText: {
+    fontFamily: FONT.regular,
+    fontSize: FS.sm,
+    color: colors.destructive,
+  },
+  retryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  retryText: {
+    fontFamily: FONT.semibold,
+    fontSize: FS.sm,
+  },
+  generatingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    borderRadius: RADIUS.lg,
+    padding: SP.md,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  generatingText: {
     fontFamily: FONT.medium,
     fontSize: FS.sm,
-    color: FG,
+    color: colors.mutedForeground,
   },
-  pickerRoot: {
-    flex: 1, backgroundColor: BG, paddingTop: SP.md,
+  historyRoot: {
+    flex: 1,
+    backgroundColor: colors.background,
   },
-  pickerHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.lg,
+  historyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: SP.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  pickerTitle: {
-    fontFamily: FONT.bold, fontSize: FS.lg, color: FG,
+  historyTitle: {
+    fontFamily: FONT.bold,
+    fontSize: FS.md,
+    color: colors.text,
   },
-  pickerSub: {
-    fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED,
-    paddingHorizontal: SP.lg, marginTop: SP.xs, marginBottom: SP.sm,
+  historyCard: {
+    flex: 1,
+    margin: SP.xs,
+    borderRadius: RADIUS.md,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    overflow: 'hidden',
+    backgroundColor: colors.card,
   },
-  productRow: {
-    flexDirection: 'row', alignItems: 'center', gap: SP.md,
-    backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
-    padding: SP.sm, marginBottom: SP.sm,
+  historyThumb: {
+    width: '100%',
+    aspectRatio: 1,
   },
-  productThumb: { width: 52, height: 52, borderRadius: RADIUS.sm },
-  productThumbEmpty: { backgroundColor: CARD_ELEVATED, alignItems: 'center', justifyContent: 'center' },
-  productName: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, marginBottom: 4 },
-  productStatus: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
-  });
-};
+  historyPrompt: {
+    fontFamily: FONT.regular,
+    fontSize: FS.xs,
+    color: colors.mutedForeground,
+    padding: SP.xs,
+  },
+});

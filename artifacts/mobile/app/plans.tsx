@@ -40,6 +40,12 @@ import { useRevenueCat } from '@/lib/revenueCat';
 import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { recommendSellerPlan, SELLER_PLANS, type SellerPlanDefinition } from '@/lib/sellerPlans';
+import {
+  comparisonRows,
+  displayPriceFor,
+  planIncludesFeature,
+  PLAN_FAQ,
+} from '@/lib/sellerPlansDisplay';
 
 // ─── Local palette constants ──────────────────────────────────────────────────
 // (plans.tsx predates the theme migration; keep these local so the screen is
@@ -67,6 +73,7 @@ export default function PlansScreen() {
   /** 'none' means no paid subscription yet — Starter must remain selectable. */
   const [currentPlanStatus, setCurrentPlanStatus] = useState<string | null>(null);
   const [pricesTimedOut,    setPricesTimedOut]    = useState(false);
+  const [openFaqIndex,      setOpenFaqIndex]      = useState<number | null>(null);
 
   // Native pricing comes from RevenueCat asynchronously. If packages never
   // arrive, treat it as a real failure rather than leaving the CTA active
@@ -272,11 +279,8 @@ export default function PlansScreen() {
           </TouchableOpacity>
         )}
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>
+          <Text style={styles.headerTitle} numberOfLines={1}>
             {isOnboarding ? 'Choose your plan' : 'Subscription plans'}
-          </Text>
-          <Text style={styles.headerSub}>
-            {hasRealTrialOffer ? '5-day free trial · cancel anytime' : 'Pick the plan that fits your brand'}
           </Text>
         </View>
         <View style={{ width: 40 }} />
@@ -286,6 +290,23 @@ export default function PlansScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ padding: 16, paddingBottom: bottomPad + 48, gap: 14 }}
       >
+
+        {/* Hero */}
+        <View style={styles.hero}>
+          <LinearGradient
+            colors={theme.heroGradient as any}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={styles.heroInner}
+          >
+            <Text style={styles.heroEyebrow} allowFontScaling={false}>BRANDTHREAD FOR SELLERS</Text>
+            <Text style={styles.heroTitle} allowFontScaling={false}>
+              Everything to build, run, and grow your brand
+            </Text>
+            <Text style={styles.heroSub}>
+              {hasRealTrialOffer ? '5-day free trial on every plan · cancel anytime' : 'Pick the plan that fits your brand'}
+            </Text>
+          </LinearGradient>
+        </View>
 
         {/* Recommendation banner */}
         {recommendedId && (
@@ -337,8 +358,12 @@ export default function PlansScreen() {
           const isCurrent     = !isOnboarding && plan.id === currentPlanId;
           const isLoading     = loadingId === plan.id;
           const revenueCatPackage = packages.find((pkg) => pkg.identifier === SELLER_PACKAGE_IDS[plan.id]);
+          // Web shows our own literal monthly price string; native purchases
+          // always use RevenueCat's real priceString for the same monthly
+          // product. No yearly option exists, so there's nothing to toggle.
+          const webPrice = displayPriceFor(plan);
           const priceLabel = Platform.OS === 'web'
-            ? plan.priceLabel
+            ? webPrice.price
             : revenueCatPackage?.product.priceString ?? null;
           const trial = revenueCatPackage?.product.introPrice;
           const cardPriceLoading = Platform.OS !== 'web' && !priceLabel && !pricesFailed;
@@ -389,7 +414,9 @@ export default function PlansScreen() {
                        {cardPriceFailed ? '—' : priceLabel}
                     </Text>
                   )}
-                   <Text style={styles.pricePeriod}>{Platform.OS === 'web' ? '/mo' : 'per month'}</Text>
+                   <Text style={styles.pricePeriod}>
+                     {Platform.OS === 'web' ? webPrice.period : 'per month'}
+                   </Text>
                 </View>
               </View>
                {Platform.OS !== 'web' && trial && priceLabel && (() => {
@@ -452,6 +479,57 @@ export default function PlansScreen() {
             </View>
           );
         })}
+
+        {/* Full comparison table */}
+        <View style={styles.compareSection} testID="seller-plans-comparison-table">
+          <Text style={styles.compareTitle}>Compare every plan</Text>
+          <View style={styles.compareHeaderRow}>
+            <View style={{ flex: 1.4 }} />
+            {SELLER_PLANS.map((plan) => (
+              <Text key={plan.id} style={styles.compareHeaderCell} numberOfLines={1}>{plan.name}</Text>
+            ))}
+          </View>
+          {comparisonRows().map((feature, index) => (
+            <View
+              key={feature}
+              style={[styles.compareRow, index % 2 === 1 && styles.compareRowAlt]}
+            >
+              <Text style={styles.compareFeatureCell} numberOfLines={2}>{feature}</Text>
+              {SELLER_PLANS.map((plan) => (
+                <View key={plan.id} style={styles.compareValueCell}>
+                  {planIncludesFeature(plan, feature) ? (
+                    <Feather name="check" size={15} color={theme.success} />
+                  ) : (
+                    <Feather name="minus" size={15} color={theme.muted} />
+                  )}
+                </View>
+              ))}
+            </View>
+          ))}
+        </View>
+
+        {/* FAQ */}
+        <View style={styles.faqSection} testID="seller-plans-faq">
+          <Text style={styles.compareTitle}>Frequently asked questions</Text>
+          {PLAN_FAQ.map((item, index) => {
+            const isOpen = openFaqIndex === index;
+            return (
+              <View key={item.question} style={styles.faqItem}>
+                <TouchableOpacity
+                  style={styles.faqQuestionRow}
+                  onPress={() => { haptic(); setOpenFaqIndex(isOpen ? null : index); }}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: isOpen }}
+                  testID={`seller-plans-faq-${index}`}
+                >
+                  <Text style={styles.faqQuestion}>{item.question}</Text>
+                  <Feather name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color={theme.muted} />
+                </TouchableOpacity>
+                {isOpen && <Text style={styles.faqAnswer}>{item.answer}</Text>}
+              </View>
+            );
+          })}
+        </View>
 
         {/* Skip during onboarding — Starter is a paid plan, so this must not read as "free" */}
         {isOnboarding && (
@@ -528,6 +606,13 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   headerCenter:{ flex: 1, alignItems: 'center' },
   headerTitle: { fontSize: FS.lg, fontFamily: FONT.semibold, color: theme.text },
   headerSub:   { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
+
+  // Hero
+  hero: { borderRadius: RADIUS.xl, overflow: 'hidden', borderWidth: 1, borderColor: theme.border },
+  heroInner: { padding: SP.lg, gap: 6 },
+  heroEyebrow: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.accent, letterSpacing: 1.5 },
+  heroTitle: { fontSize: 24, fontFamily: FONT.semibold, color: theme.text, letterSpacing: -0.3, lineHeight: 30 },
+  heroSub: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
 
   // Recommendation banner
   recBanner: {
@@ -619,6 +704,29 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
    priceSkeleton: { width: 64, height: 28, borderRadius: RADIUS.xs, backgroundColor: theme.border },
 
   // Legal footer (Apple 3.1.2 — auto-renew disclosure + Terms/Privacy)
+  // Comparison table
+  compareSection: {
+    backgroundColor: theme.card, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: theme.border,
+    padding: SP.md, gap: 4,
+  },
+  compareTitle: { fontSize: FS.lg, fontFamily: FONT.semibold, color: theme.text, marginBottom: SP.sm },
+  compareHeaderRow: { flexDirection: 'row', alignItems: 'center', paddingBottom: SP.sm, borderBottomWidth: 1, borderBottomColor: theme.border },
+  compareHeaderCell: { flex: 1, fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text, textAlign: 'center' },
+  compareRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderRadius: RADIUS.sm },
+  compareRowAlt: { backgroundColor: `${theme.border}30` },
+  compareFeatureCell: { flex: 1.4, fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, paddingRight: 6 },
+  compareValueCell: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
+  // FAQ
+  faqSection: {
+    backgroundColor: theme.card, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: theme.border,
+    padding: SP.md, gap: 4,
+  },
+  faqItem: { borderTopWidth: 1, borderTopColor: theme.border, paddingVertical: SP.sm },
+  faqQuestionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm },
+  faqQuestion: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
+  faqAnswer: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18, marginTop: SP.xs },
+
   legalFooter: { paddingTop: SP.sm, paddingHorizontal: SP.xs, gap: 10 },
   legalFooterText: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 16, textAlign: 'center' },
   legalLinksRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },

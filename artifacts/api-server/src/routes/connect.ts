@@ -3,13 +3,41 @@
  * Mounted at /api/seller/connect — all routes require Clerk auth.
  */
 import { Router } from "express";
+import type Stripe from "stripe";
 import { db, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { requireStripe } from "../lib/stripe";
+import { requireStripe, stripe } from "../lib/stripe";
 import { getWebOrigin } from "../lib/webOrigin";
 
 const router = Router();
+
+/**
+ * Best-effort read of the tax info the account still needs, from the same
+ * `requirements` block Stripe already returns on account retrieval — no new
+ * business logic, just surfacing an existing field for the setup screen.
+ */
+function deriveTaxInfoStatus(account: Stripe.Account): "submitted" | "needed" | "unknown" {
+  const due = [
+    ...(account.requirements?.currently_due ?? []),
+    ...(account.requirements?.eventually_due ?? []),
+  ];
+  const needsTaxInfo = due.some((field) => /tax_id|id_number|ssn_last_4/.test(field));
+  if (needsTaxInfo) return "needed";
+  if (account.details_submitted) return "submitted";
+  return "unknown";
+}
+
+function payoutScheduleOf(account: Stripe.Account) {
+  const schedule = account.settings?.payouts?.schedule;
+  if (!schedule) return null;
+  return {
+    interval: schedule.interval ?? null,
+    delayDays: schedule.delay_days ?? null,
+    weeklyAnchor: schedule.weekly_anchor ?? null,
+    monthlyAnchor: schedule.monthly_anchor ?? null,
+  };
+}
 router.use(requireAuth);
 
 /**
@@ -92,6 +120,11 @@ router.get("/status", async (req, res) => {
       return;
     }
 
+    // Never let a missing/misconfigured Stripe key crash this endpoint — the
+    // mobile Payouts screen needs a clean "setup needed" state to render
+    // instead of a 500/503.
+    const providerConfigured = Boolean(stripe);
+
     if (!user.stripeAccountId) {
       res.json({
         connected: false,
@@ -102,14 +135,38 @@ router.get("/status", async (req, res) => {
         status: "not_started",
         verified: false,
         bankLast4: null,
+        providerConfigured,
+        payoutSchedule: null,
+        requirementsDue: [],
+        taxInfoStatus: "unknown" as const,
       });
       return;
     }
 
-    const stripe = requireStripe();
+    if (!providerConfigured) {
+      // The account exists on our side but this environment has no Stripe
+      // key configured — surface that plainly rather than throwing.
+      res.json({
+        connected: true,
+        stripeAccountId: user.stripeAccountId,
+        chargesEnabled: false,
+        payoutsEnabled: false,
+        detailsSubmitted: false,
+        status: "provider_unavailable",
+        verified: false,
+        bankLast4: null,
+        providerConfigured: false,
+        payoutSchedule: null,
+        requirementsDue: [],
+        taxInfoStatus: "unknown" as const,
+      });
+      return;
+    }
+
+    const stripeClient = requireStripe();
     // Fetch the live account and only the external-account data needed to
     // identify the payout bank. Never return Stripe's account object itself.
-    const account = await stripe.accounts.retrieve(user.stripeAccountId);
+    const account = await stripeClient.accounts.retrieve(user.stripeAccountId);
     const chargesEnabled = account.charges_enabled === true;
     const payoutsEnabled = account.payouts_enabled === true;
     const detailsSubmitted = account.details_submitted === true;
@@ -125,7 +182,7 @@ router.get("/status", async (req, res) => {
     let startingAfter: string | undefined;
     let hasMore = true;
     while (hasMore) {
-      const page = await stripe.accounts.listExternalAccounts(
+      const page = await stripeClient.accounts.listExternalAccounts(
         user.stripeAccountId,
         { object: "bank_account", limit: 100, ...(startingAfter ? { starting_after: startingAfter } : {}) },
       );
@@ -165,6 +222,10 @@ router.get("/status", async (req, res) => {
       status: stripeAccountStatus,
        verified: payoutsEnabled,
       bankLast4,
+      providerConfigured: true,
+      payoutSchedule: payoutScheduleOf(account),
+      requirementsDue: account.requirements?.currently_due ?? [],
+      taxInfoStatus: deriveTaxInfoStatus(account),
     });
   } catch (err: any) {
     const status = err.status ?? 500;

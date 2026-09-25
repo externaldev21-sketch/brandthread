@@ -7,7 +7,9 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { Header } from '@/components/layout';
+import { useApi } from '@/lib/api';
 import {
   SURFACE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -31,12 +33,17 @@ export default function StorePublishScreen() {
   const { theme } = useAppTheme();
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
+  const api = useApi();
   const params = useLocalSearchParams<{ from?: string }>();
   const [store, setStore] = useState<Storefront | null>(null);
   const [validation, setValidation] = useState<StoreValidationResult | null>(null);
   const [validating, setValidating] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
+  const [sharingPreview, setSharingPreview] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+  const [revokingPreview, setRevokingPreview] = useState(false);
+  const [previewRevoked, setPreviewRevoked] = useState(false);
 
   const leaveSetupDestination = () => {
     if (isSellerSetupOrigin(params.from)) {
@@ -44,6 +51,46 @@ export default function StorePublishScreen() {
       return;
     }
     router.back();
+  };
+
+  const handleSharePreview = async () => {
+    if (sharingPreview) return;
+    setSharingPreview(true);
+    try {
+      const result = await (api as any).store.sharePreview() as { url: string; expiresAt: string };
+      await Clipboard.setStringAsync(result.url);
+      setPreviewRevoked(false);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 3000);
+    } catch {
+      Alert.alert('Could not generate link', 'Check your connection and try again.');
+    } finally {
+      setSharingPreview(false);
+    }
+  };
+
+  const handleRevokePreview = () => {
+    Alert.alert(
+      "Revoke preview link?",
+      "Anyone with the current link won't be able to view your store. You can share a fresh link any time.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Revoke', style: 'destructive', onPress: async () => {
+            setRevokingPreview(true);
+            try {
+              await (api as any).store.revokePreview();
+              setPreviewRevoked(true);
+              setShareCopied(false);
+            } catch {
+              Alert.alert('Could not revoke link', 'Check your connection and try again.');
+            } finally {
+              setRevokingPreview(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const doValidate = async () => {
@@ -193,6 +240,30 @@ export default function StorePublishScreen() {
           <Text style={pub.revalidateText}>Validate Again</Text>
         </TouchableOpacity>
 
+        {/* Share a private preview link before going live */}
+        {!published && (
+          <BrandthreadCard style={pub.card}>
+            <Text style={pub.shareTitle}>Share a preview link</Text>
+            <Text style={pub.shareDesc}>
+              Generate a private link to your unpublished store — good for showing a partner or manufacturer before you publish. Valid for 24 hours.
+            </Text>
+            <View style={pub.shareActions}>
+              <SecondaryButton
+                label={sharingPreview ? 'Generating…' : shareCopied ? 'Link copied!' : 'Copy preview link'}
+                onPress={handleSharePreview}
+                disabled={sharingPreview}
+                icon={shareCopied ? 'check' : 'link'}
+                style={{ flex: 1 }}
+              />
+              {!previewRevoked && (
+                <TouchableOpacity onPress={handleRevokePreview} disabled={revokingPreview} style={pub.revokeBtn}>
+                  <Text style={pub.revokeText}>{revokingPreview ? 'Revoking…' : 'Revoke'}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </BrandthreadCard>
+        )}
+
         {/* Publish / Published */}
         {published ? (
           <BrandthreadCard style={pub.card}>
@@ -272,4 +343,9 @@ const pub = StyleSheet.create({
   divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.07)', marginVertical: SP.md, marginHorizontal: SP.md },
   dangerTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: RED },
   dangerDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  shareTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
+  shareDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 19 },
+  shareActions: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.xs },
+  revokeBtn: { paddingHorizontal: SP.sm, paddingVertical: SP.sm },
+  revokeText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: RED },
 });

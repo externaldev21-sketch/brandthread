@@ -1,16 +1,32 @@
 /**
  * Cinematic opener for onboarding — the very first screen a new user sees
- * after splash. No external network fetches: the "collage" is built purely
- * from theme gradient tokens plus the app logo, so it renders instantly and
- * correctly across all 12 themes without bundling video assets.
+ * after splash. A black canvas, one line of big type, and the signature
+ * thread drawing itself edge to edge through the Brandthread mark.
+ *
+ * No network fetches or media assets: everything is vector or theme token,
+ * so it renders instantly and correctly across all 12 themes.
  */
-import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSpring,
+} from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+import { Glow, ThreadDraw } from './ThreadLine';
+import { PillButton, Reveal, StepHeadline } from './OnboardingUI';
+import { MOTION, SPACE, TYPE, useOnboardingMotion } from './onboardingTokens';
+
+const THREAD_DELAY = 250;
+const HERO_HEIGHT = 200;
+const LOGO_SIZE = 92;
 
 export function WelcomeStep({
   onGetStarted,
@@ -20,125 +36,98 @@ export function WelcomeStep({
   onSignIn: () => void;
 }) {
   const { theme } = useAppTheme();
+  const { reduceMotion } = useOnboardingMotion();
   const insets = useSafeAreaInsets();
   const styles = createStyles(theme);
-  const onAccentTextStyle = getOnAccentTextStyle(theme);
 
-  const fade = useRef(new Animated.Value(0)).current;
-  const logoScale = useRef(new Animated.Value(0.85)).current;
-  const panA = useRef(new Animated.Value(0)).current;
-  const panB = useRef(new Animated.Value(0)).current;
-
+  // The mark resolves as the thread passes through its centre.
+  const logo = useSharedValue(reduceMotion ? 1 : 0);
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fade, { toValue: 1, duration: 650, useNativeDriver: true }),
-      Animated.spring(logoScale, { toValue: 1, damping: 14, stiffness: 90, useNativeDriver: true }),
-    ]).start();
-
-    // Slow, looping "pan" of two large gradient blobs to simulate a
-    // gently-moving collage without any video/image asset pipeline.
-    const loop = (value: Animated.Value, duration: number, delay = 0) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(value, { toValue: 1, duration, delay, useNativeDriver: true }),
-          Animated.timing(value, { toValue: 0, duration, useNativeDriver: true }),
-        ]),
-      );
-    loop(panA, 9000).start();
-    loop(panB, 12000, 1200).start();
+    if (reduceMotion) return;
+    logo.value = withDelay(
+      THREAD_DELAY + MOTION.welcomeDrawMs * 0.36,
+      withSpring(1, { damping: 15, stiffness: 120 }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const logoStyle = useAnimatedStyle(() => ({
+    opacity: logo.value,
+    transform: [{ scale: interpolate(logo.value, [0, 1], [0.86, 1]) }],
+  }));
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: logo.value,
+    transform: [{ scale: interpolate(logo.value, [0, 1], [0.5, 1]) }],
+  }));
+
+  const copyDelay = reduceMotion ? 0 : THREAD_DELAY + MOTION.welcomeDrawMs * 0.55;
 
   return (
     <View style={styles.root}>
-      <View style={StyleSheet.absoluteFill}>
-        <LinearGradient
-          colors={theme.heroGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-        <Animated.View
-          style={[
-            styles.blob,
-            styles.blobA,
-            {
-              backgroundColor: theme.accent,
-              transform: [
-                { translateX: panA.interpolate({ inputRange: [0, 1], outputRange: [-40, 40] }) },
-                { translateY: panA.interpolate({ inputRange: [0, 1], outputRange: [-20, 30] }) },
-              ],
-            },
-          ]}
-        />
-        <Animated.View
-          style={[
-            styles.blob,
-            styles.blobB,
-            {
-              backgroundColor: theme.secondary,
-              transform: [
-                { translateX: panB.interpolate({ inputRange: [0, 1], outputRange: [30, -30] }) },
-                { translateY: panB.interpolate({ inputRange: [0, 1], outputRange: [40, -10] }) },
-              ],
-            },
-          ]}
-        />
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.28)' }]} />
-      </View>
+      <LinearGradient
+        pointerEvents="none"
+        colors={[theme.heroGradient[theme.heroGradient.length - 1], theme.background]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 0.7 }}
+        style={styles.topWash}
+      />
 
-      <Animated.View style={[styles.content, { opacity: fade, paddingTop: insets.top + 48, paddingBottom: insets.bottom + 28 }]}>
-        <Animated.View style={{ transform: [{ scale: logoScale }] }}>
-          <BrandthreadLogo size={56} />
-        </Animated.View>
+      <View style={[styles.content, { paddingTop: insets.top + SPACE.md, paddingBottom: insets.bottom + SPACE.lg }]}>
+        <Reveal>
+          <Text style={[TYPE.eyebrow, { color: theme.muted }]}>BRANDTHREAD</Text>
+        </Reveal>
 
-        <View style={styles.copyWrap}>
-          <Text style={styles.headline}>Where brands{'\n'}find their people.</Text>
+        {/* Hero: the thread sews through the mark. */}
+        <View style={styles.hero}>
+          <ThreadDraw
+            height={HERO_HEIGHT}
+            color={theme.text}
+            delay={THREAD_DELAY}
+            style={styles.heroThread}
+          />
+          <Animated.View pointerEvents="none" style={[styles.heroGlow, glowStyle]}>
+            <Glow size={LOGO_SIZE * 3} color={theme.text} intensity={0.13} />
+          </Animated.View>
+          <Animated.View style={logoStyle}>
+            <BrandthreadLogo size={LOGO_SIZE} />
+          </Animated.View>
         </View>
 
-        <View style={styles.ctas}>
-          <TouchableOpacity
+        <View style={styles.copy}>
+          <StepHeadline size="display" delay={copyDelay}>
+            Where brands{'\n'}find their{'\n'}people.
+          </StepHeadline>
+        </View>
+
+        <Reveal delay={copyDelay} index={3} style={styles.ctas}>
+          <PillButton
             testID="onboarding-welcome-get-started"
             accessibilityLabel="Get started"
-            activeOpacity={0.88}
+            label="Get started"
+            haptic={false}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onGetStarted(); }}
-          >
-            <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.primaryBtn}>
-              <Text style={[styles.primaryBtnText, onAccentTextStyle]}>Get started</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity
+          />
+          <PillButton
             testID="onboarding-welcome-sign-in"
             accessibilityLabel="I already have an account"
-            style={styles.secondaryBtn}
-            activeOpacity={0.75}
+            label="I already have an account"
+            variant="secondary"
+            haptic={false}
             onPress={() => { Haptics.selectionAsync(); onSignIn(); }}
-          >
-            <Text style={styles.secondaryBtnText}>I already have an account</Text>
-          </TouchableOpacity>
-        </View>
-      </Animated.View>
+          />
+        </Reveal>
+      </View>
     </View>
   );
 }
 
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.background, overflow: 'hidden' },
-  blob: { position: 'absolute', width: 420, height: 420, borderRadius: 210, opacity: 0.35 },
-  blobA: { top: -120, left: -100 },
-  blobB: { bottom: -140, right: -120 },
-  content: { flex: 1, justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 28 },
-  copyWrap: { marginTop: 'auto', marginBottom: 32 },
-  headline: {
-    fontSize: 40,
-    fontFamily: 'Inter_700Bold',
-    color: '#FFFFFF',
-    letterSpacing: -1.2,
-    lineHeight: 46,
-  },
-  ctas: { width: '100%', gap: 10 },
-  primaryBtn: { borderRadius: 14, paddingVertical: 17, alignItems: 'center' },
-  primaryBtnText: { fontSize: 16, fontFamily: 'Inter_700Bold' },
-  secondaryBtn: { paddingVertical: 14, alignItems: 'center' },
-  secondaryBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: 'rgba(255,255,255,0.9)' },
+  topWash: { position: 'absolute', top: 0, left: 0, right: 0, height: '60%', opacity: 0.9 },
+  content: { flex: 1, paddingHorizontal: SPACE.lg },
+  hero: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: HERO_HEIGHT },
+  // Full-bleed: cancel the content gutter so the thread runs edge to edge.
+  heroThread: { position: 'absolute', left: -SPACE.lg, right: -SPACE.lg, top: '50%', marginTop: -HERO_HEIGHT / 2 },
+  heroGlow: { position: 'absolute', width: LOGO_SIZE * 3, height: LOGO_SIZE * 3 },
+  copy: { marginBottom: SPACE.xl },
+  ctas: { width: '100%', gap: SPACE.sm },
 });

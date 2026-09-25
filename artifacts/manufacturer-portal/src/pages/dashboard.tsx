@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "wouter";
+import { useAuth } from "@clerk/react";
 import { formatDistanceToNow } from "date-fns";
 import {
-  ArrowUpRight, Banknote, CheckCircle2, CircleDashed, Clock, Eye, EyeOff, ImagePlus, Inbox, Loader2, Package, ShieldAlert, Truck,
+  ArrowUpRight, Banknote, Boxes, CheckCircle2, CircleDashed, Clock, Eye, EyeOff, ImagePlus, Inbox, Loader2, Package, ShieldAlert, Truck,
 } from "lucide-react";
 import {
   getGetManufacturerDashboardQueryKey, getGetMyManufacturerProfileQueryKey, useGetManufacturerDashboard, useGetMyManufacturerProfile,
@@ -11,6 +12,30 @@ import { formatMoney, isTerminalStatus, localClock, orderStatusLabel, orderTypeL
 import { EmptyState, QueryError } from "@/components/query-state";
 import { useConnectStatus } from "@/hooks/use-connect-status";
 import { cn } from "@/lib/utils";
+
+// Products isn't in the generated dashboard payload yet, so we fetch a lightweight
+// count directly — mirrors the hand-rolled fetch pattern used on the quote-requests page.
+function useProductsSummary() {
+  const { getToken } = useAuth();
+  const [summary, setSummary] = useState<{ total: number; active: number } | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const token = await getToken();
+      const response = await fetch("/api/manufacturers/me/products", {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      if (!response.ok) return;
+      const products = (await response.json()) as Array<{ status: string }>;
+      setSummary({ total: products.length, active: products.filter((p) => p.status === "active").length });
+    } catch {
+      // Non-critical dashboard widget — fail silently and just omit the stat.
+    }
+  }, [getToken]);
+
+  useEffect(() => { void load(); }, [load]);
+  return summary;
+}
 
 function greeting(timeZone: string | null | undefined) {
   const hour = Number(new Intl.DateTimeFormat("en-US", { hour: "numeric", hourCycle: "h23", timeZone: timeZone ?? undefined }).format(new Date()));
@@ -21,6 +46,7 @@ export default function Dashboard() {
   const dashboard = useGetManufacturerDashboard({ query: { queryKey: getGetManufacturerDashboardQueryKey(), refetchInterval: 30_000 } });
   const profile = useGetMyManufacturerProfile({ query: { queryKey: getGetMyManufacturerProfileQueryKey(), staleTime: 30_000 } });
   const connect = useConnectStatus();
+  const products = useProductsSummary();
   const [, setTick] = useState(0);
   useEffect(() => { const id = setInterval(() => setTick((tick) => tick + 1), 60_000); return () => clearInterval(id); }, []);
 
@@ -55,6 +81,7 @@ export default function Dashboard() {
     { label: "Awaiting payment", value: awaiting.length, detail: awaiting.length ? formatMoney(awaiting.reduce((sum, order) => sum + order.priceCents, 0)) : null, icon: Clock, href: "/orders" },
     { label: "In production", value: inProduction.length, icon: Package, href: "/orders" },
     { label: "Shipped", value: shipped.length, icon: Truck, href: "/orders" },
+    ...(products ? [{ label: "Catalog products", value: products.total, detail: products.active ? `${products.active} active` : null, icon: Boxes, href: "/products" }] : []),
   ];
 
   const checklist = [

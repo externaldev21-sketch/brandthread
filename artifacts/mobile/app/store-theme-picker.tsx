@@ -24,7 +24,7 @@ import {
   EmptyState, StatCard,
 } from '@/components/BrandthreadUI';
 import { getThemes, getStorefront, applyTheme } from '@/services/storeService';
-import { StoreTheme, THREAD_THEME_NAME } from '@/services/storeTypes';
+import { StoreTheme, TYPOGRAPHY_STYLES } from '@/services/storeTypes';
 
 export default function StoreThemePicker() {
   const { theme } = useAppTheme();
@@ -56,8 +56,8 @@ export default function StoreThemePicker() {
     const theme = themes.find(t => t.id === themeId);
     if (!theme) return;
     Alert.alert(
-      `Apply ${THREAD_THEME_NAME}`,
-      'Use Brandthread’s monochrome editorial system for this storefront?',
+      `Apply ${theme.name}`,
+      `Switch your storefront to the ${theme.name} theme? Fonts, palette, button style, and corner rounding will update to match.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -169,7 +169,7 @@ export default function StoreThemePicker() {
   return (
     <View style={styles.root}>
       <Header
-        title={THREAD_THEME_NAME}
+        title="Storefront Theme"
         onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
       />
 
@@ -224,6 +224,24 @@ export default function StoreThemePicker() {
             </View>
           </ScrollView>
 
+          {/* Style sheet: typography, button style, corner rounding */}
+          <View style={styles.styleSheetRow}>
+            <View style={styles.styleSheetChip}>
+              <Text style={styles.styleSheetLabel}>Font</Text>
+              <Text style={styles.styleSheetValue}>
+                {TYPOGRAPHY_STYLES.find(t => t.value === previewingTheme.defaultTypography)?.heading ?? previewingTheme.defaultTypography}
+              </Text>
+            </View>
+            <View style={styles.styleSheetChip}>
+              <Text style={styles.styleSheetLabel}>Button</Text>
+              <Text style={styles.styleSheetValue}>{previewingTheme.defaultButtonStyle}</Text>
+            </View>
+            <View style={styles.styleSheetChip}>
+              <Text style={styles.styleSheetLabel}>Corners</Text>
+              <Text style={styles.styleSheetValue}>{previewingTheme.defaultCornerRadius}</Text>
+            </View>
+          </View>
+
           {/* Preset Variants */}
           {previewingTheme.presets.length > 0 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.presetsRow}>
@@ -252,7 +270,7 @@ export default function StoreThemePicker() {
           {/* Action Buttons */}
           <View style={styles.detailButtons}>
             <PrimaryButton
-              label={`Use ${THREAD_THEME_NAME}`}
+              label={`Use ${previewingTheme.name}`}
               onPress={() => handleApply(previewingTheme.id, selectedPresetId ?? undefined)}
               style={{ flex: 1 }}
             />
@@ -491,6 +509,34 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: FS.xs,
     fontFamily: FONT.medium,
     color: MUTED,
+  },
+  styleSheetRow: {
+    flexDirection: 'row',
+    gap: SP.xs,
+    marginBottom: SP.sm,
+  },
+  styleSheetChip: {
+    flex: 1,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: CARD_ELEVATED,
+    paddingHorizontal: SP.sm,
+    paddingVertical: SP.xs,
+  },
+  styleSheetLabel: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: SUBTLE,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  styleSheetValue: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    color: FG,
+    marginTop: 1,
+    textTransform: 'capitalize',
   },
   presetsRow: {
     flexGrow: 0,
