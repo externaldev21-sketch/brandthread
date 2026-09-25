@@ -52,6 +52,7 @@ import {
 } from '@/services/aiTypes';
 import {
   sendMessage,
+  sendMessageStream,
   cancelGeneration,
   loadSession,
   startNewSession,
@@ -61,16 +62,6 @@ import {
 } from '@/services/aiService';
 import { getStoreContext } from '@/lib/api';
 import {
-  CARD,
-  CARD_ELEVATED,
-  BORDER,
-  BORDER_ACTIVE,
-  FG,
-  MUTED,
-  SUBTLE,
-  SUCCESS,
-  RED,
-  RED_DIM,
   FONT,
   FS,
   SP,
@@ -97,6 +88,8 @@ function humanizeAiError(rawMessage?: string): string {
 // ─── Streaming Dots ────────────────────────────────────────────────────────────
 
 function StreamingDots({ accentColor }: { accentColor: string }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const reduceMotion = useReducedMotion();
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
@@ -148,6 +141,7 @@ interface ActionCardProps {
 
 function ActionCardView({ msg, onApply, onDismiss, onUndo }: ActionCardProps) {
   const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const card = msg.actionCard;
   if (!card) return null;
   const { status } = card;
@@ -189,7 +183,7 @@ function ActionCardView({ msg, onApply, onDismiss, onUndo }: ActionCardProps) {
 
       {status === 'applied' && (
         <View style={styles.actionAppliedRow}>
-          <Feather name="check-circle" size={14} color={SUCCESS} />
+          <Feather name="check-circle" size={14} color={colors.success} />
           <Text style={styles.actionAppliedText}>Applied</Text>
           {card.canUndo && (
             <TouchableOpacity onPress={() => onUndo(msg.id)} activeOpacity={0.7}>
@@ -233,6 +227,8 @@ function MessageBubble({
   precedingUserText,
 }: MessageBubbleProps) {
   const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const router = useRouter();
 
   if (msg.role === 'user') {
     return (
@@ -273,14 +269,32 @@ function MessageBubble({
                 onPress={() => onRetry(precedingUserText ?? '')}
                 activeOpacity={0.7}
               >
-                <Feather name="refresh-cw" size={13} color={RED} />
+                <Feather name="refresh-cw" size={13} color={colors.destructive} />
                 <Text style={styles.retryText}>Retry</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <MarkdownLite text={msg.content} textColor={FG} />
+            <MarkdownLite text={msg.content} textColor={colors.text} />
           )}
         </View>
+
+        {showActions && msg.sources && msg.sources.length > 0 && (
+          <View style={styles.sourcesRow}>
+            {msg.sources.map((source) => (
+              <TouchableOpacity
+                key={source.route}
+                style={[styles.sourceChip, { borderColor: colors.border }]}
+                onPress={() => router.push(source.route as any)}
+                activeOpacity={0.7}
+              >
+                <Feather name="link" size={11} color={colors.primary} />
+                <Text style={[styles.sourceChipText, { color: colors.primary }]} numberOfLines={1}>
+                  {source.title}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {showActions && (
           <View style={styles.msgActionRow}>
@@ -290,7 +304,7 @@ function MessageBubble({
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               accessibilityLabel="Copy message"
             >
-              <Feather name="copy" size={13} color={SUBTLE} />
+              <Feather name="copy" size={13} color={colors.subtle} />
               <Text style={styles.msgActionText}>Copy</Text>
             </TouchableOpacity>
             {precedingUserText ? (
@@ -300,7 +314,7 @@ function MessageBubble({
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                 accessibilityLabel="Regenerate response"
               >
-                <Feather name="refresh-cw" size={13} color={SUBTLE} />
+                <Feather name="refresh-cw" size={13} color={colors.subtle} />
                 <Text style={styles.msgActionText}>Regenerate</Text>
               </TouchableOpacity>
             ) : null}
@@ -330,6 +344,8 @@ interface EmptyStateProps {
 }
 
 function EmptyState({ context, onPillPress, accentColor, isTablet }: EmptyStateProps) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const prompts =
     SCREEN_PROMPTS[context.screen as keyof typeof SCREEN_PROMPTS] ??
     SCREEN_PROMPTS['home'] ??
@@ -366,13 +382,19 @@ function EmptyState({ context, onPillPress, accentColor, isTablet }: EmptyStateP
  * This is NEVER persisted as a message. It disappears when the response arrives
  * or the request fails.
  */
-function TypingIndicator({ accentColor }: { accentColor: string }) {
+function TypingIndicator({ accentColor, streamingText }: { accentColor: string; streamingText?: string }) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.assistantRow}>
       <BrandthreadLogo size={18} style={styles.assistantAvatar} />
       <View style={styles.assistantBubbleCol}>
         <View style={styles.assistantBubble}>
-          <StreamingDots accentColor={accentColor} />
+          {streamingText ? (
+            <MarkdownLite text={streamingText} textColor={colors.text} />
+          ) : (
+            <StreamingDots accentColor={accentColor} />
+          )}
         </View>
       </View>
     </View>
@@ -391,11 +413,12 @@ const GREETING: AIMessage = {
 
 export default function AiBrainScreen() {
   const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isTablet = width >= BREAKPOINT.tablet;
-  const { getToken, userId } = useAuth();
+  const { getToken, userId, isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const params = useLocalSearchParams<{ context?: string }>();
 
   const parsedContext: AIScreenContext = useMemo(() => {
@@ -417,6 +440,7 @@ export default function AiBrainScreen() {
    */
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [pendingRetryText, setPendingRetryText] = useState<string>('');
+  const [streamingText, setStreamingText] = useState<string>('');
 
   const flatListRef = useRef<FlatList<AIMessage>>(null);
 
@@ -453,6 +477,24 @@ export default function AiBrainScreen() {
       const text = (override ?? inputText).trim();
       if (!text || isGenerating || !session) return;
 
+      // Clerk hasn't finished hydrating the session yet — this is not the
+      // same as "not signed in". Retrying getToken() here would sometimes
+      // resolve to null for a genuinely signed-in user and wrongly show the
+      // sign-in prompt (the root cause of the "sign in" bug on this screen).
+      if (!isAuthLoaded) {
+        setErrorMsg("Still preparing your session — tap Retry in a moment.");
+        setPendingRetryText(text);
+        setInputText(text);
+        return;
+      }
+
+      if (!isSignedIn) {
+        setErrorMsg('Sign in to use Brandthread AI.');
+        setPendingRetryText(text);
+        setInputText(text);
+        return;
+      }
+
       setInputText('');
       setErrorMsg(null);
       setPendingRetryText(text);
@@ -461,14 +503,23 @@ export default function AiBrainScreen() {
 
       const token = await getToken().catch(() => null);
 
+      // The user IS signed in (checked above) — a null token here means the
+      // token fetch itself failed (network/refresh), not that they're
+      // signed out. Surface that distinction instead of collapsing both
+      // cases into the same "sign in" message.
+      if (!token) {
+        setErrorMsg("Couldn't verify your session. Tap Retry.");
+        setInputText(text);
+        setIsGenerating(false);
+        return;
+      }
+
+      setStreamingText('');
       try {
-        const result = await sendMessage({
-          userText: text,
-          session,
-          authToken: token,
-          userId,
-          storeContext,
-        });
+        const result = await sendMessageStream(
+          { userText: text, session, authToken: token, userId, storeContext },
+          (textSoFar) => setStreamingText(textSoFar),
+        );
         setSession(result.session);
       } catch (err: unknown) {
         const isAbort = (err as Error)?.name === 'AbortError';
@@ -479,9 +530,10 @@ export default function AiBrainScreen() {
         }
       } finally {
         setIsGenerating(false);
+        setStreamingText('');
       }
     },
-    [inputText, isGenerating, session, getToken, userId, storeContext],
+    [inputText, isGenerating, session, getToken, userId, storeContext, isAuthLoaded, isSignedIn],
   );
 
   // ─── Pill tap (populates composer only — user taps send) ────────────────────
@@ -497,6 +549,7 @@ export default function AiBrainScreen() {
   const handleStop = useCallback(() => {
     cancelGeneration();
     setIsGenerating(false);
+    setStreamingText('');
   }, []);
 
   // ─── Clear session ──────────────────────────────────────────────────────────
@@ -669,7 +722,7 @@ export default function AiBrainScreen() {
             onPress={() => router.back()}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Feather name="x" size={20} color={FG} />
+            <Feather name="x" size={20} color={colors.text} />
           </TouchableOpacity>
 
           <View style={styles.headerCenter}>
@@ -683,14 +736,14 @@ export default function AiBrainScreen() {
               onPress={handleClear}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Feather name="rotate-ccw" size={18} color={MUTED} />
+              <Feather name="rotate-ccw" size={18} color={colors.mutedForeground} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.headerBtn, { marginLeft: 4 }]}
               onPress={() => router.push('/ai-settings' as any)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Feather name="sliders" size={18} color={MUTED} />
+              <Feather name="sliders" size={18} color={colors.mutedForeground} />
             </TouchableOpacity>
           </View>
         </View>
@@ -698,7 +751,7 @@ export default function AiBrainScreen() {
         {/* ── Error banner ────────────────────────────────────────────────── */}
         {errorMsg ? (
           <View style={styles.errorBanner}>
-            <Feather name="alert-circle" size={14} color={RED} style={{ marginRight: 6 }} />
+            <Feather name="alert-circle" size={14} color={colors.destructive} style={{ marginRight: 6 }} />
             <Text style={styles.errorBannerText} numberOfLines={2}>{errorMsg}</Text>
             <TouchableOpacity
               onPress={() => handleRetry(pendingRetryText)}
@@ -710,46 +763,72 @@ export default function AiBrainScreen() {
           </View>
         ) : null}
 
-        {/* ── Message list ────────────────────────────────────────────────── */}
-        <FlatList
-          ref={flatListRef}
-          data={[...allMessages].reverse()}
-          keyExtractor={m => m.id}
-          renderItem={renderMessage}
-          inverted
-          contentContainerStyle={[
-            styles.listContent,
-            isTablet && styles.listContentTablet,
-          ]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          ListHeaderComponent={isGenerating ? <TypingIndicator accentColor={colors.primary} /> : null}
-          ListFooterComponent={
-            sessionMessages.length === 0 ? (
-              <View style={styles.emptyWrapper}>
-                <EmptyState
-                  context={parsedContext}
-                  onPillPress={handlePillPress}
-                  accentColor={colors.primary}
-                  isTablet={isTablet}
-                />
-              </View>
-            ) : null
-          }
-        />
+        {/* ── Signed-out gate ─────────────────────────────────────────────────
+            Only shown once Clerk has actually finished loading AND
+            confirmed there's no session — never during the brief hydration
+            window, which is what previously caused this screen to show a
+            false "sign in" prompt for already-signed-in sellers. */}
+        {isAuthLoaded && !isSignedIn ? (
+          <View style={styles.signInGate}>
+            <Feather name="lock" size={28} color={colors.mutedForeground} />
+            <Text style={styles.signInGateTitle}>Sign in to use Brandthread AI</Text>
+            <Text style={styles.signInGateBody}>
+              Brandthread AI reads your store's live data to answer questions — sign in to start chatting.
+            </Text>
+            <TouchableOpacity
+              style={[styles.signInGateBtn, { backgroundColor: colors.primary }]}
+              onPress={() => router.push('/sign-in' as any)}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.signInGateBtnText, { color: colors.primaryForeground }]}>Sign in</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            {/* ── Message list ────────────────────────────────────────────── */}
+            <FlatList
+              ref={flatListRef}
+              data={[...allMessages].reverse()}
+              keyExtractor={m => m.id}
+              renderItem={renderMessage}
+              inverted
+              contentContainerStyle={[
+                styles.listContent,
+                isTablet && styles.listContentTablet,
+              ]}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              ListHeaderComponent={isGenerating ? (
+                <TypingIndicator accentColor={colors.primary} streamingText={streamingText} />
+              ) : null}
+              ListFooterComponent={
+                sessionMessages.length === 0 ? (
+                  <View style={styles.emptyWrapper}>
+                    <EmptyState
+                      context={parsedContext}
+                      onPillPress={handlePillPress}
+                      accentColor={colors.primary}
+                      isTablet={isTablet}
+                    />
+                  </View>
+                ) : null
+              }
+            />
 
-        {/* ── Input row ───────────────────────────────────────────────────── */}
-        <AiComposer
-          value={inputText}
-          onChangeText={setInputText}
-          onSend={() => handleSend()}
-          onStop={handleStop}
-          isGenerating={isGenerating}
-          canSend={canSend}
-          placeholder="Ask anything about your brand…"
-          accentColor={colors.primary}
-          bottomInset={composerBottomInset}
-        />
+            {/* ── Input row ───────────────────────────────────────────────── */}
+            <AiComposer
+              value={inputText}
+              onChangeText={setInputText}
+              onSend={() => handleSend()}
+              onStop={handleStop}
+              isGenerating={isGenerating}
+              canSend={canSend}
+              placeholder={isAuthLoaded ? 'Ask anything about your brand…' : 'Preparing your session…'}
+              accentColor={colors.primary}
+              bottomInset={composerBottomInset}
+            />
+          </>
+        )}
       </KeyboardAvoidingView>
     </View>
   );
@@ -757,10 +836,10 @@ export default function AiBrainScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#0A0A0B',
+    backgroundColor: colors.background,
   },
   kav: {
     flex: 1,
@@ -773,7 +852,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'transparent',
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: BORDER,
+    borderBottomColor: colors.border,
     paddingHorizontal: SP.md,
     paddingBottom: SP.sm,
     minHeight: 56,
@@ -793,7 +872,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.sm,
   },
   headerLabel: {
-    color: MUTED,
+    color: colors.mutedForeground,
     fontSize: FS.sm,
     fontFamily: FONT.medium,
   },
@@ -806,15 +885,15 @@ const styles = StyleSheet.create({
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: RED_DIM,
+    backgroundColor: `${colors.destructive}22`,
     borderBottomWidth: 1,
-    borderBottomColor: RED,
+    borderBottomColor: colors.destructive,
     paddingHorizontal: SP.md,
     paddingVertical: SP.sm,
   },
   errorBannerText: {
     flex: 1,
-    color: RED,
+    color: colors.destructive,
     fontSize: FS.sm,
     fontFamily: FONT.regular,
     lineHeight: 18,
@@ -825,8 +904,41 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   retryBannerText: {
-    color: RED,
+    color: colors.destructive,
     fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+  },
+
+  // ── Signed-out gate
+  signInGate: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SP.xl,
+    gap: SP.sm,
+  },
+  signInGateTitle: {
+    color: colors.text,
+    fontSize: FS.lg,
+    fontFamily: FONT.semibold,
+    marginTop: SP.sm,
+    textAlign: 'center',
+  },
+  signInGateBody: {
+    color: colors.mutedForeground,
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: SP.sm,
+  },
+  signInGateBtn: {
+    paddingHorizontal: SP.xl,
+    paddingVertical: SP.sm,
+    borderRadius: RADIUS.lg,
+  },
+  signInGateBtnText: {
+    fontSize: FS.md,
     fontFamily: FONT.semibold,
   },
 
@@ -858,7 +970,7 @@ const styles = StyleSheet.create({
     maxWidth: 480,
   },
   emptyTitle: {
-    color: FG,
+    color: colors.text,
     fontSize: FS.xl,
     fontFamily: FONT.semibold,
     textAlign: 'center',
@@ -866,7 +978,7 @@ const styles = StyleSheet.create({
     marginBottom: SP.xs,
   },
   emptySubtitle: {
-    color: MUTED,
+    color: colors.mutedForeground,
     fontSize: FS.sm,
     fontFamily: FONT.regular,
     textAlign: 'center',
@@ -883,14 +995,14 @@ const styles = StyleSheet.create({
   pill: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: colors.border,
     borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 12,
     maxWidth: '47%',
   },
   pillText: {
-    color: MUTED,
+    color: colors.mutedForeground,
     fontSize: FS.sm,
     fontFamily: FONT.regular,
     textAlign: 'center',
@@ -908,7 +1020,7 @@ const styles = StyleSheet.create({
     maxWidth: '75%',
   },
   userText: {
-    color: '#FFFFFF',
+    color: colors.primaryForeground,
     fontSize: FS.base,
     fontFamily: FONT.medium,
   },
@@ -930,16 +1042,35 @@ const styles = StyleSheet.create({
   assistantBubble: {
     backgroundColor: 'rgba(255,255,255,0.045)',
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: colors.border,
     borderRadius: 16,
     paddingVertical: 12,
     paddingHorizontal: 14,
   },
   assistantBubbleError: {
-    borderColor: RED,
+    borderColor: colors.destructive,
   },
 
   // ── Message actions (copy / regenerate)
+  sourcesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+  },
+  sourceChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  sourceChipText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+  },
   msgActionRow: {
     flexDirection: 'row',
     gap: 14,
@@ -952,7 +1083,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   msgActionText: {
-    color: SUBTLE,
+    color: colors.subtle,
     fontSize: FS.xs,
     fontFamily: FONT.medium,
   },
@@ -972,7 +1103,7 @@ const styles = StyleSheet.create({
 
   // ── Error / retry
   errorText: {
-    color: RED,
+    color: colors.destructive,
     fontSize: FS.base,
     fontFamily: FONT.regular,
     lineHeight: 22,
@@ -985,16 +1116,16 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   retryText: {
-    color: RED,
+    color: colors.destructive,
     fontSize: FS.sm,
     fontFamily: FONT.medium,
   },
 
   // ── Action card
   actionCard: {
-    backgroundColor: CARD_ELEVATED,
+    backgroundColor: colors.elevated,
     borderWidth: 1,
-    borderColor: BORDER_ACTIVE,
+    borderColor: colors.primary,
     borderRadius: 14,
     padding: 12,
     marginTop: 8,
@@ -1012,13 +1143,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   actionTitle: {
-    color: FG,
+    color: colors.text,
     fontSize: FS.base,
     fontFamily: FONT.semibold,
     marginBottom: 4,
   },
   actionDesc: {
-    color: MUTED,
+    color: colors.mutedForeground,
     fontSize: FS.sm,
     fontFamily: FONT.regular,
     lineHeight: 19,
@@ -1045,22 +1176,22 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   actionApplyText: {
-    color: '#FFFFFF',
+    color: colors.primaryForeground,
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
   },
   actionDismissBtn: {
     flex: 1,
-    backgroundColor: CARD,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: colors.border,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
   },
   actionDismissText: {
-    color: MUTED,
+    color: colors.mutedForeground,
     fontSize: FS.sm,
     fontFamily: FONT.medium,
   },
@@ -1071,18 +1202,18 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   actionAppliedText: {
-    color: SUCCESS,
+    color: colors.success,
     fontSize: FS.sm,
     fontFamily: FONT.medium,
     flex: 1,
   },
   actionUndoText: {
-    color: MUTED,
+    color: colors.mutedForeground,
     fontSize: FS.sm,
     fontFamily: FONT.medium,
   },
   actionStatusText: {
-    color: SUBTLE,
+    color: colors.subtle,
     fontSize: FS.sm,
     fontFamily: FONT.regular,
     marginTop: 8,
