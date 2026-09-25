@@ -5,7 +5,7 @@
  * feed player or the product page it links to:
  *
  *  - videos:   GET /api/public/users/:id/videos     (same row shape as the Thread feed)
- *  - product:  GET /api/public/products/:id/videos
+ *  - product:  GET /api/public/products/:id/feed-videos
  *  - shop:     GET /api/public/products?ownerId=     (active listings, live prices/stock —
  *              the exact source buyer product detail and checkout read)
  */
@@ -64,10 +64,10 @@ export async function getCreatorVideosPage(
   return toPage(raw, offset);
 }
 
-/** Public videos that tag a product — the product page's "Featured in" strip. */
+/** Public videos that tag a product — what the product-scoped feed player swipes through. */
 export async function getProductVideosPage(productId: string, offset = 0, limit = 12): Promise<CreatorVideosPage> {
   const raw = await serviceRequest<RawVideosResponse>(
-    `/api/public/products/${encodeURIComponent(productId)}/videos?limit=${limit}&offset=${offset}`,
+    `/api/public/products/${encodeURIComponent(productId)}/feed-videos?limit=${limit}&offset=${offset}`,
   );
   return toPage(raw, offset);
 }

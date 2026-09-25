@@ -66,7 +66,7 @@ describe('product detail → seller, DM, and featured videos', () => {
   it('links product detail to the seller profile, a product DM, and the videos featuring it', () => {
     expect(pdp).toContain("profileHref({ userId: product.sellerId, accountType: 'seller' })");
     expect(pdp).toContain('messageSellerAboutProductHref({');
-    expect(pdp).toContain("profileVideosHref({ source: 'product', id: productId, startPostId: video.id");
+    expect(pdp).toContain("profileVideosHref({ source: 'product', id: productId, startPostId: video.postId");
   });
 
   it('carries the product into the DM: passes contextProductId and stages the product card', () => {
@@ -105,6 +105,14 @@ describe('profile layout geometry', () => {
       expect(layout.heroHeight).toBeLessThan(height * 0.5);
       expect(layout.heroHeight).toBeGreaterThanOrEqual(280);
     }
+  });
+
+  it('fills the global WebAppShell column on desktop web (no second, narrower column)', () => {
+    const shell = read('components/web/WebAppShell.tsx');
+    expect(shell).toContain(`WEB_SHELL_MAX_WIDTH = ${PROFILE_WEB_COLUMN}`);
+    expect(shell).toContain('WEB_SHELL_BREAKPOINT = 700');
+    expect(computeProfileLayout(699, 900, 'web').isDesktopWeb).toBe(false);
+    expect(computeProfileLayout(700, 900, 'web').isDesktopWeb).toBe(true);
   });
 
   it('centers a fixed app column on desktop web instead of stretching', () => {

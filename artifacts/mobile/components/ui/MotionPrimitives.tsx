@@ -52,8 +52,16 @@ export function HeartToggle({ liked, onChange, size = 22, accessibilityLabel, on
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? (liked ? 'Unlike' : 'Like')}
       accessibilityState={{ selected: liked }}
-      onPress={() => { hapticSuccessAction(); onChange(!liked); }}
-      onLongPress={onLongPress}
+      onPress={(e) => {
+        // On web this Pressable commonly sits inside a Card/row that is itself
+        // pressable (e.g. a product card) — without stopping propagation, a
+        // tap on the heart also bubbles to the DOM and fires the outer
+        // Pressable's onPress, navigating away instead of just toggling.
+        e.stopPropagation?.();
+        hapticSuccessAction();
+        onChange(!liked);
+      }}
+      onLongPress={(e) => { e.stopPropagation?.(); onLongPress?.(); }}
       hitSlop={8}
     >
       <Animated.View style={style}>

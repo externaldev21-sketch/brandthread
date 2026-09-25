@@ -16,7 +16,9 @@
  *     a non-friend gets `{ restricted: "friends_only", videos: [] }`.
  *   - The owner viewing themself also sees their own non-public posts.
  *
- * GET /api/public/products/:productId/videos?limit=12
+ * GET /api/public/products/:productId/feed-videos?limit=12
+ *   (feed-player row shape; public.ts owns the lighter /products/:id/videos
+ *   used by the product page's "Worn in these videos" strip)
  *   Public posts that tag the product, newest first — the "Featured in" strip
  *   on product detail links into these.
  */
@@ -313,8 +315,8 @@ router.get("/users/:userId/videos", async (req, res) => {
   }
 });
 
-// ─── GET /api/public/products/:productId/videos ───────────────────────────────
-router.get("/products/:productId/videos", async (req, res) => {
+// ─── GET /api/public/products/:productId/feed-videos ──────────────────────────
+router.get("/products/:productId/feed-videos", async (req, res) => {
   try {
     const productId = String(req.params.productId ?? "");
     if (!UUID_RE.test(productId)) return res.status(404).json({ error: "Product not found" });

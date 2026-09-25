@@ -43,7 +43,8 @@ import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useAuth } from '@clerk/expo';
 import { formatCents } from '@/lib/money';
 import { CachedImage } from '@/components/CachedImage';
-import { CardSkeleton, ListSkeleton, ResponsiveContainer } from '@/components/layout';
+import { CardSkeleton, ListSkeleton, ResponsiveContainer, SkeletonBlock } from '@/components/layout';
+import { LinearGradient } from 'expo-linear-gradient';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { saveItem, removeSavedItem, getSavedItems } from '@/services/socialService';
 import { SaveToCollectionSheet, SaveToCollectionItem } from '@/components/SaveToCollectionSheet';
@@ -60,6 +61,7 @@ import {
 } from '@/components/CommerceSignal';
 import { SectionError } from '@/components/InlineFeedback';
 import { Card, IconButton, HeartToggle, ThemedRefreshControl } from '@/components/ui';
+import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
 import { hapticLight, hapticMedium, hapticToggle } from '@/lib/haptics';
@@ -560,6 +562,152 @@ const tr = StyleSheet.create({
   avatar:   { width: 44, height: 44, borderRadius: RADII.chip, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
 });
 
+// ─── Discover Hero — full-bleed "Just Dropped" spotlight ───────────────────────
+//
+// Layout inspired by GOAT's immersive drop page (see attached_assets/
+// image_1790033866493.png): full-bleed gradient backdrop, one product floating
+// centered with a price pill, a slim top bar (counter chip · title · Shop all
+// pill), and horizontal swipe between products with a peek of the next one.
+//
+// The buyer product API only returns a single flat product photo per item —
+// there is no background-removed cutout or a separate seller lifestyle photo
+// in the data yet (the seller's cutout toggle in add-product.tsx never makes
+// it into the saved `images` array, and there's no lifestyle-shot field at
+// all), so this renders the real product photo on the theme's hero gradient
+// rather than fabricating an image. Follow-up: plumb the seller's chosen
+// cutout image through to `images[0]` so this can render true floating cutouts.
+function DiscoverHero({ items, theme, onOpenProduct, onShopAll }: {
+  items: ProductCardItem[];
+  theme: AppThemePreset;
+  onOpenProduct: (item: ProductCardItem) => void;
+  onShopAll: () => void;
+}) {
+  const { width: windowWidth } = useWindowDimensions();
+  const [activeIndex, setActiveIndex] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
+  const heroHeight = Math.min(560, Math.max(420, windowWidth * 1.05));
+  // Page is slightly narrower than the viewport so the next card peeks in at
+  // the edge, matching the reference's horizontal-swipe behavior.
+  const pagePeek = 28;
+  const pageWidth = Math.min(windowWidth, GRID_MAX_WIDTH) - pagePeek;
+  const sideInset = (windowWidth - pageWidth) / 2;
+
+  if (items.length === 0) return null;
+  const active = items[Math.min(activeIndex, items.length - 1)];
+
+  return (
+    <View style={{ height: heroHeight, marginBottom: SP.xl }}>
+      <LinearGradient
+        colors={theme.heroGradient}
+        start={{ x: 0.15, y: 0 }}
+        end={{ x: 0.85, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
+      {/* Top bar — counter chip · title · Shop all pill */}
+      <View style={[dh.topBar, { paddingHorizontal: Math.max(SP.md, sideInset) }]}>
+        <View style={dh.counterChip}>
+          <Text style={dh.counterChipText}>{activeIndex + 1}/{items.length}</Text>
+        </View>
+        <Text style={dh.title} numberOfLines={1}>JUST DROPPED</Text>
+        <Pressable onPress={onShopAll} style={dh.shopAllPill} accessibilityRole="button" accessibilityLabel="Shop all">
+          <Text style={dh.shopAllText}>Shop all</Text>
+        </Pressable>
+      </View>
+
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled={false}
+        snapToInterval={pageWidth}
+        decelerationRate="fast"
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: sideInset }}
+        onMomentumScrollEnd={(e) => {
+          const next = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
+          setActiveIndex(Math.max(0, Math.min(items.length - 1, next)));
+        }}
+      >
+        {items.map((item) => (
+          <Pressable
+            key={item.id}
+            onPress={() => onOpenProduct(item)}
+            style={{ width: pageWidth, alignItems: 'center' }}
+            accessibilityRole="button"
+            accessibilityLabel={`${item.name} by ${item.brand}${item.commerce.currentPriceCents != null ? `, ${formatCents(item.commerce.currentPriceCents)}` : ''}`}
+          >
+            <View style={dh.productWrap}>
+              {item.imageUri ? (
+                <CachedImage source={{ uri: item.imageUri }} style={dh.productImage} contentFit="contain" />
+              ) : (
+                <View style={[dh.productImage, dh.productImageFallback, { backgroundColor: `${theme.onAccent}22` }]}>
+                  <Text style={[dh.productFallbackInitials, { color: theme.onAccent }]}>{item.initials}</Text>
+                </View>
+              )}
+            </View>
+            {item.commerce.currentPriceCents != null && (
+              <View style={dh.pricePill}>
+                <Text style={dh.pricePillText}>{formatCents(item.commerce.currentPriceCents)}</Text>
+              </View>
+            )}
+          </Pressable>
+        ))}
+      </ScrollView>
+
+      {/* Anchor — brand/seller identity, standing in for a lifestyle shot the
+          product data doesn't carry yet. */}
+      <View style={[dh.anchorRow, { paddingHorizontal: Math.max(SP.md, sideInset) }]} pointerEvents="none">
+        <View style={[dh.anchorAvatar, { backgroundColor: `${theme.onAccent}22` }]}>
+          <Text style={[dh.anchorAvatarText, { color: theme.onAccent }]}>{active.initials}</Text>
+        </View>
+        <Text style={dh.anchorText} numberOfLines={1}>{active.brand}</Text>
+      </View>
+    </View>
+  );
+}
+
+const dh = StyleSheet.create({
+  topBar: {
+    position: 'absolute', top: SP.sm, left: 0, right: 0, zIndex: 2,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+  },
+  counterChip: {
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADII.pill,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  counterChipText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 11, ...TABULAR_NUMS },
+  title: {
+    flex: 1, textAlign: 'center', color: '#FFFFFF', fontFamily: FONT.bold,
+    fontSize: 13, letterSpacing: 1, textTransform: 'uppercase',
+  },
+  shopAllPill: {
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: RADII.pill,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  shopAllText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 12 },
+  productWrap: {
+    flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center', paddingTop: 56,
+  },
+  productImage: { width: '68%', height: '62%' },
+  productImageFallback: { alignItems: 'center', justifyContent: 'center', borderRadius: RADII.card },
+  productFallbackInitials: { fontFamily: FONT.bold, fontSize: 40 },
+  pricePill: {
+    marginTop: SP.sm, marginBottom: SP.lg,
+    paddingHorizontal: 16, paddingVertical: 8, borderRadius: RADII.pill,
+    backgroundColor: '#FFFFFF',
+  },
+  pricePillText: { color: '#0A0A0A', fontFamily: FONT.bold, fontSize: 15, ...TABULAR_NUMS },
+  anchorRow: {
+    position: 'absolute', bottom: SP.md, left: 0, right: 0,
+    flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center',
+  },
+  anchorAvatar: {
+    width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+  },
+  anchorAvatarText: { fontFamily: FONT.bold, fontSize: 10 },
+  anchorText: { color: '#FFFFFF', fontFamily: FONT.medium, fontSize: 12, opacity: 0.85 },
+});
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function DiscoverScreen() {
@@ -801,6 +949,25 @@ export default function DiscoverScreen() {
         </View>
       </ResponsiveContainer>
 
+      {/* ─ Hero — full-bleed "Just Dropped" spotlight, sourced from the same
+          For You catalogue fetched below (no separate endpoint yet). ─ */}
+      {forYouLoading ? (
+        <View style={{ marginBottom: SP.xl, paddingHorizontal: SP.md }}>
+          <SkeletonBlock width="100%" height={420} radius={RADII.card} />
+        </View>
+      ) : forYouError ? null : forYouItems.length === 0 ? null : (
+        <DiscoverHero
+          items={forYouItems.slice(0, 6)}
+          theme={theme}
+          onOpenProduct={(item) => {
+            hapticLight();
+            const pid = encodeURIComponent(item.productId ?? item.id);
+            push((`/thread-product-detail?productId=${pid}&productName=${encodeURIComponent(item.name)}`) as never);
+          }}
+          onShopAll={() => router.push('/(buyer)/search' as never)}
+        />
+      )}
+
       {/* ─ High Demand — publicProducts.highDemand(6) only, no trending posts ─ */}
       <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
         <HighDemandSectionHead
@@ -813,7 +980,12 @@ export default function DiscoverScreen() {
         ) : highDemandError ? (
           <SectionError message={highDemandError} onRetry={fetchHighDemand} />
         ) : highDemandItems.length === 0 ? (
-          <EmptyState icon="trending-up" title="No high-demand products right now" compact />
+          <EmptyState
+            icon="trending-up"
+            title="No high-demand products right now"
+            description="Check back soon, or browse everything sellers have listed."
+            action={{ label: 'Browse products', onPress: () => router.push('/(buyer)/search' as never) }}
+          />
         ) : (
           <View style={{ gap: 10 }}>
             {highDemandItems.slice(0, 6).map(item => (
@@ -858,7 +1030,12 @@ export default function DiscoverScreen() {
         </ResponsiveContainer>
       ) : forYouItems.length === 0 ? (
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
-          <EmptyState icon="package" title="No products available right now" compact />
+          <EmptyState
+            icon="package"
+            title="No products available right now"
+            description="New arrivals show up here as sellers add them."
+            action={{ label: 'Search products', onPress: () => router.push('/(buyer)/search' as never) }}
+          />
         </ResponsiveContainer>
       ) : (
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
@@ -882,7 +1059,12 @@ export default function DiscoverScreen() {
           ) : dropsError ? (
             <SectionError message={dropsError} onRetry={fetchDrops} />
           ) : dropsItems.length === 0 ? (
-            <EmptyState icon="calendar" title="No upcoming drops right now" compact />
+            <EmptyState
+              icon="calendar"
+              title="No upcoming drops right now"
+              description="Follow sellers to get notified the moment a new drop goes live."
+              action={{ label: 'See all drops', onPress: () => router.push('/buyer-drops' as never) }}
+            />
           ) : (
             dropsItems.map(item => <DropRow key={item.id} item={item} />)
           )}
@@ -903,11 +1085,21 @@ export default function DiscoverScreen() {
           ) : trendingError ? (
             <SectionError message={trendingError} onRetry={fetchTrending} />
           ) : trendingItems.length === 0 ? (
-            <EmptyState icon="activity" title="No trending posts right now" compact />
+            <EmptyState
+              icon="activity"
+              title="No trending posts right now"
+              description="Posts with the most likes and saves across the platform show up here."
+              action={{ label: 'Explore feed', onPress: () => router.push('/(buyer)/feed' as never) }}
+            />
           ) : (
             trendingItems.slice(0, 10).map(item => <TrendingRow key={item.id} item={item} />)
           )}
         </View>
+      </ResponsiveContainer>
+
+      {/* ─ Recently viewed ─ */}
+      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginTop: SP.xl }}>
+        <RecentlyViewedRow />
       </ResponsiveContainer>
     </ScrollView>
   );

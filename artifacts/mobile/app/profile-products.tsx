@@ -182,7 +182,7 @@ export default function ProfileProductsScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.column, { width: layout.columnWidth }, layout.isDesktopWeb && styles.desktopColumn]}>
+      <View style={[styles.column, { width: layout.columnWidth }]}>
         <FlatList
           key={`shop-${columns}`}
           data={loading || error ? [] : products}
@@ -207,7 +207,6 @@ function makeStyles(theme: AppThemePreset) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: theme.background, alignItems: 'center' },
     column: { flex: 1 },
-    desktopColumn: { borderLeftWidth: StyleSheet.hairlineWidth, borderRightWidth: StyleSheet.hairlineWidth, borderColor: theme.border },
     header: { paddingHorizontal: SP.md, paddingBottom: SP.md, gap: SP.sm },
     headerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
     headerCopy: { flex: 1, minWidth: 0 },

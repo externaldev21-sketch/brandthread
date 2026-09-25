@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, FontAwesome } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useIsFocused } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -23,6 +23,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
 import { Asset } from 'expo-asset';
+import { Image as ExpoImage } from 'expo-image';
+import {
+  enqueueEngagementRetry, isRetryableFailure, setEngagementRetryExecutor, startEngagementRetryQueuePump,
+} from '@/lib/engagementRetryQueue';
+import { computeJustDroppedDrops, type FollowedDrop } from '@/lib/justDroppedDrops';
 import type { ViewToken } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 import { useApi } from '@/lib/api';
@@ -30,11 +35,11 @@ import {
   BG, SCREEN_BG, SURFACE, CARD, OVERLAY,
   BORDER, BORDER_SUBTLE,
   FG, MUTED, SUBTLE, ON_DARK,
-  SUCCESS, RED,
+  SUCCESS, RED, GOLD,
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM, GRID_MAX_WIDTH,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FeedSkeleton } from '@/components/BrandthreadUI';
+import { FeedSkeleton, PressableScale } from '@/components/BrandthreadUI';
 import { EmptyState, ListSkeleton, ResponsiveContainer } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
@@ -276,12 +281,14 @@ interface SpotlightItem {
   productOriginalPrice: string | null;
   accentColor: string;
   likes: number;
+  likedByMe?: boolean;
   comments: { id: string; user: string; text: string }[];
   reposts: number;
   repostedByMe?: boolean;
   friendReposts?: SellerThreadPost['friendReposts'];
   shares: number;
   saves: number;
+  savedByMe?: boolean;
   location?: string;
   // Optional fields present on real seller posts
   productId?: string;
@@ -293,6 +300,8 @@ interface SpotlightItem {
   commentsCount?: number;
 }
 type SpotlightProductTag = NonNullable<SpotlightItem['productTags']>[number];
+
+const SOUND_PREF_KEY = 'bt:feed-sound-on:v1';
 
 const FASHION_PREVIEW_VIDEO_SOURCES: VideoSource[] = [
   require('../../assets/videos/fashion_runway_01.mp4'),
@@ -347,16 +356,16 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$480',
     productOriginalPrice: null,
     accentColor: '#232323',
-    likes: 12840,
+    likes: 0,
     comments: [],
-    reposts: 684,
-    shares: 392,
-    saves: 2103,
+    reposts: 0,
+    shares: 0,
+    saves: 0,
     location: 'Paris, France',
     productId: 'preview-product-01',
     sellerId: 'preview-seller-01',
     productTags: [{ productId: 'preview-product-01', productName: 'Sculpted Wool Coat', priceCents: 48000 }],
-    commentsCount: 318,
+    commentsCount: 0,
   },
   {
     id: 'preview-fashion-02',
@@ -376,16 +385,16 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$325',
     productOriginalPrice: '$390',
     accentColor: '#474747',
-    likes: 9360,
+    likes: 0,
     comments: [],
-    reposts: 441,
-    shares: 287,
-    saves: 1745,
+    reposts: 0,
+    shares: 0,
+    saves: 0,
     location: 'Milan, Italy',
     productId: 'preview-product-02',
     sellerId: 'preview-seller-02',
     productTags: [{ productId: 'preview-product-02', productName: 'Liquid Silver Dress', priceCents: 32500 }],
-    commentsCount: 204,
+    commentsCount: 0,
   },
   {
     id: 'preview-fashion-03',
@@ -405,16 +414,16 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$560',
     productOriginalPrice: null,
     accentColor: '#171717',
-    likes: 18600,
+    likes: 0,
     comments: [],
-    reposts: 1204,
-    shares: 875,
-    saves: 3980,
+    reposts: 0,
+    shares: 0,
+    saves: 0,
     location: 'New York, NY',
     productId: 'preview-product-03',
     sellerId: 'preview-seller-03',
     productTags: [{ productId: 'preview-product-03', productName: 'Oversized Tuxedo', priceCents: 56000 }],
-    commentsCount: 527,
+    commentsCount: 0,
   },
   {
     id: 'preview-fashion-04',
@@ -434,16 +443,16 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$410',
     productOriginalPrice: null,
     accentColor: '#626262',
-    likes: 7420,
+    likes: 0,
     comments: [],
-    reposts: 306,
-    shares: 198,
-    saves: 1390,
+    reposts: 0,
+    shares: 0,
+    saves: 0,
     location: 'London, UK',
     productId: 'preview-product-04',
     sellerId: 'preview-seller-04',
     productTags: [{ productId: 'preview-product-04', productName: 'Ivory Column Set', priceCents: 41000 }],
-    commentsCount: 149,
+    commentsCount: 0,
   },
   {
     id: 'preview-fashion-05',
@@ -463,16 +472,16 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$295',
     productOriginalPrice: '$350',
     accentColor: '#0F0F0F',
-    likes: 22100,
+    likes: 0,
     comments: [],
-    reposts: 1640,
-    shares: 1118,
-    saves: 5206,
+    reposts: 0,
+    shares: 0,
+    saves: 0,
     location: 'Tokyo, Japan',
     productId: 'preview-product-05',
     sellerId: 'preview-seller-05',
     productTags: [{ productId: 'preview-product-05', productName: 'Asymmetric Layer Jacket', priceCents: 29500 }],
-    commentsCount: 731,
+    commentsCount: 0,
   },
   {
     id: 'preview-fashion-06',
@@ -492,16 +501,16 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$375',
     productOriginalPrice: null,
     accentColor: '#353535',
-    likes: 6890,
+    likes: 0,
     comments: [],
-    reposts: 249,
-    shares: 164,
-    saves: 1187,
+    reposts: 0,
+    shares: 0,
+    saves: 0,
     location: 'Berlin, Germany',
     productId: 'preview-product-06',
     sellerId: 'preview-seller-06',
     productTags: [{ productId: 'preview-product-06', productName: 'Draped Hardware Gown', priceCents: 37500 }],
-    commentsCount: 121,
+    commentsCount: 0,
   },
   {
     id: 'preview-fashion-07',
@@ -521,16 +530,16 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$245',
     productOriginalPrice: null,
     accentColor: '#555555',
-    likes: 15300,
+    likes: 0,
     comments: [],
-    reposts: 908,
-    shares: 622,
-    saves: 2874,
+    reposts: 0,
+    shares: 0,
+    saves: 0,
     location: 'Los Angeles, CA',
     productId: 'preview-product-07',
     sellerId: 'preview-seller-07',
     productTags: [{ productId: 'preview-product-07', productName: 'Crystal Mesh Top', priceCents: 24500 }],
-    commentsCount: 406,
+    commentsCount: 0,
   },
   {
     id: 'preview-fashion-08',
@@ -550,16 +559,16 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$520',
     productOriginalPrice: null,
     accentColor: '#292929',
-    likes: 11800,
+    likes: 0,
     comments: [],
-    reposts: 715,
-    shares: 483,
-    saves: 2460,
+    reposts: 0,
+    shares: 0,
+    saves: 0,
     location: 'Copenhagen, Denmark',
     productId: 'preview-product-08',
     sellerId: 'preview-seller-08',
     productTags: [{ productId: 'preview-product-08', productName: 'Reconstructed Trench', priceCents: 52000 }],
-    commentsCount: 276,
+    commentsCount: 0,
   },
   {
     id: 'preview-fashion-09',
@@ -579,16 +588,16 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$445',
     productOriginalPrice: '$510',
     accentColor: '#404040',
-    likes: 8470,
+    likes: 0,
     comments: [],
-    reposts: 378,
-    shares: 244,
-    saves: 1518,
+    reposts: 0,
+    shares: 0,
+    saves: 0,
     location: 'Seoul, South Korea',
     productId: 'preview-product-09',
     sellerId: 'preview-seller-09',
     productTags: [{ productId: 'preview-product-09', productName: 'Satin Power Suit', priceCents: 44500 }],
-    commentsCount: 188,
+    commentsCount: 0,
   },
   {
     id: 'preview-fashion-10',
@@ -608,16 +617,16 @@ const FASHION_PREVIEW_POSTS: SpotlightItem[] = [
     productPrice: '$690',
     productOriginalPrice: null,
     accentColor: '#1E1E1E',
-    likes: 27400,
+    likes: 0,
     comments: [],
-    reposts: 1980,
-    shares: 1320,
-    saves: 6140,
+    reposts: 0,
+    shares: 0,
+    saves: 0,
     location: 'Paris, France',
     productId: 'preview-product-10',
     sellerId: 'preview-seller-10',
     productTags: [{ productId: 'preview-product-10', productName: 'Sculpted Silk Gown', priceCents: 69000 }],
-    commentsCount: 902,
+    commentsCount: 0,
   },
 ];
 
@@ -634,8 +643,75 @@ interface LiveStreamFeedItem {
   productTags: { productName: string; priceCents: number }[];
 }
 
+// ─── "Just dropped from brands you follow" rail ───────────────────────────────
+interface JustDroppedRailItem {
+  _isJustDropped: true;
+  id: string;
+  drops: FollowedDrop[];
+}
+function isJustDroppedItem(item: unknown): item is JustDroppedRailItem {
+  return !!item && typeof item === 'object' && (item as JustDroppedRailItem)._isJustDropped === true;
+}
+
 // Union of all possible displayable items in the FlatList
-type FeedItem = SpotlightItem | LiveStreamFeedItem | BuyerDemandPageItem;
+type FeedItem = SpotlightItem | LiveStreamFeedItem | BuyerDemandPageItem | JustDroppedRailItem;
+
+function JustDroppedRailPage({
+  drops, pageWidth, pageHeight, bottomClearance, onOpenDrop, onSeeAll,
+}: {
+  drops: FollowedDrop[];
+  pageWidth: number;
+  pageHeight: number;
+  bottomClearance: number;
+  onOpenDrop: (drop: FollowedDrop) => void;
+  onSeeAll: () => void;
+}) {
+  const { theme } = useAppTheme();
+  return (
+    <View style={{ width: pageWidth, height: pageHeight, backgroundColor: theme.background, justifyContent: 'center' }}>
+      <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text }}>Just dropped</Text>
+          <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 }}>From brands you follow</Text>
+        </View>
+        <PressableScale onPress={onSeeAll} accessibilityRole="button" accessibilityLabel="See all drops from brands you follow">
+          <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.accent }}>See all</Text>
+        </PressableScale>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: SP.md, gap: SP.sm }}>
+        {drops.map(drop => (
+          <PressableScale
+            key={drop.id}
+            onPress={() => onOpenDrop(drop)}
+            style={{ width: 160 }}
+            accessibilityRole="button"
+            accessibilityLabel={`${drop.name} by ${drop.sellerName}`}
+          >
+            <View style={{ width: 160, height: 200, borderRadius: RADIUS.lg, overflow: 'hidden', backgroundColor: theme.cardElevated }}>
+              {drop.heroImageUrl ? (
+                <CachedImage source={{ uri: drop.heroImageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+              ) : (
+                <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
+                  <Feather name="zap" size={28} color={theme.muted} />
+                </View>
+              )}
+              <View style={{ position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 3 }}>
+                <Text style={{ fontSize: 10, fontFamily: FONT.bold, color: '#fff' }}>
+                  {drop.releaseAt && new Date(drop.releaseAt).getTime() > Date.now() ? 'SOON' : 'LIVE'}
+                </Text>
+              </View>
+            </View>
+            <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginTop: 6 }} numberOfLines={1}>{drop.name}</Text>
+            <Text style={{ fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted }} numberOfLines={1}>{drop.sellerName}</Text>
+          </PressableScale>
+        ))}
+      </ScrollView>
+      <Text style={{ position: 'absolute', bottom: bottomClearance + 16, left: 0, right: 0, textAlign: 'center', fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted }}>
+        Swipe to keep browsing
+      </Text>
+    </View>
+  );
+}
 
 function LiveStreamPage({
   stream,
@@ -742,8 +818,8 @@ type EngagementState = {
 
 function initialEngagement(item: SpotlightItem): EngagementState {
   return {
-    liked: false, likes: item.likes,
-    saved: false, saves: item.saves,
+    liked: item.likedByMe === true, likes: item.likes,
+    saved: item.savedByMe === true, saves: item.saves,
     reposted: item.repostedByMe === true, reposts: item.reposts,
     following: false,
     comments: item.comments,
@@ -851,6 +927,7 @@ function VideoVisual({
   muted = false,
   posterUri,
   posterSource,
+  fallbackColor,
   immersive = false,
   progressBottom,
   pageAspect = 9 / 16,
@@ -865,6 +942,10 @@ function VideoVisual({
   muted?: boolean;
   posterUri?: string;
   posterSource?: ImageSourcePropType;
+  /** Solid cover shown pre-decode when there's no poster image at all — a
+   * black frame before the first decoded frame paints is otherwise visible
+   * for any clip whose post has no thumbnail. */
+  fallbackColor?: string;
   /** Buyer Home: portrait clips fill the screen edge to edge behind the bar. */
   immersive?: boolean;
   /** When set, a thin playback progress line sits this far above the bottom. */
@@ -896,6 +977,7 @@ function VideoVisual({
   const [videoAspect, setVideoAspect] = useState(9 / 16);
   const [progress, setProgress] = useState(0);
   const showPoster = Boolean(posterSource || posterUri) && !hasStarted;
+  const showFallbackCover = !showPoster && !hasStarted;
   const cropFraction = 1 - Math.min(videoAspect, pageAspect) / Math.max(videoAspect, pageAspect);
   const fit = immersive && cropFraction <= 0.3 ? 'cover' : 'contain';
   const posterImage = posterSource ?? (posterUri ? { uri: posterUri } : undefined);
@@ -917,10 +999,17 @@ function VideoVisual({
     });
     return () => subscription.remove();
   }, [isActive, player, progressBottom]);
+  const isScreenFocused = useIsFocused();
   React.useEffect(() => {
-    if (isActive && !paused) player.play();
+    // isFocused is required (not just isActive) so navigating to a modal on
+    // top of the feed (e.g. the comments sheet) pauses this clip, and — the
+    // real fix here — coming back explicitly re-issues play() rather than
+    // relying on isActive alone, which never changes across that round trip
+    // and left the last decoded frame frozen/gray on web until some other
+    // state change happened to re-run this effect.
+    if (isActive && !paused && isScreenFocused) player.play();
     else player.pause();
-  }, [isActive, paused, player]);
+  }, [isActive, paused, isScreenFocused, player]);
   React.useEffect(() => {
     player.playbackRate = rate;
   }, [player, rate]);
@@ -953,11 +1042,17 @@ function VideoVisual({
             contentFit={fit}
           />
         )}
+        {showFallbackCover && (
+          <View
+            style={[StyleSheet.absoluteFill, { backgroundColor: fallbackColor ?? '#0a0a0a' }]}
+            pointerEvents="none"
+          />
+        )}
         <VideoView
           player={player}
           // Explicit size: on web the style lands on a <video>, which ignores
           // inset-only sizing and would otherwise render at its intrinsic size.
-          style={[StyleSheet.absoluteFill, styles.videoFill, showPoster && { opacity: 0 }]}
+          style={[StyleSheet.absoluteFill, styles.videoFill, (showPoster || showFallbackCover) && { opacity: 0 }]}
           contentFit={fit}
           nativeControls={false}
         />
@@ -1093,7 +1188,7 @@ function ShopPill({
 }
 
 function SpotlightPage({
-  item, isActive, pageWidth, pageHeight, bottomClearance, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator,
+  item, isActive, pageWidth, pageHeight, bottomClearance, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, soundOn, onToggleSound,
 }: {
   item: SpotlightItem;
   isActive: boolean;
@@ -1114,6 +1209,10 @@ function SpotlightPage({
   onFollow: (id: string) => Promise<void>;
   onOpenComments: (id: string) => void;
   onShopTag: (item: SpotlightItem, tag: SpotlightProductTag) => void;
+  onNotInterested: (id: string) => void;
+  /** Whether the app-wide feed sound preference is on. */
+  soundOn: boolean;
+  onToggleSound: () => void;
 }) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -1134,7 +1233,9 @@ function SpotlightPage({
   const heartScale = useRef(new Animated.Value(1)).current;
   const speedPillOpacity = useRef(new Animated.Value(0)).current;
   const repostSpin = useRef(new Animated.Value(0)).current;
+  const repostScale = useRef(new Animated.Value(1)).current;
   const saveDrop = useRef(new Animated.Value(0)).current;
+  const saveScale = useRef(new Animated.Value(1)).current;
   const lastTap = useRef(0);
   const pauseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1166,16 +1267,24 @@ function SpotlightPage({
     ]).start();
   }
 
-  /** Arrows spin/morph a full turn — repost toggled either way. */
+  /** Arrows spin a full turn with a pop of scale — repost toggled either way. */
   function spinRepost() {
     repostSpin.setValue(0);
     Animated.timing(repostSpin, { toValue: 1, duration: 420, useNativeDriver: true }).start();
+    Animated.sequence([
+      Animated.spring(repostScale, { toValue: 1.3, useNativeDriver: true, speed: 40 }),
+      Animated.spring(repostScale, { toValue: 1, useNativeDriver: true, speed: 40 }),
+    ]).start();
   }
 
-  /** Bookmark lifts then drops/settles — save toggled either way. */
+  /** Bookmark lifts, pops gold, then drops/settles — save toggled either way. */
   function dropSave() {
     saveDrop.setValue(0);
     Animated.timing(saveDrop, { toValue: 1, duration: 360, useNativeDriver: true }).start();
+    Animated.sequence([
+      Animated.spring(saveScale, { toValue: 1.4, useNativeDriver: true, speed: 40 }),
+      Animated.spring(saveScale, { toValue: 1, useNativeDriver: true, speed: 40 }),
+    ]).start();
   }
 
   function handleQuickTap() {
@@ -1245,9 +1354,10 @@ function SpotlightPage({
                 isActive={isActive}
                 paused={paused || holdPaused}
                 rate={speedActive ? 2 : 1}
-                muted={item.videoSource != null}
+                muted={!soundOn}
                 posterUri={item.videoPosterUri}
                 posterSource={item.videoPosterSource}
+                fallbackColor={item.accentColor}
                 immersive={immersive}
                 progressBottom={immersive ? bottomClearance - 10 : undefined}
                 pageAspect={pageHeight > 0 ? pageWidth / pageHeight : undefined}
@@ -1285,22 +1395,11 @@ function SpotlightPage({
         </View>
       </Pressable>
 
-      {/* ─ Legibility scrims: header and bottom overlays stay readable over bright footage ─ */}
-      {immersive && (
-        <>
-          <LinearGradient
-            pointerEvents="none"
-            colors={['rgba(0,0,0,0.42)', 'rgba(0,0,0,0)']}
-            style={[styles.topScrim, { height: insets.top + 120 }]}
-          />
-          <LinearGradient
-            pointerEvents="none"
-            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.28)', 'rgba(0,0,0,0.62)']}
-            locations={[0, 0.45, 1]}
-            style={[styles.bottomScrim, { height: bottomClearance + 240 }]}
-          />
-        </>
-      )}
+      {/* Legibility scrims moved out of this per-cell component — see the
+          fixed overlay siblings rendered once above the FlatList in
+          FeedScreen, so they no longer scroll away with the page during a
+          swipe (each cell used to carry its own copy, which visibly slid
+          off with the content). */}
 
       {/* ─ Shop pill — compact, sits above the creator name ─ */}
       {!!item.productTags?.length && (
@@ -1394,6 +1493,7 @@ function SpotlightPage({
           accessibilityState={{ checked: engagement?.reposted ?? false }}
           style={styles.railActionContent}
           rotateAnim={repostSpin}
+          scaleAnim={repostScale}
           onPress={async () => {
             spinRepost();
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1410,12 +1510,13 @@ function SpotlightPage({
           iconSize={21}
           count={formatCount(engagement?.saves ?? item.saves)}
           active={engagement?.saved ?? false}
-          activeColor={theme.accent}
+          activeColor={GOLD}
           inactiveColor={ON_DARK}
           accessibilityLabel={`${engagement?.saved ? 'Unsave' : 'Save'}, ${formatCount(engagement?.saves ?? item.saves)} saves`}
           accessibilityState={{ checked: engagement?.saved ?? false }}
           style={styles.railActionContent}
           translateYAnim={saveDrop}
+          scaleAnim={saveScale}
           onPress={async () => {
             dropSave();
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1453,7 +1554,7 @@ function SpotlightPage({
         isVideo={item.contentType === 'video'}
         onClose={() => setShareOpen(false)}
         onReport={() => router.push(`/buyer-report?targetType=post&targetId=${encodeURIComponent(item.id)}&targetLabel=Post` as never)}
-        onNotInterested={() => showToast('We’ll show you fewer posts like this.', 'info')}
+        onNotInterested={() => onNotInterested(item.id)}
         onFeedback={showToast}
       />
 
@@ -1518,10 +1619,17 @@ function SpotlightPage({
             {item.caption.length > 86 && <Text style={styles.moreText}> more</Text>}
          </Text>
 
-        <View style={styles.soundRow}>
-           <Feather name="music" size={12} color={`${ON_DARK}CC`} />
+        <Pressable
+          style={styles.soundRow}
+          onPress={onToggleSound}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={soundOn ? 'Mute sound' : 'Unmute sound'}
+          accessibilityState={{ checked: soundOn }}
+        >
+           <Feather name={soundOn ? 'volume-2' : 'volume-x'} size={12} color={`${ON_DARK}CC`} />
           <Text style={styles.soundText} numberOfLines={1}>{item.sound}</Text>
-        </View>
+        </Pressable>
       </View>
     </View>
   );
@@ -1531,7 +1639,7 @@ function SpotlightPage({
 
 // ─── Type guard for the feed union ───────────────────────────────────────────
 
-function isLiveStreamItem(item: SpotlightItem | LiveStreamFeedItem): item is LiveStreamFeedItem {
+function isLiveStreamItem(item: SpotlightItem | LiveStreamFeedItem | JustDroppedRailItem): item is LiveStreamFeedItem {
   return (item as LiveStreamFeedItem)._isLive === true;
 }
 
@@ -1562,12 +1670,14 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     productOriginalPrice: null,
     accentColor: post.authorColor,
     likes: post.likesCount,
+    likedByMe: post.likedByMe === true,
     comments: [],
     reposts: post.repostsCount,
     repostedByMe: post.repostedByMe,
     friendReposts: post.friendReposts,
     shares: 0,
     saves: Number((post as any).savedCount ?? (post as any).savesCount ?? 0),
+    savedByMe: post.savedByMe === true,
     location: (post as any).location ?? (post as any).locationName ?? undefined,
     productId: tag?.productId,
     sellerId: post.authorId,
@@ -1655,6 +1765,20 @@ export default function FeedScreen({
   const { showToast } = useFeedToast();
 
   const [engagements, setEngagements] = useState<Record<string, EngagementState>>({});
+  // The feed's sound on/off choice — a single app-wide preference (not
+  // per-post), persisted so it survives leaving and returning to the feed.
+  const [soundOn, setSoundOn] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem(SOUND_PREF_KEY).then(v => { if (v === 'on') setSoundOn(true); }).catch(() => {});
+  }, []);
+  const toggleSound = useCallback(() => {
+    setSoundOn(prev => {
+      const next = !prev;
+      AsyncStorage.setItem(SOUND_PREF_KEY, next ? 'on' : 'off').catch(() => {});
+      return next;
+    });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  }, []);
   const [showGestureGuide, setShowGestureGuide] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
@@ -1884,6 +2008,27 @@ export default function FeedScreen({
     return () => clearInterval(id);
   }, [isCreatorFeed]);
 
+  // "Just dropped from brands you follow" — real drops only: fetch the
+  // buyer's follow graph and the platform's currently-live drops, then
+  // intersect them client-side (no server change needed). Never shown if
+  // empty — this is a rail, not a placeholder.
+  const [justDroppedDrops, setJustDroppedDrops] = useState<FollowedDrop[]>([]);
+  useEffect(() => {
+    if (!isBuyerSurface) return;
+    let active = true;
+    Promise.all([
+      api.social.following().catch(() => []),
+      (api as any).publicDrops.list('live').catch(() => []),
+    ]).then(([followingRows, liveDrops]: [any[], any[]]) => {
+      if (!active) return;
+      setJustDroppedDrops(computeJustDroppedDrops(
+        Array.isArray(followingRows) ? followingRows : [],
+        Array.isArray(liveDrops) ? liveDrops : [],
+      ));
+    }).catch(() => { if (active) setJustDroppedDrops([]); });
+    return () => { active = false; };
+  }, [api, isBuyerSurface]);
+
   // Add engagement entries for newly loaded seller posts
   useEffect(() => {
     if (sellerFeedPosts.length === 0) return;
@@ -1911,21 +2056,83 @@ export default function FeedScreen({
     const previewPosts = __DEV__ && !isCreatorFeed && (buyerMode || showFashionPreview) && feedTab === 'for-you'
       ? FASHION_PREVIEW_POSTS
       : [];
-    const regular: (SpotlightItem | LiveStreamFeedItem)[] = [...previewPosts, ...sellerFeedPosts];
+    const regular: (SpotlightItem | LiveStreamFeedItem | JustDroppedRailItem)[] = [...previewPosts, ...sellerFeedPosts];
+    // A creator/product-scoped player shows only those videos — no live
+    // streams or rails woven in.
     if (isCreatorFeed || feedTab === 'following') return regular;
+    // Weave the "Just dropped" rail in once, early (index 2) — a real,
+    // non-video page in the same vertical pager the live-stream cards use.
+    if (isBuyerSurface && justDroppedDrops.length > 0) {
+      regular.splice(Math.min(2, regular.length), 0, { _isJustDropped: true, id: 'just-dropped-rail', drops: justDroppedDrops });
+    }
     if (!activeLiveStreams.length) return regular;
     // Weave live streams in: first at index 4, then every 10 after
-    const result: (SpotlightItem | LiveStreamFeedItem)[] = [...regular];
+    const result: (SpotlightItem | LiveStreamFeedItem | JustDroppedRailItem)[] = [...regular];
     activeLiveStreams.slice(0, 3).forEach((liveItem, i) => {
       const insertAt = Math.min(4 + i * 10, result.length);
       result.splice(insertAt, 0, liveItem);
     });
     return result;
-  }, [sellerFeedPosts, activeLiveStreams, buyerMode, feedTab, showFashionPreview, isCreatorFeed]);
+  }, [sellerFeedPosts, activeLiveStreams, buyerMode, feedTab, showFashionPreview, isBuyerSurface, justDroppedDrops, isCreatorFeed]);
+
+  // Every on-screen post's real engagement snapshot (server-backed likes/
+  // saves/reposts/liked-by-me/saved-by-me), keyed by id. `engagements` state
+  // is only populated lazily as posts are interacted with; before that, any
+  // fallback MUST read from here (not a zeroed DEFAULT_ENGAGEMENT) or a first
+  // tap on like/save/repost would optimistically count up from 0 and wipe
+  // out the real count that was already showing.
+  const itemsById = useMemo(() => {
+    const map = new Map<string, SpotlightItem>();
+    for (const item of allItems) {
+      if (!isLiveStreamItem(item) && !isJustDroppedItem(item)) map.set(item.id, item);
+    }
+    return map;
+  }, [allItems]);
+
+  const engagementFor = useCallback((id: string): EngagementState => {
+    const item = itemsById.get(id);
+    return item ? initialEngagement(item) : DEFAULT_ENGAGEMENT;
+  }, [itemsById]);
+
+  // Offline-safe retry: the optimistic engagement state above already
+  // updates instantly on every tap; this replays the actual persistence
+  // call once connectivity returns, for whichever like/save/repost/follow
+  // couldn't reach the server the first time. Re-registered whenever `api`
+  // changes identity so the executor always calls through the live client.
+  useEffect(() => {
+    setEngagementRetryExecutor(async (action) => {
+      switch (action.kind) {
+        case 'like':
+          await api.posts.interact(action.targetId, { type: 'like', value: action.payload?.value as string | undefined });
+          break;
+        case 'repost':
+          await api.posts.interact(action.targetId, { type: 'repost', value: action.payload?.value as string | undefined });
+          break;
+        case 'save':
+          if (action.payload?.value === 'remove') {
+            await api.buyer.saved.remove(action.targetId);
+          } else {
+            const item = itemsById.get(action.targetId);
+            const title = item?.caption?.trim() || `${item?.creator ?? 'Post'}'s post`;
+            await api.buyer.saved.save({ type: 'post', targetId: action.targetId, title, subtitle: item?.creator, accentColor: item?.accentColor });
+          }
+          break;
+        case 'follow':
+          await setSellerFollowing(action.targetId, action.payload?.value !== 'unfollow');
+          break;
+        case 'not_interested':
+          await api.posts.interact(action.targetId, { type: 'not_interested' });
+          break;
+      }
+    });
+    return () => setEngagementRetryExecutor(null);
+  }, [api, itemsById]);
+  useEffect(() => startEngagementRetryQueuePump(), []);
 
   // filteredContentItems: regular spotlight/live items after search filter
   const filteredContentItems = searchQuery.trim()
     ? allItems.filter(item => {
+        if (isJustDroppedItem(item)) return false;
         const q = searchQuery.toLowerCase();
         if (isLiveStreamItem(item)) {
           return (item.brandName ?? item.sellerName).toLowerCase().includes(q) ||
@@ -1981,14 +2188,14 @@ export default function FeedScreen({
 
   function update(id: string, patch: Partial<EngagementState> | ((e: EngagementState) => Partial<EngagementState>)) {
     setEngagements(prev => {
-      const cur = prev[id] ?? DEFAULT_ENGAGEMENT;
+      const cur = prev[id] ?? engagementFor(id);
       const delta = typeof patch === 'function' ? patch(cur) : patch;
       return { ...prev, [id]: { ...cur, ...delta } };
     });
   }
 
   const handleLike = useCallback(async (id: string): Promise<void> => {
-    const snapshot = engagements[id] ?? DEFAULT_ENGAGEMENT;
+    const snapshot = engagements[id] ?? engagementFor(id);
     const willLike = !snapshot.liked;
     // Optimistic update
     update(id, e => ({ liked: willLike, likes: willLike ? e.likes + 1 : Math.max(0, e.likes - 1) }));
@@ -1998,17 +2205,21 @@ export default function FeedScreen({
       try {
         const { api: _api } = require('@/lib/api');
         await _api.posts.interact(id, { type: 'like', value: willLike ? 'add' : 'remove' });
-      } catch {
-        // Rollback on failure
-        update(id, () => ({ liked: snapshot.liked, likes: snapshot.likes }));
-        showToast('Could not update like. Try again.', 'error');
+      } catch (error) {
+        if (isRetryableFailure(error)) {
+          // Offline/server outage — keep the optimistic state and replay once connectivity returns.
+          void enqueueEngagementRetry({ kind: 'like', targetId: id, payload: { value: willLike ? 'add' : 'remove' } });
+        } else {
+          update(id, () => ({ liked: snapshot.liked, likes: snapshot.likes }));
+          showToast('Could not update like. Try again.', 'error');
+        }
       }
     }
-  }, [engagements, showToast]);
+  }, [engagements, engagementFor, showToast]);
 
   const handleDoubleTapLike = useCallback((id: string) => {
     setEngagements(prev => {
-      const e = prev[id] ?? DEFAULT_ENGAGEMENT;
+      const e = prev[id] ?? engagementFor(id);
       if (e.liked) return prev;
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
       if (isUUID) {
@@ -2016,10 +2227,10 @@ export default function FeedScreen({
       }
       return { ...prev, [id]: { ...e, liked: true, likes: e.likes + 1 } };
     });
-  }, []);
+  }, [engagementFor]);
 
   const handleSave = useCallback(async (id: string): Promise<void> => {
-    const cur = engagements[id] ?? DEFAULT_ENGAGEMENT;
+    const cur = engagements[id] ?? engagementFor(id);
     const willSave = !cur.saved;
     const snapshot = { saved: cur.saved, saves: cur.saves };
     // Optimistic update
@@ -2029,17 +2240,26 @@ export default function FeedScreen({
       try {
         const { api: _api } = require('@/lib/api');
         if (willSave) {
-          await _api.saved.add({ targetId: id, targetType: 'post' });
+          // saved.save requires targetId + title (400 without one) — a post
+          // has no "title" field of its own, so fall back through caption
+          // then creator name the same way the saved-items list would want
+          // to display it.
+          const item = itemsById.get(id);
+          const title = item?.caption?.trim() || `${item?.creator ?? 'Post'}'s post`;
+          await _api.buyer.saved.save({ type: 'post', targetId: id, title, subtitle: item?.creator, accentColor: item?.accentColor });
         } else {
-          await _api.saved.remove(id);
+          await _api.buyer.saved.remove(id);
         }
-      } catch {
-        // Rollback
-        update(id, () => ({ saved: snapshot.saved, saves: snapshot.saves }));
-        showToast('Could not update save. Try again.', 'error');
+      } catch (error) {
+        if (isRetryableFailure(error)) {
+          void enqueueEngagementRetry({ kind: 'save', targetId: id, payload: { value: willSave ? 'add' : 'remove' } });
+        } else {
+          update(id, () => ({ saved: snapshot.saved, saves: snapshot.saves }));
+          showToast('Could not update save. Try again.', 'error');
+        }
       }
     }
-  }, [engagements, showToast]);
+  }, [engagements, engagementFor, itemsById, showToast]);
 
   const showRepostEducationOnce = useCallback(async () => {
     const key = `bt:repost-education:${userId ?? 'preview'}:v1`;
@@ -2056,7 +2276,7 @@ export default function FeedScreen({
   const handleRepost = useCallback(async (id: string): Promise<void> => {
     if (repostPendingRef.current.has(id)) return;
     repostPendingRef.current.add(id);
-    const snapshot = engagements[id] ?? DEFAULT_ENGAGEMENT;
+    const snapshot = engagements[id] ?? engagementFor(id);
     const willRepost = !snapshot.reposted;
     update(id, e => ({ reposted: willRepost, reposts: willRepost ? e.reposts + 1 : Math.max(0, e.reposts - 1) }));
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -2073,16 +2293,20 @@ export default function FeedScreen({
           }));
         }
         if (result.action === 'added') await showRepostEducationOnce();
-      } catch {
-        // Rollback
-        update(id, () => ({ reposted: snapshot.reposted, reposts: snapshot.reposts }));
-        showToast('Could not repost. Try again.', 'error');
+      } catch (error) {
+        if (isRetryableFailure(error)) {
+          void enqueueEngagementRetry({ kind: 'repost', targetId: id, payload: { value: willRepost ? undefined : 'remove' } });
+          if (willRepost) await showRepostEducationOnce();
+        } else {
+          update(id, () => ({ reposted: snapshot.reposted, reposts: snapshot.reposts }));
+          showToast('Could not repost. Try again.', 'error');
+        }
       }
     } else if (willRepost) {
       await showRepostEducationOnce();
     }
     repostPendingRef.current.delete(id);
-  }, [api, engagements, showRepostEducationOnce, showToast]);
+  }, [api, engagements, engagementFor, showRepostEducationOnce, showToast]);
 
   const handleFollow = useCallback(async (id: string): Promise<void> => {
     const item = sellerFeedPosts.find(post => post.id === id);
@@ -2105,7 +2329,11 @@ export default function FeedScreen({
           : engagement,
       ])));
       if (feedTab === 'following' && !state.isFollowing) void loadFeed();
-    } catch {
+    } catch (error) {
+      if (isRetryableFailure(error)) {
+        void enqueueEngagementRetry({ kind: 'follow', targetId: sellerId, payload: { value: wasFollowing ? 'unfollow' : undefined } });
+        return;
+      }
       // Rollback
       setEngagements(prev => Object.fromEntries(Object.entries(prev).map(([postId, engagement]) => [
         postId,
@@ -2116,6 +2344,20 @@ export default function FeedScreen({
       showToast('Could not update follow. Check your connection.', 'error');
     }
   }, [engagements, feedTab, loadFeed, sellerFeedPosts, showToast]);
+
+  // "Not interested" removes the post from this session's feed immediately
+  // (a real, visible effect — not just a toast) and records the signal so
+  // ranking can downweight similar posts going forward. Fire-and-forget:
+  // the post is already gone from the feed either way.
+  const handleNotInterested = useCallback((id: string) => {
+    setSellerFeedPosts(prev => prev.filter(post => post.id !== id));
+    if (/^[0-9a-f-]{36}$/i.test(id)) {
+      void api.posts.interact(id, { type: 'not_interested' }).catch((error) => {
+        if (isRetryableFailure(error)) void enqueueEngagementRetry({ kind: 'not_interested', targetId: id });
+      });
+    }
+    showToast('We’ll show you fewer posts like this.', 'info');
+  }, [api, showToast]);
 
   useEffect(() => {
     const sellerIds = [...new Set(sellerFeedPosts.map(post => post.sellerId).filter((id): id is string => !!id))];
@@ -2138,17 +2380,14 @@ export default function FeedScreen({
 
   function handleOpenComments(id: string) {
     const item = allItems.find(i => i.id === id);
-    if (!item || isLiveStreamItem(item)) return;
-    const videoSource = item.videoSource;
-    const videoUri = item.contentType === 'video'
-      ? (
-        typeof videoSource === 'number'
-          ? Asset.fromModule(videoSource).uri
-          : typeof videoSource === 'string'
-            ? videoSource
-            : videoSource?.uri ?? item.mediaUris[0] ?? ''
-      )
-      : item.mediaUris[0] ?? '';
+    if (!item || isLiveStreamItem(item) || isJustDroppedItem(item)) return;
+    // item.mediaUris[0] is already the fully-resolved, playable URI for both
+    // real posts (server URL) and preview posts (FASHION_PREVIEW_VIDEO_URIS,
+    // itself built via Asset.fromModule) — re-deriving it here from
+    // item.videoSource duplicated that resolution with a narrower set of
+    // cases and could disagree with what the feed itself is actually
+    // playing, leaving the comments sheet's backdrop with a broken source.
+    const videoUri = item.mediaUris[0] ?? '';
     const qs = [
       'postId=' + encodeURIComponent(item.id),
       'postAuthorId=' + encodeURIComponent(item.sellerId ?? ''),
@@ -2187,6 +2426,20 @@ export default function FeedScreen({
       setActiveIndex(viewableItems[0].index);
     }
   }).current;
+
+  // Prefetch the next 2 posts' poster images so the placeholder is already
+  // decoded by the time a swipe reaches them — the video players themselves
+  // are already buffering ahead of time via the FlatList's windowSize, but
+  // the poster (what actually covers the screen until playback starts) was
+  // only ever requested once its own cell mounted.
+  useEffect(() => {
+    for (let i = activeIndex + 1; i <= activeIndex + 2; i++) {
+      const next = displayItems[i];
+      if (!next || !('contentType' in next)) continue;
+      const uri = next.videoPosterUri ?? (next.contentType !== 'video' ? next.mediaUris[0] : undefined);
+      if (uri) ExpoImage.prefetch(uri).catch(() => {});
+    }
+  }, [activeIndex, displayItems]);
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
   // Buyer Home plays edge to edge behind the floating tab bar, so every
@@ -2301,6 +2554,21 @@ export default function FeedScreen({
           if (isDemandPageItem(item as FeedItem)) {
             return <BuyerHighDemandPage pageWidth={pageWidth} pageHeight={pageHeight} bottomClearance={bottomClearance} topInset={buyerHeaderHeight} />;
           }
+          if (isJustDroppedItem(item)) {
+            return (
+              <JustDroppedRailPage
+                drops={item.drops}
+                pageWidth={pageWidth}
+                pageHeight={pageHeight}
+                bottomClearance={bottomClearance}
+                onOpenDrop={(drop) => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push(`/buyer-drop-detail?dropId=${encodeURIComponent(drop.id)}&dropName=${encodeURIComponent(drop.name)}` as never);
+                }}
+                onSeeAll={() => router.push('/(tabs)/following' as never)}
+              />
+            );
+          }
           if ((item as any)._isLive) {
             const live = item as unknown as LiveStreamFeedItem;
             return (
@@ -2339,10 +2607,31 @@ export default function FeedScreen({
               onFollow={handleFollow}
               onOpenComments={handleOpenComments}
               onShopTag={handleShopTag}
+              onNotInterested={handleNotInterested}
+              soundOn={soundOn}
+              onToggleSound={toggleSound}
             />
           );
         }}
       />}
+
+      {/* ─ Legibility scrims: fixed overlay above the list (not per-cell), so
+          they stay put while the video underneath swipes past. ─ */}
+      {isBuyerSurface && (
+        <>
+          <LinearGradient
+            pointerEvents="none"
+            colors={['rgba(0,0,0,0.42)', 'rgba(0,0,0,0)']}
+            style={[styles.topScrim, { height: insets.top + 120 }]}
+          />
+          <LinearGradient
+            pointerEvents="none"
+            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.28)', 'rgba(0,0,0,0.62)']}
+            locations={[0, 0.45, 1]}
+            style={[styles.bottomScrim, { height: bottomClearance + 240 }]}
+          />
+        </>
+      )}
 
       {/* ─ Top bar overlay ─ */}
       {isCreatorFeed ? (

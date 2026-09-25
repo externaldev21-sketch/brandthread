@@ -103,7 +103,7 @@ describe('loadVideoFeedThrough — the player opens at the tapped video', () => 
   it('reads product-scoped videos from the product endpoint', async () => {
     serviceRequestMock.mockResolvedValueOnce({ total: 1, hasMore: false, videos: [row('a')] });
     await loadVideoFeedThrough('product', 'prod-1', 'a');
-    expect(serviceRequestMock.mock.calls[0][0]).toBe('/api/public/products/prod-1/videos?limit=30&offset=0');
+    expect(serviceRequestMock.mock.calls[0][0]).toBe('/api/public/products/prod-1/feed-videos?limit=30&offset=0');
   });
 
   it('falls back to the first video when the id is unknown, without looping forever', async () => {

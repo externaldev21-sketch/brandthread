@@ -1,5 +1,5 @@
 /**
- * GET /api/public/users/:userId/videos, GET /api/public/products/:id/videos,
+ * GET /api/public/users/:userId/videos, GET /api/public/products/:id/feed-videos,
  * and the profile-facing extensions of the public catalog
  * (/products?ownerId=<users.id alias>, /sellers/:id productsCount/videosCount).
  */
@@ -183,9 +183,9 @@ describe("GET /api/public/users/:userId/videos", () => {
   });
 });
 
-describe("GET /api/public/products/:productId/videos", () => {
+describe("GET /api/public/products/:productId/feed-videos", () => {
   it("returns the public videos that tag the product", async () => {
-    const response = await get(`/api/public/products/${productId}/videos`);
+    const response = await get(`/api/public/products/${productId}/feed-videos`);
     expect(response.status).toBe(200);
     const body = await response.json() as any;
     expect(body.total).toBe(1);
@@ -193,7 +193,7 @@ describe("GET /api/public/products/:productId/videos", () => {
   });
 
   it("404s a malformed product id", async () => {
-    expect((await get(`/api/public/products/not-a-uuid/videos`)).status).toBe(404);
+    expect((await get(`/api/public/products/not-a-uuid/feed-videos`)).status).toBe(404);
   });
 });
 

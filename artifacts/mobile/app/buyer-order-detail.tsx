@@ -975,7 +975,7 @@ export default function BuyerOrderDetailScreen() {
             <View style={{ flexDirection: 'row', gap: SP.sm, marginTop: SP.sm, flexWrap: 'wrap' }}>
               {order.trackingCarrier && (
                 <View style={styles.carrierChip}>
-                  <Text style={styles.carrierChipText}>{order.trackingCarrier}</Text>
+                  <Text style={styles.carrierChipText} numberOfLines={1}>{order.trackingCarrier}</Text>
                 </View>
               )}
               {order.trackingStatus && (

@@ -19,7 +19,7 @@
  *   │ ▯▯▯  9:16 video grid         │
  *   └──────────( Shop 12 products )┘  optional floating CTA
  *
- * On desktop web the whole shell sits in a centered app column.
+ * On desktop web it fills the global WebAppShell column (components/web).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -108,7 +108,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const layout = useProfileLayout();
-  const { heroHeight, columnWidth, isDesktopWeb } = layout;
+  const { heroHeight, columnWidth } = layout;
 
   const scrollY = useRef(new Animated.Value(0)).current;
   const [heroOnScreen, setHeroOnScreen] = useState(true);
@@ -264,7 +264,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
 
   return (
     <View style={[styles.root]} testID={testID}>
-      <View style={[styles.column, { width: columnWidth }, isDesktopWeb && styles.desktopColumn]}>
+      <View style={[styles.column, { width: columnWidth }]}>
         <AnimatedFlatList
           key={listKey}
           data={data}
@@ -334,9 +334,6 @@ function makeStyles(theme: AppThemePreset) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: theme.background, alignItems: 'center' },
     column: { flex: 1, backgroundColor: theme.background },
-    desktopColumn: {
-      borderLeftWidth: StyleSheet.hairlineWidth, borderRightWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
-    },
     hero: { width: '100%', overflow: 'hidden', justifyContent: 'flex-end', backgroundColor: theme.card },
     topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
     identity: {

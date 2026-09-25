@@ -218,6 +218,18 @@ export async function getMyPosts(k: SocialKeys = K()): Promise<BuyerPost[]> {
   );
   return Array.isArray(remote) ? remote : [];
 }
+/** A single post by id, regardless of author — for opening a specific post
+ *  (e.g. from Saved or a Collection) without already knowing who wrote it.
+ *  Returns null if it doesn't exist, isn't visible, or isn't shared with the
+ *  viewer (posts are friends-only unless they're the viewer's own). */
+export async function getPostById(postId: string, k: SocialKeys = K()): Promise<BuyerPost | null> {
+  if (k.userId === 'anon' || !postId) return null;
+  try {
+    return await serviceRequest<BuyerPost>(`/api/social/posts/${encodeURIComponent(postId)}`);
+  } catch {
+    return null;
+  }
+}
 export async function createPost(params: {
   type: BuyerPost['type'];
   caption: string;
@@ -1559,6 +1571,41 @@ export async function getThreadPostsPage(
     cursor: next,
     hasMore: !next.followedDone || !next.generalDone,
   };
+}
+
+/**
+ * Buyer's personalized For You ranking (GET /api/feed/for-you) — additive,
+ * does not replace `getThreadPostsPage`'s existing 'for-you'/'mixed' modes
+ * (those keep their current offset-paginated /api/public/posts behavior).
+ * Screens can opt into this real ranked feed independently. Live items in
+ * the response are passed through as-is (`kind: 'live'`) since they have no
+ * post shape to map through `mapApiPostToSellerThreadPost`.
+ */
+export type ForYouFeedEntry =
+  | { kind: 'post'; post: SellerThreadPost }
+  | { kind: 'live'; liveStreamId: string; sellerId: string; title: string; thumbnailUrl: string | null; viewerCount: number };
+
+export async function getForYouFeedPage(
+  offset = 0,
+  limit = 20,
+): Promise<{ entries: ForYouFeedEntry[]; nextOffset: number | null }> {
+  const response = await serviceRequest<{ items: any[]; nextOffset: number | null }>(
+    `/api/feed/for-you?limit=${limit}&offset=${offset}`,
+  );
+  const entries: ForYouFeedEntry[] = (response.items ?? []).map((item, index) => {
+    if (item?.type === 'live') {
+      return {
+        kind: 'live',
+        liveStreamId: item.liveStreamId,
+        sellerId: item.sellerId,
+        title: item.title,
+        thumbnailUrl: item.thumbnailUrl ?? null,
+        viewerCount: item.viewerCount ?? 0,
+      };
+    }
+    return { kind: 'post', post: mapApiPostToSellerThreadPost(item, index) };
+  });
+  return { entries, nextOffset: response.nextOffset ?? null };
 }
 
 export function createThreadFeedCursor(): ThreadFeedCursor {

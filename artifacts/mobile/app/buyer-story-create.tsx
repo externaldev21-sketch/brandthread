@@ -515,7 +515,7 @@ export default function BuyerStoryCreate() {
               accessibilityLabel={taggedProduct ? `Tagged product: ${taggedProduct.name}` : 'Tag a product'}
             >
               <Feather name="shopping-bag" size={ICON.sm} color={ON_DARK} />
-              <Text style={styles.toolbarBtnText}>{taggedProduct ? taggedProduct.name : 'Tag product'}</Text>
+              <Text style={styles.toolbarBtnText} numberOfLines={1}>{taggedProduct ? taggedProduct.name : 'Tag product'}</Text>
               {taggedProduct && (
                 <Pressable
                   onPress={() => { hapticLight(); setTaggedProduct(null); }}
