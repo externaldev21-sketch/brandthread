@@ -393,6 +393,11 @@ function AuthGate() {
       clearSocialCache().catch(() => {});
       clearCartCache().catch(() => {});
       setActiveSeller(false);
+      // These onboarding-in-progress flags (see app/onboarding.tsx) are
+      // device-scoped, not per-account, so a half-finished attempt from the
+      // account that just signed out must not leak into the next sign-up on
+      // this device (e.g. a different friend using the same phone/Expo Go).
+      AsyncStorage.multiRemove(['onboarding_pending_flow', 'onboarding_pending_username']).catch(() => {});
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignedIn, isLoaded]);
