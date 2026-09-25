@@ -16,8 +16,10 @@ import { Keyboard, Platform, Pressable, Text, View, StatusBar } from 'react-nati
 import { LinearGradient } from 'expo-linear-gradient';
 import * as SystemUI from 'expo-system-ui';
 import * as NavigationBar from 'expo-navigation-bar';
-import { Stack, useGlobalSearchParams, useRootNavigationState, useRouter, useSegments } from 'expo-router';
-import { DarkTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
+import {
+  DarkTheme, Stack, ThemeProvider as NavigationThemeProvider,
+  useGlobalSearchParams, useRootNavigationState, useRouter, useSegments,
+} from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useUser } from '@clerk/expo';
 import { tokenCache } from '@/lib/tokenCache';
