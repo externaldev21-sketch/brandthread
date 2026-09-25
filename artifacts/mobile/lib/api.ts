@@ -464,6 +464,110 @@ export interface AdCampaignCheckoutSession {
   status: AdCampaignStatus;
 }
 
+// ─── Meta (Facebook & Instagram) Ads ──────────────────────────────────────────
+
+export type MetaAdsConnectionStatus = 'pending_selection' | 'connected' | 'needs_reauth' | 'disconnected';
+
+export interface MetaAdsConnection {
+  connected: boolean;
+  status?: MetaAdsConnectionStatus;
+  businessName?: string;
+  adAccountName?: string;
+  adAccountCurrency?: string;
+  pageName?: string;
+  instagramUsername?: string;
+  tokenExpiresAt?: string;
+}
+
+export interface MetaBusiness { id: string; name: string; }
+export interface MetaAdAccount { id: string; name: string; currency: string; accountStatus: string; }
+export interface MetaPage {
+  id: string;
+  name: string;
+  instagramBusinessAccount?: { id: string; username: string };
+}
+
+export interface MetaTargetingResult {
+  id: string;
+  name: string;
+  audienceSizeLower?: number;
+  audienceSizeUpper?: number;
+}
+
+export type MetaAdObjective = 'sales' | 'traffic' | 'awareness';
+export type MetaAdCtaType = 'SHOP_NOW' | 'LEARN_MORE' | 'SIGN_UP' | string;
+export type MetaAdPromoteKind = 'product' | 'store' | 'video';
+export type MetaCampaignStatus =
+  | 'draft' | 'launching' | 'in_review' | 'active' | 'paused'
+  | 'rejected' | 'completed' | 'failed' | 'archived';
+
+export interface MetaTargetingSpec {
+  countries?: string[];
+  ageMin?: number;
+  ageMax?: number;
+  genders?: string[];
+  interests?: { id: string; name: string }[];
+}
+
+export interface MetaCampaign {
+  id: string;
+  sellerId: string;
+  promoteKind: MetaAdPromoteKind;
+  promoteRefId: string | null;
+  objective: MetaAdObjective;
+  primaryText: string | null;
+  headline: string | null;
+  ctaType: MetaAdCtaType | null;
+  destinationUrl: string;
+  mediaKind: 'video' | 'photos';
+  mediaObjectPaths: string[];
+  budgetType: 'daily' | 'lifetime';
+  budgetCents: number;
+  startTime: string | null;
+  endTime: string | null;
+  advantagePlus: boolean;
+  placements: Record<string, unknown> | null;
+  targetingSpec: MetaTargetingSpec | null;
+  status: MetaCampaignStatus;
+  rejectionReason: string | null;
+  metaAdId: string | null;
+  launchedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MetaCampaignInsights {
+  spendCents: number;
+  impressions: number;
+  reach: number;
+  clicks: number;
+  ctr: number;
+  cpcCents: number;
+  purchases: number;
+  purchaseValueCents: number;
+  roas: number;
+  fetchedAt: string;
+}
+
+export interface MetaCampaignDraftInput {
+  promoteKind: MetaAdPromoteKind;
+  promoteRefId?: string;
+  objective: MetaAdObjective;
+  primaryText?: string;
+  headline?: string;
+  ctaType?: MetaAdCtaType;
+  destinationUrl: string;
+  mediaKind: 'video' | 'photos';
+  mediaObjectPaths: string[];
+  budgetType: 'daily' | 'lifetime';
+  budgetCents: number;
+  startTime?: string;
+  endTime?: string;
+  advantagePlus?: boolean;
+  placements?: Record<string, unknown>;
+  targetingSpec?: MetaTargetingSpec;
+}
+
 export interface Freelancer {
   id: string;
   userId: string;
@@ -2251,6 +2355,81 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           `/api/ad-campaigns/${encodeURIComponent(id)}/pay/verify`,
           {},
         ),
+    },
+    /**
+     * Meta (Facebook & Instagram) Ads — OAuth connection, campaign builder,
+     * and lifecycle. Meta bills the seller's ad account directly; Brandthread
+     * never touches ad spend here (unlike adCampaigns' Stripe-funded boosts).
+     */
+    metaAds: {
+      /** Current connection state — call before showing any Meta Ads screen. */
+      connection: () =>
+        get<MetaAdsConnection>('/api/meta-ads/connection'),
+      /** Returns the Meta OAuth URL to open with WebBrowser.openAuthSessionAsync. */
+      oauthStart: () =>
+        get<{ authUrl: string }>('/api/meta-ads/oauth/start'),
+      /** Meta Business Manager businesses available to the connected user. */
+      businesses: () =>
+        get<{ businesses: MetaBusiness[] }>('/api/meta-ads/businesses'),
+      /** Ad accounts under a given business. */
+      adAccounts: (businessId: string) =>
+        get<{ adAccounts: MetaAdAccount[] }>(`/api/meta-ads/businesses/${encodeURIComponent(businessId)}/ad-accounts`),
+      /** Facebook Pages (with linked Instagram account, when present) under a business. */
+      pages: (businessId: string) =>
+        get<{ pages: MetaPage[] }>(`/api/meta-ads/businesses/${encodeURIComponent(businessId)}/pages`),
+      /** Finalize the connection by selecting business / ad account / page. */
+      selectConnection: (body: {
+        businessId: string; businessName: string;
+        adAccountId: string; adAccountName: string; adAccountCurrency: string;
+        pageId: string; pageName: string;
+        instagramActorId?: string; instagramUsername?: string;
+      }) =>
+        post<MetaAdsConnection>('/api/meta-ads/connection/select', body),
+      /** Disconnect Meta entirely — the seller must re-run OAuth to reconnect. */
+      disconnect: () =>
+        del<{ ok: boolean }>('/api/meta-ads/connection'),
+      /** Interest/audience search for targeting (e.g. type='adinterest'). */
+      targetingSearch: (q: string, type: string = 'adinterest') =>
+        get<{ results: MetaTargetingResult[] }>(`/api/meta-ads/targeting-search?q=${encodeURIComponent(q)}&type=${encodeURIComponent(type)}`),
+      /** Create a campaign draft. Returns the draft plus an estimated reach range. */
+      createCampaign: (body: MetaCampaignDraftInput) =>
+        post<{ campaign: MetaCampaign; estimatedReach: { low: number; high: number } }>('/api/meta-ads/campaigns', body),
+      /** Update the editable subset of a draft (or a rejected campaign being fixed). */
+      updateCampaign: (id: string, body: Partial<MetaCampaignDraftInput>) =>
+        patch<{ campaign: MetaCampaign }>(`/api/meta-ads/campaigns/${encodeURIComponent(id)}`, body),
+      /** Rendered ad preview HTML (one per placement) for a WebView. */
+      preview: (id: string) =>
+        get<{ previews: { html: string }[] }>(`/api/meta-ads/campaigns/${encodeURIComponent(id)}/preview`),
+      /** Submits the campaign to Meta. On failure the server returns a plain-English `error`. */
+      launch: (id: string) =>
+        post<{ status: 'in_review'; metaAdId: string }>(`/api/meta-ads/campaigns/${encodeURIComponent(id)}/launch`, {}),
+      list: () =>
+        get<{ campaigns: (MetaCampaign & { insights?: MetaCampaignInsights })[] }>('/api/meta-ads/campaigns'),
+      get: (id: string) =>
+        get<{ campaign: MetaCampaign; insights?: MetaCampaignInsights }>(`/api/meta-ads/campaigns/${encodeURIComponent(id)}`),
+      refreshInsights: (id: string) =>
+        post<{ insights: MetaCampaignInsights }>(`/api/meta-ads/campaigns/${encodeURIComponent(id)}/refresh-insights`, {}),
+      pause: (id: string) =>
+        post<{ campaign: MetaCampaign }>(`/api/meta-ads/campaigns/${encodeURIComponent(id)}/pause`, {}),
+      resume: (id: string) =>
+        post<{ campaign: MetaCampaign }>(`/api/meta-ads/campaigns/${encodeURIComponent(id)}/resume`, {}),
+      duplicate: (id: string) =>
+        post<{ campaign: MetaCampaign }>(`/api/meta-ads/campaigns/${encodeURIComponent(id)}/duplicate`, {}),
+      /**
+       * Fire-and-forget server-side Conversions API relay, paired with the
+       * client-side pixel event using the same eventId for Meta's dedup.
+       * Called via services/metaAdsService.ts / lib/marketingPixels.ts — not
+       * meant to block any UI.
+       */
+      conversionEvent: (body: {
+        eventId: string;
+        eventName: 'ViewContent' | 'AddToCart' | 'InitiateCheckout' | 'Purchase';
+        occurredAt: string;
+        productId?: string;
+        valueCents?: number;
+        currency?: string;
+      }) =>
+        post<{ ok: boolean }>('/api/meta-ads/conversion-events', body),
     },
     /** Buyer loyalty / rewards points. */
     loyalty: {

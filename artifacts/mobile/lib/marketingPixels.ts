@@ -1,4 +1,6 @@
 import { Platform } from 'react-native';
+import { randomUUID } from 'expo-crypto';
+import { api } from '@/lib/api';
 
 export type MarketingPixelEvent =
   | 'PageView'
@@ -156,16 +158,60 @@ export function trackMarketingPixelEvent(
   event: MarketingPixelEvent,
   properties: Record<string, unknown> = {},
   config = configuredPixels(),
+  /**
+   * Meta's pixel dedup id — passed as the 4th positional arg to fbq('track', …),
+   * NOT folded into `properties`. Pairs with the server-side Conversions API
+   * call carrying the same id (see trackAndRelayConversionEvent below).
+   */
+  eventId?: string,
 ): boolean {
   if (!consentGranted || !initialized || !ALLOWED_EVENTS.has(event) || Platform.OS !== 'web' || typeof window === 'undefined') {
     return false;
   }
   const win = window as PixelWindow;
-  if (config.metaPixelId) win.fbq?.('track', event, properties);
+  if (config.metaPixelId) {
+    if (eventId) win.fbq?.('track', event, properties, { eventID: eventId });
+    else win.fbq?.('track', event, properties);
+  }
   if (config.tiktokPixelId) {
     if (event === 'PageView') win.ttq?.page?.();
     else win.ttq?.track?.(event, properties);
   }
+  return true;
+}
+
+/** Whether marketing consent is currently granted (mirrors useCanUseMarketing()'s
+ *  value, as last applied via setMarketingPixelConsent). Non-web platforms never
+ *  set this — the cookie-consent banner and this whole pixel layer are web-only. */
+export function isMarketingPixelConsentGranted(): boolean {
+  return consentGranted;
+}
+
+export type ConversionEvent = 'ViewContent' | 'AddToCart' | 'InitiateCheckout' | 'Purchase';
+
+/**
+ * Fires the client-side pixel event AND relays the same event, with the same
+ * eventId, to the server's Conversions API endpoint for Meta's dedup — per
+ * Meta's guidance (send the same event_id from both the browser pixel and the
+ * server-side CAPI call). The server relay is fire-and-forget: it never blocks
+ * or throws into the caller, and is skipped entirely without marketing consent.
+ */
+export function trackAndRelayConversionEvent(
+  event: ConversionEvent,
+  properties: Record<string, unknown> = {},
+  relay: { eventId?: string; productId?: string; valueCents?: number; currency?: string } = {},
+): boolean {
+  if (!consentGranted) return false;
+  const eventId = relay.eventId ?? randomUUID();
+  trackMarketingPixelEvent(event, properties, configuredPixels(), eventId);
+  void api.metaAds.conversionEvent({
+    eventId,
+    eventName: event,
+    occurredAt: new Date().toISOString(),
+    productId: relay.productId,
+    valueCents: relay.valueCents,
+    currency: relay.currency,
+  }).catch(() => { /* fire-and-forget — never block the UI on this */ });
   return true;
 }
 
