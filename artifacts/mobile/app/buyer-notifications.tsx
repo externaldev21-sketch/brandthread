@@ -16,7 +16,8 @@ import {
 } from '@/services/socialService';
 import type { Notification, NotificationCategory } from '@/services/socialTypes';
 import { BrandedLoadingState, EmptyState, PressableScale, ThreadDivider } from '@/components/BrandthreadUI';
-import { BottomSheet, IconButton, ListRow } from '@/components/ui';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { BottomSheet, Chip, ListRow } from '@/components/ui';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -378,7 +379,7 @@ export default function BuyerNotifications() {
         <PressableScale
           style={[
             styles.notifRow,
-            { backgroundColor: theme.background },
+            { backgroundColor: theme.background, borderBottomColor: theme.border },
             !notif.isRead && {
               backgroundColor: theme.card,
               borderLeftWidth: 2,
@@ -434,22 +435,12 @@ export default function BuyerNotifications() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* HEADER */}
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <IconButton
-          name="arrow-left"
-          onPress={() => router.back()}
-          accessibilityLabel="Back"
-          style={styles.backBtn}
-        />
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Notifications</Text>
-        {hasRead && (
-          <PressableScale onPress={handleClearRead} accessibilityRole="button" accessibilityLabel="Clear read notifications">
-            <Text style={[styles.clearReadText, { color: theme.muted }]}>Clear read</Text>
-          </PressableScale>
-        )}
-      </View>
+      <ScreenHeader
+        title="Notifications"
+        actions={hasRead ? [{ icon: 'trash-2', onPress: handleClearRead, accessibilityLabel: 'Clear read notifications' }] : undefined}
+      />
 
       {/* CATEGORY PILLS */}
       <ScrollView
@@ -461,28 +452,12 @@ export default function BuyerNotifications() {
         {PILLS.map(pill => {
           const active = selectedCategory === pill.value;
           return (
-            <PressableScale
+            <Chip
               key={pill.label}
-              style={[
-                styles.pill,
-                active
-                  ? { backgroundColor: theme.accentDim, borderColor: theme.accent }
-                  : { backgroundColor: theme.card, borderColor: theme.border },
-              ]}
-              onPress={() => { hapticToggle(); setSelectedCategory(pill.value); }}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
-              accessibilityLabel={pill.label}
-            >
-              <Text
-                style={[
-                  styles.pillText,
-                  { color: active ? theme.accent : theme.muted },
-                ]}
-              >
-                {pill.label}
-              </Text>
-            </PressableScale>
+              label={pill.label}
+              selected={active}
+              onPress={() => setSelectedCategory(pill.value)}
+            />
           );
         })}
       </ScrollView>
@@ -551,25 +526,6 @@ const makeStyles = () => StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: SPACING.sm,
-  },
-  backBtn: {
-    marginRight: 0,
-  },
-  headerTitle: {
-    flex: 1,
-    ...TYPE_SCALE.headline,
-    fontFamily: FONT.bold,
-  },
-  clearReadText: {
-    ...TYPE_SCALE.footnote,
-  },
   pillsScroll: {
     flexGrow: 0,
     // flexShrink defaults to 1, so a sibling flex:1 element (the loading
@@ -583,17 +539,6 @@ const makeStyles = () => StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     gap: SPACING.sm,
-  },
-  pill: {
-    borderRadius: RADII.pill,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-    borderWidth: 1,
-    marginRight: SPACING.sm,
-  },
-  pillText: {
-    ...TYPE_SCALE.footnote,
-    fontFamily: FONT.medium,
   },
   unreadBar: {
     paddingHorizontal: SPACING.md,

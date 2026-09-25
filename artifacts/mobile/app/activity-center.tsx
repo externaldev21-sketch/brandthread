@@ -34,14 +34,15 @@ import { useUser } from '@clerk/expo';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
 import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
-import { Header, EmptyState, SkeletonBlock } from '@/components/layout';
+import { EmptyState, SkeletonBlock } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { CachedImage } from '@/components/CachedImage';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { ThemedRefreshControl } from '@/components/ui';
+import { Chip, ThemedRefreshControl } from '@/components/ui';
 import SwipeActionRow from '@/components/SwipeActionRow';
 import { useApi } from '@/lib/api';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
-import { hapticPrimaryAction, hapticSuccessAction, hapticToggle } from '@/lib/haptics';
+import { hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
 import {
   ACTIVITY_FILTERS,
   ACTIVITY_PAGE_SIZE,
@@ -342,8 +343,8 @@ export default function ActivityCenterScreen() {
   }, [loadFirstPage]));
 
   const changeFilter = useCallback((next: ActivityFilter) => {
+    // Chip already fires a selection haptic on tap.
     if (next === filter) return;
-    hapticToggle();
     setItems([]);
     setHasMore(true);
     setStatus('loading');
@@ -480,7 +481,7 @@ export default function ActivityCenterScreen() {
 
   return (
     <View style={styles.container}>
-      <Header
+      <ScreenHeader
         title="Activity"
         actions={hasUnread ? [{
           icon: 'check-circle',
@@ -496,22 +497,14 @@ export default function ActivityCenterScreen() {
         contentContainerStyle={styles.chipRow}
         accessibilityRole="tablist"
       >
-        {ACTIVITY_FILTERS.map((chip) => {
-          const active = chip.key === filter;
-          return (
-            <PressableScale
-              key={chip.key}
-              style={[styles.chip, active && styles.chipActive]}
-              onPress={() => changeFilter(chip.key)}
-              accessibilityRole="tab"
-              accessibilityLabel={chip.label}
-              accessibilityState={{ selected: active }}
-              hitSlop={{ top: 6, bottom: 6 }}
-            >
-              <Text style={[styles.chipText, active && styles.chipTextActive]}>{chip.label}</Text>
-            </PressableScale>
-          );
-        })}
+        {ACTIVITY_FILTERS.map((chip) => (
+          <Chip
+            key={chip.key}
+            label={chip.label}
+            selected={chip.key === filter}
+            onPress={() => changeFilter(chip.key)}
+          />
+        ))}
       </ScrollView>
 
       {status === 'loading' ? (
@@ -586,23 +579,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     gap: SP.xs,
     alignItems: 'center',
   },
-  chip: {
-    paddingHorizontal: SP.sm + 4,
-    paddingVertical: SP.xs + 2,
-    borderRadius: RADIUS.pill,
-  },
-  chipActive: {
-    backgroundColor: theme.card,
-  },
-  chipText: {
-    color: theme.subtle,
-    fontFamily: FONT.medium,
-    fontSize: FS.sm,
-  },
-  chipTextActive: {
-    color: theme.text,
-  },
-
   listContent: {
     paddingTop: SP.xs,
   },

@@ -4,7 +4,7 @@
  * which scope the key by the current Clerk user ID so accounts never share the list.
  */
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -16,10 +16,10 @@ import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { hapticToggle, hapticSuccessAction } from '@/lib/haptics';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { Avatar, StickyBottomCTA } from '@/components/ui';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { ListRow, StickyBottomCTA } from '@/components/ui';
 import { getAcceptedFriends, getCloseFriendIds, saveCloseFriendIds } from '@/services/socialService';
 import type { Friendship } from '@/services/socialTypes';
-import { Header } from '@/components/layout';
 
 export default function BuyerCloseFriends() {
   const colors = useColors();
@@ -69,28 +69,31 @@ export default function BuyerCloseFriends() {
   function renderFriend({ item }: { item: Friendship }) {
     const isCF = closeFriends.has(item.userId);
     return (
-      <PressableScale
-        style={s.row}
+      <ListRow
+        avatar={{ name: item.name }}
+        title={item.name}
+        subtitle={item.handle}
         onPress={() => toggle(item.userId)}
-        accessibilityRole="button"
-        accessibilityLabel={`${item.name}, ${item.handle}`}
-        accessibilityState={{ selected: isCF }}
-      >
-        <Avatar name={item.name} size={40} />
-        <View style={{ flex: 1 }}>
-          <Text style={s.name} numberOfLines={1}>{item.name}</Text>
-          <Text style={s.handle} numberOfLines={1}>{item.handle}</Text>
-        </View>
-        <View style={[s.radio, isCF && s.radioActive]}>
-          {isCF && <Feather name="star" size={14} color={theme.onAccent} />}
-        </View>
-      </PressableScale>
+        right={(
+          <Pressable
+            onPress={() => toggle(item.userId)}
+            accessibilityRole="button"
+            accessibilityLabel={isCF ? `Remove ${item.name} from close friends` : `Add ${item.name} to close friends`}
+            accessibilityState={{ selected: isCF }}
+            hitSlop={8}
+          >
+            <View style={[s.radio, isCF && s.radioActive]}>
+              {isCF && <Feather name="star" size={14} color={theme.onAccent} />}
+            </View>
+          </Pressable>
+        )}
+      />
     );
   }
 
   return (
     <View style={s.page}>
-      <Header title="Close friends" />
+      <ScreenHeader title="Close friends" />
 
       {/* Info banner */}
       <View style={s.banner}>
@@ -147,7 +150,8 @@ export default function BuyerCloseFriends() {
         ItemSeparatorComponent={() => <View style={s.separator} />}
       />
 
-      <StickyBottomCTA label="Save" onPress={handleSave} loading={saving} />
+      {/* Save */}
+      <StickyBottomCTA label="Save" onPress={() => { void handleSave(); }} loading={saving} />
     </View>
   );
 }
@@ -167,14 +171,11 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   },
   searchInput: { flex: 1, color: colors.foreground, ...TYPE_SCALE.body },
   countBadge: { ...TYPE_SCALE.caption, color: colors.primary, paddingHorizontal: SPACING.md, marginBottom: SPACING.xxs },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 12 },
-  name: { fontFamily: FONT.semibold, color: colors.foreground, ...TYPE_SCALE.body },
-  handle: { ...TYPE_SCALE.footnote, color: colors.mutedForeground, marginTop: 2 },
   radio: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   radioActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 56 },
+  separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 52 },
   empty: { alignItems: 'center', paddingVertical: SPACING.xxl, gap: SPACING.sm },
-  emptyTitle: { fontFamily: FONT.semibold, ...TYPE_SCALE.headline, color: colors.foreground },
+  emptyTitle: { ...TYPE_SCALE.headline, color: colors.foreground },
   emptyDesc: { ...TYPE_SCALE.footnote, color: colors.mutedForeground, textAlign: 'center', maxWidth: 240 },
   findFriendsBtn: {
     marginTop: SPACING.xs, paddingHorizontal: SPACING.xl, paddingVertical: SPACING.sm,

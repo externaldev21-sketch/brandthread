@@ -15,6 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { getBuyerProduct } from '@/services/cartService';
@@ -98,12 +99,7 @@ export function VariantPickerSheet({
         {loading ? (
           <View style={s.centerBox}><ActivityIndicator color={theme.accent} /></View>
         ) : error ? (
-          <View style={s.centerBox}>
-            <Text style={{ color: theme.error, marginBottom: SP.sm }}>{error}</Text>
-            <TouchableOpacity onPress={load} accessibilityRole="button" accessibilityLabel="Retry">
-              <Text style={{ color: theme.accent, fontFamily: FONT.semibold }}>Retry</Text>
-            </TouchableOpacity>
-          </View>
+          <ErrorState message={error || undefined} onRetry={load} />
         ) : product ? (
           <>
             <View style={s.productRow}>

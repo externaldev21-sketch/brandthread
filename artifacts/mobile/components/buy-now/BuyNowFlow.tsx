@@ -32,6 +32,7 @@ import { useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { CachedImage } from '@/components/CachedImage';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import {
@@ -248,12 +249,7 @@ export function BuyNowFlow({
         )}
 
         {phase === 'error' && (
-          <View style={s.centerBox}>
-            <Text style={{ color: theme.error, marginBottom: SP.sm, textAlign: 'center' }}>{error}</Text>
-            <TouchableOpacity onPress={hydrate} accessibilityRole="button" accessibilityLabel="Retry">
-              <Text style={{ color: theme.accent, fontFamily: FONT.semibold }}>Retry</Text>
-            </TouchableOpacity>
-          </View>
+          <ErrorState message={error || undefined} onRetry={hydrate} />
         )}
 
         {(phase === 'review' || phase === 'paying') && product && variant && (

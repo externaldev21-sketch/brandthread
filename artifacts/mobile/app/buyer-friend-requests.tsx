@@ -3,7 +3,6 @@ import {
   View, Text, ScrollView, FlatList,
   Alert, StyleSheet,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -17,7 +16,7 @@ import { useAuth } from '@clerk/expo';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { Header, ListSkeleton } from '@/components/layout';
 import { Button, SegmentedControl } from '@/components/ui';
-import { PressableScale } from '@/components/BrandthreadUI';
+import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -170,11 +169,11 @@ export default function BuyerFriendRequestsScreen() {
     if (loading) return <ListSkeleton rows={4} />;
     if (incoming.length === 0) {
       return (
-        <View style={s.emptyState}>
-          <Feather name="inbox" size={32} color={palette.mutedForeground} />
-          <Text style={[TYPE_SCALE.headline, s.emptyTitle]}>No new followers</Text>
-          <Text style={[TYPE_SCALE.body, s.emptyBody]}>When someone follows you, they'll appear here.</Text>
-        </View>
+        <EmptyState
+          icon="inbox"
+          title="No new followers"
+          description="When someone follows you, they'll appear here."
+        />
       );
     }
     return (
@@ -221,11 +220,11 @@ export default function BuyerFriendRequestsScreen() {
     if (loading) return <ListSkeleton rows={4} />;
     if (sent.length === 0) {
       return (
-        <View style={s.emptyState}>
-          <Feather name="user-check" size={32} color={palette.mutedForeground} />
-          <Text style={[TYPE_SCALE.headline, s.emptyTitle]}>All caught up</Text>
-          <Text style={[TYPE_SCALE.body, s.emptyBody]}>Everyone you follow also follows you back.</Text>
-        </View>
+        <EmptyState
+          icon="user-check"
+          title="All caught up"
+          description="Everyone you follow also follows you back."
+        />
       );
     }
     return (
@@ -268,11 +267,11 @@ export default function BuyerFriendRequestsScreen() {
   function renderSuggested() {
     if (suggestions.length === 0) {
       return (
-        <View style={s.emptyState}>
-          <Feather name="users" size={32} color={palette.mutedForeground} />
-          <Text style={[TYPE_SCALE.headline, s.emptyTitle]}>No suggestions yet</Text>
-          <Text style={[TYPE_SCALE.body, s.emptyBody]}>Use Search to find buyers to follow.</Text>
-        </View>
+        <EmptyState
+          icon="users"
+          title="No suggestions yet"
+          description="Use Search to find buyers to follow."
+        />
       );
     }
     return (
@@ -350,9 +349,6 @@ const rowStyles = StyleSheet.create({
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: ReturnType<typeof useColors>) => StyleSheet.create({
   container:       { flex: 1, backgroundColor: palette.background },
   tabBarWrap:      { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: palette.border },
-  emptyState:      { alignItems: 'center', paddingVertical: SPACING.xxl, gap: SPACING.sm },
-  emptyTitle:      { color: palette.foreground },
-  emptyBody:       { color: palette.mutedForeground, textAlign: 'center', paddingHorizontal: SPACING.xl },
   row:             { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingVertical: SPACING.md, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: palette.border, gap: SPACING.sm },
   avatar48:        { width: 48, height: 48, borderRadius: RADII.avatar, alignItems: 'center', justifyContent: 'center' },
   avatar48Text:    { color: '#FFFFFF' }, // theme-exempt: initials on a per-user identity color

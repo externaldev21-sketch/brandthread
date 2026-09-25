@@ -71,21 +71,28 @@ vi.mock('react-native', () => {
     return MockNativeComponent;
   };
 
-  const AnimatedValue = class {
-    constructor(private value: number) {}
-    setValue(value: number) { this.value = value; }
+  // A minimal Animated stand-in: values with a plain numeric handle and
+  // timing/spring calls that resolve their `start` callback synchronously,
+  // matching how the real API is used by Chip/ListRow/Button-style press
+  // feedback (no native driver needed in this jsdom-free renderer).
+  class MockAnimatedValue {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    constructor(_value: number) {}
+    setValue() {}
+  }
+  const animatedTransition = () => ({ start: (cb?: () => void) => cb?.() });
+  const MockAnimated = {
+    Value: MockAnimatedValue,
+    timing: animatedTransition,
+    spring: animatedTransition,
+    loop: () => ({ start: () => {}, stop: () => {} }),
+    sequence: () => ({ start: () => {} }),
+    View: nativeComponent('Animated.View'),
   };
 
   return {
     ActivityIndicator: nativeComponent('ActivityIndicator'),
-    Animated: {
-      Value: AnimatedValue,
-      View: nativeComponent('Animated.View'),
-      Text: nativeComponent('Animated.Text'),
-      timing: () => ({ start: (cb?: () => void) => cb?.() }),
-      spring: () => ({ start: (cb?: () => void) => cb?.() }),
-    },
-    LayoutAnimation: { configureNext: () => {}, Presets: { easeInEaseOut: {} } },
+    Animated: MockAnimated,
     Platform: { OS: 'ios', select: (obj: any) => obj.ios },
     Pressable: nativeComponent('Pressable'),
     RefreshControl: nativeComponent('RefreshControl'),
@@ -104,11 +111,6 @@ vi.mock('react-native-safe-area-context', () => ({
 
 vi.mock('@expo/vector-icons', () => ({
   Feather: ({ name }: { name: string }) => React.createElement('Feather', { name }),
-}));
-
-vi.mock('react-native-svg', () => ({
-  default: (props: Record<string, unknown>) => React.createElement('Svg', props, props.children as React.ReactNode),
-  Line: (props: Record<string, unknown>) => React.createElement('SvgLine', props),
 }));
 
 vi.mock('expo-router', () => ({
@@ -168,12 +170,6 @@ vi.mock('@/components/CachedImage', () => ({
 vi.mock('react-native-reanimated', () => ({
   default: { View: (props: Record<string, unknown>) => React.createElement('Animated.View', props, props.children as React.ReactNode) },
   useAnimatedStyle: (fn: () => unknown) => fn(),
-  useSharedValue: (initial: unknown) => {
-    const shared = { value: initial, set(next: unknown) { shared.value = next; } };
-    return shared;
-  },
-  withSpring: (v: unknown) => v,
-  withTiming: (v: unknown) => v,
 }));
 
 vi.mock('@/components/buyer-nav/buyerTabBarMetrics', () => ({

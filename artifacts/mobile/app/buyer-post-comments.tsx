@@ -39,6 +39,7 @@ import { RADII } from '@/constants/radii';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { InlineSpinner, InlineError } from '@/components/InlineFeedback';
+import { EmptyState } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { useApi } from '@/lib/api';
 import { apiErrorCode, apiErrorMessage, reportHref, shortRelativeTime, BLOCK_EXPLAINER } from '@/lib/safety';
@@ -740,16 +741,14 @@ export default function BuyerPostCommentsScreen() {
           ListEmptyComponent={
             !loading && !fetchError
               ? (
-                <View style={s.emptyState}>
-                  <Text style={s.emptyTitle}>
-                    {isPreviewPost ? 'Preview content' : meta.commentsDisabled ? 'Comments are off' : 'Start the conversation'}
-                  </Text>
-                  <Text style={s.emptyText}>
-                    {isPreviewPost
-                      ? 'Comments aren’t available on preview posts.'
-                      : meta.commentsDisabled ? 'The creator turned off comments for this post.' : 'Be the first to comment.'}
-                  </Text>
-                </View>
+                <EmptyState
+                  icon="message-circle"
+                  title={isPreviewPost ? 'Preview content' : meta.commentsDisabled ? 'Comments are off' : 'Start the conversation'}
+                  description={isPreviewPost
+                    ? 'Comments aren’t available on preview posts.'
+                    : meta.commentsDisabled ? 'The creator turned off comments for this post.' : 'Be the first to comment.'}
+                  compact
+                />
               )
               : null
           }

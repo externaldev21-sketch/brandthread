@@ -1,16 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
-import { FONT, FS, SP, RADIUS } from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { FONT, SP } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 import { BuyerSettingsState, loadBuyerSettings, patchBuyerSettings } from '@/lib/buyerSettings';
 import { reportNetworkError } from '@/lib/networkNotice';
 import { useApi } from '@/hooks/useApi';
-import { Header } from '@/components/layout';
-import { HapticSwitch } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { Card, ListRow } from '@/components/ui';
 
 type ToggleKey = keyof { [K in keyof BuyerSettingsState as BuyerSettingsState[K] extends boolean ? K : never]: true };
 type Item = { label: string; sub?: string; icon?: keyof typeof Feather.glyphMap; toggle?: ToggleKey; value?: string; action?: () => void };
@@ -51,9 +50,8 @@ const CONFIG: Record<string, Config> = {
 };
 
 export default function BuyerSettingsDetail() {
-  const { theme } = useAppTheme();
-  const PURPLE = theme.accent;
-  const styles = makeStyles(theme);
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { section = 'content' } = useLocalSearchParams<{ section?: string }>();
   const router = useRouter(); const insets = useSafeAreaInsets();
   const api = useApi();
@@ -83,7 +81,6 @@ export default function BuyerSettingsDetail() {
   }, [api, section]);
   useEffect(() => { load(); }, [load]);
   const toggle = useCallback(async (key: ToggleKey, value: boolean) => {
-    Haptics.selectionAsync();
     const prior = settings;
     if (prior) setSettings({ ...prior, [key]: value });
     try {
@@ -106,18 +103,31 @@ export default function BuyerSettingsDetail() {
   const items = useMemo(() => settings ? cfg.items(settings, router) : [], [cfg, settings, router]);
 
   return <View style={styles.page}>
-     <Header title={cfg.title} />
+    <ScreenHeader title={cfg.title} variant="push" onBack={() => router.back()} />
     <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}>
       {cfg.intro ? <Text style={styles.intro}>{cfg.intro}</Text> : null}
-      {loading ? <Text style={styles.intro}>Loading settings…</Text> : settings && items.length > 0 ? <View style={styles.card}>{items.map((item, i) => {
+      {loading ? <Text style={styles.intro}>Loading settings…</Text> : settings && items.length > 0 ? <Card style={styles.card}>{items.map((item, i) => {
         const isActionable = !!item.toggle || !!item.action;
-        return <TouchableOpacity key={`${item.label}-${i}`} activeOpacity={isActionable ? (item.toggle ? 1 : 0.7) : 1} disabled={!isActionable} style={[styles.row, i < items.length - 1 && styles.divider]} onPress={() => { if (item.action) { Haptics.selectionAsync(); item.action(); } }}>
-         {item.icon ? <View style={styles.itemIcon}><Feather name={item.icon} size={16} color={theme.text}/></View> : null}
-        <View style={{ flex: 1 }}><Text style={styles.label} numberOfLines={1}>{item.label}</Text>{item.sub ? <Text style={styles.sub} numberOfLines={1}>{item.sub}</Text> : null}</View>
-         {item.toggle && settings ? <HapticSwitch value={Boolean(settings[item.toggle])} onValueChange={(v) => toggle(item.toggle!, v)} trackColor={{ false: theme.border, true: PURPLE }} thumbColor={theme.onAccent} /> : <>{item.value ? <Text style={styles.value} numberOfLines={1}>{item.value}</Text> : null}{item.action ? <Feather name="chevron-right" size={17} color={theme.subtle}/> : null}</>}
-      </TouchableOpacity>;
-      })}</View> : null}
+        return <React.Fragment key={`${item.label}-${i}`}>
+          <ListRow
+            icon={item.icon}
+            title={item.label}
+            subtitle={item.sub}
+            value={!item.toggle ? item.value : undefined}
+            chevron={!item.toggle && !!item.action}
+            toggle={item.toggle && settings ? { value: Boolean(settings[item.toggle]), onChange: (v) => toggle(item.toggle!, v) } : undefined}
+            onPress={isActionable && item.action ? item.action : undefined}
+            disabled={!isActionable}
+          />
+          {i < items.length - 1 && <View style={styles.divider} />}
+        </React.Fragment>;
+      })}</Card> : null}
     </ScrollView>
   </View>;
 }
-const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({ page:{flex:1,backgroundColor:theme.background},intro:{color:theme.muted,fontFamily:FONT.regular,fontSize:13,lineHeight:19,marginBottom:SP.md},card:{backgroundColor:theme.card,borderWidth:1,borderColor:theme.border,borderRadius:RADIUS.lg,overflow:'hidden'},row:{minHeight:52,paddingHorizontal:14,paddingVertical:12,flexDirection:'row',alignItems:'center',gap:12},divider:{borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:theme.border},itemIcon:{width:30,height:30,borderRadius:9,alignItems:'center',justifyContent:'center',backgroundColor:theme.cardElevated},label:{color:theme.text,fontFamily:FONT.medium,fontSize:14,lineHeight:18},sub:{color:theme.muted,fontFamily:FONT.regular,fontSize:12,marginTop:2,lineHeight:15},value:{color:theme.muted,fontFamily:FONT.regular,fontSize:13,lineHeight:17,textTransform:'capitalize',maxWidth:110},});
+const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
+  page: { flex: 1, backgroundColor: colors.background },
+  intro: { color: colors.mutedForeground, fontFamily: FONT.regular, fontSize: 13, lineHeight: 19, marginBottom: SP.md },
+  card: { padding: 0, paddingHorizontal: SP.md },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+});

@@ -224,6 +224,50 @@ vi.mock('@/components/layout', () => {
   };
 });
 
+// profile.tsx also renders the (separately Phase-2-migrated) ShareProfileSheet,
+// which pulls in react-native-reanimated-based motion/share-card components
+// at module scope — real reanimated isn't parseable under Vitest's SSR
+// transform outside a Metro/RN runtime, and this test doesn't exercise the
+// share sheet's own UI, so it's stubbed out entirely.
+vi.mock('@/components/ShareProfileSheet', () => ({
+  ShareProfileSheet: () => null,
+}));
+
+vi.mock('@/components/BrandthreadUI', () => {
+  const ReactActual = require('react') as typeof import('react');
+  // Mocking this module wholesale (for EmptyState below) shadows every one of
+  // its other exports too — profile.tsx also imports the real `PressableScale`
+  // from here, so it needs a stand-in. This renders straight to the same
+  // 'Pressable' host type the react-native mock's Pressable produces (rather
+  // than requiring that mocked module from inside this factory, which trips
+  // Vitest's mock-hoisting analysis), so every existing query against
+  // `node.type === 'Pressable'` keeps matching, and a function child (the
+  // render-prop real PressableScale/Pressable support) is still invoked.
+  const PressableScale = ({ children, ...rest }: Record<string, unknown>) => {
+    const content = typeof children === 'function'
+      ? (children as (state: { pressed: boolean }) => unknown)({ pressed: false })
+      : children;
+    return ReactActual.createElement('Pressable', rest, content as React.ReactNode);
+  };
+  return {
+    PressableScale,
+    EmptyState: ({ title, description, action }: { title: string; description?: string; action?: { label: string; onPress: () => void } }) =>
+      ReactActual.createElement(
+        'View',
+        {},
+        ReactActual.createElement('Text', null, title),
+        description ? ReactActual.createElement('Text', null, description) : null,
+        action
+          ? ReactActual.createElement(
+            'TouchableOpacity',
+            { testID: 'empty-state-action', onPress: action.onPress },
+            ReactActual.createElement('Text', null, action.label),
+          )
+          : null,
+      ),
+  };
+});
+
 import ProfileScreen from '@/app/(buyer)/profile';
 
 function textContent(value: unknown): string {

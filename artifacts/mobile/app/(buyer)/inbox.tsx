@@ -8,8 +8,8 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { EmptyState, ListSkeleton } from '@/components/layout';
-import { SearchBar, SheetHandle } from '@/components/BrandthreadUI';
+import { ListSkeleton } from '@/components/layout';
+import { EmptyState, SearchBar, SheetHandle } from '@/components/BrandthreadUI';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS, ICON, SCREEN_BG } from '@/lib/theme';
@@ -642,7 +642,8 @@ export default function InboxScreen() {
       return (
         <EmptyState
           icon="search"
-          message={`No conversations match "${messagesSearchQuery.trim()}"`}
+          title="No matches"
+          description={`No conversations match "${messagesSearchQuery.trim()}"`}
         />
       );
     }
@@ -651,10 +652,9 @@ export default function InboxScreen() {
     return (
       <EmptyState
         icon={loadError ? 'alert-circle' : icon}
-        message={loadError ? 'Could not load your inbox. Pull to refresh and try again.' : `${title} — ${subtitle}`}
-        variant={loadError ? 'error' : 'empty'}
-        actionLabel={isMessages && !loadError ? 'New message' : undefined}
-        onAction={isMessages && !loadError ? openCompose : undefined}
+        title={loadError ? 'Could not load your inbox' : title}
+        description={loadError ? 'Pull to refresh and try again.' : subtitle}
+        action={isMessages && !loadError ? { label: 'New message', onPress: openCompose } : undefined}
       />
     );
   }

@@ -21,7 +21,8 @@ import { useApi } from '@/lib/api';
 import { useAuth } from '@clerk/expo';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
-import { EmptyState, GridSkeleton, ResponsiveContainer, useGridColumns, useBreakpoint } from '@/components/layout';
+import { GridSkeleton, ResponsiveContainer, useGridColumns, useBreakpoint } from '@/components/layout';
+import { EmptyState } from '@/components/BrandthreadUI';
 
 const { width } = Dimensions.get('window');
 const GRID_GAP  = 1;
@@ -385,7 +386,7 @@ export default function BuyerOtherProfileScreen() {
               <GridSkeleton columns={gridColumns} cardWidth={gridCellSize} rows={2} gap={GRID_GAP} />
             </ResponsiveContainer>
           ) : posts.length === 0 ? (
-            <EmptyState icon="image" message="No posts yet." />
+            <EmptyState icon="image" title="No posts yet" description="Posts will appear here." />
           ) : (
             <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ paddingHorizontal: 0 }}>
               <View style={styles.grid}>

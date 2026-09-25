@@ -662,7 +662,7 @@ const stS = StyleSheet.create({
 interface EmptyStateProps {
   icon: keyof typeof Feather.glyphMap;
   title: string;
-  description: string;
+  description?: string;
   action?: { label: string; onPress: () => void; icon?: keyof typeof Feather.glyphMap };
   secondaryAction?: { label: string; onPress: () => void };
   style?: StyleProp<ViewStyle>;
@@ -696,7 +696,9 @@ export function EmptyState({ icon, title, description, action, secondaryAction, 
         </LinearGradient>
       </View>}
       <Text style={[esS.title, { color: colors.foreground }]}>{title}</Text>
-      <Text style={[esS.desc, { color: colors.mutedForeground }]}>{description}</Text>
+      {!!description && (
+        <Text style={[esS.desc, { color: colors.mutedForeground }]}>{description}</Text>
+      )}
       {action && (
         <View style={esS.actions}>
           <PrimaryButton label={action.label} onPress={action.onPress} icon={action.icon} style={esS.btn} />

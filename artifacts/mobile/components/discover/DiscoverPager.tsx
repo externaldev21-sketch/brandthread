@@ -46,9 +46,9 @@ import { hapticPrimaryAction } from '@/lib/haptics';
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
 import { CachedImage } from '@/components/CachedImage';
-import { CardSkeleton, EmptyState } from '@/components/layout';
+import { CardSkeleton } from '@/components/layout';
 import { IconButton } from '@/components/ui';
-import { PressableScale } from '@/components/BrandthreadUI';
+import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
 import {
   addToCart,
   getBuyerProduct,
@@ -237,11 +237,11 @@ export function DiscoverPager() {
         <DiscoverSkeleton insets={insets} cardWidth={cardWidth} />
       ) : showError ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <EmptyState icon="wifi-off" variant="error" message={error!} actionLabel="Retry" onAction={handleRetry} />
+          <EmptyState icon="wifi-off" title="Couldn't load" description={error!} action={{ label: 'Retry', onPress: handleRetry }} compact />
         </View>
       ) : showEmpty ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <EmptyState icon="compass" message="No trending products right now" actionLabel="Retry" onAction={handleRetry} />
+          <EmptyState icon="compass" title="No trending products" description="Nothing is trending right now." action={{ label: 'Retry', onPress: handleRetry }} compact />
         </View>
       ) : (
         <>

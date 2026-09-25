@@ -133,22 +133,23 @@ vi.mock('@/components/BrandthreadUI', () => ({
   SheetHandle: () => React.createElement('View', { testID: 'inbox-compose-sheet-handle' }),
   PressableScale: ({ children, ...rest }: any) =>
     React.createElement('Pressable', rest, typeof children === 'function' ? children({ pressed: false }) : children),
-}));
-
-vi.mock('@/components/layout', () => ({
-  EmptyState: ({ message, actionLabel, onAction }: { message: string; actionLabel?: string; onAction?: () => void }) =>
+  EmptyState: ({ title, description, action }: { title: string; description?: string; action?: { label: string; onPress: () => void } }) =>
     React.createElement(
       'View',
       {},
-      React.createElement('Text', {}, message),
-      actionLabel
+      React.createElement('Text', {}, title),
+      description ? React.createElement('Text', {}, description) : null,
+      action
         ? React.createElement(
           'TouchableOpacity',
-          { testID: 'empty-state-action', onPress: onAction },
-          React.createElement('Text', {}, actionLabel),
+          { testID: 'empty-state-action', onPress: action.onPress },
+          React.createElement('Text', {}, action.label),
         )
         : null,
     ),
+}));
+
+vi.mock('@/components/layout', () => ({
   ListSkeleton: () => React.createElement('View', { testID: 'inbox-skeleton' }),
 }));
 

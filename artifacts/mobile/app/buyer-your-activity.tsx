@@ -12,39 +12,10 @@ import { useFocusEffect } from 'expo-router';
 import { FONT, ICON } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { getMyPosts, getSavedItems, getMyReposts } from '@/services/socialService';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card, ErrorState, ListRow, SkeletonBlock, SkeletonLine } from '@/components/ui';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
-
-// Simple inline bar chart using plain Views — no chart library
-function BarChart({ data, maxVal }: { data: number[]; maxVal: number }) {
-  const { theme } = useAppTheme();
-  const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: SPACING.xs, height: 88, paddingTop: SPACING.xs }}>
-      {data.map((val, i) => {
-        const h = maxVal > 0 ? Math.max(4, (val / maxVal) * 72) : 4;
-        const isToday = i === data.length - 1;
-        return (
-          <View key={i} style={{ flex: 1, alignItems: 'center', gap: SPACING.xxs }}>
-            <View
-              style={{
-                height: h,
-                borderRadius: 4,
-                backgroundColor: isToday ? theme.accent : theme.accentDim,
-                width: '100%',
-              }}
-            />
-            <Text style={[TYPE_SCALE.caption, { color: isToday ? theme.accent : theme.muted }]}>
-              {days[i]}
-            </Text>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
 
 function StatsSkeleton({ s }: { s: Styles }) {
   return (
@@ -103,10 +74,6 @@ export default function BuyerYourActivity() {
   }, [userId]);
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
-  // Time-spent data is device-local (no time-tracking integration yet); show zeros
-  // until a backend integration can supply accurate per-day minutes.
-  const weeklyTime = loaded ? [0, 0, 0, 0, 0, 0, 0] : [0, 0, 0, 0, 0, 0, 0];
-
   const activityItems = [
     { icon: 'image' as const, label: 'Posts', value: String(postCount), sub: 'Your profile', color: theme.accent },
     { icon: 'bookmark' as const, label: 'Saved items', value: String(savedCount), sub: 'Across all types', color: theme.accentLight },
@@ -115,7 +82,7 @@ export default function BuyerYourActivity() {
 
   return (
     <View style={s.page}>
-      <Header title="Your Activity" />
+      <ScreenHeader title="Your Activity" />
 
       <ScrollView
         contentContainerStyle={{ padding: SPACING.md, paddingBottom: insets.bottom + SPACING.xxxl }}

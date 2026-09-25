@@ -24,6 +24,7 @@ import {
   reorderHighlights, type Highlight,
 } from '@/lib/highlightsService';
 import { Header } from '@/components/layout';
+import { EmptyState } from '@/components/BrandthreadUI';
 
 const EMOJIS = ['✨', '🌟', '💜', '🎵', '🌿', '🔥', '💫', '🌙', '🎨', '🏄', '🍕', '📸', '🎉', '💙', '🌸', '🏆'];
 
@@ -289,12 +290,12 @@ export default function BuyerHighlightsManager() {
         keyExtractor={h => h.id}
         contentContainerStyle={{ padding: SPACING.md, paddingBottom: insets.bottom + 40 }}
         ListEmptyComponent={
-          <View style={s.empty}>
-            <Feather name="bookmark" size={36} color={colors.mutedForeground} />
-            <Text style={[s.emptyTitle, { color: colors.foreground }]}>No highlights yet</Text>
-            <Text style={[s.emptySub, { color: colors.mutedForeground }]}>Create a highlight to display it on your profile.</Text>
-            <Button label="Create highlight" variant="primary" onPress={openCreate} style={{ marginTop: SPACING.xs }} />
-          </View>
+          <EmptyState
+            icon="bookmark"
+            title="No highlights yet"
+            description="Create a highlight to display it on your profile."
+            action={{ label: 'Create highlight', onPress: openCreate }}
+          />
         }
         renderItem={renderItem}
         ItemSeparatorComponent={() => <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />}
@@ -346,9 +347,6 @@ const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   rowLabel: { flex: 1, fontFamily: FONT.medium, ...TYPE_SCALE.body },
   editIcon: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   deleteIcon: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  empty: { alignItems: 'center', paddingTop: 80, gap: SPACING.md },
-  emptyTitle: { fontFamily: FONT.semibold, ...TYPE_SCALE.headline },
-  emptySub: { ...TYPE_SCALE.footnote, textAlign: 'center', paddingHorizontal: SPACING.xl },
   emojiTrigger: { alignItems: 'center', paddingVertical: SPACING.md, gap: 4 },
   emojiHint: { ...TYPE_SCALE.caption },
   emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center', paddingBottom: SPACING.md },

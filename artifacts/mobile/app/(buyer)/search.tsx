@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Platform, ActivityIndicator, useWindowDimensions,
+  Platform, useWindowDimensions, Animated as RNAnimated, Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -13,19 +13,20 @@ import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
-import { CachedImage } from '@/components/CachedImage';
-import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useBuyerSearch } from '@/contexts/BuyerSearchContext';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { FONT, GUTTER, GRID_MAX_WIDTH } from '@/lib/theme';
 import { GridSkeleton, ResponsiveContainer, useGridColumns } from '@/components/layout';
+import { Chip, ListRow, SkeletonBlock, ThemedRefreshControl } from '@/components/ui';
+import { TYPE_SCALE } from '@/constants/typography';
+import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
+import { RADII } from '@/constants/radii';
+import { PRESS_DURATION_MS, PRESS_SCALE } from '@/constants/motion';
+import { hapticPrimaryAction, hapticSelection, hapticToggle } from '@/lib/haptics';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { ProductTile } from '@/components/search/ProductTile';
 import { PersonRow, type SearchPerson } from '@/components/search/PersonRow';
-import { SEARCH_TABS, type SearchTabKey } from '@/components/search/SegmentedTabs';
-import { IconButton, ListRow, SegmentedControl, ThemedRefreshControl } from '@/components/ui';
-import { TYPE_SCALE } from '@/constants/typography';
-import { RADII } from '@/constants/radii';
-import { hapticLight, hapticSelection } from '@/lib/haptics';
+import { SegmentedTabs, type SearchTabKey } from '@/components/search/SegmentedTabs';
 
 type PersonResult = SearchPerson;
 type ProductResult = Extract<SearchResult, { kind: 'product' }>;
@@ -205,7 +206,7 @@ export default function SearchScreen() {
   const handleRefresh = useCallback(() => {
     const q = query.trim();
     setRefreshing(true);
-    hapticLight();
+    hapticPrimaryAction();
     const tasks: Promise<unknown>[] = [];
     if (q.length >= 1) tasks.push(performSearch(q));
     tasks.push(
@@ -220,7 +221,7 @@ export default function SearchScreen() {
   }, [query, performSearch]);
 
   function goToBrand(sellerId?: string) {
-    hapticLight();
+    hapticPrimaryAction();
     if (sellerId) {
       router.push({ pathname: '/seller-profile' as any, params: { sellerId } });
     } else {
@@ -233,7 +234,7 @@ export default function SearchScreen() {
   }
 
   function handleResultPress(r: SearchResult) {
-    hapticLight();
+    hapticPrimaryAction();
     rememberSearch(query || r.name);
     if (r.kind === 'brand' && (r as any).sellerId) {
       goToBrand((r as any).sellerId);
@@ -246,7 +247,7 @@ export default function SearchScreen() {
 
   function handlePersonPress(p: PersonResult) {
     rememberSearch(query || p.name);
-    hapticLight();
+    hapticPrimaryAction();
     router.push({
       pathname: '/buyer-other-profile' as any,
       params: { userId: p.userId, name: p.name, handle: p.handle, initials: p.initials, color: p.color },
@@ -264,7 +265,7 @@ export default function SearchScreen() {
         await api.social.follow(person.userId);
       }
       setPeople((prev) => prev.map((p) => (p.userId === person.userId ? { ...p, isFollowing: !wasFollowing } : p)));
-      hapticLight();
+      hapticPrimaryAction();
     } catch {
       // Keep the previous state on failure — no destructive optimistic flip.
     } finally {
@@ -304,23 +305,16 @@ export default function SearchScreen() {
   );
 
   const brandRows = (items: BrandResult[]) => items.map((r) => (
-    <TouchableOpacity
-      key={r.id}
-      style={styles.row}
-      activeOpacity={0.7}
-      onPress={() => handleResultPress(r)}
-      accessibilityRole="button"
-      accessibilityLabel={`Open ${r.name}`}
-    >
+    <PressRow key={r.id} onPress={() => handleResultPress(r)} accessibilityLabel={`Open ${r.name}`}>
       <View style={[styles.avatar, { backgroundColor: r.color }]}>
         <Text style={styles.avatarText}>{r.initials}</Text>
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[TYPE_SCALE.body, { fontFamily: FONT.medium, color: fg }]} numberOfLines={1}>{r.name}</Text>
-        <Text style={[TYPE_SCALE.footnote, { color: muted, marginTop: 2 }]} numberOfLines={1}>{r.handle}</Text>
+        <Text style={[styles.rowText, { color: fg }]} numberOfLines={1}>{r.name}</Text>
+        <Text style={[styles.rowSub, { color: muted }]} numberOfLines={1}>{r.handle}</Text>
       </View>
       <Feather name="chevron-right" size={16} color={muted} />
-    </TouchableOpacity>
+    </PressRow>
   ));
 
   const personRows = (items: PersonResult[]) => items.map((p) => (
@@ -356,18 +350,14 @@ export default function SearchScreen() {
           description={`We couldn't find anything for "${trimmedQuery}". Try a broader term.`}
         />
         {noResultsFallbackTerms.length > 0 && (
-          <View style={styles.tryChips}>
+          <View style={styles.chipRow}>
             {noResultsFallbackTerms.map((term) => (
-              <TouchableOpacity
+              <Chip
                 key={term}
-                style={[styles.tryChip, { borderColor: theme.border, backgroundColor: theme.card }]}
-                activeOpacity={0.75}
+                label={term}
+                selected={false}
                 onPress={() => submitTerm(term)}
-                accessibilityRole="button"
-                accessibilityLabel={`Search for ${term}`}
-              >
-                <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.medium, color: fg }]}>{term}</Text>
-              </TouchableOpacity>
+              />
             ))}
           </View>
         )}
@@ -377,7 +367,7 @@ export default function SearchScreen() {
 
   function renderLoading() {
     return (
-      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginTop: 16 }}>
+      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginTop: SPACING.md }}>
         <GridSkeleton columns={gridColumns} cardWidth={gridCardWidth} rows={2} gap={GUTTER} />
       </ResponsiveContainer>
     );
@@ -440,8 +430,8 @@ export default function SearchScreen() {
         }
       >
         <View style={styles.titleBlock}>
-          <Text style={[TYPE_SCALE.title1, { fontFamily: FONT.bold, letterSpacing: -0.6, color: fg }]} accessibilityRole="header">Search</Text>
-          <Text style={[TYPE_SCALE.footnote, { color: muted, marginTop: 4 }]}>
+          <Text style={[styles.title, { color: fg }]} accessibilityRole="header">Search</Text>
+          <Text style={[styles.subtitle, { color: muted }]}>
             {trimmedQuery.length === 0
               ? 'Brands, pieces and people on Brandthread'
               : `Showing matches for "${trimmedQuery}"`}
@@ -460,53 +450,45 @@ export default function SearchScreen() {
                     accessibilityLabel="Clear recent searches"
                     hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   >
-                    <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: fg, paddingTop: 16, paddingBottom: 6 }]}>Clear all</Text>
+                    <Text style={[styles.sectionAction, { color: fg }]}>Clear all</Text>
                   </TouchableOpacity>
                 </View>
-                {recentSearches.map((term) => (
-                  <View key={term} style={styles.row}>
-                    <TouchableOpacity
-                      style={styles.recentTouchArea}
-                      activeOpacity={0.7}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Search for ${term}`}
+                <View style={styles.chipRow}>
+                  {recentSearches.map((term) => (
+                    <Chip
+                      key={term}
+                      label={term}
+                      selected={false}
+                      icon="clock"
                       onPress={() => submitTerm(term)}
-                    >
-                      <Feather name="clock" size={16} color={muted} />
-                      <Text style={[TYPE_SCALE.body, { fontFamily: FONT.medium, color: fg, flex: 1 }]} numberOfLines={1}>{term}</Text>
-                    </TouchableOpacity>
-                    <IconButton
-                      name="x"
-                      variant="plain"
-                      size={16}
-                      color={muted}
-                      onPress={() => removeRecentSearch(term)}
-                      accessibilityLabel={`Remove ${term} from recent searches`}
+                      onRemove={() => removeRecentSearch(term)}
+                      removeAccessibilityLabel={`Remove ${term} from recent searches`}
                     />
-                  </View>
-                ))}
+                  ))}
+                </View>
               </>
             )}
 
             {(trendingLoading || trending.length > 0) && (
               <>
-                <Text style={[styles.sectionLabel, { color: muted, marginTop: 8 }]}>TRENDING</Text>
+                <Text style={[styles.sectionLabel, { color: muted, marginTop: SPACING.xs }]}>TRENDING</Text>
                 {trendingLoading ? (
-                  <ActivityIndicator style={{ marginLeft: 16, marginTop: 4 }} color={primary} />
+                  <View style={styles.chipRow}>
+                    {[0, 1, 2, 3].map((i) => (
+                      <SkeletonBlock key={i} width={72 + (i % 2) * 24} height={34} radius={RADII.pill} />
+                    ))}
+                  </View>
                 ) : (
-                  <View style={styles.tryChips}>
+                  <View style={styles.chipRow}>
                     {trending.map((t, index) => (
-                      <TouchableOpacity
+                      <Chip
                         key={`${t.term}-${index}`}
-                        style={[styles.tryChip, { borderColor: theme.border, backgroundColor: theme.card }]}
-                        activeOpacity={0.75}
+                        label={t.term}
+                        selected={false}
+                        icon={t.type === 'brand' ? 'trending-up' : 'hash'}
+                        iconColor={primary}
                         onPress={() => submitTerm(t.term)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Search for ${t.term}`}
-                      >
-                        <Feather name={t.type === 'brand' ? 'trending-up' : 'hash'} size={12} color={primary} />
-                        <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.medium, color: fg }]}>{t.term}</Text>
-                      </TouchableOpacity>
+                      />
                     ))}
                   </View>
                 )}
@@ -515,30 +497,36 @@ export default function SearchScreen() {
 
             {(suggestedLoading || suggestedBrands.length > 0) && (
               <>
-                <Text style={[styles.sectionLabel, { color: muted, marginTop: 8 }]}>BRANDS TO FOLLOW</Text>
+                <Text style={[styles.sectionLabel, { color: muted, marginTop: SPACING.xs }]}>BRANDS TO FOLLOW</Text>
                 {suggestedLoading ? (
-                  <ActivityIndicator style={{ marginLeft: 16, marginTop: 4 }} color={primary} />
+                  <View style={styles.brandAvatarRow}>
+                    {[0, 1, 2, 3].map((i) => (
+                      <View key={i} style={styles.brandAvatarItem}>
+                        <SkeletonBlock width={58} height={58} radius={RADII.avatar} style={{ marginBottom: SPACING.xxs + 2 }} />
+                        <SkeletonBlock width={48} height={10} radius={4} />
+                      </View>
+                    ))}
+                  </View>
                 ) : (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.brandAvatarRow}>
                     {suggestedBrands.map((b) => (
-                      <TouchableOpacity
+                      <PressRow
                         key={b.id}
-                        style={styles.brandAvatarItem}
-                        activeOpacity={0.75}
-                        onPress={() => { hapticLight(); goToBrand(b.sellerId); }}
-                        accessibilityRole="button"
+                        onPress={() => { hapticPrimaryAction(); goToBrand(b.sellerId); }}
                         accessibilityLabel={`Visit ${b.name}`}
+                        style={styles.brandAvatarItem}
+                        rowStyle={{ paddingHorizontal: 0, paddingVertical: 0 }}
                       >
                         <View style={[styles.brandAvatar, { backgroundColor: b.color }]}>
                           <Text style={styles.avatarText}>{b.initials}</Text>
                         </View>
-                        <Text style={[TYPE_SCALE.caption, { fontFamily: FONT.semibold, color: fg, textAlign: 'center' }]} numberOfLines={1}>{b.name}</Text>
+                        <Text style={[styles.brandAvatarName, { color: fg }]} numberOfLines={1}>{b.name}</Text>
                         {b.followerCount > 0 && (
-                          <Text style={[TYPE_SCALE.caption, { color: muted, textAlign: 'center', marginTop: 1 }]} numberOfLines={1}>
+                          <Text style={[styles.brandAvatarSub, { color: muted }]} numberOfLines={1}>
                             {b.followerCount} {b.followerCount === 1 ? 'follower' : 'followers'}
                           </Text>
                         )}
-                      </TouchableOpacity>
+                      </PressRow>
                     ))}
                   </ScrollView>
                 )}
@@ -547,7 +535,7 @@ export default function SearchScreen() {
 
             {(suggestedLoading || suggestedProducts.length > 0) && (
               <>
-                <Text style={[styles.sectionLabel, { color: muted, marginTop: 8 }]}>DISCOVER SOMETHING NEW</Text>
+                <Text style={[styles.sectionLabel, { color: muted, marginTop: SPACING.xs }]}>DISCOVER SOMETHING NEW</Text>
                 {suggestedLoading ? (
                   renderLoading()
                 ) : (
@@ -574,26 +562,19 @@ export default function SearchScreen() {
               </>
             )}
 
-            <Text style={[styles.sectionLabel, { color: muted, marginTop: 8 }]}>DISCOVER</Text>
+            <Text style={[styles.sectionLabel, { color: muted, marginTop: SPACING.xs }]}>DISCOVER</Text>
             <ListRow
               icon="compass"
               iconColor={primary}
               title="Browse trending brands and drops"
               chevron
               onPress={() => goToBrand()}
-              style={{ paddingHorizontal: 16 }}
+              style={styles.discoverRow}
             />
           </View>
         ) : (
           <>
-            <View style={{ marginHorizontal: 16, marginTop: 12, marginBottom: 4 }}>
-              <SegmentedControl
-                options={SEARCH_TABS.map((tab) => ({ id: tab.key, label: tab.label }))}
-                selectedId={activeTab}
-                onChange={(id) => setActiveTab(id as SearchTabKey)}
-                testID="search-tab"
-              />
-            </View>
+            <SegmentedTabs active={activeTab} onChange={setActiveTab} />
             <View testID="buyer-search-results-state" accessibilityLabel={`Search results for ${query}`}>
               {renderTabContent()}
             </View>
@@ -605,33 +586,76 @@ export default function SearchScreen() {
   );
 }
 
+/**
+ * Shared row press-feel for this screen's list rows (brand results, brand
+ * avatar chips) — same PRESS_SCALE/PRESS_DURATION_MS motion tokens and
+ * semantic haptic as `components/ui/ListRow` and `components/search/PersonRow`.
+ */
+function PressRow({
+  children, onPress, accessibilityLabel, style, rowStyle,
+}: {
+  children: React.ReactNode;
+  onPress: () => void;
+  accessibilityLabel: string;
+  style?: React.ComponentProps<typeof View>['style'];
+  rowStyle?: React.ComponentProps<typeof View>['style'];
+}) {
+  const scale = React.useRef(new RNAnimated.Value(1)).current;
+  const nativeDriver = Platform.OS !== 'web';
+
+  return (
+    <Pressable
+      onPress={() => { hapticToggle(); onPress(); }}
+      onPressIn={() => RNAnimated.timing(scale, { toValue: PRESS_SCALE, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
+      onPressOut={() => RNAnimated.spring(scale, { toValue: 1, useNativeDriver: nativeDriver, speed: 18, bounciness: 6 }).start()}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={style}
+    >
+      <RNAnimated.View style={[localStyles.row, rowStyle, { transform: [{ scale }] }]}>
+        {children}
+      </RNAnimated.View>
+    </Pressable>
+  );
+}
+
+const localStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
+    paddingHorizontal: SCREEN_GUTTER, paddingVertical: SPACING.xs + 3,
+  },
+});
+
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  titleBlock: { paddingHorizontal: 16, paddingBottom: 6 },
+  titleBlock: { paddingHorizontal: SCREEN_GUTTER, paddingBottom: SPACING.xs - 2 },
+  title: { ...TYPE_SCALE.title2, letterSpacing: -0.6 },
+  subtitle: { ...TYPE_SCALE.footnote, marginTop: SPACING.xxs },
   sectionHeaderRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: SCREEN_GUTTER,
   },
-  tryChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
-  tryChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    minHeight: 36, paddingHorizontal: 14, borderRadius: RADII.pill, borderWidth: StyleSheet.hairlineWidth, justifyContent: 'center',
-  },
+  sectionAction: { ...TYPE_SCALE.footnote, fontFamily: FONT.semibold, paddingTop: SPACING.md, paddingBottom: SPACING.xs - 2 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs, paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.xxs, paddingBottom: SPACING.xs },
   sectionLabel: {
-    fontSize: 11.5, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.4,
-    paddingHorizontal: 16, paddingTop: 16, paddingBottom: 6,
+    ...TYPE_SCALE.caption, letterSpacing: 0.4,
+    paddingHorizontal: SCREEN_GUTTER, paddingTop: SPACING.md, paddingBottom: SPACING.xs - 2,
   },
   row: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 16, paddingVertical: 11,
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
+    paddingHorizontal: SCREEN_GUTTER, paddingVertical: SPACING.xs + 3,
   },
-  recentTouchArea: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  rowText: { ...TYPE_SCALE.body, fontFamily: FONT.medium },
+  rowSub: { ...TYPE_SCALE.caption, marginTop: 2 },
   avatar: {
-    width: 38, height: 38, borderRadius: RADII.pill,
+    width: 38, height: 38, borderRadius: RADII.avatar,
     alignItems: 'center', justifyContent: 'center',
   },
-  avatarText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: theme.onAccent },
+  avatarText: { ...TYPE_SCALE.footnote, fontFamily: FONT.bold, color: theme.onAccent },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GUTTER },
-  brandAvatarRow: { flexDirection: 'row', gap: 16, paddingHorizontal: 16, paddingVertical: 4 },
+  discoverRow: { paddingHorizontal: SCREEN_GUTTER },
+  brandAvatarRow: { flexDirection: 'row', gap: SPACING.md, paddingHorizontal: SCREEN_GUTTER, paddingVertical: SPACING.xxs },
   brandAvatarItem: { alignItems: 'center', width: 74 },
-  brandAvatar: { width: 58, height: 58, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  brandAvatar: { width: 58, height: 58, borderRadius: RADII.avatar, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.xxs + 2 },
+  brandAvatarName: { ...TYPE_SCALE.caption, fontFamily: FONT.semibold, textAlign: 'center' },
+  brandAvatarSub: { ...TYPE_SCALE.caption, fontSize: 10, textAlign: 'center', marginTop: 1 },
 });

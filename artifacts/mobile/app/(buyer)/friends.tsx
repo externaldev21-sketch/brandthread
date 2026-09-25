@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, FlatList,
   Alert, StyleSheet, Dimensions, Share,
@@ -11,7 +11,7 @@ import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/expo';
 import { CachedImage } from '@/components/CachedImage';
-import { PressableScale, FeedSkeleton } from '@/components/BrandthreadUI';
+import { PressableScale, FeedSkeleton, EmptyState } from '@/components/BrandthreadUI';
 import { IconButton, Snackbar, ErrorState } from '@/components/ui';
 import { useColors } from '@/hooks/useColors';
 import {
@@ -480,22 +480,14 @@ export default function FriendsScreen() {
         </PressableScale>
       </View>
 
-      {/* Empty state */}
+      {/* Empty state — converged on the shared EmptyState component */}
       {!hasFriends && feedPosts.length === 0 && apiFollowing.length === 0 && !loading && !loadError && (
-        <View style={s.emptyState}>
-          <Feather name="users" size={48} color={palette.mutedForeground} />
-          <Text style={[TYPE_SCALE.headline, s.emptyTitle, { color: palette.foreground }]}>Find your crew</Text>
-          <Text style={[TYPE_SCALE.body, s.emptyBody, { color: palette.mutedForeground }]}>
-            Add friends to see what they're copping, saving, and dropping.
-          </Text>
-          <PressableScale
-            onPress={() => { hapticPrimaryAction(); router.push('/buyer-friend-requests' as never); }}
-          >
-            <View style={[s.findFriendsBtn, { backgroundColor: theme.accent }]}>
-              <Text style={[TYPE_SCALE.headline, s.findFriendsBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Find friends</Text>
-            </View>
-          </PressableScale>
-        </View>
+        <EmptyState
+          icon="users"
+          title="Find your crew"
+          description="Add friends to see what they're copping, saving, and dropping."
+          action={{ label: 'Find friends', onPress: () => { hapticPrimaryAction(); router.push('/buyer-friend-requests' as never); } }}
+        />
       )}
     </>
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -672,28 +664,6 @@ const s = StyleSheet.create({
   },
   sectionTitle: {},
   seeAll: {},
-
-  emptyState: {
-    alignItems: 'center',
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.xl,
-    gap: SPACING.sm,
-  },
-  emptyTitle: {
-    marginTop: SPACING.sm,
-  },
-  emptyBody: {
-    textAlign: 'center',
-  },
-  findFriendsBtn: {
-    marginTop: SPACING.sm,
-    paddingHorizontal: SPACING.xl,
-    height: 52,
-    borderRadius: RADII.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  findFriendsBtnText: {},
 
   // Post card
   card: {

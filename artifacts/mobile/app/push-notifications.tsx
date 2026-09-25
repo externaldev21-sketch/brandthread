@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { ScrollView, View, Text, StyleSheet, Platform } from 'react-native';
+import { ScrollView, View, Text, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { HapticSwitch } from '@/components/BrandthreadUI';
+import { hapticToggle } from '@/lib/haptics';
+import { ListRow } from '@/components/ui/ListRow';
+import { Card } from '@/components/ui/Card';
 import { TYPE_SCALE } from '@/constants/typography';
-import { RADII } from '@/constants/radii';
+import { SPACING } from '@/constants/spacing';
+import { FONT } from '@/lib/theme';
 
 interface ToggleRow {
   key: string;
@@ -55,6 +58,7 @@ export default function PushNotificationsScreen() {
   });
 
   function toggle(key: string) {
+    hapticToggle();
     setValues((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
@@ -63,40 +67,29 @@ export default function PushNotificationsScreen() {
       <ScreenHeader title="Push notifications" />
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: 20, paddingBottom: 60, paddingHorizontal: 20 }}
+        contentContainerStyle={{ paddingTop: SPACING.md + 4, paddingBottom: 60, paddingHorizontal: SPACING.md + 4 }}
         showsVerticalScrollIndicator={false}
       >
         {GROUPS.map((group) => (
           <View key={group.title} style={styles.group}>
-            <Text style={[styles.groupTitle, { color: colors.foreground }]}>{group.title}</Text>
+            <Text style={[TYPE_SCALE.footnote, styles.groupTitle, { color: colors.foreground }]}>{group.title}</Text>
             {group.subtitle && (
-              <Text style={[styles.groupSubtitle, { color: colors.mutedForeground }]}>{group.subtitle}</Text>
+              <Text style={[TYPE_SCALE.footnote, styles.groupSubtitle, { color: colors.mutedForeground }]}>{group.subtitle}</Text>
             )}
-            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Card style={styles.card}>
               {group.rows.map((row, i) => (
-                <View
-                  key={row.key}
-                  style={[
-                    styles.row,
-                    i !== group.rows.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
-                  ]}
-                >
-                  <View style={{ flex: 1, paddingRight: 12 }}>
-                    <Text style={[styles.rowLabel, { color: colors.foreground }]}>{row.label}</Text>
-                    {row.description && (
-                      <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>{row.description}</Text>
-                    )}
-                  </View>
-                  <HapticSwitch
-                    value={values[row.key]}
-                    onValueChange={() => toggle(row.key)}
-                    trackColor={{ false: colors.border, true: colors.primary }}
-                    thumbColor={Platform.OS === 'android' ? colors.background : undefined}
-                    accessibilityLabel={row.description ? `${row.label}, ${row.description}` : row.label}
+                <React.Fragment key={row.key}>
+                  <ListRow
+                    title={row.label}
+                    subtitle={row.description}
+                    toggle={{ value: values[row.key], onChange: () => toggle(row.key) }}
                   />
-                </View>
+                  {i !== group.rows.length - 1 && (
+                    <View style={[styles.rowDivider, { backgroundColor: colors.border }]} />
+                  )}
+                </React.Fragment>
               ))}
-            </View>
+            </Card>
           </View>
         ))}
       </ScrollView>
@@ -106,11 +99,9 @@ export default function PushNotificationsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  group: { marginBottom: 22 },
-  groupTitle: { fontSize: TYPE_SCALE.footnote.fontSize, fontFamily: 'Inter_600SemiBold', marginBottom: 4 },
-  groupSubtitle: { fontSize: TYPE_SCALE.footnote.fontSize, fontFamily: 'Inter_400Regular', marginBottom: 10 },
-  card: { borderRadius: RADII.card, borderWidth: 1, overflow: 'hidden' },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 14 },
-  rowLabel: { fontSize: TYPE_SCALE.callout.fontSize, fontFamily: 'Inter_500Medium' },
-  rowDescription: { fontSize: TYPE_SCALE.footnote.fontSize, fontFamily: 'Inter_400Regular', marginTop: 3 },
+  group: { marginBottom: SPACING.xl - 2 },
+  groupTitle: { fontFamily: FONT.semibold, marginBottom: SPACING.xxs },
+  groupSubtitle: { marginBottom: SPACING.sm - 2 },
+  card: { padding: SPACING.sm },
+  rowDivider: { height: StyleSheet.hairlineWidth },
 });
