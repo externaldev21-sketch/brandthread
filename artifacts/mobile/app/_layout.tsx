@@ -45,6 +45,7 @@ import { initInventoryService } from '@/services/inventoryService';
 import { initAnalyticsService } from '@/services/analyticsService';
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { initBuyerProfile } from '@/lib/buyerProfile';
+import { WebAppShell } from '@/components/web/WebAppShell';
 import StoreContextBanner from '@/components/StoreContextBanner';
 import NetworkNoticeBanner from '@/components/NetworkNoticeBanner';
 import { dismissNetworkNotice } from '@/lib/networkNotice';
@@ -120,7 +121,7 @@ function RuntimeThemeShell({ children }: { children: React.ReactNode }) {
           barStyle={palette.statusBarStyle ?? 'light-content'}
           backgroundColor={background}
         />
-        {children}
+        <WebAppShell>{children}</WebAppShell>
       </View>
     </NavigationThemeProvider>
   );
