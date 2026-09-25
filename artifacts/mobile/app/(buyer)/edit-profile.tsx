@@ -320,7 +320,7 @@ export default function BuyerEditProfileScreen() {
           <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} onPress={() => router.back()}>
             <Feather name="chevron-left" size={24} color={theme.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>Edit profile</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]} numberOfLines={1}>Edit profile</Text>
           <TouchableOpacity
             onPress={handleSave}
             disabled={!isDirty || saving || avatarUploading}
@@ -380,7 +380,7 @@ export default function BuyerEditProfileScreen() {
           <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <View>
               <View style={styles.row}>
-                <Text style={[styles.rowLabel, { color: theme.text }]}>Name</Text>
+                <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Name</Text>
                 <TextInput
                   style={[styles.rowInput, { color: theme.text }]}
                   value={fields.name}
@@ -399,7 +399,7 @@ export default function BuyerEditProfileScreen() {
             {/* Username — format validated live, availability checked on blur */}
             <View>
               <View style={styles.row}>
-                <Text style={[styles.rowLabel, { color: theme.text }]}>Username</Text>
+                <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Username</Text>
                 <TextInput
                   style={[
                     styles.rowInput,
@@ -443,7 +443,7 @@ export default function BuyerEditProfileScreen() {
 
             {/* Bio with character counter */}
             <View style={[styles.row, { alignItems: 'flex-start', paddingTop: 13 }]}>
-              <Text style={[styles.rowLabel, { color: theme.text }]}>Bio</Text>
+              <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Bio</Text>
               <View style={{ flex: 1 }}>
                 <TextInput
                   style={[styles.rowInput, { color: theme.text, textAlignVertical: 'top', minHeight: 60 }]}
@@ -463,7 +463,7 @@ export default function BuyerEditProfileScreen() {
 
             <View>
               <View style={styles.row}>
-                <Text style={[styles.rowLabel, { color: theme.text }]}>Link</Text>
+                <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Link</Text>
                 <TextInput
                   style={[styles.rowInput, { color: theme.text }, errors.link && { color: theme.error }]}
                   value={fields.link}
@@ -488,14 +488,14 @@ export default function BuyerEditProfileScreen() {
               activeOpacity={0.7}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setGenderPickerOpen(true); }}
             >
-              <Text style={[styles.rowLabel, { color: theme.text, flex: 1 }]}>Gender</Text>
+              <Text style={[styles.rowLabel, { color: theme.text, flex: 1 }]} numberOfLines={1}>Gender</Text>
               <Text style={[styles.chevronLabel, { color: theme.muted }]}>{extra.gender || 'Add'}</Text>
               <Feather name="chevron-right" size={17} color={theme.muted} />
             </TouchableOpacity>
             <Divider theme={theme} />
             <View style={styles.row}>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.rowLabel, { color: theme.text }]}>AI creator</Text>
+                <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>AI creator</Text>
                 <Text style={[styles.rowHint, { color: theme.muted }]}>Add this label if your content often uses AI.</Text>
               </View>
               <HapticSwitch
@@ -512,7 +512,7 @@ export default function BuyerEditProfileScreen() {
           <Text style={[styles.sectionHint, { color: theme.muted }]}>Shown next to your name on your profile.</Text>
           <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <View style={styles.row}>
-              <Text style={[styles.rowLabel, { color: theme.text, flex: 1 }]}>Show badge</Text>
+              <Text style={[styles.rowLabel, { color: theme.text, flex: 1 }]} numberOfLines={1}>Show badge</Text>
               <HapticSwitch
                 value={badge.enabled}
                 onValueChange={v => setBadge(b => ({ ...b, enabled: v }))}
@@ -522,7 +522,7 @@ export default function BuyerEditProfileScreen() {
             </View>
             <Divider theme={theme} />
             <View style={styles.row}>
-              <Text style={[styles.rowLabel, { color: theme.text }]}>Emoji</Text>
+              <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Emoji</Text>
               <TextInput
                 style={[styles.rowInput, { color: theme.text }]}
                 value={badge.emoji}
@@ -534,7 +534,7 @@ export default function BuyerEditProfileScreen() {
             </View>
             <Divider theme={theme} />
             <View style={styles.row}>
-              <Text style={[styles.rowLabel, { color: theme.text }]}>Label</Text>
+              <Text style={[styles.rowLabel, { color: theme.text }]} numberOfLines={1}>Label</Text>
               <TextInput
                 style={[styles.rowInput, { color: theme.text }]}
                 value={badge.label}
