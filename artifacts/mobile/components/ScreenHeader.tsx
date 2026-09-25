@@ -31,6 +31,8 @@ interface ScreenHeaderProps {
   /** Scroll distance over which the large title fully collapses. */
   collapseDistance?: number;
   onBack?: () => void;
+  /** Optional testID forwarded to the back/close button, for screens whose tests target it directly. */
+  backTestID?: string;
   /**
    * 'push' (default) shows the standard back arrow for a stack-pushed screen.
    * 'modal' shows a close "X" instead, for screens presented as a modal/sheet
@@ -45,7 +47,7 @@ interface ScreenHeaderProps {
 const MAX_HEADER_ACTIONS = 2;
 
 export function ScreenHeader({
-  title, subtitle, rightElement, actions, scrollY, collapseDistance = 48, onBack, variant = 'push',
+  title, subtitle, rightElement, actions, scrollY, collapseDistance = 48, onBack, backTestID, variant = 'push',
 }: ScreenHeaderProps) {
   const colors = useColors();
   const cappedActions = actions?.slice(-MAX_HEADER_ACTIONS);
@@ -77,6 +79,7 @@ export function ScreenHeader({
           accessibilityRole="button"
           accessibilityLabel={variant === 'modal' ? `Close ${title}` : `Go back from ${title}`}
           accessibilityHint={variant === 'modal' ? `Dismisses ${title}` : `Returns from ${title}`}
+          testID={backTestID}
         >
           <Feather name={variant === 'modal' ? 'x' : 'arrow-left'} size={ICON.md} color={colors.foreground} />
         </PressableScale>
