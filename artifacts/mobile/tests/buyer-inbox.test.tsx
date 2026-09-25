@@ -42,20 +42,31 @@ vi.mock('react-native', () => ({
         ),
       ),
     ),
+  Image: nativeComponent('Image'),
   Modal: nativeComponent('Modal'),
+  Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios },
   RefreshControl: nativeComponent('RefreshControl'),
   ScrollView: nativeComponent('ScrollView'),
-  StyleSheet: { create: (styles: unknown) => styles, flatten: (s: unknown) => s },
+  StyleSheet: { create: (styles: unknown) => styles, flatten: (s: unknown) => s, hairlineWidth: 1, absoluteFill: {} },
+  Switch: nativeComponent('Switch'),
   Text: nativeComponent('Text'),
   TextInput: nativeComponent('TextInput'),
   TouchableOpacity: nativeComponent('TouchableOpacity'),
   View: nativeComponent('View'),
-  Pressable: nativeComponent('Pressable'),
+  Pressable: (props: Record<string, unknown> & { children?: unknown }) => {
+    const { children, ...rest } = props;
+    return React.createElement(
+      'Pressable',
+      rest,
+      typeof children === 'function' ? (children as (state: { pressed: boolean }) => React.ReactNode)({ pressed: false }) : (children as React.ReactNode),
+    );
+  },
   Animated: {
     Value: class { _value: number; constructor(v?: number) { this._value = v ?? 0; } setValue(v: number) { this._value = v; } },
     View: nativeComponent('Animated.View'),
     timing: () => ({ start: (cb?: () => void) => cb?.() }),
     spring: () => ({ start: (cb?: () => void) => cb?.() }),
+    parallel: () => ({ start: (cb?: () => void) => cb?.() }),
   },
   PanResponder: { create: () => ({ panHandlers: {} }) },
 }));
@@ -67,7 +78,28 @@ vi.mock('@expo/vector-icons', () => ({
 vi.mock('expo-haptics', () => ({
   impactAsync: vi.fn(() => Promise.resolve()),
   selectionAsync: vi.fn(() => Promise.resolve()),
+  notificationAsync: vi.fn(() => Promise.resolve()),
   ImpactFeedbackStyle: { Light: 'light', Medium: 'medium' },
+  NotificationFeedbackType: { Success: 'success', Error: 'error', Warning: 'warning' },
+}));
+
+vi.mock('expo-linear-gradient', () => ({
+  LinearGradient: (props: Record<string, unknown>) => React.createElement('LinearGradient', props, props.children as React.ReactNode),
+}));
+
+vi.mock('react-native-svg', () => ({
+  default: nativeComponent('Svg'),
+  Line: nativeComponent('Line'),
+}));
+
+vi.mock('react-native-reanimated', () => ({
+  default: {
+    View: (props: Record<string, unknown>) => React.createElement('Animated.View', props, props.children as React.ReactNode),
+  },
+  Easing: { out: (fn: unknown) => fn, cubic: (v: number) => v, linear: (v: number) => v },
+  useSharedValue: (initial: number) => ({ value: initial, set: () => {} }),
+  useAnimatedStyle: (fn: () => unknown) => fn(),
+  withTiming: (value: unknown) => value,
 }));
 
 vi.mock('expo-router', () => ({
@@ -134,24 +166,17 @@ vi.mock('@/lib/api', () => ({
   useApi: () => ({ conversations: { accept: vi.fn(), decline: vi.fn() } }),
 }));
 
-vi.mock('@/lib/theme', () => ({
-  BG: '#09090b',
-  SCREEN_BG: 'transparent',
-  CARD: '#18181b',
-  CARD_ELEVATED: '#202024',
-  BORDER: '#3f3f46',
-  FG: '#fafafa',
-  MUTED: '#a1a1aa',
-  SUBTLE: '#71717a',
-  RED: '#ef4444',
-  SURFACE: '#111113',
-  FONT: { regular: 'Test-Regular', medium: 'Test-Medium', semibold: 'Test-Semibold', bold: 'Test-Bold' },
-  FS: { xs: 11, sm: 13, base: 15, md: 17 },
-  SP: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 },
-  RADIUS: { xs: 6, sm: 10, md: 14, lg: 18, xl: 24, pill: 999 },
-  COMP: {},
-  ICON: { xs: 14, sm: 16, md: 20, lg: 24, xl: 28 },
-}));
+vi.mock('@/lib/theme', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/theme')>();
+  return {
+    ...actual,
+    FONT: { regular: 'Test-Regular', medium: 'Test-Medium', semibold: 'Test-Semibold', bold: 'Test-Bold' },
+    FS: { xs: 11, sm: 13, base: 15, md: 17 },
+    SP: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 },
+    RADIUS: { xs: 6, sm: 10, md: 14, lg: 18, xl: 24, pill: 999 },
+    ICON: { xs: 14, sm: 16, md: 20, lg: 24, xl: 28 },
+  };
+});
 
 vi.mock('@/services/socialService', () => ({
   getConversations: getConversationsMock,

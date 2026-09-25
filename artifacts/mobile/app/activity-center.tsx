@@ -19,29 +19,29 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  RefreshControl,
   ScrollView,
   SectionList,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
   type ViewToken,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 import { useUser } from '@clerk/expo';
 
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
-import { FONT, FS, ICON, ON_DARK, RADIUS, SP } from '@/lib/theme';
+import { FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
 import { Header, EmptyState, SkeletonBlock } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { ThemedRefreshControl } from '@/components/ui';
 import SwipeActionRow from '@/components/SwipeActionRow';
 import { useApi } from '@/lib/api';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
+import { hapticPrimaryAction, hapticSuccessAction, hapticToggle } from '@/lib/haptics';
 import {
   ACTIVITY_FILTERS,
   ACTIVITY_PAGE_SIZE,
@@ -109,7 +109,7 @@ function Avatar({ actor, size, styles, ring }: {
       ]}
     >
       <Text
-        style={[styles.avatarText, { fontSize: size >= 40 ? FS.sm : FS.xs }]}
+        style={[styles.avatarText, { color: theme.onAccent, fontSize: size >= 40 ? FS.sm : FS.xs }]}
         allowFontScaling={false}
         numberOfLines={1}
       >
@@ -189,9 +189,8 @@ const ActivityRowView = React.memo(function ActivityRowView({
       onAction={() => onDismiss(row)}
       accessibilityLabel="Dismiss activity"
     >
-      <TouchableOpacity
+      <PressableScale
         style={[styles.row, { backgroundColor: rowBackground }]}
-        activeOpacity={0.75}
         onPress={() => onPress(row)}
         accessibilityRole="button"
         accessibilityLabel={`${unread ? 'Unread. ' : ''}${sentence}. ${relativeTime(row.createdAt, now)}`}
@@ -217,7 +216,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
         </View>
 
         {followBack ? (
-          <TouchableOpacity
+          <PressableScale
             style={[
               styles.followBtn,
               followState === 'done'
@@ -240,7 +239,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
                 {followState === 'done' ? 'Following' : 'Follow back'}
               </Text>
             )}
-          </TouchableOpacity>
+          </PressableScale>
         ) : row.targetImageUrl ? (
           <CachedImage
             source={{ uri: row.targetImageUrl }}
@@ -255,7 +254,7 @@ const ActivityRowView = React.memo(function ActivityRowView({
         ) : null}
 
         {unread && <View style={styles.unreadDot} />}
-      </TouchableOpacity>
+      </PressableScale>
     </SwipeActionRow>
   );
 });
@@ -344,7 +343,7 @@ export default function ActivityCenterScreen() {
 
   const changeFilter = useCallback((next: ActivityFilter) => {
     if (next === filter) return;
-    Haptics.selectionAsync().catch(() => {});
+    hapticToggle();
     setItems([]);
     setHasMore(true);
     setStatus('loading');
@@ -429,11 +428,12 @@ export default function ActivityCenterScreen() {
   const handleFollowBack = useCallback(async (row: ActivityRow) => {
     const userId = row.targetId;
     if (!userId) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    hapticPrimaryAction();
     setFollowStates((prev) => ({ ...prev, [row.key]: 'pending' }));
     tracker.markNow(row.ids.filter((id) => !readIdsRef.current.has(id)));
     try {
       await setSellerFollowing(userId, true);
+      hapticSuccessAction();
       setFollowStates((prev) => ({ ...prev, [row.key]: 'done' }));
     } catch {
       setFollowStates((prev) => {
@@ -446,7 +446,7 @@ export default function ActivityCenterScreen() {
   }, [tracker]);
 
   const handleMarkAll = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    hapticPrimaryAction();
     const previous = itemsRef.current;
     setItems((prev) => applyRead(prev, prev.map((item) => item.id)));
     try {
@@ -499,16 +499,17 @@ export default function ActivityCenterScreen() {
         {ACTIVITY_FILTERS.map((chip) => {
           const active = chip.key === filter;
           return (
-            <TouchableOpacity
+            <PressableScale
               key={chip.key}
               style={[styles.chip, active && styles.chipActive]}
               onPress={() => changeFilter(chip.key)}
               accessibilityRole="tab"
+              accessibilityLabel={chip.label}
               accessibilityState={{ selected: active }}
               hitSlop={{ top: 6, bottom: 6 }}
             >
               <Text style={[styles.chipText, active && styles.chipTextActive]}>{chip.label}</Text>
-            </TouchableOpacity>
+            </PressableScale>
           );
         })}
       </ScrollView>
@@ -537,11 +538,9 @@ export default function ActivityCenterScreen() {
           onEndReached={() => { void loadMore(); }}
           onEndReachedThreshold={0.4}
           refreshControl={(
-            <RefreshControl
+            <ThemedRefreshControl
               refreshing={refreshing}
               onRefresh={() => { void loadFirstPage('refresh'); }}
-              tintColor={theme.muted}
-              colors={[theme.accent]}
             />
           )}
           ListEmptyComponent={(
@@ -639,7 +638,6 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: {
-    color: ON_DARK,
     fontFamily: FONT.bold,
     letterSpacing: 0.2,
   },

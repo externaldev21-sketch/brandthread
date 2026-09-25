@@ -88,6 +88,14 @@ vi.mock('react-native', () => {
       props.visible ? React.createElement('Modal', props, props.children) : null,
     PanResponder: { create: () => ({ panHandlers: {} }) },
     Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios },
+    Pressable: (props: Record<string, unknown> & { children?: unknown }) => {
+      const { children, ...rest } = props;
+      return React.createElement(
+        'Pressable',
+        rest,
+        typeof children === 'function' ? (children as (state: { pressed: boolean }) => React.ReactNode)({ pressed: false }) : (children as React.ReactNode),
+      );
+    },
     RefreshControl: nativeComponent('RefreshControl'),
     ScrollView: nativeComponent('ScrollView'),
     Share: { share: vi.fn().mockResolvedValue({}) },
@@ -122,6 +130,20 @@ vi.mock('expo-linear-gradient', () => ({
   LinearGradient: (props: Record<string, unknown>) => React.createElement('LinearGradient', props, props.children as React.ReactNode),
 }));
 
+vi.mock('expo-image', () => ({
+  Image: (props: Record<string, unknown>) => React.createElement('Image', props, props.children as React.ReactNode),
+}));
+
+vi.mock('react-native-reanimated', () => ({
+  default: {
+    View: (props: Record<string, unknown>) => React.createElement('Animated.View', props, props.children as React.ReactNode),
+  },
+  Easing: { out: (fn: unknown) => fn, cubic: (v: number) => v, linear: (v: number) => v },
+  useSharedValue: (initial: number) => ({ value: initial, set: () => {} }),
+  useAnimatedStyle: (fn: () => unknown) => fn(),
+  withTiming: (value: unknown) => value,
+}));
+
 vi.mock('@expo/vector-icons', () => ({
   Feather: ({ name }: { name: string }) => React.createElement('Feather', { name }),
   MaterialCommunityIcons: ({ name }: { name: string }) => React.createElement('MaterialCommunityIcons', { name }),
@@ -145,7 +167,10 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
 vi.mock('expo-haptics', () => ({
   impactAsync: vi.fn().mockResolvedValue(undefined),
+  selectionAsync: vi.fn().mockResolvedValue(undefined),
+  notificationAsync: vi.fn().mockResolvedValue(undefined),
   ImpactFeedbackStyle: { Light: 'light', Medium: 'medium' },
+  NotificationFeedbackType: { Success: 'success', Error: 'error', Warning: 'warning' },
 }));
 
 vi.mock('expo-image-picker', () => ({
@@ -218,13 +243,17 @@ vi.mock('@/contexts/AppThemeContext', () => ({
   }),
 }));
 
-vi.mock('@/lib/theme', () => ({
-  FONT: { regular: 'System', semibold: 'System', bold: 'System', medium: 'System' },
-  FS: { xs: 11, sm: 13, base: 15, md: 17, lg: 19, xl: 22 },
-  SP: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 },
-  RADIUS: { xs: 6, sm: 10, md: 14, lg: 18, xl: 24, pill: 999 },
-  ICON: { xs: 14, sm: 16, md: 20, lg: 24, xl: 28 },
-}));
+vi.mock('@/lib/theme', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/theme')>();
+  return {
+    ...actual,
+    FONT: { regular: 'System', semibold: 'System', bold: 'System', medium: 'System' },
+    FS: { xs: 11, sm: 13, base: 15, md: 17, lg: 19, xl: 22 },
+    SP: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 },
+    RADIUS: { xs: 6, sm: 10, md: 14, lg: 18, xl: 24, pill: 999 },
+    ICON: { xs: 14, sm: 16, md: 20, lg: 24, xl: 28 },
+  };
+});
 
 import BuyerConversationScreen from '@/app/buyer-conversation';
 
@@ -412,7 +441,7 @@ describe('buyer conversation chat redesign', () => {
 
   it('sends a message optimistically and clears the input', async () => {
     renderer = await renderScreen();
-    const input = renderer.root.findByProps({ placeholder: 'Message...' });
+    const input = renderer.root.findByProps({ placeholder: 'Message…' });
     await act(async () => {
       input.props.onChangeText('Hi!');
     });
@@ -423,14 +452,14 @@ describe('buyer conversation chat redesign', () => {
     });
 
     expect(socialServiceMock.sendMessage).toHaveBeenCalledWith('conv-1', 'Hi!', undefined, undefined);
-    const inputAfter = renderer.root.findByProps({ placeholder: 'Message...' });
+    const inputAfter = renderer.root.findByProps({ placeholder: 'Message…' });
     expect(inputAfter.props.value).toBe('');
   });
 
   it('restores the draft and shows an alert when sending fails, and retry resends it', async () => {
     socialServiceMock.sendMessage.mockRejectedValueOnce(new Error('network down'));
     renderer = await renderScreen();
-    const input = renderer.root.findByProps({ placeholder: 'Message...' });
+    const input = renderer.root.findByProps({ placeholder: 'Message…' });
     await act(async () => {
       input.props.onChangeText('Will this send?');
     });
@@ -440,7 +469,7 @@ describe('buyer conversation chat redesign', () => {
     });
 
     expect(alertMock).toHaveBeenCalledWith('Message not sent', expect.any(String));
-    const inputAfter = renderer.root.findByProps({ placeholder: 'Message...' });
+    const inputAfter = renderer.root.findByProps({ placeholder: 'Message…' });
     expect(inputAfter.props.value).toBe('Will this send?');
 
     socialServiceMock.sendMessage.mockResolvedValueOnce(messageFixture({ id: 'msg-3', fromId: 'me', text: 'Will this send?' }));

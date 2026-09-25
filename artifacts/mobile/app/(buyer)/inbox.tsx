@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity,
+  View, Text, FlatList,
   Alert, StyleSheet, ScrollView, RefreshControl,
   Modal, TextInput, ActivityIndicator,
 } from 'react-native';
@@ -10,13 +10,8 @@ import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { EmptyState, ListSkeleton } from '@/components/layout';
 import { useFocusEffect, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
-import {
-  BG, SCREEN_BG, CARD, CARD_ELEVATED, BORDER,
-  FG, MUTED, SUBTLE, RED,
-  SURFACE, FONT, FS, SP, RADIUS, COMP, ICON,
-} from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON, SCREEN_BG } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   getConversations, markConversationRead, archiveConversation,
@@ -27,6 +22,10 @@ import type { Conversation, Notification, ProfileSearchResult } from '@/services
 import { useApi } from '@/lib/api';
 import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
 import { ConversationPreview } from '@/components/inbox/ConversationPreview';
+import { IconButton } from '@/components/ui/IconButton';
+import { Snackbar } from '@/components/ui/Snackbar';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { hapticPrimaryAction, hapticDestructiveConfirm } from '@/lib/haptics';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -70,7 +69,7 @@ export default function InboxScreen() {
   const router = useRouter();
   const api = useApi();
   const { theme } = useAppTheme();
-  const palette = theme as typeof theme & { background?: string; };
+  const s = React.useMemo(() => createStyles(theme), [theme]);
   const { userId } = useAuth();
   const accountRef = useRef(userId);
   accountRef.current = userId;
@@ -90,6 +89,14 @@ export default function InboxScreen() {
   const [composeStartingId, setComposeStartingId] = useState<string | null>(null);
   const composeSearchSeq = useRef(0);
   const [messagesSearchQuery, setMessagesSearchQuery] = useState('');
+  const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
+  const snackbarTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showSnackbar = useCallback((message: string) => {
+    if (snackbarTimer.current) clearTimeout(snackbarTimer.current);
+    setSnackbarMessage(message);
+    snackbarTimer.current = setTimeout(() => setSnackbarMessage(null), 2500);
+  }, []);
 
   const loadData = useCallback(async () => {
     if (!userId) {
@@ -164,13 +171,13 @@ export default function InboxScreen() {
   function openConversation(conv: Conversation) {
     // Don't open request conversations inline — user must accept first
     if (conv.isRequest) return;
-    Haptics.selectionAsync();
+    hapticPrimaryAction();
     markConversationRead(conv.id);
     router.push(`/buyer-conversation?id=${conv.id}` as never);
   }
 
   async function acceptRequest(conv: Conversation) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticPrimaryAction();
     setRequestActionLoading(conv.id);
     try {
       await api.conversations.accept(conv.id);
@@ -181,7 +188,7 @@ export default function InboxScreen() {
       markConversationRead(conv.id);
       router.push(`/buyer-conversation?id=${conv.id}` as never);
     } catch {
-      Alert.alert('Error', 'Could not accept request. Try again.');
+      Alert.alert('Couldn’t accept request', 'Please try again.');
     } finally {
       setRequestActionLoading(null);
     }
@@ -203,7 +210,7 @@ export default function InboxScreen() {
               await api.conversations.decline(conv.id);
               setConversations(prev => prev.filter(c => c.id !== conv.id));
             } catch {
-              Alert.alert('Error', 'Could not decline request. Try again.');
+              Alert.alert('Couldn’t decline request', 'Please try again.');
             } finally {
               setRequestActionLoading(null);
             }
@@ -214,9 +221,9 @@ export default function InboxScreen() {
   }
 
   function longPressConversation(conv: Conversation) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    hapticDestructiveConfirm();
     Alert.alert('Options', undefined, [
-      { text: 'Archive', onPress: () => archiveConversation(conv.id), style: 'destructive' },
+      { text: 'Archive', onPress: () => swipeArchiveConversation(conv), style: 'destructive' },
       { text: 'Cancel', style: 'cancel' },
     ]);
   }
@@ -226,6 +233,7 @@ export default function InboxScreen() {
     setConversations(prev => prev.map(item =>
       item.id === conv.id ? { ...item, isArchived: true } : item
     ));
+    showSnackbar('Conversation archived');
   }
 
   // Swipe actions on a Messages-tab row: delete removes it from the inbox
@@ -248,8 +256,9 @@ export default function InboxScreen() {
         initials: participant.initials,
         color: participant.color,
       });
+      showSnackbar(`Muted ${participant.name}`);
     } catch {
-      Alert.alert('Error', 'Could not mute. Try again.');
+      Alert.alert('Couldn’t mute', 'Please try again.');
     }
   }
 
@@ -261,12 +270,11 @@ export default function InboxScreen() {
         item.id === conv.id ? { ...item, unreadCount: 0 } : item
       ));
     } catch {
-      Alert.alert('Error', 'Could not mark as read. Try again.');
+      Alert.alert('Couldn’t mark as read', 'Please try again.');
     }
   }
 
   function openCompose() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setComposeQuery('');
     setComposeResults([]);
     setComposeVisible(true);
@@ -331,7 +339,7 @@ export default function InboxScreen() {
   }
 
   function openFollow(notif: Notification) {
-    Haptics.selectionAsync();
+    hapticPrimaryAction();
     if (!notif.isRead) {
       markNotificationRead(notif.id);
       setNotifications(prev => prev.map(item =>
@@ -373,22 +381,22 @@ export default function InboxScreen() {
 
             {/* Accept / Decline buttons */}
             <View style={s.requestActions}>
-              <TouchableOpacity
+              <PressableScale
                 style={[s.requestAcceptBtn, { backgroundColor: theme.accent }, isLoadingAction && s.requestBtnDisabled]}
                 onPress={() => acceptRequest(conv)}
                 disabled={isLoadingAction}
                 activeOpacity={0.8}
               >
                 <Text style={[s.requestAcceptText, { color: theme.onAccent }]}>Accept</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </PressableScale>
+              <PressableScale
                 style={[s.requestDeclineBtn, isLoadingAction && s.requestBtnDisabled]}
                 onPress={() => declineRequest(conv)}
                 disabled={isLoadingAction}
                 activeOpacity={0.8}
               >
                 <Text style={s.requestDeclineText}>Decline</Text>
-              </TouchableOpacity>
+              </PressableScale>
             </View>
           </View>
         </View>
@@ -401,7 +409,7 @@ export default function InboxScreen() {
         label: 'Read',
         icon: 'check-circle',
         color: theme.accentDim,
-        textColor: theme.accent,
+        textColor: theme.accentLight,
         onPress: () => swipeMarkReadConversation(conv),
         accessibilityLabel: `Mark conversation with ${participant.name} as read`,
       },
@@ -418,8 +426,8 @@ export default function InboxScreen() {
         key: 'delete',
         label: 'Delete',
         icon: 'trash-2',
-        color: RED,
-        textColor: '#FFFFFF',
+        color: theme.cardElevated,
+        textColor: theme.error,
         onPress: () => swipeDeleteConversation(conv),
         accessibilityLabel: `Delete conversation with ${participant.name}`,
       },
@@ -427,7 +435,7 @@ export default function InboxScreen() {
 
     return (
       <InboxSwipeRow rowId={conv.id} actions={swipeActions}>
-        <TouchableOpacity
+        <PressableScale
           style={s.convRow}
           onPress={() => openConversation(conv)}
           onLongPress={() => longPressConversation(conv)}
@@ -483,7 +491,7 @@ export default function InboxScreen() {
         ) : (
             <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
         )}
-        </TouchableOpacity>
+        </PressableScale>
       </InboxSwipeRow>
     );
   }
@@ -491,32 +499,31 @@ export default function InboxScreen() {
   function renderFollowRow({ item: notif }: { item: Notification }) {
     const isUnread = !notif.isRead;
     return (
-      <TouchableOpacity
+      <PressableScale
         style={s.convRow}
         onPress={() => openFollow(notif)}
-        activeOpacity={0.75}
         accessibilityRole="button"
         accessibilityLabel={notif.title}
       >
         <View style={s.avatarContainer}>
-          <View style={[s.avatar48, { backgroundColor: notif.actorColor ?? CARD }]}>
+          <View style={[s.avatar48, { backgroundColor: notif.actorColor ?? theme.cardElevated }]}>
             <Text style={s.avatarInitials}>{notif.actorInitials ?? '?'}</Text>
           </View>
           {isUnread && <View style={[s.unreadDot, { backgroundColor: theme.accent }]} />}
         </View>
         <View style={s.convCenter}>
           <View style={s.convNameRow}>
-            <Text style={[s.convName, { fontFamily: isUnread ? FONT.bold : FONT.semibold }]} numberOfLines={1}>
+            <Text style={[s.convName, { color: theme.text, fontFamily: isUnread ? FONT.bold : FONT.semibold }]} numberOfLines={1}>
               {notif.actorName ?? notif.title}
             </Text>
             <Text style={s.convTime}>{timeAgo(new Date(notif.createdAt).getTime())}</Text>
           </View>
-          <Text style={[s.convPreview, isUnread && { color: FG }]} numberOfLines={2}>
+          <Text style={[s.convPreview, isUnread && { color: theme.text }]} numberOfLines={2}>
             {notif.body || 'Started following you'}
           </Text>
         </View>
-        <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
-      </TouchableOpacity>
+        <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
+      </PressableScale>
     );
   }
 
@@ -545,29 +552,20 @@ export default function InboxScreen() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <View style={[s.root, { backgroundColor: palette.background ?? BG }]}>
-      {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
-        <TouchableOpacity
-          style={s.headerSide}
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <Feather name="arrow-left" size={22} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Inbox</Text>
-        <TouchableOpacity
-          style={s.headerSide}
+    <View style={[s.root, { backgroundColor: SCREEN_BG }]}>
+      {/* Header — tab root: no back arrow, just the title and the compose action */}
+      <View style={[s.header, { paddingTop: insets.top + SP.sm, borderBottomColor: theme.border }]}>
+        <View style={s.headerSide} />
+        <Text style={[s.headerTitle, { color: theme.text }]}>Inbox</Text>
+        <IconButton
+          name="edit-3"
+          size={20}
+          variant="plain"
+          color={theme.text}
           onPress={openCompose}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel="New conversation"
-        >
-          <Feather name="edit-3" size={21} color={FG} />
-          {unreadNotifCount > 0 && <View style={[s.headerUnreadDot, { backgroundColor: theme.accent }]} />}
-        </TouchableOpacity>
+          accessibilityLabel="New message"
+          testID="inbox-header-compose"
+        />
       </View>
 
       {/* Inbox categories */}
@@ -578,19 +576,19 @@ export default function InboxScreen() {
             ? conversations.filter(conv => conv.isRequest && !conv.isArchived).length
             : tab === 'Follows'
               ? followNotifications.filter(notif => !notif.isRead).length
-              : conversations.filter(conv => !conv.isRequest && !conv.isArchived).length;
+              : conversations.filter(conv => !conv.isRequest && !conv.isArchived && conv.unreadCount > 0).length;
           return (
-            <TouchableOpacity
+            <PressableScale
               key={tab}
               style={s.primaryTab}
-              onPress={() => setActiveTab(tab)}
-              activeOpacity={0.8}
+              onPress={() => { hapticPrimaryAction(); setActiveTab(tab); }}
               accessibilityRole="tab"
               accessibilityState={{ selected: isActive }}
+              accessibilityLabel={tab}
             >
-              <Text style={[s.primaryTabText, isActive && s.primaryTabTextActive]}>{tab}</Text>
-              {count > 0 && <Text style={s.primaryTabCount}>{count > 99 ? '99+' : count}</Text>}
-            </TouchableOpacity>
+              <Text style={[s.primaryTabText, isActive && s.primaryTabTextActive, { color: isActive ? theme.text : theme.muted }]}>{tab}</Text>
+              {count > 0 && <Text style={[s.primaryTabCount, { color: theme.accent }]}>{count > 99 ? '99+' : count}</Text>}
+            </PressableScale>
           );
         })}
       </View>
@@ -610,14 +608,14 @@ export default function InboxScreen() {
             accessibilityLabel="Search conversations"
           />
           {messagesSearchQuery.length > 0 && (
-            <TouchableOpacity
+            <PressableScale
               onPress={() => setMessagesSearchQuery('')}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
               accessibilityLabel="Clear search"
             >
               <Feather name="x" size={15} color={theme.muted} />
-            </TouchableOpacity>
+            </PressableScale>
           )}
         </View>
       )}
@@ -674,16 +672,16 @@ export default function InboxScreen() {
 
       {/* New message FAB */}
       {activeTab === 'Messages' && !loading && (
-        <TouchableOpacity
+        <PressableScale
           style={[s.fab, { bottom: barInset + SP.md, backgroundColor: theme.accent, shadowColor: theme.shadowColor }]}
-          onPress={openCompose}
+          onPress={() => { hapticPrimaryAction(); openCompose(); }}
           activeOpacity={0.85}
           accessibilityRole="button"
           accessibilityLabel="New message"
           testID="inbox-fab-new-message"
         >
           <Feather name="edit-3" size={22} color={theme.onAccent} />
-        </TouchableOpacity>
+        </PressableScale>
       )}
 
       <Modal
@@ -697,14 +695,14 @@ export default function InboxScreen() {
             <View style={s.composeHandle} />
             <View style={s.composeHeader}>
               <Text style={s.composeTitle}>New message</Text>
-              <TouchableOpacity
+              <PressableScale
                 onPress={closeCompose}
                 accessibilityRole="button"
                 accessibilityLabel="Close"
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <Feather name="x" size={22} color={theme.text} />
-              </TouchableOpacity>
+              </PressableScale>
             </View>
             <View style={[s.composeSearchRow, { borderColor: theme.border }]}>
               <Feather name="search" size={16} color={theme.muted} />
@@ -728,7 +726,7 @@ export default function InboxScreen() {
                 keyExtractor={item => item.userId}
                 keyboardShouldPersistTaps="handled"
                 renderItem={({ item }) => (
-                  <TouchableOpacity
+                  <PressableScale
                     style={s.composeResultRow}
                     onPress={() => startConversationWith(item)}
                     disabled={!!composeStartingId}
@@ -743,21 +741,28 @@ export default function InboxScreen() {
                       <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs }} numberOfLines={1}>{item.handle}</Text>
                     </View>
                     {composeStartingId === item.userId && <ActivityIndicator color={theme.accent} size="small" />}
-                  </TouchableOpacity>
+                  </PressableScale>
                 )}
               />
             )}
           </View>
         </View>
       </Modal>
+
+      <Snackbar
+        visible={!!snackbarMessage}
+        message={snackbarMessage ?? ''}
+        onDismiss={() => setSnackbarMessage(null)}
+      />
     </View>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: SCREEN_BG },
+function createStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
+  return StyleSheet.create({
+  root: { flex: 1 },
 
   // Compose modal
   composeBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
@@ -768,15 +773,15 @@ const s = StyleSheet.create({
     paddingHorizontal: SP.md,
     height: '70%',
   },
-  composeHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: SP.sm },
+  composeHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: 'center', marginBottom: SP.sm },
   composeHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     marginBottom: SP.sm,
   },
-  composeTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
+  composeTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: theme.text },
   composeSearchRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: SP.sm, height: 44,
+    borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.md, paddingHorizontal: SP.sm, height: 44,
     marginBottom: SP.sm,
   },
   composeSearchInput: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, height: 44 },
@@ -798,7 +803,6 @@ const s = StyleSheet.create({
     paddingBottom: 10,
     backgroundColor: 'transparent',
     borderBottomWidth: 1,
-    borderBottomColor: BORDER,
   },
   headerSide: {
     width: 44,
@@ -810,17 +814,12 @@ const s = StyleSheet.create({
   headerTitle: {
     fontSize: FS.md,
     fontFamily: FONT.semibold,
-    color: FG,
-  },
-  headerUnreadDot: {
-    position: 'absolute', top: 8, right: 7, width: 7, height: 7, borderRadius: 4,
-    borderWidth: 1.5, borderColor: BG,
   },
   primaryTabs: {
     flexDirection: 'row',
     minHeight: 48,
     borderBottomWidth: 1,
-    borderBottomColor: BORDER,
+    borderBottomColor: theme.border,
     backgroundColor: 'transparent',
     paddingHorizontal: SP.sm,
   },
@@ -832,9 +831,9 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     gap: 3,
   },
-  primaryTabText: { fontSize: 13, fontFamily: FONT.regular, color: MUTED },
-  primaryTabTextActive: { fontFamily: FONT.semibold, color: FG },
-  primaryTabCount: { fontSize: 13, fontFamily: FONT.semibold, color: RED },
+  primaryTabText: { fontSize: 13, fontFamily: FONT.regular },
+  primaryTabTextActive: { fontFamily: FONT.semibold },
+  primaryTabCount: { fontSize: 13, fontFamily: FONT.semibold },
   notifBadge: {
     position: 'absolute',
     top: 4,
@@ -849,7 +848,7 @@ const s = StyleSheet.create({
   notifBadgeText: {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: FG,
+    color: theme.text,
   },
 
   // Tabs
@@ -878,7 +877,7 @@ const s = StyleSheet.create({
     paddingHorizontal: SP.md,
     paddingVertical: SP.md,
     borderBottomWidth: 1,
-    borderBottomColor: BORDER,
+    borderBottomColor: theme.border,
     backgroundColor: 'transparent',
     gap: SP.md,
   },
@@ -891,28 +890,30 @@ const s = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 36,
     paddingVertical: SP.xs,
     borderRadius: RADIUS.md,
   },
   requestAcceptText: {
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
-    color: '#FFFFFF',
+    color: theme.onAccent,
   },
   requestDeclineBtn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 36,
     paddingVertical: SP.xs,
-    backgroundColor: CARD,
+    backgroundColor: theme.card,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
   },
   requestDeclineText: {
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
-    color: MUTED,
+    color: theme.muted,
   },
   requestBtnDisabled: {
     opacity: 0.5,
@@ -928,7 +929,7 @@ const s = StyleSheet.create({
     paddingVertical: SP.md,
     minHeight: 78,
     borderBottomWidth: 1,
-    borderBottomColor: BORDER,
+    borderBottomColor: theme.border,
     backgroundColor: 'transparent',
   },
   avatarContainer: {
@@ -954,7 +955,7 @@ const s = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: BG,
+    borderColor: theme.background,
   },
   onlineDot: {
     position: 'absolute',
@@ -1008,12 +1009,11 @@ const s = StyleSheet.create({
   convName: {
     flex: 1,
     fontSize: FS.base,
-    color: FG,
   },
   convTime: {
     fontSize: FS.xs,
     fontFamily: FONT.regular,
-    color: MUTED,
+    color: theme.muted,
     marginLeft: SP.xs,
   },
   orderPill: {
@@ -1030,7 +1030,7 @@ const s = StyleSheet.create({
   convPreview: {
     fontSize: FS.sm,
     fontFamily: FONT.regular,
-    color: MUTED,
+    color: theme.muted,
   },
   unreadBadge: {
     minWidth: 20,
@@ -1044,7 +1044,7 @@ const s = StyleSheet.create({
   unreadBadgeText: {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: '#FFFFFF',
+    color: theme.onAccent,
   },
 
   // Empty state
@@ -1063,13 +1063,14 @@ const s = StyleSheet.create({
   emptyTitle: {
     fontSize: FS.base,
     fontFamily: FONT.semibold,
-    color: MUTED,
+    color: theme.muted,
     marginTop: SP.sm,
   },
   emptySubtitle: {
     fontSize: FS.sm,
     fontFamily: FONT.regular,
-    color: SUBTLE,
+    color: theme.subtle,
   },
   retryText: { fontSize: FS.sm, fontFamily: FONT.semibold, marginTop: SP.sm },
-});
+  });
+}

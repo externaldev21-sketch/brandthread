@@ -3,32 +3,31 @@
  * loaded from the social and saved-items services. No hard-coded numbers.
  */
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useFocusEffect } from 'expo-router';
-import * as Haptics from 'expo-haptics';
-import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, ORANGE,
-  FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { FONT, ICON } from '@/lib/theme';
+import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { getMyPosts, getSavedItems, getMyReposts } from '@/services/socialService';
 import { Header } from '@/components/layout';
+import { Card, ErrorState, ListRow, SkeletonBlock, SkeletonLine } from '@/components/ui';
+import { TYPE_SCALE } from '@/constants/typography';
+import { SPACING } from '@/constants/spacing';
 
 // Simple inline bar chart using plain Views — no chart library
 function BarChart({ data, maxVal }: { data: number[]; maxVal: number }) {
   const { theme } = useAppTheme();
   const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, height: 88, paddingTop: 8 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: SPACING.xs, height: 88, paddingTop: SPACING.xs }}>
       {data.map((val, i) => {
         const h = maxVal > 0 ? Math.max(4, (val / maxVal) * 72) : 4;
         const isToday = i === data.length - 1;
         return (
-          <View key={i} style={{ flex: 1, alignItems: 'center', gap: 4 }}>
+          <View key={i} style={{ flex: 1, alignItems: 'center', gap: SPACING.xxs }}>
             <View
               style={{
                 height: h,
@@ -37,7 +36,7 @@ function BarChart({ data, maxVal }: { data: number[]; maxVal: number }) {
                 width: '100%',
               }}
             />
-            <Text style={{ fontFamily: FONT.regular, fontSize: FS.xs, color: isToday ? theme.accent : MUTED }}>
+            <Text style={[TYPE_SCALE.caption, { color: isToday ? theme.accent : theme.muted }]}>
               {days[i]}
             </Text>
           </View>
@@ -47,12 +46,29 @@ function BarChart({ data, maxVal }: { data: number[]; maxVal: number }) {
   );
 }
 
+function StatsSkeleton({ s }: { s: Styles }) {
+  return (
+    <>
+      <SkeletonLine width={72} height={12} style={{ marginBottom: SPACING.sm, marginTop: SPACING.md }} />
+      <View style={s.statsGrid}>
+        {[0, 1, 2].map((i) => (
+          <View key={i} style={s.statCard}>
+            <SkeletonBlock width={20} height={20} radius={4} />
+            <SkeletonLine width="40%" height={22} style={{ marginTop: SPACING.xs }} />
+            <SkeletonLine width="60%" height={12} />
+            <SkeletonLine width="80%" height={11} />
+          </View>
+        ))}
+      </View>
+    </>
+  );
+}
+
+type Styles = ReturnType<typeof makeStyles>;
+
 export default function BuyerYourActivity() {
   const { theme } = useAppTheme();
-  const PURPLE = theme.accent;
-  const PURPLE_DIM = theme.accentDim;
-  const CYAN = theme.accentLight;
-  const s = makeStyles();
+  const s = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { userId } = useAuth();
@@ -67,6 +83,7 @@ export default function BuyerYourActivity() {
       setPostCount(0);
       setSavedCount(0);
       setRepostCount(0);
+      setLoadError(false);
       setLoaded(true);
       return;
     }
@@ -77,10 +94,9 @@ export default function BuyerYourActivity() {
       setSavedCount(saved.length);
       setRepostCount(reposts.length);
     } catch (error) {
-      setLoadError(false);
-      setPostCount(0);
-      setSavedCount(0);
-      setRepostCount(0);
+      // Don't show a false "0 across the board" empty state on a failed
+      // fetch — surface a real error with a retry instead.
+      setLoadError(true);
     } finally {
       setLoaded(true);
     }
@@ -92,9 +108,9 @@ export default function BuyerYourActivity() {
   const weeklyTime = loaded ? [0, 0, 0, 0, 0, 0, 0] : [0, 0, 0, 0, 0, 0, 0];
 
   const activityItems = [
-    { icon: 'image' as const, label: 'Posts', value: String(postCount), sub: 'Your profile', color: PURPLE },
-    { icon: 'bookmark' as const, label: 'Saved items', value: String(savedCount), sub: 'Across all types', color: CYAN },
-    { icon: 'repeat' as const, label: 'Reposts', value: String(repostCount), sub: 'To your profile', color: ORANGE },
+    { icon: 'image' as const, label: 'Posts', value: String(postCount), sub: 'Your profile', color: theme.accent },
+    { icon: 'bookmark' as const, label: 'Saved items', value: String(savedCount), sub: 'Across all types', color: theme.accentLight },
+    { icon: 'repeat' as const, label: 'Reposts', value: String(repostCount), sub: 'To your profile', color: theme.warning },
   ];
 
   return (
@@ -102,57 +118,65 @@ export default function BuyerYourActivity() {
       <Header title="Your Activity" />
 
       <ScrollView
-        contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}
+        contentContainerStyle={{ padding: SPACING.md, paddingBottom: insets.bottom + SPACING.xxxl }}
         showsVerticalScrollIndicator={false}
       >
-        {!loaded ? <Text style={s.loadingText}>Loading activity…</Text> : <>
-        {/* Interaction stats grid */}
-        <Text style={s.groupLabel}>Content</Text>
-        <View style={s.statsGrid}>
-          {activityItems.map(item => (
-            <View key={item.label} style={s.statCard}>
-              <Feather name={item.icon} size={20} color={item.color} />
-              <Text style={s.statValue}>{item.value}</Text>
-              <Text style={s.statLabel}>{item.label}</Text>
-              <Text style={s.statSub}>{item.sub}</Text>
+        {!loaded ? (
+          <StatsSkeleton s={s} />
+        ) : loadError ? (
+          <ErrorState
+            message="Couldn't load your activity. Check your connection and try again."
+            onRetry={() => { setLoaded(false); void loadData(); }}
+          />
+        ) : (
+          <>
+            {/* Interaction stats grid */}
+            <Text style={s.groupLabel}>Content</Text>
+            <View style={s.statsGrid}>
+              {activityItems.map(item => (
+                <Card key={item.label} style={s.statCard}>
+                  <Feather name={item.icon} size={ICON.md} color={item.color} />
+                  <Text style={s.statValue}>{item.value}</Text>
+                  <Text style={s.statLabel}>{item.label}</Text>
+                  <Text style={s.statSub}>{item.sub}</Text>
+                </Card>
+              ))}
             </View>
-          ))}
-        </View>
 
-        {/* Recently deleted — navigates to the archive screen which shows archived posts */}
-        <Text style={s.groupLabel}>Manage</Text>
-        <View style={s.card}>
-          <TouchableOpacity
-            style={s.row}
-            activeOpacity={0.7}
-            onPress={() => { Haptics.selectionAsync(); router.push('/buyer-archive' as never); }}
-          >
-            <Feather name="archive" size={18} color={PURPLE} style={{ width: 28 }} />
-            <View style={{ flex: 1 }}>
-              <Text style={s.rowLabel}>Archive</Text>
-              <Text style={s.rowSub}>Posts you've archived from your profile</Text>
-            </View>
-            <Feather name="chevron-right" size={18} color={SUBTLE} />
-          </TouchableOpacity>
-        </View>
-        </>}
+            {/* Recently deleted — navigates to the archive screen which shows archived posts */}
+            <Text style={s.groupLabel}>Manage</Text>
+            <Card style={s.card}>
+              <ListRow
+                icon="archive"
+                iconColor={theme.accent}
+                title="Archive"
+                subtitle="Posts you've archived from your profile"
+                chevron
+                onPress={() => router.push('/buyer-archive' as never)}
+              />
+            </Card>
+          </>
+        )}
       </ScrollView>
     </View>
   );
 }
 
-const makeStyles = () => StyleSheet.create({
-  page: { flex: 1, backgroundColor: 'transparent' },
-  groupLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SP.sm, marginTop: SP.md },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
-  statCard: { flex: 1, minWidth: '45%', backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md, gap: 4 },
-  statValue: { fontFamily: FONT.bold, fontSize: FS.xl, color: FG },
-  statLabel: { fontFamily: FONT.medium, fontSize: FS.sm, color: FG },
-  statSub: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
-  card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
-  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: 14, gap: 12 },
-  rowLabel: { fontFamily: FONT.medium, fontSize: FS.base, color: FG },
-  rowSub: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
-  loadingText: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', padding: SP.lg },
-  errorState: { alignItems: 'center' },
+const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
+  page: { flex: 1, backgroundColor: theme.background },
+  groupLabel: {
+    ...TYPE_SCALE.caption,
+    fontFamily: FONT.semibold,
+    color: theme.muted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: SPACING.sm,
+    marginTop: SPACING.md,
+  },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
+  statCard: { flex: 1, minWidth: '45%', gap: 4 },
+  statValue: { ...TYPE_SCALE.title2, color: theme.text },
+  statLabel: { ...TYPE_SCALE.footnote, fontFamily: FONT.medium, color: theme.text },
+  statSub: { ...TYPE_SCALE.caption, color: theme.muted },
+  card: { paddingVertical: SPACING.xxs, paddingHorizontal: SPACING.md, overflow: 'hidden' },
 });

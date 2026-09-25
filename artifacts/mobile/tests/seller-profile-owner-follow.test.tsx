@@ -42,6 +42,18 @@ vi.mock("react-native", () => {
     constructor(value: number) { this._value = value; }
     interpolate() { return this._value; }
   }
+  // Real RN Pressable supports a function-as-children render prop (used by the
+  // shared PressableScale/IconButton primitives to read the current press
+  // state). The generic `nativeComponent` helper just forwards `children`
+  // verbatim, which would leave that function unrendered — invoke it here.
+  function MockPressable(props: Record<string, unknown>) {
+    const { children, ...rest } = props;
+    const content = typeof children === "function"
+      ? (children as (state: { pressed: boolean }) => React.ReactNode)({ pressed: false })
+      : children;
+    return React.createElement("Pressable", rest, content as React.ReactNode);
+  }
+  MockPressable.displayName = "Pressable";
   return {
     ActivityIndicator: nativeComponent("ActivityIndicator"),
     Alert: { alert: vi.fn() },
@@ -55,6 +67,8 @@ vi.mock("react-native", () => {
     Image: nativeComponent("Image"),
     Linking: { openURL: vi.fn() },
     Modal: nativeComponent("Modal"),
+    Platform: { OS: "ios", select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
+    Pressable: MockPressable,
     RefreshControl: nativeComponent("RefreshControl"),
     ScrollView: nativeComponent("ScrollView"),
     Share: { share: vi.fn() },
@@ -96,8 +110,11 @@ vi.mock("@expo/vector-icons", () => ({
 }));
 
 vi.mock("expo-haptics", () => ({
-  impactAsync: vi.fn(),
-  notificationAsync: vi.fn(),
+  // lib/haptics.ts calls `.catch()` on every one of these — plain vi.fn()
+  // returns undefined, which crashes there, so resolve like the real API.
+  impactAsync: vi.fn().mockResolvedValue(undefined),
+  notificationAsync: vi.fn().mockResolvedValue(undefined),
+  selectionAsync: vi.fn().mockResolvedValue(undefined),
   ImpactFeedbackStyle: { Light: "light", Medium: "medium" },
   NotificationFeedbackType: { Success: "success" },
 }));
@@ -105,6 +122,47 @@ vi.mock("expo-haptics", () => ({
 vi.mock("expo-clipboard", () => ({
   setStringAsync: vi.fn(),
 }));
+
+// seller-profile.tsx now pulls in the shared PressableScale (components/BrandthreadUI.tsx)
+// and FollowMorphButton/Snackbar (components/ui/*), which in turn import these
+// native packages at module scope. Their real builds aren't parseable under
+// Vitest's SSR transform outside a Metro/RN runtime.
+vi.mock("expo-linear-gradient", () => ({
+  LinearGradient: ({ children }: { children?: React.ReactNode }) =>
+    React.createElement("LinearGradient", {}, children),
+}));
+
+vi.mock("react-native-svg", () => ({
+  default: ({ children }: { children?: React.ReactNode }) => React.createElement("Svg", {}, children),
+  Line: (props: Record<string, unknown>) => React.createElement("SvgLine", props),
+}));
+
+// FollowMorphButton (components/ui/MotionPrimitives.tsx) and Snackbar
+// (components/ui/Snackbar.tsx) animate with react-native-reanimated. This
+// mock resolves every worklet synchronously so tests read the final value.
+vi.mock("react-native-reanimated", () => {
+  const makeAnimatedComponent = (name: string) =>
+    (props: Record<string, unknown>) => React.createElement(name, props, props.children as React.ReactNode);
+  return {
+    default: {
+      View: makeAnimatedComponent("Animated.View"),
+      Text: makeAnimatedComponent("Animated.Text"),
+    },
+    useSharedValue: (initial: number) => ({
+      value: initial,
+      set(next: number) { this.value = next; },
+    }),
+    useAnimatedStyle: (fn: () => unknown) => fn(),
+    withTiming: (toValue: unknown) => toValue,
+    withSpring: (toValue: unknown) => toValue,
+    withSequence: (...values: unknown[]) => values[values.length - 1],
+    interpolateColor: (value: number, input: number[], output: string[]) => {
+      const index = input.indexOf(value);
+      return index >= 0 ? output[index] : output[value >= (input[input.length - 1] ?? 1) ? output.length - 1 : 0];
+    },
+    Easing: { out: (fn: unknown) => fn, cubic: () => 0 },
+  };
+});
 
 vi.mock("expo-router", () => ({
   useRouter: () => routerMock,
