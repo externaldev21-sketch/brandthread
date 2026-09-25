@@ -60,7 +60,10 @@ describe('seller setup destination navigation', () => {
     const addProduct = read('app/add-product.tsx');
     const createPost = read('app/create-post.tsx');
 
-    expect(addProduct).toContain("{ text: 'Done', onPress: leaveProductFlow }");
+    // "Product published!" moved from a native Alert to the shared
+    // SuccessSheet (components/ui/SuccessSheet.tsx) — its secondary action
+    // still returns to the seller-setup origin via leaveProductFlow.
+    expect(addProduct).toContain("secondaryAction={{ label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }}");
     expect(createPost).toContain("(isSellerSetup ? SELLER_HOME_ROUTE : '/(tabs)/profile') as never");
   });
 
