@@ -1077,6 +1077,18 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           `/api/buyer/orders/${encodeURIComponent(id)}/cancel`, {}
         ),
       },
+      /** Recently viewed products — recorded on product detail view, shown on Discover and in the bag. */
+      recentlyViewed: {
+        record: (productId: string) => post<void>('/api/buyer/recently-viewed', { productId }),
+        list: (limit = 12) => get<Array<{
+          productId: string;
+          name: string;
+          brand: string;
+          image: string | null;
+          priceCents: number | null;
+          viewedAt: string;
+        }>>(`/api/buyer/recently-viewed?limit=${limit}`),
+      },
       /** Saved / wishlisted items — DB-backed. */
       saved: {
         list:   () => get<any[]>('/api/buyer/saved'),
@@ -1224,6 +1236,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
        *  Returns an empty array when nothing qualifies — no fallback list. */
       highDemand: (limit = 6) =>
         get<any[]>(`/api/public/products/high-demand?limit=${encodeURIComponent(String(limit))}`),
+      /** Videos that tagged this product ("Worn in these videos"). */
+      taggedVideos: (productId: string, limit?: number) =>
+        get<Array<{
+          postId: string;
+          mediaUrl: string;
+          thumbnailUrl: string | null;
+          caption: string | null;
+          createdAt: string;
+          authorId: string;
+          authorName: string;
+        }>>(`/api/public/products/${encodeURIComponent(productId)}/videos${limit ? `?limit=${limit}` : ''}`),
     },
     public: {
       search: (opts: { q: string; sort?: string; minPriceCents?: number; maxPriceCents?: number; category?: string; limit?: number }) => {

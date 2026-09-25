@@ -314,6 +314,53 @@ router.get("/products/high-demand", async (req, res) => {
   }
 });
 
+// GET /api/public/products/:id/videos
+// "Worn in these videos" — posts that tagged this product, video-only.
+// Must precede /products/:id so Express does not treat "videos" as a product id.
+router.get("/products/:id/videos", async (req, res) => {
+  const parsedLimit = parseNonNegativeInteger(req.query.limit, "limit", 12);
+  if (typeof parsedLimit !== "number" || parsedLimit < 1) {
+    return res.status(400).json({ error: typeof parsedLimit === "number" ? "limit must be at least 1" : parsedLimit.error });
+  }
+  const lim = Math.min(parsedLimit, 24);
+
+  try {
+    setPublicCacheHeaders(res);
+    const rows = await db.select({
+      postId: posts.id,
+      mediaUrl: posts.mediaUrl,
+      thumbnailUrl: posts.thumbnailUrl,
+      caption: posts.caption,
+      createdAt: posts.createdAt,
+      authorId: posts.userId,
+      authorName: users.displayName,
+      authorUsername: users.username,
+    }).from(posts)
+      .innerJoin(postTaggedProducts, eq(postTaggedProducts.postId, posts.id))
+      .innerJoin(users, eq(users.clerkId, posts.userId))
+      .where(and(
+        eq(postTaggedProducts.productId, req.params.id),
+        eq(posts.mediaType, "video"),
+        publicPostCondition(),
+      ))
+      .orderBy(desc(posts.createdAt))
+      .limit(lim);
+
+    return res.json(rows.map((row) => ({
+      postId: row.postId,
+      mediaUrl: row.mediaUrl,
+      thumbnailUrl: row.thumbnailUrl,
+      caption: row.caption,
+      createdAt: row.createdAt,
+      authorId: row.authorId,
+      authorName: row.authorName ?? row.authorUsername ?? "Seller",
+    })));
+  } catch (err) {
+    req.log.error({ err, productId: req.params.id }, "Failed to fetch tagged videos");
+    return res.status(500).json({ error: "Failed to fetch tagged videos" });
+  }
+});
+
 // GET /api/public/products/:id/related
 // This route must precede /products/:id so Express does not treat "related" as
 // a product id.

@@ -24,6 +24,8 @@ import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
 import {
   applyDiscount, clearCheckoutSession, createCheckoutSession,
   getCart, getCheckoutSession, removeCartItems, removeDiscount, saveCheckoutProgress, validateCart,
@@ -1259,6 +1261,7 @@ export default function BuyerCheckoutScreen() {
   const insets = useSafeAreaInsets();
   const api = useApi();
   const { isSignedIn } = useAuth();
+  const threadCashCheckoutEnabled = useFeatureFlag('threadCashCheckoutDiscount');
 
   const [session, setSession] = useState<CheckoutSession | null>(null);
   const [contact, setContact] = useState<Partial<CheckoutContact>>({ orderUpdates: 'email', marketingConsent: false });
@@ -1774,6 +1777,20 @@ export default function BuyerCheckoutScreen() {
                 }
               />
             </GuidedSection>
+
+            {/* THREAD CASH HOOK POINT: same self-contained card cart.tsx uses,
+                gated behind the same OFF-by-default 'threadCashCheckoutDiscount'
+                flag. See components/thread-cash/UseThreadCashCard.tsx and
+                docs/payments/thread-cash-checkout-todo.md — no checkout money
+                logic is touched here. */}
+            {isSignedIn && current.deliveryGroups.length === 1 && threadCashCheckoutEnabled && (
+              <UseThreadCashCard
+                maxDiscountCents={Math.max(0, current.summary.subtotalCents + current.summary.shippingTotalCents - 1)}
+                redemption={current.threadCashRedemption ?? null}
+                onApply={(redemption) => void persist({ ...current, threadCashRedemption: redemption })}
+                onRemove={() => void persist({ ...current, threadCashRedemption: undefined })}
+              />
+            )}
 
             <GuidedSection
               title="Review & policies"

@@ -37,7 +37,8 @@ import {
   FONT, FS, SP, RADIUS, COMP, ICON, TYPE,
 } from '@/lib/theme';
 import { ResponsiveContainer, StickyFooter } from '@/components/layout';
-import { Button, IconButton, Chip, QuantityStepper, Snackbar } from '@/components/ui';
+import { CachedImage } from '@/components/CachedImage';
+import { Button, IconButton, Chip, QuantityStepper, BottomSheet } from '@/components/ui';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -259,11 +260,19 @@ const galleryStyles = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 7, borderRadius: RADIUS.pill, backgroundColor: 'rgba(0,0,0,0.65)',
   },
   resetZoomText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.xs },
+  thumbRail: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  thumb: {
+    width: 56, height: 56, borderRadius: RADIUS.sm, overflow: 'hidden',
+    borderWidth: 2, borderColor: 'transparent',
+  },
+  thumbImage: { width: '100%', height: '100%' },
 });
 
-function ProductGallery({ imageUris }: { imageUris: string[] }) {
+function ProductGallery({ imageUris, accentColor }: { imageUris: string[]; accentColor: string }) {
   const images = imageUris.filter(Boolean);
   const scrollX = useRef(new Animated.Value(0)).current;
+  const listRef = useRef<Animated.FlatList<string>>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
 
   if (!images.length) {
     return (
@@ -275,39 +284,71 @@ function ProductGallery({ imageUris }: { imageUris: string[] }) {
   }
 
   return (
-    <View style={galleryStyles.gallery}>
-      <Animated.FlatList
-        data={images}
-        keyExtractor={(uri, index) => `${uri}-${index}`}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        renderItem={({ item }) => <ZoomableGalleryImage uri={item} />}
-        getItemLayout={(_, index) => ({ length: GALLERY_WIDTH, offset: GALLERY_WIDTH * index, index })}
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
-        scrollEventThrottle={16}
-      />
-      <View style={galleryStyles.galleryShade} pointerEvents="none" />
-      <View style={galleryStyles.galleryMeta} pointerEvents="none">
-        <Feather name="maximize-2" size={13} color={ON_DARK} />
-        <Text style={galleryStyles.galleryMetaText}>Pinch to zoom</Text>
-      </View>
-      {images.length > 1 && (
-        <View style={galleryStyles.dots} pointerEvents="none">
-          {images.map((_, index) => {
-            const width = scrollX.interpolate({
-              inputRange: [(index - 1) * GALLERY_WIDTH, index * GALLERY_WIDTH, (index + 1) * GALLERY_WIDTH],
-              outputRange: [6, 22, 6],
-              extrapolate: 'clamp',
-            });
-            const opacity = scrollX.interpolate({
-              inputRange: [(index - 1) * GALLERY_WIDTH, index * GALLERY_WIDTH, (index + 1) * GALLERY_WIDTH],
-              outputRange: [0.45, 1, 0.45],
-              extrapolate: 'clamp',
-            });
-            return <Animated.View key={index} style={[galleryStyles.dot, { width, opacity }]} />;
-          })}
+    <View>
+      <View style={galleryStyles.gallery}>
+        <Animated.FlatList
+          ref={listRef}
+          data={images}
+          keyExtractor={(uri, index) => `${uri}-${index}`}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          renderItem={({ item }) => <ZoomableGalleryImage uri={item} />}
+          getItemLayout={(_, index) => ({ length: GALLERY_WIDTH, offset: GALLERY_WIDTH * index, index })}
+          onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
+          onMomentumScrollEnd={(e) => {
+            const next = Math.round(e.nativeEvent.contentOffset.x / GALLERY_WIDTH);
+            setActiveIndex(Math.max(0, Math.min(images.length - 1, next)));
+          }}
+          scrollEventThrottle={16}
+        />
+        <View style={galleryStyles.galleryShade} pointerEvents="none" />
+        <View style={galleryStyles.galleryMeta} pointerEvents="none">
+          <Feather name="maximize-2" size={13} color={ON_DARK} />
+          <Text style={galleryStyles.galleryMetaText}>Pinch to zoom</Text>
         </View>
+        {images.length > 1 && (
+          <View style={galleryStyles.dots} pointerEvents="none">
+            {images.map((_, index) => {
+              const width = scrollX.interpolate({
+                inputRange: [(index - 1) * GALLERY_WIDTH, index * GALLERY_WIDTH, (index + 1) * GALLERY_WIDTH],
+                outputRange: [6, 22, 6],
+                extrapolate: 'clamp',
+              });
+              const opacity = scrollX.interpolate({
+                inputRange: [(index - 1) * GALLERY_WIDTH, index * GALLERY_WIDTH, (index + 1) * GALLERY_WIDTH],
+                outputRange: [0.45, 1, 0.45],
+                extrapolate: 'clamp',
+              });
+              return <Animated.View key={index} style={[galleryStyles.dot, { width, opacity }]} />;
+            })}
+          </View>
+        )}
+      </View>
+
+      {/* Thumbnail rail — tap a thumbnail to jump the main gallery to it */}
+      {images.length > 1 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={galleryStyles.thumbRail}
+        >
+          {images.map((uri, index) => (
+            <TouchableOpacity
+              key={`${uri}-${index}`}
+              onPress={() => {
+                listRef.current?.scrollToIndex({ index, animated: true });
+                setActiveIndex(index);
+              }}
+              style={[galleryStyles.thumb, index === activeIndex && { borderColor: accentColor }]}
+              accessibilityRole="button"
+              accessibilityLabel={`View photo ${index + 1} of ${images.length}`}
+              accessibilityState={{ selected: index === activeIndex }}
+            >
+              <CachedImage source={{ uri }} style={galleryStyles.thumbImage} contentFit="cover" />
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       )}
     </View>
   );
@@ -439,6 +480,10 @@ export default function BuyerProductDetailScreen() {
   const [addingToCart, setAddingToCart] = useState(false);
   const [buyingNow, setBuyingNow] = useState(false);
   const [addedToCart, setAddedToCart] = useState(false);
+  // Deliberate-choice confirmation sheet (View bag / Keep shopping) —
+  // separate from `addedToCart` above, which only drives the transient
+  // checkmark on the sticky action bar's icon button.
+  const [showAddedSheet, setShowAddedSheet] = useState(false);
   const [sellerPaymentReady, setSellerPaymentReady] = useState<boolean | null>(null);
   const [sellerPaymentReason, setSellerPaymentReason] = useState<string | null>(null);
   const [sellerVacationMessage, setSellerVacationMessage] = useState<string | null>(null);
@@ -521,6 +566,9 @@ export default function BuyerProductDetailScreen() {
             setSellerPaymentReady(paymentStatus.ready);
             setSellerPaymentReason(paymentStatus.reason ?? null);
           }
+          // Best-effort — a failed view record should never affect the
+          // product page itself, so no error handling beyond swallowing it.
+          if (prod?.id && isSignedIn) api.buyer.recentlyViewed.record(prod.id).catch(() => {});
         }
       } catch {}
       if (!cancelled) setLoading(false);
@@ -715,8 +763,10 @@ export default function BuyerProductDetailScreen() {
     setAddingToCart(false);
     if (result.success) {
       setAddedToCart(true);
+      setShowAddedSheet(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Auto-clear the "added" confirmation after 2.5s (matching ShopProductSheet behavior)
+      // Auto-clear the icon-button checkmark after 2.5s; the sheet itself
+      // stays open until the buyer taps View bag or Keep shopping.
       if (addedBannerTimerRef.current) clearTimeout(addedBannerTimerRef.current);
       addedBannerTimerRef.current = setTimeout(() => setAddedToCart(false), 2500);
     } else {
@@ -786,7 +836,7 @@ export default function BuyerProductDetailScreen() {
       >
         {/* Immersive product gallery */}
         <View style={s.imageArea}>
-          <ProductGallery imageUris={product.imageUris} />
+          <ProductGallery imageUris={product.imageUris} accentColor={PURPLE} />
           {/* Back button */}
           <View style={[s.backBtnWrap, { top: insets.top + SP.sm }]}>
             <IconButton
@@ -830,12 +880,33 @@ export default function BuyerProductDetailScreen() {
 
           {/* Title & Seller */}
           <Text style={s.productName} numberOfLines={3}>{product.name}</Text>
-          <TouchableOpacity style={s.sellerRow} onPress={() => router.push(('/seller-profile?id=' + product.sellerId) as never)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`View seller ${product.sellerName}`}>
+          <TouchableOpacity style={s.sellerCard} onPress={() => router.push(('/seller-profile?id=' + product.sellerId) as never)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`View seller ${product.sellerName}`}>
             <View style={s.sellerAvatar}><Text style={s.sellerInitial}>{product.sellerName.charAt(0)}</Text></View>
-            <Text style={s.sellerName} numberOfLines={1}>{product.sellerName}</Text>
-            <Text style={s.sellerHandle} numberOfLines={1}>{product.sellerHandle}</Text>
-            <Feather name="chevron-right" size={14} color={MUTED} />
+            <View style={{ flex: 1 }}>
+              <Text style={s.sellerName} numberOfLines={1}>{product.sellerName}</Text>
+              <Text style={s.sellerHandle} numberOfLines={1}>{product.sellerHandle}</Text>
+            </View>
+            <View style={s.sellerViewStore}>
+              <Text style={s.sellerViewStoreText}>View store</Text>
+              <Feather name="chevron-right" size={14} color={MUTED} />
+            </View>
           </TouchableOpacity>
+
+          {/* Buyer protection trust cues */}
+          <View style={s.trustRow}>
+            <View style={s.trustCue}>
+              <Feather name="shield" size={13} color={MUTED} />
+              <Text style={s.trustCueText}>Buyer Protection</Text>
+            </View>
+            <View style={s.trustCue}>
+              <Feather name="lock" size={13} color={MUTED} />
+              <Text style={s.trustCueText}>Secure checkout</Text>
+            </View>
+            <View style={s.trustCue}>
+              <Feather name="refresh-cw" size={13} color={MUTED} />
+              <Text style={s.trustCueText}>Easy returns</Text>
+            </View>
+          </View>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: SP.md, marginBottom: SP.md }}>
             <TouchableOpacity
               onPress={() => router.push(reportHref({
@@ -1068,6 +1139,9 @@ export default function BuyerProductDetailScreen() {
             </>
           )}
 
+          {/* Worn in these videos */}
+          <WornInVideos productId={product.id} productName={product.name} />
+
           {/* Related Products */}
           <View style={s.divider} />
           <Text style={s.reviewsHeader}>You Might Also Like</Text>
@@ -1076,13 +1150,43 @@ export default function BuyerProductDetailScreen() {
         </ResponsiveContainer>
       </ScrollView>
 
-      {/* Add-to-bag confirmation banner — slides in above the action bar */}
-      <Snackbar
-        visible={addedToCart}
-        message="Added to your bag!"
-        actionLabel="View Cart"
-        onAction={() => router.push('/(buyer)/cart' as never)}
-      />
+      {/* Added-to-bag confirmation — a deliberate choice (UNIQLO-style), not
+          an auto-dismissing toast: the buyer picks View bag or Keep shopping. */}
+      <BottomSheet visible={showAddedSheet} onClose={() => setShowAddedSheet(false)}>
+        <View style={s.addedSheetContent}>
+          <View style={s.addedSheetIconWrap}>
+            <Feather name="check" size={22} color={SUCCESS} />
+          </View>
+          <Text style={s.addedSheetTitle}>Added to your bag</Text>
+          <View style={s.addedSheetProductRow}>
+            {product.imageUris[0] ? (
+              <CachedImage source={{ uri: product.imageUris[0] }} style={s.addedSheetImage} contentFit="cover" />
+            ) : (
+              <View style={[s.addedSheetImage, { alignItems: 'center', justifyContent: 'center', backgroundColor: CARD_ELEVATED }]}>
+                <Feather name="image" size={18} color={SUBTLE} />
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={s.addedSheetProductName} numberOfLines={1}>{product.name}</Text>
+              <Text style={s.addedSheetProductMeta}>
+                {formatCents(variantPrice)}{qty > 1 ? ` · Qty ${qty}` : ''}
+              </Text>
+            </View>
+          </View>
+          <Button
+            label="View bag"
+            onPress={() => { setShowAddedSheet(false); router.push('/(buyer)/cart' as never); }}
+            fullWidth
+          />
+          <Button
+            label="Keep shopping"
+            variant="secondary"
+            onPress={() => setShowAddedSheet(false)}
+            fullWidth
+            style={{ marginTop: SP.sm }}
+          />
+        </View>
+      </BottomSheet>
 
       {/* Persistent purchase bar remains visible while product content scrolls.
           This screen is pushed as a root stack card over the whole app (not
@@ -1187,6 +1291,95 @@ function SizeChartViewer({ chart }: { chart: SizeChart }) {
     </ScrollView>
   );
 }
+
+function WornInVideos({ productId, productName }: { productId: string; productName: string }) {
+  const router = useRouter();
+  const { theme } = useThemeAliases();
+  const api = useApi();
+  const [videos, setVideos] = useState<Array<{
+    postId: string; mediaUrl: string; thumbnailUrl: string | null; authorName: string;
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.publicProducts.taggedVideos(productId, 10)
+      .then((rows) => { if (!cancelled) setVideos(rows); })
+      .catch(() => { if (!cancelled) setVideos([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [productId, api]);
+
+  if (loading) {
+    return (
+      <View style={{ paddingVertical: SP.md, alignItems: 'center' }}>
+        <ActivityIndicator color={theme.accent} size="small" />
+      </View>
+    );
+  }
+
+  // No banner/empty-state here by design — an entirely absent row for a
+  // product nobody has posted a video of yet is the correct "nothing to see"
+  // state; the "You Might Also Like" section right below still gives the
+  // buyer somewhere real to go.
+  if (videos.length === 0) return null;
+
+  return (
+    <View style={{ marginBottom: SP.lg }}>
+      <View style={[wv.divider, { backgroundColor: theme.border }]} />
+      <Text style={[wv.header, { color: theme.muted }]}>Worn in these videos</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ marginHorizontal: -SP.md }}
+        contentContainerStyle={{ paddingHorizontal: SP.md, gap: SP.sm }}
+      >
+        {videos.map((video) => (
+          <TouchableOpacity
+            key={video.postId}
+            style={wv.card}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={`Watch ${video.authorName}'s video of ${productName}`}
+            onPress={() => {
+              const qs = new URLSearchParams({
+                postId: video.postId,
+                postType: 'video',
+                postAuthorName: video.authorName,
+              });
+              router.push(`/buyer-post-viewer?${qs.toString()}` as never);
+            }}
+          >
+            {video.thumbnailUrl ? (
+              <CachedImage source={{ uri: video.thumbnailUrl }} style={wv.thumb} contentFit="cover" />
+            ) : (
+              <View style={[wv.thumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: theme.cardElevated }]}>
+                <Feather name="video" size={20} color={theme.muted} />
+              </View>
+            )}
+            <View style={wv.playBadge}>
+              <Feather name="play" size={12} color="#FFFFFF" />
+            </View>
+            <Text style={[wv.authorName, { color: theme.muted }]} numberOfLines={1}>{video.authorName}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+const wv = StyleSheet.create({
+  divider: { height: 1, marginVertical: SP.md },
+  header: { fontSize: FS.sm, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
+  card: { width: 104 },
+  thumb: { width: 104, height: 150, borderRadius: RADIUS.md },
+  playBadge: {
+    position: 'absolute', top: 8, right: 8,
+    width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  authorName: { fontSize: FS.xs, fontFamily: FONT.medium, marginTop: 4 },
+});
 
 function RelatedProducts({ productId }: { productId: string }) {
   const { push } = useThreadPull();
@@ -1356,11 +1549,32 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   saleBadge: { backgroundColor: RED_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
   saleBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: RED, letterSpacing: 0.4 },
   productName: { ...TYPE.title, color: FG, marginBottom: SP.sm },
-  sellerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginBottom: SP.md },
-  sellerAvatar: { width: 24, height: 24, borderRadius: RADIUS.pill, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
-  sellerInitial: { fontSize: FS.xs, fontFamily: FONT.bold, color: PURPLE_LIGHT },
+  addedSheetContent: { padding: SP.md, paddingTop: SP.xs, alignItems: 'center' },
+  addedSheetIconWrap: {
+    width: 44, height: 44, borderRadius: RADIUS.pill, backgroundColor: SUCCESS_DIM,
+    alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm,
+  },
+  addedSheetTitle: { ...TYPE.title, color: FG, marginBottom: SP.md },
+  addedSheetProductRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.sm, width: '100%',
+    marginBottom: SP.lg, padding: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
+  },
+  addedSheetImage: { width: 52, height: 52, borderRadius: RADIUS.sm },
+  addedSheetProductName: { ...TYPE.bodyMedium, color: FG },
+  addedSheetProductMeta: { ...TYPE.caption, color: MUTED, marginTop: 2 },
+  sellerCard: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm,
+    padding: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD,
+  },
+  sellerAvatar: { width: 36, height: 36, borderRadius: RADIUS.pill, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
+  sellerInitial: { fontSize: FS.sm, fontFamily: FONT.bold, color: PURPLE_LIGHT },
   sellerName: { ...TYPE.bodyMedium, color: FG, flexShrink: 1 },
   sellerHandle: { ...TYPE.caption, color: MUTED, flexShrink: 1 },
+  sellerViewStore: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  sellerViewStoreText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
+  trustRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.md, marginBottom: SP.md },
+  trustCue: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  trustCueText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   paymentWarningBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',

@@ -61,6 +61,7 @@ import {
 } from '@/components/CommerceSignal';
 import { SectionError } from '@/components/InlineFeedback';
 import { Card, IconButton, HeartToggle, ThemedRefreshControl } from '@/components/ui';
+import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
 import { hapticLight, hapticMedium, hapticToggle } from '@/lib/haptics';
@@ -1094,6 +1095,11 @@ export default function DiscoverScreen() {
             trendingItems.slice(0, 10).map(item => <TrendingRow key={item.id} item={item} />)
           )}
         </View>
+      </ResponsiveContainer>
+
+      {/* ─ Recently viewed ─ */}
+      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginTop: SP.xl }}>
+        <RecentlyViewedRow />
       </ResponsiveContainer>
     </ScrollView>
   );
