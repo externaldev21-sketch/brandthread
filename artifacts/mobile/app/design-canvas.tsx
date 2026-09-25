@@ -110,7 +110,8 @@ import {
   UndoModel, type UndoCommand,
 } from '@/lib/undoModel';
 import {
-  getGarmentTemplates, buildGarmentTemplateLayer, type GarmentTemplateDef,
+  getGarmentTemplates, getGarmentTemplate, buildGarmentTemplateLayer, GARMENT_TEMPLATES,
+  type GarmentTemplateDef,
 } from '@/lib/garmentTemplates';
 import {
   pushRecentColor, addColorToPalette, createPalette, type BrandPalette,
@@ -474,6 +475,7 @@ export default function DesignCanvasScreen() {
   const [smudgeSize, setSmudgeSize]     = useState(20);
 
   const [sizeSliderDragging, setSizeSliderDragging] = useState(false);
+  const [opacitySliderDragging, setOpacitySliderDragging] = useState(false);
   const sizeSliderHeightRef = useRef(200);
   const sizeSliderYRef      = useRef(0);
 
@@ -1468,6 +1470,27 @@ export default function DesignCanvasScreen() {
     })
   ).current;
 
+  // ─── Left opacity slider PanResponder — mirrors sizePanResponder ──────────
+  const opacitySliderYRef = useRef(0);
+  const opacitySliderHeightRef = useRef(200);
+  const opacityPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder:  () => true,
+      onPanResponderGrant: (e) => {
+        setOpacitySliderDragging(true);
+        opacitySliderYRef.current = e.nativeEvent.pageY;
+      },
+      onPanResponderMove: (e) => {
+        const dy = opacitySliderYRef.current - e.nativeEvent.pageY;
+        const pct = Math.max(0.02, Math.min(1, dy / opacitySliderHeightRef.current + 0.5));
+        setBrushOpacity(pct);
+        opacitySliderYRef.current = e.nativeEvent.pageY;
+      },
+      onPanResponderRelease: () => setOpacitySliderDragging(false),
+    })
+  ).current;
+
   // ─── Layer actions ─────────────────────────────────────────────────────────
   function handleAddDrawingLayer() {
     const lw = project?.canvas.width  || canvasSize.w || 1080;
@@ -1608,6 +1631,29 @@ export default function DesignCanvasScreen() {
     };
     mutateLayer(prev => [...prev.filter(l => l.id !== top.id && l.id !== below.id), merged]);
     setSelectedLayerId(merged.id);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
+
+  // ─── Garment template guide (lib/garmentTemplates.ts) ──────────────────────
+  // Inserts (or toggles the visibility of) a LOCKED, non-exportable flat-sketch
+  // garment outline layer at the bottom of the stack, sized to the project's
+  // garmentType/garmentView (falling back to a t-shirt front if the project
+  // doesn't specify one). Export already excludes layers with isTemplate: true
+  // (see the compositor and export SVG below) — this just makes it reachable.
+  function handleToggleGarmentGuide() {
+    const existing = layers.find(l => l.isTemplate);
+    if (existing) {
+      mutateLayer(prev => prev.map(l => l.id === existing.id ? { ...l, visible: !l.visible } : l));
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      return;
+    }
+    const garmentType = project?.garmentType ?? 'tshirt';
+    const garmentView = project?.garmentView ?? 'front';
+    const def = getGarmentTemplate(garmentType, garmentView) ?? GARMENT_TEMPLATES[0];
+    const lw = project?.canvas.width  || canvasSize.w || 1080;
+    const lh = project?.canvas.height || canvasSize.h || 1080;
+    const templateLayer = buildGarmentTemplateLayer(def, lw, lh);
+    mutateLayer(prev => [...prev.filter(l => !l.isTemplate), templateLayer]);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
@@ -3078,32 +3124,56 @@ export default function DesignCanvasScreen() {
       {/* ── CANVAS AREA ── */}
       <View style={styles.canvasOuter}>
 
-        {/* Left: size slider */}
-        <View
-          style={styles.sizeSlider}
-          onLayout={e => { sizeSliderHeightRef.current = e.nativeEvent.layout.height; }}
-          {...sizePanResponder.panHandlers}
-        >
-          <View style={[
-            styles.sizeDisc,
-            {
-              width:  Math.max(8, Math.min(56, activeSize * 1.4)),
-              height: Math.max(8, Math.min(56, activeSize * 1.4)),
-              borderRadius: 999,
-              backgroundColor: activeTopTool === 'eraser' ? CARD_ELEVATED : drawColor,
-              borderColor: activeTopTool === 'eraser' ? FG : 'transparent',
-              borderWidth: activeTopTool === 'eraser' ? 1.5 : 0,
-            },
-          ]} />
-          <View style={styles.sizeTrack}>
-            <View style={[styles.sizeFill, { height: `${(activeSize / 80) * 100}%` }]} />
-          </View>
-          {sizeSliderDragging && (
-            <View style={styles.sizeBubble}>
-              <Text style={styles.sizeBubbleText}>{activeSize}</Text>
+        {/* Left edge: Procreate-style size + opacity vertical sliders, shown
+            only while a drawing tool (brush/smudge/eraser) is active — thin
+            translucent dark tracks over the canvas's left edge. */}
+        {['brush', 'smudge', 'eraser'].includes(activeTopTool) && (
+          <View style={styles.leftSliderRail} pointerEvents="box-none">
+            <View
+              style={styles.sizeSlider}
+              onLayout={e => { sizeSliderHeightRef.current = e.nativeEvent.layout.height; }}
+              {...sizePanResponder.panHandlers}
+              testID="brush-size-slider"
+            >
+              <View style={[
+                styles.sizeDisc,
+                {
+                  width:  Math.max(8, Math.min(56, activeSize * 1.4)),
+                  height: Math.max(8, Math.min(56, activeSize * 1.4)),
+                  borderRadius: 999,
+                  backgroundColor: activeTopTool === 'eraser' ? CARD_ELEVATED : drawColor,
+                  borderColor: activeTopTool === 'eraser' ? FG : 'transparent',
+                  borderWidth: activeTopTool === 'eraser' ? 1.5 : 0,
+                },
+              ]} />
+              <View style={styles.sizeTrack}>
+                <View style={[styles.sizeFill, { height: `${(activeSize / 80) * 100}%` }]} />
+              </View>
+              {sizeSliderDragging && (
+                <View style={styles.sizeBubble}>
+                  <Text style={styles.sizeBubbleText}>{activeSize}</Text>
+                </View>
+              )}
             </View>
-          )}
-        </View>
+
+            <View
+              style={styles.opacitySlider}
+              onLayout={e => { opacitySliderHeightRef.current = e.nativeEvent.layout.height; }}
+              {...opacityPanResponder.panHandlers}
+              testID="brush-opacity-slider"
+            >
+              <Feather name="droplet" size={ICON.xs} color={MUTED} style={styles.opacityIcon} />
+              <View style={styles.sizeTrack}>
+                <View style={[styles.sizeFill, { height: `${brushOpacity * 100}%` }]} />
+              </View>
+              {opacitySliderDragging && (
+                <View style={styles.sizeBubble}>
+                  <Text style={styles.sizeBubbleText}>{Math.round(brushOpacity * 100)}%</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
 
         {/* Canvas-level touch listeners observe QuickMenu long-press while the
             active tool PanResponder retains gesture ownership. */}
@@ -3817,6 +3887,9 @@ export default function DesignCanvasScreen() {
         // GUIDES tab
         guideSettings={guideSettings}
         onGuideSettingsChange={(gs) => { setGuideSettings(gs); guideSettingsRef.current = gs; markDirty(); }}
+        hasGarmentTemplate={layers.some(l => l.isTemplate)}
+        garmentTemplateVisible={layers.some(l => l.isTemplate && l.visible)}
+        onToggleGarmentGuide={handleToggleGarmentGuide}
         // SHARE tab
         onExportPng={() => { closeSheet(); setTimeout(() => handleExport('png'), 220); }}
         onExportJpeg={() => { closeSheet(); setTimeout(() => handleExport('jpeg'), 220); }}
@@ -4580,6 +4653,9 @@ interface WrenchActionsSheetProps {
   // GUIDES
   guideSettings: GuideSettings;
   onGuideSettingsChange: (gs: GuideSettings) => void;
+  hasGarmentTemplate: boolean;
+  garmentTemplateVisible: boolean;
+  onToggleGarmentGuide: () => void;
   // SHARE
   onExportPng: () => void;
   onExportJpeg: () => void;
@@ -4619,6 +4695,7 @@ function WrenchActionsSheet({
   onFlipHorizontal, onFlipVertical, onCanvasInfo,
   referenceVisible, onToggleReference, onChooseReference, onDismissReference, hasReference,
   guideSettings, onGuideSettingsChange,
+  hasGarmentTemplate, garmentTemplateVisible, onToggleGarmentGuide,
   onExportPng, onExportJpeg, onShare, onSaveCopy,
   onUseAsProductPhoto, onUseInPost, exporting,
   logicalW, logicalH, layerCount, cropRect, masterDescriptor, saveStatus,
@@ -4804,6 +4881,23 @@ function WrenchActionsSheet({
           {/* ── GUIDES TAB ── */}
           {wrenchTab === 'guides' && (
             <View style={{ paddingHorizontal: SP.md, paddingTop: SP.sm }}>
+              {/* Garment template guide — locked outline layer, excluded from export */}
+              <View style={styles.guideRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.guideLabel}>Garment Guide</Text>
+                  <Text style={styles.guideSub}>
+                    {hasGarmentTemplate
+                      ? 'Locked flat-sketch outline — excluded from export'
+                      : 'Insert a flat-sketch garment outline to draw against'}
+                  </Text>
+                </View>
+                <TogglePill
+                  label={hasGarmentTemplate ? (garmentTemplateVisible ? 'On' : 'Off') : 'Add'}
+                  active={hasGarmentTemplate && garmentTemplateVisible}
+                  onPress={onToggleGarmentGuide}
+                />
+              </View>
+
               {/* Grid toggle */}
               <View style={styles.guideRow}>
                 <View style={{ flex: 1 }}>
@@ -5259,14 +5353,22 @@ const styles = StyleSheet.create({
 
   canvasOuter: { flex: 1, flexDirection: 'row' },
 
-  sizeSlider: {
-    width: 44, alignItems: 'center', justifyContent: 'center',
-    paddingVertical: SP.lg, gap: SP.sm,
-    backgroundColor: CARD,
-    borderRightWidth: 1, borderRightColor: BORDER,
+  leftSliderRail: {
+    flexDirection: 'row', alignSelf: 'stretch',
   },
+  sizeSlider: {
+    width: 36, alignItems: 'center', justifyContent: 'center',
+    paddingVertical: SP.lg, gap: SP.sm,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  opacitySlider: {
+    width: 24, alignItems: 'center', justifyContent: 'center',
+    paddingVertical: SP.lg, paddingTop: SP.xl, gap: SP.sm,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  opacityIcon: { marginBottom: 4 },
   sizeDisc:  { marginBottom: 8 },
-  sizeTrack: { width: 4, flex: 1, backgroundColor: BORDER, borderRadius: RADIUS.pill, overflow: 'hidden', justifyContent: 'flex-end' },
+  sizeTrack: { width: 4, flex: 1, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: RADIUS.pill, overflow: 'hidden', justifyContent: 'flex-end' },
   sizeFill:  { width: '100%', backgroundColor: FG, borderRadius: RADIUS.pill },
   sizeBubble:{ position: 'absolute', right: 50, top: '50%', backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 4, borderWidth: 1, borderColor: BORDER },
   sizeBubbleText: { color: FG, fontFamily: FONT.bold, fontSize: FS.sm },
