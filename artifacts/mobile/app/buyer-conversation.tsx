@@ -1258,8 +1258,9 @@ export default function BuyerConversationScreen() {
               }
             </PressableScale>
 
-            {/* THREAD CASH HOOK POINT: minimal attach entry, OFF by default
-                behind the 'threadCashSend' flag. Rendering a sent Thread Cash
+            {/* Minimal attach entry — works for any conversation participant
+                (buyer-to-buyer friends included), server-gated by mutual
+                follow at send AND claim. Rendering a sent Thread Cash
                 message in the thread above is left for this screen's own
                 renderAttachment/message-list logic to wire up. */}
             {threadCashSendEnabled && sellerUserId ? (

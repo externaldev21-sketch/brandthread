@@ -23,6 +23,8 @@ import { requestContextualPushPermission } from '@/lib/contextualPushPermission'
 import { confirmBlock, confirmUnblock, reportHref } from '@/lib/safety';
 import { GridSkeleton, ResponsiveContainer, useGridColumns, useBreakpoint } from '@/components/layout';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+import { ThreadCashAttachButton } from '@/components/thread-cash/ChatAttachThreadCash';
 
 const { width } = Dimensions.get('window');
 const GRID_GAP  = 1;
@@ -43,6 +45,7 @@ type RemoteProfile = {
 
 export default function BuyerOtherProfileScreen() {
   const { theme } = useAppTheme();
+  const threadCashSendEnabled = useFeatureFlag('threadCashSend');
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const router  = useRouter();
@@ -369,6 +372,22 @@ export default function BuyerOtherProfileScreen() {
               : <Text style={styles.outlineBtnText}>Message</Text>
             }
           </PressableScale>
+          {isMutual && threadCashSendEnabled ? (
+            <ThreadCashAttachButton
+              recipientId={canonicalUserId}
+              onSent={() => {}}
+              renderTrigger={(open) => (
+                <PressableScale
+                  onPress={open}
+                  style={styles.moreBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel="Send Thread Cash"
+                >
+                  <Feather name="dollar-sign" size={ICON.md} color={theme.text} />
+                </PressableScale>
+              )}
+            />
+          ) : null}
           <PressableScale
             style={styles.moreBtn}
             onPress={() => { hapticSelection(); setMoreSheetOpen(true); }}

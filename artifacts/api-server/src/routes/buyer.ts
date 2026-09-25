@@ -24,6 +24,14 @@ import {
   reserveLoyaltyRedemption,
   reversePurchasePointsOnce,
 } from "./loyalty";
+import {
+  bindThreadCashRedemptionToCheckout,
+  getThreadCashConfig,
+  isFeatureEnabled,
+  releaseThreadCashRedemption,
+  reserveThreadCashRedemption,
+  ThreadCashError,
+} from "../lib/threadCash/wallet";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { validateDiscountCode, DiscountValidationError } from "../lib/discounts";
 import { logger } from "../lib/logger";
@@ -55,6 +63,10 @@ const checkoutItemSchema = z.object({
   quantity: z.coerce.number().int().min(1).max(100),
   price: z.number().nonnegative().optional(),
 }).passthrough();
+// Stripe's minimum charge for a USD card payment. Thread Cash is a discount,
+// never a full payment method: applying it can never bring the card charge
+// below this floor (see reserveThreadCashRedemption's minRemainderCents).
+const STRIPE_MIN_CARD_CHARGE_CENTS = 50;
 const checkoutBodySchema = z.object({
   items: z.array(checkoutItemSchema).min(1).max(100),
   successUrl: requestPrimitives.url,
@@ -457,6 +469,7 @@ router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }
  */
 router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), async (req, res) => {
   let loyaltyReservation: { buyerId: string; token: string; reservationId: string } | null = null;
+  let threadCashReservation: { buyerId: string; token: string; reservationId: string } | null = null;
   let checkoutRecordId: string | null = null;
   let checkoutIdempotencyKey: string | null = null;
   let stripeCreationStarted = false;
@@ -469,22 +482,19 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       clientIdempotencyKey, dropId, loyaltyToken, threadCashToken, discountCode,
     } = req.body;
 
-    // ── THREAD CASH HOOK POINT ────────────────────────────────────────────
-    // Thread Cash (platform-funded reward credit) is not yet wired into the
-    // Stripe money flow here. Doing so without changing seller payout
-    // requires (a) feeding paymentIntentMoney the PRE-Thread-Cash amount so
-    // the destination transfer/application fee are computed as if the buyer
-    // paid full price, and (b) a supplemental Stripe Transfer to the seller
-    // for the discounted gap, funded from the platform's balance and posted
-    // as its own ledger entry — see docs/payments/thread-cash-checkout-todo.md
-    // for the exact plan. Until that lands (and the 'threadCashCheckoutDiscount'
-    // feature flag is reviewed and turned on), reject any redeem attempt here
-    // rather than silently ignoring it or reusing the loyalty-coupon path,
-    // which would reduce the seller's payout.
-    if (typeof threadCashToken === "string" && threadCashToken.trim()) {
-      res.status(400).json({
+    // ── Thread Cash ─────────────────────────────────────────────────────
+    // Platform-funded reward credit: a DISCOUNT on a card purchase, never a
+    // full payment method. Gated behind the same flag the /redeem endpoint
+    // uses; see docs/payments/thread-cash-checkout-todo.md for the full plan
+    // (kept in sync with the implementation below).
+    const normalizedThreadCashToken =
+      typeof threadCashToken === "string" && threadCashToken.trim()
+        ? threadCashToken.trim().toUpperCase()
+        : null;
+    if (normalizedThreadCashToken && !(await isFeatureEnabled("threadCashCheckoutDiscount"))) {
+      res.status(403).json({
         error: "Using Thread Cash at checkout isn't available yet.",
-        code: "THREAD_CASH_CHECKOUT_NOT_IMPLEMENTED",
+        code: "THREAD_CASH_CHECKOUT_DISABLED",
       });
       return;
     }
@@ -678,6 +688,19 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       throw planError;
     }
 
+    // Held preorder charges land on Brandthread's own balance and are only
+    // paid to the seller later, from the drop's held pool — the platform
+    // top-up mechanism used for in-stock destination charges
+    // (lib/threadCash/checkoutTopup.ts) doesn't apply there. Keep Thread
+    // Cash to in-stock checkouts for now rather than under-fund a preorder.
+    if (chargePlan.chargeModel === "held" && normalizedThreadCashToken) {
+      res.status(400).json({
+        error: "Thread Cash can't be applied to a preorder yet.",
+        code: "THREAD_CASH_PREORDER_NOT_SUPPORTED",
+      });
+      return;
+    }
+
     const hasKey = !!clientIdempotencyKey && typeof clientIdempotencyKey === "string";
     checkoutIdempotencyKey = hasKey ? clientIdempotencyKey : null;
 
@@ -718,6 +741,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
           id:              checkoutSessions.id,
           stripeSessionId: checkoutSessions.stripeSessionId,
           loyaltyToken:    checkoutSessions.loyaltyToken,
+          threadCashToken: checkoutSessions.threadCashToken,
         })
         .from(checkoutSessions)
         .where(eq(checkoutSessions.clientIdempotencyKey, clientIdempotencyKey))
@@ -795,6 +819,9 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
             existingCS.loyaltyToken!,
             existingCS.id,
           ));
+        }
+        if (existingCS.threadCashToken) {
+          await releaseThreadCashRedemption(db, buyerId, existingCS.threadCashToken, existingCS.id);
         }
         res.status(410).json({
           error: "Your checkout session expired. Please review your cart and try again.",
@@ -924,10 +951,52 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       };
     }
 
+    // Loyalty points and a discount code both reduce the fee basis (they are
+    // seller-funded). Thread Cash never does — see below.
+    const combinedDiscountCents = (loyaltyRedemption?.discountCents ?? 0) + discountCodeAmountCents;
+
+    // ── Thread Cash reservation ────────────────────────────────────────────
+    // Attaches the buyer's already-redeemed Thread Cash token (see POST
+    // /api/thread-cash/redeem) to this one checkout attempt. The amount was
+    // fixed when the buyer redeemed it; this only verifies it is still valid,
+    // unused, and leaves the card charge at or above Stripe's minimum.
+    let threadCashRedemption: { token: string; discountCents: number } | null = null;
+    if (normalizedThreadCashToken) {
+      const config = await getThreadCashConfig();
+      const remainingAfterOtherDiscounts = Math.max(0, totalBeforeLoyaltyDiscountCents - combinedDiscountCents);
+      try {
+        const reservationId = `checkout:${crypto.randomUUID()}`;
+        const reserved = await reserveThreadCashRedemption(
+          buyerId,
+          normalizedThreadCashToken,
+          reservationId,
+          config.maxRedemptionPerOrderCents != null
+            ? Math.min(remainingAfterOtherDiscounts, config.maxRedemptionPerOrderCents + STRIPE_MIN_CARD_CHARGE_CENTS)
+            : remainingAfterOtherDiscounts,
+          STRIPE_MIN_CARD_CHARGE_CENTS,
+        );
+        threadCashReservation = { buyerId, token: reserved.token, reservationId };
+        threadCashRedemption = { token: reserved.token, discountCents: reserved.discountCents };
+      } catch (err) {
+        if (err instanceof ThreadCashError) {
+          res.status(err.status).json({ error: err.message, code: err.code });
+          return;
+        }
+        throw err;
+      }
+    }
+    // What the buyer's Stripe charge is discounted by (loyalty + discount
+    // code + Thread Cash). Only `combinedDiscountCents` above feeds the fee
+    // basis below — Thread Cash must never shrink the platform fee or the
+    // seller's destination-transfer amount, since Brandthread (not the
+    // seller) funds it. The gap this creates for destination charges is
+    // topped up by a supplemental Stripe transfer once the order is paid
+    // (routes/webhooks.ts) — see docs/payments/thread-cash-checkout-todo.md.
+    const stripeChargeDiscountCents = combinedDiscountCents + (threadCashRedemption?.discountCents ?? 0);
+
     // Persist the checkout before Stripe is contacted. Its ID is included in
     // the initial Stripe metadata, so a paid session is always reconstructable
     // by the webhook even if the later session-ID write is interrupted.
-    const combinedDiscountCents = (loyaltyRedemption?.discountCents ?? 0) + discountCodeAmountCents;
     const money = paymentIntentMoney({
       plan: chargePlan,
       sellerStripeAccountId: seller.stripeAccountId,
@@ -950,6 +1019,10 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         discountCodeId: discountApplication.discount.id,
         discountCodeAmountCents: discountCodeAmountCents,
       } : {}),
+      ...(threadCashRedemption ? {
+        threadCashToken: threadCashRedemption.token,
+        threadCashDiscountCents: threadCashRedemption.discountCents,
+      } : {}),
       ...(validatedShipping ? { shippingAddress: validatedShipping } : {}),
       ...(hasKey ? { clientIdempotencyKey } : {}),
     };
@@ -971,6 +1044,15 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
             loyaltyReservation!.reservationId,
           ));
           loyaltyReservation = null;
+        }
+        if (threadCashReservation) {
+          await releaseThreadCashRedemption(
+            db,
+            threadCashReservation.buyerId,
+            threadCashReservation.token,
+            threadCashReservation.reservationId,
+          );
+          threadCashReservation = null;
         }
         for (let attempt = 0; attempt < 30; attempt++) {
           const [winner] = await db
@@ -1003,24 +1085,35 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       );
       loyaltyReservation.reservationId = csId;
     }
+    if (threadCashReservation) {
+      await bindThreadCashRedemptionToCheckout(
+        threadCashReservation.buyerId,
+        threadCashReservation.token,
+        threadCashReservation.reservationId,
+        csId,
+      );
+      threadCashReservation.reservationId = csId;
+    }
 
-    // Loyalty points and a seller discount code are both represented as ONE
-    // combined Stripe once-off coupon — Checkout Sessions only accept a single
-    // `discounts` entry in payment mode. This keeps tax and the buyer-facing
-    // Stripe total authoritative, unlike rewriting individual line-item prices.
+    // Loyalty points, a seller discount code, and Thread Cash are all
+    // represented as ONE combined Stripe once-off coupon — Checkout Sessions
+    // only accept a single `discounts` entry in payment mode. This keeps tax
+    // and the buyer-facing Stripe total authoritative, unlike rewriting
+    // individual line-item prices. (Thread Cash discounts the buyer's charge
+    // here but never the fee basis above — see `stripeChargeDiscountCents`.)
     let combinedCouponId: string | undefined;
-    if (combinedDiscountCents > 0) {
-      const couponName = loyaltyRedemption && discountApplication
-        ? `Brandthread rewards + ${discountApplication.discount.code}`
-        : loyaltyRedemption
-          ? "Brandthread rewards"
-          : discountApplication!.discount.code;
+    if (stripeChargeDiscountCents > 0) {
+      const nameParts = [
+        loyaltyRedemption ? "Brandthread rewards" : null,
+        discountApplication ? discountApplication.discount.code : null,
+        threadCashRedemption ? "Thread Cash" : null,
+      ].filter((part): part is string => Boolean(part));
       const coupon = await stripe.coupons.create({
-        amount_off: combinedDiscountCents,
+        amount_off: stripeChargeDiscountCents,
         currency: "usd",
         duration: "once",
         max_redemptions: 1,
-        name: couponName,
+        name: nameParts.join(" + "),
       });
       combinedCouponId = coupon.id;
     }
@@ -1091,6 +1184,14 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
               loyaltyReservation.buyerId,
               loyaltyReservation.token,
               loyaltyReservation.reservationId,
+            );
+          }
+          if (threadCashReservation) {
+            await releaseThreadCashRedemption(
+              tx,
+              threadCashReservation.buyerId,
+              threadCashReservation.token,
+              threadCashReservation.reservationId,
             );
           }
           if (checkoutRecordId) {

@@ -367,6 +367,15 @@ export const orders = pgTable('orders', {
   sellerNetCents: integer('seller_net_cents').notNull().default(0),
   refundedCents: integer('refunded_cents').notNull().default(0),
   platformFeeRefundedCents: integer('platform_fee_refunded_cents').notNull().default(0),
+  // Thread Cash spent on this order (platform-funded, tracked separately from
+  // discountAmountCents above since the seller is still paid in full for this
+  // portion — see lib/threadCash/wallet.ts). Refunded/cancelled orders return
+  // this amount to the buyer's Thread Cash balance exactly once.
+  threadCashAppliedCents: integer('thread_cash_applied_cents').notNull().default(0),
+  // The platform-funded supplemental transfer that topped the seller up to
+  // the full item price (destination charges only). A full refund reverses
+  // exactly this transfer in addition to the buyer's card refund.
+  stripeThreadCashTransferId: text('stripe_thread_cash_transfer_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -510,6 +519,12 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   // order creation by the paid-order webhook (see lib/discounts.ts).
   discountCodeId: text('discount_code_id'),
   discountCodeAmountCents: integer('discount_code_amount_cents').notNull().default(0),
+  // Optional Thread Cash redemption reserved for this Stripe Checkout Session.
+  // Platform-funded (unlike loyalty/discount code above): it discounts the
+  // buyer's Stripe charge only — it must never reduce platformFeeCents /
+  // processingFeeEstimateCents below, which stay computed on the full price.
+  threadCashToken: text('thread_cash_token'),
+  threadCashDiscountCents: integer('thread_cash_discount_cents').notNull().default(0),
   // Money decisions fixed when the Stripe session was created.
   chargeModel: text('charge_model'),        // 'destination' | 'held'
   dropId: uuid('drop_id'),                  // server-derived from the products
