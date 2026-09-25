@@ -1585,7 +1585,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Owner-only verified performance. Untracked metrics return tracked=false and null values. */
       analytics: (id: string) =>
         get<PostAnalyticsResponse>(`/api/posts/${encodeURIComponent(id)}/analytics`),
-      interact: (id: string, body: { type: 'like' | 'repost' | 'view' | 'watch_time' | 'shop_click'; value?: string }) =>
+      interact: (id: string, body: { type: 'like' | 'repost' | 'view' | 'watch_time' | 'shop_click' | 'share' | 'not_interested'; value?: string }) =>
         post<{ action: string; count?: number }>(`/api/posts/${encodeURIComponent(id)}/interact`, body),
     },
     /** Content reporting (buyers and sellers can submit reports) */
