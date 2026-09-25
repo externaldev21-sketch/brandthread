@@ -64,6 +64,9 @@ export const users = pgTable('users', {
   policyRestricted:             boolean('policy_restricted').notNull().default(false),
   returnPolicy:       text('return_policy'),
   cancellationPolicy: text('cancellation_policy'),
+  // ISO-3166 alpha-2 country the seller ships from. Used to resolve which
+  // shipping zone is "domestic" for that seller (see shippingZones).
+  sellerShipFromCountry: text('seller_ship_from_country').notNull().default('US'),
   // Public profile link (bio website)
   website: text('website'),
   // Unique @handle (letters, numbers, underscores; 3–30 chars). Nullable so
@@ -204,6 +207,10 @@ export const productVariants = pgTable('product_variants', {
   priceCents: integer('price_cents').notNull(),
   stock: integer('stock').notNull().default(0),
   lowStockThreshold: integer('low_stock_threshold').notNull().default(10),
+  // Used to resolve weight-tiered shipping zone rates at checkout (see
+  // shippingZones). 0 = unknown/unset, which weight-tiered zones treat as
+  // falling into their lowest tier.
+  weightGrams: integer('weight_grams').notNull().default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -1068,6 +1075,61 @@ export const shippingRates = pgTable('shipping_rates', {
   updatedAt:      timestamp('updated_at').defaultNow().notNull(),
 }, (t) => ({
   sellerIdx: index('shipping_rates_seller_idx').on(t.sellerId),
+}));
+
+// ─── Shipping zones (worldwide shipping settings) ──────────────────────────────
+// Supersedes the single flat-rate `shippingRates` table above with per-zone
+// rules: domestic / named countries / rest-of-world, each either flat-rate or
+// weight-tiered, with its own free-shipping threshold, processing time, and
+// an informational carrier/service label (no live rate shopping). This table
+// is additive — `shippingRates` is kept for backward compatibility and as the
+// fallback when a seller has configured no zones yet.
+export const shippingZones = pgTable('shipping_zones', {
+  id:       text('id').primaryKey().default(''),
+  sellerId: text('seller_id').notNull(),
+  name:     text('name').notNull(),
+  /** 'domestic' | 'country' | 'rest_of_world'. Exactly one 'rest_of_world' zone
+   *  per seller acts as the catch-all; 'domestic' matches the seller's home
+   *  country; 'country' matches the ISO-3166 alpha-2 codes in `countries`. */
+  zoneType: text('zone_type').notNull().default('country'),
+  /** ISO-3166 alpha-2 country codes this zone covers. Empty for 'rest_of_world'
+   *  (matches anything not covered by another zone) and for 'domestic' when
+   *  falling back to the seller's own country. */
+  countries: json('countries').$type<string[]>().notNull().default([]),
+  /** 'flat' | 'weight_tiered'. Weight-tiered rates live in shippingZoneWeightTiers. */
+  pricingModel:  text('pricing_model').notNull().default('flat'),
+  flatRateCents: integer('flat_rate_cents').notNull().default(0),
+  /** Order subtotal (cents) at/above which shipping is free in this zone. NULL = never auto-free. */
+  freeAboveCents: integer('free_above_cents'),
+  /** Business days before the seller ships an order in this zone. */
+  processingDays: integer('processing_days').notNull().default(2),
+  /** Informational label only, e.g. "USPS Priority", "DHL Express" — not a live carrier integration. */
+  carrierLabel: text('carrier_label'),
+  /** Whether this zone ships outside the seller's home country at all. Always true for 'domestic'. */
+  shipsInternationally: boolean('ships_internationally').notNull().default(true),
+  /** 'ddp' (seller/platform prepays duties) | 'dap' (buyer pays duties/customs on delivery). Informational; coordinates with the Taxes settings slice. */
+  dutiesHandling: text('duties_handling').notNull().default('dap'),
+  active:    boolean('active').notNull().default(true),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (t) => ({
+  sellerIdx: index('shipping_zones_seller_idx').on(t.sellerId),
+  sellerActiveOrderIdx: index('shipping_zones_seller_active_order_idx').on(t.sellerId, t.active, t.sortOrder),
+}));
+
+// Weight-based rate brackets for a zone with pricingModel = 'weight_tiered'.
+// Tiers are matched by cart weight in grams; a NULL maxWeightGrams means "and up".
+export const shippingZoneWeightTiers = pgTable('shipping_zone_weight_tiers', {
+  id:             text('id').primaryKey().default(''),
+  zoneId:         text('zone_id').notNull().references(() => shippingZones.id, { onDelete: 'cascade' }),
+  minWeightGrams: integer('min_weight_grams').notNull().default(0),
+  maxWeightGrams: integer('max_weight_grams'),
+  rateCents:      integer('rate_cents').notNull(),
+  sortOrder:      integer('sort_order').notNull().default(0),
+  createdAt:      timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  zoneIdx: index('shipping_zone_weight_tiers_zone_idx').on(t.zoneId, t.sortOrder),
 }));
 
 // ─── Content reports ──────────────────────────────────────────────────────────

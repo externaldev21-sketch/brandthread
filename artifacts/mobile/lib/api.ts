@@ -1753,6 +1753,33 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       calculate: (sellerId: string, subtotalCents: number) =>
         get<any>(`/api/shipping-rates/calculate?sellerId=${encodeURIComponent(sellerId)}&subtotalCents=${subtotalCents}`),
     },
+    /** Shipping zones — worldwide zone-based rates (domestic / country / rest-of-world), replacing the single flat rate above. */
+    shippingZones: {
+      list: () => get<any[]>('/api/shipping-zones'),
+      create: (data: {
+        name: string;
+        zoneType: 'domestic' | 'country' | 'rest_of_world';
+        countries?: string[];
+        pricingModel?: 'flat' | 'weight_tiered';
+        flatRateCents?: number;
+        freeAboveCents?: number | null;
+        processingDays?: number;
+        carrierLabel?: string | null;
+        shipsInternationally?: boolean;
+        dutiesHandling?: 'ddp' | 'dap';
+        sortOrder?: number;
+      }) => post<any>('/api/shipping-zones', data),
+      update: (id: string, data: Record<string, unknown>) =>
+        patch<any>(`/api/shipping-zones/${encodeURIComponent(id)}`, data),
+      delete: (id: string) => del<any>(`/api/shipping-zones/${encodeURIComponent(id)}`),
+      setWeightTiers: (id: string, tiers: Array<{ minWeightGrams: number; maxWeightGrams: number | null; rateCents: number }>) =>
+        put<any>(`/api/shipping-zones/${encodeURIComponent(id)}/weight-tiers`, { tiers }),
+      getSettings: () => get<{ shipFromCountry: string }>('/api/shipping-zones/settings'),
+      updateSettings: (shipFromCountry: string) =>
+        patch<{ shipFromCountry: string }>('/api/shipping-zones/settings', { shipFromCountry }),
+      resolve: (sellerId: string, country: string, subtotalCents: number, weightGrams = 0) =>
+        get<any>(`/api/shipping-zones/resolve?sellerId=${encodeURIComponent(sellerId)}&country=${encodeURIComponent(country)}&subtotalCents=${subtotalCents}&weightGrams=${weightGrams}`),
+    },
     // (products key defined earlier in this object — no duplicate)
     /** Waitlist — out-of-stock variant demand tracking. */
     waitlist: {

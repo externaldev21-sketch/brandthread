@@ -64,7 +64,7 @@ describe('seller setup destination navigation', () => {
       ['app/seller-verification.tsx', "data?.verificationStatus === 'verified'", "completeSetupTaskWhen('verify_account'"],
       ['app/payouts.tsx', 'normalized?.connected && normalized.chargesEnabled && normalized.payoutsEnabled', "'connect_payments'"],
       ['app/add-product.tsx', '() => api.products.create(serverCreatePayload)', "'first_product'"],
-      ['app/shipping.tsx', '() => api.shippingRates.create', "'shipping_rates'"],
+      ['app/shipping.tsx', '() => api.shippingZones.create(payload)', "'shipping_rates'"],
       ['app/store-builder.tsx', "() => applyTheme(THREAD_THEME_ID, 'light')", "'customize_store'"],
       ['app/store-domain.tsx', "verificationStatus === 'verified'", "'connect_domain'"],
       ['app/store-publish.tsx', 'result.success', "'publish_store'"],
