@@ -24,8 +24,15 @@ import {
   sellerHomeAnalyticsKey,
   type SellerHomeAnalyticsSnapshot,
 } from '@/lib/sellerHomeAnalytics';
-import { skipTask, type SetupState, type SetupTask } from '@/lib/setupStore';
+import {
+  completeTask, isSetupComplete, completionPercent, nextTask,
+  markWalkthroughShown, markCelebrated,
+  type SetupState, type SetupTask,
+} from '@/lib/setupStore';
 import { withSellerSetupOrigin } from '@/lib/setupNavigation';
+import SetupWalkthroughSheet from '@/components/SetupWalkthroughSheet';
+import SetupContinueBanner from '@/components/SetupContinueBanner';
+import SetupCelebration from '@/components/SetupCelebration';
 import { ResponsiveContainer, SkeletonBlock, useBreakpoint } from '@/components/layout';
 import ActivityBellButton from '@/components/ActivityBellButton';
 import { PressableScale } from '@/components/BrandthreadUI';
@@ -166,6 +173,42 @@ export default function SellerHomeCommerceDashboard({
 
   const data = selectSellerHomeAnalytics(snapshot, userId, range);
 
+  const [walkthroughVisible, setWalkthroughVisible] = useState(false);
+  const [celebrationVisible, setCelebrationVisible] = useState(false);
+  const autoOpenedRef = useRef(false);
+  const wasCompleteRef = useRef<boolean | null>(null);
+  const setupComplete = isSetupComplete(setupState);
+  const setupPercent = completionPercent(setupState);
+
+  // Show the guided walkthrough automatically the first time a seller lands
+  // on an incomplete dashboard (e.g. right after signup), then never again
+  // uninvited — the "Continue setup" banner takes over from there.
+  useEffect(() => {
+    if (autoOpenedRef.current) return;
+    if (!userId || setupComplete) return;
+    if (setupState.walkthroughShown) return;
+    autoOpenedRef.current = true;
+    setWalkthroughVisible(true);
+    void markWalkthroughShown(userId).then(onSetupStateChange);
+  }, [onSetupStateChange, setupComplete, setupState.walkthroughShown, userId]);
+
+  // One-time celebration the moment every required step becomes complete.
+  useEffect(() => {
+    if (wasCompleteRef.current === null) {
+      wasCompleteRef.current = setupComplete;
+      if (setupComplete && !setupState.celebrated && userId) {
+        setCelebrationVisible(true);
+        void markCelebrated(userId).then(onSetupStateChange);
+      }
+      return;
+    }
+    if (setupComplete && !wasCompleteRef.current && !setupState.celebrated && userId) {
+      setCelebrationVisible(true);
+      void markCelebrated(userId).then(onSetupStateChange);
+    }
+    wasCompleteRef.current = setupComplete;
+  }, [onSetupStateChange, setupComplete, setupState.celebrated, userId]);
+
   // ── Range-scoped analytics (hero + chart + stat grid) ────────────────────
   useEffect(() => {
     if (!userId) {
@@ -273,6 +316,15 @@ export default function SellerHomeCommerceDashboard({
   }, [api, currentRole, isLoadingRole, userId]);
 
   useEffect(() => { void loadFinanceBalance(); }, [loadFinanceBalance]);
+
+  // Auto-check "Set up payments" the moment real payout data confirms Stripe
+  // Connect is live — real data, not a manual tap, drives this step.
+  useEffect(() => {
+    if (!userId || !financeBalance?.connected) return;
+    const task = setupState.tasks.find((t) => t.id === 'connect_payments');
+    if (!task || task.completed) return;
+    void completeTask('connect_payments', userId).then(onSetupStateChange);
+  }, [financeBalance?.connected, onSetupStateChange, setupState.tasks, userId]);
 
   useEffect(() => subscribeStoreContext(() => {
     balanceGenerationRef.current += 1;
@@ -419,19 +471,6 @@ export default function SellerHomeCommerceDashboard({
     // would leave a dead, unreachable dashboard scene underneath it.
     router.replace(withSellerSetupOrigin(task.route) as never);
   }, [router]);
-
-  const dismissTask = useCallback(async (task: SetupTask) => {
-    const next = await skipTask(task.id, userId);
-    onSetupStateChange(next);
-  }, [onSetupStateChange, userId]);
-
-  const showTaskOptions = useCallback((task: SetupTask) => {
-    Alert.alert(task.label, undefined, [
-      { text: 'Open', onPress: () => openTask(task) },
-      { text: 'Dismiss', style: 'destructive', onPress: () => void dismissTask(task) },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  }, [dismissTask, openTask]);
 
   const addProductTask = setupState.tasks.find((task) => task.id === 'first_product') ?? null;
   const newSeller = everSoldCount !== null && isNewSeller(everSoldCount);
@@ -669,46 +708,33 @@ export default function SellerHomeCommerceDashboard({
             </>
           )}
 
-          {/* ── Setup checklist ─────────────────────────────────────────── */}
-          {setupState.tasks.some((task) => !task.completed && !task.skipped) && (
+          {/* ── Setup checklist: "Continue setup" banner opens the guided
+              walkthrough sheet, which owns the full task list — no separate
+              inline checklist duplicated here. ──────────────────────────── */}
+          {!setupComplete && setupState.walkthroughShown && (
             <View style={styles.section}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionHeaderLabel}>Set up your business</Text>
-              </View>
-              <View style={[styles.setupList, { backgroundColor: theme.card, borderColor: theme.borderSubtle }]}>
-                {setupState.tasks.filter((task) => !task.completed && !task.skipped).map((task, index, arr) => (
-                  <TouchableOpacity
-                    key={task.id}
-                    style={[styles.setupCard, index < arr.length - 1 && { borderBottomColor: theme.borderSubtle, borderBottomWidth: StyleSheet.hairlineWidth }]}
-                    activeOpacity={0.75}
-                    onPress={() => openTask(task)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Open setup task: ${task.label}`}
-                  >
-                    <View style={[styles.setupIcon, { backgroundColor: theme.accentDim }]}>
-                      <Feather name={task.icon as keyof typeof Feather.glyphMap} size={18} color={theme.accent} />
-                    </View>
-                    <View style={styles.setupCopy}>
-                      <Text style={[styles.setupTitle, { color: theme.text }]}>{task.label}</Text>
-                      <Text style={[styles.setupDescription, { color: theme.muted }]} numberOfLines={2}>{task.description}</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.optionsButton}
-                      hitSlop={10}
-                      onPress={(event) => { event.stopPropagation(); showTaskOptions(task); }}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Options for ${task.label}`}
-                    >
-                      <Feather name="more-horizontal" size={18} color={MUTED} />
-                    </TouchableOpacity>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              <SetupContinueBanner
+                percent={setupPercent}
+                nextLabel={nextTask(setupState)?.label ?? null}
+                onPress={() => setWalkthroughVisible(true)}
+              />
             </View>
           )}
         </ResponsiveContainer>
         <View testID="seller-dashboard-scroll-end" accessibilityLabel="Seller dashboard scroll end" style={styles.scrollEndMarker} />
       </ScrollView>
+
+      <SetupWalkthroughSheet
+        visible={walkthroughVisible}
+        onClose={() => setWalkthroughVisible(false)}
+        userId={userId}
+        setupState={setupState}
+        onSetupStateChange={onSetupStateChange}
+      />
+      <SetupCelebration
+        visible={celebrationVisible}
+        onDismiss={() => setCelebrationVisible(false)}
+      />
     </View>
   );
 }

@@ -1,7 +1,7 @@
 /**
- * Brandthread Orders Service — demo layer with AsyncStorage persistence.
- * All writes persist across restarts. Seller orders start empty; the separate
- * buyer preview dataset remains available for buyer-facing demo flows.
+ * Brandthread Orders Service — AsyncStorage-backed local persistence.
+ * All writes persist across restarts. Seller and buyer orders both start
+ * empty; no demo/sample data is ever seeded for a real account.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -101,238 +101,6 @@ function makeHeld(orderId: string, totalReceivedCents: number, completedKeys: st
   };
 }
 
-function makeTimeline(events: { type: OrderTimelineEvent['type']; message: string; customerVisible?: boolean }[]): OrderTimelineEvent[] {
-  return events.map((e, i) => ({
-    id: 'tl_' + uid(),
-    type: e.type,
-    message: e.message,
-    isCustomerVisible: e.customerVisible ?? false,
-    isSystemEvent: true,
-    isSellerNote: false,
-    createdAt: daysAgo(events.length - i),
-  }));
-}
-
-function makeFulfillment(orderId: string, lineItemIds: string[], type: FulfillmentType, status: FulfillmentStatus): Fulfillment {
-  const group: FulfillmentGroup = {
-    id: 'fg_' + uid(), orderId, type, status, lineItemIds,
-    createdAt: daysAgo(2), updatedAt: now(),
-  };
-  return {
-    id: 'ff_' + uid(), orderId, groups: [group], type, status,
-    isPicked: ['ready_to_ship', 'fulfilled'].includes(status),
-    isPacked: ['ready_to_ship', 'fulfilled'].includes(status),
-    fromAddress: makeAddress('Seller'),
-  };
-}
-
-const DEMO_ORDERS_DATA: Order[] = [
-  // 1. New order, seller fulfilled
-  (() => {
-    const id = 'ord_001'; const num = '#1042'; const totalCents = 14800;
-    const items: OrderLineItem[] = [
-      { id: 'li_001a', productId: 'p1', productName: 'Oversized Hoodie', variant: 'Black / L', sku: 'HOD-BLK-L', quantity: 1, unitPriceCents: 9800, discountAmountCents: 0, taxAmountCents: 0, totalCents: 9800, fulfillmentSource: 'seller', isPreOrder: false },
-      { id: 'li_001b', productId: 'p2', productName: 'Logo Tee', variant: 'White / M', sku: 'TEE-WHT-M', quantity: 2, unitPriceCents: 2500, discountAmountCents: 0, taxAmountCents: 0, totalCents: 5000, fulfillmentSource: 'seller', isPreOrder: false },
-    ];
-    return {
-      id, orderNumber: num, source: 'Thread', salesChannel: 'Brandthread',
-      status: 'new' as OrderStatus, paymentStatus: 'paid' as PaymentStatus,
-      fulfillmentStatus: 'unfulfilled' as FulfillmentStatus, fulfillmentType: 'seller' as FulfillmentType,
-      riskLevel: 'low' as const, riskFlags: [],
-      customer: makeCustomer('cust_001', 'Jordan Kim', 'jordan.kim@brandthread-mail.com', 3, 41200),
-      lineItems: items,
-      fulfillment: makeFulfillment(id, items.map(i => i.id), 'seller', 'unfulfilled'),
-      payment: makePayment(totalCents), heldFunds: makeHeld(id, totalCents, ['payment_confirmed']),
-      shipments: [], labels: [], returns: [], refunds: [], disputes: [],
-      timeline: makeTimeline([
-        { type: 'order_created', message: `Order ${num} placed`, customerVisible: true },
-        { type: 'payment_confirmed', message: 'Payment of $148.00 confirmed', customerVisible: true },
-      ]),
-      notes: [], hasUnreadMessage: true, isPreOrder: false, isManufacturerFulfilled: false,
-      sellerId: 'u_threadhaus', sellerName: 'Threadhaus', sellerHandle: '@threadhaus',
-      currency: 'USD', tags: [], createdAt: daysAgo(1), updatedAt: now(),
-    } as Order;
-  })(),
-
-  // 2. Processing, ready to ship
-  (() => {
-    const id = 'ord_002'; const num = '#1041'; const totalCents = 26500;
-    const items: OrderLineItem[] = [
-      { id: 'li_002a', productId: 'p1', productName: 'Track Jacket', variant: 'Navy / XL', sku: 'TRK-NVY-XL', quantity: 1, unitPriceCents: 14500, discountAmountCents: 0, taxAmountCents: 0, totalCents: 14500, fulfillmentSource: 'seller', isPreOrder: false },
-      { id: 'li_002b', productId: 'p3', productName: 'Cargo Shorts', variant: 'Olive / 32', sku: 'CRG-OLV-32', quantity: 2, unitPriceCents: 6000, discountAmountCents: 0, taxAmountCents: 0, totalCents: 12000, fulfillmentSource: 'seller', isPreOrder: false },
-    ];
-    return {
-      id, orderNumber: num, source: 'Discover', salesChannel: 'Brandthread',
-      status: 'ready_to_ship' as OrderStatus, paymentStatus: 'paid' as PaymentStatus,
-      fulfillmentStatus: 'partially_fulfilled' as FulfillmentStatus, fulfillmentType: 'seller' as FulfillmentType,
-      riskLevel: 'low' as const, riskFlags: [],
-      customer: makeCustomer('cust_002', 'Alex Rivera', 'alex.rivera@brandthread-mail.com', 7, 124000),
-      lineItems: items,
-      fulfillment: makeFulfillment(id, items.map(i => i.id), 'seller', 'partially_fulfilled'),
-      payment: makePayment(totalCents), heldFunds: makeHeld(id, totalCents, ['payment_confirmed', 'manufacturer_deposit']),
-      shipments: [], labels: [], returns: [], refunds: [], disputes: [],
-      timeline: makeTimeline([
-        { type: 'order_created', message: `Order ${num} placed`, customerVisible: true },
-        { type: 'payment_confirmed', message: 'Payment of $265.00 confirmed', customerVisible: true },
-        { type: 'processing_started', message: 'Order marked processing' },
-      ]),
-      notes: [], hasUnreadMessage: false, isPreOrder: false, isManufacturerFulfilled: false,
-      sellerId: 'u_threadhaus', sellerName: 'Threadhaus', sellerHandle: '@threadhaus',
-      currency: 'USD', tags: [], createdAt: daysAgo(2), updatedAt: now(),
-    } as Order;
-  })(),
-
-  // 3. Shipped with tracking
-  (() => {
-    const id = 'ord_003'; const num = '#1038'; const totalCents = 8900;
-    const items: OrderLineItem[] = [
-      { id: 'li_003a', productId: 'p4', productName: 'Vintage Cap', variant: 'Washed Black / One Size', sku: 'CAP-BLK-OS', quantity: 1, unitPriceCents: 4500, discountAmountCents: 0, taxAmountCents: 0, totalCents: 4500, fulfillmentSource: 'seller', isPreOrder: false },
-      { id: 'li_003b', productId: 'p5', productName: 'Logo Socks 3-Pack', variant: 'White / One Size', sku: 'SOC-WHT-OS', quantity: 1, unitPriceCents: 4400, discountAmountCents: 0, taxAmountCents: 0, totalCents: 4400, fulfillmentSource: 'seller', isPreOrder: false },
-    ];
-    const shipment: Shipment = {
-      id: 'shp_001', orderId: id, fulfillmentGroupId: 'fg_001',
-      carrier: 'USPS', trackingNumber: '9400111899223512345671',
-      trackingStatus: 'in_transit',
-      trackingEvents: [
-        { id: 'te_001', status: 'label_created', description: 'Label created', timestamp: daysAgo(3) },
-        { id: 'te_002', status: 'accepted', location: 'Los Angeles, CA', description: 'Package accepted at post office', timestamp: daysAgo(2) },
-        { id: 'te_003', status: 'in_transit', location: 'Phoenix, AZ', description: 'In transit to destination', timestamp: daysAgo(1) },
-      ],
-      shippedAt: daysAgo(2), estimatedDelivery: daysFromNow(1), isDemo: true,
-    };
-    const label: ShippingLabel = {
-      id: 'lbl_001', orderId: id, carrier: 'USPS', service: 'Priority Mail',
-      trackingNumber: '9400111899223512345671', priceCents: 1240,
-      status: 'active', isDemo: true, purchasedAt: daysAgo(2),
-    };
-    return {
-      id, orderNumber: num, source: 'Thread', salesChannel: 'Brandthread',
-      status: 'shipped' as OrderStatus, paymentStatus: 'paid' as PaymentStatus,
-      fulfillmentStatus: 'fulfilled' as FulfillmentStatus, fulfillmentType: 'seller' as FulfillmentType,
-      riskLevel: 'low' as const, riskFlags: [],
-      customer: makeCustomer('cust_003', 'Sam Chen', 'sam.chen@brandthread-mail.com', 2, 24500),
-      lineItems: items,
-      fulfillment: makeFulfillment(id, items.map(i => i.id), 'seller', 'fulfilled'),
-      payment: makePayment(totalCents, false), heldFunds: makeHeld(id, totalCents, ['payment_confirmed', 'product_shipped', 'tracking_verified']),
-      shipments: [shipment], labels: [label], returns: [], refunds: [], disputes: [],
-      timeline: makeTimeline([
-        { type: 'order_created', message: `Order ${num} placed`, customerVisible: true },
-        { type: 'payment_confirmed', message: 'Payment confirmed', customerVisible: true },
-        { type: 'label_purchased', message: 'USPS Priority Mail label purchased — $12.40' },
-        { type: 'shipped', message: `Shipped via USPS · Tracking: 9400111899223512345671`, customerVisible: true },
-      ]),
-      notes: [], hasUnreadMessage: false, isPreOrder: false, isManufacturerFulfilled: false,
-      sellerId: 'u_threadhaus', sellerName: 'Threadhaus', sellerHandle: '@threadhaus',
-      currency: 'USD', tags: [], createdAt: daysAgo(4), updatedAt: now(),
-    } as Order;
-  })(),
-
-  // 5. Return requested
-  (() => {
-    const id = 'ord_005'; const num = '#1030'; const totalCents = 11200;
-    const items: OrderLineItem[] = [
-      { id: 'li_005a', productId: 'p1', productName: 'Oversized Hoodie', variant: 'Grey / M', sku: 'HOD-GRY-M', quantity: 1, unitPriceCents: 9800, discountAmountCents: 0, taxAmountCents: 0, totalCents: 9800, fulfillmentSource: 'seller', isPreOrder: false },
-      { id: 'li_005b', productId: 'p2', productName: 'Logo Tee', variant: 'Black / S', sku: 'TEE-BLK-S', quantity: 1, unitPriceCents: 1400, discountAmountCents: 0, taxAmountCents: 0, totalCents: 1400, fulfillmentSource: 'seller', isPreOrder: false },
-    ];
-    const returnReq: ReturnRequest = {
-      id: 'ret_001', orderId: id, orderNumber: num,
-      customerId: 'cust_005', customerName: 'Taylor Nguyen',
-      status: 'requested', items: [
-        { lineItemId: 'li_005a', productName: 'Oversized Hoodie', variant: 'Grey / M', quantity: 1, unitPriceCents: 9800, reason: 'wrong_size' },
-      ],
-      customerExplanation: 'Ordered Medium but it runs large — too big for me.',
-      imageUris: [], requestedResolution: 'refund',
-      returnDeadline: daysFromNow(14),
-      createdAt: daysAgo(1), updatedAt: now(),
-    };
-    return {
-      id, orderNumber: num, source: 'Discover', salesChannel: 'Brandthread',
-      status: 'delivered' as OrderStatus, paymentStatus: 'paid' as PaymentStatus,
-      fulfillmentStatus: 'fulfilled' as FulfillmentStatus, fulfillmentType: 'seller' as FulfillmentType,
-      riskLevel: 'low' as const, riskFlags: [],
-      customer: makeCustomer('cust_005', 'Taylor Nguyen', 'taylor.nguyen@brandthread-mail.com', 4, 56000),
-      lineItems: items,
-      fulfillment: makeFulfillment(id, items.map(i => i.id), 'seller', 'fulfilled'),
-      payment: makePayment(totalCents, false), heldFunds: makeHeld(id, totalCents, ['payment_confirmed', 'product_shipped', 'tracking_verified', 'delivered']),
-      shipments: [], labels: [], returns: [returnReq], refunds: [], disputes: [],
-      timeline: makeTimeline([
-        { type: 'order_created', message: `Order ${num} placed`, customerVisible: true },
-        { type: 'payment_confirmed', message: 'Payment confirmed', customerVisible: true },
-        { type: 'shipped', message: 'Shipped via USPS', customerVisible: true },
-        { type: 'delivered', message: 'Delivered', customerVisible: true },
-        { type: 'return_requested', message: 'Customer requested return — Wrong size', customerVisible: true },
-      ]),
-      notes: [], hasUnreadMessage: true, isPreOrder: false, isManufacturerFulfilled: false,
-      sellerId: 'u_threadhaus', sellerName: 'Threadhaus', sellerHandle: '@threadhaus',
-      currency: 'USD', tags: [], createdAt: daysAgo(14), updatedAt: now(),
-    } as Order;
-  })(),
-
-  // 6. Disputed / high risk
-  (() => {
-    const id = 'ord_006'; const num = '#1028'; const totalCents = 19800;
-    const items: OrderLineItem[] = [
-      { id: 'li_006a', productId: 'p7', productName: 'Denim Jacket', variant: 'Indigo / L', sku: 'DNM-IND-L', quantity: 1, unitPriceCents: 19800, discountAmountCents: 0, taxAmountCents: 0, totalCents: 19800, fulfillmentSource: 'seller', isPreOrder: false },
-    ];
-    const dispute: Dispute = {
-      id: 'disp_001', orderId: id, type: 'not_received', status: 'evidence_needed',
-      customerClaim: 'I never received my order. Tracking says delivered but nothing arrived.',
-      amountCents: 19800, evidenceDeadline: daysFromNow(5),
-      evidence: [], internalNotes: [], potentialHoldCents: 19800,
-      createdAt: daysAgo(3), updatedAt: now(),
-    };
-    return {
-      id, orderNumber: num, source: 'Thread', salesChannel: 'Brandthread',
-      status: 'disputed' as OrderStatus, paymentStatus: 'paid' as PaymentStatus,
-      fulfillmentStatus: 'fulfilled' as FulfillmentStatus, fulfillmentType: 'seller' as FulfillmentType,
-      riskLevel: 'high' as const,
-      riskFlags: [
-        { id: 'rf_001', type: 'billing_mismatch', label: 'Billing & shipping address mismatch', severity: 'medium' },
-        { id: 'rf_002', type: 'new_customer', label: 'New customer, high value order', severity: 'low' },
-      ],
-      customer: makeCustomer('cust_006', 'Casey Park', 'casey.park@brandthread-mail.com', 1, 19800),
-      lineItems: items,
-      fulfillment: makeFulfillment(id, items.map(i => i.id), 'seller', 'fulfilled'),
-      payment: makePayment(totalCents, true), heldFunds: makeHeld(id, totalCents, ['payment_confirmed', 'product_shipped']),
-      shipments: [], labels: [], returns: [], refunds: [], disputes: [dispute],
-      timeline: makeTimeline([
-        { type: 'order_created', message: `Order ${num} placed`, customerVisible: true },
-        { type: 'risk_review', message: 'Order flagged for risk review — billing/shipping mismatch' },
-        { type: 'payment_confirmed', message: 'Payment confirmed', customerVisible: true },
-        { type: 'shipped', message: 'Shipped via UPS', customerVisible: true },
-        { type: 'dispute_opened', message: 'Customer dispute opened — Product not received', customerVisible: true },
-      ]),
-      notes: [], hasUnreadMessage: true, isPreOrder: false, isManufacturerFulfilled: false,
-      sellerId: 'u_threadhaus', sellerName: 'Threadhaus', sellerHandle: '@threadhaus',
-      currency: 'USD', tags: ['high-risk'], createdAt: daysAgo(18), updatedAt: now(),
-    } as Order;
-  })(),
-];
-
-// Demo buyer orders
-const DEMO_BUYER_ORDERS: BuyerOrderView[] = DEMO_ORDERS_DATA.map(o => ({
-  id: o.id,
-  orderNumber: o.orderNumber,
-  sellerId: o.sellerId,
-  sellerName: o.sellerName,
-  sellerHandle: o.sellerHandle,
-  status: o.status,
-  paymentStatus: o.paymentStatus,
-  fulfillmentStatus: o.fulfillmentStatus,
-  lineItems: o.lineItems.map(li => ({ productName: li.productName, variant: li.variant, quantity: li.quantity, unitPriceCents: li.unitPriceCents })),
-  shippingAddress: o.customer.shippingAddress,
-  payment: { subtotalCents: o.payment.subtotalCents, shippingTotalCents: o.payment.shippingTotalCents, taxTotalCents: o.payment.taxTotalCents, totalCents: o.payment.totalCents },
-  trackingNumber: o.shipments[0]?.trackingNumber,
-  trackingCarrier: o.shipments[0]?.carrier,
-  trackingStatus: o.shipments[0]?.trackingStatus,
-  estimatedDelivery: o.shipments[0]?.estimatedDelivery,
-  shippedAt: o.shipments[0]?.shippedAt,
-  isPreOrder: o.isPreOrder,
-  preOrderEstShipDate: o.preOrder?.estimatedShipDate,
-  hasReturnRequest: o.returns.length > 0,
-  createdAt: o.createdAt,
-}));
-
 // ─── In-memory store ──────────────────────────────────────────────────────────
 
 let _initialized = false;
@@ -345,19 +113,12 @@ async function ensureInitialized() {
   try {
     const [[, raw], [, rawBuyer]] = await AsyncStorage.multiGet([KEYS.orders, KEYS.buyer]);
     _orders = raw ? JSON.parse(raw) : [];
-    _buyerOrders = rawBuyer ? JSON.parse(rawBuyer) : DEMO_BUYER_ORDERS;
-    // Backfill sellerId/sellerHandle for records persisted before these fields were added
-    _buyerOrders = _buyerOrders.map(o => ({
-      ...o,
-      sellerId:     o.sellerId     ?? 'u_threadhaus',
-      sellerName:   o.sellerName   ?? 'Threadhaus',
-      sellerHandle: o.sellerHandle ?? '@threadhaus',
-    }));
+    _buyerOrders = rawBuyer ? JSON.parse(rawBuyer) : [];
     if (!raw) await AsyncStorage.setItem(KEYS.orders, JSON.stringify([]));
     if (!rawBuyer) await AsyncStorage.setItem(KEYS.buyer, JSON.stringify(_buyerOrders));
   } catch {
     _orders = [];
-    _buyerOrders = DEMO_BUYER_ORDERS;
+    _buyerOrders = [];
   }
 }
 

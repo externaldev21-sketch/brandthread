@@ -10,12 +10,19 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { logger } from "../lib/logger";
 
-// ─── Startup migration — add tutorial flag + questionnaire columns ─────────────
+// ─── Startup migration — add tutorial flag + questionnaire + profile columns ───
 (async () => {
   try {
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS has_seen_seller_tutorial BOOLEAN NOT NULL DEFAULT FALSE`);
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS seller_goals JSONB`);
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS buyer_style_interests JSONB`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS category TEXT`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS tags JSONB NOT NULL DEFAULT '[]'`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS location TEXT`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS social_links JSONB NOT NULL DEFAULT '{}'`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS contact_email TEXT`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS logo_url TEXT`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS banner_url TEXT`);
   } catch (err) {
     logger.error({ err }, "Seller profile migration failed");
   }
@@ -25,10 +32,11 @@ const router = Router();
 router.use(requireAuth);
 const objectStorage = new ObjectStorageService();
 
-const AVATAR_IMAGE_MIMES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+const IMAGE_MIMES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+const MAX_BANNER_BYTES = 8 * 1024 * 1024;
 
-function hasValidAvatarSignature(bytes: Buffer, contentType: string): boolean {
+function hasValidImageSignature(bytes: Buffer, contentType: string): boolean {
   if (contentType === "image/jpeg" || contentType === "image/jpg") {
     return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
   }
@@ -50,6 +58,14 @@ async function displayProfileImage(
   return uploadedImagePath ?? clerkAvatarUrl;
 }
 
+async function displayObjectImage(path: string | null): Promise<string | null> {
+  if (!path) return null;
+  if (path.startsWith("/objects/")) {
+    return objectStorage.getObjectEntityDownloadURL(path).catch(() => null);
+  }
+  return path;
+}
+
 // ─── GET /api/seller/profile ──────────────────────────────────────────────────
 router.get("/profile", async (req, res): Promise<void> => {
   const clerkId = (req as any).clerkUserId as string;
@@ -65,6 +81,13 @@ router.get("/profile", async (req, res): Promise<void> => {
         username:            users.username,
         profileImageUrl:     users.profileImageUrl,
         avatarUrl:           users.avatarUrl,
+        logoUrl:             users.logoUrl,
+        bannerUrl:           users.bannerUrl,
+        category:            users.category,
+        tags:                users.tags,
+        location:            users.location,
+        socialLinks:         users.socialLinks,
+        contactEmail:        users.contactEmail,
         storefrontVisits:    users.storefrontVisitCount,
         verified:            users.verified,
         verificationStatus:  users.verificationStatus,
@@ -100,10 +123,16 @@ router.get("/profile", async (req, res): Promise<void> => {
 
   const storefrontVisits = user.storefrontVisits ?? 0;
   const paidOrders = Number(paidOrderMetrics?.orders ?? 0);
-  const profileImageUrl = await displayProfileImage(user.profileImageUrl, user.avatarUrl);
+  const [profileImageUrl, logoUrl, bannerUrl] = await Promise.all([
+    displayProfileImage(user.profileImageUrl, user.avatarUrl),
+    displayObjectImage(user.logoUrl),
+    displayObjectImage(user.bannerUrl),
+  ]);
   res.json({
     ...user,
     profileImageUrl,
+    logoUrl,
+    bannerUrl,
     totalLikes: Number(likeTotal?.totalLikes ?? 0),
     metrics: {
       revenueCents: Number(paidOrderMetrics?.revenueCents ?? 0),
@@ -116,70 +145,87 @@ router.get("/profile", async (req, res): Promise<void> => {
   });
 });
 
-// ─── POST /api/seller/profile/avatar/upload ───────────────────────────────────
+// ─── Generic profile-image upload (avatar / logo / banner) ────────────────────
 // A seller-uploaded identity image is stored separately from Clerk's avatar URL,
 // so a later Clerk sync cannot overwrite a deliberate brand profile photo.
-router.post(
-  "/profile/avatar/upload",
-  express.raw({ type: "image/*", limit: MAX_AVATAR_BYTES }),
-  async (req, res): Promise<void> => {
-    const clerkId = (req as any).clerkUserId as string;
-    const contentType = String(req.headers["content-type"] ?? "").split(";")[0].toLowerCase();
-    const bytes = req.body as Buffer;
+type ProfileImageColumn = "profileImageUrl" | "logoUrl" | "bannerUrl";
 
-    if (!AVATAR_IMAGE_MIMES.has(contentType)) {
-      res.status(400).json({ error: "Use a JPEG, PNG, or WebP image for your avatar." });
-      return;
-    }
-    if (!Buffer.isBuffer(bytes) || bytes.length === 0 || bytes.length > MAX_AVATAR_BYTES) {
-      res.status(400).json({ error: "Avatar images must be no larger than 5 MB." });
-      return;
-    }
-    if (!hasValidAvatarSignature(bytes, contentType)) {
-      res.status(400).json({ error: "The uploaded file does not match its declared image type." });
-      return;
-    }
+function createProfileImageUploadHandler(
+  column: ProfileImageColumn,
+  dbColumn: typeof users.profileImageUrl | typeof users.logoUrl | typeof users.bannerUrl,
+  maxBytes: number,
+  label: string,
+) {
+  return [
+    express.raw({ type: "image/*", limit: maxBytes }),
+    async (req: express.Request, res: express.Response): Promise<void> => {
+      const clerkId = (req as any).clerkUserId as string;
+      const contentType = String(req.headers["content-type"] ?? "").split(";")[0].toLowerCase();
+      const bytes = req.body as Buffer;
 
-    const [seller] = await db
-      .select({ profileImageUrl: users.profileImageUrl })
-      .from(users)
-      .where(eq(users.clerkId, clerkId))
-      .limit(1);
-    if (!seller) {
-      res.status(404).json({ error: "Seller profile not found" });
-      return;
-    }
+      if (!IMAGE_MIMES.has(contentType)) {
+        res.status(400).json({ error: `Use a JPEG, PNG, or WebP image for your ${label}.` });
+        return;
+      }
+      if (!Buffer.isBuffer(bytes) || bytes.length === 0 || bytes.length > maxBytes) {
+        res.status(400).json({ error: `Your ${label} image must be no larger than ${Math.round(maxBytes / (1024 * 1024))} MB.` });
+        return;
+      }
+      if (!hasValidImageSignature(bytes, contentType)) {
+        res.status(400).json({ error: "The uploaded file does not match its declared image type." });
+        return;
+      }
 
-    let objectPath: string | null = null;
-    try {
-      objectPath = await objectStorage.createObjectEntityFromBuffer(bytes, contentType);
-      await objectStorage.trySetObjectEntityAclPolicy(objectPath, {
-        owner: clerkId,
-        visibility: "private",
-      });
-      await db
-        .update(users)
-        .set({ profileImageUrl: objectPath, updatedAt: new Date() })
-        .where(eq(users.clerkId, clerkId));
+      const [seller] = await db
+        .select({ existing: dbColumn })
+        .from(users)
+        .where(eq(users.clerkId, clerkId))
+        .limit(1);
+      if (!seller) {
+        res.status(404).json({ error: "Seller profile not found" });
+        return;
+      }
 
-      if (seller.profileImageUrl?.startsWith("/objects/")) {
-        void objectStorage.deleteObjectEntity(seller.profileImageUrl).catch((err) => {
-          req.log.warn({ err }, "Could not remove replaced seller avatar");
+      let objectPath: string | null = null;
+      try {
+        objectPath = await objectStorage.createObjectEntityFromBuffer(bytes, contentType);
+        await objectStorage.trySetObjectEntityAclPolicy(objectPath, {
+          owner: clerkId,
+          visibility: "private",
         });
-      }
+        await db
+          .update(users)
+          .set({ [column]: objectPath, updatedAt: new Date() })
+          .where(eq(users.clerkId, clerkId));
 
-      res.status(201).json({
-        profileImageUrl: await objectStorage.getObjectEntityDownloadURL(objectPath),
-      });
-    } catch (err) {
-      if (objectPath) {
-        await objectStorage.deleteObjectEntity(objectPath).catch(() => undefined);
+        if (seller.existing?.startsWith("/objects/")) {
+          void objectStorage.deleteObjectEntity(seller.existing).catch((err) => {
+            req.log.warn({ err }, `Could not remove replaced ${label}`);
+          });
+        }
+
+        res.status(201).json({
+          [column]: await objectStorage.getObjectEntityDownloadURL(objectPath),
+        });
+      } catch (err) {
+        if (objectPath) {
+          await objectStorage.deleteObjectEntity(objectPath).catch(() => undefined);
+        }
+        req.log.error({ err }, `Seller ${label} upload failed`);
+        res.status(500).json({ error: `Could not save your ${label}. Please try again.` });
       }
-      req.log.error({ err }, "Seller avatar upload failed");
-      res.status(500).json({ error: "Could not save avatar. Please try again." });
-    }
-  },
-);
+    },
+  ] as const;
+}
+
+// ─── POST /api/seller/profile/avatar/upload ───────────────────────────────────
+router.post("/profile/avatar/upload", ...createProfileImageUploadHandler("profileImageUrl", users.profileImageUrl, MAX_AVATAR_BYTES, "avatar"));
+
+// ─── POST /api/seller/profile/logo/upload ─────────────────────────────────────
+router.post("/profile/logo/upload", ...createProfileImageUploadHandler("logoUrl", users.logoUrl, MAX_AVATAR_BYTES, "logo"));
+
+// ─── POST /api/seller/profile/banner/upload ───────────────────────────────────
+router.post("/profile/banner/upload", ...createProfileImageUploadHandler("bannerUrl", users.bannerUrl, MAX_BANNER_BYTES, "banner"));
 
 // ─── PATCH /api/seller/policy ─────────────────────────────────────────────────
 router.patch("/policy", async (req, res): Promise<void> => {

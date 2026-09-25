@@ -2,17 +2,20 @@
  * Signature launch intro — plays once per cold start, on top of the native
  * splash screen (expo-splash-screen), before handing off to the app below.
  *
- * Sequencing:
+ * Sequencing (~1.2-1.6s on a typical cold start):
  *  1. Renders the same static logo/background as the native splash so
  *     `SplashScreen.hideAsync()` (fired on mount) is an invisible swap.
- *  2. Shoots the logo in from depth with a motion-streak trail, lands with
- *     a spring + haptic tick, then a light sweeps across it.
- *  3. First-ever launch after install gets a longer thread-line draw before
+ *  2. Shoots the logo in from depth with a spring overshoot and a
+ *     motion-streak trail (duplicate fading copies of the mark, not a
+ *     raster blur), lands with a haptic tick, then a light sweeps across it.
+ *  3. If fonts aren't loaded yet, holds on the settled logo with a slow
+ *     breathing pulse — no spinner — until they are, then reveals the
+ *     wordmark letter by letter.
+ *  4. First-ever launch after install gets a longer thread-line draw before
  *     the shoot-in; every later cold start skips straight to it.
- *  4. If `ready` isn't true yet when the entrance finishes, holds on the
- *     landed frame with a slow pulse until it is, then reveals the app by
- *     zooming through the mark.
- *  5. Reduce Motion collapses all of the above to a plain fade in/out.
+ *  5. Hands off with a zoom-through: the logo scales up and the overlay
+ *     fades as the first screen shows through underneath — no hard cut.
+ *  6. Reduce Motion collapses all of the above to a plain fade in/out.
  *
  * The app tree (`children`) mounts immediately underneath so data loading
  * always runs in parallel with the animation, never after it.
@@ -30,25 +33,26 @@ import Animated, {
   useReducedMotion,
   useSharedValue,
   withRepeat,
-  withSequence,
   withTiming,
   withSpring,
   runOnJS,
+  type SharedValue,
 } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
 import * as SplashScreen from 'expo-splash-screen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
-import { DEFAULT_THEME } from '@/contexts/AppThemeContext';
+import { DEFAULT_THEME, peekPersistedTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { consumeFirstLaunch } from '@/lib/introSplash';
+import { hapticLight } from '@/lib/haptics';
 
 const LOGO_BOX = 132;
 const SWEEP_WIDTH = LOGO_BOX * 0.9;
+const WORDMARK = 'BRANDTHREAD';
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
-type Phase = 'pending' | 'draw' | 'enter' | 'sweep' | 'hold' | 'reveal' | 'done';
+type Phase = 'pending' | 'draw' | 'enter' | 'shine' | 'hold' | 'wordmark' | 'reveal' | 'done';
 
 // A single flowing stroke — a stitched "thread" flourish, not a trace of the
 // raster logo (we don't have vector path data for it). It draws once, then
@@ -74,14 +78,20 @@ function AnimatedAppIntroSplash({ ready, children }: AppIntroSplashProps) {
   const reducedMotion = useReducedMotion();
   const [phase, setPhase] = useState<Phase>('pending');
   const [isFirstLaunch, setIsFirstLaunch] = useState(false);
+  // The native splash is still covering the screen while this resolves, so
+  // swapping the theme here never reads as a flash — it's set before the
+  // very first frame the user actually sees (see the mount effect below).
+  const [theme, setTheme] = useState<AppThemePreset>(DEFAULT_THEME);
   const readyRef = useRef(ready);
   readyRef.current = ready;
 
-  const logoScale = useSharedValue(0.22);
+  const logoScale = useSharedValue(0.6);
   const logoOpacity = useSharedValue(0);
   const drawProgress = useSharedValue(0);
   const drawOpacity = useSharedValue(1);
   const sweepProgress = useSharedValue(0);
+  const wordmarkProgress = useSharedValue(0);
+  const wordmarkFade = useSharedValue(1);
   const pulse = useSharedValue(0);
   const overlayOpacity = useSharedValue(1);
 
@@ -90,6 +100,7 @@ function AnimatedAppIntroSplash({ ready, children }: AppIntroSplashProps) {
   const startReveal = () => {
     setPhase('reveal');
     cancelAnimation(pulse);
+    wordmarkFade.value = withTiming(0, { duration: reducedMotion ? 0 : 140 });
     logoScale.value = withTiming(reducedMotion ? 1 : 3.4, {
       duration: reducedMotion ? 0 : 260,
       easing: Easing.in(Easing.cubic),
@@ -103,28 +114,47 @@ function AnimatedAppIntroSplash({ ready, children }: AppIntroSplashProps) {
     );
   };
 
+  // Reduce-Motion-only path: skip straight from the instantly-shown logo to
+  // the hold/reveal gate, since there's no shine or wordmark stagger to play.
   const startHoldOrReveal = () => {
     if (readyRef.current) {
       startReveal();
       return;
     }
     setPhase('hold');
-    pulse.value = withRepeat(withTiming(1, { duration: 900, easing: Easing.inOut(Easing.sin) }), -1, true);
   };
 
-  const startSweep = () => {
-    setPhase('sweep');
-    sweepProgress.value = withTiming(
+  const startWordmark = () => {
+    setPhase('wordmark');
+    wordmarkProgress.value = withTiming(
       1,
-      { duration: 380, easing: Easing.out(Easing.cubic) },
+      { duration: 320, easing: Easing.out(Easing.cubic) },
       (finished) => {
-        if (finished) runOnJS(startHoldOrReveal)();
+        if (finished) runOnJS(startReveal)();
       },
     );
   };
 
-  const triggerLandingHaptic = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+  // Fonts load in parallel with this sequence; most cold starts have them
+  // ready well before the shoot-in finishes, so this rarely holds at all.
+  const startHoldOrWordmark = () => {
+    if (readyRef.current) {
+      startWordmark();
+      return;
+    }
+    setPhase('hold');
+    pulse.value = withRepeat(withTiming(1, { duration: 900, easing: Easing.inOut(Easing.sin) }), -1, true);
+  };
+
+  const startShine = () => {
+    setPhase('shine');
+    sweepProgress.value = withTiming(
+      1,
+      { duration: 380, easing: Easing.out(Easing.cubic) },
+      (finished) => {
+        if (finished) runOnJS(startHoldOrWordmark)();
+      },
+    );
   };
 
   const startEnter = () => {
@@ -132,11 +162,11 @@ function AnimatedAppIntroSplash({ ready, children }: AppIntroSplashProps) {
     logoOpacity.value = withTiming(1, { duration: 160, easing: Easing.out(Easing.quad) });
     logoScale.value = withSpring(
       1,
-      { damping: 14, stiffness: 170, mass: 0.9 },
+      { damping: 13, stiffness: 190, mass: 0.9 },
       (finished) => {
         if (finished) {
-          runOnJS(triggerLandingHaptic)();
-          runOnJS(startSweep)();
+          runOnJS(hapticLight)();
+          runOnJS(startShine)();
         }
       },
     );
@@ -152,14 +182,18 @@ function AnimatedAppIntroSplash({ ready, children }: AppIntroSplashProps) {
     });
   };
 
-  // Resolve variant + reveal the native splash's held frame to this
-  // component, then kick off the sequence.
+  // Resolve the persisted theme + first-launch variant, reveal the native
+  // splash's held frame to this component, then kick off the sequence.
   useEffect(() => {
     let active = true;
     void (async () => {
-      const firstLaunch = await consumeFirstLaunch(AsyncStorage);
+      const [firstLaunch, persistedTheme] = await Promise.all([
+        consumeFirstLaunch(AsyncStorage),
+        peekPersistedTheme(AsyncStorage),
+      ]);
       if (!active) return;
       setIsFirstLaunch(firstLaunch);
+      setTheme(persistedTheme);
       await SplashScreen.hideAsync().catch(() => {});
       if (!active) return;
 
@@ -167,6 +201,7 @@ function AnimatedAppIntroSplash({ ready, children }: AppIntroSplashProps) {
         setPhase('enter');
         logoOpacity.value = withTiming(1, { duration: 300 });
         logoScale.value = 1;
+        wordmarkProgress.value = 1;
         // The hold/reveal below still respects `ready`; just skip the theatrics.
         startHoldOrReveal();
         return;
@@ -185,9 +220,12 @@ function AnimatedAppIntroSplash({ ready, children }: AppIntroSplashProps) {
   }, []);
 
   // If the entrance finished and we're just holding on the landed logo,
-  // reveal as soon as the app becomes ready.
+  // continue as soon as the app becomes ready: into the wordmark reveal on
+  // the normal path, or straight to reveal under Reduce Motion.
   useEffect(() => {
-    if (ready && phase === 'hold') startReveal();
+    if (!ready || phase !== 'hold') return;
+    if (reducedMotion) startReveal();
+    else startWordmark();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, phase]);
 
@@ -200,13 +238,14 @@ function AnimatedAppIntroSplash({ ready, children }: AppIntroSplashProps) {
     };
   });
 
-  const streakStyle = useAnimatedStyle(() => {
-    const streakOpacity = interpolate(logoScale.value, [0.22, 0.55, 1], [0, 0.35, 0], Extrapolation.CLAMP);
-    return {
-      opacity: streakOpacity,
-      transform: [{ scale: logoScale.value * 1.35 }],
-    };
-  });
+  const echoNear = useAnimatedStyle(() => ({
+    opacity: interpolate(logoScale.value, [0.6, 0.85, 1], [0, 0.4, 0], Extrapolation.CLAMP),
+    transform: [{ scale: logoScale.value * 1.18 }],
+  }));
+  const echoFar = useAnimatedStyle(() => ({
+    opacity: interpolate(logoScale.value, [0.6, 0.85, 1], [0, 0.22, 0], Extrapolation.CLAMP),
+    transform: [{ scale: logoScale.value * 1.34 }],
+  }));
 
   const drawStyle = useAnimatedStyle(() => ({ opacity: drawOpacity.value }));
   const threadAnimatedProps = useAnimatedProps(() => ({
@@ -216,11 +255,7 @@ function AnimatedAppIntroSplash({ ready, children }: AppIntroSplashProps) {
   const sweepStyle = useAnimatedStyle(() => ({
     transform: [
       {
-        translateX: interpolate(
-          sweepProgress.value,
-          [0, 1],
-          [-LOGO_BOX, LOGO_BOX],
-        ),
+        translateX: interpolate(sweepProgress.value, [0, 1], [-LOGO_BOX, LOGO_BOX]),
       },
       { rotate: '18deg' },
     ],
@@ -235,7 +270,7 @@ function AnimatedAppIntroSplash({ ready, children }: AppIntroSplashProps) {
     <View style={StyleSheet.absoluteFill}>
       {children}
       <Animated.View
-        style={[styles.overlay, { backgroundColor: DEFAULT_THEME.background }, overlayStyle]}
+        style={[styles.overlay, { backgroundColor: theme.background }, overlayStyle]}
         pointerEvents="auto"
       >
         {isFirstLaunch && !reducedMotion && (
@@ -243,7 +278,7 @@ function AnimatedAppIntroSplash({ ready, children }: AppIntroSplashProps) {
             <Svg width={LOGO_BOX} height={LOGO_BOX * 0.6} viewBox="0 0 172 108">
               <AnimatedPath
                 d={THREAD_PATH}
-                stroke={DEFAULT_THEME.accentLight}
+                stroke={theme.accentLight}
                 strokeWidth={3}
                 strokeLinecap="round"
                 fill="none"
@@ -255,27 +290,75 @@ function AnimatedAppIntroSplash({ ready, children }: AppIntroSplashProps) {
         )}
 
         <View style={styles.logoBox}>
-          <Animated.View style={[styles.streak, streakStyle]}>
-            <BrandthreadLogo size={LOGO_BOX} tintColor={DEFAULT_THEME.accentLight} opacity={0.5} />
+          <Animated.View style={[styles.streak, echoFar]}>
+            <BrandthreadLogo size={LOGO_BOX} tintColor={theme.accentLight} opacity={0.5} />
+          </Animated.View>
+          <Animated.View style={[styles.streak, echoNear]}>
+            <BrandthreadLogo size={LOGO_BOX} tintColor={theme.accentLight} opacity={0.5} />
           </Animated.View>
           <Animated.View style={logoStyle}>
-            <BrandthreadLogo size={LOGO_BOX} tintColor={DEFAULT_THEME.accentLight} />
+            <BrandthreadLogo size={LOGO_BOX} tintColor={theme.accentLight} />
           </Animated.View>
-          {(phase === 'sweep' || phase === 'hold' || phase === 'reveal') && !reducedMotion && (
-            <Animated.View style={[styles.sweepClip, { width: LOGO_BOX, height: LOGO_BOX }]} pointerEvents="none">
-              <Animated.View style={[styles.sweepBeam, sweepStyle]}>
-                <LinearGradient
-                  colors={['#FFFFFF00', '#FFFFFF66', '#FFFFFF00']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={StyleSheet.absoluteFill}
-                />
+          {(phase === 'shine' || phase === 'hold' || phase === 'wordmark' || phase === 'reveal') &&
+            !reducedMotion && (
+              <Animated.View
+                style={[styles.sweepClip, { width: LOGO_BOX, height: LOGO_BOX }]}
+                pointerEvents="none"
+              >
+                <Animated.View style={[styles.sweepBeam, sweepStyle]}>
+                  <LinearGradient
+                    colors={['#FFFFFF00', '#FFFFFF66', '#FFFFFF00']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                </Animated.View>
               </Animated.View>
-            </Animated.View>
-          )}
+            )}
+        </View>
+
+        {/* Anchored to the logo's own bottom edge (absolute, out of flow) so
+            reserving space for it never shifts the logo off the position the
+            native splash already painted. */}
+        <View style={styles.wordmarkRow} pointerEvents="none">
+          {WORDMARK.split('').map((char, index) => (
+            <WordmarkLetter
+              key={`${char}-${index}`}
+              char={char}
+              index={index}
+              total={WORDMARK.length}
+              progress={wordmarkProgress}
+              fade={wordmarkFade}
+              color={theme.text}
+            />
+          ))}
         </View>
       </Animated.View>
     </View>
+  );
+}
+
+type WordmarkLetterProps = {
+  char: string;
+  index: number;
+  total: number;
+  progress: SharedValue<number>;
+  fade: SharedValue<number>;
+  color: string;
+};
+
+function WordmarkLetter({ char, index, total, progress, fade, color }: WordmarkLetterProps) {
+  const style = useAnimatedStyle(() => {
+    const start = (index / total) * 0.6;
+    const end = start + 0.4;
+    const revealed = interpolate(progress.value, [start, end], [0, 1], Extrapolation.CLAMP);
+    return {
+      opacity: revealed * fade.value,
+      transform: [{ translateY: interpolate(revealed, [0, 1], [6, 0]) }],
+    };
+  });
+  return (
+    <Animated.Text style={[styles.wordmarkChar, { color }, style]}>{char === ' ' ? ' ' : char}</Animated.Text>
   );
 }
 
@@ -314,5 +397,19 @@ const styles = StyleSheet.create({
     left: -LOGO_BOX * 0.5,
     width: SWEEP_WIDTH,
     height: LOGO_BOX * 2,
+  },
+  wordmarkRow: {
+    position: 'absolute',
+    top: '50%',
+    left: 0,
+    right: 0,
+    marginTop: LOGO_BOX / 2 + 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  wordmarkChar: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    letterSpacing: 4,
   },
 });

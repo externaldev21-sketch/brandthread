@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Switch, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { BuyerSettingsState, loadBuyerSettings, patchBuyerSettings } from '@/lib
 import { reportNetworkError } from '@/lib/networkNotice';
 import { useApi } from '@/hooks/useApi';
 import { Header } from '@/components/layout';
+import { HapticSwitch } from '@/components/BrandthreadUI';
 
 type ToggleKey = keyof { [K in keyof BuyerSettingsState as BuyerSettingsState[K] extends boolean ? K : never]: true };
 type Item = { label: string; sub?: string; icon?: keyof typeof Feather.glyphMap; toggle?: ToggleKey; value?: string; action?: () => void };
@@ -111,12 +112,12 @@ export default function BuyerSettingsDetail() {
       {loading ? <Text style={styles.intro}>Loading settings…</Text> : settings && items.length > 0 ? <View style={styles.card}>{items.map((item, i) => {
         const isActionable = !!item.toggle || !!item.action;
         return <TouchableOpacity key={`${item.label}-${i}`} activeOpacity={isActionable ? (item.toggle ? 1 : 0.7) : 1} disabled={!isActionable} style={[styles.row, i < items.length - 1 && styles.divider]} onPress={() => { if (item.action) { Haptics.selectionAsync(); item.action(); } }}>
-         {item.icon ? <View style={styles.itemIcon}><Feather name={item.icon} size={19} color={theme.text}/></View> : null}
-        <View style={{ flex: 1 }}><Text style={styles.label}>{item.label}</Text>{item.sub ? <Text style={styles.sub}>{item.sub}</Text> : null}</View>
-         {item.toggle && settings ? <Switch value={Boolean(settings[item.toggle])} onValueChange={(v) => toggle(item.toggle!, v)} trackColor={{ false: theme.cardElevated, true: PURPLE }} thumbColor={theme.onAccent} /> : <>{item.value ? <Text style={styles.value}>{item.value}</Text> : null}{item.action ? <Feather name="chevron-right" size={18} color={theme.subtle}/> : null}</>}
+         {item.icon ? <View style={styles.itemIcon}><Feather name={item.icon} size={16} color={theme.text}/></View> : null}
+        <View style={{ flex: 1 }}><Text style={styles.label} numberOfLines={1}>{item.label}</Text>{item.sub ? <Text style={styles.sub} numberOfLines={1}>{item.sub}</Text> : null}</View>
+         {item.toggle && settings ? <HapticSwitch value={Boolean(settings[item.toggle])} onValueChange={(v) => toggle(item.toggle!, v)} trackColor={{ false: theme.border, true: PURPLE }} thumbColor={theme.onAccent} /> : <>{item.value ? <Text style={styles.value} numberOfLines={1}>{item.value}</Text> : null}{item.action ? <Feather name="chevron-right" size={17} color={theme.subtle}/> : null}</>}
       </TouchableOpacity>;
       })}</View> : null}
     </ScrollView>
   </View>;
 }
-const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({ page:{flex:1,backgroundColor:theme.background},intro:{color:theme.muted,fontFamily:FONT.regular,fontSize:13,lineHeight:19,marginBottom:SP.md},card:{backgroundColor:theme.card,borderWidth:1,borderColor:theme.border,borderRadius:RADIUS.lg,overflow:'hidden'},row:{minHeight:60,paddingHorizontal:14,paddingVertical:12,flexDirection:'row',alignItems:'center',gap:10},divider:{borderBottomWidth:1,borderBottomColor:theme.border},itemIcon:{width:28,alignItems:'center'},label:{color:theme.text,fontFamily:FONT.medium,fontSize:14},sub:{color:theme.muted,fontFamily:FONT.regular,fontSize:11.5,marginTop:3,lineHeight:16},value:{color:theme.muted,fontFamily:FONT.regular,fontSize:12,textTransform:'capitalize',maxWidth:110},});
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({ page:{flex:1,backgroundColor:theme.background},intro:{color:theme.muted,fontFamily:FONT.regular,fontSize:13,lineHeight:19,marginBottom:SP.md},card:{backgroundColor:theme.card,borderWidth:1,borderColor:theme.border,borderRadius:RADIUS.lg,overflow:'hidden'},row:{minHeight:52,paddingHorizontal:14,paddingVertical:12,flexDirection:'row',alignItems:'center',gap:12},divider:{borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:theme.border},itemIcon:{width:30,height:30,borderRadius:9,alignItems:'center',justifyContent:'center',backgroundColor:theme.cardElevated},label:{color:theme.text,fontFamily:FONT.medium,fontSize:14,lineHeight:18},sub:{color:theme.muted,fontFamily:FONT.regular,fontSize:12,marginTop:2,lineHeight:15},value:{color:theme.muted,fontFamily:FONT.regular,fontSize:13,lineHeight:17,textTransform:'capitalize',maxWidth:110},});

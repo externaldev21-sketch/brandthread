@@ -76,7 +76,39 @@ export const APP_THEME_PRESETS: readonly AppThemePreset[] = [
 export const DEFAULT_THEME = APP_THEME_PRESETS[0];
 const getTheme = (id: unknown) => APP_THEME_PRESETS.find((theme) => theme.id === id) ?? DEFAULT_THEME;
 const isThemeId = (id: unknown): id is AppThemeId => typeof id === 'string' && APP_THEME_PRESETS.some((theme) => theme.id === id);
-const storageKeyFor = (userId?: string | null) => `@brandthread/app-theme:v1:${userId ?? 'guest'}`;
+const THEME_STORAGE_PREFIX = '@brandthread/app-theme:v1:';
+const storageKeyFor = (userId?: string | null) => `${THEME_STORAGE_PREFIX}${userId ?? 'guest'}`;
+
+export interface ThemePeekStorage {
+  getItem(key: string): Promise<string | null>;
+  getAllKeys?(): Promise<readonly string[]>;
+}
+
+/**
+ * Best-effort read of the last-persisted theme, for code that must render
+ * before `AppThemeProvider` (and therefore `useAuth()`) exists — namely the
+ * launch intro, which wraps the whole provider tree so it can hand off to
+ * the native splash before anything else has mounted. Falls back to
+ * `DEFAULT_THEME` whenever nothing usable is found or storage throws.
+ */
+export async function peekPersistedTheme(storage: ThemePeekStorage): Promise<AppThemePreset> {
+  try {
+    if (storage.getAllKeys) {
+      const keys = await storage.getAllKeys();
+      const userKey = keys.find((key) => key.startsWith(THEME_STORAGE_PREFIX) && key !== storageKeyFor(null));
+      if (userKey) {
+        const value = await storage.getItem(userKey);
+        if (isThemeId(value)) return getTheme(value);
+      }
+    }
+    const guestValue = await storage.getItem(storageKeyFor(null));
+    if (isThemeId(guestValue)) return getTheme(guestValue);
+  } catch {
+    // Best effort only — the splash still needs to render something.
+  }
+  return DEFAULT_THEME;
+}
+
 const getPreviewThemeId = (): AppThemeId | null => {
   if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined') return null;
   const requested = new URLSearchParams(window.location.search).get('bt_theme');

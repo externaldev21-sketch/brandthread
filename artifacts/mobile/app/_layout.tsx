@@ -62,6 +62,7 @@ import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 import AppLockGate from '@/components/security/AppLockGate';
 import LegalAcceptanceGate from '@/components/legal/LegalAcceptanceGate';
 import { SellerShellProvider, useSellerShell } from '@/contexts/SellerShellContext';
+import { FADE_MS, SCREEN_PUSH_MS } from '@/constants/motion';
 
 // Presentation routes must remain transparent so the active runtime shell is
 // visible behind cards, sheets, and full-screen modal content.
@@ -869,19 +870,21 @@ function RootLayoutNav() {
         screenOptions={{
           headerShown: false,
           animation: 'ios_from_right',
-          animationDuration: 280,
+          // Design-system push duration (constants/motion.ts SCREEN_PUSH_MS) —
+          // Android honors this exactly; iOS uses its native, equivalent-feel push.
+          animationDuration: SCREEN_PUSH_MS,
           gestureEnabled: true,
           contentStyle: OPAQUE_SCREEN_CONTENT,
         }}
       >
         {/* Boot: "/" renders BootScreen until AuthGate redirects */}
-        <Stack.Screen name="index"          options={{ headerShown: false, animation: 'fade' }} />
+        <Stack.Screen name="index"          options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
         {/* Auth & onboarding */}
-        <Stack.Screen name="splash"         options={{ headerShown: false, animation: 'fade' }} />
+        <Stack.Screen name="splash"         options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
         <Stack.Screen name="sign-in"        options={{ headerShown: false }} />
         <Stack.Screen name="forgot-password" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="onboarding"        options={{ headerShown: false, gestureEnabled: false }} />
-        <Stack.Screen name="thread-explainer"  options={{ headerShown: false, animation: 'fade', gestureEnabled: false }} />
+        <Stack.Screen name="thread-explainer"  options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS, gestureEnabled: false }} />
         {/* Main app */}
         <Stack.Screen name="(tabs)"         options={{ headerShown: false }} />
         <Stack.Screen name="(buyer)"        options={{ headerShown: false }} />
@@ -995,14 +998,14 @@ function RootLayoutNav() {
         <Stack.Screen name="seller-conversation"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-other-profile"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-friend-requests"   options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="buyer-story-viewer"      options={{ headerShown: false, animation: 'fade', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="buyer-story-viewer"      options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS, presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-story-create"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-notifications"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="activity-center"         options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-privacy-settings"  options={{ headerShown: false, animation: 'ios_from_right' }} />
-        <Stack.Screen name="privacy"                 options={{ headerShown: false, animation: 'fade' }} />
-        <Stack.Screen name="terms"                   options={{ headerShown: false, animation: 'fade' }} />
-        <Stack.Screen name="community-guidelines"    options={{ headerShown: false, animation: 'fade' }} />
+        <Stack.Screen name="privacy"                 options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
+        <Stack.Screen name="terms"                   options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
+        <Stack.Screen name="community-guidelines"    options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
         <Stack.Screen name="buyer-saved"             options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-collection"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-blocked"              options={{ headerShown: false, animation: 'ios_from_right' }} />

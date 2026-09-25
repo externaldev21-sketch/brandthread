@@ -85,7 +85,6 @@ export const SECTIONS: ControlCenterSection[] = [
       { id: 'products',    label: 'Products',     icon: 'grid',        route: '/(tabs)/products', description: 'Your full catalog' },
       { id: 'orders',      label: 'Orders',       icon: 'shopping-bag', route: '/(tabs)/orders', description: 'Fulfill and track orders', badgeKey: 'orders' },
       { id: 'inventory',   label: 'Inventory',    icon: 'archive',     route: '/inventory', description: 'Stock levels and locations' },
-      { id: 'drops',       label: 'Drops',        icon: 'zap',         route: '/add-product?intent=drop', description: 'Schedule a limited drop' },
       { id: 'discounts',   label: 'Discounts',    icon: 'tag',         route: '/discounts', description: 'Coupon codes and offers' },
     ],
   },

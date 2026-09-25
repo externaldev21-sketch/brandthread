@@ -225,20 +225,7 @@ export default function UsersScreen() {
   const title = role ? `${ROLE_LABEL[String(role)] ?? String(role)}${String(role) === 'staff' ? '' : 's'}` : 'Users';
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader
-        title={title}
-        rightElement={
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              onPress={haptic}
-              activeOpacity={0.7}
-              style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-            >
-              <Feather name="more-horizontal" size={17} color={colors.foreground} />
-            </TouchableOpacity>
-          </View>
-        }
-      />
+      <ScreenHeader title={title} />
 
       {loading ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
@@ -284,15 +271,6 @@ export default function UsersScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  headerActions: { flexDirection: 'row', gap: 8 },
-  headerBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
   userRow: {
     flexDirection: 'row',
     alignItems: 'center',

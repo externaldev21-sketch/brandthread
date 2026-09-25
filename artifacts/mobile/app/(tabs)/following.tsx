@@ -230,9 +230,6 @@ export default function FollowingScreen() {
           <Text style={[s.headerTitle, { color: FG }]}>Following</Text>
           <Text style={[s.headerSub, { color: MUTED }]}>{subtitle}</Text>
         </View>
-        <TouchableOpacity style={[s.headerBtn, { borderColor: BORDER }]} activeOpacity={0.7}>
-          <Feather name="user-plus" size={18} color={MUTED} />
-        </TouchableOpacity>
       </View>
 
       {/* Brand avatars row — only shown when real drops exist */}
@@ -300,7 +297,6 @@ const s = StyleSheet.create({
   },
   headerTitle: { fontSize: 28, fontFamily: FONT.bold, letterSpacing: -0.6 },
   headerSub:   { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
-  headerBtn:   { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20, borderWidth: 1 },
 
   avatarsRow:    { borderBottomWidth: 1 },
   avatarsScroll: { paddingHorizontal: 16, paddingVertical: 12, gap: 14 },
