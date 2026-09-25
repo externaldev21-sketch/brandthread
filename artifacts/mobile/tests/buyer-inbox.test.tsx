@@ -99,26 +99,6 @@ vi.mock('@/components/BrandthreadUI', () => ({
       testID: 'inbox-compose-search-input', value, onChangeText: onChange, placeholder, style,
     }),
   SheetHandle: () => React.createElement('View', { testID: 'inbox-compose-sheet-handle' }),
-}));
-
-vi.mock('@/components/layout', () => ({
-  EmptyState: ({ message, actionLabel, onAction }: { message: string; actionLabel?: string; onAction?: () => void }) =>
-    React.createElement(
-      'View',
-      {},
-      React.createElement('Text', {}, message),
-      actionLabel
-        ? React.createElement(
-          'TouchableOpacity',
-          { testID: 'empty-state-action', onPress: onAction },
-          React.createElement('Text', {}, actionLabel),
-        )
-        : null,
-    ),
-  ListSkeleton: () => React.createElement('View', { testID: 'inbox-skeleton' }),
-}));
-
-vi.mock('@/components/BrandthreadUI', () => ({
   EmptyState: ({ title, description, action }: { title: string; description?: string; action?: { label: string; onPress: () => void } }) =>
     React.createElement(
       'View',
@@ -133,6 +113,10 @@ vi.mock('@/components/BrandthreadUI', () => ({
         )
         : null,
     ),
+}));
+
+vi.mock('@/components/layout', () => ({
+  ListSkeleton: () => React.createElement('View', { testID: 'inbox-skeleton' }),
 }));
 
 vi.mock('@/contexts/AppThemeContext', () => ({
