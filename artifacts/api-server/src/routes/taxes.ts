@@ -143,7 +143,7 @@ router.post("/enable", async (req, res) => {
 
 router.patch("/config", async (req, res) => {
   const sellerId = getSellerId(req);
-  const { collectDuties, chargeShippingTax, chargeVat, taxCalculationMode } = req.body;
+  const { stripeTaxEnabled, collectDuties, chargeShippingTax, chargeVat, taxCalculationMode } = req.body;
 
   try {
     await db
@@ -152,6 +152,10 @@ router.patch("/config", async (req, res) => {
       .onConflictDoNothing();
 
     const patch: Record<string, any> = { updatedAt: new Date() };
+    // Turning tax collection back off is a local preference only — it does not
+    // touch the Stripe Connect account's tax settings, so re-enabling later
+    // does not require reconfiguring Stripe.
+    if (typeof stripeTaxEnabled === "boolean") patch.stripeTaxEnabled = stripeTaxEnabled;
     if (typeof collectDuties    === "boolean") patch.collectDuties    = collectDuties;
     if (typeof chargeShippingTax === "boolean") patch.chargeShippingTax = chargeShippingTax;
     if (typeof chargeVat        === "boolean") patch.chargeVat        = chargeVat;
