@@ -130,6 +130,20 @@ describe("joined-store billing isolation", () => {
         ["POST", "/api/seller/connect/onboard"],
         ["GET", "/api/seller/connect/onboard/return"],
         ["GET", "/api/seller/connect/onboard/refresh"],
+      ]) {
+        const result = await request(path, method);
+        expect(result.status).toBe(403);
+        expect(result.body).toMatchObject({
+          code: "ROLE_REQUIRED",
+          requiredRole: "owner",
+          currentRole: role,
+        });
+      }
+
+      // Finance now gates on the "payouts" capability (requirePermission),
+      // not a raw owner-rank check — a "finance" team role also passes this,
+      // but the legacy staff/manager roles here still don't.
+      for (const [method, path] of [
         ["GET", "/api/finance/balance"],
         ["GET", "/api/finance/payouts"],
         ["GET", "/api/finance/transactions"],
@@ -139,8 +153,8 @@ describe("joined-store billing isolation", () => {
         const result = await request(path, method);
         expect(result.status).toBe(403);
         expect(result.body).toMatchObject({
-          code: "ROLE_REQUIRED",
-          requiredRole: "owner",
+          code: "PERMISSION_REQUIRED",
+          requiredPermission: "payouts",
           currentRole: role,
         });
       }

@@ -84,7 +84,7 @@ export default function MarketingScreen() {
       api.adCampaigns.list()
         .then((res) => { if (!cancelled) setCampaigns(Array.isArray(res?.campaigns) ? res.campaigns : []); })
         .catch(() => { if (!cancelled) setCampaigns([]); });
-      api.discounts.list()
+      api.discountCodes.list()
         .then((res) => { if (!cancelled) setDiscounts(Array.isArray(res) ? (res as DiscountCode[]) : []); })
         .catch(() => { if (!cancelled) setDiscounts([]); });
       api.referrals.stats()

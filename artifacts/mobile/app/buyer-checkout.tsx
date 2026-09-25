@@ -1512,6 +1512,9 @@ export default function BuyerCheckoutScreen() {
               ...(current.threadCashRedemption && current.deliveryGroups.length === 1
                 ? { threadCashToken: current.threadCashRedemption.token }
                 : {}),
+              ...(current.deliveryGroups.length === 1 && current.discounts.find(d => d.isValid)
+                ? { discountCode: current.discounts.find(d => d.isValid)!.code }
+                : {}),
             },
           );
         } else {

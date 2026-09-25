@@ -17,7 +17,7 @@ import {
 } from "@workspace/db";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { requireRole, teamContext } from "../middlewares/requireRole";
+import { requirePermission, teamContext } from "../middlewares/requireRole";
 import { stripe } from "../lib/stripe";
 import { cashOutableAmount, isValidPayoutIdempotencyKey } from "../lib/payoutSafety";
 import { publishNotification } from "./notifications-feed";
@@ -83,7 +83,7 @@ type CashoutResult =
 
 // Finance data is owner-only: a joined-store member must not infer balances,
 // payouts, fees, or account status after teamContext rewrites the store owner.
-router.get("/balance", requireRole("owner"), async (req, res) => {
+router.get("/balance", requirePermission("payouts"), async (req, res) => {
   const sellerId = getSellerId(req);
   try {
     const accountId = await getStripeAccount(sellerId);
@@ -188,7 +188,7 @@ router.get("/balance", requireRole("owner"), async (req, res) => {
 //   paidOut    everything Brandthread has sent to the seller's Stripe account
 //   owed       what the seller owes Brandthread (e.g. a failed drop's
 //              refunds after the bulk order was paid, unrecovered labels)
-router.get("/summary", requireRole("owner"), async (req, res) => {
+router.get("/summary", requirePermission("payouts"), async (req, res) => {
   const sellerId = getSellerId(req);
   try {
     const sellerSums = await db.select({
@@ -354,7 +354,7 @@ router.get("/summary", requireRole("owner"), async (req, res) => {
 
 // ─── GET /api/finance/payouts ─────────────────────────────────────────────────
 
-router.get("/payouts", requireRole("owner"), async (req, res) => {
+router.get("/payouts", requirePermission("payouts"), async (req, res) => {
   const sellerId = getSellerId(req);
   const limit = Math.min(Number(req.query.limit) || 20, 100);
   try {
@@ -398,7 +398,7 @@ router.get("/payouts", requireRole("owner"), async (req, res) => {
 
 // ─── GET /api/finance/transactions ───────────────────────────────────────────
 
-router.get("/transactions", requireRole("owner"), async (req, res) => {
+router.get("/transactions", requirePermission("payouts"), async (req, res) => {
   const sellerId = getSellerId(req);
   const limit = Math.min(Number(req.query.limit) || 50, 100);
   const type  = req.query.type as string | undefined; // e.g. 'charge', 'payout', 'refund'
@@ -444,7 +444,7 @@ router.get("/transactions", requireRole("owner"), async (req, res) => {
 
 // ─── GET /api/finance/statement.csv ──────────────────────────────────────────
 
-router.get("/statement.csv", requireRole("owner"), async (req, res) => {
+router.get("/statement.csv", requirePermission("payouts"), async (req, res) => {
   const sellerId = getSellerId(req);
   try {
     const accountId = await getStripeAccount(sellerId);
@@ -485,7 +485,7 @@ router.get("/statement.csv", requireRole("owner"), async (req, res) => {
 
 // ─── POST /api/finance/payout — manual bank payout ────────────────────────────
 
-router.post("/payout", requireRole("owner"), async (req, res) => {
+router.post("/payout", requirePermission("payouts"), async (req, res) => {
   const sellerId = getSellerId(req);
   const { amount, currency, idempotencyKey } = req.body;
 

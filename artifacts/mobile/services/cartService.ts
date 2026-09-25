@@ -700,17 +700,22 @@ export async function applyDiscount(
   if (!trimmedCode) {
     return { code: '', type: 'percentage' as any, value: 0, description: '', isValid: false, appliedAmountCents: 0, errorMessage: 'Please enter a code.' };
   }
-  // Get current checkout session to find the seller
+  // Get current checkout session to find the seller and line items (for
+  // product-scoped codes — an entire_store code ignores these anyway).
   const sess = await getCheckoutSession();
-  const sellerId = (sess as any)?.items?.[0]?.sellerId ?? (sess as any)?.deliveryGroups?.[0]?.sellerId ?? '';
+  const group = (sess as any)?.deliveryGroups?.[0];
+  const sellerId = group?.sellerId ?? '';
   if (!sellerId) {
     // No seller context to validate a code against — fail closed rather than
     // accepting an unvalidated code.
     return { code: trimmedCode, type: 'percentage' as any, value: 0, appliedAmountCents: 0, description: '', isValid: false, errorMessage: 'Add items to your cart before applying a discount code.' };
   }
+  const items = Array.isArray(group?.items)
+    ? group.items.map((item: CartItem) => ({ productId: item.productId, priceCents: item.priceCents, quantity: item.quantity }))
+    : undefined;
   try {
     const { api } = await import('@/lib/api');
-    const result = await api.discountCodes.validate(trimmedCode, sellerId, subtotalCents);
+    const result = await api.discountCodes.validate(trimmedCode, sellerId, subtotalCents, items);
     return {
       code: result.code,
       type: result.type,
@@ -732,8 +737,12 @@ export async function applyDiscount(
       }
     } catch {}
     const msg = errCode === 'EXPIRED' ? 'This code has expired.' :
+                errCode === 'NOT_STARTED' ? "This code isn't active yet." :
                 errCode === 'MAX_USES_REACHED' ? 'This code has reached its usage limit.' :
+                errCode === 'ALREADY_USED_BY_CUSTOMER' ? "You've already used this code." :
                 errCode === 'MIN_ORDER_NOT_MET' ? 'Minimum order not met for this code.' :
+                errCode === 'NO_ELIGIBLE_ITEMS' ? 'No items in your cart qualify for this code.' :
+                errCode === 'INACTIVE' ? 'This code is paused.' :
                 'Invalid or expired discount code.';
     return { code: trimmedCode, type: 'percentage' as any, value: 0, description: '', isValid: false, appliedAmountCents: 0, errorMessage: msg };
   }

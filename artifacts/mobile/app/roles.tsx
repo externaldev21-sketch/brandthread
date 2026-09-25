@@ -6,12 +6,16 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
+import { Alert } from 'react-native';
 
 // Fallback role data if API not connected
 const DEFAULT_ROLES = [
   { key: 'owner', name: 'Owner', group: 'Organization', description: 'Full access to all features', staffCount: 1 },
-  { key: 'manager', name: 'Manager', group: 'Store', description: 'Products, orders, inventory', staffCount: 0 },
-  { key: 'staff', name: 'Staff', group: 'Store', description: 'Fulfillment and shipping only', staffCount: 0 },
+  { key: 'admin', name: 'Admin', group: 'Organization', description: 'Products, orders, inventory, analytics, customers, marketing, payouts and team', staffCount: 0 },
+  { key: 'finance', name: 'Finance', group: 'Store', description: 'Balance, payouts, transactions and statements', staffCount: 0 },
+  { key: 'orders', name: 'Orders', group: 'Store', description: 'Orders, fulfillment and inventory', staffCount: 0 },
+  { key: 'marketing', name: 'Marketing', group: 'Store', description: 'Ads, boosts and discount codes', staffCount: 0 },
+  { key: 'viewer', name: 'Viewer', group: 'Store', description: 'Read-only analytics and store data', staffCount: 0 },
 ];
 
 export default function RolesScreen() {
@@ -34,10 +38,26 @@ export default function RolesScreen() {
         title="Roles"
         rightElement={
           <View style={styles.headerActions}>
-            <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TouchableOpacity
+              onPress={() => { haptic(); router.push('/team' as never); }}
+              activeOpacity={0.7}
+              style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              accessibilityLabel="Invite a team member"
+            >
               <Feather name="plus" size={17} color={colors.foreground} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TouchableOpacity
+              onPress={() => {
+                haptic();
+                Alert.alert('Roles', 'Permissions are enforced per role on the server — team members only see and do what their role allows.', [
+                  { text: 'Manage team', onPress: () => router.push('/team' as never) },
+                  { text: 'OK', style: 'cancel' },
+                ]);
+              }}
+              activeOpacity={0.7}
+              style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              accessibilityLabel="About roles"
+            >
               <Feather name="more-horizontal" size={17} color={colors.foreground} />
             </TouchableOpacity>
           </View>

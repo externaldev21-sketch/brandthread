@@ -6,7 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
-import { isManagerRole } from '@/lib/roleError';
+import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import { SUCCESS, ORANGE, FS } from '@/lib/theme';
 import { useTeamRole } from '@/hooks/useTeamRole';
@@ -120,7 +120,7 @@ export default function FinanceScreen() {
     );
   }
 
-  if (currentRole !== 'owner' && !isReadOnly) {
+  if (!hasPayoutsAccess(currentRole) && !isReadOnly) {
     return (
       <View style={[styles.container, { backgroundColor: 'transparent' }]}>
         <ScreenHeader title="Finance" subtitle="P&L, cash flow & expenses" />
