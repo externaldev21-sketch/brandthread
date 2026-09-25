@@ -68,6 +68,8 @@ vi.mock("react-native", () => {
     Linking: { openURL: vi.fn() },
     Modal: nativeComponent("Modal"),
     Platform: { OS: "ios", select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
+    // Render-prop-aware mock — plain nativeComponent() would leave
+    // PressableScale's function child unrendered (see comment above).
     Pressable: MockPressable,
     RefreshControl: nativeComponent("RefreshControl"),
     ScrollView: nativeComponent("ScrollView"),

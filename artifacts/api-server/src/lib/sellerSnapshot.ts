@@ -26,6 +26,7 @@ import {
   users,
   drops,
   discountCodes,
+  shippingRates,
 } from "@workspace/db";
 import { eq, and, desc, asc, inArray, sql, gte, count, sum, isNull } from "drizzle-orm";
 
@@ -45,6 +46,7 @@ export interface SellerSnapshot {
   boosts: BoostSummary;
   manufacturerOrders: ManufacturerOrderSummary;
   discountCodes: DiscountCodeSummary;
+  shipping: ShippingSummary;
 }
 
 export interface SellerIdentity {
@@ -183,6 +185,12 @@ export interface DiscountCodeSummary {
   totalCodes: number;
 }
 
+export interface ShippingSummary {
+  activeRateCount: number;
+  totalRateCount: number;
+  hasFreeShippingThreshold: boolean;
+}
+
 // ─── Snapshot builder ──────────────────────────────────────────────────────────
 
 export async function buildSellerSnapshot(ownerId: string): Promise<SellerSnapshot> {
@@ -212,6 +220,7 @@ export async function buildSellerSnapshot(ownerId: string): Promise<SellerSnapsh
     boostResult,
     quoteResult,
     discountCodeResult,
+    shippingRatesResult,
   ] = await Promise.allSettled([
     // [0] seller identity
     db.select({
@@ -426,6 +435,15 @@ export async function buildSellerSnapshot(ownerId: string): Promise<SellerSnapsh
     }).from(discountCodes)
       .where(eq(discountCodes.sellerId, ownerId))
       .groupBy(discountCodes.active),
+
+    // [19] shipping rates (seller's own)
+    db.select({
+      active: shippingRates.active,
+      freeAboveCents: shippingRates.freeAboveCents,
+      cnt: count(),
+    }).from(shippingRates)
+      .where(eq(shippingRates.sellerId, ownerId))
+      .groupBy(shippingRates.active, shippingRates.freeAboveCents),
   ]);
 
   // ─── Assemble sections ────────────────────────────────────────────────────
@@ -596,6 +614,14 @@ export async function buildSellerSnapshot(ownerId: string): Promise<SellerSnapsh
   const activeCodes = discountRows.find(r => r.active === true)?.cnt ?? 0;
   const totalCodes  = discountRows.reduce((s, r) => s + (r.cnt ?? 0), 0);
 
+  // Shipping rates
+  const shippingRows = shippingRatesResult.status === "fulfilled" ? shippingRatesResult.value : [];
+  const shippingSummary: ShippingSummary = {
+    activeRateCount: shippingRows.filter(r => r.active === true).reduce((s, r) => s + Number(r.cnt), 0),
+    totalRateCount: shippingRows.reduce((s, r) => s + Number(r.cnt), 0),
+    hasFreeShippingThreshold: shippingRows.some(r => r.freeAboveCents != null),
+  };
+
   return {
     snapshotAt,
     seller,
@@ -614,6 +640,7 @@ export async function buildSellerSnapshot(ownerId: string): Promise<SellerSnapsh
     boosts: boostSummary,
     manufacturerOrders: manfSummary,
     discountCodes: { activeCodes: Number(activeCodes), totalCodes: Number(totalCodes) },
+    shipping: shippingSummary,
   };
 }
 

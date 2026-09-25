@@ -20,9 +20,8 @@ import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '@/hooks/useColors';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import {
@@ -80,11 +79,14 @@ import {
   getFirstIncompleteCheckoutSection,
   mergeCheckoutFormState,
 } from '@/lib/checkoutReadiness';
-import { CheckoutSkeleton, HapticSwitch } from '@/components/BrandthreadUI';
+import { CheckoutSkeleton, HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
 import { AddressAutocompleteInput } from '@/components/AddressAutocompleteInput';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { StickyFooter } from '@/components/layout';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
+import { Button, IconButton } from '@/components/ui';
+import { RADII } from '@/constants/radii';
+import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -1174,73 +1176,55 @@ function Confirmation({
 
       {/* Actions */}
       {finalizing ? (
-        <TouchableOpacity
-          style={s.refreshButton}
+        <Button
+          label="Check order status"
+          variant="tertiary"
+          loading={refreshing}
           onPress={onRefresh}
-          disabled={refreshing}
-          accessibilityRole="button"
-          accessibilityLabel="Check order status"
-          accessibilityState={{ disabled: refreshing, busy: refreshing }}
-        >
-          {refreshing
-            ? <ActivityIndicator color={PURPLE_LIGHT} />
-            : <Text style={[s.refreshText, { color: PURPLE_LIGHT }]}>Check order status</Text>}
-        </TouchableOpacity>
+          style={{ marginTop: SP.lg }}
+        />
       ) : (
         <View style={{ marginTop: SP.xl, width: '100%', gap: SP.sm }}>
           {/* Message seller + View purchase — mirroring Depop Thank you screen */}
           {firstGroup && (
             <View style={{ flexDirection: 'row', gap: SP.sm }}>
-              <TouchableOpacity
-                style={s.actionBtnOutline}
+              <Button
+                label="Message seller"
+                icon="message-circle"
+                variant="secondary"
                 onPress={handleMessageSeller}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityLabel="Message seller"
-              >
-                <Feather name="message-circle" size={16} color={FG} />
-                <Text style={s.actionBtnOutlineText}>Message seller</Text>
-              </TouchableOpacity>
+                style={{ flex: 1 }}
+              />
               {/*
                 "View purchase" is ONLY rendered when we have a verified server order ID.
                 If orderId is absent (still finalizing / webhook not yet received),
                 this button stays hidden — never falls back to orderNumber for routing.
               */}
               {firstVerified?.id && (
-                <TouchableOpacity
-                  style={s.actionBtnOutline}
+                <Button
+                  label="View purchase"
+                  icon="package"
+                  variant="secondary"
                   onPress={handleViewPurchase}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
-                  accessibilityLabel="View purchase"
-                >
-                  <Feather name="package" size={16} color={FG} />
-                  <Text style={s.actionBtnOutlineText}>View purchase</Text>
-                </TouchableOpacity>
+                  style={{ flex: 1 }}
+                />
               )}
             </View>
           )}
 
           {!isSignedIn && (
-            <TouchableOpacity
-              style={s.createAccountBtn}
+            <Button
+              label="Create an account"
               onPress={() => router.replace('/sign-in' as never)}
-              activeOpacity={0.8}
-              accessibilityRole="button"
-              accessibilityLabel="Create an account"
-            >
-              <Text style={s.createAccountText}>Create an account</Text>
-            </TouchableOpacity>
+              fullWidth
+            />
           )}
-          <TouchableOpacity
-            style={s.continueShopBtn}
+          <Button
+            label="Continue shopping"
+            variant="secondary"
             onPress={() => router.replace('/(buyer)/discover' as never)}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="Continue shopping"
-          >
-            <Text style={s.continueShopText}>Continue shopping</Text>
-          </TouchableOpacity>
+            fullWidth
+          />
         </View>
       )}
     </View>
@@ -1702,14 +1686,12 @@ export default function BuyerCheckoutScreen() {
       {/* Header */}
       {current.step !== 'confirmation' && (
         <View style={[s.header, { paddingTop: insets.top + SP.xs }]}>
-          <TouchableOpacity
-            style={s.back}
+          <IconButton
+            name="chevron-left"
+            variant="plain"
             onPress={leaveCheckout}
-            accessibilityRole="button"
             accessibilityLabel="Back"
-          >
-            <Feather name="chevron-left" size={ICON.md} color={FG} />
-          </TouchableOpacity>
+          />
           <View style={{ flex: 1, alignItems: 'center' }}>
             <Text style={s.stepLabel}>Secure checkout</Text>
             <Progress step={current.step} />
@@ -1845,30 +1827,13 @@ export default function BuyerCheckoutScreen() {
       {/* Persistent Pay securely CTA — hidden on confirmation */}
       {current.step !== 'confirmation' && (
         <StickyFooter style={s.bottom}>
-          <TouchableOpacity
-            style={s.continue}
-            disabled={placing}
-            onPress={() => {
-              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              void (canRetryPayment ? retryPayment() : handleContinue());
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={ctaLabel}
-            accessibilityState={{ disabled: placing, busy: placing }}
-          >
-            <LinearGradient colors={theme.primaryGradient} style={s.continueGradient}>
-              {placing
-                ? <ActivityIndicator color={theme.onAccent} />
-                : (
-                  <>
-                    {current.step === 'review' && <Feather name="lock" size={16} color={theme.onAccent} style={{ marginRight: 6 }} />}
-                    <Text style={[s.continueText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
-                      {ctaLabel}
-                    </Text>
-                  </>
-                )}
-            </LinearGradient>
-          </TouchableOpacity>
+          <Button
+            label={ctaLabel}
+            icon={current.step === 'review' ? 'lock' : undefined}
+            loading={placing}
+            fullWidth
+            onPress={() => void (canRetryPayment ? retryPayment() : handleContinue())}
+          />
         </StickyFooter>
       )}
 
@@ -1920,7 +1885,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     back: { width: COMP.minTouchTarget, height: COMP.minTouchTarget, justifyContent: 'center', alignItems: 'center' },
     stepLabel: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, marginBottom: 5 },
     progress: { flexDirection: 'row', gap: 4, width: 120 },
-    progressSegment: { height: 4, flex: 1, borderRadius: 2, backgroundColor: CARD_ELEVATED },
+    progressSegment: { height: 4, flex: 1, borderRadius: RADII.pill, backgroundColor: CARD_ELEVATED },
     progressSegmentActive: { backgroundColor: PURPLE },
 
     // Card
@@ -1952,7 +1917,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
       minHeight: 72, flexDirection: 'row', alignItems: 'center',
       gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm,
     },
-    guidedStatus: { width: 26, height: 26, borderRadius: 13, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+    guidedStatus: { width: 26, height: 26, borderRadius: RADII.pill, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
     guidedStatusComplete: { backgroundColor: SUCCESS, borderColor: SUCCESS },
     guidedTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
     guidedSummary: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 3 },
@@ -1987,7 +1952,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
       borderTopWidth: 1, borderTopColor: BORDER,
       maxHeight: '80%', padding: SP.md,
     },
-    sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: SP.md },
+    sheetHandle: { width: 36, height: 4, borderRadius: RADII.pill, backgroundColor: BORDER, alignSelf: 'center', marginBottom: SP.md },
     sheetHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.md },
     sheetTitle: { fontFamily: FONT.bold, fontSize: FS.md, color: FG },
     receiptItemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginBottom: SP.sm },
@@ -1998,7 +1963,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
     // Delivery methods
     method: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.sm, borderRadius: RADIUS.md, marginBottom: 6 },
-    radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: MUTED },
+    radio: { width: 18, height: 18, borderRadius: RADII.pill, borderWidth: 2, borderColor: MUTED },
     methodTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
 
     // Promo code
@@ -2019,14 +1984,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     multiSeller: { flexDirection: 'row', gap: SP.sm, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md },
     multiSellerText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
     ack: { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', minHeight: COMP.minTouchTarget, marginBottom: SP.sm },
-    checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1, borderColor: MUTED, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+    checkbox: { width: 20, height: 20, borderRadius: RADII.chip, borderWidth: 1, borderColor: MUTED, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
     ackText: { flex: 1, color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
 
     // Bottom CTA bar
     bottom: {},
-    continue: { overflow: 'hidden', borderRadius: RADIUS.lg, ...SHADOW_PURPLE },
-    continueGradient: { height: COMP.buttonH, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-    continueText: { fontFamily: FONT.bold, fontSize: FS.base },
     continueBtn: { borderRadius: RADIUS.lg, height: COMP.buttonH, alignItems: 'center', justifyContent: 'center' },
     continueBtnText: { fontFamily: FONT.bold, fontSize: FS.base },
 
@@ -2044,13 +2006,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     confirmation: { alignItems: 'center', paddingTop: SP.xl, position: 'relative', overflow: 'hidden' },
     confettiLayer: { position: 'absolute', top: 0, left: 0, right: 0, height: 220 },
     confetti: { position: 'absolute', top: 0, width: 8, height: 14, borderRadius: 2 },
-    successHalo: { width: 112, height: 112, borderRadius: 56, backgroundColor: SUCCESS_DIM, alignItems: 'center', justifyContent: 'center', marginBottom: SP.md },
-    confirmIcon: { width: 78, height: 78, borderRadius: 39, alignItems: 'center', justifyContent: 'center', backgroundColor: SUCCESS },
+    successHalo: { width: 112, height: 112, borderRadius: RADII.pill, backgroundColor: SUCCESS_DIM, alignItems: 'center', justifyContent: 'center', marginBottom: SP.md },
+    confirmIcon: { width: 78, height: 78, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: SUCCESS },
     confirmEyebrow: { color: SUCCESS, fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1.8, marginBottom: 7 },
     headline: { color: FG, fontFamily: FONT.extrabold ?? FONT.bold, fontSize: FS.h1, letterSpacing: -1.2, marginBottom: SP.sm },
     confirmText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 22, textAlign: 'center', maxWidth: 330 },
     deliveryHero: { width: '100%', alignItems: 'center', backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.xl, padding: SP.lg, marginTop: SP.xl },
-    deliveryIcon: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm },
+    deliveryIcon: { width: 46, height: 46, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm },
     deliveryLabel: { color: SUBTLE, fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1.5, marginBottom: 5 },
     deliveryDate: { color: FG, fontFamily: FONT.extrabold ?? FONT.bold, fontSize: FS.xl, textAlign: 'center', letterSpacing: -0.35 },
     deliverySub: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 6, textAlign: 'center' },
@@ -2060,26 +2022,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     confirmProduct: { width: 112 },
     confirmProductImage: { width: 112, height: 126, borderRadius: RADIUS.md, backgroundColor: CARD },
     confirmProductFallback: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER },
-    confirmQty: { position: 'absolute', top: 7, right: 7, minWidth: 23, height: 23, paddingHorizontal: 5, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.72)', alignItems: 'center', justifyContent: 'center' },
+    confirmQty: { position: 'absolute', top: 7, right: 7, minWidth: 23, height: 23, paddingHorizontal: 5, borderRadius: RADII.pill, backgroundColor: 'rgba(0,0,0,0.72)', alignItems: 'center', justifyContent: 'center' },
     confirmQtyText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs },
     confirmProductName: { color: FG, fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 16, marginTop: 7 },
     confirmProductVariant: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
     orderNumbers: { width: '100%', marginTop: SP.lg, backgroundColor: CARD, borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: SP.sm },
     orderNumber: { color: FG, fontFamily: FONT.bold, fontSize: FS.sm, textAlign: 'center', paddingVertical: 3 },
-    refreshButton: { borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: SP.lg, paddingVertical: SP.sm, marginTop: SP.lg },
-    refreshText: { fontFamily: FONT.bold, fontSize: FS.sm },
-
-    // Confirmation action buttons (Message seller / View purchase)
-    actionBtnOutline: {
-      flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-      gap: 6, height: COMP.buttonH, borderRadius: RADIUS.md,
-      borderWidth: 1, borderColor: BORDER, backgroundColor: CARD,
-    },
-    actionBtnOutlineText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
-    createAccountBtn: { backgroundColor: PURPLE, height: COMP.buttonH, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
-    createAccountText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: FS.base },
-    continueShopBtn: { borderWidth: 1, borderColor: BORDER, height: COMP.buttonH, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
-    continueShopText: { color: FG, fontFamily: FONT.bold, fontSize: FS.base },
 
     // Address cards
     savedAddressCard: { padding: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginBottom: SP.sm },

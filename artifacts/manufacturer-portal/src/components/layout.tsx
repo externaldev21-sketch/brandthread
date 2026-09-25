@@ -1,9 +1,9 @@
 import React from "react";
 import { Link, Redirect, useLocation } from "wouter";
 import {
-  LayoutDashboard, 
-  Package, 
-  MessageSquare, 
+  LayoutDashboard,
+  Package,
+  MessageSquare,
   History,
   Store,
   Settings,
@@ -11,6 +11,7 @@ import {
   ShieldAlert,
   FileText,
   Wallet,
+  Boxes,
 } from "lucide-react";
 import { localClock, timeZoneOffsetLabel } from "@workspace/manufacturer-flow";
 import { useConnectStatus } from "@/hooks/use-connect-status";
@@ -34,6 +35,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { href: "/payment", label: "Payouts", icon: Wallet, mobile: "Payouts" },
     { href: "/sellers", label: "Sellers", icon: Store },
     { href: "/quote-requests", label: "Quote Requests", icon: FileText },
+    { href: "/products", label: "Products", icon: Boxes },
     { href: "/profile", label: "Profile", icon: Settings, mobile: "Profile" },
   ];
 

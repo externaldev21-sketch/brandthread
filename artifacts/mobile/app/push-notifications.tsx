@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { ScrollView, View, Text, Switch, StyleSheet, Platform } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, Platform } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import * as Haptics from 'expo-haptics';
+import { HapticSwitch } from '@/components/BrandthreadUI';
+import { TYPE_SCALE } from '@/constants/typography';
+import { RADII } from '@/constants/radii';
 
 interface ToggleRow {
   key: string;
@@ -53,7 +55,6 @@ export default function PushNotificationsScreen() {
   });
 
   function toggle(key: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setValues((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
@@ -86,11 +87,12 @@ export default function PushNotificationsScreen() {
                       <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>{row.description}</Text>
                     )}
                   </View>
-                  <Switch
+                  <HapticSwitch
                     value={values[row.key]}
                     onValueChange={() => toggle(row.key)}
                     trackColor={{ false: colors.border, true: colors.primary }}
-                    thumbColor={Platform.OS === 'android' ? '#FFFFFF' : undefined}
+                    thumbColor={Platform.OS === 'android' ? colors.background : undefined}
+                    accessibilityLabel={row.description ? `${row.label}, ${row.description}` : row.label}
                   />
                 </View>
               ))}
@@ -105,10 +107,10 @@ export default function PushNotificationsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   group: { marginBottom: 22 },
-  groupTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold', marginBottom: 4 },
-  groupSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 10 },
-  card: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
+  groupTitle: { fontSize: TYPE_SCALE.footnote.fontSize, fontFamily: 'Inter_600SemiBold', marginBottom: 4 },
+  groupSubtitle: { fontSize: TYPE_SCALE.footnote.fontSize, fontFamily: 'Inter_400Regular', marginBottom: 10 },
+  card: { borderRadius: RADII.card, borderWidth: 1, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 14 },
-  rowLabel: { fontSize: 14, fontFamily: 'Inter_500Medium' },
-  rowDescription: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 3 },
+  rowLabel: { fontSize: TYPE_SCALE.callout.fontSize, fontFamily: 'Inter_500Medium' },
+  rowDescription: { fontSize: TYPE_SCALE.footnote.fontSize, fontFamily: 'Inter_400Regular', marginTop: 3 },
 });

@@ -63,6 +63,7 @@ vi.mock("react-native", () => {
     Image: nativeComponent("Image"),
     KeyboardAvoidingView: nativeComponent("KeyboardAvoidingView"),
     Modal: nativeComponent("Modal"),
+    Pressable: nativeComponent("Pressable"),
     Platform: { OS: "ios" },
     RefreshControl: nativeComponent("RefreshControl"),
     ScrollView: nativeComponent("ScrollView"),

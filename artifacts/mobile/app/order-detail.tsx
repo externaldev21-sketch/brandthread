@@ -4,16 +4,17 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, ScrollView, TextInput, StyleSheet, Alert, ActivityIndicator, Modal } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, StatusBadge, SectionHeader, EmptyState, PressableScale } from '@/components/BrandthreadUI';
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { RADII } from '@/constants/radii';
+import { hapticPrimaryAction, hapticToggle, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, ReturnStatus, RETURN_REASONS, OrderStatus, TrackingStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent, PaymentSummary } from '@/services/orderTypes';
@@ -507,7 +508,7 @@ export default function OrderDetailScreen() {
   );
 
   const retryUpdates = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    hapticPrimaryAction();
     const generation = generationRef.current;
     consecutiveFailuresRef.current = 0;
     setUpdatesPaused(false);
@@ -520,25 +521,25 @@ export default function OrderDetailScreen() {
   // ── Actions ──────────────────────────────────────────────────────────────
 
   async function handleMarkProcessing() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    hapticSuccessAction();
     try { await api.orders.updateStatus(id, 'processing'); } catch (e: any) { Alert.alert('Couldn’t update this order', 'Check your connection and try again.'); return; }
     load(generationRef.current);
   }
 
   async function handleMarkReadyToShip() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    hapticSuccessAction();
     try { await api.orders.updateStatus(id, 'fulfilled'); } catch (e: any) { Alert.alert('Couldn’t update this order', 'Check your connection and try again.'); return; }
     load(generationRef.current);
   }
 
   async function handleMarkShipped() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    hapticSuccessAction();
     try { await api.orders.updateStatus(id, 'shipped'); } catch (e: any) { Alert.alert('Couldn’t update this order', 'Check your connection and try again.'); return; }
     load(generationRef.current);
   }
 
   async function handleMarkDelivered() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    hapticSuccessAction();
     try { await api.orders.updateStatus(id, 'delivered'); } catch (e: any) { Alert.alert('Couldn’t update this order', 'Check your connection and try again.'); return; }
     load(generationRef.current);
   }
@@ -548,6 +549,7 @@ export default function OrderDetailScreen() {
       Alert.alert('Select a reason', 'Please choose a cancellation reason.');
       return;
     }
+    hapticDestructiveConfirm();
     setCancelling(true);
     try {
       await api.orders.updateStatus(id, 'cancelled', {
@@ -641,7 +643,8 @@ export default function OrderDetailScreen() {
   }
 
   async function handleReturnAction(returnId: string, status: ReturnStatus, deniedReason?: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (status === 'denied') hapticDestructiveConfirm();
+    else hapticSuccessAction();
     // Returns not yet wired to API — update locally
     if (order) {
       setOrder({
@@ -665,10 +668,9 @@ export default function OrderDetailScreen() {
     return (
       <View style={[s.root, { paddingTop: insets.top }]}>
         {updatesPaused && (
-          <TouchableOpacity
+          <PressableScale
             style={s.pausedBanner}
             onPress={retryUpdates}
-            activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel="Live updates paused. Tap to retry."
             testID="order-detail-live-updates-retry"
@@ -677,7 +679,7 @@ export default function OrderDetailScreen() {
             <Text style={s.pausedBannerText}>Live updates paused</Text>
             <Text style={s.pausedBannerAction}>Tap to retry</Text>
             <Feather name="refresh-cw" size={12} color={ORANGE} />
-          </TouchableOpacity>
+          </PressableScale>
         )}
         <EmptyState
           icon="alert-circle"
@@ -692,18 +694,15 @@ export default function OrderDetailScreen() {
   const trackingModal = order.shipments.find(sh => sh.id === trackingModalShipmentId);
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <View style={s.root}>
       {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <View style={s.headerMid}>
-          <Text style={s.headerTitle}>{order.orderNumber}</Text>
-          <Text style={s.headerSub}>{order.customer.name}</Text>
-        </View>
-        <IconButton name="refresh-cw" onPress={retryUpdates} color={MUTED} />
-      </View>
+      <ScreenHeader
+        title={order.orderNumber}
+        subtitle={order.customer.name}
+        variant="push"
+        onBack={() => router.back()}
+        actions={[{ icon: 'refresh-cw', onPress: retryUpdates, accessibilityLabel: 'Refresh order' }]}
+      />
 
       {/* Tab bar */}
       <ScrollView
@@ -713,22 +712,24 @@ export default function OrderDetailScreen() {
         contentContainerStyle={s.tabBarContent}
       >
         {TABS.map(t => (
-          <TouchableOpacity
+          <PressableScale
             key={t.key}
-            onPress={() => { Haptics.selectionAsync(); setActiveTab(t.key); }}
+            onPress={() => { hapticToggle(); setActiveTab(t.key); }}
             style={[s.tabItem, activeTab === t.key && s.tabItemActive]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: activeTab === t.key }}
+            accessibilityLabel={t.label}
           >
             <Text style={[s.tabLabel, activeTab === t.key && s.tabLabelActive]}>{t.label}</Text>
-          </TouchableOpacity>
+          </PressableScale>
         ))}
       </ScrollView>
 
       {/* Cancellation confirmed banner */}
       {updatesPaused && (
-        <TouchableOpacity
+        <PressableScale
           style={s.pausedBanner}
           onPress={retryUpdates}
-          activeOpacity={0.8}
           accessibilityRole="button"
           accessibilityLabel="Live updates paused. Tap to retry."
           testID="order-detail-live-updates-retry"
@@ -737,16 +738,16 @@ export default function OrderDetailScreen() {
           <Text style={s.pausedBannerText}>Live updates paused</Text>
           <Text style={s.pausedBannerAction}>Tap to retry</Text>
           <Feather name="refresh-cw" size={12} color={ORANGE} />
-        </TouchableOpacity>
+        </PressableScale>
       )}
 
       {cancelConfirmed && (
         <View style={s.cancelBanner}>
           <Feather name="check-circle" size={ICON.sm} color={FG} />
           <Text style={s.cancelBannerText}>Order cancelled successfully.</Text>
-          <TouchableOpacity onPress={() => setCancelConfirmed(false)}>
+          <PressableScale onPress={() => { hapticPrimaryAction(); setCancelConfirmed(false); }} accessibilityRole="button" accessibilityLabel="Dismiss">
             <Feather name="x" size={ICON.sm} color={FG} />
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       )}
 
@@ -775,13 +776,16 @@ export default function OrderDetailScreen() {
             <Text style={s.modalSubtitle}>Select a reason</Text>
             <View style={s.chipRow}>
               {CANCELLATION_REASONS.map(r => (
-                <TouchableOpacity
+                <PressableScale
                   key={r.key}
-                  onPress={() => setCancelReason(r.key)}
+                  onPress={() => { hapticToggle(); setCancelReason(r.key); }}
                   style={[s.chip, cancelReason === r.key && s.chipActive]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: cancelReason === r.key }}
+                  accessibilityLabel={r.label}
                 >
                   <Text style={[s.chipText, cancelReason === r.key && s.chipTextActive]}>{r.label}</Text>
-                </TouchableOpacity>
+                </PressableScale>
               ))}
             </View>
             <TextInput
@@ -807,7 +811,7 @@ export default function OrderDetailScreen() {
                 label="Confirm Cancel"
                 onPress={handleCancelOrder}
                 loading={cancelling}
-                colors={[RED, '#C0392B']}
+                colors={[RED, RED]}
                 style={{ flex: 1 }}
               />
             </View>
@@ -1224,10 +1228,10 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
             {TRACKING_STATUS_OPTIONS.map(option => {
               const selected = trackingStatus === option.key;
               return (
-                <TouchableOpacity
+                <PressableScale
                   key={option.key}
                   onPress={() => {
-                    Haptics.selectionAsync();
+                    hapticToggle();
                     setTrackingStatus(option.key);
                     setTrackingFormDirty(true);
                   }}
@@ -1240,7 +1244,7 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
                   <Text style={[s.trackingStatusOptionText, selected && s.trackingStatusOptionTextSelected]}>
                     {option.label}
                   </Text>
-                </TouchableOpacity>
+                </PressableScale>
               );
             })}
           </View>
@@ -1356,10 +1360,15 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
                     {sh.trackingEvents.length > 0 && (
                       <Text style={s.latestEvent}>{sh.trackingEvents[sh.trackingEvents.length - 1].description}</Text>
                     )}
-                    <TouchableOpacity onPress={() => onShowTracking(sh.id)} style={s.viewTrackingBtn}>
+                    <PressableScale
+                      onPress={() => { hapticPrimaryAction(); onShowTracking(sh.id); }}
+                      style={s.viewTrackingBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel="View tracking"
+                    >
                       <Feather name="map-pin" size={ICON.xs} color={CYAN} />
                       <Text style={s.viewTrackingText}>View tracking</Text>
-                    </TouchableOpacity>
+                    </PressableScale>
                   </BrandthreadCard>
                 ))}
               </View>
@@ -1638,9 +1647,15 @@ function NotesTab({ order, noteText, setNoteText, noteType, setNoteType, onAddNo
           <View style={s.noteHeader}>
             <StatusBadge label={note.type.toUpperCase()} variant={noteTypeVariant(note.type)} />
             {note.isPinned && <Feather name="bookmark" size={ICON.xs} color={GOLD} />}
-            <TouchableOpacity onPress={() => onPinNote(note.id, note.isPinned)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginLeft: 'auto' }}>
+            <PressableScale
+              onPress={() => { hapticToggle(); onPinNote(note.id, note.isPinned); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={{ marginLeft: 'auto' }}
+              accessibilityRole="button"
+              accessibilityLabel={note.isPinned ? 'Unpin note' : 'Pin note'}
+            >
               <Text style={[s.pinToggle, { color: note.isPinned ? ORANGE : MUTED }]}>{note.isPinned ? 'Unpin' : 'Pin'}</Text>
-            </TouchableOpacity>
+            </PressableScale>
           </View>
           <Text style={s.noteContent}>{note.content}</Text>
           <Text style={s.noteMeta}>{note.authorName} · {fmtTime(note.createdAt)}</Text>
@@ -1653,13 +1668,16 @@ function NotesTab({ order, noteText, setNoteText, noteType, setNoteType, onAddNo
       {/* Type selector */}
       <View style={s.noteTypeRow}>
         {(['internal', 'customer', 'manufacturer'] as const).map(t => (
-          <TouchableOpacity
+          <PressableScale
             key={t}
-            onPress={() => setNoteType(t)}
+            onPress={() => { hapticToggle(); setNoteType(t); }}
             style={[s.noteTypeChip, noteType === t && { borderColor: noteTypeColor(t), backgroundColor: noteTypeColor(t) + '22' }]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: noteType === t }}
+            accessibilityLabel={t}
           >
             <Text style={[s.noteTypeText, noteType === t && { color: noteTypeColor(t) }]}>{t}</Text>
-          </TouchableOpacity>
+          </PressableScale>
         ))}
       </View>
 
@@ -1699,13 +1717,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   return StyleSheet.create({
   root:             { flex: 1, backgroundColor: 'transparent' },
   centered:         { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
-
-  // Header
-  header:           { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, gap: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
-  backBtn:          { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  headerMid:        { flex: 1 },
-  headerTitle:      { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
-  headerSub:        { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
 
   // Tab bar
   tabBar:           { borderBottomWidth: 1, borderBottomColor: BORDER, maxHeight: 52, backgroundColor: SURFACE },
@@ -1763,7 +1774,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   // Customer
   customerHero:     { alignItems: 'center', gap: SP.sm },
-  avatarCircle:     { width: 64, height: 64, borderRadius: 32, backgroundColor: PURPLE_DIM, borderWidth: 2, borderColor: BORDER_ACTIVE, alignItems: 'center', justifyContent: 'center' },
+  avatarCircle:     { width: 64, height: 64, borderRadius: RADII.pill, backgroundColor: PURPLE_DIM, borderWidth: 2, borderColor: BORDER_ACTIVE, alignItems: 'center', justifyContent: 'center' },
   avatarInitials:   { fontSize: FS.xl, fontFamily: FONT.bold, color: PURPLE },
   customerName:     { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
   customerEmail:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
@@ -1835,7 +1846,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   // Timeline
   timelineRow:      { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
-  timelineDot:      { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
+  timelineDot:      { width: 10, height: 10, borderRadius: RADII.pill, marginTop: 4 },
   timelineBody:     { flex: 1 },
   timelineMessage:  { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
   timelineMeta:     { flexDirection: 'row', gap: SP.sm, alignItems: 'center', marginTop: 2 },
@@ -1897,12 +1908,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   pausedBanner:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: ORANGE_DIM, borderBottomWidth: 1, borderBottomColor: ORANGE + '55', paddingHorizontal: SP.md, paddingVertical: SP.sm },
   pausedBannerText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.medium, color: FG },
   pausedBannerAction: { fontSize: FS.xs, fontFamily: FONT.semibold, color: ORANGE },
-  cancelBanner:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: '#1A3A2A', borderBottomWidth: 1, borderBottomColor: SUCCESS + '55', paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  cancelBanner:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: SUCCESS_DIM, borderBottomWidth: 1, borderBottomColor: SUCCESS + '55', paddingHorizontal: SP.md, paddingVertical: SP.sm },
   cancelBannerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
 
   // Tracking modal
   trackingEventRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
-  trackingDot:      { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
+  trackingDot:      { width: 10, height: 10, borderRadius: RADII.pill, marginTop: 4 },
   trackingEvDesc:   { fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
   trackingEvLoc:    { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   trackingEvTime:   { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },

@@ -64,7 +64,10 @@ vi.mock('react-native', () => {
     View: nativeComponent('View'),
     Text: nativeComponent('Text'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),
+    // Use the render-prop-aware Pressable mock (plain nativeComponent() would
+    // leave PressableScale's function child unrendered — see comment above).
     Pressable: MockPressable,
+    ActivityIndicator: nativeComponent('ActivityIndicator'),
     ScrollView: nativeComponent('ScrollView'),
     Modal: nativeComponent('Modal'),
     RefreshControl: nativeComponent('RefreshControl'),
