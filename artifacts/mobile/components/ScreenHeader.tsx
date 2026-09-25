@@ -86,14 +86,17 @@ export function ScreenHeader({
 
         <View style={styles.titleBlock}>
           {scrollY ? (
-            <Animated.Text style={[styles.title, { color: colors.foreground, opacity: compactTitleOpacity }]}>
+            <Animated.Text
+              style={[styles.title, { color: colors.foreground, opacity: compactTitleOpacity }]}
+              numberOfLines={1}
+            >
               {title}
             </Animated.Text>
           ) : (
-            <Text style={[styles.title, { color: colors.foreground }]}>{title}</Text>
+            <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={1}>{title}</Text>
           )}
           {subtitle && !scrollY && (
-            <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>{subtitle}</Text>
+            <Text style={[styles.subtitle, { color: colors.mutedForeground }]} numberOfLines={1}>{subtitle}</Text>
           )}
         </View>
 

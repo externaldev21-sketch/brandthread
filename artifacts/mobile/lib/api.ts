@@ -30,6 +30,17 @@ const BASE =
 const REQUEST_TIMEOUT_MS = 15_000;
 
 /**
+ * AI generation endpoints (mockup/photography/logo/background-removal) can
+ * legitimately take much longer than an ordinary read/write — the server's
+ * own "expensive" rate-limit policy (see api-server/src/middlewares/
+ * rateLimit.ts) exists specifically for this class of request. Using the
+ * default 15s timeout here was cutting off in-progress generations that
+ * would have succeeded, surfacing a false "Request timed out" failure
+ * instead of the real result.
+ */
+const EXPENSIVE_REQUEST_TIMEOUT_MS = 90_000;
+
+/**
  * fetch() with a hard timeout. Expo/RN's fetch never rejects or resolves on
  * its own if the connection just hangs — AbortController is the only way to
  * bound it. A timeout surfaces as ApiError(408) so it flows through the same
@@ -52,6 +63,32 @@ async function fetchWithTimeout(
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Global 429 backoff gate. When the server rate-limits us, every request
+ * (not just the one that got the 429) waits out the server's Retry-After
+ * window before hitting the network again, instead of each screen's own
+ * retry/focus-refetch logic immediately re-triggering another 429. This is
+ * what actually stops the client from hammering the server during a rate
+ * limit — the previous behavior just surfaced the 429 as an error and let
+ * the next focus/retry fire right away.
+ */
+let rateLimitedUntil = 0;
+
+function noteRateLimited(retryAfterSeconds: number): void {
+  rateLimitedUntil = Math.max(rateLimitedUntil, Date.now() + retryAfterSeconds * 1000);
+}
+
+async function waitOutRateLimit(): Promise<void> {
+  const remaining = rateLimitedUntil - Date.now();
+  if (remaining <= 0) return;
+  await new Promise((resolve) => setTimeout(resolve, remaining));
+}
+
+function retryAfterSecondsFrom(res: Response): number {
+  const header = Number(res.headers.get('Retry-After'));
+  return Number.isFinite(header) && header > 0 ? header : 5;
 }
 
 type GetToken = () => Promise<string | null>;
@@ -241,7 +278,9 @@ async function request<T = any>(
   asText = false,
   getCacheScope: GetCacheScope = () => 'anonymous',
   reportErrors = true,
+  timeoutMs: number = REQUEST_TIMEOUT_MS,
 ): Promise<T> {
+  await waitOutRateLimit();
   const resolvedPath = versionApiPath(path);
   const isRead = (options.method ?? 'GET').toUpperCase() === 'GET';
   const cacheKey = isRead && options.cache !== 'no-store' && !asText
@@ -264,10 +303,10 @@ async function request<T = any>(
   };
   let res: Response;
   try {
-    res = await fetchWithTimeout(`${BASE}${resolvedPath}`, { ...options, headers });
+    res = await fetchWithTimeout(`${BASE}${resolvedPath}`, { ...options, headers }, timeoutMs);
   } catch (error) {
     const retry = isRead
-      ? () => request<T>(path, options, getToken, asText, getCacheScope, reportErrors)
+      ? () => request<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs)
       : undefined;
     const cached = cacheKey ? await readApiCache<T>(cacheKey) : null;
     if (reportErrors) reportNetworkError(error, retry, cached !== null);
@@ -275,12 +314,13 @@ async function request<T = any>(
     throw error;
   }
   if (!res.ok) {
+    if (res.status === 429) noteRateLimited(retryAfterSecondsFrom(res));
     const body = await res.text();
     const error = new ApiError(res.status, body);
     const retry = isRead
-      ? () => request<T>(path, options, getToken, asText, getCacheScope, reportErrors)
+      ? () => request<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs)
       : undefined;
-    const cached = cacheKey && res.status >= 500 ? await readApiCache<T>(cacheKey) : null;
+    const cached = cacheKey && (res.status >= 500 || res.status === 429) ? await readApiCache<T>(cacheKey) : null;
     if (reportErrors) reportNetworkError(error, retry, cached !== null);
     if (cached !== null) return cached;
     throw error;
@@ -549,6 +589,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
   const quietGet = <T>(path: string) => request<T>(path, { method: 'GET' }, getToken, false, getCacheScope, false);
   const getText  = (path: string)   => request<string>(path, { method: 'GET' }, getToken, true, getCacheScope);
   const post  = <T>(path: string, body: unknown) => request<T>(path, { method: 'POST',  body: JSON.stringify(body) }, getToken, false, getCacheScope);
+  const postExpensive = <T>(path: string, body: unknown) =>
+    request<T>(path, { method: 'POST', body: JSON.stringify(body) }, getToken, false, getCacheScope, true, EXPENSIVE_REQUEST_TIMEOUT_MS);
   const put   = <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT',   body: JSON.stringify(body) }, getToken, false, getCacheScope);
   const patch = <T>(path: string, body: unknown) => request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }, getToken, false, getCacheScope);
   const del   = <T>(path: string) => request<T>(path, { method: 'DELETE' }, getToken, false, getCacheScope);
@@ -918,9 +960,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         }>('/api/notification-prefs', body),
     },
     logo: {
-      generate: (brandName: string, style: string) => post<any>('/api/logo/generate', { brandName, style }),
+      generate: (brandName: string, style: string) => postExpensive<any>('/api/logo/generate', { brandName, style }),
       onboardingSample: (brandName: string, style: string) =>
-        post<{ b64_json: string }>('/api/onboarding-sample/logo', { brandName, style }),
+        postExpensive<{ b64_json: string }>('/api/onboarding-sample/logo', { brandName, style }),
     },
     mockup: {
       generate: (
@@ -928,19 +970,19 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         referenceImage?: string,
         mode: 'text_to_design' | 'sketch_to_design' | 'prompt_edit' = referenceImage ? 'prompt_edit' : 'text_to_design',
       ) =>
-        post<any>('/api/mockup/generate', { prompt, mode, ...(referenceImage ? { referenceImage } : {}) }),
+        postExpensive<any>('/api/mockup/generate', { prompt, mode, ...(referenceImage ? { referenceImage } : {}) }),
     },
     photography: {
       generate: (
         images: string[],
         prompt: string,
         mode: 'photoshoot' | 'mockup_to_model' = 'photoshoot',
-      ) => post<any>('/api/photography/generate', { images, prompt, mode }),
+      ) => postExpensive<any>('/api/photography/generate', { images, prompt, mode }),
       generateOutfitSwap: (
         heroImage: string,
         garmentImages: string[],
         prompt: string,
-      ) => post<{
+      ) => postExpensive<{
         results: { garmentIndex: number; b64_json: string }[];
         errors?: { garmentIndex: number }[];
       }>('/api/photography/outfit-swap', { heroImage, garmentImages, prompt }),
@@ -949,7 +991,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         garmentImage: string,
         garmentIndex: number,
         prompt: string,
-      ) => post<{
+      ) => postExpensive<{
         garmentIndex: number;
         b64_json: string;
       }>('/api/photography/outfit-swap/retry', { heroImage, garmentImage, garmentIndex, prompt }),
@@ -959,7 +1001,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
        * Remove the background from a base64 data-URL image.
        * Returns: { b64_json, storageKey, size, mime, createdAt, id }
        */
-      remove: (image: string) => post<{
+      remove: (image: string) => postExpensive<{
         b64_json: string;
         storageKey: string | null;
         size: number;
@@ -969,11 +1011,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       }>('/api/bg-removal/remove', { image }),
       replace: (body: {
         image: string; backgroundImage?: string; prompt?: string; color?: string; bgType?: string;
-      }) => post<{ b64_json: string }>('/api/bg-removal/replace', body),
+      }) => postExpensive<{ b64_json: string }>('/api/bg-removal/replace', body),
     },
     lifestyle: {
       generate: (referenceImages: string[], productImages: string[], prompt: string) =>
-        post<any>('/api/lifestyle/generate', { referenceImages, productImages, prompt }),
+        postExpensive<any>('/api/lifestyle/generate', { referenceImages, productImages, prompt }),
     },
     techpack: {
       generate: (payload: {
@@ -989,7 +1031,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         careNotes: string;
         sizeChart: { sizes: string[]; rows: { point: string; values: Record<string, string> }[] };
         photos: string[];
-      }) => post<any>('/api/techpack/generate', payload),
+      }) => postExpensive<any>('/api/techpack/generate', payload),
     },
     integrations: {
       klaviyoStatus:      () => get<any>('/api/integrations/klaviyo'),
@@ -2048,12 +2090,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     /** AI — brand memory, proactive suggestions */
     ai: {
-      brandMemoryRebuild: () => post<{ fields: Record<string, string> }>('/api/ai/brand-memory/rebuild', {}),
+      brandMemoryRebuild: () => postExpensive<{ fields: Record<string, string> }>('/api/ai/brand-memory/rebuild', {}),
       suggestions:        () => get<{ suggestions: any[] }>('/api/ai/suggestions'),
       nextActions:        () => get<{ suggestions: any[] }>('/api/ai/suggestions'),
       /** One-off assistant call — e.g. "rewrite this copy". */
       chat: (body: { messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>; maxTokens?: number }) =>
-        post<{ content: string; actionCard?: Record<string, unknown>; tokensUsed?: number }>('/api/ai/chat', body),
+        postExpensive<{ content: string; actionCard?: Record<string, unknown>; tokensUsed?: number }>('/api/ai/chat', body),
     },
     /** Security — login sessions */
     security: {
