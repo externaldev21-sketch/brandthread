@@ -19,7 +19,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  RefreshControl,
   ScrollView,
   SectionList,
   StyleSheet,
@@ -37,7 +36,9 @@ import { useUser } from '@clerk/expo';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
 import { FONT, FS, ICON, ON_DARK, RADIUS, SP } from '@/lib/theme';
-import { Header, EmptyState, SkeletonBlock } from '@/components/layout';
+import { EmptyState, SkeletonBlock } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { Chip, ThemedRefreshControl } from '@/components/ui';
 import { CachedImage } from '@/components/CachedImage';
 import SwipeActionRow from '@/components/SwipeActionRow';
 import { useApi } from '@/lib/api';
@@ -480,7 +481,7 @@ export default function ActivityCenterScreen() {
 
   return (
     <View style={styles.container}>
-      <Header
+      <ScreenHeader
         title="Activity"
         actions={hasUnread ? [{
           icon: 'check-circle',
@@ -496,21 +497,14 @@ export default function ActivityCenterScreen() {
         contentContainerStyle={styles.chipRow}
         accessibilityRole="tablist"
       >
-        {ACTIVITY_FILTERS.map((chip) => {
-          const active = chip.key === filter;
-          return (
-            <TouchableOpacity
-              key={chip.key}
-              style={[styles.chip, active && styles.chipActive]}
-              onPress={() => changeFilter(chip.key)}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
-              hitSlop={{ top: 6, bottom: 6 }}
-            >
-              <Text style={[styles.chipText, active && styles.chipTextActive]}>{chip.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
+        {ACTIVITY_FILTERS.map((chip) => (
+          <Chip
+            key={chip.key}
+            label={chip.label}
+            selected={chip.key === filter}
+            onPress={() => changeFilter(chip.key)}
+          />
+        ))}
       </ScrollView>
 
       {status === 'loading' ? (
@@ -537,11 +531,9 @@ export default function ActivityCenterScreen() {
           onEndReached={() => { void loadMore(); }}
           onEndReachedThreshold={0.4}
           refreshControl={(
-            <RefreshControl
+            <ThemedRefreshControl
               refreshing={refreshing}
               onRefresh={() => { void loadFirstPage('refresh'); }}
-              tintColor={theme.muted}
-              colors={[theme.accent]}
             />
           )}
           ListEmptyComponent={(
