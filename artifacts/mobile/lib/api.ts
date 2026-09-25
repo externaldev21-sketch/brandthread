@@ -1268,21 +1268,30 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<any[]>(`/api/public/products/high-demand?limit=${encodeURIComponent(String(limit))}`),
     },
     public: {
-      search: (opts: { q: string; sort?: string; minPriceCents?: number; maxPriceCents?: number; category?: string; limit?: number }) => {
+      search: (opts: { q: string; sort?: string; minPriceCents?: number; maxPriceCents?: number; category?: string; size?: string; brand?: string; limit?: number; offset?: number }) => {
         const params = new URLSearchParams();
         if (opts.q) params.set('q', opts.q);
         if (opts.sort) params.set('sort', opts.sort);
         if (opts.minPriceCents !== undefined) params.set('minPriceCents', String(opts.minPriceCents));
         if (opts.maxPriceCents !== undefined) params.set('maxPriceCents', String(opts.maxPriceCents));
         if (opts.category) params.set('category', opts.category);
+        if (opts.size) params.set('size', opts.size);
+        if (opts.brand) params.set('brand', opts.brand);
         if (opts.limit) params.set('limit', String(opts.limit));
-        return get<{ results: any[] }>(`/api/public/search?${params.toString()}`);
+        if (opts.offset) params.set('offset', String(opts.offset));
+        return get<{ results: any[]; pagination: { limit: number; offset: number; returned: number; total?: number; hasMore: boolean } }>(`/api/public/search?${params.toString()}`);
       },
-      /** Trending search terms (categories + brands) for the search empty state. */
+      /** Trending search terms (real logged queries once there's enough volume, else categories + brands) for the search empty state. */
       trending: (limit = 8) =>
-        get<{ trending: Array<{ term: string; type: 'category' | 'brand' }> }>(
+        get<{ trending: Array<{ term: string; type: 'category' | 'brand' | 'query' }> }>(
           `/api/public/search/trending?limit=${encodeURIComponent(String(limit))}`
         ),
+      /** This signed-in buyer's own recent searches, most recent first. */
+      recent: (limit = 10) =>
+        get<{ recent: Array<{ query: string; normalized: string }> }>(
+          `/api/public/search/recent?limit=${encodeURIComponent(String(limit))}`
+        ),
+      clearRecent: () => del<{ ok: boolean }>('/api/public/search/recent'),
       /** Suggested brands + products for the search empty state. */
       suggested: (limit = 6) =>
         get<{
@@ -2287,6 +2296,28 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           likesCount: number; commentsCount: number; repostsCount: number; shopClicks: number;
           boosted: boolean; category: string; hype: string;
         }> }>(`/api/public/trending?limit=${limit}`),
+    },
+    /**
+     * For You ranking pipeline: batched behavioral-event ingestion + the
+     * buyer's personalized ranked Thread feed. Auth required for both.
+     */
+    feed: {
+      /** Batched, idempotent event ingestion (up to 50 events/request). Each
+       *  event needs a stable client-generated `clientEventId` so a retried
+       *  batch never double-counts a signal. */
+      events: (events: Array<{
+        postId: string;
+        type: 'view' | 'watch_time' | 'rewatch' | 'shop_click' | 'add_to_bag' | 'skip' | 'not_interested';
+        value?: string;
+        clientEventId: string;
+      }>) => post<{ accepted: number; deduped: number }>('/api/feed/events', { events }),
+      /** Cursor-paginated (`nextOffset`) personalized ranking. */
+      forYou: (opts: { limit?: number; offset?: number } = {}) => {
+        const params = new URLSearchParams();
+        params.set('limit', String(opts.limit ?? 20));
+        params.set('offset', String(opts.offset ?? 0));
+        return get<{ items: any[]; nextOffset: number | null }>(`/api/feed/for-you?${params.toString()}`);
+      },
     },
     /**
      * Public "For You" ranked Discover feed — no auth required (an Authorization

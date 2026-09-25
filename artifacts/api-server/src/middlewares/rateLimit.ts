@@ -15,7 +15,8 @@ export type RateLimitPolicyName =
   | "messaging"
   | "comment"
   | "follow"
-  | "report";
+  | "report"
+  | "feed-event";
 
 export type RateLimitPolicy = {
   id: RateLimitPolicyName;
@@ -114,6 +115,14 @@ export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> =
     limit: scaled(10),
     windowMs: 5 * 60_000,
     message: "Too many reports submitted. Please wait before submitting another.",
+  },
+  "feed-event": {
+    id: "feed-event",
+    // Batched (up to 50 events/request) so this is generous per-request but
+    // still bounds a client that retries aggressively or fires unbatched.
+    limit: 120,
+    windowMs: 60_000,
+    message: "Too many feed events submitted. Please wait a moment and try again.",
   },
 };
 

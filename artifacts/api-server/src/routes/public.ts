@@ -3,7 +3,7 @@
  * Mounted at /api/public — no requireAuth middleware.
  */
 import { Router } from "express";
-import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems, follows, savedCollections, savedItems } from "@workspace/db";
+import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems, follows, savedCollections, savedItems, searchLog } from "@workspace/db";
 import { getAuth } from "@clerk/express";
 import { effectiveDropLaunchAt } from "../lib/money/dropLaunch";
 import { adaptSavedRows } from "../lib/savedItemAdapter";
@@ -447,20 +447,39 @@ router.get("/collections/:id", async (req, res) => {
   }
 });
 
-// GET /api/public/search?q=query&limit=20
+// Typo-tolerance threshold for pg_trgm similarity(). Below this a term is
+// considered "not a real match" even though ILIKE substring already gates
+// most of the noise; this only widens matching to near-miss spellings.
+const SIMILARITY_THRESHOLD = 0.25;
+
+/** SQL predicate: substring match (existing behavior) OR trigram-similarity match (typo tolerance). */
+function fuzzyMatch(column: any, term: string, pattern: string) {
+  return sql`(${ilike(column, pattern)} OR similarity(${column}, ${term}) > ${SIMILARITY_THRESHOLD})`;
+}
+
+/** Best-of(substring exactness, trigram similarity) — used to order "relevance" results server-side. */
+function relevanceScore(column: any, term: string) {
+  return sql<number>`GREATEST(similarity(${column}, ${term}), CASE WHEN ${column} ILIKE ${"%" + term + "%"} THEN 0.999 ELSE 0 END)`;
+}
+
+// GET /api/public/search?q=query&limit=20&offset=0
 // Returns: { results: Array<{ id, kind:'brand'|'product', ...SearchBrand|SearchProduct fields }> }
 router.get("/search", async (req, res): Promise<void> => {
   try {
     const q = singleQueryValue(req.query.q);
     const sortValue = singleQueryValue(req.query.sort);
     const category = singleQueryValue(req.query.category);
+    const sizeValue = singleQueryValue(req.query.size);
+    const brandValue = singleQueryValue(req.query.brand);
     const parsedLimit = parseNonNegativeInteger(req.query.limit, "limit", 20);
+    const parsedOffset = parseNonNegativeInteger(req.query.offset, "offset", 0);
     const minPriceCents = req.query.minPriceCents === undefined
       ? undefined : parseNonNegativeInteger(req.query.minPriceCents, "minPriceCents");
     const maxPriceCents = req.query.maxPriceCents === undefined
       ? undefined : parseNonNegativeInteger(req.query.maxPriceCents, "maxPriceCents");
-    if (q === null || sortValue === null || category === null ||
-        typeof parsedLimit !== "number" || typeof minPriceCents === "object" || typeof maxPriceCents === "object") {
+    if (q === null || sortValue === null || category === null || sizeValue === null || brandValue === null ||
+        typeof parsedLimit !== "number" || typeof parsedOffset !== "number" ||
+        typeof minPriceCents === "object" || typeof maxPriceCents === "object") {
       res.status(400).json({ error: "Invalid search query values" }); return;
     }
     if (parsedLimit < 1) { res.status(400).json({ error: "limit must be at least 1" }); return; }
@@ -473,9 +492,10 @@ router.get("/search", async (req, res): Promise<void> => {
     const sort: SearchSort = (sortValue as SearchSort | undefined) ?? "relevance";
     const searchQuery = q ?? "";
     const term = normalizeSearchTerm(searchQuery);
-    if (!term || term.length < 2) { res.json({ results: [] }); return; }
+    if (!term || term.length < 2) { res.json({ results: [], pagination: paginationMetadata({ limit: parsedLimit, offset: parsedOffset }, 0, 0) }); return; }
 
     const lim = Math.min(parsedLimit, 50);
+    const off = parsedOffset;
     const pattern = containsSearchPattern(term);
     const viewerId = optionalViewerId(req);
 
@@ -487,15 +507,21 @@ router.get("/search", async (req, res): Promise<void> => {
         clerkId:     users.clerkId,
         displayName: users.displayName,
         brandName:   users.brandName,
+        username:    users.username,
+        relevance:   relevanceScore(sql`COALESCE(${users.brandName}, ${users.displayName}, ${users.username}, '')`, term),
       }).from(users).where(
         and(
           eq(users.accountType, "seller"),
           isNull(users.suspendedAt),
           isNull(users.deletedAt),
           notBlockedWith(viewerId, users.clerkId),
-          or(ilike(users.displayName, pattern), ilike(users.brandName, pattern)),
+          or(
+            fuzzyMatch(users.displayName, term, pattern),
+            fuzzyMatch(users.brandName, term, pattern),
+            fuzzyMatch(users.username, term, pattern),
+          ),
         ),
-      ).orderBy(asc(users.displayName), asc(users.clerkId)).limit(10),
+      ).orderBy(desc(relevanceScore(sql`COALESCE(${users.brandName}, ${users.displayName}, ${users.username}, '')`, term)), asc(users.clerkId)).limit(10),
 
       db.select({
         id:         products.id,
@@ -505,11 +531,19 @@ router.get("/search", async (req, res): Promise<void> => {
         images:     products.images,
         createdAt:  products.createdAt,
         priceCents: productPrice,
+        relevance:  sql<number>`max(${relevanceScore(products.name, term)})`,
       }).from(products)
         .leftJoin(productVariants, eq(productVariants.productId, products.id))
-        .where(and(eq(products.status, "active"), isNull(products.deletedAt), ilike(products.name, pattern),
+        .where(and(
+          eq(products.status, "active"), isNull(products.deletedAt),
+          fuzzyMatch(products.name, term, pattern),
           category ? eq(products.category, category) : undefined,
           notBlockedWith(viewerId, products.ownerId),
+          sizeValue ? sql`EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = ${products.id} AND pv.size ILIKE ${sizeValue})` : undefined,
+          brandValue ? sql`EXISTS (
+            SELECT 1 FROM users bu WHERE bu.clerk_id = ${products.ownerId}
+              AND (bu.clerk_id = ${brandValue} OR bu.brand_name ILIKE ${containsSearchPattern(normalizeSearchTerm(brandValue))})
+          )` : undefined,
           sql`NOT EXISTS (SELECT 1 FROM users su WHERE su.clerk_id = ${products.ownerId} AND su.suspended_at IS NOT NULL)`))
         .groupBy(products.id)
         .having(and(
@@ -544,16 +578,17 @@ router.get("/search", async (req, res): Promise<void> => {
     const seen = new Set<string>();
     const results: any[] = [];
 
-    // Brands first
-    for (const s of sellers) {
+    // Brands first, best relevance (typo-tolerant) match first.
+    const sortedSellers = [...sellers].sort((a, b) => Number(b.relevance) - Number(a.relevance) || a.clerkId.localeCompare(b.clerkId));
+    for (const s of sortedSellers) {
       if (seen.has(s.clerkId)) continue;
       seen.add(s.clerkId);
-      const name = s.brandName ?? s.displayName ?? "Brand";
+      const name = s.brandName ?? s.displayName ?? s.username ?? "Brand";
       results.push({
         id:       s.clerkId,
         kind:     "brand",
         name,
-        handle:   mkHandle(name),
+        handle:   s.username ? `@${s.username}` : mkHandle(name),
         color:    hashColor(s.clerkId),
         initials: mkInitials(name),
         sellerId: s.clerkId,
@@ -561,17 +596,17 @@ router.get("/search", async (req, res): Promise<void> => {
     }
 
     // Products arrive collapsed and price-filtered by the database.
-    const prodMap = new Map<string, { id: string; name: string; ownerId: string; category: string; images: string[]; createdAt: Date; minPrice: number }>();
+    const prodMap = new Map<string, { id: string; name: string; ownerId: string; category: string; images: string[]; createdAt: Date; minPrice: number; relevance: number }>();
     for (const p of prods) {
       const price = Number(p.priceCents ?? 0);
-      prodMap.set(p.id, { id: p.id, name: p.name, ownerId: p.ownerId, category: p.category, images: Array.isArray(p.images) ? p.images.filter((image): image is string => typeof image === "string") : [], createdAt: p.createdAt, minPrice: price });
+      prodMap.set(p.id, { id: p.id, name: p.name, ownerId: p.ownerId, category: p.category, images: Array.isArray(p.images) ? p.images.filter((image): image is string => typeof image === "string") : [], createdAt: p.createdAt, minPrice: price, relevance: Number(p.relevance ?? 0) });
     }
     const filteredProducts = [...prodMap.values()]
       .sort((a, b) => {
         if (sort === "price_asc") return a.minPrice - b.minPrice || b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id);
         if (sort === "price_desc") return b.minPrice - a.minPrice || b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id);
         if (sort === "newest") return b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id);
-        return a.name.localeCompare(b.name) || b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id);
+        return b.relevance - a.relevance || b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id);
       });
     for (const p of filteredProducts) {
       if (seen.has(p.id)) continue;
@@ -593,10 +628,21 @@ router.get("/search", async (req, res): Promise<void> => {
       });
     }
 
-    const limited = results.slice(0, lim);
+    const total = results.length;
+    const limited = results.slice(off, off + lim);
+
+    // Fire-and-forget query log — backs /search/recent and /search/trending.
+    // Never blocks or fails the response.
+    db.insert(searchLog).values({
+      userId: viewerId ?? null,
+      query: searchQuery.slice(0, 200),
+      normalized: term,
+      resultCount: total,
+    }).catch((err) => req.log.error({ err }, "Failed to log search query"));
+
     res.json({
       results: limited,
-      pagination: paginationMetadata({ limit: lim, offset: 0 }, limited.length),
+      pagination: paginationMetadata({ limit: lim, offset: off }, limited.length, total),
     });
   } catch (err) {
     req.log.error({ err }, "Public search failed");
@@ -605,11 +651,14 @@ router.get("/search", async (req, res): Promise<void> => {
 });
 
 // ─── GET /api/public/search/trending — trending searches (empty-state chips) ──
-// There is no search-query logging table yet, so "trending" is approximated
-// from data we already have: the categories with the most active listings
-// (a proxy for what buyers are currently browsing/searching for) plus the
-// brands gaining the most followers. This intentionally avoids standing up
-// new tracking infrastructure for a lightweight empty-state feature.
+// Real trending: the most-frequent normalized queries logged to search_log in
+// the last 48h (search_log now exists — see migration 088). Falls back to the
+// category/follower-based approximation used before search logging existed
+// when the log is too sparse (fresh environment, low traffic) to be
+// meaningful, so this never regresses to an empty/boring result.
+const TRENDING_LOG_WINDOW_MS = 48 * 60 * 60 * 1000;
+const MIN_LOGGED_QUERIES_FOR_TRENDING = 5;
+
 router.get("/search/trending", async (req, res) => {
   try {
     const parsedLimit = parseNonNegativeInteger(req.query.limit, "limit", 8);
@@ -617,6 +666,20 @@ router.get("/search/trending", async (req, res) => {
       res.status(400).json({ error: "limit must be at least 1" }); return;
     }
     const lim = Math.min(parsedLimit, 20);
+    const since = new Date(Date.now() - TRENDING_LOG_WINDOW_MS);
+
+    const loggedTrending = await db
+      .select({ normalized: searchLog.normalized, cnt: count() })
+      .from(searchLog)
+      .where(gte(searchLog.createdAt, since))
+      .groupBy(searchLog.normalized)
+      .orderBy(desc(count()))
+      .limit(lim);
+
+    if (loggedTrending.length >= MIN_LOGGED_QUERIES_FOR_TRENDING) {
+      res.json({ trending: loggedTrending.map((t) => ({ term: t.normalized, type: "query" as const })) });
+      return;
+    }
 
     const [topCategories, topBrands] = await Promise.all([
       db.select({ category: products.category, count: count() })
@@ -642,6 +705,7 @@ router.get("/search/trending", async (req, res) => {
     const brandNameById = new Map(brandRows.map((b) => [b.clerkId, b.brandName ?? b.displayName ?? "Brand"]));
 
     const trending = [
+      ...loggedTrending.map((t) => ({ term: t.normalized, type: "query" as const })),
       ...topCategories.map((c) => ({ term: c.category, type: "category" as const })),
       ...topBrands.map((b) => ({ term: brandNameById.get(b.sellerId) ?? "Brand", type: "brand" as const })),
     ].slice(0, lim);
@@ -650,6 +714,45 @@ router.get("/search/trending", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to fetch trending searches");
     res.status(500).json({ error: "Failed to fetch trending searches" });
+  }
+});
+
+// ─── GET /api/public/search/recent — this buyer's own recent searches ─────────
+// Signed-in only (a client-side "recent" list is meaningless without an
+// identity to scope it to). Deduped by normalized query, most recent first.
+router.get("/search/recent", requireAuth, async (req, res) => {
+  try {
+    const userId = (req as any).clerkUserId as string;
+    const parsedLimit = parseNonNegativeInteger(req.query.limit, "limit", 10);
+    if (typeof parsedLimit !== "number" || parsedLimit < 1) {
+      res.status(400).json({ error: "limit must be at least 1" }); return;
+    }
+    const lim = Math.min(parsedLimit, 30);
+
+    const rows = await db
+      .select({ query: searchLog.query, normalized: searchLog.normalized, createdAt: sql<Date>`max(${searchLog.createdAt})` })
+      .from(searchLog)
+      .where(eq(searchLog.userId, userId))
+      .groupBy(searchLog.query, searchLog.normalized)
+      .orderBy(desc(sql`max(${searchLog.createdAt})`))
+      .limit(lim);
+
+    res.json({ recent: rows.map((r) => ({ query: r.query, normalized: r.normalized })) });
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch recent searches");
+    res.status(500).json({ error: "Failed to fetch recent searches" });
+  }
+});
+
+// ─── DELETE /api/public/search/recent — clear this buyer's recent searches ────
+router.delete("/search/recent", requireAuth, async (req, res) => {
+  try {
+    const userId = (req as any).clerkUserId as string;
+    await db.delete(searchLog).where(eq(searchLog.userId, userId));
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Failed to clear recent searches");
+    res.status(500).json({ error: "Failed to clear recent searches" });
   }
 });
 
