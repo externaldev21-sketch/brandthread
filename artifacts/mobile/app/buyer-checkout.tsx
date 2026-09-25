@@ -86,6 +86,7 @@ import { AddressAutocompleteInput } from '@/components/AddressAutocompleteInput'
 import { SheetRise } from '@/components/motion/SheetRise';
 import { StickyFooter } from '@/components/layout';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
+import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
 import { Button, IconButton } from '@/components/ui';
 import { RADII } from '@/constants/radii';
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
@@ -1334,6 +1335,16 @@ export default function BuyerCheckoutScreen() {
       setVerifiedOrders(restoredVerified);
       setPendingSessionIds(restoredPending);
 
+      // Meta Pixel + Conversions API — fires once when checkout actually
+      // starts (session freshly loaded/created), not on every re-render.
+      if (next.step !== 'confirmation') {
+        void trackAndRelayConversionEvent(
+          'InitiateCheckout',
+          { value: next.summary.totalCents / 100, currency: next.summary.currency },
+          { valueCents: next.summary.totalCents, currency: next.summary.currency },
+        );
+      }
+
       // Load saved addresses for authenticated users
       if (isSignedIn) {
         try {
@@ -1577,6 +1588,16 @@ export default function BuyerCheckoutScreen() {
             amountTotalCents: verification.amountTotal ?? undefined,
           };
           await persist({ ...current, paidGroups });
+
+          // Meta Pixel + Conversions API — fires exactly once per newly
+          // verified order (this branch only runs the first time a group's
+          // payment resolves to a real order id).
+          const purchaseValueCents = verification.amountTotal ?? current.summary.totalCents;
+          void trackAndRelayConversionEvent(
+            'Purchase',
+            { value: purchaseValueCents / 100, currency: current.summary.currency, content_ids: group.items.map(item => item.productId) },
+            { valueCents: purchaseValueCents, currency: current.summary.currency },
+          );
         } else {
           // orderId not yet available — persist the stripe session for reconciliation.
           unresolved.push(isSignedIn ? result.sessionId : `${result.sessionId}|${result.guestAccessToken}`);
