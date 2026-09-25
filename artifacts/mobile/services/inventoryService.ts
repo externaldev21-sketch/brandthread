@@ -19,9 +19,12 @@ import {
   InventoryFilterKey,
 } from './inventoryTypes';
 
-// ─── Storage keys ─────────────────────────────────────────────────────────────
+// ─── Storage keys (scoped by user ID so two accounts never share storage) ─────
 
-const KEYS = {
+/** Legacy, unscoped keys from before per-account scoping. Migrated once into
+ *  the first user to initialize the service on a given device, then removed
+ *  so they can never leak into a different account afterward. */
+const LEGACY_KEYS = {
   items:       'inv:items:v1',
   locations:   'inv:locations:v1',
   adjustments: 'inv:adjustments:v1',
@@ -35,7 +38,47 @@ const KEYS = {
 };
 
 /** One-time migration marker — written after legacy demo records are purged. */
-const INV_MIGRATION_V1_KEY = 'inv:migration_v1_demo_purged';
+const LEGACY_INV_MIGRATION_V1_KEY = 'inv:migration_v1_demo_purged';
+
+/** Set by initInventoryService() after sign-in. Falls back to 'anon' so the
+ *  service is safe to call before the user ID is available. */
+let _invUserId = 'anon';
+
+/** Call once after Clerk resolves the current user ID (and again on sign-out
+ *  with null, or when the signed-in user changes) so a different account
+ *  never reads/writes the previous account's cached inventory. */
+export function initInventoryService(userId: string | null): void {
+  const newUserId = userId ?? 'anon';
+  if (newUserId === _invUserId) return;
+  _invUserId = newUserId;
+  _init = false;
+  _items = []; _locations = []; _adjustments = []; _events = [];
+  _transfers = []; _incoming = []; _alerts = []; _reservations = [];
+  _preorders = []; _counts = [];
+}
+
+function invKeys(uid = _invUserId) {
+  return {
+    items:        `inv:${uid}:items:v1`,
+    locations:    `inv:${uid}:locations:v1`,
+    adjustments:  `inv:${uid}:adjustments:v1`,
+    events:       `inv:${uid}:events:v1`,
+    transfers:    `inv:${uid}:transfers:v1`,
+    incoming:     `inv:${uid}:incoming:v1`,
+    alerts:       `inv:${uid}:alerts:v1`,
+    reservations: `inv:${uid}:reservations:v1`,
+    preorders:    `inv:${uid}:preorders:v1`,
+    counts:       `inv:${uid}:counts:v1`,
+  };
+}
+
+function invMigratedKey(uid: string): string {
+  return `inv:migration_v2_scoped:${uid}`;
+}
+
+function invDemoPurgedKey(uid: string): string {
+  return `${LEGACY_INV_MIGRATION_V1_KEY}:${uid}`;
+}
 
 // ─── Known legacy demo IDs (seeded in v1 demo build) ─────────────────────────
 // These exact IDs are removed on first run to clear stale demo data from devices
@@ -97,72 +140,104 @@ let _preorders:   PreorderCommitment[]   = [];
 let _counts:      InventoryCount[]       = [];
 
 async function persist() {
+  const k = invKeys();
   await AsyncStorage.multiSet([
-    [KEYS.items,        JSON.stringify(_items)],
-    [KEYS.locations,    JSON.stringify(_locations)],
-    [KEYS.adjustments,  JSON.stringify(_adjustments)],
-    [KEYS.events,       JSON.stringify(_events)],
-    [KEYS.transfers,    JSON.stringify(_transfers)],
-    [KEYS.incoming,     JSON.stringify(_incoming)],
-    [KEYS.alerts,       JSON.stringify(_alerts)],
-    [KEYS.reservations, JSON.stringify(_reservations)],
-    [KEYS.preorders,    JSON.stringify(_preorders)],
-    [KEYS.counts,       JSON.stringify(_counts)],
+    [k.items,        JSON.stringify(_items)],
+    [k.locations,    JSON.stringify(_locations)],
+    [k.adjustments,  JSON.stringify(_adjustments)],
+    [k.events,       JSON.stringify(_events)],
+    [k.transfers,    JSON.stringify(_transfers)],
+    [k.incoming,     JSON.stringify(_incoming)],
+    [k.alerts,       JSON.stringify(_alerts)],
+    [k.reservations, JSON.stringify(_reservations)],
+    [k.preorders,    JSON.stringify(_preorders)],
+    [k.counts,       JSON.stringify(_counts)],
   ]);
+}
+
+/** Move data written before per-account scoping existed into the first
+ *  account that initializes on this device, then delete the legacy keys so
+ *  they can never be picked up by a second account later. */
+async function migrateLegacyInventory(uid: string, k: ReturnType<typeof invKeys>): Promise<void> {
+  const already = await AsyncStorage.getItem(invMigratedKey(uid)).catch(() => null);
+  if (already) return;
+  try {
+    const legacyEntries = Object.keys(LEGACY_KEYS) as Array<keyof typeof LEGACY_KEYS>;
+    const [legacyPairs, scopedPairs] = await Promise.all([
+      AsyncStorage.multiGet(legacyEntries.map((name) => LEGACY_KEYS[name])),
+      AsyncStorage.multiGet(legacyEntries.map((name) => k[name])),
+    ]);
+    const updates: [string, string][] = [];
+    legacyEntries.forEach((name, i) => {
+      const legacyValue = legacyPairs[i][1];
+      const scopedValue = scopedPairs[i][1];
+      if (legacyValue && !scopedValue) updates.push([k[name], legacyValue]);
+    });
+    if (updates.length > 0) await AsyncStorage.multiSet(updates);
+    await AsyncStorage.multiRemove(legacyEntries.map((name) => LEGACY_KEYS[name]));
+  } catch { /* non-fatal — worst case the legacy data is left in place */ }
+  await AsyncStorage.setItem(invMigratedKey(uid), '1').catch(() => {});
 }
 
 async function ensureInitialized() {
   if (_init) return;
-  _init = true;
+  const uid = _invUserId;
+  const k = invKeys(uid);
+
+  await migrateLegacyInventory(uid, k);
+  // An init() call (account switch) may have landed while the migration was
+  // in flight. Never hydrate a different account's data into the active one.
+  if (_invUserId !== uid) return;
 
   // One-time migration: remove known legacy demo records on existing devices.
   // Uses exact known IDs so no user-created record is ever removed.
-  const migrated = await AsyncStorage.getItem(INV_MIGRATION_V1_KEY).catch(() => null);
+  const migrated = await AsyncStorage.getItem(invDemoPurgedKey(uid)).catch(() => null);
   if (!migrated) {
     try {
-      const pairs = await AsyncStorage.multiGet(Object.values(KEYS));
+      const pairs = await AsyncStorage.multiGet(Object.values(k));
       const updates: [string, string][] = [];
-      pairs.forEach(([k, v]) => {
+      pairs.forEach(([key, v]) => {
         if (!v) return;
         try {
           const arr: any[] = JSON.parse(v);
           let filtered: any[];
-          if (k === KEYS.items)            filtered = arr.filter((x: any) => !LEGACY_DEMO_ITEM_IDS.has(x.id));
-          else if (k === KEYS.adjustments) filtered = arr.filter((x: any) => !LEGACY_DEMO_ADJUSTMENT_IDS.has(x.id));
-          else if (k === KEYS.events)      filtered = arr.filter((x: any) => !LEGACY_DEMO_EVENT_IDS.has(x.id));
-          else if (k === KEYS.transfers)   filtered = arr.filter((x: any) => !LEGACY_DEMO_TRANSFER_IDS.has(x.id));
-          else if (k === KEYS.incoming)    filtered = arr.filter((x: any) => !LEGACY_DEMO_INCOMING_IDS.has(x.id));
-          else if (k === KEYS.alerts)      filtered = arr.filter((x: any) => !LEGACY_DEMO_ALERT_IDS.has(x.id));
-          else if (k === KEYS.locations)   filtered = arr.filter((x: any) => !LEGACY_DEMO_LOCATION_IDS.has(x.id));
+          if (key === k.items)            filtered = arr.filter((x: any) => !LEGACY_DEMO_ITEM_IDS.has(x.id));
+          else if (key === k.adjustments) filtered = arr.filter((x: any) => !LEGACY_DEMO_ADJUSTMENT_IDS.has(x.id));
+          else if (key === k.events)      filtered = arr.filter((x: any) => !LEGACY_DEMO_EVENT_IDS.has(x.id));
+          else if (key === k.transfers)   filtered = arr.filter((x: any) => !LEGACY_DEMO_TRANSFER_IDS.has(x.id));
+          else if (key === k.incoming)    filtered = arr.filter((x: any) => !LEGACY_DEMO_INCOMING_IDS.has(x.id));
+          else if (key === k.alerts)      filtered = arr.filter((x: any) => !LEGACY_DEMO_ALERT_IDS.has(x.id));
+          else if (key === k.locations)   filtered = arr.filter((x: any) => !LEGACY_DEMO_LOCATION_IDS.has(x.id));
           else return; // reservations, preorders, counts — no legacy demo data
-          if (filtered.length !== arr.length) updates.push([k, JSON.stringify(filtered)]);
+          if (filtered.length !== arr.length) updates.push([key, JSON.stringify(filtered)]);
         } catch { /* skip malformed entry */ }
       });
       if (updates.length > 0) await AsyncStorage.multiSet(updates);
     } catch { /* non-fatal */ }
-    await AsyncStorage.setItem(INV_MIGRATION_V1_KEY, '1').catch(() => {});
+    await AsyncStorage.setItem(invDemoPurgedKey(uid), '1').catch(() => {});
   }
 
   try {
-    const pairs = await AsyncStorage.multiGet(Object.values(KEYS));
+    const pairs = await AsyncStorage.multiGet(Object.values(k));
     const map: Record<string, string | null> = {};
-    pairs.forEach(([k, v]) => { map[k] = v; });
+    pairs.forEach(([key, v]) => { map[key] = v; });
 
-    _items        = map[KEYS.items]        ? JSON.parse(map[KEYS.items]!)        : [];
-    _locations    = map[KEYS.locations]    ? JSON.parse(map[KEYS.locations]!)    : [];
-    _adjustments  = map[KEYS.adjustments]  ? JSON.parse(map[KEYS.adjustments]!)  : [];
-    _events       = map[KEYS.events]       ? JSON.parse(map[KEYS.events]!)       : [];
-    _transfers    = map[KEYS.transfers]    ? JSON.parse(map[KEYS.transfers]!)    : [];
-    _incoming     = map[KEYS.incoming]     ? JSON.parse(map[KEYS.incoming]!)     : [];
-    _alerts       = map[KEYS.alerts]       ? JSON.parse(map[KEYS.alerts]!)       : [];
-    _reservations = map[KEYS.reservations] ? JSON.parse(map[KEYS.reservations]!) : [];
-    _preorders    = map[KEYS.preorders]    ? JSON.parse(map[KEYS.preorders]!)    : [];
-    _counts       = map[KEYS.counts]       ? JSON.parse(map[KEYS.counts]!)       : [];
+    _items        = map[k.items]        ? JSON.parse(map[k.items]!)        : [];
+    _locations    = map[k.locations]    ? JSON.parse(map[k.locations]!)    : [];
+    _adjustments  = map[k.adjustments]  ? JSON.parse(map[k.adjustments]!)  : [];
+    _events       = map[k.events]       ? JSON.parse(map[k.events]!)       : [];
+    _transfers    = map[k.transfers]    ? JSON.parse(map[k.transfers]!)    : [];
+    _incoming     = map[k.incoming]     ? JSON.parse(map[k.incoming]!)     : [];
+    _alerts       = map[k.alerts]       ? JSON.parse(map[k.alerts]!)       : [];
+    _reservations = map[k.reservations] ? JSON.parse(map[k.reservations]!) : [];
+    _preorders    = map[k.preorders]    ? JSON.parse(map[k.preorders]!)    : [];
+    _counts       = map[k.counts]       ? JSON.parse(map[k.counts]!)       : [];
   } catch {
     // All stores start empty on error — no demo fallback
     _items = []; _locations = []; _adjustments = []; _events = [];
     _transfers = []; _incoming = []; _alerts = [];
   }
+  if (_invUserId === uid) _init = true;
 }
 
 function addEvent(

@@ -125,6 +125,16 @@ vi.mock('@/components/buyer-nav/buyerTabBarMetrics', () => ({
   useBuyerTabBarInset: () => 0,
 }));
 
+vi.mock('@/components/BrandthreadUI', () => ({
+  SearchBar: ({ value, onChange, placeholder, style }: any) =>
+    React.createElement('TextInput', {
+      testID: 'inbox-compose-search-input', value, onChangeText: onChange, placeholder, style,
+    }),
+  SheetHandle: () => React.createElement('View', { testID: 'inbox-compose-sheet-handle' }),
+  PressableScale: ({ children, ...rest }: any) =>
+    React.createElement('Pressable', rest, typeof children === 'function' ? children({ pressed: false }) : children),
+}));
+
 vi.mock('@/components/layout', () => ({
   EmptyState: ({ message, actionLabel, onAction }: { message: string; actionLabel?: string; onAction?: () => void }) =>
     React.createElement(
@@ -162,8 +172,18 @@ vi.mock('@/contexts/AppThemeContext', () => ({
   }),
 }));
 
+// Stable reference: inbox.tsx's compose-directory effect depends on `api`,
+// so a fresh object per render (a naive `useApi: () => ({...})` factory)
+// would retrigger that effect every render and spin forever under act().
+const apiStub = vi.hoisted(() => ({
+  conversations: { accept: vi.fn(), decline: vi.fn() },
+  social: {
+    following: vi.fn().mockResolvedValue([]),
+    followers: vi.fn().mockResolvedValue([]),
+  },
+}));
 vi.mock('@/lib/api', () => ({
-  useApi: () => ({ conversations: { accept: vi.fn(), decline: vi.fn() } }),
+  useApi: () => apiStub,
 }));
 
 vi.mock('@/lib/theme', async (importOriginal) => {
@@ -187,6 +207,7 @@ vi.mock('@/services/socialService', () => ({
   markNotificationRead: vi.fn(),
   searchProfiles: vi.fn().mockResolvedValue([]),
   createOrGetConversation: vi.fn(),
+  getFriendSuggestions: vi.fn().mockResolvedValue([]),
   muteUser: muteUserMock,
   MY_USER_ID: 'me',
 }));

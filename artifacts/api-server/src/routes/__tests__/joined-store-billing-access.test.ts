@@ -143,8 +143,6 @@ describe("joined-store billing isolation", () => {
         ["POST", "/api/seller/connect/onboard"],
         ["GET", "/api/seller/connect/onboard/return"],
         ["GET", "/api/seller/connect/onboard/refresh"],
-        // Money-moving: still owner-only regardless of finance read access.
-        ["POST", "/api/finance/payout"],
       ]) {
         const result = await request(path, method);
         expect(result.status).toBe(403);
@@ -154,6 +152,20 @@ describe("joined-store billing isolation", () => {
           currentRole: role,
         });
       }
+
+      // The money-moving write gates on the "payouts" capability
+      // (requirePermission) alone — a "finance"/"admin" role passes this,
+      // but neither legacy staff nor manager (read-only) does. The GET
+      // finance reads below use requirePayoutsRead(), which additionally
+      // admits "manager" — covered by the two dedicated tests below instead
+      // of this shared staff/manager loop.
+      const payoutResult = await request("/api/finance/payout", "POST");
+      expect(payoutResult.status).toBe(403);
+      expect(payoutResult.body).toMatchObject({
+        code: "PERMISSION_REQUIRED",
+        requiredPermission: "payouts",
+        currentRole: role,
+      });
     },
   );
 
@@ -169,8 +181,8 @@ describe("joined-store billing isolation", () => {
       const result = await request(path);
       expect(result.status).toBe(403);
       expect(result.body).toMatchObject({
-        code: "ROLE_REQUIRED",
-        requiredRole: "manager",
+        code: "PERMISSION_REQUIRED",
+        requiredPermission: "payouts",
         currentRole: "staff",
       });
     }
