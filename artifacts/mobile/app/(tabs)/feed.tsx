@@ -27,6 +27,7 @@ import { Image as ExpoImage } from 'expo-image';
 import {
   enqueueEngagementRetry, isRetryableFailure, setEngagementRetryExecutor, startEngagementRetryQueuePump,
 } from '@/lib/engagementRetryQueue';
+import { computeJustDroppedDrops, type FollowedDrop } from '@/lib/justDroppedDrops';
 import type { ViewToken } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 import { useApi } from '@/lib/api';
@@ -38,7 +39,7 @@ import {
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM, GRID_MAX_WIDTH,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FeedSkeleton } from '@/components/BrandthreadUI';
+import { FeedSkeleton, PressableScale } from '@/components/BrandthreadUI';
 import { EmptyState, ListSkeleton, ResponsiveContainer } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
@@ -625,8 +626,75 @@ interface LiveStreamFeedItem {
   productTags: { productName: string; priceCents: number }[];
 }
 
+// ─── "Just dropped from brands you follow" rail ───────────────────────────────
+interface JustDroppedRailItem {
+  _isJustDropped: true;
+  id: string;
+  drops: FollowedDrop[];
+}
+function isJustDroppedItem(item: unknown): item is JustDroppedRailItem {
+  return !!item && typeof item === 'object' && (item as JustDroppedRailItem)._isJustDropped === true;
+}
+
 // Union of all possible displayable items in the FlatList
-type FeedItem = SpotlightItem | LiveStreamFeedItem | BuyerDemandPageItem;
+type FeedItem = SpotlightItem | LiveStreamFeedItem | BuyerDemandPageItem | JustDroppedRailItem;
+
+function JustDroppedRailPage({
+  drops, pageWidth, pageHeight, bottomClearance, onOpenDrop, onSeeAll,
+}: {
+  drops: FollowedDrop[];
+  pageWidth: number;
+  pageHeight: number;
+  bottomClearance: number;
+  onOpenDrop: (drop: FollowedDrop) => void;
+  onSeeAll: () => void;
+}) {
+  const { theme } = useAppTheme();
+  return (
+    <View style={{ width: pageWidth, height: pageHeight, backgroundColor: theme.background, justifyContent: 'center' }}>
+      <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text }}>Just dropped</Text>
+          <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 }}>From brands you follow</Text>
+        </View>
+        <PressableScale onPress={onSeeAll} accessibilityRole="button" accessibilityLabel="See all drops from brands you follow">
+          <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.accent }}>See all</Text>
+        </PressableScale>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: SP.md, gap: SP.sm }}>
+        {drops.map(drop => (
+          <PressableScale
+            key={drop.id}
+            onPress={() => onOpenDrop(drop)}
+            style={{ width: 160 }}
+            accessibilityRole="button"
+            accessibilityLabel={`${drop.name} by ${drop.sellerName}`}
+          >
+            <View style={{ width: 160, height: 200, borderRadius: RADIUS.lg, overflow: 'hidden', backgroundColor: theme.cardElevated }}>
+              {drop.heroImageUrl ? (
+                <CachedImage source={{ uri: drop.heroImageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+              ) : (
+                <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
+                  <Feather name="zap" size={28} color={theme.muted} />
+                </View>
+              )}
+              <View style={{ position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 3 }}>
+                <Text style={{ fontSize: 10, fontFamily: FONT.bold, color: '#fff' }}>
+                  {drop.releaseAt && new Date(drop.releaseAt).getTime() > Date.now() ? 'SOON' : 'LIVE'}
+                </Text>
+              </View>
+            </View>
+            <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginTop: 6 }} numberOfLines={1}>{drop.name}</Text>
+            <Text style={{ fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted }} numberOfLines={1}>{drop.sellerName}</Text>
+          </PressableScale>
+        ))}
+      </ScrollView>
+      <Text style={{ position: 'absolute', bottom: bottomClearance + 16, left: 0, right: 0, textAlign: 'center', fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted }}>
+        Swipe to keep browsing
+      </Text>
+    </View>
+  );
+}
 
 function LiveStreamPage({
   stream,
@@ -1545,7 +1613,7 @@ function SpotlightPage({
 
 // ─── Type guard for the feed union ───────────────────────────────────────────
 
-function isLiveStreamItem(item: SpotlightItem | LiveStreamFeedItem): item is LiveStreamFeedItem {
+function isLiveStreamItem(item: SpotlightItem | LiveStreamFeedItem | JustDroppedRailItem): item is LiveStreamFeedItem {
   return (item as LiveStreamFeedItem)._isLive === true;
 }
 
@@ -1867,6 +1935,27 @@ export default function FeedScreen({
     return () => clearInterval(id);
   }, []);
 
+  // "Just dropped from brands you follow" — real drops only: fetch the
+  // buyer's follow graph and the platform's currently-live drops, then
+  // intersect them client-side (no server change needed). Never shown if
+  // empty — this is a rail, not a placeholder.
+  const [justDroppedDrops, setJustDroppedDrops] = useState<FollowedDrop[]>([]);
+  useEffect(() => {
+    if (!isBuyerSurface) return;
+    let active = true;
+    Promise.all([
+      api.social.following().catch(() => []),
+      (api as any).publicDrops.list('live').catch(() => []),
+    ]).then(([followingRows, liveDrops]: [any[], any[]]) => {
+      if (!active) return;
+      setJustDroppedDrops(computeJustDroppedDrops(
+        Array.isArray(followingRows) ? followingRows : [],
+        Array.isArray(liveDrops) ? liveDrops : [],
+      ));
+    }).catch(() => { if (active) setJustDroppedDrops([]); });
+    return () => { active = false; };
+  }, [api, isBuyerSurface]);
+
   // Add engagement entries for newly loaded seller posts
   useEffect(() => {
     if (sellerFeedPosts.length === 0) return;
@@ -1894,17 +1983,22 @@ export default function FeedScreen({
     const previewPosts = __DEV__ && (buyerMode || showFashionPreview) && feedTab === 'for-you'
       ? FASHION_PREVIEW_POSTS
       : [];
-    const regular: (SpotlightItem | LiveStreamFeedItem)[] = [...previewPosts, ...sellerFeedPosts];
+    const regular: (SpotlightItem | LiveStreamFeedItem | JustDroppedRailItem)[] = [...previewPosts, ...sellerFeedPosts];
     if (feedTab === 'following') return regular;
+    // Weave the "Just dropped" rail in once, early (index 2) — a real,
+    // non-video page in the same vertical pager the live-stream cards use.
+    if (isBuyerSurface && justDroppedDrops.length > 0) {
+      regular.splice(Math.min(2, regular.length), 0, { _isJustDropped: true, id: 'just-dropped-rail', drops: justDroppedDrops });
+    }
     if (!activeLiveStreams.length) return regular;
     // Weave live streams in: first at index 4, then every 10 after
-    const result: (SpotlightItem | LiveStreamFeedItem)[] = [...regular];
+    const result: (SpotlightItem | LiveStreamFeedItem | JustDroppedRailItem)[] = [...regular];
     activeLiveStreams.slice(0, 3).forEach((liveItem, i) => {
       const insertAt = Math.min(4 + i * 10, result.length);
       result.splice(insertAt, 0, liveItem);
     });
     return result;
-  }, [sellerFeedPosts, activeLiveStreams, buyerMode, feedTab, showFashionPreview]);
+  }, [sellerFeedPosts, activeLiveStreams, buyerMode, feedTab, showFashionPreview, isBuyerSurface, justDroppedDrops]);
 
   // Every on-screen post's real engagement snapshot (server-backed likes/
   // saves/reposts/liked-by-me/saved-by-me), keyed by id. `engagements` state
@@ -1915,7 +2009,7 @@ export default function FeedScreen({
   const itemsById = useMemo(() => {
     const map = new Map<string, SpotlightItem>();
     for (const item of allItems) {
-      if (!isLiveStreamItem(item)) map.set(item.id, item);
+      if (!isLiveStreamItem(item) && !isJustDroppedItem(item)) map.set(item.id, item);
     }
     return map;
   }, [allItems]);
@@ -1963,6 +2057,7 @@ export default function FeedScreen({
   // filteredContentItems: regular spotlight/live items after search filter
   const filteredContentItems = searchQuery.trim()
     ? allItems.filter(item => {
+        if (isJustDroppedItem(item)) return false;
         const q = searchQuery.toLowerCase();
         if (isLiveStreamItem(item)) {
           return (item.brandName ?? item.sellerName).toLowerCase().includes(q) ||
@@ -2180,7 +2275,7 @@ export default function FeedScreen({
 
   function handleOpenComments(id: string) {
     const item = allItems.find(i => i.id === id);
-    if (!item || isLiveStreamItem(item)) return;
+    if (!item || isLiveStreamItem(item) || isJustDroppedItem(item)) return;
     // item.mediaUris[0] is already the fully-resolved, playable URI for both
     // real posts (server URL) and preview posts (FASHION_PREVIEW_VIDEO_URIS,
     // itself built via Asset.fromModule) — re-deriving it here from
@@ -2333,6 +2428,21 @@ export default function FeedScreen({
           // Buyer demand page — full-screen at index 0 in buyer mode
           if (isDemandPageItem(item as FeedItem)) {
             return <BuyerHighDemandPage pageWidth={pageWidth} pageHeight={pageHeight} bottomClearance={bottomClearance} topInset={buyerHeaderHeight} />;
+          }
+          if (isJustDroppedItem(item)) {
+            return (
+              <JustDroppedRailPage
+                drops={item.drops}
+                pageWidth={pageWidth}
+                pageHeight={pageHeight}
+                bottomClearance={bottomClearance}
+                onOpenDrop={(drop) => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push(`/buyer-drop-detail?dropId=${encodeURIComponent(drop.id)}&dropName=${encodeURIComponent(drop.name)}` as never);
+                }}
+                onSeeAll={() => router.push('/(tabs)/following' as never)}
+              />
+            );
           }
           if ((item as any)._isLive) {
             const live = item as unknown as LiveStreamFeedItem;
