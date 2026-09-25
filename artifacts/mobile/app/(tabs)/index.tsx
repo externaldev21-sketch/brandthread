@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { getSetupState, type SetupState } from '@/lib/setupStore';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { LoadingSkeleton } from '@/components/BrandthreadUI';
 import { SP, RADIUS, SCREEN_BG } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -31,7 +32,7 @@ const DEFAULT_SETUP: SetupState = {
 export default function SellerHomeScreen() {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const { userId } = useAuth();
+  const { userId, isLoaded, isSignedIn } = useAuth();
   const api = useApi();
 
   const [loading, setLoading] = useState(true);
@@ -51,12 +52,19 @@ export default function SellerHomeScreen() {
   }, [api, userId]);
 
   useEffect(() => {
-    if (!userId) {
+    if (!isLoaded || !isSignedIn || !userId) {
       setLoading(false);
       return;
     }
     void loadSetup();
-  }, [loadSetup, userId]);
+  }, [isLoaded, isSignedIn, loadSetup, userId]);
+
+  // AuthGate redirects signed-out native routes, but this screen can mount
+  // first on a deep link. Never mount seller request-making children until a
+  // Clerk session exists. Web's intentional design preview is unaffected.
+  if ((!isLoaded || !isSignedIn || !userId) && !isSellerDevPreview()) {
+    return <View style={styles.root} />;
+  }
 
   if (loading) {
     return (

@@ -57,7 +57,6 @@ import { createNotificationResponseHandler } from '@/lib/notificationNavigation'
 import { useCanUseMarketing } from '@/contexts/CookieConsentContext';
 import { setMarketingPixelConsent, trackMarketingPixelEvent } from '@/lib/marketingPixels';
 import { captureNotificationEvent, flushNotificationEvents } from '@/lib/notificationEventOutbox';
-import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
 import { getDevWebPreviewRole } from '@/lib/devPreview';
 import NotificationBanner from '@/components/notifications/NotificationBanner';
 import { showNotificationBanner } from '@/lib/notificationBannerBus';
@@ -197,7 +196,7 @@ const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
 // Renders the global seller tab bar + Studio radial menu when:
 //   1. SellerShellContext reports an active seller session (set by AuthGate after
 //      it resolves onboarding completion and role from AsyncStorage/server), OR
-//   2. The development seller preview is active on web or device (no Clerk required).
+//   2. The development seller preview is active on web (no Clerk required).
 //
 // AuthGate is the single authority that reads AsyncStorage and the server
 // profile. SellerBarGate consumes SellerShellContext — no parallel read.
@@ -212,9 +211,8 @@ function SellerBarGate() {
   const [studioOpenRequestKey, setStudioOpenRequestKey] = useState(0);
 
   // Preview navigation must not depend on Clerk or completed onboarding.
-  // PREVIEW_ROLE covers web; DEV_BYPASS_ROLE covers the Expo Go device preview
-  // and is null in production builds.
-  const isPreviewSeller = PREVIEW_ROLE === 'seller' || DEV_BYPASS_ROLE === 'seller';
+  // PREVIEW_ROLE is web-only; native seller chrome requires an active session.
+  const isPreviewSeller = PREVIEW_ROLE === 'seller';
 
   const showBar = isActiveSeller || isPreviewSeller;
 
@@ -306,13 +304,10 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
   document.body.style.backgroundColor = '#0A0A0B';
 }
 
-// ─── DEV design-preview bypass (web + dev builds only) ───────────────────────
+// ─── DEV design-preview bypass (web only) ─────────────────────────────────────
 // The default development web preview opens the populated seller workspace.
 // Explicit ?bt_preview=buyer and ?bt_preview=seller links switch preview roles.
-// The __DEV__ and web guards keep this inert on native and in production builds.
-// ─── DEV: bypass all auth + onboarding on every platform ─────────────────────
-// Set to 'buyer' or 'seller' to jump straight to that dashboard on device.
-// Set back to null when you're ready to test real sign-in.
+// The web guard keeps this inert on native builds. Expo Go follows real auth.
 const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST === '1';
 
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
@@ -329,13 +324,6 @@ if (PREVIEW_ROLE && typeof localStorage !== 'undefined') {
   localStorage.setItem('splash_seen', 'true');
   localStorage.setItem('onboarding_complete', 'true');
   localStorage.setItem('user_role', PREVIEW_ROLE);
-}
-if (DEV_BYPASS_ROLE && Platform.OS !== 'web') {
-  AsyncStorage.multiSet([
-    ['splash_seen', 'true'],
-    ['onboarding_complete', 'true'],
-    ['user_role', DEV_BYPASS_ROLE],
-  ]);
 }
 
 const queryClient = new QueryClient();
@@ -554,9 +542,8 @@ function AuthGate() {
       (inBuyerGroup && ['discover', 'search', 'cart'].includes((segments as string[])[1])) ||
       ['buyer-product-detail', 'buyer-checkout', 'seller-profile'].includes(segments[0] as string);
 
-    // DEV bypass (all platforms): skip auth and go straight to dashboard.
-    const devRole = PREVIEW_ROLE ?? DEV_BYPASS_ROLE;
-    if (devRole) {
+    // Review-only web preview. Never bypass authentication on Expo Go.
+    if (PREVIEW_ROLE) {
       // The index route handles the preview redirect after the root Stack has
       // mounted. Redirecting from this root-level effect races Expo Router's
       // initial navigator on web and produces a blank error screen.
@@ -1206,9 +1193,8 @@ export default function RootLayout() {
   return (
     <AppIntroSplash ready={appReady}>
       <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache} proxyUrl={proxyUrl}>
-        {PREVIEW_ROLE || DEV_BYPASS_ROLE ? (
-          // Development previews on web and device must not wait for Clerk
-          // before rendering their already-bypassed navigation tree.
+        {PREVIEW_ROLE ? (
+          // Web design preview renders without waiting for Clerk.
           appTree
         ) : (
           <>

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -166,6 +167,7 @@ export default function SellerHomeCommerceDashboard({
   onSetupStateChange: (next: SetupState) => void;
 }) {
   const router = useRouter();
+  const { isSignedIn } = useAuth();
   const api = useApi();
   const { theme } = useAppTheme();
   const { currentRole, isLoadingRole } = useTeamRole();
@@ -411,6 +413,7 @@ export default function SellerHomeCommerceDashboard({
   }, [loadSecondaryData]);
 
   const requestCashOut = useCallback(() => {
+    if (!isSignedIn) return;
     if (currentRole !== 'owner') {
       Alert.alert('Owner access required', 'Only the store owner can cash out earnings.');
       return;
@@ -525,7 +528,7 @@ export default function SellerHomeCommerceDashboard({
         },
       ],
     );
-  }, [api, currentRole, financeBalance, loadFinanceBalance, nav, userId]);
+  }, [api, currentRole, financeBalance, isSignedIn, loadFinanceBalance, nav, userId]);
 
   const openTask = useCallback((task: SetupTask) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -623,13 +626,15 @@ export default function SellerHomeCommerceDashboard({
             <View testID="seller-dashboard-scroll-position" accessibilityLabel="Seller dashboard scroll position" accessible>
               <Text style={[styles.screenTitle, { color: theme.text ?? FG }]}>Dashboard</Text>
             </View>
-            <ActivityBellButton
+            {sellerPreview && !isSignedIn ? (
+              <Text style={{ color: theme.muted }}>Design preview · no account</Text>
+            ) : <ActivityBellButton
               testID="seller-dashboard-activity"
               color={theme.text ?? FG}
               size={22}
               style={styles.topBarAction}
               badgeBorderColor={theme.background ?? BG}
-            />
+            />}
           </View>
 
           {!data && analyticsError ? (

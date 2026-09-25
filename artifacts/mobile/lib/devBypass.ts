@@ -1,5 +1,5 @@
 /**
- * Temporary development-only entry bypass for Expo device testing.
- * Set to null when real sign-in and onboarding should be tested again.
+ * Native Expo Go always uses real Clerk authentication and onboarding.
+ * Review-only, unauthenticated preview navigation is confined to dev web.
  */
-export const DEV_BYPASS_ROLE: 'buyer' | 'seller' | null = __DEV__ ? 'seller' : null;
+export const DEV_BYPASS_ROLE: 'buyer' | 'seller' | null = null;
