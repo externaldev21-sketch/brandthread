@@ -24,6 +24,9 @@ import { BlurView } from 'expo-blur';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
 import { Asset } from 'expo-asset';
 import { Image as ExpoImage } from 'expo-image';
+import {
+  enqueueEngagementRetry, isRetryableFailure, setEngagementRetryExecutor, startEngagementRetryQueuePump,
+} from '@/lib/engagementRetryQueue';
 import type { ViewToken } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 import { useApi } from '@/lib/api';
@@ -1922,6 +1925,41 @@ export default function FeedScreen({
     return item ? initialEngagement(item) : DEFAULT_ENGAGEMENT;
   }, [itemsById]);
 
+  // Offline-safe retry: the optimistic engagement state above already
+  // updates instantly on every tap; this replays the actual persistence
+  // call once connectivity returns, for whichever like/save/repost/follow
+  // couldn't reach the server the first time. Re-registered whenever `api`
+  // changes identity so the executor always calls through the live client.
+  useEffect(() => {
+    setEngagementRetryExecutor(async (action) => {
+      switch (action.kind) {
+        case 'like':
+          await api.posts.interact(action.targetId, { type: 'like', value: action.payload?.value as string | undefined });
+          break;
+        case 'repost':
+          await api.posts.interact(action.targetId, { type: 'repost', value: action.payload?.value as string | undefined });
+          break;
+        case 'save':
+          if (action.payload?.value === 'remove') {
+            await api.buyer.saved.remove(action.targetId);
+          } else {
+            const item = itemsById.get(action.targetId);
+            const title = item?.caption?.trim() || `${item?.creator ?? 'Post'}'s post`;
+            await api.buyer.saved.save({ type: 'post', targetId: action.targetId, title, subtitle: item?.creator, accentColor: item?.accentColor });
+          }
+          break;
+        case 'follow':
+          await setSellerFollowing(action.targetId, action.payload?.value !== 'unfollow');
+          break;
+        case 'not_interested':
+          await api.posts.interact(action.targetId, { type: 'not_interested' });
+          break;
+      }
+    });
+    return () => setEngagementRetryExecutor(null);
+  }, [api, itemsById]);
+  useEffect(() => startEngagementRetryQueuePump(), []);
+
   // filteredContentItems: regular spotlight/live items after search filter
   const filteredContentItems = searchQuery.trim()
     ? allItems.filter(item => {
@@ -1967,10 +2005,14 @@ export default function FeedScreen({
       try {
         const { api: _api } = require('@/lib/api');
         await _api.posts.interact(id, { type: 'like', value: willLike ? 'add' : 'remove' });
-      } catch {
-        // Rollback on failure
-        update(id, () => ({ liked: snapshot.liked, likes: snapshot.likes }));
-        showToast('Could not update like. Try again.', 'error');
+      } catch (error) {
+        if (isRetryableFailure(error)) {
+          // Offline/server outage — keep the optimistic state and replay once connectivity returns.
+          void enqueueEngagementRetry({ kind: 'like', targetId: id, payload: { value: willLike ? 'add' : 'remove' } });
+        } else {
+          update(id, () => ({ liked: snapshot.liked, likes: snapshot.likes }));
+          showToast('Could not update like. Try again.', 'error');
+        }
       }
     }
   }, [engagements, engagementFor, showToast]);
@@ -2008,10 +2050,13 @@ export default function FeedScreen({
         } else {
           await _api.buyer.saved.remove(id);
         }
-      } catch {
-        // Rollback
-        update(id, () => ({ saved: snapshot.saved, saves: snapshot.saves }));
-        showToast('Could not update save. Try again.', 'error');
+      } catch (error) {
+        if (isRetryableFailure(error)) {
+          void enqueueEngagementRetry({ kind: 'save', targetId: id, payload: { value: willSave ? 'add' : 'remove' } });
+        } else {
+          update(id, () => ({ saved: snapshot.saved, saves: snapshot.saves }));
+          showToast('Could not update save. Try again.', 'error');
+        }
       }
     }
   }, [engagements, engagementFor, itemsById, showToast]);
@@ -2048,10 +2093,14 @@ export default function FeedScreen({
           }));
         }
         if (result.action === 'added') await showRepostEducationOnce();
-      } catch {
-        // Rollback
-        update(id, () => ({ reposted: snapshot.reposted, reposts: snapshot.reposts }));
-        showToast('Could not repost. Try again.', 'error');
+      } catch (error) {
+        if (isRetryableFailure(error)) {
+          void enqueueEngagementRetry({ kind: 'repost', targetId: id, payload: { value: willRepost ? undefined : 'remove' } });
+          if (willRepost) await showRepostEducationOnce();
+        } else {
+          update(id, () => ({ reposted: snapshot.reposted, reposts: snapshot.reposts }));
+          showToast('Could not repost. Try again.', 'error');
+        }
       }
     } else if (willRepost) {
       await showRepostEducationOnce();
@@ -2080,7 +2129,11 @@ export default function FeedScreen({
           : engagement,
       ])));
       if (feedTab === 'following' && !state.isFollowing) void loadFeed();
-    } catch {
+    } catch (error) {
+      if (isRetryableFailure(error)) {
+        void enqueueEngagementRetry({ kind: 'follow', targetId: sellerId, payload: { value: wasFollowing ? 'unfollow' : undefined } });
+        return;
+      }
       // Rollback
       setEngagements(prev => Object.fromEntries(Object.entries(prev).map(([postId, engagement]) => [
         postId,
@@ -2099,7 +2152,9 @@ export default function FeedScreen({
   const handleNotInterested = useCallback((id: string) => {
     setSellerFeedPosts(prev => prev.filter(post => post.id !== id));
     if (/^[0-9a-f-]{36}$/i.test(id)) {
-      void api.posts.interact(id, { type: 'not_interested' }).catch(() => {});
+      void api.posts.interact(id, { type: 'not_interested' }).catch((error) => {
+        if (isRetryableFailure(error)) void enqueueEngagementRetry({ kind: 'not_interested', targetId: id });
+      });
     }
     showToast('We’ll show you fewer posts like this.', 'info');
   }, [api, showToast]);
