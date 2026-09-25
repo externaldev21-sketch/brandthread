@@ -174,6 +174,10 @@ vi.mock('@/components/BrandthreadUI', () => ({
         : null,
     ]);
   },
+  PressableScale: (props: Record<string, unknown>) => {
+    const React = require('react');
+    return React.createElement('TouchableOpacity', props, props.children as React.ReactNode);
+  },
 }));
 
 vi.mock('@/components/buy-now/BuyNowFlow', () => ({
