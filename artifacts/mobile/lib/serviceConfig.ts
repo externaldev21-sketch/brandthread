@@ -25,6 +25,38 @@ let _resolveConfigured: (() => void) | null = null;
  * layout's effect wires auth in (child effects run first). Wait briefly for
  * configuration instead of failing the first request.
  */
+/**
+ * Every request gets a hard ceiling so a hung connection (dead server, black
+ * hole route) always resolves into an error the caller can show instead of
+ * leaving a screen's loading state stuck forever.
+ */
+const REQUEST_TIMEOUT_MS = 15_000;
+
+/**
+ * fetch() with a hard timeout. A plain fetch() never rejects or resolves on
+ * its own if the connection just hangs — AbortController is the only way to
+ * bound it. A timeout surfaces as ApiError(408) so it flows through the same
+ * classification/retry path as a real server timeout.
+ */
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number = REQUEST_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new ApiError(408, JSON.stringify({ error: { message: 'Request timed out. Please try again.', code: 'timeout' } }));
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function whenConfigured(timeoutMs = 8_000): Promise<void> {
   if (_getToken) return Promise.resolve();
   _configured ??= new Promise<void>((resolve) => { _resolveConfigured = resolve; });
@@ -57,7 +89,7 @@ export async function serviceRequest<T = unknown>(
   const base = process.env.EXPO_PUBLIC_API_BASE_URL ?? "";
   let res: Response;
   try {
-    res = await fetch(`${base}${versionApiPath(path)}`, {
+    res = await fetchWithTimeout(`${base}${versionApiPath(path)}`, {
       ...options,
       headers: {
         "Content-Type": "application/json",

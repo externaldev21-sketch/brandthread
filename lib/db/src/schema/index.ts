@@ -69,6 +69,17 @@ export const users = pgTable('users', {
   sellerShipFromCountry: text('seller_ship_from_country').notNull().default('US'),
   // Public profile link (bio website)
   website: text('website'),
+  // Seller storefront metadata (Edit Profile — Store Details section)
+  category:     text('category'),
+  tags:         json('tags').$type<string[]>().notNull().default([]),
+  location:     text('location'),
+  socialLinks:  json('social_links').$type<Record<string, string>>().notNull().default({}),
+  contactEmail: text('contact_email'),
+  // Seller-uploaded storefront logo / banner. Same object-storage-path pattern
+  // as profileImageUrl — resolved to a signed URL on read, never overwritten
+  // by a later Clerk sync.
+  logoUrl:   text('logo_url'),
+  bannerUrl: text('banner_url'),
   // Unique @handle (letters, numbers, underscores; 3–30 chars). Nullable so
   // existing rows are unaffected; the DB-level unique index enforces platform-wide uniqueness.
   username: text('username').unique(),
