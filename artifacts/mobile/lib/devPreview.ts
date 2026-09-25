@@ -5,8 +5,9 @@
  *   - Inert (returns false) in production builds (__DEV__ === false)
  *   - Inert on native (Platform.OS !== 'web')
  *   - Inert when window is unavailable (SSR / test environments without window)
- *   - false when ?bt_preview=buyer (buyer review mode)
- *   - true  for the default dev web seller preview (no param, or ?bt_preview=seller)
+ *   - true  only when ?bt_preview=seller is explicitly set
+ *   - false otherwise, including when no bt_preview param is present at all
+ *     (no query param must mean the real signed-in experience, never fake data)
  *
  * Pure / testable: accepts an optional override for the search string so unit
  * tests can exercise every branch without touching the global window object.
@@ -19,7 +20,8 @@
 import { Platform } from 'react-native';
 
 /**
- * Returns true only in the dev-web seller preview context.
+ * Returns true only in the dev-web seller preview context, and only when
+ * explicitly requested via ?bt_preview=seller.
  *
  * @param searchOverride  Optional query string (e.g. '?bt_preview=buyer')
  *   supplied by tests instead of reading window.location.search.
@@ -38,12 +40,9 @@ export function isSellerDevPreview(searchOverride?: string): boolean {
     search = window.location.search;
   }
 
-  // ?bt_preview=buyer → this is a buyer review session, not a seller preview
+  // Only an explicit ?bt_preview=seller opts into fake preview data.
   const v = new URLSearchParams(search).get('bt_preview');
-  if (v === 'buyer') return false;
-
-  // Default (no param) or ?bt_preview=seller → seller preview
-  return true;
+  return v === 'seller';
 }
 
 /**

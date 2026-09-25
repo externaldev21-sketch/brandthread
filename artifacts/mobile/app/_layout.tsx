@@ -316,18 +316,17 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 }
 
 // ─── DEV design-preview bypass (web + dev builds only) ───────────────────────
-// The development web preview defaults to the buyer experience and skips the
-// Clerk/onboarding gates. ?bt_preview=seller remains available for seller review.
-// This is inert on native and in production builds.
-// ─── DEV: bypass all auth + onboarding on every platform ─────────────────────
-// Set to 'buyer' or 'seller' to jump straight to that dashboard on device.
-// Set back to null when you're ready to test real sign-in.
+// Explicitly opt in with ?bt_preview=buyer or ?bt_preview=seller in the URL to
+// skip the Clerk/onboarding gates and jump straight to that dashboard for
+// design review. Without the query param, web behaves like every other
+// platform: real splash -> sign-up -> onboarding. Inert in production builds.
 const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST === '1';
 
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
   if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web' || typeof window === 'undefined') return null;
   const v = new URLSearchParams(window.location.search).get('bt_preview');
-  return v === 'seller' ? 'seller' : 'buyer';
+  if (v !== 'buyer' && v !== 'seller') return null;
+  return v;
 })();
 
 // Seed storage so AuthGate doesn't loop waiting on onboarding data.
