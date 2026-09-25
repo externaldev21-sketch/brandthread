@@ -18,6 +18,7 @@ import StripeConnectWarning, { ConnectStatus, normalizeConnectStatus } from '@/c
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskWhen } from '@/lib/setupCompletion';
+import { scheduleLabel, requirementLabel, taxInfoConfig } from '@/lib/payoutSetup';
 
 type PayoutStatus = 'paid' | 'pending' | 'in_transit' | 'failed';
 
@@ -192,7 +193,11 @@ export default function PayoutsScreen() {
       <Header
         title="Payouts"
         onBack={() => { haptic(); leaveSetupDestination(); }}
-        actions={[{ icon: 'help-circle', onPress: () => {}, accessibilityLabel: 'Help' }]}
+        actions={[{
+          icon: 'help-circle',
+          onPress: () => { haptic(); router.push('/help' as never); },
+          accessibilityLabel: 'Payouts help',
+        }]}
       />
 
       {/* Balance cards */}
@@ -315,6 +320,75 @@ export default function PayoutsScreen() {
                 </Text>
              </TouchableOpacity>
            )}
+
+           {/* Verification status + next steps */}
+           {!connectLoading && connectStatus?.connected && !connectStatus.verified && connectStatus.providerConfigured && (
+             <View style={styles.settingsSection} testID="seller-payouts-verification-next-steps">
+               <Text style={styles.sectionTitle}>Next steps to get verified</Text>
+               {connectStatus.requirementsDue.length === 0 ? (
+                 <Text style={styles.bankSub}>
+                   Stripe is reviewing your account. This usually finishes within a few minutes.
+                 </Text>
+               ) : (
+                 connectStatus.requirementsDue.map((field) => (
+                   <View key={field} style={styles.settingsRow}>
+                     <Text style={styles.settingsLabel}>{requirementLabel(field)}</Text>
+                     <Feather name="alert-circle" size={14} color={ORANGE} />
+                   </View>
+                 ))
+               )}
+               {!isReadOnly && (
+                 <TouchableOpacity
+                   style={[styles.addBankBtn, { marginTop: SP.md }]}
+                   onPress={() => { haptic(); void openConnectOnboarding(); }}
+                   disabled={isConnecting}
+                   accessibilityRole="button"
+                   accessibilityLabel="Finish Stripe verification"
+                 >
+                   <Feather name="arrow-right-circle" size={16} color={theme.accent} />
+                   <Text style={styles.addBankText}>Finish verification</Text>
+                 </TouchableOpacity>
+               )}
+             </View>
+           )}
+
+           {/* Payout method + schedule */}
+           <View style={styles.settingsSection} testID="seller-payouts-schedule">
+             <Text style={styles.sectionTitle}>Payout method &amp; schedule</Text>
+             <View style={styles.settingsRow}>
+               <Text style={styles.settingsLabel}>Method</Text>
+               <Text style={styles.settingsValue}>
+                 {connectStatus?.bankLast4 ? `Bank transfer ···${connectStatus.bankLast4}` : 'Not set up'}
+               </Text>
+             </View>
+             <View style={styles.settingsRow}>
+               <Text style={styles.settingsLabel}>Schedule</Text>
+               <Text style={styles.settingsValue}>
+                 {connectLoading ? 'Loading…' : scheduleLabel(connectStatus?.payoutSchedule ?? null)}
+               </Text>
+             </View>
+           </View>
+
+           {/* Tax info status */}
+           {connectStatus?.connected && connectStatus.providerConfigured && (() => {
+             const cfg = taxInfoConfig(connectStatus.taxInfoStatus, theme);
+             return (
+               <View style={styles.settingsSection} testID="seller-payouts-tax-info">
+                 <Text style={styles.sectionTitle}>Tax information</Text>
+                 <View style={styles.settingsRow}>
+                   <Text style={styles.settingsLabel}>Status</Text>
+                   <View style={[styles.statusPill, { backgroundColor: `${cfg.color}20` }]}>
+                     <Text style={[styles.statusText, { color: cfg.color }]}>{cfg.label}</Text>
+                   </View>
+                 </View>
+                 {connectStatus.taxInfoStatus === 'needed' && (
+                   <Text style={[styles.bankSub, { marginTop: SP.xs }]}>
+                     Stripe needs your tax ID to keep paying out without interruption.
+                   </Text>
+                 )}
+               </View>
+             );
+           })()}
         </ScrollView>
       )}
     </View>
