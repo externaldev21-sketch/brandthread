@@ -15,6 +15,7 @@
     "update:production": "node scripts/eas-update.js --channel production",
     "update:rollback": "eas update:rollback",
     "screenshots": "node scripts/store-screenshots/capture.mjs",
+    "walkthrough:onboarding": "node scripts/onboarding-walkthrough/capture.mjs",
     "serve": "node server/serve.js",
     "test": "vitest run",
     "test:navigation:web": "node tests/navigation-scene-isolation.web.mjs",

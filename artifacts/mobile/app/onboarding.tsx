@@ -155,6 +155,7 @@ const SELLER_LOADING_STEPS = ['Mapping your brand workspace', 'Preparing your pr
 const LEGACY_DRAFT_KEY = 'onboarding_draft';
 const DRAFT_KEY_PREFIX = 'onboarding_draft:';
 const PENDING_FLOW_KEY = 'onboarding_pending_flow';
+const PENDING_USERNAME_KEY = 'onboarding_pending_username';
 // Draft version, step index objects and cross-version migration now live in
 // lib/onboardingFlow.ts (imported above) — this file only renders steps.
 
@@ -734,11 +735,12 @@ function BuyerAuthStep({
             const referralQuery = referralCode
               ? `&referralCode=${encodeURIComponent(referralCode)}`
               : '';
-            const url = decorateUrl(`/onboarding?postAuth=1${referralQuery}`);
+            const destination = `/onboarding?postAuth=1${referralQuery}`;
+            const url = decorateUrl(destination);
             if (url.startsWith('http') && typeof window !== 'undefined') {
               window.location.href = url;
             } else {
-              router.replace('/onboarding' as never);
+              router.replace(destination as never);
             }
           },
         });
@@ -1822,6 +1824,14 @@ export default function OnboardingScreen() {
   const [firstName, setFirstName]         = useState('');
   const [lastName, setLastName]           = useState('');
   const [username, setUsername]           = useState('');
+  // The username is chosen on the Auth step, before the Clerk account exists,
+  // so the user-scoped draft (which needs user.id) can't persist it yet. Mirror
+  // it into a device-scoped key immediately so a remount during/after email
+  // verification (e.g. the postAuth web redirect) can't silently drop it.
+  const updateUsername = useCallback((value: string) => {
+    setUsername(value);
+    void AsyncStorage.setItem(PENDING_USERNAME_KEY, value).catch(() => {});
+  }, []);
   const [referralCode, setReferralCode]   = useState(
     typeof referralCodeParam === 'string'
       ? referralCodeParam.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12)
@@ -1903,9 +1913,11 @@ export default function OnboardingScreen() {
         const values = await AsyncStorage.multiGet([
           ...(draftKey ? [draftKey] : []),
           PENDING_FLOW_KEY,
+          PENDING_USERNAME_KEY,
         ]);
         const draftVal = draftKey ? values.find(([key]) => key === draftKey)?.[1] : null;
         const pendingFlow = values.find(([key]) => key === PENDING_FLOW_KEY)?.[1];
+        const pendingUsername = values.find(([key]) => key === PENDING_USERNAME_KEY)?.[1];
 
         if (draftVal) {
           try {
@@ -1933,6 +1945,12 @@ export default function OnboardingScreen() {
               ? pendingFlow === 'buyer' ? BUYER_STEP_INDEX.NAME : SELLER_STEP_INDEX.NAME
               : pendingFlow === 'buyer' ? BUYER_STEP_INDEX.AUTH : SELLER_STEP_INDEX.AUTH,
           );
+        }
+        // The Auth step's typed username lives only in this component's state
+        // until a Clerk user exists to key the per-user draft. A remount before
+        // then (e.g. the web postAuth redirect) would otherwise lose it silently.
+        if (pendingUsername) {
+          setUsername((current) => current || pendingUsername);
         }
       } catch {
         // Local persistence is optional; a storage issue must not block signup.
@@ -2157,7 +2175,7 @@ export default function OnboardingScreen() {
         ['onboarding_style_interests', JSON.stringify(styleInterests)],
       ]);
       await AsyncStorage.multiRemove([draftKeyForUser(profile.clerkId)!, LEGACY_DRAFT_KEY]);
-      await AsyncStorage.removeItem(PENDING_FLOW_KEY);
+      await AsyncStorage.multiRemove([PENDING_FLOW_KEY, PENDING_USERNAME_KEY]);
       void registerGrantedPushToken(profile.clerkId, api);
       // Route to the feed explainer for first-time buyers
       router.replace('/thread-explainer' as never);
@@ -2249,7 +2267,7 @@ export default function OnboardingScreen() {
         ['onboarding_selected_plan', selectedPlanId],
       ]);
       await AsyncStorage.multiRemove([draftKeyForUser(profile.clerkId)!, LEGACY_DRAFT_KEY]);
-      await AsyncStorage.removeItem(PENDING_FLOW_KEY);
+      await AsyncStorage.multiRemove([PENDING_FLOW_KEY, PENDING_USERNAME_KEY]);
       void registerGrantedPushToken(profile.clerkId, api);
       api.ai.brandMemoryRebuild().catch(() => {});
       router.replace('/(tabs)/' as never);
@@ -2275,7 +2293,7 @@ export default function OnboardingScreen() {
   async function devReset() {
     try { if (isSignedIn) await signOut(); } catch {}
     await AsyncStorage.multiRemove([
-      ONBOARDING_KEY, ONBOARDING_OWNER_KEY, 'user_role', LEGACY_DRAFT_KEY, PENDING_FLOW_KEY,
+      ONBOARDING_KEY, ONBOARDING_OWNER_KEY, 'user_role', LEGACY_DRAFT_KEY, PENDING_FLOW_KEY, PENDING_USERNAME_KEY,
       ...(user?.id ? [draftKeyForUser(user.id)!] : []),
       'onboarding_first_name', 'onboarding_brand_name',
       'onboarding_style_interests', 'splash_seen',
@@ -2365,7 +2383,7 @@ export default function OnboardingScreen() {
             onAuthComplete={handleAuthComplete}
             onDevClear={devReset}
             username={username}
-            onUsernameChange={setUsername}
+            onUsernameChange={updateUsername}
             referralCode={referralCode}
             onReferralCodeChange={setReferralCode}
             onFirstNamePrefill={setFirstName}
@@ -2463,7 +2481,7 @@ export default function OnboardingScreen() {
             onAuthComplete={handleAuthComplete}
             onDevClear={devReset}
             username={username}
-            onUsernameChange={setUsername}
+            onUsernameChange={updateUsername}
             referralCode={referralCode}
             onReferralCodeChange={setReferralCode}
             onFirstNamePrefill={setFirstName}
