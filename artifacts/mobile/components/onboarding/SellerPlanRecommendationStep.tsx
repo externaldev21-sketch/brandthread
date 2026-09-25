@@ -66,7 +66,7 @@ export function SellerPlanRecommendationStep({
               <View style={styles.features}>
                 {plan.features.map((feature) => (
                   <View key={feature} style={styles.featureRow}>
-                    <Feather name="check" size={13} color={selected ? theme.accentLight : '#34D399'} />
+                    <Feather name="check" size={13} color={selected ? theme.accentLight : theme.muted} />
                     <Text style={styles.feature}>{feature}</Text>
                   </View>
                 ))}
@@ -87,14 +87,14 @@ export function SellerPlanRecommendationStep({
 }
 const styles = StyleSheet.create({
   root: { flexGrow: 1, paddingTop: 8, paddingBottom: 40 },
-  eyebrow: { fontSize: 11, fontFamily: 'Inter_700Bold', letterSpacing: 1.2, marginBottom: 6 },
-  title: { color: '#FFF', fontSize: 28, lineHeight: 34, fontFamily: 'Inter_700Bold', letterSpacing: -0.7 },
+  eyebrow: { fontSize: 11, fontFamily: 'Inter_700Bold', letterSpacing: 2.4, marginBottom: 8 },
+  title: { color: '#FFF', fontSize: 36, lineHeight: 40, fontFamily: 'Inter_700Bold', letterSpacing: -1.2 },
   reason: { color: 'rgba(255,255,255,0.72)', fontSize: 14, lineHeight: 21, fontFamily: 'Inter_500Medium', marginTop: 8 },
   guidance: { color: 'rgba(255,255,255,0.45)', fontSize: 12, lineHeight: 18, fontFamily: 'Inter_400Regular', marginTop: 6 },
   trialBadge: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, marginTop: 12 },
   trialBadgeText: { fontSize: 11, fontFamily: 'Inter_700Bold', letterSpacing: 0.3 },
   planRow: { gap: 10, paddingVertical: 18 },
-  card: { width: '100%', minHeight: 340, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.11)', backgroundColor: 'rgba(255,255,255,0.045)', padding: 16 },
+  card: { width: '100%', minHeight: 340, borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.11)', backgroundColor: 'rgba(255,255,255,0.045)', padding: 16 },
   badgeRow: { minHeight: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   badge: { flexDirection: 'row', gap: 5, alignItems: 'center', borderRadius: 20, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
   badgeText: { fontSize: FS.xs, fontFamily: 'Inter_700Bold', letterSpacing: 0.5 },
@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
   features: { gap: 9, marginTop: 14 },
   featureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   feature: { flex: 1, color: 'rgba(255,255,255,0.78)', fontSize: 12, lineHeight: 17, fontFamily: 'Inter_400Regular' },
-  continue: { borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
-  continueText: { fontSize: 15, fontFamily: 'Inter_700Bold' },
+  continue: { borderRadius: 999, minHeight: 56, justifyContent: 'center', alignItems: 'center' },
+  continueText: { fontSize: 16, fontFamily: 'Inter_700Bold' },
   chargeNote: { color: 'rgba(255,255,255,0.35)', fontSize: 11, textAlign: 'center', marginTop: 6, fontFamily: 'Inter_400Regular' },
 });
