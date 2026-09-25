@@ -2079,6 +2079,23 @@ export default function OnboardingScreen() {
   }
 
   // ── Finish handlers ─────────────────────────────────────────────────────────
+  // A username can be taken between the Auth step and final submit (another
+  // signup wins the race, or the same handle is reused after a partial retry).
+  // Blindly retrying the save would fail identically forever, so this case is
+  // routed back to the Auth step instead of the generic "try again" alert.
+  function isUsernameTakenError(error: unknown): boolean {
+    return error instanceof ApiError && error.status === 409 && /username/i.test(error.message);
+  }
+
+  function returnToAuthForUsernameConflict(targetStep: number) {
+    setFinishing(false);
+    Alert.alert(
+      'Username taken',
+      'That username was just taken by someone else. Please choose another.',
+      [{ text: 'Choose another', onPress: () => transitionTo(targetStep, -1) }],
+    );
+  }
+
   function logBuyerOnboardingFailure(stage: string, error: unknown, retryAttempt: boolean) {
     const apiError = error instanceof ApiError ? error : null;
     console.error('[buyer-onboarding] save failed', {
@@ -2151,6 +2168,10 @@ export default function OnboardingScreen() {
         error,
         retryAttempt,
       );
+      if (isUsernameTakenError(error)) {
+        returnToAuthForUsernameConflict(BUYER_STEP_INDEX.AUTH);
+        return;
+      }
       if (
         retryAttempt
         && failureStage === 'preferences-or-completion'
@@ -2232,12 +2253,20 @@ export default function OnboardingScreen() {
       void registerGrantedPushToken(profile.clerkId, api);
       api.ai.brandMemoryRebuild().catch(() => {});
       router.replace('/(tabs)/' as never);
-    } catch {
+    } catch (error) {
       setFinishing(false);
+      console.error('[seller-onboarding] save failed', {
+        name: error instanceof Error ? error.name : typeof error,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      if (isUsernameTakenError(error)) {
+        returnToAuthForUsernameConflict(SELLER_STEP_INDEX.AUTH);
+        return;
+      }
       Alert.alert(
         'Setup incomplete',
         "We couldn\u2019t save your brand profile. Check your connection and try again.",
-        [{ text: 'Retry', onPress: finishSeller }],
+        [{ text: 'Retry', onPress: () => { void finishSeller(); } }],
       );
     }
   }
