@@ -294,6 +294,8 @@ export default function UsersScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  headerActions: { flexDirection: 'row', gap: 8 },
+  headerBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   userRow: {
     flexDirection: 'row',
     alignItems: 'center',
