@@ -40,6 +40,7 @@ import cartDbRouter from "./cart-db";
 import notificationsFeedRouter from "./notifications-feed";
 import notificationPrefsRouter from "./notification-prefs";
 import postsRouter from "./posts";
+import feedRouter from "./feed";
 import reportsRouter from "./reports";
 import postCommentsRouter from "./post-comments";
 import moderationRouter from "./moderation";
@@ -167,6 +168,7 @@ router.use("/reviews",                   tc, reviewsRouter);
 // ahead of the team-context posts router.
 router.use("/posts",                     postCommentsRouter);
 router.use("/posts",                     tc, postsRouter);
+router.use("/feed",                      feedRouter); // buyer-scoped (For You ranking + event ingestion); no tc
 router.use("/reports",                   reportsRouter);
 router.use("/moderation",                moderationRouter);
 router.use("/safety",                    safetyRouter);

@@ -73,6 +73,7 @@ vi.mock("@workspace/db", () => {
     blocks:                table("blocks"),
     mutedWords:            table("mutedWords"),
     reports:               table("reports"),
+    searchLog:             table("searchLog"),
   };
 });
 
@@ -110,6 +111,7 @@ beforeEach(() => {
 describe("search empty-state endpoints", () => {
   it("returns trending categories and brands", async () => {
     state.selectQueue = [
+      [], // loggedTrending (below the minimum, falls back to category/follower approximation)
       [{ category: "apparel", count: 12 }, { category: "accessories", count: 4 }], // topCategories
       [{ sellerId: "seller-1", followerCount: 9 }], // topBrands
       [{ clerkId: "seller-1", displayName: "Seller One", brandName: "Brand One" }], // brandRows
@@ -129,7 +131,7 @@ describe("search empty-state endpoints", () => {
   });
 
   it("returns an empty trending list gracefully when there is no data yet", async () => {
-    state.selectQueue = [[], [], []];
+    state.selectQueue = [[], [], []]; // loggedTrending, topCategories, topBrands (brandRows fetch skipped: no brands)
     const response = await fetch(`${base}/api/public/search/trending`);
     const body = await response.text();
     expect(response.status, body).toBe(200);
