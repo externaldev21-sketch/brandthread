@@ -1,24 +1,27 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, FlatList, ScrollView, TouchableOpacity,
+  View, Text, FlatList, ScrollView,
   Alert, StyleSheet,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
-import { FONT, FS, SP, ICON } from '@/lib/theme';
-import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { useColors } from '@/hooks/useColors';
+import { FONT, ICON } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   getNotifications, markNotificationRead, markNotificationUnread,
   deleteNotification, muteNotificationCategory, clearAllReadNotifications,
   subscribeSocial,
 } from '@/services/socialService';
 import type { Notification, NotificationCategory } from '@/services/socialTypes';
-import { BrandedLoadingState, EmptyState, ThreadDivider } from '@/components/BrandthreadUI';
+import { BrandedLoadingState, EmptyState, PressableScale, ThreadDivider } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { Chip } from '@/components/ui/Chip';
+import { BottomSheet, Chip, ListRow } from '@/components/ui';
+import { TYPE_SCALE } from '@/constants/typography';
+import { SPACING } from '@/constants/spacing';
+import { RADII } from '@/constants/radii';
+import { hapticDestructiveConfirm, hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
 import SwipeActionRow from '@/components/SwipeActionRow';
 import { useApi } from '@/lib/api';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
@@ -96,7 +99,10 @@ function notifIcon(type: Notification['type']): string {
   }
 }
 
-function notifIconColor(cat: NotificationCategory, theme: AppThemePreset, mutedForeground: string): string {
+function notifIconColor(
+  cat: NotificationCategory,
+  theme: { accent: string; accentLight: string; success: string; warning: string; muted: string },
+): string {
   switch (cat) {
     case 'social': return theme.accent;
     case 'orders': return theme.accentLight;
@@ -104,8 +110,8 @@ function notifIconColor(cat: NotificationCategory, theme: AppThemePreset, mutedF
     case 'seller_updates': return theme.success;
     case 'products': return theme.warning;
     case 'marketing': return theme.warning;
-    case 'system': return mutedForeground;
-    default: return mutedForeground;
+    case 'system': return theme.muted;
+    default: return theme.muted;
   }
 }
 
@@ -214,8 +220,7 @@ type ListItem =
 
 export default function BuyerNotifications() {
   const { theme } = useAppTheme();
-  const colors = useColors();
-  const styles = makeStyles(theme, colors);
+  const styles = makeStyles();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
@@ -224,15 +229,22 @@ export default function BuyerNotifications() {
   const [notifs, setNotifs] = useState<Notification[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<NotificationCategory | undefined>(undefined);
   const [notifLoading, setNotifLoading] = useState(true);
+  const [optionsFor, setOptionsFor] = useState<Notification | null>(null);
+
+  // Only the very first load shows the full-screen loader. Focus refocuses and
+  // realtime socket events after that refresh the list silently so the loader
+  // doesn't flash over content that's already on screen.
+  const hasLoadedOnce = useRef(false);
 
   const loadNotifs = useCallback(async () => {
-    setNotifLoading(true);
+    if (!hasLoadedOnce.current) setNotifLoading(true);
     try {
       const data = await getNotifications();
       setNotifs(data);
       void syncNotificationBadge(data);
     } catch (_) {
     } finally {
+      hasLoadedOnce.current = true;
       setNotifLoading(false);
     }
   }, []);
@@ -242,7 +254,7 @@ export default function BuyerNotifications() {
   useEffect(() => {
     const unsub = subscribeSocial(() => loadNotifs());
     return unsub;
-  }, []);
+  }, [loadNotifs]);
 
   const filtered = selectedCategory
     ? notifs.filter(n => n.category === selectedCategory && !n.isMuted)
@@ -262,6 +274,7 @@ export default function BuyerNotifications() {
   }
 
   const handleTap = async (notif: Notification) => {
+    hapticPrimaryAction();
     void captureNotificationEvent(api, user?.id, {
       notificationId: notif.id,
       eventType: 'tap',
@@ -275,36 +288,41 @@ export default function BuyerNotifications() {
   };
 
   const handleLongPress = (notif: Notification) => {
-    Alert.alert('Options', '', [
-      {
-        text: notif.isRead ? 'Mark unread' : 'Mark read',
-        onPress: async () => {
-          if (notif.isRead) {
-            await markNotificationUnread(notif.id);
-            setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: false } : n));
-          } else {
-            await markNotificationRead(notif.id);
-            setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
-          }
-        },
-      },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteNotification(notif.id);
-          setNotifs(prev => prev.filter(n => n.id !== notif.id));
-        },
-      },
-      {
-        text: `Mute ${categoryLabel(notif.category)} alerts`,
-        onPress: async () => {
-          await muteNotificationCategory(notif.category);
-          await loadNotifs();
-        },
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    hapticToggle();
+    setOptionsFor(notif);
+  };
+
+  const closeOptions = () => setOptionsFor(null);
+
+  const handleToggleReadOption = async () => {
+    const notif = optionsFor;
+    if (!notif) return;
+    closeOptions();
+    if (notif.isRead) {
+      await markNotificationUnread(notif.id);
+      setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: false } : n));
+    } else {
+      await markNotificationRead(notif.id);
+      setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
+    }
+  };
+
+  const handleDeleteOption = async () => {
+    // ListRow already fires a haptic on tap; the sheet closes and the row is
+    // removed immediately so no second haptic is needed here.
+    const notif = optionsFor;
+    if (!notif) return;
+    closeOptions();
+    await deleteNotification(notif.id);
+    setNotifs(prev => prev.filter(n => n.id !== notif.id));
+  };
+
+  const handleMuteOption = async () => {
+    const notif = optionsFor;
+    if (!notif) return;
+    closeOptions();
+    await muteNotificationCategory(notif.category);
+    await loadNotifs();
   };
 
   const handleClearRead = () => {
@@ -313,6 +331,7 @@ export default function BuyerNotifications() {
         text: 'Clear',
         style: 'destructive',
         onPress: async () => {
+          hapticDestructiveConfirm();
           await clearAllReadNotifications();
           await loadNotifs();
         },
@@ -322,6 +341,7 @@ export default function BuyerNotifications() {
   };
 
   const toggleRead = async (notif: Notification) => {
+    hapticToggle();
     if (notif.isRead) {
       await markNotificationUnread(notif.id);
     } else {
@@ -336,9 +356,9 @@ export default function BuyerNotifications() {
     if (item.type === 'header') {
       return (
         <>
-          {index > 0 && <ThreadDivider style={{ marginHorizontal: SP.md, marginBottom: SP.sm }} />}
+          {index > 0 && <ThreadDivider style={{ marginHorizontal: SPACING.md, marginBottom: SPACING.sm }} />}
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionHeaderText}>{item.title.toUpperCase()}</Text>
+            <Text style={[styles.sectionHeaderText, { color: theme.muted }]}>{item.title.toUpperCase()}</Text>
           </View>
         </>
       );
@@ -346,7 +366,7 @@ export default function BuyerNotifications() {
 
     const { notif } = item;
     const iconName = notifIcon(notif.type);
-    const iconColor = notifIconColor(notif.category, theme, colors.mutedForeground);
+    const iconColor = notifIconColor(notif.category, theme);
 
     return (
       <SwipeActionRow
@@ -356,63 +376,66 @@ export default function BuyerNotifications() {
         onAction={() => toggleRead(notif)}
         accessibilityLabel={`Mark notification ${notif.isRead ? 'unread' : 'read'}`}
       >
-        <TouchableOpacity
+        <PressableScale
           style={[
             styles.notifRow,
+            { backgroundColor: theme.background, borderBottomColor: theme.border },
             !notif.isRead && {
-              backgroundColor: colors.card,
+              backgroundColor: theme.card,
               borderLeftWidth: 2,
               borderLeftColor: theme.accent,
             },
           ]}
           onPress={() => handleTap(notif)}
           onLongPress={() => handleLongPress(notif)}
-          activeOpacity={0.75}
+          accessibilityRole="button"
+          accessibilityLabel={`${notif.isRead ? '' : 'Unread. '}${notif.title}. ${notif.body}`}
+          accessibilityHint="Double tap to open. Long press for more options."
         >
-        {/* Left Icon */}
-        {notif.actorInitials ? (
-          <View style={[styles.avatarCircle, { backgroundColor: notif.actorColor || theme.accent }]}>
-            <Text style={styles.avatarText}>{notif.actorInitials}</Text>
-          </View>
-        ) : (
-          <View style={[styles.iconCircle, { backgroundColor: colors.elevated, borderColor: colors.border }]}>
-            <Feather name={iconName as any} size={ICON.md} color={iconColor} />
-          </View>
-        )}
+          {/* Left Icon */}
+          {notif.actorInitials ? (
+            <View style={[styles.avatarCircle, { backgroundColor: notif.actorColor || theme.accent }]}>
+              <Text style={[styles.avatarText, { color: theme.onAccent }]}>{notif.actorInitials}</Text>
+            </View>
+          ) : (
+            <View style={[styles.iconCircle, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
+              <Feather name={iconName as any} size={ICON.md} color={iconColor} />
+            </View>
+          )}
 
-        {/* Center */}
-        <View style={styles.notifCenter}>
-          <Text
-            style={[
-              styles.notifTitle,
-              { fontFamily: notif.isRead ? FONT.medium : FONT.semibold },
-            ]}
-            numberOfLines={2}
-          >
-            {notif.title}
-          </Text>
-          <Text style={styles.notifBody} numberOfLines={2}>{notif.body}</Text>
-          <View style={styles.notifMeta}>
-            <Text style={styles.notifTime}>{timeAgo(notif.createdAt)}</Text>
-            {notif.cta ? (
-              <Text style={styles.notifCta}>{' · '}{notif.cta}</Text>
-            ) : null}
+          {/* Center */}
+          <View style={styles.notifCenter}>
+            <Text
+              style={[
+                styles.notifTitle,
+                { color: theme.text, fontFamily: notif.isRead ? FONT.medium : FONT.semibold },
+              ]}
+              numberOfLines={2}
+            >
+              {notif.title}
+            </Text>
+            <Text style={[styles.notifBody, { color: theme.muted }]} numberOfLines={2}>{notif.body}</Text>
+            <View style={styles.notifMeta}>
+              <Text style={[styles.notifTime, { color: theme.subtle }]}>{timeAgo(notif.createdAt)}</Text>
+              {notif.cta ? (
+                <Text style={[styles.notifCta, { color: theme.accent }]}>{' · '}{notif.cta}</Text>
+              ) : null}
+            </View>
           </View>
-        </View>
 
-        {/* Right */}
-        {!notif.isRead ? (
-          <View style={styles.unreadDot} />
-        ) : notif.cta ? (
-          <Feather name="chevron-right" size={ICON.sm} color={colors.mutedForeground} />
-        ) : null}
-        </TouchableOpacity>
+          {/* Right */}
+          {!notif.isRead ? (
+            <View style={[styles.unreadDot, { backgroundColor: theme.accent }]} />
+          ) : notif.cta ? (
+            <Feather name="chevron-right" size={ICON.sm} color={theme.subtle} />
+          ) : null}
+        </PressableScale>
       </SwipeActionRow>
     );
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* HEADER */}
       <ScreenHeader
         title="Notifications"
@@ -442,7 +465,7 @@ export default function BuyerNotifications() {
       {/* UNREAD COUNT */}
       {unreadCount > 0 && (
         <View style={styles.unreadBar}>
-          <Text style={styles.unreadBarText}>{unreadCount} unread</Text>
+          <Text style={[styles.unreadBarText, { color: theme.accent }]}>{unreadCount} unread</Text>
         </View>
       )}
 
@@ -463,22 +486,45 @@ export default function BuyerNotifications() {
       ) : (
         <FlatList
           data={listData}
-          keyExtractor={(item, idx) =>
+          keyExtractor={(item) =>
             item.type === 'header' ? `header-${item.title}` : item.notif.id
           }
           renderItem={renderItem}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + SPACING.xl }}
         />
       )}
+
+      {/* LONG-PRESS OPTIONS SHEET */}
+      <BottomSheet visible={!!optionsFor} onClose={closeOptions}>
+        {optionsFor && (
+          <View style={styles.sheetContent}>
+            <ListRow
+              icon={optionsFor.isRead ? 'mail' : 'check'}
+              title={optionsFor.isRead ? 'Mark unread' : 'Mark read'}
+              onPress={handleToggleReadOption}
+            />
+            <ListRow
+              icon="bell-off"
+              title={`Mute ${categoryLabel(optionsFor.category)} alerts`}
+              onPress={handleMuteOption}
+            />
+            <ListRow
+              icon="trash-2"
+              title="Delete"
+              destructive
+              onPress={handleDeleteOption}
+            />
+          </View>
+        )}
+      </BottomSheet>
     </View>
   );
 }
 
-const makeStyles = (theme: AppThemePreset, colors: ReturnType<typeof useColors>) => StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
   },
   pillsScroll: {
     flexGrow: 0,
@@ -490,27 +536,25 @@ const makeStyles = (theme: AppThemePreset, colors: ReturnType<typeof useColors>)
     minHeight: 44,
   },
   pillsContent: {
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-    gap: SP.sm,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    gap: SPACING.sm,
   },
   unreadBar: {
-    paddingHorizontal: SP.md,
-    marginBottom: SP.xs,
+    paddingHorizontal: SPACING.md,
+    marginBottom: SPACING.xxs,
   },
   unreadBarText: {
-    color: theme.accent,
-    fontSize: FS.sm,
+    ...TYPE_SCALE.footnote,
     fontFamily: FONT.medium,
   },
   sectionHeader: {
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.xs,
-    marginTop: SP.sm,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    marginTop: SPACING.sm,
   },
   sectionHeaderText: {
-    color: colors.mutedForeground,
-    fontSize: FS.xs,
+    ...TYPE_SCALE.caption,
     fontFamily: FONT.semibold,
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -518,68 +562,60 @@ const makeStyles = (theme: AppThemePreset, colors: ReturnType<typeof useColors>)
   notifRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.background,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   avatarCircle: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: RADII.pill,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    color: theme.onAccent,
+    ...TYPE_SCALE.footnote,
     fontFamily: FONT.bold,
-    fontSize: FS.sm,
   },
   iconCircle: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: RADII.pill,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.border,
   },
   notifCenter: {
     flex: 1,
-    marginHorizontal: SP.md,
+    marginHorizontal: SPACING.md,
   },
   notifTitle: {
-    color: colors.foreground,
-    fontSize: FS.sm,
+    ...TYPE_SCALE.callout,
     marginBottom: 2,
   },
   notifBody: {
-    color: colors.mutedForeground,
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    lineHeight: 16,
+    ...TYPE_SCALE.footnote,
   },
   notifMeta: {
     flexDirection: 'row',
-    marginTop: SP.xs,
+    marginTop: SPACING.xxs,
     alignItems: 'center',
   },
   notifTime: {
-    color: colors.mutedForeground,
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
+    ...TYPE_SCALE.caption,
   },
   notifCta: {
-    color: theme.accent,
-    fontSize: FS.xs,
+    ...TYPE_SCALE.caption,
     fontFamily: FONT.medium,
   },
   unreadDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: theme.accent,
-    marginTop: SP.xs,
+    marginTop: SPACING.xxs,
+  },
+  sheetContent: {
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.sm,
   },
 });

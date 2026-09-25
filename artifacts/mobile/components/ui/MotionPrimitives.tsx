@@ -7,7 +7,7 @@
  * morph, and a count-up number, for later screen-level adoption.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleProp, StyleSheet, Text, ViewStyle } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import Animated, {
   interpolateColor, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming,
@@ -71,10 +71,22 @@ export interface FollowMorphButtonProps {
   following: boolean;
   onChange: (next: boolean) => void;
   small?: boolean;
+  /**
+   * Label overrides — additive (Phase 2). Lets callers with more than a plain
+   * Follow/Following pair (e.g. "Follow back" before following, "Friends" once
+   * mutual) reuse the same morph animation instead of a bespoke button.
+   */
+  followLabel?: string;
+  followingLabel?: string;
+  /** Disables interaction (e.g. while a follow/unfollow request is in flight) without changing the visual state. */
+  disabled?: boolean;
+  style?: StyleProp<ViewStyle>;
 }
 
 /** Text/style cross-fades between "Follow" (solid) and "Following" (outline). */
-export function FollowMorphButton({ following, onChange, small }: FollowMorphButtonProps) {
+export function FollowMorphButton({
+  following, onChange, small, followLabel = 'Follow', followingLabel = 'Following', disabled, style,
+}: FollowMorphButtonProps) {
   const { theme } = useAppTheme();
   const progress = useSharedValue(following ? 1 : 0);
 
@@ -82,7 +94,7 @@ export function FollowMorphButton({ following, onChange, small }: FollowMorphBut
     progress.set(withTiming(following ? 1 : 0, { duration: 180 }));
   }, [following, progress]);
 
-  const style = useAnimatedStyle(() => ({
+  const animatedStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(progress.value, [0, 1], [theme.accent, 'transparent']),
     borderWidth: 1,
     borderColor: interpolateColor(progress.value, [0, 1], [theme.accent, theme.text]),
@@ -94,13 +106,14 @@ export function FollowMorphButton({ following, onChange, small }: FollowMorphBut
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={following ? 'Following, tap to unfollow' : 'Follow'}
-      accessibilityState={{ selected: following }}
+      accessibilityLabel={following ? `${followingLabel}, tap to unfollow` : followLabel}
+      accessibilityState={{ selected: following, disabled: !!disabled }}
+      disabled={disabled}
       onPress={() => { hapticToggle(); onChange(!following); }}
     >
-      <Animated.View style={[styles.followBtn, small && styles.followBtnSmall, style]}>
+      <Animated.View style={[styles.followBtn, small && styles.followBtnSmall, animatedStyle, disabled && styles.followBtnDisabled, style]}>
         <Animated.Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold }, textStyle]}>
-          {following ? 'Following' : 'Follow'}
+          {following ? followingLabel : followLabel}
         </Animated.Text>
       </Animated.View>
     </Pressable>
@@ -155,4 +168,5 @@ export function CountUpNumber({ value, role = 'headline', color, durationMs = 40
 const styles = StyleSheet.create({
   followBtn: { height: 36, paddingHorizontal: 18, borderRadius: 9999, alignItems: 'center', justifyContent: 'center' },
   followBtnSmall: { height: 30, paddingHorizontal: 14 },
+  followBtnDisabled: { opacity: 0.5 },
 });

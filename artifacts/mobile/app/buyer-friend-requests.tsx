@@ -1,18 +1,12 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, FlatList, TouchableOpacity,
-  Alert, StyleSheet, ActivityIndicator,
+  View, Text, ScrollView, FlatList,
+  Alert, StyleSheet,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import {
-  BG, CARD, BORDER,
-  FG, MUTED, SUBTLE,
-  RED, ON_DARK,
-  FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useColors } from '@/hooks/useColors';
 import {
   getFriendSuggestions, sendFriendRequest, blockUser,
 } from '@/services/socialService';
@@ -20,8 +14,12 @@ import type { FriendSuggestion } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 import { useAuth } from '@clerk/expo';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
-import { Header } from '@/components/layout';
-import { EmptyState } from '@/components/BrandthreadUI';
+import { Header, ListSkeleton } from '@/components/layout';
+import { Button, SegmentedControl } from '@/components/ui';
+import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
+import { TYPE_SCALE } from '@/constants/typography';
+import { SPACING } from '@/constants/spacing';
+import { RADII } from '@/constants/radii';
 
 type Tab = 'incoming' | 'sent' | 'suggested';
 
@@ -37,9 +35,8 @@ type FollowRow = {
 
 export default function BuyerFriendRequestsScreen() {
   const { theme } = useAppTheme();
-  const PURPLE = theme.accent;
-  const GRAD_PRIMARY = theme.primaryGradient;
-  const s = makeStyles(theme);
+  const palette = useColors();
+  const s = makeStyles(theme, palette);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api    = useApi();
@@ -160,16 +157,16 @@ export default function BuyerFriendRequestsScreen() {
 
   // ── Tab bar ────────────────────────────────────────────────────────────────
 
-  const tabs: { key: Tab; label: string; count?: number }[] = [
-    { key: 'incoming',  label: 'Incoming',  count: incoming.length  },
-    { key: 'sent',      label: 'Sent',      count: sent.length      },
-    { key: 'suggested', label: 'Suggested'                          },
+  const tabOptions: { id: Tab; label: string; count?: number }[] = [
+    { id: 'incoming',  label: incoming.length > 0 ? `Incoming · ${incoming.length}` : 'Incoming' },
+    { id: 'sent',      label: sent.length > 0 ? `Sent · ${sent.length}` : 'Sent' },
+    { id: 'suggested', label: 'Suggested' },
   ];
 
   // ── Render incoming ──────────────────────────────────────────────────────
 
   function renderIncoming() {
-    if (loading) return <ActivityIndicator style={{ marginTop: 40 }} color={PURPLE} />;
+    if (loading) return <ListSkeleton rows={4} />;
     if (incoming.length === 0) {
       return (
         <EmptyState
@@ -185,45 +182,33 @@ export default function BuyerFriendRequestsScreen() {
         keyExtractor={r => r.userId}
         scrollEnabled={false}
         renderItem={({ item: row }) => (
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onLongPress={() =>
+          <View style={s.row}>
+            <PressableScaleRow onPress={() => goToProfile(row)} onLongPress={() =>
               Alert.alert(row.name, undefined, [
                 { text: 'Block',  style: 'destructive', onPress: () => blockUser({ userId: row.userId, name: row.name, handle: row.handle, initials: row.initials, color: row.color }) },
                 { text: 'Cancel', style: 'cancel' },
               ])
-            }
-            onPress={() => goToProfile(row)}
-            style={s.row}
-          >
-            <View style={[s.avatar48, { backgroundColor: row.color }]}>
-              <Text style={s.avatar48Text}>{row.initials}</Text>
-            </View>
-            <View style={s.rowCenter}>
-              <Text style={s.rowName}>{row.name}</Text>
-              <Text style={s.rowHandle}>{row.handle}</Text>
-              <Text style={s.rowMutual}>Follows you</Text>
-            </View>
+            }>
+              <View style={[s.avatar48, { backgroundColor: row.color }]}>
+                <Text style={[TYPE_SCALE.headline, s.avatar48Text]}>{row.initials}</Text>
+              </View>
+              <View style={s.rowCenter}>
+                <Text style={[TYPE_SCALE.body, s.rowName]} numberOfLines={1}>{row.name}</Text>
+                <Text style={[TYPE_SCALE.footnote, s.rowHandle]} numberOfLines={1}>{row.handle}</Text>
+                <Text style={[TYPE_SCALE.caption, s.rowMutual]}>Follows you</Text>
+              </View>
+            </PressableScaleRow>
             <View style={s.rowActions}>
-              <TouchableOpacity style={s.declineBtn} onPress={() => handleDismiss(row)}>
-                <Text style={s.declineBtnText}>Dismiss</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                activeOpacity={0.85}
-                disabled={actionId === row.userId}
+              <Button label="Dismiss" variant="secondary" size="small" onPress={() => handleDismiss(row)} />
+              <Button
+                label="Follow"
+                variant="primary"
+                size="small"
+                loading={actionId === row.userId}
                 onPress={() => handleFollowBack(row)}
-              >
-                {actionId === row.userId
-                  ? <View style={s.acceptBtn}><ActivityIndicator size="small" color={theme.onAccent} /></View>
-                  : (
-                    <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.acceptBtn}>
-                      <Text style={[s.acceptBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Follow</Text>
-                    </LinearGradient>
-                  )
-                }
-              </TouchableOpacity>
+              />
             </View>
-          </TouchableOpacity>
+          </View>
         )}
       />
     );
@@ -232,7 +217,7 @@ export default function BuyerFriendRequestsScreen() {
   // ── Render sent ──────────────────────────────────────────────────────────
 
   function renderSent() {
-    if (loading) return <ActivityIndicator style={{ marginTop: 40 }} color={PURPLE} />;
+    if (loading) return <ListSkeleton rows={4} />;
     if (sent.length === 0) {
       return (
         <EmptyState
@@ -248,31 +233,30 @@ export default function BuyerFriendRequestsScreen() {
         keyExtractor={r => r.userId}
         scrollEnabled={false}
         renderItem={({ item: row }) => (
-          <TouchableOpacity activeOpacity={0.85} onPress={() => goToProfile(row)} style={s.row}>
-            <View style={[s.avatar48, { backgroundColor: row.color }]}>
-              <Text style={s.avatar48Text}>{row.initials}</Text>
-            </View>
-            <View style={s.rowCenter}>
-              <Text style={s.rowName}>{row.name}</Text>
-              <Text style={s.rowHandle}>{row.handle}</Text>
-              <Text style={s.rowMutual}>You follow them</Text>
-            </View>
-            <View style={s.rowActions}>
-              <View style={s.requestedPill}>
-                <Text style={s.requestedPillText}>Following</Text>
+          <View style={s.row}>
+            <PressableScaleRow onPress={() => goToProfile(row)}>
+              <View style={[s.avatar48, { backgroundColor: row.color }]}>
+                <Text style={[TYPE_SCALE.headline, s.avatar48Text]}>{row.initials}</Text>
               </View>
-              <TouchableOpacity
-                style={s.cancelBtn}
-                disabled={actionId === row.userId}
+              <View style={s.rowCenter}>
+                <Text style={[TYPE_SCALE.body, s.rowName]} numberOfLines={1}>{row.name}</Text>
+                <Text style={[TYPE_SCALE.footnote, s.rowHandle]} numberOfLines={1}>{row.handle}</Text>
+                <Text style={[TYPE_SCALE.caption, s.rowMutual]}>You follow them</Text>
+              </View>
+            </PressableScaleRow>
+            <View style={s.rowActions}>
+              <View style={[s.requestedPill, { borderColor: theme.accent }]}>
+                <Text style={[TYPE_SCALE.caption, s.requestedPillText, { color: theme.accent }]}>Following</Text>
+              </View>
+              <Button
+                label="Unfollow"
+                variant="tertiary"
+                size="small"
+                loading={actionId === row.userId}
                 onPress={() => handleCancel(row)}
-              >
-                {actionId === row.userId
-                  ? <ActivityIndicator size="small" color={MUTED} />
-                  : <Text style={s.cancelBtnText}>Unfollow</Text>
-                }
-              </TouchableOpacity>
+              />
             </View>
-          </TouchableOpacity>
+          </View>
         )}
       />
     );
@@ -298,36 +282,30 @@ export default function BuyerFriendRequestsScreen() {
         renderItem={({ item: sug }) => {
           const followed = sentSet.has(sug.userId);
           return (
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => router.push({
+            <View style={s.row}>
+              <PressableScaleRow onPress={() => router.push({
                 pathname: '/buyer-other-profile' as any,
                 params: { userId: sug.userId, name: sug.name, handle: sug.handle, initials: sug.initials, color: sug.color },
-              })}
-              style={s.row}
-            >
-              <View style={[s.avatar48, { backgroundColor: sug.color }]}>
-                <Text style={s.avatar48Text}>{sug.initials}</Text>
-              </View>
-              <View style={s.rowCenter}>
-                <Text style={s.rowName}>{sug.name}</Text>
-                <Text style={s.rowHandle}>{sug.handle}</Text>
-                {sug.reason ? <Text style={s.rowMutual}>{sug.reason}</Text> : null}
-              </View>
+              })}>
+                <View style={[s.avatar48, { backgroundColor: sug.color }]}>
+                  <Text style={[TYPE_SCALE.headline, s.avatar48Text]}>{sug.initials}</Text>
+                </View>
+                <View style={s.rowCenter}>
+                  <Text style={[TYPE_SCALE.body, s.rowName]} numberOfLines={1}>{sug.name}</Text>
+                  <Text style={[TYPE_SCALE.footnote, s.rowHandle]} numberOfLines={1}>{sug.handle}</Text>
+                  {sug.reason ? <Text style={[TYPE_SCALE.caption, s.rowMutual]} numberOfLines={1}>{sug.reason}</Text> : null}
+                </View>
+              </PressableScaleRow>
               <View style={s.rowActions}>
                 {followed ? (
-                  <View style={s.requestedPill}>
-                    <Text style={s.requestedPillText}>Following</Text>
+                  <View style={[s.requestedPill, { borderColor: theme.accent }]}>
+                    <Text style={[TYPE_SCALE.caption, s.requestedPillText, { color: theme.accent }]}>Following</Text>
                   </View>
                 ) : (
-                  <TouchableOpacity activeOpacity={0.85} onPress={() => handleFollowSuggestion(sug)}>
-                    <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.followBtn}>
-                      <Text style={[s.acceptBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Follow</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
+                  <Button label="Follow" variant="primary" size="small" onPress={() => handleFollowSuggestion(sug)} />
                 )}
               </View>
-            </TouchableOpacity>
+            </View>
           );
         }}
       />
@@ -342,28 +320,11 @@ export default function BuyerFriendRequestsScreen() {
       />
 
       {/* Tabs */}
-      <View style={s.tabBar}>
-        {tabs.map(t => (
-          <TouchableOpacity
-            key={t.key}
-            style={[s.tabItem, tab === t.key && s.tabItemActive]}
-            onPress={() => setTab(t.key)}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={[s.tabLabel, tab === t.key && s.tabLabelActive]}>
-                {t.label}
-              </Text>
-              {t.count != null && t.count > 0 && (
-                <View style={s.tabBadge}>
-                   <Text style={s.tabBadgeText}>{t.count}</Text>
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
-        ))}
+      <View style={s.tabBarWrap}>
+        <SegmentedControl options={tabOptions} selectedId={tab} onChange={(id) => setTab(id as Tab)} />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + SPACING.huge + SPACING.xxl }}>
         {tab === 'incoming'  && renderIncoming()}
         {tab === 'sent'      && renderSent()}
         {tab === 'suggested' && renderSuggested()}
@@ -372,33 +333,30 @@ export default function BuyerFriendRequestsScreen() {
   );
 }
 
-const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  container:       { flex: 1, backgroundColor: 'transparent' },
-  tabBar:          { flexDirection: 'row', borderBottomWidth: 1, borderColor: BORDER },
-  tabItem:         { flex: 1, alignItems: 'center', paddingVertical: SP.sm + 2, borderBottomWidth: 2, borderColor: 'transparent' },
-  tabItemActive:   { borderColor: theme.accent },
-  tabLabel:        { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
-  tabLabelActive:  { color: theme.accent },
-  tabBadge:        { backgroundColor: theme.accent, borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1 },
-   tabBadgeText:    { fontFamily: FONT.bold, fontSize: FS.xs, color: theme.onAccent },
-  emptyState:      { alignItems: 'center', paddingVertical: SP.xl * 2, gap: SP.sm },
-  emptyTitle:      { fontFamily: FONT.semibold, fontSize: FS.md, color: FG },
-  emptyBody:       { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', paddingHorizontal: SP.xl },
-  row:             { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.md, borderBottomWidth: 1, borderColor: BORDER },
-  avatar48:        { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  avatar48Text:    { fontFamily: FONT.bold, fontSize: FS.base, color: ON_DARK },
-  rowCenter:       { flex: 1, marginLeft: SP.sm, gap: 2 },
-  rowName:         { fontFamily: FONT.semibold, fontSize: FS.base, color: FG },
-  rowHandle:       { fontFamily: FONT.regular,  fontSize: FS.xs,   color: MUTED },
-  rowMutual:       { fontFamily: FONT.regular,  fontSize: FS.xs,   color: SUBTLE },
-  rowActions:      { flexDirection: 'row', alignItems: 'center', gap: SP.xs },
-  acceptBtn:       { height: 32, paddingHorizontal: SP.md, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center', minWidth: 64 },
-  acceptBtnText:   { fontFamily: FONT.semibold, fontSize: FS.sm, color: ON_DARK },
-  declineBtn:      { height: 32, paddingHorizontal: SP.sm, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  declineBtnText:  { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
-  requestedPill:   { paddingHorizontal: SP.sm, paddingVertical: 4, backgroundColor: CARD, borderWidth: 1, borderColor: theme.accent, borderRadius: RADIUS.pill },
-  requestedPillText: { fontFamily: FONT.medium, fontSize: FS.xs, color: theme.accent },
-  cancelBtn:       { height: 32, paddingHorizontal: SP.sm, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
-  cancelBtnText:   { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
-  followBtn:       { height: 32, paddingHorizontal: SP.md, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center', minWidth: 64 },
+// A row's tap area (open profile) built on the shared press-scale feel, kept
+// separate from the row's trailing action buttons so they don't nest presses.
+function PressableScaleRow({ children, onPress, onLongPress }: { children: React.ReactNode; onPress: () => void; onLongPress?: () => void }) {
+  return (
+    <PressableScale onPress={onPress} onLongPress={onLongPress} style={rowStyles.wrap}>
+      {children}
+    </PressableScale>
+  );
+}
+const rowStyles = StyleSheet.create({
+  wrap: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+});
+
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: ReturnType<typeof useColors>) => StyleSheet.create({
+  container:       { flex: 1, backgroundColor: palette.background },
+  tabBarWrap:      { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: palette.border },
+  row:             { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingVertical: SPACING.md, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: palette.border, gap: SPACING.sm },
+  avatar48:        { width: 48, height: 48, borderRadius: RADII.avatar, alignItems: 'center', justifyContent: 'center' },
+  avatar48Text:    { color: '#FFFFFF' }, // theme-exempt: initials on a per-user identity color
+  rowCenter:       { flex: 1, marginLeft: SPACING.sm, gap: 2 },
+  rowName:         { color: palette.foreground },
+  rowHandle:       { color: palette.mutedForeground },
+  rowMutual:       { color: palette.mutedForeground },
+  rowActions:      { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
+  requestedPill:   { paddingHorizontal: SPACING.sm, paddingVertical: 4, backgroundColor: palette.card, borderWidth: 1, borderRadius: RADII.pill },
+  requestedPillText: {},
 });

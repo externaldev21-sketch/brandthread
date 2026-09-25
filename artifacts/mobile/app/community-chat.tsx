@@ -3,14 +3,14 @@ import { View, StyleSheet } from 'react-native';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { hapticPrimaryAction } from '@/lib/haptics';
 
 export default function CommunityChatScreen() {
   const router = useRouter();
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader title="Community Chat" />
+      <ScreenHeader title="Community chat" />
       <View style={styles.body}>
         <EmptyState
           icon="message-circle"
@@ -19,7 +19,7 @@ export default function CommunityChatScreen() {
           action={{
             label: 'Back to dashboard',
             onPress: () => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              hapticPrimaryAction();
               router.back();
             },
           }}

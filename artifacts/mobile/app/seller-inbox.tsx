@@ -4,14 +4,19 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, RefreshControl } from 'react-native';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, FS, SP } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { ListSkeleton } from '@/components/layout';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { hapticPrimaryAction } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { subscribeConversationReadFailure } from '@/lib/conversationReadEvents';
@@ -165,6 +170,7 @@ export default function SellerInboxScreen() {
   }
 
   function openConversation(conversationId: string) {
+    hapticPrimaryAction();
     // Keep the inbox truthful while the conversation screen completes its
     // server-side mark-as-read request and avoid an inflated header total.
     const openedConversation = convs.find((conversation) => conversation.id === conversationId);
@@ -189,11 +195,13 @@ export default function SellerInboxScreen() {
     if (!other) return null;
     const hasUnread = item.unreadCount > 0;
     return (
-      <TouchableOpacity
+      <PressableScale
         testID={`seller-conversation-${item.id}`}
         style={s.row}
         activeOpacity={0.7}
         onPress={() => openConversation(item.id)}
+        accessibilityRole="button"
+        accessibilityLabel={`Open conversation with ${other.name || other.handle || 'buyer'}`}
       >
         <View style={[s.avatar, { backgroundColor: other.color || theme.accent }]}>
           <Text style={s.avatarInitials}>{other.initials || (other.name?.[0] ?? '?').toUpperCase()}</Text>
@@ -224,36 +232,29 @@ export default function SellerInboxScreen() {
             )}
           </View>
         </View>
-      </TouchableOpacity>
+      </PressableScale>
     );
   }
 
+  const totalUnread = convs.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+
   return (
-    <View style={[s.root, { paddingTop: insets.top + SP.sm }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={s.headerBack}
-        >
-          <Feather name="arrow-left" size={ICON.lg} color={theme.text} />
-        </TouchableOpacity>
-        <View style={s.headerCenter}>
-          <Text style={s.headerTitle}>Messages</Text>
-          {(() => {
-            const totalUnread = convs.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
-            return totalUnread > 0 ? (
-              <Text style={s.headerSubtitle}>{totalUnread} unread</Text>
-            ) : null;
-          })()}
-        </View>
-        <View style={{ width: ICON.lg }} />
-      </View>
+    <View style={s.root}>
+      <ScreenHeader
+        title="Messages"
+        subtitle={totalUnread > 0 ? `${totalUnread} unread` : undefined}
+      />
 
       {isLoading ? (
+        <View style={[s.listPad, { paddingTop: SP.md }]}>
+          <ListSkeleton rows={6} />
+        </View>
+      ) : loadError && convs.length === 0 ? (
         <View style={s.centerFill}>
-          <ActivityIndicator color={theme.accent} />
+          <ErrorState
+            message="Couldn't load messages. Pull to refresh."
+            onRetry={onRefresh}
+          />
         </View>
       ) : convs.length === 0 ? (
         <View style={s.centerFill}>
@@ -282,28 +283,13 @@ export default function SellerInboxScreen() {
 const createStyles = (theme: AppThemePreset) => {
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
-  header: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: SP.md, paddingBottom: SP.sm,
-    borderBottomWidth: 1, borderBottomColor: theme.border,
-  },
-  headerBack: { marginRight: SP.sm },
-  headerCenter: { flex: 1, alignItems: 'center' },
-  headerTitle: {
-    textAlign: 'center',
-    fontSize: FS.md, fontFamily: FONT.semibold, color: theme.text,
-  },
-  headerSubtitle: {
-    fontSize: FS.xs, fontFamily: FONT.medium, color: theme.accent, marginTop: 1,
-  },
+  listPad: { paddingHorizontal: SP.md },
   centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
   emptyTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text, marginTop: SP.md },
   emptyBody: {
     fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted,
     textAlign: 'center', marginTop: SP.xs,
   },
-   retryButton: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: SP.md, paddingHorizontal: SP.md, paddingVertical: SP.sm, borderWidth: 1, borderColor: theme.accent, borderRadius: RADIUS.sm },
-   retryText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.accent },
 
   // Row — flat Instagram-style, no card chrome
   row: {

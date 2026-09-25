@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
   Animated, TextInput, Modal, Pressable, PanResponder,
-  AccessibilityInfo, Platform, ScrollView, RefreshControl, ActivityIndicator, KeyboardAvoidingView, Image,
+  AccessibilityInfo, Platform, ScrollView, RefreshControl, ActivityIndicator, KeyboardAvoidingView,
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -920,20 +920,20 @@ function VideoVisual({
     <>
       <View style={[StyleSheet.absoluteFill, sharpClipStyle]}>
         {immersive && fit === 'contain' && posterImage && (
-          <Image
+          <CachedImage
             source={posterImage}
             style={[StyleSheet.absoluteFill, styles.letterboxBackdrop]}
-            resizeMode="cover"
+            contentFit="cover"
             blurRadius={40}
             accessibilityElementsHidden
             importantForAccessibility="no"
           />
         )}
         {showPoster && (
-          <Image
+          <CachedImage
             source={posterSource ?? { uri: posterUri! }}
             style={StyleSheet.absoluteFill}
-            resizeMode={fit}
+            contentFit={fit}
           />
         )}
         <VideoView
@@ -981,7 +981,7 @@ function VideoVisual({
   );
 }
 
-function PhotoVisual({ uris, pageWidth, pageHeight }: { uris: string[]; pageWidth: number; pageHeight: number }) {
+function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange }: { uris: string[]; pageWidth: number; pageHeight: number; onPageChange?: (index: number) => void }) {
   const pages = uris.length > 0 ? uris : [''];
   return (
     <FlatList
@@ -993,6 +993,11 @@ function PhotoVisual({ uris, pageWidth, pageHeight }: { uris: string[]; pageWidt
       showsHorizontalScrollIndicator={false}
       directionalLockEnabled
       nestedScrollEnabled
+      onMomentumScrollEnd={(e) => {
+        if (!onPageChange || pageWidth <= 0) return;
+        const index = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
+        onPageChange(Math.max(0, Math.min(pages.length - 1, index)));
+      }}
       renderItem={({ item: uri }) => (
         <View style={{ width: pageWidth, height: pageHeight }}>
           {uri ? <CachedImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="contain" /> : (
@@ -1094,6 +1099,8 @@ function SpotlightPage({
   const router = useRouter();
   const { push } = useThreadPull();
   const [paused, setPaused] = useState(false);
+  /** Which page of a multi-photo post is currently visible, for the pager dots. */
+  const [photoPageIndex, setPhotoPageIndex] = useState(0);
   /** Pause while the buyer is holding down on the left/center of the video — distinct from the tap-to-toggle `paused` above, so releasing always resumes rather than fighting a manual pause. */
   const [holdPaused, setHoldPaused] = useState(false);
   /** 2x while holding the right side of the video. */
@@ -1226,10 +1233,10 @@ function SpotlightPage({
                 bottomStripHeight={immersive ? bottomClearance : 0}
               />
             )
-            : <PhotoVisual uris={item.mediaUris} pageWidth={pageWidth} pageHeight={pageHeight} />}
+            : <PhotoVisual uris={item.mediaUris} pageWidth={pageWidth} pageHeight={pageHeight} onPageChange={setPhotoPageIndex} />}
           {item.contentType !== 'video' && item.mediaUris.length > 1 && (
             <View style={styles.mediaDots} pointerEvents="none">
-              {item.mediaUris.slice(0, 5).map((_, index) => <View key={index} style={[styles.mediaDot, index === 0 && styles.mediaDotActive]} />)}
+              {item.mediaUris.slice(0, 5).map((_, index) => <View key={index} style={[styles.mediaDot, index === photoPageIndex && styles.mediaDotActive]} />)}
             </View>
           )}
           <Animated.View
@@ -2138,8 +2145,8 @@ export default function FeedScreen({
         ListEmptyComponent={
           searchQuery.trim() ? (
             <View style={{ width: pageWidth, height: pageHeight, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-              <Feather name="search" size={32} color="#8C8577" />
-              <Text style={{ fontSize: FS.base, fontFamily: FONT.medium, color: '#8C8577' }}>
+              <Feather name="search" size={32} color={theme.muted} />
+              <Text style={{ fontSize: FS.base, fontFamily: FONT.medium, color: theme.muted }}>
                 No results for "{searchQuery}"
               </Text>
             </View>

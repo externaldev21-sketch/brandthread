@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, TouchableOpacity,
+  View, Text,
   StyleSheet, Modal, Animated, Share,
   RefreshControl, Linking, Alert, ScrollView,
 } from 'react-native';
@@ -9,8 +9,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useFocusEffect, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { useAuth, useUser } from '@clerk/expo';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { hapticLight, hapticMedium, hapticSelection, hapticDestructiveConfirm } from '@/lib/haptics';
 import {
   FONT, FS, SP, RADIUS, ICON, TYPE, GRID_MAX_WIDTH, OVERLAY,
 } from '@/lib/theme';
@@ -86,20 +87,24 @@ function BottomSheet({
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
   const anim = useRef(new Animated.Value(0)).current;
+  const [mounted, setMounted] = useState(visible);
 
   useEffect(() => {
+    if (visible) setMounted(true);
     Animated.timing(anim, {
       toValue: visible ? 1 : 0,
       duration: 220,
       useNativeDriver: true,
-    }).start();
+    }).start(() => {
+      if (!visible) setMounted(false);
+    });
   }, [visible, anim]);
 
-  if (!visible) return null;
+  if (!mounted) return null;
 
   return (
-    <Modal transparent animationType="none" onRequestClose={onClose} visible={visible}>
-      <TouchableOpacity style={[styles.backdrop, { backgroundColor: OVERLAY }]} activeOpacity={1} onPress={onClose}>
+    <Modal transparent animationType="none" onRequestClose={onClose} visible={mounted}>
+      <PressableScale style={[styles.backdrop, { backgroundColor: OVERLAY }]} activeOpacity={1} onPress={onClose}>
         <Animated.View
           style={[
             styles.sheet,
@@ -108,12 +113,14 @@ function BottomSheet({
             { opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [120, 0] }) }] },
           ]}
         >
-          <TouchableOpacity activeOpacity={1}>
+          <PressableScale activeOpacity={1}>
             <View style={[styles.sheetHandle, { backgroundColor: theme.border }]} />
-            {children}
-          </TouchableOpacity>
+            <ScrollView style={styles.sheetScroll} showsVerticalScrollIndicator={false}>
+              {children}
+            </ScrollView>
+          </PressableScale>
         </Animated.View>
-      </TouchableOpacity>
+      </PressableScale>
     </Modal>
   );
 }
@@ -128,10 +135,10 @@ function SheetRow({
 }) {
   const { theme } = useAppTheme();
   return (
-    <TouchableOpacity style={styles.sheetRow} onPress={onPress} activeOpacity={0.7}>
+    <PressableScale style={styles.sheetRow} onPress={onPress} activeOpacity={0.7}>
       <Feather name={icon} size={ICON.md} color={destructive ? theme.error : theme.text} />
       <Text style={[styles.sheetRowText, { color: destructive ? theme.error : theme.text }]}>{label}</Text>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -145,7 +152,7 @@ const PostCell = React.memo(function PostCell({
   const handlePress = useCallback(() => onPress(post), [onPress, post]);
   const handleLongPress = useCallback(() => onLongPress(post), [onLongPress, post]);
   return (
-    <TouchableOpacity
+    <PressableScale
       style={{ width: size, height: size, padding: GRID_GAP / 2 }}
       onPress={handlePress}
       onLongPress={handleLongPress}
@@ -173,7 +180,7 @@ const PostCell = React.memo(function PostCell({
           </View>
         )}
       </View>
-    </TouchableOpacity>
+    </PressableScale>
   );
 });
 
@@ -184,7 +191,7 @@ const SavedCell = React.memo(function SavedCell({
 }) {
   const handlePress = useCallback(() => onPress(item), [onPress, item]);
   return (
-    <TouchableOpacity
+    <PressableScale
       style={{ width: size, padding: SP.xs / 2 }}
       onPress={handlePress}
       activeOpacity={0.85}
@@ -194,7 +201,7 @@ const SavedCell = React.memo(function SavedCell({
         <Text style={[styles.savedTitle, { color: theme.text }]} numberOfLines={2}>{item.title}</Text>
         {item.subtitle ? <Text style={[styles.savedSubtitle, { color: theme.muted }]} numberOfLines={1}>{item.subtitle}</Text> : null}
       </View>
-    </TouchableOpacity>
+    </PressableScale>
   );
 });
 
@@ -357,31 +364,41 @@ export default function ProfileScreen() {
 
   // ── Menu actions ──
   const handleMenu = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticLight();
     setMenuOpen(true);
   };
 
   const handleShareProfile = () => {
     setMenuOpen(false);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticLight();
     setShareSheetOpen(true);
   };
 
-  const handleSignOut = async () => {
+  const handleSignOut = () => {
     setMenuOpen(false);
-    try { await signOut(); } catch {}
-    router.replace('/sign-in' as never);
+    Alert.alert('Sign out of Brandthread?', undefined, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign out',
+        style: 'destructive',
+        onPress: async () => {
+          hapticDestructiveConfirm();
+          try { await signOut(); } catch {}
+          router.replace('/sign-in' as never);
+        },
+      },
+    ]);
   };
 
   // ── Tab switch (haptic + spring-ish state change) ──
   const handleTabPress = useCallback((tab: Tab) => {
-    Haptics.selectionAsync();
+    hapticSelection();
     setActiveTab(tab);
   }, []);
 
   // ── Highlights ──
   const handleHighlightPress = useCallback(() => {
-    Haptics.selectionAsync();
+    hapticSelection();
     router.push('/buyer-highlights-manager' as any);
   }, [router]);
 
@@ -390,19 +407,19 @@ export default function ProfileScreen() {
   const featuredOrder = myOrders.find(o => ACTIVE_ORDER_STATUSES.includes(o.status)) ?? myOrders[0] ?? null;
 
   const handleOrdersSeeAll = useCallback(() => {
-    Haptics.selectionAsync();
+    hapticSelection();
     router.push('/(buyer)/orders' as never);
   }, [router]);
 
   const handleFeaturedOrderPress = useCallback(() => {
     if (!featuredOrder) return;
-    Haptics.selectionAsync();
+    hapticSelection();
     router.push(`/buyer-order-detail?id=${featuredOrder.id}` as never);
   }, [featuredOrder, router]);
 
   // ── Post sheet ──
   const handlePostLongPress = useCallback((post: BuyerPost) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    hapticMedium();
     setPostSheet(post);
   }, []);
 
@@ -414,12 +431,22 @@ export default function ProfileScreen() {
     try { await archivePost(post.id); await loadData(); } catch { setPosts(prev => [...prev, post]); Alert.alert('Could not archive post', 'Try again.'); }
   };
 
-  const handleDeletePost = async () => {
+  const handleDeletePost = () => {
     if (!postSheet) return;
     const post = postSheet;
     setPostSheet(null);
-    setPosts(prev => prev.filter(item => item.id !== post.id));
-    try { await deletePost(post.id); await loadData(); } catch { setPosts(prev => [...prev, post]); Alert.alert('Could not delete post', 'Try again.'); }
+    Alert.alert("Delete this post? This can't be undone.", undefined, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          hapticDestructiveConfirm();
+          setPosts(prev => prev.filter(item => item.id !== post.id));
+          try { await deletePost(post.id); await loadData(); } catch { setPosts(prev => [...prev, post]); Alert.alert("Couldn't delete post", 'Try again.'); }
+        },
+      },
+    ]);
   };
 
   const handleShareCurrentPost = async () => {
@@ -432,13 +459,13 @@ export default function ProfileScreen() {
     try {
       await Share.share({
         message: `${handle} on Brandthread: "${post.caption || 'Check this out'}"`,
-        title: 'Share Post',
+        title: 'Share post',
       });
     } catch {}
   };
 
   const handlePostTap = useCallback((post: BuyerPost) => {
-    Haptics.selectionAsync();
+    hapticSelection();
     const params = new URLSearchParams({
       postId: post.id,
       postAuthorName: post.authorName,
@@ -488,7 +515,7 @@ export default function ProfileScreen() {
       {/* ── Avatar (scroll-linked parallax) ── */}
       <View style={styles.avatarSection}>
         <Animated.View style={{ transform: [{ scale: avatarScale }, { translateY: avatarTranslateY }] }}>
-          <TouchableOpacity onPress={() => router.push('/buyer-story-create' as any)} style={styles.avatarWrap} activeOpacity={0.85}>
+          <PressableScale onPress={() => router.push('/buyer-story-create' as any)} style={styles.avatarWrap} activeOpacity={0.85}>
             {avatarUri ? (
               <CachedImage
                 source={{ uri: avatarUri }}
@@ -503,7 +530,7 @@ export default function ProfileScreen() {
             <View style={[styles.avatarBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
               <Feather name="plus" size={12} color={theme.onAccent} />
             </View>
-          </TouchableOpacity>
+          </PressableScale>
         </Animated.View>
       </View>
 
@@ -518,9 +545,9 @@ export default function ProfileScreen() {
           <Text style={[styles.bio, { color: theme.text }]} numberOfLines={3}>{profile.bio}</Text>
         ) : null}
         {profile?.website ? (
-          <TouchableOpacity onPress={() => { const url = profile.website.startsWith('http') ? profile.website : 'https://' + profile.website; Linking.openURL(url); }}>
+          <PressableScale onPress={() => { const url = profile.website.startsWith('http') ? profile.website : 'https://' + profile.website; Linking.openURL(url); }}>
             <Text style={[styles.website, { color: theme.secondary }]}>{profile.website}</Text>
-          </TouchableOpacity>
+          </PressableScale>
         ) : null}
         {profile?.location ? (
           <View style={styles.locationRow}>
@@ -537,22 +564,22 @@ export default function ProfileScreen() {
           <Text style={[styles.statLabel, { color: theme.muted }]}>Posts</Text>
         </View>
         <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-        <TouchableOpacity style={styles.statCol} onPress={() => router.push('/connections?type=followers' as any)}>
+        <PressableScale style={styles.statCol} onPress={() => router.push('/connections?type=followers' as any)}>
           <Text style={[styles.statNum, { color: theme.text }]}>{profile?.friendsCount ?? 0}</Text>
           <Text style={[styles.statLabel, { color: theme.muted }]}>Followers</Text>
-        </TouchableOpacity>
+        </PressableScale>
         <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-        <TouchableOpacity style={styles.statCol} onPress={() => router.push('/connections?type=following' as any)}>
+        <PressableScale style={styles.statCol} onPress={() => router.push('/connections?type=following' as any)}>
           <Text style={[styles.statNum, { color: theme.text }]}>{profile?.followingBrandsCount ?? 0}</Text>
           <Text style={[styles.statLabel, { color: theme.muted }]}>Following</Text>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
 
       {/* ── Thread Cash balance chip ── */}
       {useFeatureFlag('threadCash') && (
-        <TouchableOpacity
+        <PressableScale
           style={[styles.threadCashChip, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}
-          onPress={() => { Haptics.selectionAsync(); router.push('/thread-cash' as never); }}
+          onPress={() => { hapticSelection(); router.push('/thread-cash' as never); }}
           accessibilityRole="button"
           accessibilityLabel="Thread Cash wallet"
         >
@@ -561,26 +588,26 @@ export default function ProfileScreen() {
             {formatCents(threadCashBalanceCents)} Thread Cash
           </Text>
           <Feather name="chevron-right" size={14} color={theme.accent} />
-        </TouchableOpacity>
+        </PressableScale>
       )}
 
       {/* ── Action Buttons ── */}
       <View style={styles.actionRow}>
-        <TouchableOpacity
+        <PressableScale
           style={[styles.actionBtn, styles.actionBtnPrimary, { backgroundColor: theme.accent }]}
           onPress={() => router.push('/(buyer)/edit-profile')}
         >
-          <Text style={[styles.actionBtnText, { color: theme.onAccent }]}>Edit Profile</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
+          <Text style={[styles.actionBtnText, { color: theme.onAccent }]}>Edit profile</Text>
+        </PressableScale>
+        <PressableScale
           style={[styles.actionIconBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
           onPress={() => router.push('/(buyer)/inbox' as never)}
           accessibilityRole="button"
           accessibilityLabel="Messages"
         >
           <Feather name="send" size={ICON.sm} color={theme.text} />
-        </TouchableOpacity>
-        <TouchableOpacity
+        </PressableScale>
+        <PressableScale
           style={[styles.actionIconBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
           onPress={handleShareProfile}
           accessibilityRole="button"
@@ -588,7 +615,7 @@ export default function ProfileScreen() {
           accessibilityHint="Opens your shareable profile link and QR code"
         >
           <Feather name="share-2" size={ICON.sm} color={theme.text} />
-        </TouchableOpacity>
+        </PressableScale>
       </View>
 
       {/* ── My Orders — always-visible way back to order history ── */}
@@ -596,16 +623,16 @@ export default function ProfileScreen() {
         <View style={styles.ordersSection}>
           <View style={styles.ordersSectionHeader}>
             <Text style={[styles.ordersSectionTitle, { color: theme.text }]}>My Orders</Text>
-            <TouchableOpacity
+            <PressableScale
               onPress={handleOrdersSeeAll}
               accessibilityRole="button"
               accessibilityLabel="See all orders"
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Text style={[styles.ordersSeeAll, { color: theme.secondary }]}>See all</Text>
-            </TouchableOpacity>
+            </PressableScale>
           </View>
-          <TouchableOpacity
+          <PressableScale
             style={[styles.orderCard, { backgroundColor: theme.card, borderColor: theme.border }]}
             onPress={handleFeaturedOrderPress}
             activeOpacity={0.85}
@@ -627,32 +654,32 @@ export default function ProfileScreen() {
               <OrderStatusTimeline status={featuredOrder.status} compact />
             </View>
             <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       ) : null}
 
       {/* ── Story-style Highlights row ── */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.highlightsRow}>
-        <TouchableOpacity style={styles.highlightNew} onPress={handleHighlightPress} activeOpacity={0.8}>
+        <PressableScale style={styles.highlightNew} onPress={handleHighlightPress} activeOpacity={0.8}>
           <View style={[styles.highlightCircle, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <Feather name="plus" size={20} color={theme.muted} />
           </View>
           <Text style={[styles.highlightLabel, { color: theme.muted }]}>New</Text>
-        </TouchableOpacity>
+        </PressableScale>
         {highlights.map(h => (
-          <TouchableOpacity key={h.id} style={styles.highlight} onPress={handleHighlightPress} activeOpacity={0.8}>
+          <PressableScale key={h.id} style={styles.highlight} onPress={handleHighlightPress} activeOpacity={0.8}>
             <View style={[styles.highlightCircleColored, { backgroundColor: h.coverColor }]}>
               <Text style={styles.highlightEmoji}>{h.emoji}</Text>
             </View>
             <Text style={[styles.highlightLabel, { color: theme.muted }]} numberOfLines={1}>{h.label}</Text>
-          </TouchableOpacity>
+          </PressableScale>
         ))}
       </ScrollView>
 
       {/* ── Inline segmented tab control (scrolls away; sticky twin lives above) ── */}
       <View style={[styles.tabBar, { borderColor: theme.border }]}>
         {TABS.map(tab => (
-          <TouchableOpacity
+          <PressableScale
             key={tab}
             style={styles.tabItem}
             onPress={() => handleTabPress(tab)}
@@ -663,7 +690,7 @@ export default function ProfileScreen() {
             <Feather name={profileTabIcon(tab)} size={16} color={activeTab === tab ? theme.text : theme.muted} />
             <Text style={[styles.tabText, { color: activeTab === tab ? theme.text : theme.muted }, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
             {activeTab === tab && <View style={[styles.tabUnderline, { backgroundColor: theme.accent }]} />}
-          </TouchableOpacity>
+          </PressableScale>
         ))}
       </View>
     </View>
@@ -684,7 +711,7 @@ export default function ProfileScreen() {
     emptyIcon = 'image';
     emptyTitle = 'No posts yet';
     emptyDescription = 'Your posts will appear here.';
-    emptyActionLabel = 'Create Post';
+    emptyActionLabel = 'Create post';
     emptyOnAction = () => router.push('/create-post?accountType=buyer' as any);
   } else if (activeTab === 'Tagged') {
     listData = [];
@@ -703,7 +730,7 @@ export default function ProfileScreen() {
     emptyIcon = 'bookmark';
     emptyTitle = 'No saved posts yet';
     emptyDescription = 'Items you save will appear here.';
-    emptyActionLabel = 'View Saved';
+    emptyActionLabel = 'View saved';
     emptyOnAction = () => router.push('/buyer-saved' as any);
   }
 
@@ -724,10 +751,10 @@ export default function ProfileScreen() {
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: theme.background }]}>
       {/* ── Persistent top bar: account switcher + notifications + menu ── */}
       <View style={styles.topBar}>
-        <TouchableOpacity
+        <PressableScale
           style={styles.topBarLeft}
           onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            hapticLight();
             router.push('/account-switcher' as never);
           }}
           activeOpacity={0.75}
@@ -737,14 +764,14 @@ export default function ProfileScreen() {
         >
           <Text style={[styles.topHandle, { color: theme.text }]} numberOfLines={1}>{displayName}</Text>
           <Feather name="chevron-down" size={16} color={theme.text} />
-        </TouchableOpacity>
+        </PressableScale>
         <View style={styles.topBarRight}>
-          <TouchableOpacity onPress={() => router.push('/buyer-notifications' as any)} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Notifications">
+          <PressableScale onPress={() => router.push('/buyer-notifications' as any)} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="Notifications">
             <Feather name="bell" size={ICON.md} color={theme.text} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleMenu} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="More options">
+          </PressableScale>
+          <PressableScale onPress={handleMenu} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel="More options">
             <Feather name="menu" size={ICON.md} color={theme.text} />
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       </View>
 
@@ -758,7 +785,7 @@ export default function ProfileScreen() {
         ]}
       >
         {TABS.map(tab => (
-          <TouchableOpacity
+          <PressableScale
             key={tab}
             style={styles.stickyTabItem}
             onPress={() => handleTabPress(tab)}
@@ -768,7 +795,7 @@ export default function ProfileScreen() {
           >
             <Feather name={profileTabIcon(tab)} size={16} color={activeTab === tab ? theme.text : theme.muted} />
             {activeTab === tab && <View style={[styles.stickyTabUnderline, { backgroundColor: theme.accent }]} />}
-          </TouchableOpacity>
+          </PressableScale>
         ))}
       </Animated.View>
 
@@ -828,21 +855,21 @@ export default function ProfileScreen() {
       {/* ── Profile Menu Sheet ── */}
       <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)}>
         <Text style={[styles.sheetTitle, { color: theme.muted }]}>Profile</Text>
-        <SheetRow icon="edit-3" label="Edit Profile" onPress={() => { setMenuOpen(false); router.push('/(buyer)/edit-profile'); }} />
-        <SheetRow icon="share-2" label="Share Profile" onPress={handleShareProfile} />
+        <SheetRow icon="edit-3" label="Edit profile" onPress={() => { setMenuOpen(false); router.push('/(buyer)/edit-profile'); }} />
+        <SheetRow icon="share-2" label="Share profile" onPress={handleShareProfile} />
         <SheetRow icon="users" label="Friends" onPress={() => { setMenuOpen(false); router.push('/(buyer)/friends' as any); }} />
-        <SheetRow icon="star" label="Close Friends" onPress={() => { setMenuOpen(false); router.push('/buyer-close-friends' as any); }} />
+        <SheetRow icon="star" label="Close friends" onPress={() => { setMenuOpen(false); router.push('/buyer-close-friends' as any); }} />
         <SheetRow icon="archive" label="Archive" onPress={() => { setMenuOpen(false); router.push('/buyer-archive' as any); }} />
-        <SheetRow icon="activity" label="Your Activity" onPress={() => { setMenuOpen(false); router.push('/buyer-your-activity' as any); }} />
-        <SheetRow icon="package" label="My Orders" onPress={() => { setMenuOpen(false); router.push('/(buyer)/orders'); }} />
-        <SheetRow icon="briefcase" label="My Freelancer Jobs" onPress={() => { setMenuOpen(false); router.push('/freelancer-jobs' as any); }} />
-        <SheetRow icon="gift" label="Rewards & Points" onPress={() => { setMenuOpen(false); router.push('/loyalty' as any); }} />
-        <SheetRow icon="bookmark" label="Saved Items" onPress={() => { setMenuOpen(false); router.push('/buyer-saved' as any); }} />
-        <SheetRow icon="grid" label="QR Code" onPress={() => { setMenuOpen(false); router.push('/buyer-qr-code' as any); }} />
+        <SheetRow icon="activity" label="Your activity" onPress={() => { setMenuOpen(false); router.push('/buyer-your-activity' as any); }} />
+        <SheetRow icon="package" label="Orders" onPress={() => { setMenuOpen(false); router.push('/(buyer)/orders'); }} />
+        <SheetRow icon="briefcase" label="Freelancer jobs" onPress={() => { setMenuOpen(false); router.push('/freelancer-jobs' as any); }} />
+        <SheetRow icon="gift" label="Rewards" onPress={() => { setMenuOpen(false); router.push('/loyalty' as any); }} />
+        <SheetRow icon="bookmark" label="Saved" onPress={() => { setMenuOpen(false); router.push('/buyer-saved' as any); }} />
+        <SheetRow icon="grid" label="QR code" onPress={() => { setMenuOpen(false); router.push('/buyer-qr-code' as any); }} />
         <SheetRow icon="image" label="Highlights" onPress={() => { setMenuOpen(false); router.push('/buyer-highlights-manager' as any); }} />
         <SheetRow icon="settings" label="Settings" onPress={() => { setMenuOpen(false); router.push('/settings' as any); }} />
         <View style={[styles.sheetDivider, { backgroundColor: theme.border }]} />
-        <SheetRow icon="log-out" label="Sign Out" destructive onPress={handleSignOut} />
+        <SheetRow icon="log-out" label="Sign out" destructive onPress={handleSignOut} />
       </BottomSheet>
 
       <ShareProfileSheet
@@ -859,10 +886,10 @@ export default function ProfileScreen() {
       {/* ── Post Long-Press Sheet ── */}
       <BottomSheet visible={!!postSheet} onClose={() => setPostSheet(null)}>
         <Text style={[styles.sheetTitle, { color: theme.muted }]} numberOfLines={1}>{postSheet?.caption || 'Post'}</Text>
-        <SheetRow icon="share-2" label="Share Post" onPress={handleShareCurrentPost} />
+        <SheetRow icon="share-2" label="Share post" onPress={handleShareCurrentPost} />
         <SheetRow icon="archive" label="Archive" onPress={handleArchivePost} />
         <View style={[styles.sheetDivider, { backgroundColor: theme.border }]} />
-        <SheetRow icon="trash-2" label="Delete Post" destructive onPress={handleDeletePost} />
+        <SheetRow icon="trash-2" label="Delete post" destructive onPress={handleDeletePost} />
       </BottomSheet>
     </View>
   );
@@ -874,7 +901,7 @@ const styles = StyleSheet.create({
   topBarLeft: { flexDirection: 'row', alignItems: 'center', gap: SP.xs },
   topHandle: { fontFamily: FONT.semibold, fontSize: FS.sm },
   topBarRight: { flexDirection: 'row', alignItems: 'center', gap: SP.xs },
-  iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 
   stickyTabBar: {
     position: 'absolute', left: 0, right: 0, zIndex: 9,
@@ -926,13 +953,13 @@ const styles = StyleSheet.create({
   // Action buttons
   actionRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, marginTop: SP.md, gap: SP.sm },
   actionBtn: {
-    flex: 1, height: 40,
+    flex: 1, height: 44,
     borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center',
   },
   actionBtnPrimary: {},
   actionBtnText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   actionIconBtn: {
-    width: 40, height: 40, borderWidth: 1,
+    width: 44, height: 44, borderWidth: 1,
     borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center',
   },
 
@@ -1003,7 +1030,8 @@ const styles = StyleSheet.create({
 
   // Bottom sheet
   backdrop: { flex: 1, justifyContent: 'flex-end' },
-  sheet: { borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, paddingTop: SP.sm, paddingHorizontal: SP.md, borderWidth: 1, borderBottomWidth: 0 },
+  sheet: { borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, paddingTop: SP.sm, paddingHorizontal: SP.md, borderWidth: 1, borderBottomWidth: 0, maxHeight: '80%' },
+  sheetScroll: { maxHeight: '100%' },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: SP.md },
   sheetTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, paddingVertical: SP.sm, paddingHorizontal: SP.xs, marginBottom: SP.xs },
   sheetRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: 14, paddingHorizontal: SP.xs, borderRadius: RADIUS.md },

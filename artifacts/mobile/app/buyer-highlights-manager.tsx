@@ -4,19 +4,21 @@
  */
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity,
-  TextInput, Modal,
+  View, Text, StyleSheet, FlatList, TextInput, Modal,
+  KeyboardAvoidingView, Platform, Alert, Pressable,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
-import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  SUCCESS, RED, ORANGE, GOLD,
-  FONT, FS, SP, RADIUS, OVERLAY,
-} from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { FONT } from '@/lib/theme';
+import { TYPE_SCALE } from '@/constants/typography';
+import { SPACING } from '@/constants/spacing';
+import { RADII } from '@/constants/radii';
+import { hapticSelection, hapticSuccessAction, hapticDestructiveConfirm, hapticLight } from '@/lib/haptics';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { Button } from '@/components/ui';
 import {
   loadHighlights, createHighlight, updateHighlight, deleteHighlight,
   reorderHighlights, type Highlight,
@@ -24,103 +26,124 @@ import {
 import { Header } from '@/components/layout';
 import { EmptyState } from '@/components/BrandthreadUI';
 
-function EmojiPicker({ visible, onSelect, onClose }: {
-  visible: boolean;
-  onSelect: (emoji: string) => void;
-  onClose: () => void;
-}) {
-  const EMOJIS = ['✨', '🌟', '💜', '🎵', '🌿', '🔥', '💫', '🌙', '🎨', '🏄', '🍕', '📸', '🎉', '💙', '🌸', '🏆'];
-  const insets = useSafeAreaInsets();
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={sheet.backdrop} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity activeOpacity={1} style={[sheet.sheet, { paddingBottom: insets.bottom + SP.md }]}>
-          <View style={sheet.handle} />
-          <Text style={sheet.sheetTitle}>Choose an emoji</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center', paddingHorizontal: SP.md }}>
-            {EMOJIS.map(e => (
-              <TouchableOpacity key={e} style={sheet.emojiBtn} onPress={() => { onSelect(e); onClose(); }}>
-                <Text style={{ fontSize: 32 }}>{e}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </TouchableOpacity>
-      </TouchableOpacity>
-    </Modal>
-  );
-}
+const EMOJIS = ['✨', '🌟', '💜', '🎵', '🌿', '🔥', '💫', '🌙', '🎨', '🏄', '🍕', '📸', '🎉', '💙', '🌸', '🏆'];
 
 function HLFormModal({
-  visible, title, label, setLabel, emoji, coverColor, setCoverColor, coverColors,
-  onEmojiTrigger, onSave, onClose, s, insets,
+  visible, title, label, setLabel, emoji, setEmoji, coverColor, setCoverColor, coverColors,
+  onSave, onClose, s, insets, colors,
 }: {
   visible: boolean; title: string;
   label: string; setLabel: (v: string) => void;
-  emoji: string;
+  emoji: string; setEmoji: (v: string) => void;
   coverColor: string; setCoverColor: (v: string) => void;
   coverColors: string[];
-  onEmojiTrigger: () => void;
   onSave: () => void; onClose: () => void;
   s: ReturnType<typeof makeStyles>;
   insets: { bottom: number };
+  colors: ReturnType<typeof useColors>;
 }) {
+  // Emoji grid inlines into this same sheet instead of a modal-on-modal
+  // (a second Modal on top of this one won't present on iOS).
+  const [emojiGridOpen, setEmojiGridOpen] = useState(false);
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={sheet.backdrop} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity activeOpacity={1} style={[sheet.sheet, { paddingBottom: insets.bottom + SP.md }]}>
-          <View style={sheet.handle} />
-          <Text style={sheet.sheetTitle}>{title}</Text>
-          {/* Emoji picker trigger */}
-          <TouchableOpacity style={s.emojiTrigger} onPress={onEmojiTrigger}>
-            <Text style={{ fontSize: 36 }}>{emoji}</Text>
-            <Text style={s.emojiHint}>Tap to change</Text>
-          </TouchableOpacity>
-          {/* Label input */}
-          <TextInput
-            style={s.labelInput}
-            value={label}
-            onChangeText={setLabel}
-            placeholder="Highlight name"
-            placeholderTextColor={SUBTLE}
-            maxLength={20}
-            autoFocus
-          />
-          {/* Cover colour */}
-          <Text style={s.colorLabel}>Cover color</Text>
-          <View style={s.colorRow}>
-            {coverColors.map(c => (
-              <TouchableOpacity
-                key={c}
-                style={[s.colorSwatch, { backgroundColor: c }, coverColor === c && s.colorSwatchActive]}
-                onPress={() => setCoverColor(c)}
-              />
-            ))}
-          </View>
-          <View style={s.modalActions}>
-            <TouchableOpacity style={s.cancelBtn} onPress={onClose}>
-              <Text style={s.cancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[s.saveBtn, !label.trim() && { opacity: 0.4 }]}
-              onPress={onSave}
-              disabled={!label.trim()}
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      onShow={() => setEmojiGridOpen(false)}
+    >
+      <View style={sheet.backdrop}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+        />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={sheet.kbWrap}
+        >
+          <View style={[sheet.sheet, { backgroundColor: colors.card, paddingBottom: insets.bottom + SPACING.md }]}>
+            <View style={[sheet.handle, { backgroundColor: colors.border }]} />
+            <Text style={[sheet.sheetTitle, { color: colors.foreground }]}>{title}</Text>
+
+            {/* Emoji picker trigger */}
+            <PressableScale
+              style={s.emojiTrigger}
+              onPress={() => { hapticSelection(); setEmojiGridOpen(v => !v); }}
+              accessibilityRole="button"
+              accessibilityLabel="Change highlight emoji"
             >
-              <Text style={s.saveBtnText}>Save</Text>
-            </TouchableOpacity>
+              <Text style={{ fontSize: 36 }}>{emoji}</Text>
+              <Text style={[s.emojiHint, { color: colors.mutedForeground }]}>
+                {emojiGridOpen ? 'Choose below' : 'Tap to change'}
+              </Text>
+            </PressableScale>
+
+            {emojiGridOpen && (
+              <View style={s.emojiGrid}>
+                {EMOJIS.map(e => (
+                  <PressableScale
+                    key={e}
+                    style={s.emojiBtn}
+                    onPress={() => { hapticSelection(); setEmoji(e); setEmojiGridOpen(false); }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Use ${e} as the emoji`}
+                  >
+                    <Text style={{ fontSize: 28 }}>{e}</Text>
+                  </PressableScale>
+                ))}
+              </View>
+            )}
+
+            {/* Label input */}
+            <TextInput
+              style={[s.labelInput, { borderColor: colors.primary, color: colors.foreground }]}
+              value={label}
+              onChangeText={setLabel}
+              placeholder="Highlight name"
+              placeholderTextColor={colors.mutedForeground}
+              maxLength={20}
+              autoFocus
+            />
+
+            {/* Cover colour */}
+            <Text style={[s.colorLabel, { color: colors.mutedForeground }]}>Cover color</Text>
+            <View style={s.colorRow}>
+              {coverColors.map(c => (
+                <PressableScale
+                  key={c}
+                  style={[s.colorSwatch, { backgroundColor: c }, coverColor === c && [s.colorSwatchActive, { borderColor: colors.foreground }]]}
+                  onPress={() => { hapticSelection(); setCoverColor(c); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Use this color as the cover`}
+                  accessibilityState={{ selected: coverColor === c }}
+                />
+              ))}
+            </View>
+
+            <View style={s.modalActions}>
+              <Button label="Cancel" variant="secondary" onPress={onClose} style={{ flex: 1 }} />
+              <Button label="Save" variant="primary" onPress={onSave} disabled={!label.trim()} style={{ flex: 1 }} />
+            </View>
           </View>
-        </TouchableOpacity>
-      </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
 
 export default function BuyerHighlightsManager() {
+  const colors = useColors();
   const { theme } = useAppTheme();
-  const PURPLE = theme.accent;
-  const PURPLE_LIGHT = theme.accentLight;
-  const CYAN = theme.accentLight;
-  const COVER_COLORS = [PURPLE, CYAN, '#F472B6', ORANGE, SUCCESS, RED, PURPLE_LIGHT, GOLD];
-  const s = makeStyles(theme);
+  const COVER_COLORS = [
+    theme.accent, theme.accentLight,
+    '#F472B6', // theme-exempt: user-selectable cover color swatch, not UI chrome
+    theme.warning, theme.success, colors.destructive, theme.accentLight, theme.accent,
+  ];
+  const s = makeStyles(colors);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [highlights, setHighlights] = useState<Highlight[]>([]);
@@ -129,14 +152,13 @@ export default function BuyerHighlightsManager() {
   const [label, setLabel] = useState('');
   const [emoji, setEmoji] = useState('✨');
   const [coverColor, setCoverColor] = useState(COVER_COLORS[0]);
-  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
 
   useFocusEffect(useCallback(() => {
     loadHighlights().then(setHighlights);
   }, []));
 
   function openCreate() {
-    Haptics.selectionAsync();
+    hapticSelection();
     setLabel('');
     setEmoji('✨');
     setCoverColor(COVER_COLORS[0]);
@@ -144,7 +166,7 @@ export default function BuyerHighlightsManager() {
   }
 
   function openEdit(h: Highlight) {
-    Haptics.selectionAsync();
+    hapticSelection();
     setEditing(h);
     setLabel(h.label);
     setEmoji(h.emoji);
@@ -153,29 +175,44 @@ export default function BuyerHighlightsManager() {
 
   async function handleSaveCreate() {
     if (!label.trim()) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const h = await createHighlight({ emoji, label, coverColor });
+    hapticSuccessAction();
     setHighlights(prev => [...prev, h]);
     setCreating(false);
   }
 
   async function handleSaveEdit() {
     if (!editing) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await updateHighlight(editing.id, { emoji, label, coverColor });
+    hapticSuccessAction();
     setHighlights(prev => prev.map(h => h.id === editing.id ? { ...h, emoji, label, coverColor } : h));
     setEditing(null);
   }
 
-  async function handleDelete(h: Highlight) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await deleteHighlight(h.id);
-    setHighlights(prev => prev.filter(x => x.id !== h.id));
+  function confirmDelete(h: Highlight) {
+    hapticLight();
+    Alert.alert(
+      'Delete highlight?',
+      `"${h.label}" will be removed from your profile. This can't be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            hapticDestructiveConfirm();
+            await deleteHighlight(h.id);
+            setHighlights(prev => prev.filter(x => x.id !== h.id));
+          },
+        },
+      ],
+      { cancelable: true },
+    );
   }
 
   async function moveUp(index: number) {
     if (index === 0) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticSelection();
     const next = [...highlights];
     [next[index - 1], next[index]] = [next[index], next[index - 1]];
     setHighlights(next);
@@ -184,7 +221,7 @@ export default function BuyerHighlightsManager() {
 
   async function moveDown(index: number) {
     if (index >= highlights.length - 1) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticSelection();
     const next = [...highlights];
     [next[index], next[index + 1]] = [next[index + 1], next[index]];
     setHighlights(next);
@@ -193,47 +230,65 @@ export default function BuyerHighlightsManager() {
 
   const renderItem = ({ item, index }: { item: Highlight; index: number }) => (
     <View style={s.row}>
-      {/* Up/down reorder arrows */}
+      {/* Up/down reorder arrows — compact icons, hitSlop reaches the 44pt minimum without growing the row */}
       <View style={s.reorderBtns}>
-        <TouchableOpacity
+        <PressableScale
           style={[s.reorderArrow, index === 0 && { opacity: 0.2 }]}
           onPress={() => moveUp(index)}
           disabled={index === 0}
+          hitSlop={{ top: 6, bottom: 2, left: 10, right: 10 }}
+          accessibilityRole="button"
+          accessibilityLabel={`Move ${item.label} up`}
         >
-          <Feather name="chevron-up" size={16} color={MUTED} />
-        </TouchableOpacity>
-        <TouchableOpacity
+          <Feather name="chevron-up" size={16} color={colors.mutedForeground} />
+        </PressableScale>
+        <PressableScale
           style={[s.reorderArrow, index >= highlights.length - 1 && { opacity: 0.2 }]}
           onPress={() => moveDown(index)}
           disabled={index >= highlights.length - 1}
+          hitSlop={{ top: 2, bottom: 6, left: 10, right: 10 }}
+          accessibilityRole="button"
+          accessibilityLabel={`Move ${item.label} down`}
         >
-          <Feather name="chevron-down" size={16} color={MUTED} />
-        </TouchableOpacity>
+          <Feather name="chevron-down" size={16} color={colors.mutedForeground} />
+        </PressableScale>
       </View>
       <View style={[s.circle, { backgroundColor: item.coverColor }]}>
         <Text style={{ fontSize: 22 }}>{item.emoji}</Text>
       </View>
-      <Text style={s.rowLabel}>{item.label}</Text>
-      <TouchableOpacity style={s.editIcon} onPress={() => openEdit(item)}>
-        <Feather name="edit-2" size={16} color={MUTED} />
-      </TouchableOpacity>
-      <TouchableOpacity style={s.deleteIcon} onPress={() => handleDelete(item)}>
-        <Feather name="trash-2" size={16} color={MUTED} />
-      </TouchableOpacity>
+      <Text style={[s.rowLabel, { color: colors.foreground }]} numberOfLines={1}>{item.label}</Text>
+      <PressableScale
+        style={s.editIcon}
+        onPress={() => openEdit(item)}
+        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        accessibilityRole="button"
+        accessibilityLabel={`Edit ${item.label}`}
+      >
+        <Feather name="edit-2" size={16} color={colors.mutedForeground} />
+      </PressableScale>
+      <PressableScale
+        style={s.deleteIcon}
+        onPress={() => confirmDelete(item)}
+        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        accessibilityRole="button"
+        accessibilityLabel={`Delete ${item.label}`}
+      >
+        <Feather name="trash-2" size={16} color={colors.mutedForeground} />
+      </PressableScale>
     </View>
   );
 
   return (
     <View style={s.page}>
       <Header
-        title="Story Highlights"
+        title="Highlights"
         actions={[{ icon: 'plus', onPress: openCreate, accessibilityLabel: 'New highlight' }]}
       />
 
       <FlatList
         data={highlights}
         keyExtractor={h => h.id}
-        contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}
+        contentContainerStyle={{ padding: SPACING.md, paddingBottom: insets.bottom + 40 }}
         ListEmptyComponent={
           <EmptyState
             icon="bookmark"
@@ -243,8 +298,8 @@ export default function BuyerHighlightsManager() {
           />
         }
         renderItem={renderItem}
-        ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: BORDER }} />}
-        style={{ backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' }}
+        ItemSeparatorComponent={() => <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />}
+        style={{ backgroundColor: colors.card, borderRadius: RADII.card, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' }}
       />
 
       <HLFormModal
@@ -253,14 +308,15 @@ export default function BuyerHighlightsManager() {
         label={label}
         setLabel={setLabel}
         emoji={emoji}
+        setEmoji={setEmoji}
         coverColor={coverColor}
         setCoverColor={setCoverColor}
         coverColors={COVER_COLORS}
-        onEmojiTrigger={() => setEmojiPickerOpen(true)}
         onSave={handleSaveCreate}
         onClose={() => setCreating(false)}
         s={s}
         insets={insets}
+        colors={colors}
       />
       <HLFormModal
         visible={!!editing}
@@ -268,56 +324,45 @@ export default function BuyerHighlightsManager() {
         label={label}
         setLabel={setLabel}
         emoji={emoji}
+        setEmoji={setEmoji}
         coverColor={coverColor}
         setCoverColor={setCoverColor}
         coverColors={COVER_COLORS}
-        onEmojiTrigger={() => setEmojiPickerOpen(true)}
         onSave={handleSaveEdit}
         onClose={() => setEditing(null)}
         s={s}
         insets={insets}
-      />
-      <EmojiPicker
-        visible={emojiPickerOpen}
-        onSelect={setEmoji}
-        onClose={() => setEmojiPickerOpen(false)}
+        colors={colors}
       />
     </View>
   );
 }
 
-const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
-  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: 14, gap: 10 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingVertical: 14, gap: 10 },
   reorderBtns: { flexDirection: 'column', alignItems: 'center' },
   reorderArrow: { width: 24, height: 22, alignItems: 'center', justifyContent: 'center' },
-  circle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  rowLabel: { flex: 1, fontFamily: FONT.medium, fontSize: FS.base, color: FG },
+  circle: { width: 44, height: 44, borderRadius: RADII.avatar, alignItems: 'center', justifyContent: 'center' },
+  rowLabel: { flex: 1, fontFamily: FONT.medium, ...TYPE_SCALE.body },
   editIcon: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   deleteIcon: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  empty: { alignItems: 'center', paddingTop: 80, gap: SP.md },
-  emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.lg, color: FG },
-  emptySub: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', paddingHorizontal: SP.xl },
-  createBtn: { paddingHorizontal: SP.xl, paddingVertical: SP.md, borderRadius: RADIUS.pill, backgroundColor: theme.accent },
-   createBtnText: { fontFamily: FONT.bold, fontSize: FS.base, color: theme.onAccent },
-  emojiTrigger: { alignItems: 'center', paddingVertical: SP.md, gap: 4 },
-  emojiHint: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE },
-  labelInput: { borderWidth: 1, borderColor: theme.accent, borderRadius: RADIUS.md, padding: SP.md, color: FG, fontFamily: FONT.regular, fontSize: FS.base, marginBottom: SP.md },
-  colorLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SP.sm },
-  colorRow: { flexDirection: 'row', gap: 10, marginBottom: SP.lg },
+  emojiTrigger: { alignItems: 'center', paddingVertical: SPACING.md, gap: 4 },
+  emojiHint: { ...TYPE_SCALE.caption },
+  emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center', paddingBottom: SPACING.md },
+  emojiBtn: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
+  labelInput: { borderWidth: 1, borderRadius: RADII.input, padding: SPACING.md, ...TYPE_SCALE.body, marginBottom: SPACING.md },
+  colorLabel: { fontFamily: FONT.semibold, ...TYPE_SCALE.caption, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SPACING.sm },
+  colorRow: { flexDirection: 'row', gap: 10, marginBottom: SPACING.lg, flexWrap: 'wrap' },
   colorSwatch: { width: 32, height: 32, borderRadius: 16 },
-  colorSwatchActive: { borderWidth: 3, borderColor: FG },
-  modalActions: { flexDirection: 'row', gap: SP.sm },
-  cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
-  cancelBtnText: { fontFamily: FONT.medium, fontSize: FS.base, color: MUTED },
-  saveBtn: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, backgroundColor: theme.accent, alignItems: 'center' },
-   saveBtnText: { fontFamily: FONT.bold, fontSize: FS.base, color: theme.onAccent },
+  colorSwatchActive: { borderWidth: 3 },
+  modalActions: { flexDirection: 'row', gap: SPACING.sm },
 });
 
 const sheet = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },
-  sheet: { backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SP.lg },
-  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: SP.md },
-  sheetTitle: { fontFamily: FONT.bold, fontSize: FS.lg, color: FG, marginBottom: SP.md },
-  emojiBtn: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  kbWrap: { justifyContent: 'flex-end' },
+  sheet: { borderTopLeftRadius: RADII.sheet, borderTopRightRadius: RADII.sheet, padding: SPACING.lg },
+  handle: { width: 36, height: 4, borderRadius: RADII.pill, alignSelf: 'center', marginBottom: SPACING.md, opacity: 0.5 },
+  sheetTitle: { fontFamily: FONT.bold, ...TYPE_SCALE.title2, marginBottom: SPACING.md },
 });

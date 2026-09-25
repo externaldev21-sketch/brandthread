@@ -17,12 +17,11 @@
  *
  * Handles: loading, not-found, offline/retry, auth-loading wait.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ActivityIndicator,
   Image,
   ScrollView,
@@ -32,9 +31,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
+import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { hapticLight } from '@/lib/haptics';
 import {
-  BG, CARD, BORDER, BORDER_SUBTLE, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, COMP, ICON,
-  SUCCESS, SURFACE, CARD_ELEVATED,
+  FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
 import { normalizeUsername } from '@/lib/shareProfile';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
@@ -114,10 +115,12 @@ function PublicProfileLanding({
   onSignIn: () => void;
   onJoin: () => void;
 }) {
+  const { theme } = useAppTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const initials = getInitials(profile.displayName, profile.username);
   const displayName = profile.displayName || `@${profile.username}`;
   const accountLabel =
-    profile.accountType === 'seller' ? 'Seller on Brandthread' : 'Member on Brandthread';
+    profile.accountType === 'seller' ? 'Seller on Brandthread' : 'On Brandthread';
 
   return (
     <ScrollView
@@ -160,7 +163,7 @@ function PublicProfileLanding({
         )}
         {profile.verified && (
           <View style={styles.verifiedBadge} accessibilityLabel="Verified">
-            <Feather name="check" size={10} color={BG} />
+            <Feather name="check" size={10} color={theme.background} />
           </View>
         )}
       </View>
@@ -179,7 +182,7 @@ function PublicProfileLanding({
         </Text>
         {profile.verified && (
           <View style={styles.verifiedInline} accessibilityLabel="Verified account">
-            <Feather name="check-circle" size={ICON.xs} color={SUCCESS} />
+            <Feather name="check-circle" size={ICON.xs} color={theme.success} />
             <Text style={styles.verifiedText}>Verified</Text>
           </View>
         )}
@@ -190,7 +193,7 @@ function PublicProfileLanding({
         <Feather
           name={profile.accountType === 'seller' ? 'shopping-bag' : 'user'}
           size={ICON.xs}
-          color={MUTED}
+          color={theme.muted}
         />
         <Text style={styles.accountTypeText}>{accountLabel}</Text>
       </View>
@@ -216,26 +219,26 @@ function PublicProfileLanding({
         </Text>
 
         {/* Primary: Open / Join */}
-        <TouchableOpacity
+        <PressableScale
           style={styles.primaryBtn}
-          onPress={onJoin}
+          onPress={() => { hapticLight(); onJoin(); }}
           accessibilityRole="button"
           accessibilityLabel="Join Brandthread to view this profile"
           activeOpacity={0.85}
         >
           <Text style={styles.primaryBtnText}>Join Brandthread</Text>
-        </TouchableOpacity>
+        </PressableScale>
 
         {/* Secondary: Sign in */}
-        <TouchableOpacity
+        <PressableScale
           style={styles.secondaryBtn}
-          onPress={onSignIn}
+          onPress={() => { hapticLight(); onSignIn(); }}
           accessibilityRole="button"
           accessibilityLabel="Sign in to Brandthread"
           activeOpacity={0.85}
         >
           <Text style={styles.secondaryBtnText}>Sign in</Text>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
 
       {/* Fine print */}
@@ -250,6 +253,8 @@ function PublicProfileLanding({
 // ─── Root component ───────────────────────────────────────────────────────────
 
 export default function PublicProfileRoute() {
+  const { theme } = useAppTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ username?: string }>();
@@ -283,7 +288,7 @@ export default function PublicProfileRoute() {
       } else {
         setState({
           kind: 'error',
-          message: 'Could not load this profile. Check your connection.',
+          message: 'Check your connection and try again.',
         });
       }
     }
@@ -313,10 +318,14 @@ export default function PublicProfileRoute() {
         `/seller-profile?sellerId=${encodeURIComponent(profile.id)}&isOwner=false` as never,
       );
     } else {
+      // Pass initials so buyer-other-profile never renders a blank/'?' avatar
+      // while its own profile fetch is still in flight (avoids a second visible
+      // loading flash on top of this route's own loading state).
+      const initials = getInitials(profile.displayName, profile.username);
       router.replace(
         `/buyer-other-profile?userId=${encodeURIComponent(profile.id)}&name=${encodeURIComponent(
           profile.displayName ?? profile.username,
-        )}&handle=${encodeURIComponent('@' + profile.username)}` as never,
+        )}&handle=${encodeURIComponent('@' + profile.username)}&initials=${encodeURIComponent(initials)}` as never,
       );
     }
   }, [state, authLoaded, isSignedIn, router]);
@@ -331,7 +340,7 @@ export default function PublicProfileRoute() {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <View style={styles.center}>
-          <ActivityIndicator color={FG} size="large" />
+          <ActivityIndicator color={theme.text} size="large" />
           <Text style={styles.loadingText}>Loading profile…</Text>
         </View>
       </View>
@@ -343,18 +352,18 @@ export default function PublicProfileRoute() {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <TouchableOpacity
+          <PressableScale
             style={styles.backBtn}
-            onPress={() => router.back()}
+            onPress={() => { hapticLight(); router.back(); }}
             accessibilityRole="button"
             accessibilityLabel="Go back"
           >
-            <Feather name="arrow-left" size={ICON.md} color={FG} />
-          </TouchableOpacity>
+            <Feather name="arrow-left" size={ICON.md} color={theme.text} />
+          </PressableScale>
         </View>
         <View style={styles.center}>
           <View style={styles.iconBox}>
-            <Feather name="user-x" size={40} color={MUTED} />
+            <Feather name="user-x" size={40} color={theme.muted} />
           </View>
           <Text style={styles.notFoundTitle}>Profile not found</Text>
           <Text style={styles.notFoundDesc}>
@@ -362,14 +371,14 @@ export default function PublicProfileRoute() {
               ? `@${state.username} doesn't exist or is unavailable.`
               : 'This profile could not be found.'}
           </Text>
-          <TouchableOpacity
+          <PressableScale
             style={styles.homeBtn}
-            onPress={() => router.replace('/' as never)}
+            onPress={() => { hapticLight(); router.replace('/' as never); }}
             accessibilityRole="button"
             accessibilityLabel="Go to Brandthread home"
           >
             <Text style={styles.homeBtnText}>Go to Brandthread</Text>
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       </View>
     );
@@ -380,27 +389,27 @@ export default function PublicProfileRoute() {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <TouchableOpacity
+          <PressableScale
             style={styles.backBtn}
-            onPress={() => router.back()}
+            onPress={() => { hapticLight(); router.back(); }}
             accessibilityRole="button"
             accessibilityLabel="Go back"
           >
-            <Feather name="arrow-left" size={ICON.md} color={FG} />
-          </TouchableOpacity>
+            <Feather name="arrow-left" size={ICON.md} color={theme.text} />
+          </PressableScale>
         </View>
         <View style={styles.center}>
-          <Feather name="wifi-off" size={40} color={MUTED} />
-          <Text style={styles.notFoundTitle}>Something went wrong</Text>
+          <Feather name="wifi-off" size={40} color={theme.muted} />
+          <Text style={styles.notFoundTitle}>Couldn't load this profile</Text>
           <Text style={styles.notFoundDesc}>{state.message}</Text>
-          <TouchableOpacity
+          <PressableScale
             style={styles.retryBtn}
-            onPress={load}
+            onPress={() => { hapticLight(); load(); }}
             accessibilityRole="button"
             accessibilityLabel="Retry"
           >
             <Text style={styles.retryBtnText}>Retry</Text>
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       </View>
     );
@@ -422,8 +431,9 @@ export default function PublicProfileRoute() {
 
 const AVATAR_SIZE = 88;
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+function makeStyles(theme: AppThemePreset) {
+  return StyleSheet.create({
+  root: { flex: 1, backgroundColor: theme.background },
 
   // ── Shared chrome ──────────────────────────────────────────────────────────
   header: {
@@ -432,7 +442,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SP.md,
     borderBottomWidth: 1,
-    borderBottomColor: BORDER,
+    borderBottomColor: theme.border,
   },
   backBtn: {
     width: COMP.iconBtn,
@@ -450,29 +460,29 @@ const styles = StyleSheet.create({
   loadingText: {
     fontFamily: FONT.regular,
     fontSize: FS.sm,
-    color: MUTED,
+    color: theme.muted,
     marginTop: SP.sm,
   },
   iconBox: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: CARD,
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   notFoundTitle: {
     fontFamily: FONT.bold,
     fontSize: FS.lg,
-    color: FG,
+    color: theme.text,
     textAlign: 'center',
   },
   notFoundDesc: {
     fontFamily: FONT.regular,
     fontSize: FS.sm,
-    color: MUTED,
+    color: theme.muted,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -482,25 +492,25 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: CARD,
+    borderColor: theme.border,
+    backgroundColor: theme.card,
     minHeight: COMP.buttonHSm,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  homeBtnText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
+  homeBtnText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text },
   retryBtn: {
     marginTop: SP.sm,
     paddingHorizontal: SP.xl,
     paddingVertical: 14,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
-    borderColor: FG,
+    borderColor: theme.text,
     minHeight: COMP.buttonHSm,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  retryBtnText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
+  retryBtnText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text },
 
   // ── Public landing layout ──────────────────────────────────────────────────
   landingContent: {
@@ -516,7 +526,7 @@ const styles = StyleSheet.create({
   logoText: {
     fontFamily: FONT.bold,
     fontSize: FS.base,
-    color: FG,
+    color: theme.text,
     letterSpacing: 0.2,
   },
 
@@ -531,22 +541,22 @@ const styles = StyleSheet.create({
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
     borderRadius: AVATAR_SIZE / 2,
-    backgroundColor: CARD,
+    backgroundColor: theme.card,
   },
   avatarPlaceholder: {
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
     borderRadius: AVATAR_SIZE / 2,
-    backgroundColor: CARD_ELEVATED,
+    backgroundColor: theme.cardElevated,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarInitials: {
     fontFamily: FONT.bold,
     fontSize: FS.xl,
-    color: FG,
+    color: theme.text,
     letterSpacing: 1,
   },
   verifiedBadge: {
@@ -556,9 +566,9 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: SUCCESS,
+    backgroundColor: theme.success,
     borderWidth: 2,
-    borderColor: BG,
+    borderColor: theme.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -567,7 +577,7 @@ const styles = StyleSheet.create({
   displayName: {
     fontFamily: FONT.bold,
     fontSize: FS.xl,
-    color: FG,
+    color: theme.text,
     textAlign: 'center',
     lineHeight: 30,
     maxWidth: 280,
@@ -583,7 +593,7 @@ const styles = StyleSheet.create({
   handle: {
     fontFamily: FONT.regular,
     fontSize: FS.sm,
-    color: MUTED,
+    color: theme.muted,
   },
   verifiedInline: {
     flexDirection: 'row',
@@ -593,7 +603,7 @@ const styles = StyleSheet.create({
   verifiedText: {
     fontFamily: FONT.medium,
     fontSize: FS.xs,
-    color: SUCCESS,
+    color: theme.success,
   },
 
   // Account type pill
@@ -606,20 +616,20 @@ const styles = StyleSheet.create({
     paddingVertical: SP.xs + 2,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: SURFACE,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
   },
   accountTypeText: {
     fontFamily: FONT.medium,
     fontSize: FS.xs,
-    color: MUTED,
+    color: theme.muted,
   },
 
   // Bio
   bio: {
     fontFamily: FONT.regular,
     fontSize: FS.sm,
-    color: MUTED,
+    color: theme.muted,
     textAlign: 'center',
     lineHeight: 20,
     marginTop: SP.md,
@@ -630,7 +640,7 @@ const styles = StyleSheet.create({
   divider: {
     width: '100%',
     height: 1,
-    backgroundColor: BORDER_SUBTLE,
+    backgroundColor: theme.borderSubtle,
     marginVertical: SP.xl,
   },
 
@@ -643,7 +653,7 @@ const styles = StyleSheet.create({
   ctaLabel: {
     fontFamily: FONT.regular,
     fontSize: FS.sm,
-    color: MUTED,
+    color: theme.muted,
     textAlign: 'center',
     lineHeight: 20,
     maxWidth: 260,
@@ -653,37 +663,38 @@ const styles = StyleSheet.create({
     width: '100%',
     height: COMP.buttonH,
     borderRadius: RADIUS.pill,
-    backgroundColor: FG,
+    backgroundColor: theme.text,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryBtnText: {
     fontFamily: FONT.semibold,
     fontSize: FS.base,
-    color: BG,
+    color: theme.background,
   },
   secondaryBtn: {
     width: '100%',
     height: COMP.buttonH,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: CARD,
+    borderColor: theme.border,
+    backgroundColor: theme.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
   secondaryBtnText: {
     fontFamily: FONT.semibold,
     fontSize: FS.base,
-    color: FG,
+    color: theme.text,
   },
 
   // Fine print
   finePrint: {
     fontFamily: FONT.regular,
     fontSize: FS.xs,
-    color: SUBTLE,
+    color: theme.subtle,
     marginTop: SP.xl,
     textAlign: 'center',
   },
-});
+  });
+}

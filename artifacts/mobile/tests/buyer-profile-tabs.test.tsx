@@ -47,11 +47,26 @@ vi.mock('react-native', () => {
     removeListener() {}
   }
 
+  // Real RN Pressable supports a function-as-children render prop (used by the
+  // shared PressableScale primitive to get the current press state). The
+  // generic `nativeComponent` helper just forwards `children` verbatim, which
+  // would leave that function unrendered — invoke it here like RN does.
+  function MockPressable(props: Record<string, unknown>) {
+    const { children, ...rest } = props;
+    const content = typeof children === 'function'
+      ? (children as (state: { pressed: boolean }) => React.ReactNode)({ pressed: false })
+      : children;
+    return React.createElement('Pressable', rest, content as React.ReactNode);
+  }
+  MockPressable.displayName = 'Pressable';
+
   return {
     View: nativeComponent('View'),
     Text: nativeComponent('Text'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),
-    Pressable: nativeComponent('Pressable'),
+    // Use the render-prop-aware Pressable mock (plain nativeComponent() would
+    // leave PressableScale's function child unrendered — see comment above).
+    Pressable: MockPressable,
     ActivityIndicator: nativeComponent('ActivityIndicator'),
     ScrollView: nativeComponent('ScrollView'),
     Modal: nativeComponent('Modal'),
@@ -79,14 +94,27 @@ vi.mock('@clerk/expo', () => ({
 
 vi.mock('@expo/vector-icons', () => ({
   Feather: ({ name }: { name: string }) => React.createElement('Feather', { name }),
+  FontAwesome: ({ name }: { name: string }) => React.createElement('FontAwesome', { name }),
+}));
+
+// The shared `PressableScale`/`EmptyState` primitives (components/BrandthreadUI.tsx)
+// pull in these two native packages at module scope; their real builds aren't
+// parseable under Vitest's SSR transform outside a Metro/RN runtime.
+vi.mock('expo-linear-gradient', () => ({
+  LinearGradient: ({ children }: { children?: React.ReactNode }) => React.createElement('LinearGradient', {}, children),
+}));
+
+vi.mock('react-native-svg', () => ({
+  default: ({ children }: { children?: React.ReactNode }) => React.createElement('Svg', {}, children),
+  Line: (props: Record<string, unknown>) => React.createElement('SvgLine', props),
 }));
 
 vi.mock('expo-haptics', () => ({
-  impactAsync: vi.fn(),
-  selectionAsync: vi.fn(),
-  notificationAsync: vi.fn(),
-  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium' },
-  NotificationFeedbackType: { Success: 'success' },
+  impactAsync: vi.fn().mockResolvedValue(undefined),
+  selectionAsync: vi.fn().mockResolvedValue(undefined),
+  notificationAsync: vi.fn().mockResolvedValue(undefined),
+  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium', Heavy: 'heavy' },
+  NotificationFeedbackType: { Success: 'success', Warning: 'warning', Error: 'error' },
 }));
 
 vi.mock('expo-router', () => ({
@@ -117,18 +145,37 @@ vi.mock('@/contexts/AppThemeContext', () => ({
   }),
 }));
 
-vi.mock('@/lib/theme', () => ({
-  FONT: { regular: 'System', medium: 'System', semibold: 'System', bold: 'System' },
-  FS: { xs: 11, sm: 13, base: 15, md: 17, lg: 19, xl: 22, xxl: 26, h1: 32, h2: 26 },
-  SP: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 },
-  RADIUS: { xs: 6, sm: 10, md: 14, lg: 18, xl: 22, xxl: 28, pill: 999 },
-  ICON: { xs: 12, sm: 16, md: 20, lg: 24, xl: 28, xxl: 40 },
-  GRID_MAX_WIDTH: 1080,
-  TYPE: {
-    largeTitle: { fontSize: 32, fontFamily: 'System', lineHeight: 42 },
-    title: { fontSize: 26, fontFamily: 'System', lineHeight: 36 },
-  },
+// The Phase 2 design-system pass moved this screen onto the shared
+// PressableScale/IconButton/ErrorState primitives, which read colors via
+// `useColors()`. Importing the real hook pulls in `@/contexts/AppThemeContext`
+// through a path Vite's SSR transform doesn't intercept cleanly here, so this
+// mirrors the AppThemeContext mock above directly.
+vi.mock('@/hooks/useColors', () => ({
+  useColors: () => ({
+    background: '#07070F', card: '#12121F', cardElevated: '#18182E',
+    border: '#303044', text: '#F4F4FF', muted: '#AAAABC', subtle: '#77778A',
+    accent: '#C7CDD5', accentDim: '#34383E', accentLight: '#F8FAFC', onAccent: '#0A0A0B',
+    secondary: '#22D3EE', secondaryDim: '#164E63', success: '#10B981', warning: '#F97316',
+    error: '#F87171', overlay: 'rgba(0,0,0,0.72)', mutedForeground: '#AAAABC',
+  }),
 }));
+
+vi.mock('@/lib/theme', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/theme')>();
+  return {
+    ...actual,
+    FONT: { regular: 'System', medium: 'System', semibold: 'System', bold: 'System' },
+    FS: { xs: 11, sm: 13, base: 15, md: 17, lg: 19, xl: 22, xxl: 26, h1: 32, h2: 26 },
+    SP: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 },
+    RADIUS: { xs: 6, sm: 10, md: 14, lg: 18, xl: 22, xxl: 28, pill: 999 },
+    ICON: { xs: 12, sm: 16, md: 20, lg: 24, xl: 28, xxl: 40 },
+    GRID_MAX_WIDTH: 1080,
+    TYPE: {
+      largeTitle: { fontSize: 32, fontFamily: 'System', lineHeight: 42 },
+      title: { fontSize: 26, fontFamily: 'System', lineHeight: 36 },
+    },
+  };
+});
 
 vi.mock('@/services/socialService', () => ({
   getMyProfile: getMyProfileMock,
@@ -177,9 +224,33 @@ vi.mock('@/components/layout', () => {
   };
 });
 
+// profile.tsx also renders the (separately Phase-2-migrated) ShareProfileSheet,
+// which pulls in react-native-reanimated-based motion/share-card components
+// at module scope — real reanimated isn't parseable under Vitest's SSR
+// transform outside a Metro/RN runtime, and this test doesn't exercise the
+// share sheet's own UI, so it's stubbed out entirely.
+vi.mock('@/components/ShareProfileSheet', () => ({
+  ShareProfileSheet: () => null,
+}));
+
 vi.mock('@/components/BrandthreadUI', () => {
   const ReactActual = require('react') as typeof import('react');
+  // Mocking this module wholesale (for EmptyState below) shadows every one of
+  // its other exports too — profile.tsx also imports the real `PressableScale`
+  // from here, so it needs a stand-in. This renders straight to the same
+  // 'Pressable' host type the react-native mock's Pressable produces (rather
+  // than requiring that mocked module from inside this factory, which trips
+  // Vitest's mock-hoisting analysis), so every existing query against
+  // `node.type === 'Pressable'` keeps matching, and a function child (the
+  // render-prop real PressableScale/Pressable support) is still invoked.
+  const PressableScale = ({ children, ...rest }: Record<string, unknown>) => {
+    const content = typeof children === 'function'
+      ? (children as (state: { pressed: boolean }) => unknown)({ pressed: false })
+      : children;
+    return ReactActual.createElement('Pressable', rest, content as React.ReactNode);
+  };
   return {
+    PressableScale,
     EmptyState: ({ title, description, action }: { title: string; description?: string; action?: { label: string; onPress: () => void } }) =>
       ReactActual.createElement(
         'View',
@@ -335,10 +406,13 @@ describe('buyer profile tabs', () => {
     expect(routerMock.push).toHaveBeenCalledWith('/account-switcher');
 
     routerMock.push.mockReset();
+    // The Phase 2 pass migrated this button from TouchableOpacity to the
+    // shared PressableScale primitive (which renders as the mocked
+    // `Pressable` host type here) and its copy to sentence case.
     const editProfileBtns = renderer.root.findAll(
-      node => (node.type as unknown) === 'TouchableOpacity'
-        && node.props.onPress
-        && textContent(node.props.children).includes('Edit Profile'),
+      node => (node.type as unknown) === 'Pressable'
+        && typeof node.props.onPress === 'function'
+        && textContent(node.props.children).includes('Edit profile'),
     );
     expect(editProfileBtns.length).toBeGreaterThan(0);
     await act(async () => { editProfileBtns[0].props.onPress(); });

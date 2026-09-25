@@ -6,8 +6,8 @@
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  FlatList, ActivityIndicator,
+  View, Text, StyleSheet, ScrollView,
+  FlatList,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
@@ -15,13 +15,14 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
-import * as Haptics from 'expo-haptics';
-import {
-  BG, SCREEN_BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  SUCCESS, RED, RED_DIM,
-  FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { SkeletonBlock, SkeletonLine } from '@/components/ui';
+import { hapticPrimaryAction } from '@/lib/haptics';
+import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
+import { SPACING } from '@/constants/spacing';
+import { RADII } from '@/constants/radii';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,22 +70,29 @@ function useCountdown(releaseAt?: string | null): CountdownParts {
 
 // ─── Drop card ────────────────────────────────────────────────────────────────
 
-const SELLER_COLORS = ['#0EA5E9','#0F766E','#B45309','#BE185D','#1D4ED8','#059669','#DC2626','#0891B2'];
+// Per-seller identity color, generated the same way as elsewhere in the app
+// (e.g. buyer-friend-requests.tsx). This is data-driven brand identity, not UI
+// chrome, so it is intentionally kept outside the theme token system.
+const SELLER_COLORS = ['#0EA5E9', '#0F766E', '#B45309', '#BE185D', '#1D4ED8', '#059669', '#DC2626', '#0891B2'];
 function colorForId(id: string) { return SELLER_COLORS[id.charCodeAt(0) % SELLER_COLORS.length]; }
 
 function DropCard({ drop, onPress }: { drop: DropItem; onPress: () => void }) {
+  const palette = useColors();
   const { d, h, m, s, live } = useCountdown(drop.releaseAt);
   const hasCountdown = !!drop.releaseAt && !live;
   const color = drop.sellerColor;
 
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={[c.card, { borderColor: BORDER }]}>
-      {/* Visual area */}
-      <LinearGradient colors={[color + 'CC', color + '44', BG + 'FF']} style={c.visual}>
+    <PressableScale onPress={onPress} style={[c.card, { backgroundColor: palette.card, borderColor: palette.border }]}>
+      {/* Visual area — seller-color gradient with a dark scrim so white text stays legible */}
+      <LinearGradient
+        colors={[color + 'CC', color + '44', palette.background + 'FF']} // theme-exempt: gradient scrim over a seller-color visual, not UI chrome
+        style={c.visual}
+      >
         <View style={c.visualContent}>
-          <Text style={c.dropName}>{drop.name}</Text>
+          <Text style={[TYPE_SCALE.title2, c.dropName]} numberOfLines={1}>{drop.name}</Text>
           <View style={[c.typePill, { backgroundColor: color + '30', borderColor: color + '60' }]}>
-            <Text style={[c.typeText, { color }]}>{drop.tag}</Text>
+            <Text style={[TYPE_SCALE.caption, c.typeText, { color }]}>{drop.tag}</Text>
           </View>
         </View>
 
@@ -95,15 +103,15 @@ function DropCard({ drop, onPress }: { drop: DropItem; onPress: () => void }) {
               { v: d, u: 'd' }, { v: h, u: 'h' }, { v: m, u: 'm' }, { v: s, u: 's' },
             ].map(({ v, u }) => (
               <View key={u} style={c.countdownUnit}>
-                <Text style={c.countdownNum}>{String(v).padStart(2, '0')}</Text>
-                <Text style={c.countdownLabel}>{u}</Text>
+                <Text style={[TYPE_SCALE.headline, TABULAR_NUMS, c.countdownNum]}>{String(v).padStart(2, '0')}</Text>
+                <Text style={[TYPE_SCALE.caption, c.countdownLabel]}>{u}</Text>
               </View>
             ))}
           </View>
         ) : live ? (
-          <View style={c.liveBadge}>
+          <View style={[c.liveBadge, { backgroundColor: `${palette.success}CC` }]}>
             <View style={c.liveDot} />
-            <Text style={c.liveText}>Live Now</Text>
+            <Text style={[TYPE_SCALE.caption, c.liveText]}>Live now</Text>
           </View>
         ) : null}
       </LinearGradient>
@@ -112,59 +120,75 @@ function DropCard({ drop, onPress }: { drop: DropItem; onPress: () => void }) {
       <View style={c.info}>
         <View style={c.sellerRow}>
           <View style={[c.sellerDot, { backgroundColor: color }]}>
-            <Text style={c.sellerInitials}>{drop.sellerInitials}</Text>
+            <Text style={[TYPE_SCALE.caption, c.sellerInitials]}>{drop.sellerInitials}</Text>
           </View>
-          <Text style={c.sellerName} numberOfLines={1}>{drop.sellerName}</Text>
+          <Text style={[TYPE_SCALE.callout, c.sellerName, { color: palette.foreground }]} numberOfLines={1}>{drop.sellerName}</Text>
           {drop.estimatedShipDate && (
-            <Text style={c.shipDate}>
+            <Text style={[TYPE_SCALE.footnote, { color: palette.mutedForeground }]} numberOfLines={1}>
               Ships {new Date(drop.estimatedShipDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
             </Text>
           )}
         </View>
-        <Text style={c.desc} numberOfLines={2}>{drop.desc}</Text>
-        <TouchableOpacity
+        <Text style={[TYPE_SCALE.callout, c.desc, { color: palette.mutedForeground }]} numberOfLines={2}>{drop.desc}</Text>
+        <PressableScale
           style={[c.shopBtn, { backgroundColor: color }]}
-          activeOpacity={0.85}
-          onPress={onPress}
+          onPress={() => { hapticPrimaryAction(); onPress(); }}
         >
           <Feather name="shopping-bag" size={14} color="#FFF" />
-          <Text style={c.shopBtnText}>{live ? 'Shop Drop' : 'View Drop'}</Text>
-        </TouchableOpacity>
+          <Text style={[TYPE_SCALE.callout, c.shopBtnText]}>{live ? 'Shop drop' : 'View drop'}</Text>
+        </PressableScale>
       </View>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
 const c = StyleSheet.create({
-  card: { backgroundColor: CARD, borderRadius: RADIUS.xl, borderWidth: 1, overflow: 'hidden', marginBottom: 16 },
-  visual: { height: 170, padding: 16, justifyContent: 'space-between' },
-  visualContent: { gap: 8 },
-  dropName: { fontSize: 20, fontFamily: FONT.bold, color: '#FFFFFF', lineHeight: 26 },
-  typePill: { alignSelf: 'flex-start', borderRadius: RADIUS.pill, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4 },
-  typeText: { fontSize: FS.xs, fontFamily: FONT.semibold },
-  countdownBar: { flexDirection: 'row', gap: 8, alignSelf: 'flex-start', backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 6 },
+  card: { borderRadius: RADII.card, borderWidth: 1, overflow: 'hidden', marginBottom: SPACING.md },
+  visual: { height: 170, padding: SPACING.md, justifyContent: 'space-between' },
+  visualContent: { gap: SPACING.xs },
+  dropName: { color: '#FFFFFF' }, // theme-exempt: white text over a seller-color gradient scrim, not UI chrome
+  typePill: { alignSelf: 'flex-start', borderRadius: RADII.pill, borderWidth: 1, paddingHorizontal: SPACING.xs + 2, paddingVertical: 4 },
+  typeText: {},
+  countdownBar: { flexDirection: 'row', gap: SPACING.xs, alignSelf: 'flex-start', backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: RADII.chip, paddingHorizontal: SPACING.xs + 2, paddingVertical: 6 }, // theme-exempt: dark scrim over media
   countdownUnit: { alignItems: 'center', minWidth: 28 },
-  countdownNum: { fontSize: 16, fontFamily: FONT.bold, color: '#FFFFFF', lineHeight: 20 },
-  countdownLabel: { fontSize: FS.xs, fontFamily: FONT.regular, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase' },
-  liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: `${SUCCESS}CC`, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 6, alignSelf: 'flex-start' },
+  countdownNum: { color: '#FFFFFF' }, // theme-exempt: white text over scrim
+  countdownLabel: { color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase' }, // theme-exempt: white text over scrim
+  liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: RADII.pill, paddingHorizontal: SPACING.xs + 2, paddingVertical: 6, alignSelf: 'flex-start' },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FFFFFF' },
-  liveText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: '#FFFFFF' },
-  info: { paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
-  sellerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  liveText: { color: '#FFFFFF' }, // theme-exempt: white text on the success scrim badge
+  info: { paddingHorizontal: 14, paddingVertical: SPACING.sm, gap: SPACING.xs },
+  sellerRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
   sellerDot: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  sellerInitials: { fontSize: FS.xs, fontFamily: FONT.bold, color: '#FFFFFF' },
-  sellerName: { flex: 1, fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  shipDate: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  desc: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 18 },
-  shopBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', borderRadius: RADIUS.sm, paddingHorizontal: 14, paddingVertical: 8 },
-  shopBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: '#FFFFFF' },
+  sellerInitials: { color: '#FFFFFF' }, // theme-exempt: initials on a per-seller identity color
+  sellerName: { flex: 1 },
+  desc: { lineHeight: 18 },
+  shopBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', borderRadius: RADII.chip, paddingHorizontal: SPACING.md - 2, paddingVertical: SPACING.xs },
+  shopBtnText: { color: '#FFFFFF' }, // theme-exempt: label on a per-seller identity color button
 });
+
+// ─── Loading skeleton ─────────────────────────────────────────────────────────
+
+function DropCardSkeleton() {
+  return (
+    <View style={c.card}>
+      <SkeletonBlock width="100%" height={170} radius={0} />
+      <View style={c.info}>
+        <View style={c.sellerRow}>
+          <SkeletonBlock width={24} height={24} radius={12} />
+          <SkeletonLine width="40%" height={14} />
+        </View>
+        <SkeletonLine width="90%" height={12} />
+        <SkeletonBlock width={100} height={28} radius={RADII.chip} />
+      </View>
+    </View>
+  );
+}
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function FollowingScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const palette = useColors();
   const insets = useSafeAreaInsets();
   const barInset = useBuyerTabBarInset();
   const router = useRouter();
@@ -223,33 +247,42 @@ export default function FollowingScreen() {
   }));
 
   return (
-    <View style={[s.container, { backgroundColor: SCREEN_BG }]}>
+    <View style={[s.container, { backgroundColor: palette.background }]}>
       {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + 16, borderBottomColor: BORDER }]}>
+      <View style={[s.header, { paddingTop: insets.top + SPACING.md, borderBottomColor: palette.border }]}>
         <View>
-          <Text style={[s.headerTitle, { color: FG }]}>Following</Text>
-          <Text style={[s.headerSub, { color: MUTED }]}>{subtitle}</Text>
+          <Text style={[TYPE_SCALE.title1, s.headerTitle, { color: palette.foreground }]}>Following</Text>
+          <Text style={[TYPE_SCALE.footnote, s.headerSub, { color: palette.mutedForeground }]}>{subtitle}</Text>
         </View>
       </View>
 
       {/* Brand avatars row — only shown when real drops exist */}
       {avatarBrands.length > 0 && (
-        <View style={[s.avatarsRow, { borderBottomColor: BORDER }]}>
+        <View style={[s.avatarsRow, { borderBottomColor: palette.border }]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.avatarsScroll}>
             {avatarBrands.map(brand => (
-              <TouchableOpacity key={brand.id} style={s.avatarItem} activeOpacity={0.8}
-                onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}>
+              <PressableScale
+                key={brand.id}
+                style={s.avatarItem}
+                onPress={() => {
+                  hapticPrimaryAction();
+                  const drop = drops.find(d => d.id === brand.id);
+                  if (drop) {
+                    router.push((`/buyer-drop-detail?dropId=${drop.id}&dropName=${encodeURIComponent(drop.name)}`) as never);
+                  }
+                }}
+              >
                 <LinearGradient colors={[...theme.primaryGradient]} style={s.avatarRing}>
-                  <View style={[s.avatarRingInner, { backgroundColor: BG }]}>
+                  <View style={[s.avatarRingInner, { backgroundColor: palette.background }]}>
                     <View style={[s.avatarCircle, { backgroundColor: brand.color }]}>
-                      <Text style={s.avatarInitials}>{brand.initials}</Text>
+                      <Text style={[TYPE_SCALE.footnote, s.avatarInitials]}>{brand.initials}</Text>
                     </View>
                   </View>
                 </LinearGradient>
-                <Text style={[s.avatarLabel, { color: MUTED }]} numberOfLines={1}>
+                <Text style={[TYPE_SCALE.caption, s.avatarLabel, { color: palette.mutedForeground }]} numberOfLines={1}>
                   {(brand.handle ?? '').replace('@', '').slice(0, 8)}
                 </Text>
-              </TouchableOpacity>
+              </PressableScale>
             ))}
           </ScrollView>
         </View>
@@ -257,12 +290,15 @@ export default function FollowingScreen() {
 
       {/* Drop cards / loading / empty */}
       {loading ? (
-        <View style={s.loadingWrap}><ActivityIndicator color={PURPLE} /></View>
+        <View style={s.loadingWrap} accessibilityLabel="Loading drops">
+          <DropCardSkeleton />
+          <DropCardSkeleton />
+        </View>
       ) : drops.length === 0 ? (
         <View style={s.centeredWrap}>
-          <Feather name="heart" size={36} color={MUTED} style={{ marginBottom: 12 }} />
-          <Text style={s.emptyTitle}>No drops yet</Text>
-          <Text style={s.emptyBody}>
+          <Feather name="heart" size={36} color={palette.mutedForeground} style={{ marginBottom: SPACING.sm }} />
+          <Text style={[TYPE_SCALE.headline, s.emptyTitle, { color: palette.foreground }]}>No drops yet</Text>
+          <Text style={[TYPE_SCALE.body, s.emptyBody, { color: palette.mutedForeground }]}>
             Follow sellers to see their latest drops here.{'\n'}New drops from sellers you follow will appear when they go live.
           </Text>
         </View>
@@ -270,13 +306,13 @@ export default function FollowingScreen() {
         <FlatList
           data={drops}
           keyExtractor={d => d.id}
-          contentContainerStyle={{ padding: 16, paddingBottom: Math.max(120, barInset + SP.md) }}
+          contentContainerStyle={{ padding: SPACING.md, paddingBottom: Math.max(120, barInset + SPACING.md) }}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <DropCard
               drop={item}
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                hapticPrimaryAction();
                 router.push((`/buyer-drop-detail?dropId=${item.id}&dropName=${encodeURIComponent(item.name)}`) as never);
               }}
             />
@@ -293,24 +329,24 @@ const s = StyleSheet.create({
   container: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: 1,
+    paddingHorizontal: SPACING.lg, paddingBottom: SPACING.sm + 2, borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerTitle: { fontSize: 28, fontFamily: FONT.bold, letterSpacing: -0.6 },
-  headerSub:   { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
+  headerTitle: { letterSpacing: -0.6 },
+  headerSub:   { marginTop: 2 },
 
-  avatarsRow:    { borderBottomWidth: 1 },
-  avatarsScroll: { paddingHorizontal: 16, paddingVertical: 12, gap: 14 },
+  avatarsRow:    { borderBottomWidth: StyleSheet.hairlineWidth },
+  avatarsScroll: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, gap: SPACING.md - 2 },
   avatarItem:    { alignItems: 'center', gap: 5, width: 60 },
   avatarRing:    { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center' },
   avatarRingInner: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center' },
   avatarCircle:  { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
-  avatarInitials: { fontSize: 13, fontFamily: FONT.bold, color: '#FFFFFF' },
-  avatarLabel:   { fontSize: FS.xs, fontFamily: FONT.regular, textAlign: 'center' },
+  avatarInitials: { color: '#FFFFFF' }, // theme-exempt: initials on a per-seller identity color
+  avatarLabel:   { textAlign: 'center' },
 
-  loadingWrap:  { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  centeredWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  loadingWrap:  { flex: 1, padding: SPACING.md, gap: SPACING.md },
+  centeredWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.xxl },
 
   // Empty state
-  emptyTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG, marginBottom: 8, textAlign: 'center' },
-  emptyBody:  { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20 },
+  emptyTitle: { marginBottom: SPACING.xs, textAlign: 'center' },
+  emptyBody:  { textAlign: 'center', lineHeight: 20 },
 });

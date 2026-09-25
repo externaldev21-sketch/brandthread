@@ -90,7 +90,8 @@ export function useUndoToast(): UndoToastContextValue {
 // ─── Reusable Motion Primitives ───────────────────────────────────────────────
 
 interface PressableScaleProps extends Omit<PressableProps, 'style'> {
-  children: React.ReactNode | ((state: { pressed: boolean }) => React.ReactNode);
+  /** Optional so a purely-tappable overlay (e.g. a full-screen dismiss backdrop) doesn't need a dummy child. */
+  children?: React.ReactNode | ((state: { pressed: boolean }) => React.ReactNode);
   style?: StyleProp<ViewStyle> | ((state: { pressed: boolean }) => StyleProp<ViewStyle>);
   activeScale?: number;
   activeOpacity?: number;
