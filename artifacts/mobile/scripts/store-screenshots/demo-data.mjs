@@ -460,6 +460,25 @@ export function respond({ method, path, query, role, options = {} }) {
   if (p === '/posts/repost-context') return {};
   if (p === '/live/active') return { streams: [] };
   if (p.startsWith('/social/status/')) return { isFollowing: false, followersCount: 24800 };
+  // Discover's "From Brands You Follow" rail: the buyer follows Ember & Ash
+  // and Field Office; each seller's public storefront lists their catalogue.
+  if (p === '/social/following') {
+    return ['ember', 'field'].map((key) => ({
+      userId: BRANDS[key].clerkId, name: BRANDS[key].name, username: BRANDS[key].handle,
+      handle: BRANDS[key].handle, initials: BRANDS[key].name.slice(0, 2).toUpperCase(),
+      color: '#7A7A7A', followedAt: iso(90 * DAY),
+    }));
+  }
+  if ((match = p.match(/^\/public\/sellers\/([^/]+)$/))) {
+    const brandKey = Object.keys(BRANDS).find((key) => BRANDS[key].clerkId === decodeURIComponent(match[1]));
+    if (!brandKey) return { profile: null, products: [], posts: [] };
+    const brand = BRANDS[brandKey];
+    return {
+      profile: { clerkId: brand.clerkId, displayName: brand.name, brandName: brand.name, verified: true, username: brand.handle },
+      products: PUBLIC_PRODUCTS.filter((product) => product.sellerId === brand.clerkId),
+      posts: [],
+    };
+  }
   if (p === '/buyer/cart') return CART;
   if (p === '/buyer/notifications') return [];
   if (p === '/shipping-rates/calculate') return { shippingCents: 1200, rateName: 'Express courier (2–3 days)', isFree: false };

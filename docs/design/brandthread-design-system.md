@@ -63,6 +63,23 @@ compositions:
 
 Icons throughout use `@expo/vector-icons` `Feather`.
 
+### `components/ui` (Phase 1 barrel)
+
+Newer, Phase 1 primitives live in `artifacts/mobile/components/ui` and export
+from its `index.ts` barrel: `Button`, `Card`, `Chip`, `SegmentedControl`,
+`ListRow`, `Avatar`, `QuantityStepper`, `BottomSheet`, `Snackbar`, `Skeleton`,
+`ErrorState`, `IconButton` (with a `variant="glass"` frosted mode for chrome
+over full-bleed photo/gradient content), and the motion primitives
+(`HeartToggle`, `FollowMorphButton`, `CountUpNumber`).
+
+- **`GlassPanel`** (added for the buyer Discover redesign): a frosted,
+  monochrome glass surface — the "glass info card" language used for stat
+  strips and floating chrome over gradients/photos (e.g. Discover's hero
+  "Best price / Sold / Want" card). Same lazy `expo-blur` require as
+  `IconButton`'s glass variant. Use this instead of a one-off `BlurView` +
+  tint composition whenever a screen needs glass chrome over full-bleed
+  content.
+
 ## Manufacturer Hub conventions
 
 - Entry point: `artifacts/mobile/app/manufacturer-hub.tsx`, gated behind the
