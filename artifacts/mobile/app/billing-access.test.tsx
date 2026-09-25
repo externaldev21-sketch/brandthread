@@ -66,6 +66,7 @@ vi.mock('react-native', () => {
     AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
     Linking: { openURL: vi.fn(), canOpenURL: vi.fn(async () => true) },
     Platform: { OS: 'web', select: (obj: Record<string, unknown>) => obj.web ?? obj.default },
+    Pressable: nativeComponent('Pressable'),
     ScrollView: nativeComponent('ScrollView'),
     Share: { share: vi.fn() },
     StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
