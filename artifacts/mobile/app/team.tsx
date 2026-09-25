@@ -262,7 +262,14 @@ export default function TeamScreen() {
         </View>
         {isPending && (
           <TouchableOpacity
-            onPress={() => isExpired ? handleRegenerate(m) : (m.inviteUrl ? copyLink(m.inviteUrl) : null)}
+            onPress={(e) => {
+              // Stop this nested action button from also bubbling into the
+              // row's own onPress (which navigates to the member's profile) —
+              // two nested tappables sharing one gesture is a web a11y bug
+              // (nested interactive elements) and a native mis-tap trap.
+              e?.stopPropagation?.();
+              isExpired ? handleRegenerate(m) : (m.inviteUrl ? copyLink(m.inviteUrl) : null);
+            }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={[styles.linkBtn, { borderColor: isExpired ? colors.warning + '44' : colors.border }]}
             disabled={isRegenerating || isDismissing}
@@ -275,7 +282,7 @@ export default function TeamScreen() {
         )}
         {isExpired && currentRole === 'owner' && (
           <TouchableOpacity
-            onPress={() => dismissExpiredInvite(m)}
+            onPress={(e) => { e?.stopPropagation?.(); dismissExpiredInvite(m); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={[styles.dismissBtn, { borderColor: colors.border }]}
             disabled={isDismissing || isRegenerating}
