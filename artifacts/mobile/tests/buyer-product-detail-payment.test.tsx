@@ -20,6 +20,7 @@ const {
     publicProducts: {
       get: vi.fn(),
       related: vi.fn(),
+      taggedVideos: vi.fn(),
     },
     buyer: {
       sellerPaymentStatus: vi.fn(),
@@ -271,6 +272,12 @@ vi.mock('@/services/cartService', () => ({
   replaceCartItemVariant: vi.fn(),
 }));
 
+// The screen fires a fire-and-forget ViewContent pixel/CAPI event on mount;
+// stub it out (real expo-crypto isn't loadable in this test environment).
+vi.mock('@/lib/marketingPixels', () => ({
+  trackAndRelayConversionEvent: vi.fn(() => false),
+}));
+
 import BuyerProductDetailScreen from '@/app/buyer-product-detail';
 
 const product = {
@@ -302,12 +309,15 @@ function findTouchableByText(renderer: ReactTestRenderer, text: string): ReactTe
   // The design-system migration moved some of these onto Chip/Button, which
   // render a Pressable instead of a raw TouchableOpacity — same tap behavior,
   // different host element type.
-  const match = renderer.root.findAll(
+  const touchables = renderer.root.findAll(
     (node: any) =>
       (node.type === 'TouchableOpacity' || node.type === 'Pressable') &&
       typeof node.props.onPress === 'function' &&
       textContent(node.props.children).includes(text),
-  )[0];
+  );
+  // Prefer an exact label match (a size chip "M") over any control whose
+  // label merely contains the text (e.g. "Message seller").
+  const match = touchables.find((node) => textContent(node.props.children).trim() === text) ?? touchables[0];
   if (!match) throw new Error(`Could not find TouchableOpacity/Pressable containing "${text}"`);
   return match;
 }
@@ -341,6 +351,8 @@ describe('buyer product detail when seller payments are unavailable', () => {
     apiMock.publicProducts.get.mockResolvedValue(product);
     apiMock.publicProducts.related.mockReset();
     apiMock.publicProducts.related.mockResolvedValue([]);
+    apiMock.publicProducts.taggedVideos.mockReset();
+    apiMock.publicProducts.taggedVideos.mockResolvedValue([]);
     apiMock.buyer.sellerPaymentStatus.mockReset();
     apiMock.buyer.sellerPaymentStatus.mockResolvedValue({
       ready: false,
@@ -393,7 +405,7 @@ describe('buyer product detail when seller payments are unavailable', () => {
     });
 
     expect(addToCartMock).toHaveBeenCalledOnce();
-    expect(textContent(renderer.root)).toContain('View Cart');
+    expect(textContent(renderer.root)).toContain('View bag');
     expect(routerMock.push).not.toHaveBeenCalledWith('/buyer-checkout?source=buynow');
   });
 
@@ -415,7 +427,7 @@ describe('buyer product detail when seller payments are unavailable', () => {
     });
 
     expect(addToCartMock).toHaveBeenCalledOnce();
-    expect(textContent(renderer.root)).toContain('View Cart');
+    expect(textContent(renderer.root)).toContain('View bag');
 
     const buyNow = renderer.root.findByProps({ accessibilityLabel: 'Buy now' });
     expect(buyNow.props.disabled).toBe(false);

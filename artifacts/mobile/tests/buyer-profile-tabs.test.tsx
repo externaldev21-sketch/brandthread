@@ -84,8 +84,14 @@ vi.mock('react-native', () => {
       loop: () => ({ start: () => {}, stop: () => {} }),
     },
     Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
   };
 });
+
+// The redesigned profile renders into the shared ProfileShell; its native
+// hero/scroll chrome is replaced by a slot-rendering stand-in.
+vi.mock('@/components/profile/ProfileShell', async () =>
+  (await import('./helpers/profileShellMock')).profileShellMockModule);
 
 vi.mock('@clerk/expo', () => ({
   useAuth: () => ({ userId: 'buyer-1', signOut: vi.fn() }),
@@ -217,6 +223,7 @@ vi.mock('@/components/layout', () => {
   return {
     EmptyState: ({ message }: { message: string }) => ReactActual.createElement('Text', null, message),
     GridSkeleton: () => ReactActual.createElement('View', { testID: 'grid-skeleton' }),
+    SkeletonBlock: () => ReactActual.createElement('View', { testID: 'skeleton-block' }),
     ListSkeleton: () => ReactActual.createElement('View', { testID: 'list-skeleton' }),
     ResponsiveContainer: ({ children }: { children: React.ReactNode }) => ReactActual.createElement('View', null, children),
     useGridColumns: () => 3,
@@ -460,6 +467,33 @@ describe('buyer profile tabs', () => {
     const card = renderer.root.findByProps({ accessibilityLabel: 'Order BT-2001, shipped' });
     await act(async () => { card.props.onPress(); });
     expect(routerMock.push).toHaveBeenCalledWith('/buyer-order-detail?id=order-active');
+  });
+
+  it('opens the full-screen feed player on the buyer\'s own posts, starting at the tapped one', async () => {
+    renderer = await renderScreen();
+    const tile = renderer.root.findAll(
+      node => node.props.testID === 'profile-video-tile-post-1' && typeof node.props.onPress === 'function',
+    )[0];
+    await act(async () => { tile.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/profile-videos?source=creator&id=buyer-1&startPostId=post-1&title=Ava%20Buyer');
+  });
+
+  it('links the Followers / Following counts to the connection lists', async () => {
+    renderer = await renderScreen();
+    const followers = renderer.root.findAll(
+      node => node.props.testID === 'profile-stat-followers' && typeof node.props.onPress === 'function',
+    )[0];
+    await act(async () => { followers.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/connections?type=followers');
+  });
+
+  it('offers "Post your first video" when the buyer has no posts', async () => {
+    getMyPostsMock.mockResolvedValue([]);
+    renderer = await renderScreen();
+    const cta = renderer.root.findByProps({ testID: 'empty-state-action' });
+    expect(textContent(cta.props.children)).toContain('Post your first video');
+    await act(async () => { cta.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith('/create-post?accountType=buyer');
   });
 
   it('renders no My Orders section when the buyer has no orders', async () => {

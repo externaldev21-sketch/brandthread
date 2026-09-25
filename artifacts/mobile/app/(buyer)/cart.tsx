@@ -30,6 +30,7 @@ import {
 } from '@/services/cartTypes';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
+import { RecentlyViewedRow } from '@/components/RecentlyViewedRow';
 import { useApi } from '@/hooks/useApi';
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import {
@@ -1042,6 +1043,8 @@ export default function CartScreen() {
             {!hasSaved && (
               <Text style={s.savedHint}>Products you save for later will appear here.</Text>
             )}
+
+            <RecentlyViewedRow style={{ marginTop: SP.xl }} />
           </ScrollView>
 
           {/* Checkout button — acts on whatever's checked (all by default), Nike-bag style sticky pill */}

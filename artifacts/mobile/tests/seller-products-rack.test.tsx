@@ -1,6 +1,7 @@
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Product, ProductFilter } from '@/services/productTypes';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -219,6 +220,7 @@ vi.mock('@/components/products/ProductCard', () => {
 vi.mock('@/services/productService', () => ({
   getProducts: getProductsMock,
   getProductStats: getProductStatsMock,
+  getProduct: vi.fn().mockResolvedValue(undefined),
   archiveProduct: archiveProductMock,
   unarchiveProduct: unarchiveProductMock,
   deleteProduct: deleteProductMock,
@@ -267,8 +269,11 @@ async function flushPromises() {
 
 async function renderScreen(): Promise<ReactTestRenderer> {
   let renderer!: ReactTestRenderer;
+  const queryClient = new QueryClient();
   await act(async () => {
-    renderer = create(React.createElement(ProductsScreen));
+    renderer = create(
+      React.createElement(QueryClientProvider, { client: queryClient }, React.createElement(ProductsScreen)),
+    );
     await flushPromises();
   });
   return renderer;

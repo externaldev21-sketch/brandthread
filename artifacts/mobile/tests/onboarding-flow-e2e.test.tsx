@@ -34,7 +34,9 @@ const {
   apiCalls,
   api,
   clerkStore,
+  searchParams,
 } = vi.hoisted(() => {
+  const searchParams: Record<string, string | undefined> = {};
   const apiCalls: { name: string; args: unknown[] }[] = [];
   const record = (name: string) => (...args: unknown[]) => {
     apiCalls.push({ name, args });
@@ -85,7 +87,7 @@ const {
     notify() { this.listeners.forEach((fn) => fn()); },
   };
 
-  return { routerReplaceMock: vi.fn(), routerPushMock: vi.fn(), apiCalls, api, clerkStore };
+  return { routerReplaceMock: vi.fn(), routerPushMock: vi.fn(), apiCalls, api, clerkStore, searchParams };
 });
 
 // ── react-native and friends: minimal host-element stand-ins ───────────────
@@ -195,7 +197,8 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: routerReplaceMock, push: routerPushMock, back: vi.fn() }),
-  useLocalSearchParams: () => ({}),
+  useLocalSearchParams: () => searchParams,
+  useGlobalSearchParams: () => searchParams,
 }));
 
 // ── @clerk/expo: a tiny reactive fake sign-up, mirroring
@@ -589,6 +592,101 @@ describe('onboarding flow (seller)', () => {
 
     expect(routerReplaceMock).toHaveBeenCalledWith('/(tabs)/');
   }, 20_000);
+});
+
+// ── Regression coverage for the "Already signed in" trap ───────────────────
+// Reported bug: a brand-new sign-up (any email) landed back on the Auth
+// step's "Already signed in as <email> / Sign out and create another
+// account" guard instead of continuing into the questionnaire. Root cause:
+// app/onboarding.tsx's continueFromAccountType() always routed AccountType
+// -> Auth, even when a session was already active (e.g. this very sign-up's
+// own Clerk session, once verified) and the user was not deliberately adding
+// a second account. These tests drive continueFromAccountType() directly
+// through the real screen with isSignedIn pre-set, the same shape the bug
+// took after a remount lost `flow` and sent the user back through
+// AccountType while already signed in.
+describe('onboarding flow — already-signed-in routing', () => {
+  let renderer: ReactTestRenderer | undefined;
+
+  beforeEach(() => {
+    memoryStorage.clear();
+    apiCalls.length = 0;
+    clerkStore.isSignedIn = false;
+    clerkStore.userId = null;
+    clerkStore.signUp = { status: 'missing_requirements', emailAddress: null, pendingCode: null, finalized: false };
+    routerReplaceMock.mockClear();
+    routerPushMock.mockClear();
+    delete searchParams.addAccount;
+    delete searchParams.postAuth;
+  });
+
+  afterEach(async () => {
+    await act(async () => { renderer?.unmount(); });
+    renderer = undefined;
+    delete searchParams.addAccount;
+    delete searchParams.postAuth;
+  });
+
+  it('a session already active from this sign-up flow continues straight to the next step — never the sign-up form again', async () => {
+    // Simulates the reported bug's shape: a Clerk session is already active
+    // (this flow's own, just verified) and the query string carries no
+    // addAccount=1, so this is not a deliberate second-account creation.
+    clerkStore.isSignedIn = true;
+    clerkStore.userId = 'user_already_signed_in';
+
+    renderer = await renderScreen();
+    await press(renderer, findByTestId(renderer, 'onboarding-welcome-get-started'));
+    await press(renderer, findByTestId(renderer, 'onboarding-account-type-buyer'));
+    await press(renderer, findByTestId(renderer, 'onboarding-account-type-continue'));
+
+    // Lands directly on the Name step...
+    expect(() => findByTestId(renderer!, 'onboarding-first-name-input')).not.toThrow();
+    // ...and the sign-up form / "Already signed in" guard were never shown.
+    expect(() => findByLabel(renderer!, 'Email address')).toThrow();
+    const allText = renderer.root.findAllByType('Text' as never).map((n) => n.props.children);
+    expect(allText.flat().join(' ')).not.toContain('Already signed in');
+  });
+
+  it('creating a second account (add-account flow) while signed in still shows the sign-up form', async () => {
+    // The deliberate "add another account" path: a different, already-signed
+    // -in account is choosing to create a second, separate identity.
+    clerkStore.isSignedIn = true;
+    clerkStore.userId = 'user_source_account';
+    searchParams.addAccount = '1';
+
+    renderer = await renderScreen();
+    await press(renderer, findByTestId(renderer, 'onboarding-welcome-get-started'));
+    await press(renderer, findByTestId(renderer, 'onboarding-account-type-seller'));
+    await press(renderer, findByTestId(renderer, 'onboarding-account-type-continue'));
+
+    // The sign-up form is shown so a second, distinct account can be created
+    // — it must not skip straight to the questionnaire using the source
+    // account's identity, and must not show the blocking "already signed
+    // in" guard either.
+    expect(() => findByLabel(renderer!, 'Email address')).not.toThrow();
+    const allText = renderer.root.findAllByType('Text' as never).map((n) => n.props.children);
+    expect(allText.flat().join(' ')).not.toContain('Already signed in');
+  });
+
+  it('a stale pending-flow flag from an abandoned attempt resumes straight into its Auth step — which is exactly why sign-out clears it', async () => {
+    // A device-scoped `onboarding_pending_flow` left over from an earlier,
+    // different, abandoned attempt (e.g. a friend who picked seller, then
+    // signed out or closed the app) is honored on the next mount as "resume
+    // where this device last left off" and jumps straight past
+    // Welcome/AccountType into that flow's own Auth step. That's the
+    // intended behavior for the SAME still-anonymous attempt resuming after
+    // an app restart — but it's also precisely why
+    // sign-out-clears-onboarding-state.test.ts requires app/_layout.tsx to
+    // wipe this key on sign-out: without that cleanup, a NEW person signing
+    // up right after someone else signed out on the same phone would land
+    // on the previous person's half-filled Auth step instead of a clean one.
+    memoryStorage.set('onboarding_pending_flow', 'seller');
+
+    renderer = await renderScreen();
+    await act(async () => { await Promise.resolve(); });
+
+    expect(() => findByLabel(renderer!, 'Email address')).not.toThrow();
+  });
 });
 
 describe('onboarding step machine sanity', () => {

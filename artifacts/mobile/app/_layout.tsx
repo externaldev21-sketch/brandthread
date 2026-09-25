@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { queryClient, queryPersister } from '@/lib/queryClient';
+import { recordNavigationStart } from '@/lib/perf';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -329,8 +331,6 @@ if (PREVIEW_ROLE && typeof localStorage !== 'undefined') {
   localStorage.setItem('user_role', PREVIEW_ROLE);
 }
 
-const queryClient = new QueryClient();
-
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 const proxyUrl = process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;
 
@@ -380,6 +380,11 @@ function AuthGate() {
       clearSocialCache().catch(() => {});
       clearCartCache().catch(() => {});
       setActiveSeller(false);
+      // These onboarding-in-progress flags (see app/onboarding.tsx) are
+      // device-scoped, not per-account, so a half-finished attempt from the
+      // account that just signed out must not leak into the next sign-up on
+      // this device (e.g. a different friend using the same phone/Expo Go).
+      AsyncStorage.multiRemove(['onboarding_pending_flow', 'onboarding_pending_username']).catch(() => {});
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignedIn, isLoaded]);
@@ -543,7 +548,7 @@ function AuthGate() {
     // Allow public access to specific buyer routes for guests
     const isGuestAllowedRoute =
       (inBuyerGroup && ['discover', 'search', 'cart'].includes((segments as string[])[1])) ||
-      ['buyer-product-detail', 'buyer-checkout', 'seller-profile'].includes(segments[0] as string);
+      ['buyer-product-detail', 'buyer-checkout', 'seller-profile', 'profile-videos', 'profile-products'].includes(segments[0] as string);
 
     // Review-only web preview. Never bypass authentication on Expo Go.
     if (PREVIEW_ROLE) {
@@ -759,6 +764,13 @@ function RootLayoutNav() {
     'manufacturer-hub': 'manufacturerHub',
   };
   const feature = gatedRoutes[route];
+  const pathname = segments.join('/');
+
+  useEffect(() => {
+    if (!__DEV__) return;
+    recordNavigationStart(pathname || '/', queryClient);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   useEffect(() => {
     void flushNotificationEvents(api, userId);
@@ -1080,6 +1092,9 @@ function RootLayoutNav() {
         <Stack.Screen name="design-bg-removal"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="design-bg-replace"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="design-campaign"          options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="meta-ads-connect"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="meta-ads-setup"           options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="meta-ads-manage"          options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="design-mockup-preview"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="design-export"            options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="design-versions"          options={{ headerShown: false, animation: 'ios_from_right' }} />
@@ -1164,7 +1179,10 @@ export default function RootLayout() {
   const appTree = (
     <SafeAreaProvider>
       <ErrorBoundary>
-        <QueryClientProvider client={queryClient}>
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{ persister: queryPersister, maxAge: 24 * 60 * 60_000 }}
+        >
           <GestureHandlerRootView style={{ flex: 1 }}>
             <CookieConsentProvider>
             <AppThemeProvider>
@@ -1188,7 +1206,7 @@ export default function RootLayout() {
             </AppThemeProvider>
             </CookieConsentProvider>
           </GestureHandlerRootView>
-        </QueryClientProvider>
+        </PersistQueryClientProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
   );

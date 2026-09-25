@@ -48,6 +48,7 @@ interface ProductCardProps {
   product: Product;
   width: number;
   onPress: (product: Product) => void;
+  onPressIn?: (product: Product) => void;
   onMore: (product: Product) => void;
   onQuickArchive: (product: Product) => void;
   onQuickDelete: (product: Product) => void;
@@ -56,7 +57,7 @@ interface ProductCardProps {
 // Memoized with stable handlers so a recycled card only re-renders when its
 // own product changes, not on every search keystroke or stats refresh.
 export const ProductCard = React.memo(function ProductCard({
-  product, width, onPress, onMore, onQuickArchive, onQuickDelete,
+  product, width, onPress, onPressIn, onMore, onQuickArchive, onQuickDelete,
 }: ProductCardProps) {
   const { theme } = useAppTheme();
   const s = React.useMemo(() => createStyles(theme), [theme]);
@@ -116,6 +117,7 @@ export const ProductCard = React.memo(function ProductCard({
         <PressableScale
           style={[s.card, { backgroundColor: theme.card, borderColor: theme.border }]}
           onPress={() => onPress(product)}
+          onPressIn={onPressIn ? () => onPressIn(product) : undefined}
           activeScale={0.98}
           accessibilityLabel={`${product.name}, ${statusLabel(product.status)}, ${formatCents(price)}`}
         >

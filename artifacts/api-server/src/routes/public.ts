@@ -135,10 +135,20 @@ router.get("/products", async (req, res) => {
       return;
     }
     const { limit: lim, offset: off } = page.data;
+    // Profiles may only hold the users.id alias (e.g. from /u/:username) — the
+    // shop list resolves it to the seller's Clerk ID like every public read.
+    const resolvedOwnerId = ownerId && UUID_PATTERN.test(ownerId)
+      ? await resolveToClerkId(ownerId, "seller")
+      : ownerId;
+    if (ownerId && !resolvedOwnerId) {
+      setPaginationHeaders(res, page.data, 0, 0);
+      res.json([]);
+      return;
+    }
     const whereClause = and(
       eq(products.status, "active"),
       isNull(products.deletedAt),
-      ownerId ? eq(products.ownerId, ownerId) : undefined,
+      resolvedOwnerId ? eq(products.ownerId, resolvedOwnerId) : undefined,
       category ? eq(products.category, category) : undefined,
       tag
         ? or(
@@ -311,6 +321,53 @@ router.get("/products/high-demand", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to fetch high-demand products");
     return res.status(500).json({ error: "Failed to fetch high-demand products" });
+  }
+});
+
+// GET /api/public/products/:id/videos
+// "Worn in these videos" — posts that tagged this product, video-only.
+// Must precede /products/:id so Express does not treat "videos" as a product id.
+router.get("/products/:id/videos", async (req, res) => {
+  const parsedLimit = parseNonNegativeInteger(req.query.limit, "limit", 12);
+  if (typeof parsedLimit !== "number" || parsedLimit < 1) {
+    return res.status(400).json({ error: typeof parsedLimit === "number" ? "limit must be at least 1" : parsedLimit.error });
+  }
+  const lim = Math.min(parsedLimit, 24);
+
+  try {
+    setPublicCacheHeaders(res);
+    const rows = await db.select({
+      postId: posts.id,
+      mediaUrl: posts.mediaUrl,
+      thumbnailUrl: posts.thumbnailUrl,
+      caption: posts.caption,
+      createdAt: posts.createdAt,
+      authorId: posts.userId,
+      authorName: users.displayName,
+      authorUsername: users.username,
+    }).from(posts)
+      .innerJoin(postTaggedProducts, eq(postTaggedProducts.postId, posts.id))
+      .innerJoin(users, eq(users.clerkId, posts.userId))
+      .where(and(
+        eq(postTaggedProducts.productId, req.params.id),
+        eq(posts.mediaType, "video"),
+        publicPostCondition(),
+      ))
+      .orderBy(desc(posts.createdAt))
+      .limit(lim);
+
+    return res.json(rows.map((row) => ({
+      postId: row.postId,
+      mediaUrl: row.mediaUrl,
+      thumbnailUrl: row.thumbnailUrl,
+      caption: row.caption,
+      createdAt: row.createdAt,
+      authorId: row.authorId,
+      authorName: row.authorName ?? row.authorUsername ?? "Seller",
+    })));
+  } catch (err) {
+    req.log.error({ err, productId: req.params.id }, "Failed to fetch tagged videos");
+    return res.status(500).json({ error: "Failed to fetch tagged videos" });
   }
 });
 
@@ -945,11 +1002,16 @@ router.get("/sellers/:sellerId", async (req, res) => {
   }
   const vacation = await getSellerVacationStatus(canonicalClerkId);
 
-  const [sellerProducts, sellerPosts] = await Promise.all([
+  const activeProductsWhere = and(
+    eq(products.ownerId, canonicalClerkId),
+    eq(products.status, "active"),
+    isNull(products.deletedAt),
+  );
+  const [sellerProducts, sellerPosts, [{ activeProductsCount }], [{ publicPostsCount }]] = await Promise.all([
     db
       .select()
       .from(products)
-      .where(and(eq(products.ownerId, canonicalClerkId), eq(products.status, "active"), isNull(products.deletedAt)))
+      .where(activeProductsWhere)
       .orderBy(desc(products.createdAt))
       .limit(50),
     db
@@ -965,6 +1027,11 @@ router.get("/sellers/:sellerId", async (req, res) => {
       ))
       .orderBy(desc(posts.createdAt))
       .limit(30),
+    // True totals for the profile's "Shop N products" pill and video count —
+    // the two lists above are capped pages, not counts.
+    db.select({ activeProductsCount: count() }).from(products).where(activeProductsWhere),
+    db.select({ publicPostsCount: count() }).from(posts)
+      .where(and(eq(posts.userId, canonicalClerkId), publicPostCondition())),
   ]);
 
   // Attach tagged products per post
@@ -1011,6 +1078,8 @@ router.get("/sellers/:sellerId", async (req, res) => {
       vacationMessage: vacation.active ? vacation.message : null,
       vacationUntil: vacation.until?.toISOString() ?? null,
       profileImageUrl,
+      productsCount: Number(activeProductsCount),
+      videosCount: Number(publicPostsCount),
     },
     products: sellerProducts,
     posts: sellerPosts.map((p) => ({

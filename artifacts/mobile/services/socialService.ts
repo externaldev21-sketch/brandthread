@@ -6,6 +6,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '@/lib/serviceConfig';
+import { emitProfileEvent } from '@/lib/profileEvents';
 import type {
   BuyerSocialProfile, BuyerPost, RepostRecord,
   Friendship, FriendshipStatus, FriendRequest, FriendSuggestion,
@@ -459,7 +460,8 @@ export interface SellerPostSound {
 export interface SellerThreadPost {
   id:                string;
   authorId:          string;
-  authorAccountType: 'seller';
+  /** Feed posts are seller-authored; profile video grids also carry buyer posts. */
+  authorAccountType: 'seller' | 'buyer';
   authorName:        string;
   authorHandle:      string;
   authorInitials:    string;
@@ -499,6 +501,8 @@ export interface SellerThreadPost {
     avatarUrl: string | null;
     createdAt: string;
   }>;
+  /** Recorded plays — present on profile video grids (GET /api/public/users/:id/videos). */
+  viewsCount?:       number;
   /** Ordered object storage paths for composed slideshow slides (empty for video/photo posts) */
   mediaPaths?:       string[];
   /** Per-slide overlay metadata — used to restore draft editors */
@@ -745,18 +749,24 @@ export async function getSellerPosts(): Promise<SellerThreadPost[]> {
   return mapped;
 }
 
-/** Maps a raw API post object from /api/posts/feed to a SellerThreadPost. */
-function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
+/**
+ * Maps a raw API post object (from /api/posts/feed, /api/public/posts or the
+ * profile video endpoints) to a SellerThreadPost. Exported so the profile video
+ * grid and the feed player read one shape.
+ */
+export function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
   const ACCENT_POOL = ['#7C3AED','#0F766E','#BE185D','#B45309','#1D4ED8','#0891B2','#059669'];
   const now = iso();
   const authorName     = p.seller?.brandName ?? p.seller?.displayName ?? 'Seller';
-  const authorHandle   = '@' + authorName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const authorHandle   = '@' + (typeof p.seller?.username === 'string' && p.seller.username
+    ? p.seller.username
+    : authorName.toLowerCase().replace(/[^a-z0-9]/g, ''));
   const authorInitials = authorName.slice(0, 2).toUpperCase();
   const authorColor    = ACCENT_POOL[idx % ACCENT_POOL.length];
   return {
     id:                p.id,
     authorId:          p.userId,
-    authorAccountType: 'seller' as const,
+    authorAccountType: p.authorAccountType === 'buyer' ? 'buyer' : 'seller',
     authorName,
     authorHandle,
     authorInitials,
@@ -791,6 +801,7 @@ function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
     commentsCount: p.commentsCount ?? 0,
     repostsCount:  p.repostsCount  ?? 0,
     savedCount:    0,
+    viewsCount:    typeof p.viewsCount === 'number' ? p.viewsCount : undefined,
     likedByMe:     false,
     savedByMe:     false,
     repostedByMe:  p.repostedByMe === true,
@@ -838,7 +849,7 @@ export async function setSellerFollowing(
   sellerId: string,
   following: boolean,
 ): Promise<SellerFollowState> {
-  return serviceRequest<SellerFollowState>(
+  const state = await serviceRequest<SellerFollowState>(
     following
       ? '/api/social/follow'
       : `/api/social/follow/${encodeURIComponent(sellerId)}`,
@@ -846,6 +857,16 @@ export async function setSellerFollowing(
       ? { method: 'POST', body: JSON.stringify({ userId: sellerId }) }
       : { method: 'DELETE' },
   );
+  // Every screen showing this seller's follower count (or the viewer's
+  // following count) updates from the server-confirmed state.
+  emitProfileEvent({
+    type: 'follow',
+    targetId: sellerId,
+    isFollowing: state?.isFollowing ?? following,
+    followersCount: typeof state?.followersCount === 'number' ? state.followersCount : undefined,
+    viewerId: _socialUserId === 'anon' ? null : _socialUserId,
+  });
+  return state;
 }
 
 /** Backwards-compatible one-shot page loader for non-paginated callers. */
