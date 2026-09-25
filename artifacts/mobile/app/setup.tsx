@@ -21,7 +21,7 @@ import {
   BG, CARD, BORDER,
   FG, MUTED, SUBTLE, ON_DARK,
   SUCCESS, SUCCESS_DIM,
-  FONT, FS, SP, RADIUS, COMP, ICON, ANIM,
+  FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { withSellerSetupOrigin } from '@/lib/setupNavigation';
@@ -33,9 +33,11 @@ import {
 } from '@/lib/setupStore';
 import { useApi } from '@/hooks/useApi';
 import {
-  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  StatusBadge, SectionHeader,
+  GradientCard, PrimaryButton, SecondaryButton,
+  SectionHeader,
 } from '@/components/BrandthreadUI';
+import { ThreadProgress } from '@/components/onboarding/ThreadLine';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 // ─── Task Step Card ───────────────────────────────────────────────────────────
 
@@ -109,11 +111,11 @@ function TaskCard({
 
 const createTaskStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   card:       { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: CARD,
-                borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
-                paddingHorizontal: SP.md, paddingVertical: 14, marginBottom: SP.sm },
+                borderRadius: RADIUS.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
+                paddingHorizontal: SP.md, paddingVertical: 16, marginBottom: SP.sm },
   cardActive: { borderColor: colors.primary, backgroundColor: colors.accent },
   cardDone:   { opacity: 0.6 },
-  check:      { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: colors.primary,
+  check:      { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: colors.primary,
                 alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   checkDone:  { backgroundColor: SUCCESS, borderColor: SUCCESS },
   body:       { flex: 1 },
@@ -135,8 +137,8 @@ export default function SetupScreen() {
   const router = useRouter();
   const { userId } = useAuth();
   const api = useApi();
+  const { theme } = useAppTheme();
   const [state, setState] = useState<SetupState | null>(null);
-  const progressAnim = useRef(new Animated.Value(0)).current;
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -155,24 +157,14 @@ export default function SetupScreen() {
       const next = await getSetupState(userId, { onboardingComplete });
       if (!active) return;
       setState(next);
-      Animated.timing(progressAnim, {
-        toValue: completionPercent(next) / 100,
-        duration: ANIM.slow,
-        useNativeDriver: false,
-      }).start();
     };
     void load();
     return () => { active = false; };
-  }, [api, progressAnim, userId]));
+  }, [api, userId]));
 
   async function handleComplete(id: SetupTaskId) {
     const next = await completeTask(id, userId);
     setState(next);
-    Animated.timing(progressAnim, {
-      toValue: completionPercent(next) / 100,
-      duration: ANIM.normal,
-      useNativeDriver: false,
-    }).start();
   }
 
   async function handleSkip(id: SetupTaskId) {
@@ -221,19 +213,14 @@ export default function SetupScreen() {
       >
         {/* Progress bar */}
         <GradientCard colors={[colors.accent, colors.card]} style={s.progressCard} glow>
-          <View style={s.progressTrack}>
-            <Animated.View
-              style={[
-                s.progressFill,
-                {
-                  width: progressAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0%', '100%'],
-                  }),
-                },
-              ]}
-            />
-          </View>
+          {/* The onboarding thread carries on here, sewn as tasks complete. */}
+          <ThreadProgress
+            fraction={pct / 100}
+            color={theme.text}
+            trackColor={theme.border}
+            accessibilityLabel={`Store setup ${pct}% complete`}
+            style={s.progressThread}
+          />
           {!allDone && next && (
             <Text style={s.progressNext}>
               Next: <Text style={{ color: colors.accentForeground }}>{next.label}</Text>
@@ -301,15 +288,14 @@ export default function SetupScreen() {
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   header:       { flexDirection: 'row', alignItems: 'center', gap: SP.md,
                   paddingHorizontal: SP.md, paddingBottom: SP.md },
-  back:         { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD,
-                  borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  title:        { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, letterSpacing: -0.3 },
+  back:         { width: 36, height: 36, borderRadius: RADIUS.pill, backgroundColor: CARD,
+                  borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  title:        { fontSize: 28, lineHeight: 34, fontFamily: FONT.bold, color: FG, letterSpacing: -0.7 },
   subtitle:     { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
   pctBadge:     { backgroundColor: colors.accent, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 4, borderWidth: 1, borderColor: colors.primary },
   pctText:      { fontSize: FS.base, fontFamily: FONT.bold, color: colors.accentForeground },
   progressCard: { marginBottom: SP.md },
-  progressTrack:{ height: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: RADIUS.pill, overflow: 'hidden', marginBottom: SP.sm },
-  progressFill: { height: '100%', backgroundColor: colors.primary, borderRadius: RADIUS.pill },
+  progressThread: { width: '100%', marginBottom: SP.sm },
   progressNext: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
   doneIcon:     { width: 48, height: 48, borderRadius: RADIUS.md, backgroundColor: SUCCESS_DIM, alignItems: 'center', justifyContent: 'center' },
 });

@@ -55,6 +55,7 @@ vi.mock("react-native", () => {
     Image: nativeComponent("Image"),
     Linking: { openURL: vi.fn() },
     Modal: nativeComponent("Modal"),
+    Pressable: nativeComponent("Pressable"),
     RefreshControl: nativeComponent("RefreshControl"),
     ScrollView: nativeComponent("ScrollView"),
     Share: { share: vi.fn() },

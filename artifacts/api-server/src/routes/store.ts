@@ -1,7 +1,10 @@
 import dns from "dns/promises";
 import { Router } from "express";
-import { db, storefronts, storefrontVersions, storefrontCustomDomains } from "@workspace/db";
-import { eq, and, desc } from "drizzle-orm";
+import {
+  db, storefronts, storefrontVersions, storefrontCustomDomains,
+  products, productVariants,
+} from "@workspace/db";
+import { eq, and, desc, isNull, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { getWebOrigin } from "../lib/webOrigin";
 import crypto from "crypto";
@@ -198,9 +201,61 @@ function normalizeThreadTheme(value: unknown): Record<string, unknown> {
   return dark ? THREAD_THEME_DARK : THREAD_THEME_LIGHT;
 }
 
-// Helper — build self-contained HTML for a storefront (shared by /preview and /preview/:token)
-async function buildPreviewHtml(ownerId: string): Promise<string> {
-  const sf = await getOrCreateStorefront(ownerId);
+function formatUsdCents(cents: number): string {
+  return `$${(Math.max(0, cents) / 100).toFixed(2)}`;
+}
+
+/**
+ * Real, in-stock products for a seller's storefront — the same catalog rows
+ * the seller manages elsewhere in the app. Used to replace the numbered
+ * placeholder squares that used to stand in for a product grid.
+ */
+async function getStoreProducts(ownerId: string, limit = 8): Promise<Array<{
+  id: string; name: string; image: string | null; priceCents: number; variantId: string; inStock: boolean;
+}>> {
+  type ProductRow = { id: string; name: string; images: unknown };
+  type VariantRow = { id: string; productId: string; priceCents: number; stock: number };
+
+  const rows: ProductRow[] = await db
+    .select({ id: products.id, name: products.name, images: products.images })
+    .from(products)
+    .where(and(eq(products.ownerId, ownerId), eq(products.status, "active"), isNull(products.deletedAt)))
+    .orderBy(desc(products.createdAt))
+    .limit(limit);
+  if (rows.length === 0) return [];
+  const variantRows: VariantRow[] = await db
+    .select({
+      id: productVariants.id, productId: productVariants.productId,
+      priceCents: productVariants.priceCents, stock: productVariants.stock,
+    })
+    .from(productVariants)
+    .where(inArray(productVariants.productId, rows.map((r: ProductRow) => r.id)));
+  return rows
+    .map((p: ProductRow) => {
+      const variants = variantRows.filter((v: VariantRow) => v.productId === p.id);
+      if (variants.length === 0) return null;
+      const inStockVariant = variants.find((v: VariantRow) => v.stock > 0) ?? variants[0];
+      const images = Array.isArray(p.images) ? (p.images as string[]) : [];
+      return {
+        id: p.id,
+        name: p.name,
+        image: images.length > 0 ? images[0] : null,
+        priceCents: inStockVariant.priceCents,
+        variantId: inStockVariant.id,
+        inStock: variants.some((v: VariantRow) => v.stock > 0),
+      };
+    })
+    .filter((p): p is NonNullable<typeof p> => p !== null);
+}
+
+// Helper — build self-contained HTML for a storefront (shared by /preview,
+// /preview/:token, and the public /site/:slug route). `isPreview` only
+// changes the banner shown at the top of the page; the rendering, catalog,
+// cart, and checkout wiring are identical to what a real customer sees.
+async function buildPreviewHtml(ownerId: string, opts?: { isPreview?: boolean; sf?: any }): Promise<string> {
+  const isPreview = opts?.isPreview ?? true;
+  const sf = opts?.sf ?? await getOrCreateStorefront(ownerId);
+  const storeProducts = await getStoreProducts(ownerId);
   const theme    = (sf.theme    as any) ?? {};
   const branding = (sf.branding as any) ?? {};
   const seo      = (sf.seo     as any) ?? {};
@@ -241,15 +296,26 @@ async function buildPreviewHtml(ownerId: string): Promise<string> {
       const banner = escapeHtml(s.settings?.heading ?? s.settings?.text ?? "Free shipping on orders over $150");
       return `<div class="announcement">${banner}</div>`;
     }
-    if (t === "product_grid" || t === "featured_collection") {
+    if (t === "product_grid" || t === "featured_collection" || t === "collection_grid_tags") {
+      const cards = storeProducts.length > 0
+        ? storeProducts.map((p) => {
+            const img = p.image && /^https?:\/\//i.test(p.image)
+              ? `<img src="${escapeAttr(p.image)}" alt="${escapeAttr(p.name)}">`
+              : `<div class="product-image-placeholder" aria-hidden="true"></div>`;
+            return `<article class="product-card">
+              <div class="product-image">${img}</div>
+              <div class="product-meta"><span>${escapeHtml(p.name)}</span><span>${formatUsdCents(p.priceCents)}</span></div>
+              <button type="button" class="add-to-cart-btn" ${p.inStock ? "" : "disabled"}
+                data-product-id="${escapeAttr(p.id)}" data-variant-id="${escapeAttr(p.variantId)}"
+                data-name="${escapeAttr(p.name)}" data-price="${p.priceCents}" data-image="${escapeAttr(p.image ?? "")}">
+                ${p.inStock ? "Add to cart" : "Sold out"}
+              </button>
+            </article>`;
+          }).join("")
+        : `<p class="empty-catalog">No products published yet.</p>`;
       return `<section class="collection">
         <div class="section-heading"><h2>${h || "Current collection"}</h2><p>${d}</p></div>
-        <div class="product-grid">
-          ${[1, 2, 3, 4].map((n) => `<article class="product-card">
-            <div class="product-image"><span>0${n}</span></div>
-            <div class="product-meta"><span>Edition ${n}</span><span>—</span></div>
-          </article>`).join("")}
-        </div>
+        <div class="product-grid">${cards}</div>
       </section>`;
     }
     if (t === "brand_story") {
@@ -257,6 +323,49 @@ async function buildPreviewHtml(ownerId: string): Promise<string> {
     }
     if (t === "newsletter") {
       return `<section class="newsletter"><h2>${h}</h2><p>${d}</p><form><input aria-label="Email address" placeholder="Email address"><button type="button">${escapeHtml(s.settings?.buttonLabel ?? "Join")}</button></form></section>`;
+    }
+    if (t === "faq") {
+      const faqs: Array<{ q?: string; a?: string }> = Array.isArray(s.settings?.faqs) ? s.settings.faqs : [];
+      return `<section class="faq-section">
+        <div class="section-heading"><h2>${h || "Questions"}</h2></div>
+        ${faqs.map((f) => `<details class="faq-item"><summary>${escapeHtml(f.q)}</summary><p>${escapeHtml(f.a)}</p></details>`).join("")}
+      </section>`;
+    }
+    if (t === "customer_reviews") {
+      const reviews: Array<{ author?: string; text?: string; rating?: number }> = Array.isArray(s.settings?.reviews) ? s.settings.reviews : [];
+      return `<section class="reviews-section">
+        <div class="section-heading"><h2>${h || "What people say"}</h2></div>
+        <div class="reviews-grid">
+          ${reviews.map((r) => `<blockquote class="review-card">
+            <p>"${escapeHtml(r.text)}"</p>
+            <cite>${escapeHtml(r.author)} · ${"★".repeat(Math.max(0, Math.min(5, r.rating ?? 5)))}</cite>
+          </blockquote>`).join("")}
+        </div>
+      </section>`;
+    }
+    if (t === "social_links") {
+      const links: Array<{ platform?: string; url?: string }> = Array.isArray(s.settings?.socialLinks) ? s.settings.socialLinks : [];
+      return `<section class="social-links-section">
+        ${h ? `<h2>${h}</h2>` : ""}
+        <div class="social-links-row">
+          ${links.filter((l) => l.url).map((l) => `<a href="${escapeAttr(l.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(l.platform ?? "Link")}</a>`).join("")}
+        </div>
+      </section>`;
+    }
+    if (t === "contact_form") {
+      const email = escapeAttr(s.settings?.contactEmail ?? "");
+      return `<section class="contact-section">
+        <div class="section-heading"><h2>${h || "Get in touch"}</h2><p>${d}</p></div>
+        ${email
+          ? `<a class="text-link" href="mailto:${email}">Email us<span aria-hidden="true">→</span></a>`
+          : `<p class="empty-catalog">Contact form is not set up yet.</p>`}
+      </section>`;
+    }
+    if (t === "footer" || t === "spacer") {
+      // The page's global <footer> already renders below; a "footer" block in
+      // the section list is a builder-side placeholder and needs no markup of
+      // its own here, same as a spacer.
+      return "";
     }
     return `<section class="standard-section">
       <h2>${h}</h2>
@@ -268,6 +377,11 @@ async function buildPreviewHtml(ownerId: string): Promise<string> {
   const metaTitle = escapeHtml(seo.metaTitle ?? sf.title ?? "My Store");
   const metaDesc  = escapeAttr(seo.metaDescription ?? branding.tagline ?? "");
   const year      = new Date().getFullYear(); // safe integer
+  const origin       = getWebOrigin();
+  const pageUrl       = isPreview ? `${origin}/api/store/preview` : `${origin}/api/store/site/${escapeAttr(String(sf.slug ?? ""))}`;
+  const checkoutUrl   = `${origin}/api/guest/checkout/session`;
+  const storeIdSafe   = escapeAttr(String(sf.id ?? ""));
+  const bannerText    = isPreview ? "Private Preview link · Not yet published" : "";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -278,7 +392,7 @@ async function buildPreviewHtml(ownerId: string): Promise<string> {
 <meta name="description" content="${metaDesc}">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:${bg};color:${txt};font-family:Raleway,Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+body{background:${bg};color:${txt};font-family:Raleway,Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;padding-bottom:64px;}
 nav{display:flex;align-items:center;justify-content:space-between;padding:22px clamp(20px,4vw,64px);background:${bg}f2;border-bottom:1px solid ${secondary};position:sticky;top:0;z-index:10;}
 .logo{font:500 clamp(1.1rem,2vw,1.5rem)/1 ${font};color:${txt};letter-spacing:.08em;}
 .nav-links{display:flex;gap:clamp(14px,3vw,36px);}
@@ -309,12 +423,38 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:22px c
 .newsletter input{flex:1;background:transparent;border:0;padding:14px 0;color:${txt};font:inherit;outline:0;}
 .newsletter button{background:transparent;border:0;color:${txt};text-transform:uppercase;letter-spacing:.12em;font-size:.68rem;}
 .announcement{background:${txt};color:${bg};padding:10px 24px;text-align:center;font-size:.68rem;text-transform:uppercase;letter-spacing:.12em;}
+.product-image img{width:100%;height:100%;object-fit:cover;filter:grayscale(1);}
+.product-image-placeholder{width:100%;height:100%;background:${primary};}
+.add-to-cart-btn{width:100%;margin-bottom:28px;padding:10px;background:transparent;border:1px solid ${txt};color:${txt};font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;cursor:pointer;}
+.add-to-cart-btn:disabled{opacity:.4;cursor:not-allowed;}
+.add-to-cart-btn.added{background:${txt};color:${bg};}
+.empty-catalog{color:${secondary};padding:24px 0;}
+.faq-section,.reviews-section,.social-links-section,.contact-section{padding:clamp(48px,8vw,100px) clamp(20px,4vw,64px);border-top:1px solid ${secondary};}
+.faq-item{padding:18px 0;border-bottom:1px solid ${secondary};}
+.faq-item summary{cursor:pointer;font-weight:600;}
+.faq-item p{margin-top:10px;color:${secondary};line-height:1.6;}
+.reviews-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:24px;margin-top:24px;}
+.review-card{border:1px solid ${secondary};padding:20px;}
+.review-card cite{display:block;margin-top:12px;font-style:normal;font-size:.72rem;letter-spacing:.05em;color:${secondary};}
+.social-links-row{display:flex;flex-wrap:wrap;gap:20px;margin-top:16px;}
+.social-links-row a{color:${txt};text-decoration:none;text-transform:uppercase;font-size:.72rem;letter-spacing:.1em;border-bottom:1px solid currentColor;}
 footer{padding:64px 24px;text-align:center;opacity:.6;font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;}
+.cart-bar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 24px;background:${txt};color:${bg};font-size:.75rem;letter-spacing:.05em;}
+.cart-bar button{background:${bg};color:${txt};border:0;padding:8px 18px;text-transform:uppercase;font-size:.68rem;letter-spacing:.1em;cursor:pointer;}
+.checkout-overlay{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px;}
+.checkout-panel{position:relative;width:min(420px,100%);max-height:90vh;overflow:auto;background:${bg};color:${txt};padding:28px;}
+.checkout-close{position:absolute;top:14px;right:14px;background:transparent;border:0;font-size:1.4rem;color:${txt};cursor:pointer;}
+.checkout-panel h3{font:400 1.6rem/1 ${font};margin-bottom:18px;}
+.checkout-panel form{display:flex;flex-direction:column;gap:10px;}
+.checkout-panel input{padding:11px;border:1px solid ${secondary};background:transparent;color:${txt};font:inherit;}
+.checkout-panel button[type=submit]{margin-top:8px;padding:13px;background:${txt};color:${bg};border:0;text-transform:uppercase;letter-spacing:.1em;font-size:.75rem;cursor:pointer;}
+.checkout-panel button[type=submit]:disabled{opacity:.5;cursor:not-allowed;}
+.checkout-error{color:#c0392b;font-size:.8rem;margin-bottom:10px;}
 @media(max-width:640px){.nav-links a:nth-child(n+3){display:none}.product-grid{gap:1px}.section-heading{display:block}.section-heading p{margin-top:14px}}
 </style>
 </head>
 <body>
-<div class="preview-banner">Private Preview link · Not yet published</div>
+${bannerText ? `<div class="preview-banner">${bannerText}</div>` : ""}
 <nav>
   <span class="logo">${title}</span>
   <div class="nav-links"><a href="#">Shop</a><a href="#">Collections</a><a href="#">About</a><a href="#">Contact</a></div>
@@ -325,6 +465,141 @@ ${sectionHtml || `<section class="story">
   <p>${tagline || "Your storefront is ready. Publish to go live."}</p>
 </section>`}
 <footer>© ${year} ${title}. Powered by Brandthread.</footer>
+
+<div id="bt-cart-bar" class="cart-bar" style="display:none">
+  <span id="bt-cart-count">0 items</span>
+  <span id="bt-cart-subtotal"></span>
+  <button type="button" id="bt-cart-checkout-btn">Checkout</button>
+</div>
+<div id="bt-checkout-overlay" class="checkout-overlay" style="display:none">
+  <div class="checkout-panel">
+    <button type="button" id="bt-checkout-close" class="checkout-close" aria-label="Close">&times;</button>
+    <h3>Checkout</h3>
+    <div id="bt-checkout-error" class="checkout-error"></div>
+    <form id="bt-checkout-form">
+      <input name="contactEmail" type="email" placeholder="Email" required>
+      <input name="contactPhone" type="tel" placeholder="Phone" required>
+      <input name="name" placeholder="Full name" required>
+      <input name="street" placeholder="Street address" required>
+      <input name="city" placeholder="City" required>
+      <input name="state" placeholder="State / province" required>
+      <input name="zip" placeholder="ZIP / postal code" required>
+      <input name="country" placeholder="Country code (e.g. US)" maxlength="2" value="US" required>
+      <button type="submit" id="bt-checkout-submit">Pay now</button>
+    </form>
+  </div>
+</div>
+<script>
+(function () {
+  var CART_KEY = "bt_cart_${storeIdSafe}";
+  var CHECKOUT_URL = ${JSON.stringify(checkoutUrl)};
+  var PAGE_URL = ${JSON.stringify(pageUrl)};
+
+  function readCart() {
+    try {
+      var raw = window.localStorage.getItem(CART_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) { return []; }
+  }
+  function writeCart(items) {
+    try { window.localStorage.setItem(CART_KEY, JSON.stringify(items)); } catch (e) {}
+  }
+  function renderCartBar() {
+    var items = readCart();
+    var bar = document.getElementById("bt-cart-bar");
+    var count = items.reduce(function (n, it) { return n + it.quantity; }, 0);
+    var subtotal = items.reduce(function (n, it) { return n + it.priceCents * it.quantity; }, 0);
+    if (count === 0) { bar.style.display = "none"; return; }
+    bar.style.display = "flex";
+    document.getElementById("bt-cart-count").textContent = count + (count === 1 ? " item" : " items");
+    document.getElementById("bt-cart-subtotal").textContent = "$" + (subtotal / 100).toFixed(2);
+  }
+  function addToCart(btn) {
+    var items = readCart();
+    var productId = btn.getAttribute("data-product-id");
+    var variantId = btn.getAttribute("data-variant-id");
+    var existing = items.find(function (it) { return it.variantId === variantId; });
+    if (existing) {
+      existing.quantity += 1;
+    } else {
+      items.push({
+        productId: productId, variantId: variantId,
+        name: btn.getAttribute("data-name"),
+        priceCents: parseInt(btn.getAttribute("data-price"), 10) || 0,
+        quantity: 1,
+      });
+    }
+    writeCart(items);
+    renderCartBar();
+    btn.classList.add("added");
+    var original = btn.textContent;
+    btn.textContent = "Added";
+    setTimeout(function () { btn.textContent = original; btn.classList.remove("added"); }, 1200);
+  }
+
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest(".add-to-cart-btn");
+    if (btn && !btn.disabled) addToCart(btn);
+  });
+
+  var overlay = document.getElementById("bt-checkout-overlay");
+  document.getElementById("bt-cart-checkout-btn").addEventListener("click", function () {
+    overlay.style.display = "flex";
+  });
+  document.getElementById("bt-checkout-close").addEventListener("click", function () {
+    overlay.style.display = "none";
+  });
+
+  document.getElementById("bt-checkout-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var items = readCart();
+    if (items.length === 0) return;
+    var form = e.target;
+    var errorEl = document.getElementById("bt-checkout-error");
+    var submitBtn = document.getElementById("bt-checkout-submit");
+    errorEl.textContent = "";
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Processing…";
+    var idempotencyKey = "web-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+    var payload = {
+      items: items.map(function (it) { return { productId: it.productId, variantId: it.variantId, quantity: it.quantity }; }),
+      successUrl: PAGE_URL + "?checkout=success",
+      cancelUrl: PAGE_URL + "?checkout=cancelled",
+      contactEmail: form.contactEmail.value,
+      contactPhone: form.contactPhone.value,
+      shippingAddress: {
+        name: form.name.value,
+        street: form.street.value,
+        city: form.city.value,
+        state: form.state.value,
+        zip: form.zip.value,
+        country: form.country.value,
+        phone: form.contactPhone.value,
+      },
+      clientIdempotencyKey: idempotencyKey,
+    };
+    fetch(CHECKOUT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).then(function (res) {
+      return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+    }).then(function (result) {
+      if (!result.ok || !result.data || !result.data.url) {
+        throw new Error((result.data && result.data.error) || "Could not start checkout.");
+      }
+      writeCart([]);
+      window.location.href = result.data.url;
+    }).catch(function (err) {
+      errorEl.textContent = err.message || "Could not start checkout. Please try again.";
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Pay now";
+    });
+  });
+
+  renderCartBar();
+})();
+</script>
 </body>
 </html>`;
 }
@@ -381,6 +656,37 @@ router.get("/preview/:token", async (req, res): Promise<void> => {
   }
 
   const html = await buildPreviewHtml(entry.ownerId);
+  res.set("Content-Type", "text/html");
+  res.send(html);
+});
+
+const NOT_FOUND_PAGE = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Store not found</title>
+<style>*{box-sizing:border-box;margin:0;padding:0;}body{background:#07070f;color:#f4f4ff;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:24px;}
+.card{max-width:360px;}.title{font-size:1.4rem;font-weight:700;margin-bottom:8px;}.sub{opacity:0.55;font-size:0.9rem;line-height:1.6;}</style>
+</head><body><div class="card"><p class="title">This store isn't available</p><p class="sub">It may be unpublished or the link is incorrect.</p></div></body></html>`;
+
+// GET /api/store/site/:slug — the actual published storefront, publicly
+// reachable with no auth: this is what a customer's browser hits, rendering
+// straight from the storefront's saved sections/theme/branding with real
+// products, a real cart, and checkout through the same guest-checkout
+// endpoint the rest of the app uses. Registered before requireAuth below so
+// it is genuinely public.
+router.get("/site/:slug", async (req, res): Promise<void> => {
+  const { slug } = req.params;
+  const [sf] = await db
+    .select()
+    .from(storefronts)
+    .where(eq(storefronts.slug, slug))
+    .limit(1);
+  if (!sf || sf.status !== "published") {
+    res.set("Content-Type", "text/html");
+    res.status(404).send(NOT_FOUND_PAGE);
+    return;
+  }
+  const html = await buildPreviewHtml(sf.ownerId, { isPreview: false, sf });
   res.set("Content-Type", "text/html");
   res.send(html);
 });
