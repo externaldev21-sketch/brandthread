@@ -8,7 +8,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
-  Alert, ActivityIndicator, Animated, Linking, Image,
+  Alert, ActivityIndicator, Animated, Linking, Image, Share,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -26,7 +26,7 @@ import { adaptApiOrder } from '@/app/order-detail';
 import { formatCents } from '@/lib/money';
 import { Order, ShippingRate, ShippingLabel } from '@/services/orderTypes';
 import {
-  getShippingRates, purchaseShippingLabel, addTracking as addTrackingService,
+  getShippingRates, purchaseShippingLabel, voidShippingLabel, addTracking as addTrackingService,
   getPackagePresets, createPackagePreset, deletePackagePreset,
   updateFulfillmentChecklist, PackagePreset,
 } from '@/services/orderService';
@@ -53,14 +53,22 @@ export default function FulfillOrderScreen() {
     onAccent: ON_ACCENT,
   } = theme;
   const s = useMemo(() => createStyles(theme), [theme]);
-  const { orderId } = useLocalSearchParams<{ orderId: string }>();
+  const { orderId, step: stepParam } = useLocalSearchParams<{ orderId: string; step?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
 
+  // Deep-linkable step (e.g. order-detail's "Buy Label" jumps straight to
+  // step 3 instead of opening a separate shipping-label screen) — this is
+  // the single consolidated fulfillment flow for a seller-fulfilled order.
+  const initialStep = (() => {
+    const n = Number(stepParam);
+    return n === 2 || n === 3 || n === 4 ? (n as Step) : 1;
+  })();
+
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
-  const [step, setStep] = useState<Step>(1);
+  const [step, setStep] = useState<Step>(initialStep);
 
   // Step 1 — checklist
   const [checked, setChecked] = useState<Record<string, boolean>>({});
@@ -91,6 +99,9 @@ export default function FulfillOrderScreen() {
   const successOpacity = useRef(new Animated.Value(0)).current;
 
   const purchaseKey = useMemo(() => `fulfill-${orderId}`, [orderId]);
+  // A voided label is no longer usable proof of shipment — treat it the same
+  // as "no label yet" for gating Continue / Mark as Shipped.
+  const hasValidLabel = !!label && label.status !== 'voided';
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -229,7 +240,7 @@ export default function FulfillOrderScreen() {
   }, [order, parcelDims, orderId]);
 
   useEffect(() => {
-    if (step === 3 && !label && rates.length === 0 && !loadingRates && !manualMode) {
+    if (step === 3 && !hasValidLabel && rates.length === 0 && !loadingRates && !manualMode) {
       handleLoadRates();
     }
   }, [step, label, rates.length, loadingRates, manualMode, handleLoadRates]);
@@ -280,13 +291,13 @@ export default function FulfillOrderScreen() {
 
   async function handleMarkShipped() {
     if (!orderId) return;
-    if (!label && !manualTracking.trim()) {
+    if (!hasValidLabel && !manualTracking.trim()) {
       Alert.alert('Add tracking', 'Purchase a label or enter a tracking number before marking this order shipped.');
       return;
     }
     setMarking(true);
     try {
-      if (!label && manualTracking.trim()) {
+      if (!hasValidLabel && manualTracking.trim()) {
         await addTrackingService(orderId, manualCarrier, manualTracking.trim());
       }
       await api.orders.updateStatus(orderId, 'shipped');
@@ -311,7 +322,10 @@ export default function FulfillOrderScreen() {
   }
 
   async function handleOpenLabel() {
-    if (!label?.labelUrl) return;
+    if (!label?.labelUrl) {
+      Alert.alert('Label unavailable', 'The carrier did not return a downloadable label.');
+      return;
+    }
     try {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(label.labelUrl);
@@ -321,6 +335,48 @@ export default function FulfillOrderScreen() {
     } catch {
       Linking.openURL(label.labelUrl).catch(() => {});
     }
+  }
+
+  async function handleShareLabel() {
+    if (!label?.labelUrl) {
+      Alert.alert('Label unavailable', 'The carrier did not return a shareable label.');
+      return;
+    }
+    try {
+      await Share.share({ title: `Shipping label ${order?.orderNumber ?? ''}`, message: label.labelUrl });
+    } catch {
+      // User cancelled the share sheet — nothing to do.
+    }
+  }
+
+  function handleCopyTracking() {
+    if (!label?.trackingNumber) return;
+    Alert.alert('Tracking number', label.trackingNumber);
+  }
+
+  function handleVoidLabel() {
+    if (!label) return;
+    Alert.alert(
+      'Void label',
+      'Are you sure you want to void this label? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Void label',
+          style: 'destructive',
+          onPress: async () => {
+            if (!orderId) return;
+            try {
+              const updated = await voidShippingLabel(orderId, label.id);
+              setLabel(updated);
+              if (updated.refundPending) Alert.alert('Void requested', 'The carrier is processing the label refund.');
+            } catch (err: any) {
+              Alert.alert('Could not void label', err?.message ?? 'Try again later.');
+            }
+          },
+        },
+      ],
+    );
   }
 
   if (loading) {
@@ -509,7 +565,15 @@ export default function FulfillOrderScreen() {
 
         {step === 3 && (
           <>
-            {!label && !manualMode && (
+            {!label && !manualMode && !parcelDims && (
+              <BrandthreadCard style={{ gap: SP.sm }}>
+                <Text style={s.mutedText}>Choose a package before loading shipping rates.</Text>
+                <SecondaryButton label="Choose a package" icon="package" small onPress={() => setStep(2)} />
+                <SecondaryButton label="Enter tracking manually instead" icon="edit-3" small onPress={() => setManualMode(true)} />
+              </BrandthreadCard>
+            )}
+
+            {!label && !manualMode && parcelDims && (
               <>
                 <SectionHeader title="Shipping rates" />
                 {loadingRates ? (
@@ -540,7 +604,7 @@ export default function FulfillOrderScreen() {
               </>
             )}
 
-            {label && (
+            {label && label.status !== 'voided' && (
               <GradientCard colors={[`${SUCCESS}26`, `${SUCCESS}08`]} style={{ borderColor: `${SUCCESS}55` }}>
                 <View style={{ alignItems: 'center', gap: SP.sm }}>
                   <Feather name="check-circle" size={ICON.xxl} color={SUCCESS} />
@@ -550,8 +614,25 @@ export default function FulfillOrderScreen() {
                 </View>
                 <View style={s.dimRow}>
                   <SecondaryButton label="Open label" icon="external-link" small onPress={handleOpenLabel} style={{ flex: 1 }} />
+                  <SecondaryButton label="Share" icon="share-2" small onPress={handleShareLabel} style={{ flex: 1 }} />
+                </View>
+                <View style={s.dimRow}>
+                  <SecondaryButton label="Copy tracking #" icon="copy" small onPress={handleCopyTracking} style={{ flex: 1 }} />
+                  <SecondaryButton label="Void label" icon="slash" small accent={ERROR} onPress={handleVoidLabel} style={{ flex: 1 }} />
                 </View>
               </GradientCard>
+            )}
+
+            {label && label.status === 'voided' && (
+              <BrandthreadCard style={{ alignItems: 'center', gap: SP.sm, borderColor: `${ERROR}55` }}>
+                <Feather name="slash" size={ICON.xxl} color={ERROR} />
+                <Text style={[s.successTitle, { color: ERROR }]}>Label voided</Text>
+                <Text style={s.mutedText}>This label can no longer be used. Buy a new one or enter tracking manually.</Text>
+                <View style={s.dimRow}>
+                  <SecondaryButton label="Buy new label" icon="refresh-cw" small onPress={() => { setLabel(null); setRates([]); handleLoadRates(); }} style={{ flex: 1 }} />
+                  <SecondaryButton label="Enter tracking manually" icon="edit-3" small onPress={() => { setLabel(null); setManualMode(true); }} style={{ flex: 1 }} />
+                </View>
+              </BrandthreadCard>
             )}
 
             {manualMode && !label && (
@@ -586,7 +667,7 @@ export default function FulfillOrderScreen() {
             <PrimaryButton
               label="Continue"
               onPress={() => setStep(4)}
-              disabled={!label && !manualTracking.trim()}
+              disabled={!hasValidLabel && !manualTracking.trim()}
               icon="arrow-right"
             />
           </>
