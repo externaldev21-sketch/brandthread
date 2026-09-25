@@ -38,4 +38,15 @@ describe("post video publication contract", () => {
     expect(videoRoute).toContain('req.get("range")');
     expect(videoRoute).toContain("file.createReadStream({ start, end })");
   });
+
+  it("lets a seller re-extract the cover frame at a chosen offset without re-encoding", () => {
+    // Previously the composed thumbnail was always grabbed at a fixed
+    // offset (min(0.5, duration/3)) with no way for the seller to pick a
+    // different frame as their cover image.
+    expect(videoRoute).toContain('router.post("/compose-video/thumbnail", requireAuth');
+    expect(videoRoute).toContain("validObjectPath(mediaPath)");
+    expect(videoRoute).toContain("requestedPermission: ObjectPermission.WRITE");
+    expect(videoRoute).toContain('"-ss", String(clampedOffset)');
+    expect(videoRoute).toContain('visibility: "private"');
+  });
 });

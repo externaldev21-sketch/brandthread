@@ -1563,6 +1563,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         duration: number;
         clipCount: number;
       }>('/api/posts/compose-video', body),
+      /** Re-extract the cover frame from an already-composed video at a chosen offset, without re-encoding. */
+      composeVideoThumbnail: (mediaPath: string, offset: number) => post<{
+        thumbnailUrl: string;
+        thumbnailPath: string;
+        offset: number;
+      }>('/api/posts/compose-video/thumbnail', { mediaPath, offset }),
       /** Compose ordered photo slides with per-slide text overlays into portrait rendered images */
       composeSlideshow: (body: {
         slides: Array<{
