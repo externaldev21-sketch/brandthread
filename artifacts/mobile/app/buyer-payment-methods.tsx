@@ -21,6 +21,7 @@ import {
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useAuth } from '@clerk/expo';
 import { Header } from '@/components/layout';
+import { EmptyState } from '@/components/BrandthreadUI';
 
 interface PaymentMethod {
   id: string;
@@ -141,14 +142,11 @@ export default function BuyerPaymentMethodsScreen() {
           </Text>
 
           {paymentMethods.length === 0 ? (
-            <View style={s.emptyCard}>
-              <Feather name="credit-card" size={32} color={MUTED} style={{ marginBottom: 12 }} />
-              <Text style={s.emptyTitle}>No saved payment methods</Text>
-              <Text style={s.emptyDesc}>
-                Payment methods are saved automatically when you complete a purchase. 
-                Your card details are stored securely by Stripe — Brandthread never sees your full card number.
-              </Text>
-            </View>
+            <EmptyState
+              icon="credit-card"
+              title="No saved payment methods"
+              description="Payment methods are saved automatically when you complete a purchase. Your card details are stored securely by Stripe — Brandthread never sees your full card number."
+            />
           ) : (
             <View style={s.card}>
               {paymentMethods.map((pm, i) => (

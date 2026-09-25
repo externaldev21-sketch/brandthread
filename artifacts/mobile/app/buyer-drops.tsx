@@ -11,7 +11,8 @@ import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { ListSkeleton, EmptyState } from '@/components/layout';
+import { ListSkeleton } from '@/components/layout';
+import { EmptyState } from '@/components/BrandthreadUI';
 import { SectionError } from '@/components/InlineFeedback';
 import { LivePulseDot, UpcomingCountdown } from '@/components/CommerceSignal';
 import { BORDER, CARD, FG, FONT, FS, MUTED, RADIUS, SP } from '@/lib/theme';
@@ -166,10 +167,15 @@ export default function BuyerDrops() {
         ) : rows[tab].length === 0 ? (
           <EmptyState
             icon="calendar"
-            message={
-              tab === 'live' ? 'No drops are live right now'
-                : tab === 'upcoming' ? 'No upcoming drops right now'
-                : 'No past drops yet'
+            title={
+              tab === 'live' ? 'No live drops'
+                : tab === 'upcoming' ? 'No upcoming drops'
+                : 'No past drops'
+            }
+            description={
+              tab === 'live' ? 'No drops are live right now.'
+                : tab === 'upcoming' ? 'No upcoming drops right now.'
+                : 'No past drops yet.'
             }
           />
         ) : (

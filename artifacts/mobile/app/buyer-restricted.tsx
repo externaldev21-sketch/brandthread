@@ -19,6 +19,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getRestrictedUsers, unrestrictUser } from '@/services/socialService';
 import type { RestrictRecord } from '@/services/socialTypes';
 import { Header } from '@/components/layout';
+import { EmptyState } from '@/components/BrandthreadUI';
 
 export default function RestrictedAccountsScreen() {
   const { theme } = useAppTheme();
@@ -75,11 +76,11 @@ export default function RestrictedAccountsScreen() {
         keyExtractor={item => item.id}
         contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
         ListEmptyComponent={
-          <View style={styles.empty}>
-             <Feather name="user-x" size={32} color={theme.muted} />
-            <Text style={styles.emptyTitle}>No restricted accounts</Text>
-            <Text style={styles.emptySub}>Restricted accounts will appear here.</Text>
-          </View>
+          <EmptyState
+            icon="user-x"
+            title="No restricted accounts"
+            description="Restricted accounts will appear here."
+          />
         }
         renderItem={({ item }) => (
           <View style={styles.row}>

@@ -4,7 +4,6 @@ import {
   Alert, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
@@ -22,6 +21,7 @@ import { useApi } from '@/lib/api';
 import { useAuth } from '@clerk/expo';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { Header } from '@/components/layout';
+import { EmptyState } from '@/components/BrandthreadUI';
 
 type Tab = 'incoming' | 'sent' | 'suggested';
 
@@ -172,11 +172,11 @@ export default function BuyerFriendRequestsScreen() {
     if (loading) return <ActivityIndicator style={{ marginTop: 40 }} color={PURPLE} />;
     if (incoming.length === 0) {
       return (
-        <View style={s.emptyState}>
-          <Feather name="inbox" size={32} color={MUTED} />
-          <Text style={s.emptyTitle}>No new followers</Text>
-          <Text style={s.emptyBody}>When someone follows you, they'll appear here.</Text>
-        </View>
+        <EmptyState
+          icon="inbox"
+          title="No new followers"
+          description="When someone follows you, they'll appear here."
+        />
       );
     }
     return (
@@ -235,11 +235,11 @@ export default function BuyerFriendRequestsScreen() {
     if (loading) return <ActivityIndicator style={{ marginTop: 40 }} color={PURPLE} />;
     if (sent.length === 0) {
       return (
-        <View style={s.emptyState}>
-          <Feather name="user-check" size={32} color={MUTED} />
-          <Text style={s.emptyTitle}>All caught up</Text>
-          <Text style={s.emptyBody}>Everyone you follow also follows you back.</Text>
-        </View>
+        <EmptyState
+          icon="user-check"
+          title="All caught up"
+          description="Everyone you follow also follows you back."
+        />
       );
     }
     return (
@@ -283,11 +283,11 @@ export default function BuyerFriendRequestsScreen() {
   function renderSuggested() {
     if (suggestions.length === 0) {
       return (
-        <View style={s.emptyState}>
-          <Feather name="users" size={32} color={MUTED} />
-          <Text style={s.emptyTitle}>No suggestions yet</Text>
-          <Text style={s.emptyBody}>Use Search to find buyers to follow.</Text>
-        </View>
+        <EmptyState
+          icon="users"
+          title="No suggestions yet"
+          description="Use Search to find buyers to follow."
+        />
       );
     }
     return (

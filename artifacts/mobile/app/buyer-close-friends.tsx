@@ -18,6 +18,7 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { getAcceptedFriends, getCloseFriendIds, saveCloseFriendIds } from '@/services/socialService';
 import type { Friendship } from '@/services/socialTypes';
 import { Header } from '@/components/layout';
+import { EmptyState } from '@/components/BrandthreadUI';
 
 export default function BuyerCloseFriends() {
   const { theme } = useAppTheme();
@@ -112,15 +113,13 @@ export default function BuyerCloseFriends() {
         renderItem={renderFriend}
         contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
         ListEmptyComponent={
-          <View style={s.empty}>
-            <Feather name="users" size={32} color={MUTED} />
-            <Text style={s.emptyTitle}>{friends.length === 0 ? 'No friends yet' : 'No results'}</Text>
-            <Text style={s.emptyDesc}>
-              {friends.length === 0
-                ? 'Add friends to create a Close Friends list.'
-                : 'Try a different search term.'}
-            </Text>
-          </View>
+          <EmptyState
+            icon="users"
+            title={friends.length === 0 ? 'No friends yet' : 'No results'}
+            description={friends.length === 0
+              ? 'Add friends to create a Close Friends list.'
+              : 'Try a different search term.'}
+          />
         }
         ItemSeparatorComponent={() => <View style={s.separator} />}
       />

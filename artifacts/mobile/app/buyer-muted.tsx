@@ -17,6 +17,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getMutedUsers, unmuteUser } from '@/services/socialService';
 import type { MuteRecord } from '@/services/socialTypes';
 import { Header } from '@/components/layout';
+import { EmptyState } from '@/components/BrandthreadUI';
 
 export default function MutedAccountsScreen() {
   const { theme } = useAppTheme();
@@ -81,11 +82,11 @@ export default function MutedAccountsScreen() {
         keyExtractor={item => item.id}
         contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
         ListEmptyComponent={
-          <View style={styles.empty}>
-             <Feather name="volume-x" size={32} color={theme.muted} />
-            <Text style={styles.emptyTitle}>No muted accounts</Text>
-            <Text style={styles.emptySub}>Muted accounts will appear here.</Text>
-          </View>
+          <EmptyState
+            icon="volume-x"
+            title="No muted accounts"
+            description="Muted accounts will appear here."
+          />
         }
         renderItem={({ item }) => (
           <View style={styles.row}>

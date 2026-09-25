@@ -22,6 +22,7 @@ import {
   reorderHighlights, type Highlight,
 } from '@/lib/highlightsService';
 import { Header } from '@/components/layout';
+import { EmptyState } from '@/components/BrandthreadUI';
 
 function EmojiPicker({ visible, onSelect, onClose }: {
   visible: boolean;
@@ -234,14 +235,12 @@ export default function BuyerHighlightsManager() {
         keyExtractor={h => h.id}
         contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}
         ListEmptyComponent={
-          <View style={s.empty}>
-            <Feather name="bookmark" size={36} color={MUTED} />
-            <Text style={s.emptyTitle}>No highlights yet</Text>
-            <Text style={s.emptySub}>Create a highlight to display it on your profile.</Text>
-            <TouchableOpacity style={s.createBtn} onPress={openCreate}>
-              <Text style={s.createBtnText}>Create highlight</Text>
-            </TouchableOpacity>
-          </View>
+          <EmptyState
+            icon="bookmark"
+            title="No highlights yet"
+            description="Create a highlight to display it on your profile."
+            action={{ label: 'Create highlight', onPress: openCreate }}
+          />
         }
         renderItem={renderItem}
         ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: BORDER }} />}

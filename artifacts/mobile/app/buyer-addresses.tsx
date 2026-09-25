@@ -9,6 +9,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { useAuth } from '@clerk/expo';
 import { Header } from '@/components/layout';
+import { EmptyState } from '@/components/BrandthreadUI';
 
 export default function BuyerAddressesScreen() {
   const { theme } = useAppTheme();
@@ -226,10 +227,11 @@ export default function BuyerAddressesScreen() {
           ) : (
             <>
               {addresses.length === 0 ? (
-                <View style={styles.empty}>
-                   <Feather name="map-pin" size={48} color={theme.muted} style={{ marginBottom: SP.md }} />
-                  <Text style={styles.emptyText}>You haven't saved any addresses yet.</Text>
-                </View>
+                <EmptyState
+                  icon="map-pin"
+                  title="No saved addresses"
+                  description="You haven't saved any addresses yet."
+                />
               ) : (
                 <View style={styles.list}>
                   {addresses.map(addr => (

@@ -37,7 +37,8 @@ import { useUser } from '@clerk/expo';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useRole } from '@/contexts/RoleContext';
 import { FONT, FS, ICON, ON_DARK, RADIUS, SP } from '@/lib/theme';
-import { Header, EmptyState, SkeletonBlock } from '@/components/layout';
+import { Header, SkeletonBlock } from '@/components/layout';
+import { EmptyState } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import SwipeActionRow from '@/components/SwipeActionRow';
 import { useApi } from '@/lib/api';
@@ -68,18 +69,21 @@ import {
 } from '@/services/activityService';
 import { setSellerFollowing } from '@/services/socialService';
 
-const EMPTY_COPY: Record<ActivityFilter, { icon: 'activity' | 'package' | 'heart'; message: string }> = {
+const EMPTY_COPY: Record<ActivityFilter, { icon: 'activity' | 'package' | 'heart'; title: string; description: string }> = {
   all: {
     icon: 'activity',
-    message: 'Nothing has happened yet. Likes, follows, orders and drops from brands you follow will land here.',
+    title: 'Nothing has happened yet',
+    description: 'Likes, follows, orders and drops from brands you follow will land here.',
   },
   orders: {
     icon: 'package',
-    message: 'No order activity yet. Sales, shipping updates and payouts will show up here.',
+    title: 'No order activity yet',
+    description: 'Sales, shipping updates and payouts will show up here.',
   },
   social: {
     icon: 'heart',
-    message: 'No social activity yet. Follow a few brands and share a post to get things moving.',
+    title: 'No social activity yet',
+    description: 'Follow a few brands and share a post to get things moving.',
   },
 };
 
@@ -519,10 +523,9 @@ export default function ActivityCenterScreen() {
         <View style={styles.stateWrap}>
           <EmptyState
             icon="wifi-off"
-            variant="error"
-            message="Your activity couldn't load. Check your connection and try again."
-            actionLabel="Try again"
-            onAction={() => { void loadFirstPage('initial'); }}
+            title="Your activity couldn't load"
+            description="Check your connection and try again."
+            action={{ label: 'Try again', onPress: () => { void loadFirstPage('initial'); } }}
           />
         </View>
       ) : (
@@ -546,7 +549,7 @@ export default function ActivityCenterScreen() {
           )}
           ListEmptyComponent={(
             <View style={styles.stateWrap}>
-              <EmptyState icon={empty.icon} message={empty.message} />
+              <EmptyState icon={empty.icon} title={empty.title} description={empty.description} />
             </View>
           )}
           ListFooterComponent={loadingMore ? (
