@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { queryClient, queryPersister } from '@/lib/queryClient';
+import { recordNavigationStart } from '@/lib/perf';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -342,8 +344,6 @@ if (DEV_BYPASS_ROLE && Platform.OS !== 'web') {
     ['user_role', DEV_BYPASS_ROLE],
   ]);
 }
-
-const queryClient = new QueryClient();
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 const proxyUrl = process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;
@@ -748,6 +748,13 @@ function RootLayoutNav() {
     'manufacturer-hub': 'manufacturerHub',
   };
   const feature = gatedRoutes[route];
+  const pathname = segments.join('/');
+
+  useEffect(() => {
+    if (!__DEV__) return;
+    recordNavigationStart(pathname || '/', queryClient);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   useEffect(() => {
     void flushNotificationEvents(api, userId);
@@ -1158,7 +1165,10 @@ export default function RootLayout() {
   const appTree = (
     <SafeAreaProvider>
       <ErrorBoundary>
-        <QueryClientProvider client={queryClient}>
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{ persister: queryPersister, maxAge: 24 * 60 * 60_000 }}
+        >
           <GestureHandlerRootView style={{ flex: 1 }}>
             <CookieConsentProvider>
             <AppThemeProvider>
@@ -1182,7 +1192,7 @@ export default function RootLayout() {
             </AppThemeProvider>
             </CookieConsentProvider>
           </GestureHandlerRootView>
-        </QueryClientProvider>
+        </PersistQueryClientProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
   );

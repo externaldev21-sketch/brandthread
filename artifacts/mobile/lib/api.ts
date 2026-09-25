@@ -271,7 +271,68 @@ export function subscribeStoreContext(listener: (ctx: StoreContext | null) => vo
   return () => _storeContextListeners.delete(listener);
 }
 
-async function request<T = any>(
+// A screen that fires several parallel requests (common on mount) would
+// otherwise call Clerk's getToken() once per request. Clerk already caches
+// the JWT itself, but each call still costs a promise hop and, right after
+// a token refresh, a brief window where concurrent callers would all kick
+// off their own refresh. Share one in-flight/short-TTL result per getToken
+// function instance so concurrent requests await a single resolution.
+const AUTH_TOKEN_CACHE_TTL_MS = 4_000;
+const authTokenCache = new WeakMap<
+  GetToken,
+  { token: string | null; expiresAt: number; inFlight: Promise<string | null> | null }
+>();
+
+async function getCachedToken(getToken: GetToken): Promise<string | null> {
+  const now = Date.now();
+  const entry = authTokenCache.get(getToken);
+  if (entry) {
+    if (entry.inFlight) return entry.inFlight;
+    if (entry.expiresAt > now) return entry.token;
+  }
+  const inFlight = getToken().then(
+    (token) => {
+      authTokenCache.set(getToken, { token, expiresAt: Date.now() + AUTH_TOKEN_CACHE_TTL_MS, inFlight: null });
+      return token;
+    },
+    (error) => {
+      authTokenCache.delete(getToken);
+      throw error;
+    },
+  );
+  authTokenCache.set(getToken, { token: entry?.token ?? null, expiresAt: 0, inFlight });
+  return inFlight;
+}
+
+// Two screens (or a screen re-rendering mid-fetch) that ask for the same GET
+// at the same moment would otherwise fire two identical network requests.
+// Share the in-flight promise so the second caller just awaits the first.
+const inFlightGetRequests = new Map<string, Promise<any>>();
+
+function request<T = any>(
+  path: string,
+  options: RequestInit,
+  getToken: GetToken,
+  asText = false,
+  getCacheScope: GetCacheScope = () => 'anonymous',
+  reportErrors = true,
+  timeoutMs: number = REQUEST_TIMEOUT_MS,
+): Promise<T> {
+  const isRead = (options.method ?? 'GET').toUpperCase() === 'GET';
+  if (!isRead || options.cache === 'no-store') {
+    return doRequest<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs);
+  }
+  const dedupeKey = `${versionApiPath(path)}::${asText ? 'text' : 'json'}::${JSON.stringify(storeContextHeaders())}`;
+  const existing = inFlightGetRequests.get(dedupeKey);
+  if (existing) return existing;
+  const promise = doRequest<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs).finally(() => {
+    if (inFlightGetRequests.get(dedupeKey) === promise) inFlightGetRequests.delete(dedupeKey);
+  });
+  inFlightGetRequests.set(dedupeKey, promise);
+  return promise;
+}
+
+async function doRequest<T = any>(
   path: string,
   options: RequestInit,
   getToken: GetToken,
@@ -286,7 +347,7 @@ async function request<T = any>(
   const cacheKey = isRead && options.cache !== 'no-store' && !asText
     ? await apiCacheKey(resolvedPath, getCacheScope)
     : null;
-  const token = await getToken();
+  const token = await getCachedToken(getToken);
   // Build a plain Record so TypeScript is happy with every HeadersInit variant.
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -348,7 +409,7 @@ async function uploadImage<T = any>(
   }
   const imageBlob = await source.blob();
   const contentType = image.mimeType || imageBlob.type || "image/jpeg";
-  const token = await getToken();
+  const token = await getCachedToken(getToken);
   let res: Response;
   try {
     res = await fetch(`${BASE}${versionApiPath(path)}`, {
@@ -385,7 +446,7 @@ async function uploadVideo<T = any>(
   if (!source.ok) throw new Error("Could not read the recorded video.");
   const videoBlob = await source.blob();
   const contentType = video.mimeType || videoBlob.type || "video/mp4";
-  const token = await getToken();
+  const token = await getCachedToken(getToken);
   let res: Response;
   try {
     res = await fetch(`${BASE}${versionApiPath(path)}`, {
