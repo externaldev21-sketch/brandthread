@@ -549,6 +549,8 @@ export async function applyTheme(themeId: string, presetId?: string): Promise<St
   store.themeSettings.themeId = themeId;
   store.themeSettings.activePresetId = preset.paletteId;
   store.branding.colors = preset.colors;
+  store.branding.buttonStyle = theme.defaultButtonStyle;
+  store.branding.cornerRadius = theme.defaultCornerRadius;
   const typoEntry = TYPOGRAPHY_STYLES.find(t => t.value === theme.defaultTypography);
   if (typoEntry) {
     store.branding.typography = {

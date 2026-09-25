@@ -85,7 +85,6 @@ export const SECTIONS: ControlCenterSection[] = [
       { id: 'products',    label: 'Products',     icon: 'grid',        route: '/(tabs)/products', description: 'Your full catalog' },
       { id: 'orders',      label: 'Orders',       icon: 'shopping-bag', route: '/(tabs)/orders', description: 'Fulfill and track orders', badgeKey: 'orders' },
       { id: 'inventory',   label: 'Inventory',    icon: 'archive',     route: '/inventory', description: 'Stock levels and locations' },
-      { id: 'drops',       label: 'Drops',        icon: 'zap',         route: '/add-product?intent=drop', description: 'Schedule a limited drop' },
       { id: 'discounts',   label: 'Discounts',    icon: 'tag',         route: '/discounts', description: 'Coupon codes and offers' },
     ],
   },
@@ -117,13 +116,14 @@ export const SECTIONS: ControlCenterSection[] = [
     title: 'Store',
     icon: 'layout',
     items: [
-      { id: 'store-builder', label: 'Store Builder', icon: 'layout', route: '/store-builder', description: 'Customize your storefront' },
+      { id: 'store-builder', label: 'Store Builder', icon: 'layout', route: '/store-builder', description: 'Build your brand website' },
       { id: 'store-preview', label: 'Store Preview', icon: 'eye',    route: '/store-preview', description: 'See your live storefront' },
-      { id: 'collections',   label: 'Collections',   icon: 'grid',   route: '/store-collections', description: 'Group products' },
       { id: 'shipping',      label: 'Shipping',       icon: 'truck',  route: '/shipping', description: 'Rates, zones and carriers' },
       { id: 'manufacturer',  label: 'Manufacturer Hub', icon: 'tool', route: '/manufacturer-hub', description: 'Find and manage manufacturers' },
-      { id: 'brand-memory',  label: 'Brand Memory',  icon: 'cpu',    route: '/ai-brand-memory', description: 'Your AI brand guidelines' },
       ...STUDIO_ITEMS,
+      // 'collections' removed from the Store section (folded into Store Builder's
+      // collection-grid blocks). 'brand-memory' unlinked from the seller menu per
+      // product decision — screen/route/service kept intact, just unreachable from here.
     ],
   },
   {

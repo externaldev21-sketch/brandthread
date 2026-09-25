@@ -112,8 +112,6 @@ export default function RolesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  headerActions: { flexDirection: 'row', gap: 8 },
-  headerBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   toolbarRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 14 },
   allPill: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
   allPillText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },

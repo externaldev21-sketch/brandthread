@@ -24,6 +24,7 @@ import { useApi } from '@/lib/api';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { formatCents } from '@/lib/money';
 import { CachedImage } from '@/components/CachedImage';
+import { ShareProfileSheet } from '@/components/ShareProfileSheet';
 import { loadBuyerProfile } from '@/lib/buyerProfile';
 import { loadHighlights, type Highlight } from '@/lib/highlightsService';
 import {
@@ -247,6 +248,7 @@ export default function ProfileScreen() {
 
   // Sheets
   const [menuOpen, setMenuOpen] = useState(false);
+  const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [postSheet, setPostSheet] = useState<BuyerPost | null>(null);
 
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -361,7 +363,7 @@ export default function ProfileScreen() {
   const handleShareProfile = () => {
     setMenuOpen(false);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/share-profile' as never);
+    setShareSheetOpen(true);
   };
 
   const handleSignOut = async () => {
@@ -837,6 +839,17 @@ export default function ProfileScreen() {
         <View style={[styles.sheetDivider, { backgroundColor: theme.border }]} />
         <SheetRow icon="log-out" label="Sign Out" destructive onPress={handleSignOut} />
       </BottomSheet>
+
+      <ShareProfileSheet
+        visible={shareSheetOpen}
+        onClose={() => setShareSheetOpen(false)}
+        avatarUrl={avatarUri}
+        buyerExtra={{
+          statLabel: 'friends',
+          statValue: profile?.friendsCount ?? 0,
+          topPosts: posts.slice(0, 3).map(p => ({ id: p.id, uri: p.mediaUrl })),
+        }}
+      />
 
       {/* ── Post Long-Press Sheet ── */}
       <BottomSheet visible={!!postSheet} onClose={() => setPostSheet(null)}>

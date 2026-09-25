@@ -1,12 +1,13 @@
 import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { FS } from '@/lib/theme';
-import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+import { PillButton, PressableScale, Reveal, StepHeadline, StepSub, StitchAccent } from '@/components/onboarding/OnboardingUI';
+import { RADIUS, SPACE, TYPE } from '@/components/onboarding/onboardingTokens';
 
 const getCards = (theme: AppThemePreset): {
   type: AccountType;
@@ -69,14 +70,10 @@ export function AccountTypeStep({
     <View style={[styles.root, { paddingTop: embedded ? 0 : insets.top }]}>
       <StatusBar barStyle="light-content" />
 
-      {/* Header */}
+      {/* Header — one question, left-aligned */}
       <View style={styles.header}>
-        <View style={styles.headerText}>
-           <Text style={styles.headline}>Are you a buyer{'\n'}or a seller?</Text>
-          <Text style={styles.subtext}>
-             Choose your path so we can personalize your first experience.
-          </Text>
-        </View>
+        <StepHeadline>Are you a buyer{'\n'}or a seller?</StepHeadline>
+        <StepSub>Choose your path so we can personalize your first experience.</StepSub>
       </View>
 
       {/* Cards */}
@@ -84,111 +81,72 @@ export function AccountTypeStep({
         contentContainerStyle={[styles.cards, { paddingBottom: insets.bottom + 140 }]}
         showsVerticalScrollIndicator={false}
       >
-        {cards.map((c) => {
+        {cards.map((c, index) => {
           const isSelected = selected === c.type;
           return (
-            <TouchableOpacity
-              key={c.type}
-              testID={`onboarding-account-type-${c.type}`}
-              accessibilityLabel={`${c.type === 'buyer' ? 'Buyer' : 'Seller'} account type`}
-              activeOpacity={0.85}
-              onPress={() => {
-                onSelect(c.type);
-                Haptics.selectionAsync();
-              }}
-            >
-              <View style={[
-                styles.card,
-                isSelected && {
-                  borderColor: c.accent,
-                  borderWidth: 1.5,
-                  shadowColor: c.accent,
-                  shadowOpacity: 0.3,
-                  shadowRadius: 16,
-                  shadowOffset: { width: 0, height: 0 },
-                  elevation: 10,
-                },
-              ]}>
-                <LinearGradient
-                  colors={[c.accent, `${c.accent}00`]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.cardAccent}
-                />
-                {/* Check badge */}
-                {isSelected && (
-                  <View style={[styles.checkBadge, { backgroundColor: c.accent }]}>
-                    <Feather name="check" size={13} color={theme.onAccent} />
-                  </View>
-                )}
+            <Reveal key={c.type} index={index + 2}>
+              <PressableScale
+                testID={`onboarding-account-type-${c.type}`}
+                accessibilityLabel={`${c.type === 'buyer' ? 'Buyer' : 'Seller'} account type`}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: isSelected }}
+                onPress={() => {
+                  onSelect(c.type);
+                  Haptics.selectionAsync();
+                }}
+                style={[
+                  styles.card,
+                  isSelected && { borderColor: theme.text, borderWidth: 1 },
+                ]}
+              >
+                <StitchAccent active={isSelected} color={theme.text} style={styles.cardStitch} />
 
-                {/* Icon + title */}
+                {/* Icon + title + radio */}
                 <View style={styles.cardTop}>
-                  <LinearGradient
-                    colors={[`${c.accent}38`, `${c.accent}0D`]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.iconWrap}
-                  >
-                    <Feather name={c.icon} size={23} color={c.accent} />
-                  </LinearGradient>
+                  <View style={[styles.iconWrap, isSelected && { borderColor: theme.text }]}>
+                    <Feather name={c.icon} size={20} color={isSelected ? theme.text : theme.muted} />
+                  </View>
                   <View style={styles.cardTitleWrap}>
-                    <Text style={[styles.cardKicker, { color: c.accent }]}>
+                    <Text style={[styles.cardKicker, { color: isSelected ? theme.text : theme.subtle }]}>
                       {c.type === 'buyer' ? 'EXPLORE' : 'CREATE'}
                     </Text>
                     <Text style={styles.cardTitle}>{c.title}</Text>
-                    <Text style={styles.cardDesc}>{c.description}</Text>
+                  </View>
+                  <View style={[styles.radio, isSelected && { borderColor: theme.text }]}>
+                    {isSelected ? <View style={[styles.radioDot, { backgroundColor: theme.text }]} /> : null}
                   </View>
                 </View>
+                <Text style={styles.cardDesc}>{c.description}</Text>
 
                 {/* Benefits */}
                 <View style={styles.bullets}>
                   {c.bullets.map((b) => (
                     <View key={b} style={styles.bulletRow}>
-                   <View style={[styles.bulletIcon, { borderColor: isSelected ? `${c.accent}B0` : theme.border }]}>
-                         <Feather name="check" size={10} color={isSelected ? c.accent : theme.muted} />
-                      </View>
-                      <Text style={styles.bulletText}>{b}</Text>
+                      <Feather name="check" size={12} color={isSelected ? theme.text : theme.subtle} />
+                      <Text style={[styles.bulletText, isSelected && { color: theme.text }]}>{b}</Text>
                     </View>
                   ))}
                 </View>
-              </View>
-            </TouchableOpacity>
+              </PressableScale>
+            </Reveal>
           );
         })}
       </ScrollView>
 
-      {/* Footer CTA */}
+      {/* Sticky footer CTA — disabled until a path is chosen */}
       <LinearGradient
-        colors={[`${theme.background}00`, theme.background]}
+        colors={[`${theme.background}00`, theme.background, theme.background]}
+        locations={[0, 0.45, 1]}
         style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}
       >
-        <TouchableOpacity
+        <PillButton
           testID="onboarding-account-type-continue"
           accessibilityLabel="Continue from account type"
-          activeOpacity={0.88}
+          label={selected && saving ? 'Loading…' : 'Continue'}
           onPress={onContinue}
           disabled={!selected || saving}
-        >
-          {selected ? (
-            <LinearGradient
-              colors={theme.primaryGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.continueBtn}
-            >
-              <Text style={[styles.continueBtnText, getOnAccentTextStyle(theme)]}>
-                {saving ? 'Loading…' : 'Continue'}
-              </Text>
-            </LinearGradient>
-          ) : (
-            <View style={[styles.continueBtn, styles.continueBtnDisabled]}>
-               <Text style={[styles.continueBtnText, { color: theme.muted }]}>
-                Continue
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
+          haptic={false}
+        />
       </LinearGradient>
     </View>
   );
@@ -204,82 +162,41 @@ export default function AccountTypeScreen() {
 }
 
 const createStyles = (theme: AppThemePreset) => StyleSheet.create({
-   root:  { flex: 1, backgroundColor: theme.background },
-  header: { paddingHorizontal: 20, paddingBottom: 12 },
-  headerText: { gap: 6 },
-  headline: {
-    fontSize: 32,
-    fontFamily: 'Inter_700Bold',
-     color: theme.text,
-    letterSpacing: -0.8,
-    lineHeight: 38,
-  },
-  subtext: {
-    fontSize: 14,
-    fontFamily: 'Inter_400Regular',
-     color: theme.muted,
-    lineHeight: 21,
-  },
+  root:  { flex: 1, backgroundColor: theme.background },
+  header: { paddingHorizontal: SPACE.lg, paddingTop: SPACE.lg, paddingBottom: SPACE.lg },
 
-  cards: { paddingHorizontal: 20, paddingTop: 6, gap: 12 },
+  cards: { paddingHorizontal: SPACE.lg, gap: SPACE.sm },
   card: {
-     backgroundColor: theme.card,
-    borderRadius: 16,
+    backgroundColor: theme.card,
+    borderRadius: RADIUS.card,
     borderWidth: StyleSheet.hairlineWidth,
-     borderColor: theme.border,
-    padding: 18,
+    borderColor: theme.border,
+    padding: SPACE.md + 2,
     overflow: 'hidden',
   },
-  cardAccent: {
-    position: 'absolute',
-    top: 0,
-    left: 18,
-    width: 80,
-    height: 2,
-    borderBottomLeftRadius: 2,
-    borderBottomRightRadius: 2,
-  },
-  checkBadge: {
-    position: 'absolute',
-    top: 14, right: 14,
-    width: 24, height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardTop: { flexDirection: 'row', gap: 12, marginBottom: 16, alignItems: 'flex-start' },
+  cardStitch: { position: 'absolute', top: 10, left: SPACE.md + 2 },
+  cardTop: { flexDirection: 'row', gap: SPACE.sm, alignItems: 'center', marginBottom: SPACE.xs },
   iconWrap: {
-    width: 44, height: 44, borderRadius: 12,
+    width: 44, height: 44, borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  cardTitleWrap: { flex: 1, paddingTop: 1 },
-  cardKicker: { fontSize: FS.xs, fontFamily: 'Inter_700Bold', letterSpacing: 1.8, marginBottom: 3 },
-   cardTitle: { fontSize: 19, fontFamily: 'Inter_700Bold', color: theme.text, marginBottom: 4, letterSpacing: -0.3 },
-   cardDesc:  { fontSize: 13, fontFamily: 'Inter_400Regular', color: theme.muted, lineHeight: 18 },
-
-  bullets:   { gap: 9, paddingTop: 2 },
-  bulletRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  bulletIcon: {
-    width: 18, height: 18, borderRadius: 9, borderWidth: 1,
+  cardTitleWrap: { flex: 1 },
+  cardKicker: { ...TYPE.eyebrow, marginBottom: 2 },
+  cardTitle: { fontSize: 20, lineHeight: 24, fontFamily: 'Inter_700Bold', color: theme.text, letterSpacing: -0.4 },
+  radio: {
+    width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: theme.border,
     alignItems: 'center', justifyContent: 'center',
   },
-   bulletText:{ flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium', color: theme.subtle },
+  radioDot: { width: 10, height: 10, borderRadius: 5 },
+  cardDesc:  { ...TYPE.body, color: theme.muted, marginBottom: SPACE.sm },
+
+  bullets:   { flexDirection: 'row', flexWrap: 'wrap', rowGap: SPACE.xs, columnGap: SPACE.md },
+  bulletRow: { flexDirection: 'row', alignItems: 'center', gap: 6, width: '46%' },
+  bulletText:{ flex: 1, ...TYPE.label, color: theme.subtle },
 
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    paddingTop: 28, paddingHorizontal: 20,
-  },
-  continueBtn: {
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  continueBtnDisabled: {
-     backgroundColor: theme.surface,
-  },
-  continueBtnText: {
-    fontSize: 16,
-    fontFamily: 'Inter_700Bold',
-     color: theme.onAccent,
+    paddingTop: SPACE.xxl, paddingHorizontal: SPACE.lg,
   },
 });

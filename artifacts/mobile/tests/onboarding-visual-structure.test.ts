@@ -73,7 +73,8 @@ describe('onboarding visual structure', () => {
     expect(onboarding).toContain('<Text style={ssa.divText}>or</Text>');
     expect(onboarding).toContain('disabled={!!oauthLoading || loading}');
     expect(onboarding).not.toContain('disabled={!!oauthLoading || loading || !isUsernameValid}');
-    expect(onboarding).toContain("oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 14");
+    // OAuth options are pill-shaped secondary buttons (onboarding restyle).
+    expect(onboarding).toContain("oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 999");
   });
 
   it('thread explainer screen exists and routes buyers to the feed', () => {

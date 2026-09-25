@@ -155,7 +155,8 @@ export const SELLER_SETTINGS_CATALOG: SettingsCatalogGroup[] = [
       { label: 'Store Builder', description: 'Customize your storefront layout', aliases: ['builder', 'layout', 'storefront'], icon: 'layout', route: '/store-builder', audience: 'seller' },
       { label: 'Storefront theme', description: 'Colors and presentation of your public store', aliases: ['storefront theme', 'colors'], icon: 'droplet', route: '/store-theme-picker', audience: 'seller' },
       { label: 'Brand Assets', description: 'Manage your logos, colors, fonts, and saved brand assets', aliases: ['brand kit', 'logos', 'fonts', 'colors'], icon: 'layers', route: '/design-brand-assets', audience: 'seller', requiresGrowth: true },
-      { label: 'Collections', description: 'Group products into collections', aliases: ['collections', 'group products'], icon: 'grid', route: '/store-collections', audience: 'seller' },
+      // 'Collections' removed here too — collection-style grids (driven by tags) now
+      // live inside Store Builder as a section block, not a standalone screen.
       { label: 'Domains', description: 'Custom domain settings', aliases: ['domain', 'custom url'], icon: 'globe', route: '/store-domain', audience: 'seller' },
       { label: 'Discounts', description: 'Coupon codes and offers', aliases: ['coupons', 'offers', 'promo'], icon: 'tag', route: '/discounts', audience: 'seller' },
       { label: 'Locations', description: 'Manage pickup and business locations', aliases: ['locations', 'pickup'], icon: 'map-pin', route: '/locations', audience: 'seller' },

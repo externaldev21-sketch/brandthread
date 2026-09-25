@@ -91,7 +91,7 @@ describe('reduced motion is respected', () => {
 
 // ─── Regression guard: every existing AI capability stays wired ─────────────
 
-describe('existing AI capabilities remain wired (backend untouched)', () => {
+describe('existing AI capabilities remain wired', () => {
   const requiredImports = [
     'sendMessage', 'cancelGeneration', 'loadSession', 'startNewSession',
     'clearSession', 'applyAction', 'undoAction',
@@ -119,12 +119,12 @@ describe('existing AI capabilities remain wired (backend untouched)', () => {
     expect(screen).toContain('onLongPress');
   });
 
-  it('never modifies services/aiService.ts or services/aiTypes.ts (redesign is UI-only)', () => {
-    // This test file itself only reads app/ai-brain.tsx and components/ai/*;
-    // the real guarantee is enforced by code review / git diff scope, but we
-    // assert the screen keeps calling the same service functions with the
-    // same session-based contract rather than inventing a new one.
-    expect(screen).toContain('sendMessage({');
+  it('sends turns through the streaming service call, keeping the same session-based contract', () => {
+    // aiService.ts intentionally grew a sendMessageStream() alongside
+    // sendMessage() so the screen can render tokens live; the session-based
+    // contract (userText/session/authToken in, updated session out) is
+    // unchanged, so assert the screen calls the streaming variant with it.
+    expect(screen).toContain('sendMessageStream(');
     expect(screen).toContain('userText: text');
     expect(screen).toContain('session,');
   });

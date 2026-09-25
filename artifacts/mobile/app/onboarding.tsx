@@ -85,6 +85,19 @@ import {
 } from '@/lib/onboardingFlow';
 import { BrandsToFollowStep } from '@/components/onboarding/BrandsToFollowStep';
 import { WelcomeStep } from '@/components/onboarding/WelcomeStep';
+import { Glow, ThreadDraw, ThreadLogoStitch, ThreadProgress, ThreadWeave } from '@/components/onboarding/ThreadLine';
+import {
+  CodeCells,
+  FloatingInput,
+  PillButton,
+  PressableScale,
+  Reveal,
+  RevealToggle,
+  StepHeadline,
+  StepSub,
+  StitchAccent,
+} from '@/components/onboarding/OnboardingUI';
+import { MOTION, RADIUS, SPACE, TYPE } from '@/components/onboarding/onboardingTokens';
 
 // ─── Palette ────────────────────────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
@@ -205,155 +218,129 @@ function mapClerkError(err: any): string {
 // ─── Shared UI ───────────────────────────────────────────────────────────────
 
 /**
- * Minimal step-dot indicator.
- * Uses only existing palette references — no new color literals.
+ * Progress indicator: the signature thread, sewn node-to-node as the user
+ * advances (one stitch node per step). Replaces the old dot row.
  */
 function StepDots({ current, total }: { current: number; total: number }) {
   const { theme } = useAppTheme();
-  const styles = createSdots(theme);
   return (
-    <View style={styles.row} accessibilityLabel={`Step ${current + 1} of ${total}`}>
-      {Array.from({ length: total }).map((_, i) => {
-        const filled = i <= current;
-        const active = i === current;
-        return (
-          <View
-            key={i}
-            style={[
-              styles.dot,
-              active && { width: 18 },
-            ]}
-          >
-            {filled && (
-              <LinearGradient
-                colors={theme.heroGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={StyleSheet.absoluteFill}
-              />
-            )}
-          </View>
-        );
-      })}
-    </View>
+    <ThreadProgress
+      current={current}
+      total={total}
+      color={theme.text}
+      trackColor={theme.border}
+      accessibilityLabel={`Step ${current + 1} of ${total}`}
+      style={{ flex: 1 }}
+    />
   );
 }
-const createSdots = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: theme.borderSubtle, overflow: 'hidden' },
-});
 
 /**
  * Style-interest chip with solid-fill selected state and checkmark.
- * Selected: solid accent-dim background, accent border, checkmark + label.
+ * Selected: solid accent-dim background, bright border, checkmark + label.
  */
 function StyleChip({ label, emoji, selected, onPress }: { label: string; emoji: string; selected: boolean; onPress: () => void }) {
   const { theme } = useAppTheme();
+  const ssc = createSsc(theme);
   return (
-    <TouchableOpacity
+    <PressableScale
       style={[
-        createSsc(theme).chip,
-        selected && { backgroundColor: theme.accentDim, borderColor: theme.accent, borderWidth: 1.5 },
+        ssc.chip,
+        selected && { backgroundColor: theme.accentDim, borderColor: theme.text, borderWidth: 1 },
       ]}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: selected }}
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
-      activeOpacity={0.75}
     >
-      <Text style={createSsc(theme).emoji}>{emoji}</Text>
-      {selected && <Feather name="check" size={11} color={theme.accentLight} style={{ marginRight: 1 }} />}
-      <Text style={[createSsc(theme).chipText, selected && { color: theme.accentLight }]}>{label}</Text>
-    </TouchableOpacity>
+      <Text style={ssc.emoji}>{emoji}</Text>
+      <Text style={[ssc.chipText, selected && { color: theme.text }]}>{label}</Text>
+      {selected && <Feather name="check" size={13} color={theme.text} />}
+    </PressableScale>
   );
 }
 const createSsc = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  chip:     { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: 100, paddingHorizontal: 12, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  emoji:    { fontSize: 14 },
-  chipText: { fontSize: 14, fontFamily: 'Inter_500Medium', color: theme.muted },
+  chip:     { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: RADIUS.pill, minHeight: 44, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  emoji:    { fontSize: 16 },
+  chipText: { fontSize: 15, fontFamily: 'Inter_500Medium', color: theme.muted },
 });
 
 function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
   const { theme } = useAppTheme();
+  const sc = createSc(theme);
   return (
-    <TouchableOpacity
-      style={[createSc(theme).chip, selected && { backgroundColor: theme.accentDim, borderColor: theme.accent, borderWidth: 1.5 }]}
+    <PressableScale
+      style={[sc.chip, selected && { backgroundColor: theme.accentDim, borderColor: theme.text, borderWidth: 1 }]}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
-      activeOpacity={0.75}
     >
-      <Text style={[createSc(theme).chipText, selected && { color: theme.accentLight }]}>{label}</Text>
-    </TouchableOpacity>
+      <Text style={[sc.chipText, selected && { color: theme.text }]}>{label}</Text>
+      {selected && <Feather name="check" size={13} color={theme.text} />}
+    </PressableScale>
   );
 }
 const createSc = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  chip:       { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: 100, paddingHorizontal: 14, paddingVertical: 9 },
-  chipText:   { fontSize: 14, fontFamily: 'Inter_500Medium', color: theme.muted },
+  chip:       { backgroundColor: theme.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, borderRadius: RADIUS.pill, minHeight: 44, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  chipText:   { fontSize: 15, fontFamily: 'Inter_500Medium', color: theme.muted },
 });
 
+/** Big tappable option row — one of a few answers to the screen's question. */
 function RadioRow({ label, sub, selected, onPress }: { label: string; sub: string; selected: boolean; onPress: () => void }) {
   const { theme } = useAppTheme();
   const sr = createSr(theme);
   return (
-    <TouchableOpacity
-      style={[sr.row, selected && { borderColor: theme.accent, borderWidth: 1.5, backgroundColor: theme.secondaryDim }]}
+    <PressableScale
+      style={[sr.row, selected && { borderColor: theme.text, borderWidth: 1 }]}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
-      activeOpacity={0.8}
     >
+      <StitchAccent active={selected} color={theme.text} style={sr.stitch} />
       <View style={{ flex: 1 }}>
         <Text style={[sr.label, selected && sr.labelOn]}>{label}</Text>
         <Text style={sr.sub}>{sub}</Text>
       </View>
-      <View style={[sr.circle, selected && { borderColor: theme.accent }]}>
-        {selected && <View style={[sr.dot, { backgroundColor: theme.accent }]} />}
+      <View style={[sr.circle, selected && { borderColor: theme.text }]}>
+        {selected && <View style={[sr.dot, { backgroundColor: theme.text }]} />}
       </View>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 const createSr = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  row:     { backgroundColor: theme.card, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  label:   { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: theme.text, marginBottom: 2 },
+  row:     { backgroundColor: theme.card, borderRadius: RADIUS.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, paddingHorizontal: 18, paddingVertical: 20, flexDirection: 'row', alignItems: 'center', gap: SPACE.md, overflow: 'hidden' },
+  stitch:  { position: 'absolute', top: 10, left: 18 },
+  label:   { fontSize: 17, lineHeight: 22, fontFamily: 'Inter_600SemiBold', color: theme.text, marginBottom: 2 },
   labelOn: { color: theme.text },
-  sub:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: theme.muted, lineHeight: 18 },
-  circle:  { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  dot:     { width: 9, height: 9, borderRadius: 5 },
+  sub:     { ...TYPE.body, color: theme.muted },
+  circle:  { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  dot:     { width: 10, height: 10, borderRadius: 5 },
 });
 
-function PrimaryButton({ label, onPress, disabled, loading }: { label: string; onPress: () => void; disabled?: boolean; loading?: boolean }) {
+/** Full-width primary pill (press scale + optional light haptic). */
+function PrimaryButton({ label, onPress, disabled, loading, haptic = true }: { label: string; onPress: () => void; disabled?: boolean; loading?: boolean; haptic?: boolean }) {
+  return <PillButton label={label} onPress={onPress} disabled={disabled} loading={loading} haptic={haptic} />;
+}
+
+/** Inline form error with icon. */
+function InlineError({ message }: { message: string }) {
   const { theme } = useAppTheme();
-  const spb = createSpb(theme);
-  const onAccentTextStyle = getOnAccentTextStyle(theme);
   return (
-    <TouchableOpacity activeOpacity={0.88} onPress={onPress} disabled={disabled || loading}>
-      {disabled ? (
-        <View style={[spb.btn, spb.btnDisabled]}>
-          {loading ? <ActivityIndicator color={theme.muted} size="small" /> : <Text style={[spb.text, spb.textDisabled]}>{label}</Text>}
-        </View>
-      ) : (
-        <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={spb.btn}>
-          {loading ? <ActivityIndicator color={theme.onAccent} size="small" /> : <Text style={[spb.text, onAccentTextStyle]}>{label}</Text>}
-        </LinearGradient>
-      )}
-    </TouchableOpacity>
+    <Reveal style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: SPACE.sm }}>
+      <Feather name="alert-circle" size={14} color={theme.error} />
+      <Text style={[TYPE.label, { color: theme.error, flex: 1 }]}>{message}</Text>
+    </Reveal>
   );
 }
-const createSpb = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  btn:         { borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
-  btnDisabled: { backgroundColor: 'rgba(255,255,255,0.06)' },
-  text:        { fontSize: 16, fontFamily: 'Inter_700Bold', color: theme.text },
-  textDisabled:{ color: theme.subtle },
-});
 
 // ─── Loading animation ────────────────────────────────────────────────────────
+// Timing is unchanged: each task completes on the same schedule and onDone
+// fires at the same moment. Visually, the thread sews one stitch per task.
 function LoadingAnimation({ steps, onDone }: { steps: string[]; onDone: () => void }) {
   const { theme } = useAppTheme();
   const sl = createSl(theme);
   const insets  = useSafeAreaInsets();
   const [done, setDone]   = useState<boolean[]>(steps.map(() => false));
   const [active, setActive] = useState(0);
-  const progress = useRef(new Animated.Value(0)).current;
   const logoScale = useRef(new Animated.Value(0.7)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
 
@@ -364,8 +351,6 @@ function LoadingAnimation({ steps, onDone }: { steps: string[]; onDone: () => vo
       Animated.spring(logoScale, { toValue: 1, damping: 14, stiffness: 100, useNativeDriver: true }),
       Animated.timing(logoOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
     ]).start();
-
-    Animated.timing(progress, { toValue: 1, duration: total - 200, useNativeDriver: false }).start();
 
     const timers: ReturnType<typeof setTimeout>[] = [];
     steps.forEach((_, i) => {
@@ -385,68 +370,77 @@ function LoadingAnimation({ steps, onDone }: { steps: string[]; onDone: () => vo
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const doneCount = done.filter(Boolean).length;
+
   return (
-    <View style={[sl.root, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 40 }]}>
+    <View style={[sl.root, { paddingTop: insets.top + SPACE.xxl, paddingBottom: insets.bottom + SPACE.xxl }]}>
 
       {/* Logo */}
-      <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }], marginBottom: 52 }}>
+      <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }], marginBottom: SPACE.xl, alignItems: 'center' }}>
+        <Glow size={200} color={theme.text} intensity={0.12} style={sl.logoHalo} />
         <BrandthreadLogo size={72} />
       </Animated.View>
 
-      {/* Steps */}
+      {/* Steps, joined by a running stitch */}
       <View style={sl.stepsList}>
         {steps.map((label, i) => {
           const isDone = done[i];
           const isActive = active === i && !isDone;
           return (
-            <View key={label} style={sl.stepRow}>
-              <View style={[sl.stepIcon, isDone && sl.stepIconDone, isActive && { borderColor: theme.accent }]}>
-                {isDone ? (
-                  <Feather name="check" size={14} color={theme.text} />
-                ) : isActive ? (
-                  <ActivityIndicator size="small" color={theme.accent} />
-                ) : (
-                  <View style={sl.stepDot} />
-                )}
+            <Reveal key={label} index={i + 1}>
+              <View style={sl.stepRow}>
+                <View style={sl.stepRail}>
+                  <View style={[sl.stepIcon, isDone && sl.stepIconDone, isActive && { borderColor: theme.text }]}>
+                    {isDone ? (
+                      <Feather name="check" size={13} color={theme.background} />
+                    ) : isActive ? (
+                      <ActivityIndicator size="small" color={theme.text} />
+                    ) : (
+                      <View style={sl.stepDot} />
+                    )}
+                  </View>
+                  {i < steps.length - 1 ? (
+                    <View style={[sl.stepJoin, { backgroundColor: isDone ? theme.text : theme.border }]} />
+                  ) : null}
+                </View>
+                <Text style={[sl.stepLabel, (isDone || isActive) && sl.stepLabelActive]}>
+                  {label}
+                </Text>
               </View>
-              <Text style={[sl.stepLabel, (isDone || isActive) && sl.stepLabelActive]}>
-                {label}
-              </Text>
-            </View>
+            </Reveal>
           );
         })}
       </View>
 
-      {/* Progress bar */}
-      <View style={sl.barTrack}>
-        <Animated.View
-          style={[sl.barFill, {
-            width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
-          }]}
-        >
-          <LinearGradient colors={theme.heroGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
-        </Animated.View>
-      </View>
+      {/* The thread sews one stitch per finished task */}
+      <ThreadProgress
+        fraction={doneCount / Math.max(1, steps.length)}
+        color={theme.text}
+        trackColor={theme.border}
+        accessibilityLabel={`${doneCount} of ${steps.length} setup steps done`}
+        style={{ width: '100%' }}
+      />
     </View>
   );
 }
 const createSl = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const CARD = theme.card, BORDER = theme.border, FG = theme.text, MUTED = theme.muted, MUTED2 = theme.subtle, GREEN = theme.success;
+  const BORDER = theme.border, FG = theme.text, MUTED = theme.muted;
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
-  stepsList: { width: '100%', gap: 18, marginBottom: 48 },
-  stepRow:   { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  root: { flex: 1, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACE.xl },
+  logoHalo: { position: 'absolute', top: -64 },
+  stepsList: { width: '100%', marginBottom: SPACE.xl },
+  stepRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: SPACE.md },
+  stepRail:  { alignItems: 'center' },
   stepIcon:  {
-    width: 30, height: 30, borderRadius: 15,
-    borderWidth: 1, borderColor: BORDER,
+    width: 28, height: 28, borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  stepIconDone:   { backgroundColor: GREEN, borderColor: GREEN },
-  stepDot:        { width: 8, height: 8, borderRadius: 4, backgroundColor: MUTED2 },
-  stepLabel:      { fontSize: 15, fontFamily: 'Inter_400Regular', color: MUTED },
-  stepLabelActive:{ color: FG, fontFamily: 'Inter_500Medium' },
-  barTrack: { width: '100%', height: 3, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' },
-  barFill:  { height: 3, borderRadius: 2, overflow: 'hidden' },
+  stepJoin:       { width: 1, height: 20, marginVertical: 2 },
+  stepIconDone:   { backgroundColor: FG, borderColor: FG },
+  stepDot:        { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.08)' },
+  stepLabel:      { ...TYPE.body, lineHeight: 28, color: MUTED },
+  stepLabelActive:{ color: FG, fontFamily: 'Inter_600SemiBold' },
   });
 };
 
@@ -456,15 +450,6 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
   const { theme } = useAppTheme();
   const sn = createSn(theme);
   const insets  = useSafeAreaInsets();
-  const opacity = useRef(new Animated.Value(0)).current;
-  const slideY  = useRef(new Animated.Value(30)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: 450, useNativeDriver: true }),
-      Animated.spring(slideY,  { toValue: 0, damping: 18, stiffness: 110, useNativeDriver: true }),
-    ]).start();
-  }, []);
 
   const desc = flow === 'buyer'
     ? Platform.OS === 'web'
@@ -479,93 +464,72 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
     : ['New orders', 'Production milestones', 'Payout confirmations', 'Customer messages'];
 
   return (
-    <View style={[sn.root, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 32 }]}>
+    <View style={[sn.root, { paddingTop: insets.top + SPACE.xxl, paddingBottom: insets.bottom + SPACE.lg }]}>
 
-      <Animated.View style={[sn.body, { opacity, transform: [{ translateY: slideY }] }]}>
-        {/* Bell icon */}
-        <View style={sn.bellWrap}>
-          <LinearGradient colors={theme.heroGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[sn.bellBg, { shadowColor: theme.shadowColor }]}>
-            <Feather name="bell" size={32} color={theme.onAccent} />
-          </LinearGradient>
+      <View style={sn.body}>
+        {/* Hero: the thread passes through the bell */}
+        <View style={sn.hero}>
+          <ThreadDraw height={120} color={theme.text} delay={120} duration={1100} style={sn.heroThread} />
+          <Reveal>
+            <View style={[sn.bellBg, { backgroundColor: theme.background, borderColor: theme.border, shadowColor: theme.text }]}>
+              <Feather name="bell" size={30} color={theme.text} />
+            </View>
+          </Reveal>
         </View>
 
-        <Text style={sn.headline}>Never miss what matters.</Text>
-        <Text style={sn.sub}>{desc}</Text>
+        <StepHeadline size="display" delay={180}>Never miss{'\n'}what matters.</StepHeadline>
+        <StepSub index={3}>{desc}</StepSub>
 
         {/* Notification examples */}
         <View style={sn.examples}>
-          {items.map((item) => (
-            <View key={item} style={sn.exampleRow}>
-              <View style={[sn.exampleDot, { backgroundColor: theme.accent }]} />
-              <Text style={sn.exampleText}>{item}</Text>
-            </View>
+          {items.map((item, i) => (
+            <Reveal key={item} index={i + 4}>
+              <View style={sn.exampleRow}>
+                <View style={[sn.exampleDot, { backgroundColor: theme.text }]} />
+                <Text style={sn.exampleText}>{item}</Text>
+              </View>
+            </Reveal>
           ))}
         </View>
-      </Animated.View>
+      </View>
 
-      <Animated.View style={[sn.btns, { opacity }]}>
-        <TouchableOpacity
-          activeOpacity={0.88}
-          onPress={onEnable}
-        >
-          <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sn.enableBtn}>
-              <Text style={[sn.enableBtnText, getOnAccentTextStyle(theme)]}>
-                Continue
-              </Text>
-          </LinearGradient>
-        </TouchableOpacity>
-
-        <TouchableOpacity
+      <Reveal index={8} style={sn.btns}>
+        <PillButton label="Continue" onPress={onEnable} />
+        <PillButton
           testID="onboarding-notifications-skip"
           accessibilityLabel="Not now"
-          style={sn.skipBtn}
+          label="Not now"
+          variant="ghost"
           onPress={onSkip}
-          activeOpacity={0.7}
-        >
-          <Text style={sn.skipText}>Not now</Text>
-        </TouchableOpacity>
-      </Animated.View>
+        />
+      </Reveal>
     </View>
   );
 }
 const createSn = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const CARD = theme.card, BORDER = theme.border, FG = theme.text, MUTED = theme.muted, GREEN = theme.success;
+  const FG = theme.text;
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: CARD, paddingHorizontal: 24 },
-  body: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 32 },
-  bellWrap: { marginBottom: 28 },
-  bellBg:   { width: 72, height: 72, borderRadius: 20, alignItems: 'center', justifyContent: 'center', shadowOpacity: 0.5, shadowRadius: 20, shadowOffset: { width: 0, height: 0 }, elevation: 12 },
-  headline: { fontSize: 28, fontFamily: 'Inter_700Bold', color: FG, textAlign: 'center', letterSpacing: -0.5, marginBottom: 10 },
-  sub:      { fontSize: 15, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center', lineHeight: 22, marginBottom: 28 },
-  examples: { gap: 11, width: '100%' },
-  exampleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  exampleDot: { width: 6, height: 6, borderRadius: 3 },
-  exampleText:{ fontSize: 14, fontFamily: 'Inter_400Regular', color: FG },
-  btns: { gap: 10 },
-  enableBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
-  enableBtnText: { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
-  skipBtn: { paddingVertical: 13, alignItems: 'center' },
-  skipText: { fontSize: 15, fontFamily: 'Inter_500Medium', color: MUTED },
+  root: { flex: 1, backgroundColor: theme.background, paddingHorizontal: SPACE.lg },
+  body: { flex: 1, justifyContent: 'center', paddingBottom: SPACE.lg },
+  hero: { height: 120, justifyContent: 'center', marginBottom: SPACE.lg },
+  heroThread: { position: 'absolute', left: -SPACE.lg, right: -SPACE.lg, top: 0 },
+  bellBg:   { width: 72, height: 72, borderRadius: 36, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center', shadowOpacity: 0.25, shadowRadius: 24, shadowOffset: { width: 0, height: 0 }, elevation: 8, marginLeft: SPACE.xl },
+  examples: { gap: SPACE.sm, width: '100%', marginTop: SPACE.lg },
+  exampleRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
+  exampleDot: { width: 5, height: 5, borderRadius: 3 },
+  exampleText:{ ...TYPE.bodyStrong, color: FG },
+  btns: { gap: SPACE.xs },
   });
 };
 
 // ─── Success screen ────────────────────────────────────────────────────────────
+// Finale: the thread that ran through every step sews the Brandthread mark,
+// then the real logo resolves over the stitching.
 function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { flow: Flow; firstName: string; brandName: string; onFinish: () => void; finishing?: boolean }) {
   const { theme } = useAppTheme();
   const ss = createSs(theme);
   const insets  = useSafeAreaInsets();
-  const opacity = useRef(new Animated.Value(0)).current;
-  const scale   = useRef(new Animated.Value(0.85)).current;
-  const slideY  = useRef(new Animated.Value(40)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: 550, useNativeDriver: true }),
-      Animated.spring(scale,   { toValue: 1, damping: 16, stiffness: 110, useNativeDriver: true }),
-      Animated.spring(slideY,  { toValue: 0, damping: 18, stiffness: 110, useNativeDriver: true }),
-    ]).start();
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, []);
+  const copyDelay = Math.round(MOTION.finaleDrawMs * 0.7);
 
   const ctaLabel = flow === 'buyer' ? 'Start exploring' : 'Go to Dashboard';
   const desc = flow === 'buyer'
@@ -573,59 +537,75 @@ function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { fl
     : 'Your brand now has one home for design, production, selling and growth.';
 
   return (
-    <View style={[ss.root, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 32 }]}>
+    <View style={[ss.root, { paddingTop: insets.top + SPACE.xxl, paddingBottom: insets.bottom + SPACE.lg }]}>
+      <LinearGradient
+        pointerEvents="none"
+        colors={theme.heroGradient}
+        // heroGradient[0] is the theme background, so running it bottom-up
+        // lights the top and dissolves seamlessly into the canvas.
+        start={{ x: 0.5, y: 1 }}
+        end={{ x: 0.5, y: 0 }}
+        style={ss.wash}
+      />
 
-      <Animated.View style={[ss.body, { opacity, transform: [{ scale }, { translateY: slideY }] }]}>
-        {/* Checkmark circle */}
-        <View>
-          <LinearGradient colors={theme.heroGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[ss.checkCircle, { shadowColor: theme.shadowColor }]}>
-            <Feather name="check" size={36} color={theme.onAccent} />
-          </LinearGradient>
+      <View style={ss.body}>
+        <View style={ss.hero}>
+          <ThreadLogoStitch
+            size={124}
+            color={theme.text}
+            onStitched={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }}
+          />
         </View>
 
-        <Text style={ss.headline}>Welcome to{'\n'}Brandthread.</Text>
+        <StepHeadline size="display" delay={copyDelay}>Welcome to{'\n'}Brandthread.</StepHeadline>
 
         {flow === 'seller' && brandName ? (
-          <View style={[ss.brandBadge, { backgroundColor: theme.secondaryDim, borderColor: theme.secondary }]}>
-            <Text style={[ss.brandBadgeText, { color: theme.secondary }]}>{brandName}</Text>
-          </View>
+          <Reveal delay={copyDelay} index={2}>
+            <View style={[ss.brandBadge, { borderColor: theme.border }]}>
+              <Text style={[ss.brandBadgeText, { color: theme.text }]}>{brandName}</Text>
+            </View>
+          </Reveal>
         ) : null}
 
-        <Text style={ss.desc}>{desc}</Text>
+        <Reveal delay={copyDelay} index={2}>
+          <Text style={ss.desc}>{desc}</Text>
+        </Reveal>
 
         {/* Feature rows */}
         <View style={ss.features}>
           {(flow === 'buyer'
             ? ['Thread — your personal brand feed', 'Discover drops before they sell out', 'Chat directly with brands', 'Track every order in one place']
             : ['Design Studio & AI tools ready', 'Manufacturer network unlocked', 'Your store is ready to launch', 'Analytics dashboard activated']
-          ).map((f) => (
-            <View key={f} style={ss.featureRow}>
-              <Feather name="check-circle" size={16} color={theme.success} />
-              <Text style={ss.featureText}>{f}</Text>
-            </View>
+          ).map((f, i) => (
+            <Reveal key={f} delay={copyDelay} index={i + 3}>
+              <View style={ss.featureRow}>
+                <Feather name="check" size={15} color={theme.text} />
+                <Text style={ss.featureText}>{f}</Text>
+              </View>
+            </Reveal>
           ))}
         </View>
-      </Animated.View>
+      </View>
 
-      <Animated.View style={{ opacity }}>
+      <Reveal delay={copyDelay} index={7}>
         <PrimaryButton label={finishing ? 'Saving…' : ctaLabel} onPress={onFinish} loading={finishing} />
-      </Animated.View>
+      </Reveal>
     </View>
   );
 }
 const createSs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const CARD = theme.card, FG = theme.text, MUTED = theme.muted;
+  const FG = theme.text, MUTED = theme.muted;
   return StyleSheet.create({
-  root:       { flex: 1, backgroundColor: CARD, paddingHorizontal: 24 },
+  root:       { flex: 1, backgroundColor: theme.background, paddingHorizontal: SPACE.lg },
+  wash:       { position: 'absolute', top: 0, left: 0, right: 0, height: '55%', opacity: 0.8 },
   body:       { flex: 1, justifyContent: 'center' },
-  checkCircle:{ width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 24, shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 0 }, elevation: 12 },
-  headline:   { fontSize: 34, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -1, lineHeight: 40, marginBottom: 10 },
-  brandBadge: { alignSelf: 'flex-start', borderRadius: 100, paddingHorizontal: 12, paddingVertical: 4, marginBottom: 10, borderWidth: 1 },
+  hero:       { alignItems: 'center', marginBottom: SPACE.xl },
+  brandBadge: { alignSelf: 'flex-start', borderRadius: RADIUS.pill, paddingHorizontal: 14, paddingVertical: 6, marginTop: SPACE.sm, borderWidth: 1 },
   brandBadgeText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  desc:       { fontSize: 15, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 22, marginBottom: 24 },
-  features:   { gap: 10 },
-  featureRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  featureText:{ fontSize: 14, fontFamily: 'Inter_400Regular', color: FG },
+  desc:       { ...TYPE.body, color: MUTED, marginTop: SPACE.sm, marginBottom: SPACE.lg },
+  features:   { gap: SPACE.sm },
+  featureRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm },
+  featureText:{ ...TYPE.bodyStrong, color: FG },
   });
 };
 
@@ -1264,21 +1244,20 @@ function SharedAuthStep({
     return (
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={ssa.scroll} keyboardShouldPersistTaps="handled">
-          <Text style={ssa.headline}>Already signed in</Text>
-          <Text style={ssa.sub}>
+          <StepHeadline>Already signed in</StepHeadline>
+          <StepSub>
             {currentEmail ? `You are currently signed in as ${currentEmail}.` : 'You are currently signed in.'}
             {'\n\n'}Sign out first to create a new account, or continue with your current account.
-          </Text>
-          <TouchableOpacity style={ssa.sessionBtn} onPress={handleClearSession} disabled={clearingSession} activeOpacity={0.85}>
-            <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={ssa.sessionBtnGrad}>
-              {clearingSession
-                ? <ActivityIndicator color={theme.onAccent} size="small" />
-                : <Text style={[ssa.sessionBtnText, getOnAccentTextStyle(theme)]}>Sign out and create another account</Text>}
-            </LinearGradient>
-          </TouchableOpacity>
-          <TouchableOpacity style={ssa.continueBtn} onPress={onAuthComplete} activeOpacity={0.8}>
-            <Text style={ssa.continueBtnText}>Continue with current account →</Text>
-          </TouchableOpacity>
+          </StepSub>
+          <Reveal index={2} style={ssa.stack}>
+            <PillButton
+              label="Sign out and create another account"
+              onPress={handleClearSession}
+              loading={clearingSession}
+              disabled={clearingSession}
+            />
+            <PillButton label="Continue with current account →" variant="ghost" onPress={onAuthComplete} />
+          </Reveal>
         </ScrollView>
       </KeyboardAvoidingView>
     );
@@ -1289,23 +1268,28 @@ function SharedAuthStep({
     return (
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={ssa.scroll} keyboardShouldPersistTaps="handled">
-          <Text style={ssa.headline}>Account exists.</Text>
-          <Text style={ssa.sub}>An account already exists with this email.</Text>
-          <View style={[ssa.existingEmailChip, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
-            <Text style={[ssa.existingEmailText, { color: theme.accentLight }]}>{email}</Text>
-          </View>
-          <View style={[ssa.existingCard, { backgroundColor: theme.secondaryDim, borderColor: theme.accentDim }]}>
-            <Text style={ssa.existingCardTitle}>Sign in to continue your Brandthread journey.</Text>
-            <Text style={ssa.existingCardSub}>Use your existing account to complete setup. Your onboarding answers are saved.</Text>
-          </View>
-          <TouchableOpacity style={ssa.existingSignInBtn} onPress={() => router.replace('/sign-in' as never)} activeOpacity={0.88}>
-            <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={ssa.existingSignInGrad}>
-              <Text style={[ssa.existingSignInText, getOnAccentTextStyle(theme)]}>Sign in</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-          <TouchableOpacity style={ssa.existingDiffBtn} onPress={() => { setPhase('form'); setEmail(''); setPassword(''); setConfirm(''); setError(''); }} activeOpacity={0.85}>
-            <Text style={ssa.existingDiffText}>Use a different email</Text>
-          </TouchableOpacity>
+          <StepHeadline>Account exists.</StepHeadline>
+          <StepSub>An account already exists with this email.</StepSub>
+          <Reveal index={2}>
+            <View style={[ssa.existingEmailChip, { borderColor: theme.border }]}>
+              <Feather name="mail" size={13} color={theme.muted} />
+              <Text style={[ssa.existingEmailText, { color: theme.text }]}>{email}</Text>
+            </View>
+          </Reveal>
+          <Reveal index={3}>
+            <View style={[ssa.existingCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <Text style={ssa.existingCardTitle}>Sign in to continue your Brandthread journey.</Text>
+              <Text style={ssa.existingCardSub}>Use your existing account to complete setup. Your onboarding answers are saved.</Text>
+            </View>
+          </Reveal>
+          <Reveal index={4} style={ssa.stack}>
+            <PillButton label="Sign in" onPress={() => router.replace('/sign-in' as never)} />
+            <PillButton
+              label="Use a different email"
+              variant="secondary"
+              onPress={() => { setPhase('form'); setEmail(''); setPassword(''); setConfirm(''); setError(''); }}
+            />
+          </Reveal>
         </ScrollView>
       </KeyboardAvoidingView>
     );
@@ -1316,124 +1300,102 @@ function SharedAuthStep({
     return (
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={ssa.scroll} keyboardShouldPersistTaps="handled">
-          <Text style={ssa.headline}>Check your email</Text>
-          <Text style={ssa.sub}>We sent a 6-digit code to {email}</Text>
-          <View style={ssa.inputWrap}>
-            <Text style={ssa.label}>Verification code</Text>
-            <TextInput
-              style={[ssa.input, ssa.codeInput]}
-              placeholder="000000"
-              placeholderTextColor={MUTED2}
-              value={code}
-              onChangeText={setCode}
-              keyboardType="number-pad"
-              maxLength={6}
-              autoFocus
-            />
-          </View>
-          {error ? <Text style={ssa.error}>{error}</Text> : null}
-          <PrimaryButton label={loading ? 'Verifying…' : 'Verify email'} onPress={handleVerify} disabled={!canVerify} loading={loading} />
+          <StepHeadline>Check your email</StepHeadline>
+          <StepSub>We sent a 6-digit code to {email}</StepSub>
+          <Reveal index={2} style={ssa.codeWrap}>
+            <CodeCells value={code} onChangeText={setCode} autoFocus />
+          </Reveal>
+          {error ? <InlineError message={error} /> : null}
+          <Reveal index={3}>
+            <PrimaryButton label={loading ? 'Verifying…' : 'Verify email'} onPress={handleVerify} disabled={!canVerify} loading={loading} />
+          </Reveal>
           <TouchableOpacity style={ssa.resendBtn} onPress={() => signUp.verifications.sendEmailCode()}>
-            <Text style={ssa.resendText}>{"Didn't get it? "}<Text style={{ color: theme.accentLight }}>Resend</Text></Text>
+            <Text style={ssa.resendText}>{"Didn't get it? "}<Text style={{ color: theme.text, fontFamily: 'Inter_600SemiBold' }}>Resend</Text></Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     );
   }
 
-  // Main seller sign-up form: single-column labeled fields
+  // Main sign-up form: single column, floating labels, one field per row
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={ssa.scroll} keyboardShouldPersistTaps="handled">
-        <Text style={ssa.headline}>Create your account</Text>
-        <Text style={ssa.sub}>Build your brand on Brandthread.</Text>
+      <ScrollView
+        contentContainerStyle={ssa.scroll}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        showsVerticalScrollIndicator={false}
+      >
+        <StepHeadline>Create your{'\n'}account</StepHeadline>
+        <StepSub>Build your brand on Brandthread.</StepSub>
+        <View style={ssa.formTop} />
 
         {/* Email */}
-        <View style={ssa.inputWrap}>
-          <Text style={ssa.label}>Email address</Text>
-          <TextInput
-            style={ssa.input}
+        <Reveal index={2}>
+          <FloatingInput
+            label="Email address"
             placeholder="brand@yourstudio.co"
-            placeholderTextColor={MUTED2}
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
             keyboardType="email-address"
             autoComplete="email"
+            valid={email.includes('@')}
           />
-        </View>
+        </Reveal>
 
         {/* First name */}
-        <View style={ssa.inputWrap}>
-          <Text style={ssa.label}>First name</Text>
-          <TextInput
-            style={ssa.input}
+        <Reveal index={3}>
+          <FloatingInput
+            label="First name"
             placeholder="Alex"
-            placeholderTextColor={MUTED2}
             value={formFirstName}
             onChangeText={setFormFirstName}
             autoCapitalize="words"
             maxLength={40}
+            valid={formFirstName.trim().length >= 1}
           />
-        </View>
+        </Reveal>
 
         {/* Last name */}
-        <View style={ssa.inputWrap}>
-          <Text style={ssa.label}>Last name</Text>
-          <TextInput
-            style={ssa.input}
+        <Reveal index={4}>
+          <FloatingInput
+            label="Last name"
             placeholder="Rivera"
-            placeholderTextColor={MUTED2}
             value={formLastName}
             onChangeText={setFormLastName}
             autoCapitalize="words"
             maxLength={40}
           />
-        </View>
+        </Reveal>
 
         {/* Password */}
-        <View style={ssa.inputWrap}>
-          <Text style={ssa.label}>Password</Text>
-          <View style={ssa.pwRow}>
-            <TextInput
-              style={[ssa.input, ssa.pwInput]}
-              placeholder="Minimum 8 characters"
-              placeholderTextColor={MUTED2}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPw}
-              autoComplete="new-password"
-            />
-            <TouchableOpacity style={ssa.eyeBtn} onPress={() => setShowPw(v => !v)}>
-              <Feather name={showPw ? 'eye-off' : 'eye'} size={18} color={MUTED} />
-            </TouchableOpacity>
-          </View>
-          {password.length > 0 && password.length < 8 && (
-            <Text style={ssa.hint}>Use at least 8 characters</Text>
-          )}
-        </View>
+        <Reveal index={5}>
+          <FloatingInput
+            label="Password"
+            placeholder="Minimum 8 characters"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPw}
+            autoComplete="new-password"
+            hint={password.length > 0 && password.length < 8 ? 'Use at least 8 characters' : null}
+            right={<RevealToggle shown={showPw} onToggle={() => setShowPw(v => !v)} />}
+          />
+        </Reveal>
 
         {/* Confirm password */}
-        <View style={ssa.inputWrap}>
-          <Text style={ssa.label}>Confirm password</Text>
-          <View style={ssa.pwRow}>
-            <TextInput
-              style={[ssa.input, ssa.pwInput, !passwordsMatch && confirmPassword.length > 0 ? { borderColor: ERR } : undefined]}
-              placeholder="Re-enter password"
-              placeholderTextColor={MUTED2}
-              value={confirmPassword}
-              onChangeText={setConfirm}
-              secureTextEntry={!showConfirm}
-              autoComplete="new-password"
-            />
-            <TouchableOpacity style={ssa.eyeBtn} onPress={() => setShowConfirm(v => !v)}>
-              <Feather name={showConfirm ? 'eye-off' : 'eye'} size={18} color={MUTED} />
-            </TouchableOpacity>
-          </View>
-          {!passwordsMatch && confirmPassword.length > 0 && (
-            <Text style={[ssa.hint, { color: ERR }]}>Passwords do not match</Text>
-          )}
-        </View>
+        <Reveal index={6}>
+          <FloatingInput
+            label="Confirm password"
+            placeholder="Re-enter password"
+            value={confirmPassword}
+            onChangeText={setConfirm}
+            secureTextEntry={!showConfirm}
+            autoComplete="new-password"
+            error={!passwordsMatch && confirmPassword.length > 0 ? 'Passwords do not match' : null}
+            right={<RevealToggle shown={showConfirm} onToggle={() => setShowConfirm(v => !v)} />}
+          />
+        </Reveal>
 
         {/* Divider */}
         <View style={ssa.divider}>
@@ -1442,13 +1404,9 @@ function SharedAuthStep({
         </View>
 
         {/* Username */}
-        <View style={ssa.inputWrap}>
-          <Text style={ssa.label}>Username</Text>
-          <TextInput
+        <Reveal index={7}>
+          <FloatingInput
             testID="onboarding-username-input"
-            style={[ssa.input, usernameError ? { borderColor: ERR } : undefined]}
-            placeholder="e.g. noire_collective"
-            placeholderTextColor={MUTED2}
             value={username}
             editable
             onChangeText={v => {
@@ -1460,41 +1418,45 @@ function SharedAuthStep({
                 setUsernameError('');
               }
             }}
+            label="Username"
+            placeholder="e.g. noire_collective"
             autoCapitalize="none"
             autoCorrect={false}
             maxLength={30}
+            error={usernameError || null}
+            valid={isUsernameValid}
+            hint={username.length > 0
+              ? `@${username} · letters, numbers, underscores only`
+              : 'Letters, numbers, and underscores only'}
           />
-          {usernameError
-            ? <Text style={ssa.hint}>{usernameError}</Text>
-            : username.length > 0
-              ? <Text style={ssa.hint}>@{username} · letters, numbers, underscores only</Text>
-              : <Text style={ssa.hint}>Letters, numbers, and underscores only</Text>}
-        </View>
+        </Reveal>
 
         {/* Referral code */}
-        <View style={ssa.inputWrap}>
-          <Text style={ssa.label}>Referral code (optional)</Text>
-          <TextInput
+        <Reveal index={8}>
+          <FloatingInput
             testID="onboarding-referral-input"
-            style={ssa.input}
-            placeholder="e.g. FASHION"
-            placeholderTextColor={MUTED2}
             value={referralCode}
             editable
             onChangeText={v => onReferralCodeChange(v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12))}
+            label="Referral code (optional)"
+            placeholder="e.g. FASHION"
             autoCapitalize="characters"
             autoCorrect={false}
             maxLength={12}
+            hint="Enter the code from the friend who invited you."
           />
-          <Text style={ssa.hint}>Enter the code from the friend who invited you.</Text>
-        </View>
+        </Reveal>
 
-        <LegalConsent checked={agreedToTerms} onChange={updateConsent} showError={consentError} style={{ marginBottom: 16 }} />
+        <Reveal index={9}>
+          <LegalConsent checked={agreedToTerms} onChange={updateConsent} showError={consentError} style={{ marginTop: SPACE.xs, marginBottom: SPACE.md }} />
+        </Reveal>
 
-        {error ? <Text style={ssa.error}>{error}</Text> : null}
+        {error ? <InlineError message={error} /> : null}
 
-        <PrimaryButton label={loading ? 'Creating account…' : 'Create account'} onPress={handleSignUp} disabled={!canSubmit} loading={loading} />
-        {!canSubmit && missingFieldsHint ? <Text style={ssa.hint}>{missingFieldsHint}</Text> : null}
+        <Reveal index={10}>
+          <PrimaryButton label={loading ? 'Creating account…' : 'Create account'} onPress={handleSignUp} disabled={!canSubmit} loading={loading} />
+          {!canSubmit && missingFieldsHint ? <Text style={[ssa.hint, ssa.hintCentered]}>{missingFieldsHint}</Text> : null}
+        </Reveal>
 
         {/* OAuth options below the main CTA */}
         <View style={ssa.divider}>
@@ -1505,30 +1467,32 @@ function SharedAuthStep({
 
         {/* Apple first — App Store guideline 4.8 prominence requirement. */}
         {Platform.OS === 'ios' && (
-          <TouchableOpacity
+          <PressableScale
             style={[ssa.oauthBtn, ssa.appleBtn]}
             onPress={() => handleOAuth(startAppleOAuth, 'Apple')}
-            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Continue with Apple"
             disabled={!!oauthLoading || loading}
           >
-            {oauthLoading === 'Apple' ? <ActivityIndicator color={theme.accentLight} size="small" /> : <>
+            {oauthLoading === 'Apple' ? <ActivityIndicator color={theme.text} size="small" /> : <>
               <Ionicons name="logo-apple" size={20} color={FG} />
-              <Text style={[ssa.oauthText, { color: '#FFFFFF' }]}>Continue with Apple</Text>
+              <Text style={ssa.oauthText}>Continue with Apple</Text>
             </>}
-          </TouchableOpacity>
+          </PressableScale>
         )}
 
-        <TouchableOpacity
+        <PressableScale
           style={ssa.oauthBtn}
           onPress={() => handleOAuth(startGoogleOAuth, 'Google')}
-          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Continue with Google"
           disabled={!!oauthLoading || loading}
         >
-          {oauthLoading === 'Google' ? <ActivityIndicator color={theme.accentLight} size="small" /> : <>
-            <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: 'Inter_700Bold', fontSize: 11, color: FG, lineHeight: 13 }}>G</Text></View>
+          {oauthLoading === 'Google' ? <ActivityIndicator color={theme.text} size="small" /> : <>
+            <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: FG, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: 'Inter_700Bold', fontSize: 12, color: CARD, lineHeight: 14 }}>G</Text></View>
             <Text style={ssa.oauthText}>Continue with Google</Text>
           </>}
-        </TouchableOpacity>
+        </PressableScale>
 
       </ScrollView>
     </KeyboardAvoidingView>
@@ -1601,60 +1565,40 @@ const createSba = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   });
 };
 
-// Shared styles for seller auth step
+// Shared styles for the buyer/seller auth step
 const createSsa = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const CARD = theme.card, BORDER = theme.border, FG = theme.text, MUTED = theme.muted, MUTED2 = theme.subtle, INPUT_BG = theme.surface, INPUT_BD = theme.border, ERR = theme.error;
+  const BORDER = theme.border, FG = theme.text, MUTED = theme.muted;
   return StyleSheet.create({
-  scroll:    { flexGrow: 1, paddingVertical: 8, gap: 0 },
-  headline:  { fontSize: 28, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.5, marginBottom: 4 },
-  sub:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 20 },
-  inputWrap: { marginBottom: 12 },
-  label:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, marginBottom: 5 },
-  input:     { backgroundColor: INPUT_BG, borderWidth: StyleSheet.hairlineWidth, borderColor: INPUT_BD, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: 'Inter_400Regular', color: FG },
-  codeInput: { letterSpacing: 8, fontSize: 22, textAlign: 'center', fontFamily: 'Inter_700Bold' },
-  pwRow:     { flexDirection: 'row', alignItems: 'center', backgroundColor: INPUT_BG, borderWidth: 1, borderColor: INPUT_BD, borderRadius: 12 },
-  pwInput:   { flex: 1, borderWidth: 0, backgroundColor: 'transparent' },
-  eyeBtn:    { paddingHorizontal: 14 },
-  hint:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 4 },
-  error:     { color: ERR, fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 10 },
-  resendBtn: { paddingVertical: 12, alignItems: 'center', marginTop: 6 },
-  resendText:{ fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED },
-  divider:   { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 14 },
-  divLine:   { flex: 1, height: 1, backgroundColor: BORDER },
-  divText:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED },
-  oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, paddingVertical: 16, backgroundColor: CARD, marginBottom: 9 },
-  appleBtn:  { backgroundColor: CARD, borderColor: BORDER },
-  oauthText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
-  legal:     { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED2, textAlign: 'center', lineHeight: 18, marginTop: 12 },
+  scroll:    { flexGrow: 1, paddingTop: SPACE.xs, paddingBottom: SPACE.xxl, gap: 0 },
+  stack:     { gap: SPACE.sm, marginTop: SPACE.xl },
+  formTop:   { height: SPACE.lg },
+  codeWrap:  { marginTop: SPACE.xl },
+  hint:      { ...TYPE.caption, color: MUTED, marginTop: SPACE.xs },
+  hintCentered: { textAlign: 'center' },
+  resendBtn: { paddingVertical: SPACE.md, alignItems: 'center', marginTop: SPACE.xxs },
+  resendText:{ ...TYPE.body, color: MUTED },
+  divider:   { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm, marginVertical: SPACE.md },
+  divLine:   { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: BORDER },
+  divText:   { ...TYPE.label, color: MUTED },
+  oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, minHeight: 56, backgroundColor: 'transparent', marginBottom: SPACE.sm },
+  appleBtn:  { borderColor: BORDER },
+  oauthText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: FG },
   existingEmailChip: {
-    alignSelf: 'flex-start',
-    borderRadius: 20, borderWidth: 1,
-    paddingHorizontal: 14, paddingVertical: 6, marginBottom: 16,
+    alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 14, paddingVertical: 8, marginTop: SPACE.lg, marginBottom: SPACE.md,
   },
-  existingEmailText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  existingEmailText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   existingCard: {
-    borderRadius: 12, borderWidth: 1,
-    padding: 16, marginBottom: 20,
+    borderRadius: RADIUS.card, borderWidth: StyleSheet.hairlineWidth,
+    padding: SPACE.md + 2,
   },
   existingCardTitle: {
     fontSize: 17, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 6, lineHeight: 23,
   },
   existingCardSub: {
-    fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 20,
+    ...TYPE.body, color: MUTED,
   },
-  existingSignInBtn:  { marginBottom: 9, borderRadius: 12, overflow: 'hidden' },
-  existingSignInGrad: { paddingVertical: 16, alignItems: 'center', borderRadius: 12 },
-  existingSignInText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
-  existingDiffBtn: {
-    borderRadius: 12, paddingVertical: 15, alignItems: 'center',
-    borderWidth: 1, borderColor: BORDER,
-  },
-  existingDiffText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
-  sessionBtn:     { marginTop: 8, marginBottom: 10, borderRadius: 14, overflow: 'hidden' },
-  sessionBtnGrad: { paddingVertical: 16, alignItems: 'center', paddingHorizontal: 20 },
-  sessionBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
-  continueBtn:    { paddingVertical: 14, alignItems: 'center' },
-  continueBtnText:{ fontSize: 14, fontFamily: 'Inter_500Medium', color: MUTED },
   });
 };
 
@@ -1696,124 +1640,125 @@ function SellerPreviewStep({
 
   return (
     <ScrollView contentContainerStyle={spreview.scroll} showsVerticalScrollIndicator={false}>
-      <Text style={spreview.headline}>Make it feel like yours.</Text>
-      <Text style={spreview.sub}>
+      <StepHeadline>Make it feel{'\n'}like yours.</StepHeadline>
+      <StepSub>
         Pick a storefront accent, then try one free AI logo sample before choosing a plan.
         Your choices stay editable later.
-      </Text>
+      </StepSub>
 
-      <Text style={spreview.sectionLabel}>Storefront accent</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={spreview.themeRow}>
-        {APP_THEME_PRESETS.map((preset) => {
-          const selected = preset.id === selectedThemeId;
-          return (
-            <TouchableOpacity
-              key={preset.id}
-              testID={`onboarding-theme-${preset.id}`}
-              style={[spreview.themeCard, selected && { borderColor: preset.accent, borderWidth: 2 }]}
-              accessibilityRole="radio"
-              accessibilityState={{ selected }}
-              accessibilityLabel={`${preset.name} storefront theme`}
-              onPress={() => { Haptics.selectionAsync(); onSelectTheme(preset.id); }}
-              activeOpacity={0.8}
-            >
-              <LinearGradient colors={preset.heroGradient} style={spreview.themeSwatch}>
-                <View style={[spreview.themeDot, { backgroundColor: preset.accent }]} />
-                <View style={[spreview.themeLine, { backgroundColor: preset.secondary }]} />
-              </LinearGradient>
-              <Text style={spreview.themeName}>{preset.name}</Text>
-              {selected ? <Feather name="check-circle" size={14} color={preset.accentLight} /> : null}
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      <Reveal index={2}>
+        <Text style={spreview.sectionLabel}>Storefront accent</Text>
+      </Reveal>
+      <Reveal index={3}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={spreview.themeRow}>
+          {APP_THEME_PRESETS.map((preset) => {
+            const selected = preset.id === selectedThemeId;
+            return (
+              <PressableScale
+                key={preset.id}
+                testID={`onboarding-theme-${preset.id}`}
+                style={[spreview.themeCard, selected && { borderColor: theme.text, borderWidth: 1 }]}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                accessibilityLabel={`${preset.name} storefront theme`}
+                onPress={() => { Haptics.selectionAsync(); onSelectTheme(preset.id); }}
+              >
+                <LinearGradient colors={preset.heroGradient} style={spreview.themeSwatch}>
+                  <View style={[spreview.themeDot, { backgroundColor: preset.accent }]} />
+                  <View style={[spreview.themeLine, { backgroundColor: preset.secondary }]} />
+                </LinearGradient>
+                <View style={spreview.themeNameRow}>
+                  <Text numberOfLines={1} style={spreview.themeName}>{preset.name}</Text>
+                  {selected ? <Feather name="check" size={13} color={theme.text} /> : null}
+                </View>
+              </PressableScale>
+            );
+          })}
+        </ScrollView>
+      </Reveal>
       <Text style={spreview.hint}>Saved when your seller workspace is created.</Text>
 
-      <View style={spreview.sampleHeader}>
-        <View style={{ flex: 1 }}>
-          <Text style={spreview.sectionLabel}>One free AI sample</Text>
-          <Text style={spreview.sampleSub}>See your brand name as a logo. This calls the real generator.</Text>
+      <Reveal index={4}>
+        <View style={spreview.sampleHeader}>
+          <View style={{ flex: 1 }}>
+            <Text style={spreview.sectionLabel}>One free AI sample</Text>
+            <Text style={spreview.sampleSub}>See your brand name as a logo. This calls the real generator.</Text>
+          </View>
+          <Feather name="zap" size={18} color={theme.text} />
         </View>
-        <Feather name="zap" size={18} color={theme.accentLight} />
-      </View>
-      <View style={spreview.styleRow}>
-        {LOGO_SAMPLE_STYLES.map((style) => (
-          <Chip key={style} label={style} selected={sampleStyle === style} onPress={() => setSampleStyle(style)} />
-        ))}
-      </View>
+        <View style={spreview.styleRow}>
+          {LOGO_SAMPLE_STYLES.map((style) => (
+            <Chip key={style} label={style} selected={sampleStyle === style} onPress={() => setSampleStyle(style)} />
+          ))}
+        </View>
+      </Reveal>
 
       {sampleUri ? (
-        <View style={[spreview.resultCard, { borderColor: theme.accent }]}>
-          <Image source={{ uri: sampleUri }} style={spreview.resultImage} resizeMode="contain" accessibilityLabel={`${brandName} AI logo sample`} />
-          <View style={spreview.resultCaption}>
-            <Feather name="check" size={15} color={GREEN} />
-            <Text style={spreview.resultText}>Your real AI sample is ready.</Text>
+        <Reveal>
+          <View style={[spreview.resultCard, { borderColor: theme.border }]}>
+            <Image source={{ uri: sampleUri }} style={spreview.resultImage} resizeMode="contain" accessibilityLabel={`${brandName} AI logo sample`} />
+            <View style={spreview.resultCaption}>
+              <Feather name="check" size={15} color={theme.text} />
+              <Text style={spreview.resultText}>Your real AI sample is ready.</Text>
+            </View>
           </View>
-        </View>
+        </Reveal>
       ) : (
-        <TouchableOpacity
-          testID="onboarding-generate-sample"
-          activeOpacity={0.88}
-          onPress={() => { void handleGenerate(); }}
-          disabled={generating}
-        >
-          <LinearGradient colors={theme.primaryGradient} style={spreview.generateButton}>
-            {generating
-              ? <ActivityIndicator color={theme.onAccent} />
-              : <><Feather name="image" size={18} color={theme.onAccent} /><Text style={[spreview.generateText, getOnAccentTextStyle(theme)]}>Generate free sample</Text></>}
-          </LinearGradient>
-        </TouchableOpacity>
+        <Reveal index={5}>
+          <PillButton
+            testID="onboarding-generate-sample"
+            label="Generate free sample"
+            icon={<Feather name="image" size={18} color={theme.onAccent} />}
+            onPress={() => { void handleGenerate(); }}
+            loading={generating}
+          />
+        </Reveal>
       )}
       {sampleError ? (
         <View style={spreview.errorBox}>
+          <Feather name="alert-circle" size={14} color={theme.error} />
           <Text style={spreview.errorText}>{sampleError}</Text>
           <TouchableOpacity onPress={() => { void handleGenerate(); }} disabled={generating || !!sampleUri}>
-            <Text style={[spreview.retryText, { color: theme.accentLight }]}>Retry</Text>
+            <Text style={[spreview.retryText, { color: theme.text }]}>Retry</Text>
           </TouchableOpacity>
         </View>
       ) : null}
-      <TouchableOpacity
-        testID="onboarding-preview-continue"
-        accessibilityRole="button"
-        accessibilityLabel={sampleUri ? 'Continue to plans' : 'Skip sample and continue to plans'}
-        style={spreview.continueButton}
-        onPress={onContinue}
-      >
-        <Text style={spreview.continueText}>{sampleUri ? 'Continue to plans' : 'Skip sample · Continue to plans'}</Text>
-      </TouchableOpacity>
+      <Reveal index={6} style={spreview.continueWrap}>
+        <PillButton
+          testID="onboarding-preview-continue"
+          accessibilityLabel={sampleUri ? 'Continue to plans' : 'Skip sample and continue to plans'}
+          label={sampleUri ? 'Continue to plans' : 'Skip sample · Continue to plans'}
+          variant={sampleUri ? 'primary' : 'secondary'}
+          onPress={onContinue}
+        />
+      </Reveal>
     </ScrollView>
   );
 }
 const createSpreview = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const CARD = theme.card, BORDER = theme.border, FG = theme.text, MUTED = theme.muted, MUTED2 = theme.subtle, ERR = theme.error, GREEN = theme.success;
+  const CARD = theme.card, BORDER = theme.border, FG = theme.text, MUTED = theme.muted, MUTED2 = theme.subtle, ERR = theme.error;
   return StyleSheet.create({
-  scroll: { flexGrow: 1, paddingBottom: 24 },
-  headline: { fontSize: 26, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.5, marginBottom: 6 },
-  sub: { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 21, marginBottom: 18 },
-  sectionLabel: { fontSize: 13, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 8 },
-  themeRow: { gap: 8, paddingRight: 8 },
-  themeCard: { width: 98, minHeight: 96, padding: 6, borderRadius: 12, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
-  themeSwatch: { height: 52, borderRadius: 8, padding: 9, justifyContent: 'space-between' },
+  scroll: { flexGrow: 1, paddingTop: SPACE.xs, paddingBottom: SPACE.xl },
+  sectionLabel: { ...TYPE.eyebrow, color: FG, textTransform: 'uppercase', marginTop: SPACE.xl, marginBottom: SPACE.sm },
+  themeRow: { gap: SPACE.xs, paddingRight: SPACE.xs },
+  themeCard: { width: 104, padding: 6, borderRadius: 18, backgroundColor: CARD, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER },
+  themeSwatch: { height: 56, borderRadius: 13, padding: 10, justifyContent: 'space-between' },
   themeDot: { width: 16, height: 16, borderRadius: 8 },
   themeLine: { width: 36, height: 3, borderRadius: 2 },
-  themeName: { flex: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: FG, marginTop: 6 },
-  hint: { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED2, marginTop: 6, marginBottom: 20 },
-  sampleHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 },
-  sampleSub: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 18, paddingRight: 18 },
-  styleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
-  resultCard: { borderRadius: 12, borderWidth: 1, backgroundColor: '#F7F7F7', overflow: 'hidden', marginBottom: 12 },
+  themeNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 4, paddingVertical: 8 },
+  themeName: { flex: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: FG },
+  hint: { ...TYPE.caption, color: MUTED2, marginTop: SPACE.xs },
+  sampleHeader: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: SPACE.sm },
+  sampleSub: { ...TYPE.caption, color: MUTED, paddingRight: 18, marginTop: -4 },
+  styleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.xs, marginBottom: SPACE.md },
+  resultCard: { borderRadius: RADIUS.card, borderWidth: StyleSheet.hairlineWidth, backgroundColor: '#F7F7F7', overflow: 'hidden', marginBottom: SPACE.sm },
   resultImage: { width: '100%', height: 180 },
-  resultCaption: { flexDirection: 'row', gap: 7, alignItems: 'center', paddingHorizontal: 12, paddingVertical: 9, backgroundColor: 'rgba(0,0,0,0.86)' },
-  resultText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: FG },
-  generateButton: { borderRadius: 12, paddingVertical: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
-  generateText: { fontSize: 15, fontFamily: 'Inter_700Bold' },
-  errorBox: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 8, padding: 10, borderRadius: 9, backgroundColor: 'rgba(248,113,113,0.10)' },
+  resultCaption: { flexDirection: 'row', gap: 7, alignItems: 'center', paddingHorizontal: 14, paddingVertical: 11, backgroundColor: 'rgba(0,0,0,0.86)' },
+  resultText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
+  errorBox: { flexDirection: 'row', alignItems: 'center', gap: SPACE.xs, marginTop: SPACE.xs, padding: SPACE.sm, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: ERR },
   errorText: { flex: 1, fontSize: 12, lineHeight: 17, color: ERR },
   retryText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
-  continueButton: { marginTop: 14, borderRadius: 12, paddingVertical: 14, alignItems: 'center', backgroundColor: GREEN },
-  continueDisabled: { backgroundColor: 'rgba(255,255,255,0.07)' },
-  continueText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#06110B' },
-  continueTextDisabled: { color: MUTED2 },
+  continueWrap: { marginTop: SPACE.md },
   });
 };
 
@@ -2413,23 +2358,22 @@ export default function OnboardingScreen() {
       if (step === BUYER_STEP_INDEX.NAME) return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={sm.scroll} keyboardShouldPersistTaps="handled">
-            <Text style={sm.stepHeadline}>What should{'\n'}we call you?</Text>
-            <Text style={sm.stepSub}>This is how your profile will appear.</Text>
-            <View style={sm.inputWrap}>
-              <Text style={sm.label}>First name</Text>
-              <TextInput
+            <StepHeadline>What should{'\n'}we call you?</StepHeadline>
+            <StepSub>This is how your profile will appear.</StepSub>
+            <Reveal index={2} style={sm.inputWrap}>
+              <FloatingInput
                 ref={firstNameInputRef}
                 testID="onboarding-first-name-input"
                 onFocus={recordDeviceFocus}
-                style={sm.input}
+                label="First name"
                 placeholder="Alex"
-                placeholderTextColor={MUTED2}
                 value={firstName}
                 onChangeText={setFirstName}
                 autoCapitalize="words"
                 maxLength={40}
+                valid={firstName.trim().length >= 2}
               />
-            </View>
+            </Reveal>
           </ScrollView>
         </KeyboardAvoidingView>
       );
@@ -2437,9 +2381,9 @@ export default function OnboardingScreen() {
       // Step 3: Style interests — emoji chips with solid-fill selected state
       if (step === BUYER_STEP_INDEX.STYLE) return (
         <ScrollView contentContainerStyle={sm.scroll} showsVerticalScrollIndicator={false}>
-          <Text style={sm.stepHeadline}>What do you{'\n'}want to see?</Text>
-          <Text style={sm.stepSub}>Pick a few for better recommendations. You can skip this for now.</Text>
-          <View style={sm.chipGrid}>
+          <StepHeadline>What do you{'\n'}want to see?</StepHeadline>
+          <StepSub>Pick a few for better recommendations. You can skip this for now.</StepSub>
+          <Reveal index={2} style={sm.chipGrid}>
             {STYLE_INTERESTS_WITH_EMOJI.map(({ label: item, emoji }) => (
               <StyleChip
                 key={item}
@@ -2449,7 +2393,7 @@ export default function OnboardingScreen() {
                 onPress={() => setStyleArr((prev) => prev.includes(item) ? prev.filter((v) => v !== item) : [...prev, item])}
               />
             ))}
-          </View>
+          </Reveal>
         </ScrollView>
       );
 
@@ -2512,23 +2456,22 @@ export default function OnboardingScreen() {
       if (step === SELLER_STEP_INDEX.NAME) return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={sm.scroll} keyboardShouldPersistTaps="handled">
-            <Text style={sm.stepHeadline}>What should{'\n'}we call you?</Text>
-            <Text style={sm.stepSub}>This is how your workspace will greet you.</Text>
-            <View style={sm.inputWrap}>
-              <Text style={sm.label}>First name</Text>
-              <TextInput
+            <StepHeadline>What should{'\n'}we call you?</StepHeadline>
+            <StepSub>This is how your workspace will greet you.</StepSub>
+            <Reveal index={2} style={sm.inputWrap}>
+              <FloatingInput
                 ref={firstNameInputRef}
                 testID="onboarding-first-name-input"
                 onFocus={recordDeviceFocus}
-                style={sm.input}
+                label="First name"
                 placeholder="Alex"
-                placeholderTextColor={MUTED2}
                 value={firstName}
                 onChangeText={setFirstName}
                 autoCapitalize="words"
                 maxLength={40}
+                valid={firstName.trim().length >= 2}
               />
-            </View>
+            </Reveal>
           </ScrollView>
         </KeyboardAvoidingView>
       );
@@ -2537,24 +2480,23 @@ export default function OnboardingScreen() {
       if (step === SELLER_STEP_INDEX.BRAND_NAME) return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={sm.scroll} keyboardShouldPersistTaps="handled">
-            <Text style={sm.stepHeadline}>What are you{'\n'}building?</Text>
-            <Text style={sm.stepSub}>Use your current name, a working name, or change it later.</Text>
-            <View style={sm.inputWrap}>
-              <Text style={sm.label}>Brand name</Text>
-              <TextInput
+            <StepHeadline>What are you{'\n'}building?</StepHeadline>
+            <StepSub>Use your current name, a working name, or change it later.</StepSub>
+            <Reveal index={2} style={sm.inputWrap}>
+              <FloatingInput
                 ref={brandNameInputRef}
                 testID="onboarding-brand-name-input"
                 onFocus={recordDeviceFocus}
-                style={sm.input}
+                label="Brand name"
                 placeholder="e.g. Noir Collective"
-                placeholderTextColor={MUTED2}
                 value={brandName}
                 onChangeText={setBrandName}
                 autoCapitalize="words"
                 maxLength={60}
+                valid={brandName.trim().length >= 1}
+                hint="Brandthread AI will use this to shape your workspace."
               />
-              <Text style={sm.inputHint}>Brandthread AI will use this to shape your workspace.</Text>
-            </View>
+            </Reveal>
           </ScrollView>
         </KeyboardAvoidingView>
       );
@@ -2562,17 +2504,18 @@ export default function OnboardingScreen() {
       // Step 4: Brand stage
       if (step === SELLER_STEP_INDEX.BRAND_STAGE) return (
         <ScrollView contentContainerStyle={sm.scroll} showsVerticalScrollIndicator={false}>
-          <Text style={sm.stepHeadline}>Where is your{'\n'}brand today?</Text>
-          <Text style={sm.stepSub}>We'll tailor your workspace to your stage.</Text>
+          <StepHeadline>Where is your{'\n'}brand today?</StepHeadline>
+          <StepSub>We'll tailor your workspace to your stage.</StepSub>
           <View style={sm.radioList}>
-            {BRAND_STAGES.map((s) => (
-              <RadioRow
-                key={s.value}
-                label={s.label}
-                sub={s.sub}
-                selected={brandStage === s.value}
-                onPress={() => setBrandStage(s.value)}
-              />
+            {BRAND_STAGES.map((s, i) => (
+              <Reveal key={s.value} index={i + 2}>
+                <RadioRow
+                  label={s.label}
+                  sub={s.sub}
+                  selected={brandStage === s.value}
+                  onPress={() => setBrandStage(s.value)}
+                />
+              </Reveal>
             ))}
           </View>
         </ScrollView>
@@ -2581,9 +2524,9 @@ export default function OnboardingScreen() {
       // Step 5: Goals
       if (step === SELLER_STEP_INDEX.GOALS) return (
         <ScrollView contentContainerStyle={sm.scroll} showsVerticalScrollIndicator={false}>
-          <Text style={sm.stepHeadline}>What do you{'\n'}need help with?</Text>
-          <Text style={sm.stepSub}>Choose what matters right now, or skip and personalize later.</Text>
-          <View style={sm.chipGrid}>
+          <StepHeadline>What do you{'\n'}need help with?</StepHeadline>
+          <StepSub>Choose what matters right now, or skip and personalize later.</StepSub>
+          <Reveal index={2} style={sm.chipGrid}>
             {SELLER_GOALS.map((g) => (
               <Chip
                 key={g}
@@ -2592,21 +2535,15 @@ export default function OnboardingScreen() {
                 onPress={() => setGoals((prev) => prev.includes(g) ? prev.filter((v) => v !== g) : [...prev, g])}
               />
             ))}
-          </View>
-          <TouchableOpacity
-            style={sm.buildBtn}
-            onPress={() => goNext()}
-          >
-            <LinearGradient
-              colors={theme.primaryGradient}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={sm.buildBtnInner}
-            >
-              <Text style={[sm.buildBtnText, getOnAccentTextStyle(theme)]}>
-                {goals.length > 0 ? 'Build my workspace' : 'Skip for now'}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
+          </Reveal>
+          <Reveal index={3} style={sm.buildBtn}>
+            <PillButton
+              label={goals.length > 0 ? 'Build my workspace' : 'Skip for now'}
+              variant={goals.length > 0 ? 'primary' : 'secondary'}
+              haptic={false}
+              onPress={() => goNext()}
+            />
+          </Reveal>
         </ScrollView>
       );
 
@@ -2693,7 +2630,11 @@ export default function OnboardingScreen() {
       <View style={{ flex: 1, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center' }}>
         <View pointerEvents="none" style={sm.backgroundDim} />
         <StatusBar barStyle="light-content" />
-        <ActivityIndicator color={theme.accent} />
+        {/* Brief on-brand hold while the session resolves: the mark and a thread beginning to sew. */}
+        <View accessible accessibilityLabel="Loading" style={sm.bootWrap}>
+          <BrandthreadLogo size={44} />
+          <ThreadDraw height={36} color={theme.text} duration={1100} style={sm.bootThread} />
+        </View>
       </View>
     );
   }
@@ -2702,17 +2643,29 @@ export default function OnboardingScreen() {
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <StatusBar barStyle="light-content" />
 
+      {/* The thread weaves behind each headline as screens hand off. */}
+      {!isFullScreen && (
+        <ThreadWeave
+          stepKey={`${flow ?? 'choose'}-${step}`}
+          direction={transitionDirection.current}
+          color={theme.text}
+          style={[sm.weave, { top: insets.top + 44 }]}
+        />
+      )}
+
       {/* Standard header for form steps */}
       {!isFullScreen && (
         <View style={[sm.header, { paddingTop: insets.top + 8 }]}>
           {!isAccountTypeStep && (
-            <TouchableOpacity
+            <PressableScale
               style={sm.backBtn}
               onPress={goBack}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-              <Feather name="chevron-left" size={20} color={MUTED} />
-            </TouchableOpacity>
+              <Feather name="chevron-left" size={20} color={FG} />
+            </PressableScale>
           )}
 
           {showsProgressBar() && (
@@ -2736,14 +2689,14 @@ export default function OnboardingScreen() {
       {/* Step content */}
       <Animated.View style={[
         sm.stepWrap,
-        isAccountTypeStep && sm.accountTypeStepWrap,
+        (isAccountTypeStep || isFullScreen) && sm.accountTypeStepWrap,
         isAuthStep && sm.interactiveStepWrap,
         {
           opacity: transitionProgress,
           transform: [{
             translateX: transitionProgress.interpolate({
               inputRange: [0, 1],
-              outputRange: [transitionDirection.current * 18, 0],
+              outputRange: [transitionDirection.current * 28, 0],
             }),
           }],
         },
@@ -2767,24 +2720,29 @@ export default function OnboardingScreen() {
 
       {/* Footer Continue button */}
       {showFooter && (
-        <View style={[sm.footer, { paddingBottom: insets.bottom + 16 }]}>
+        <LinearGradient
+          colors={[`${theme.background}00`, theme.background]}
+          locations={[0, 0.35]}
+          style={[sm.footer, { paddingBottom: insets.bottom + 16 }]}
+        >
           <PrimaryButton
             label={footerButtonLabel()}
             onPress={() => goNext()}
             disabled={!canContinue()}
+            haptic={false}
           />
-        </View>
+        </LinearGradient>
       )}
     </View>
   );
 }
 
 const createSm = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const CARD = theme.card, BORDER = theme.border, FG = theme.text, MUTED = theme.muted, MUTED2 = theme.subtle, INPUT_BG = theme.surface, INPUT_BD = theme.border;
+  const BORDER = theme.border;
   return StyleSheet.create({
   deviceProbeControl: { position: 'absolute', right: 0, bottom: 0, width: 2, height: 2, opacity: 0.01 },
   deviceProbeMetric: { position: 'absolute', width: 1, height: 1, opacity: 0.01 },
-  header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 8, gap: 10, zIndex: 3 },
+  header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: SPACE.sm, gap: SPACE.sm, zIndex: 3 },
   progressOverlay: {
     position: 'absolute',
     top: 0,
@@ -2793,33 +2751,26 @@ const createSm = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     zIndex: 30,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: SPACE.lg,
     paddingBottom: 8,
   },
-  backBtn:   { width: 32, height: 32, justifyContent: 'center' },
-  stepWrap:  { flex: 1, paddingHorizontal: 24 },
+  backBtn:   { width: 36, height: 36, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  weave:     { position: 'absolute', left: 0, right: 0, zIndex: 0, opacity: 0.9 },
+  stepWrap:  { flex: 1, paddingHorizontal: SPACE.lg },
   interactiveStepWrap: { position: 'relative', zIndex: 2 },
   accountTypeStepWrap: { paddingHorizontal: 0 },
-  footer:    { paddingHorizontal: 24, paddingTop: 8 },
+  footer:    { paddingHorizontal: SPACE.lg, paddingTop: SPACE.lg, marginTop: -SPACE.lg },
   backgroundDim: {
     ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(7,7,15,0.34)',
   },
+  bootWrap:  { alignItems: 'center', gap: SPACE.md, width: 160 },
+  bootThread:{ width: 160 },
 
-  scroll:    { flexGrow: 1, paddingTop: 8, paddingBottom: 40 },
-  stepHeadline: { fontSize: 32, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.8, lineHeight: 38, marginBottom: 6 },
-  stepSub:   { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 21, marginBottom: 20 },
-  inputWrap: { gap: 4 },
-  label:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, marginBottom: 5 },
-  input:     { backgroundColor: INPUT_BG, borderWidth: StyleSheet.hairlineWidth, borderColor: INPUT_BD, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 16, fontFamily: 'Inter_400Regular', color: FG },
-  inputHint: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED2, marginTop: 5 },
-  chipGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  radioList: { gap: 8 },
-  selectionHint: { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center', marginTop: 8 },
-  buildBtn:  { marginTop: 8 },
-  buildBtnDisabled: { opacity: 0.5 },
-  buildBtnInner: { borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
-  buildBtnText: { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
-  buildBtnTextDisabled: { color: MUTED2 },
+  scroll:    { flexGrow: 1, paddingTop: SPACE.xs, paddingBottom: SPACE.xxl },
+  inputWrap: { marginTop: SPACE.xl },
+  chipGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.xs, marginTop: SPACE.xl, marginBottom: SPACE.md },
+  radioList: { gap: SPACE.sm, marginTop: SPACE.xl },
+  buildBtn:  { marginTop: SPACE.xs },
   });
 };
