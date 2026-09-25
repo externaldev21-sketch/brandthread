@@ -7,12 +7,12 @@
  * video. Products live one tap away behind the floating "Shop N products"
  * pill (the seller's live listings, same source as product detail).
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Linking, Modal, Share, StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -198,6 +198,18 @@ export default function SellerProfileScreen() {
   }), [canonicalSellerId, isOwner]);
 
   const videos = useCreatorVideos(canonicalSellerId, { fresh: isOwner });
+
+  // Returning to this profile (after posting, editing listings, deleting a
+  // video, or following from another screen) silently refetches counts,
+  // products and videos instead of showing the pre-change snapshot.
+  const focusCountRef = useRef(0);
+  const reloadVideos = videos.reload;
+  useFocusEffect(useCallback(() => {
+    focusCountRef.current += 1;
+    if (focusCountRef.current === 1) return;
+    setReloadTick((tick) => tick + 1);
+    void reloadVideos({ fresh: true });
+  }, [reloadVideos]));
 
   useEffect(() => {
     if (!snackbar) return;

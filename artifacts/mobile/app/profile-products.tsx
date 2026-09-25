@@ -12,7 +12,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState, PressableScale, ProductGridSkeleton } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
@@ -74,7 +74,9 @@ export default function ProfileProductsScreen() {
     }
   }, [sellerId]);
 
-  useEffect(() => { void load(); }, [load]);
+  // Refetch on every focus: coming back from Manage products / add / delete
+  // must not show the listing set from before the change.
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const loadMore = useCallback(() => {
     if (!hasMore || loadingMore || !sellerId) return;
