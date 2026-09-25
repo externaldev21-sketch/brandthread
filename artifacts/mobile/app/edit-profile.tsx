@@ -1,47 +1,79 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, Platform, TextInput, Image, Animated, ActivityIndicator,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
+import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+import { NavigationCard } from '@/components/BrandthreadUI';
+import { pickProfileImage } from '@/lib/pickProfileImage';
+import { uploadImageWithProgress } from '@/lib/uploadWithProgress';
+import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 
-type DragRow = { label: string };
+const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const LINK_RE = /^(https?:\/\/)?[^\s.]+\.[^\s]{2,}$/i;
+const BIO_MAX = 300;
 
-const DRAG_ROWS: DragRow[] = [
-  { label: 'Brand Studio' },
-  { label: 'Your orders'  },
-  { label: 'Analytics'    },
-];
-
-const EMPTY_FIELDS = {
-  name:     '',
-  username: '',
-  bio:      '',
-  pronoun:  '',
-  category: '',
-  website:  '',
+type Fields = {
+  name: string;
+  username: string;
+  bio: string;
+  website: string;
+  category: string;
+  tagsText: string;
+  location: string;
+  contactEmail: string;
+  instagram: string;
+  tiktok: string;
 };
+
+const EMPTY_FIELDS: Fields = {
+  name: '', username: '', bio: '', website: '', category: '',
+  tagsText: '', location: '', contactEmail: '', instagram: '', tiktok: '',
+};
+
+type ImageSlotKey = 'avatar' | 'logo' | 'banner';
+
+/** Quick links into existing seller settings screens — never duplicate those forms here. */
+const QUICK_LINKS: { icon: keyof typeof Feather.glyphMap; label: string; description: string; route: string }[] = [
+  { icon: 'home', label: 'Store settings', description: 'Storefront identity, localization, checkout', route: '/store-settings' },
+  { icon: 'truck', label: 'Shipping & delivery', description: 'Rates, zones, and carriers', route: '/shipping-delivery' },
+  { icon: 'dollar-sign', label: 'Payouts', description: 'Bank account and payout history', route: '/payouts' },
+  { icon: 'file-text', label: 'Store policies', description: 'Return and cancellation policy', route: '/store-policies' },
+];
 
 export default function EditProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const navigation = useNavigation();
   const api = useApi();
+  const { getToken } = useAuth();
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
 
-  const [fields, setFields] = useState<Record<string, string>>(EMPTY_FIELDS);
-  const [order, setOrder] = useState(DRAG_ROWS.map((r) => r.label));
+  const [fields, setFields] = useState<Fields>(EMPTY_FIELDS);
+  const [initial, setInitial] = useState<Fields>(EMPTY_FIELDS);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [logoUri, setLogoUri] = useState<string | null>(null);
+  const [bannerUri, setBannerUri] = useState<string | null>(null);
+  const [uploading, setUploading] = useState<Record<ImageSlotKey, boolean>>({ avatar: false, logo: false, banner: false });
+  const [uploadProgress, setUploadProgress] = useState<Record<ImageSlotKey, number>>({ avatar: 0, logo: 0, banner: 0 });
+  const [uploadError, setUploadError] = useState<Record<ImageSlotKey, string | null>>({ avatar: null, logo: null, banner: null });
   const [saving, setSaving] = useState(false);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [errors, setErrors] = useState<Partial<Record<keyof Fields, string>>>({});
+
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'ok' | 'taken' | 'invalid'>('idle');
+  const [usernameError, setUsernameError] = useState('');
 
   // Never overwrite the seller's real profile with placeholder defaults —
   // fields start empty and Save stays disabled until a real profile loads.
@@ -58,24 +90,32 @@ export default function EditProfileScreen() {
     Animated.timing(toastOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
     toastTimer.current = setTimeout(() => {
       Animated.timing(toastOpacity, { toValue: 0, duration: 150, useNativeDriver: true }).start();
-      setToast((t) => ({ ...t, visible: false }));
+      setToast(t => ({ ...t, visible: false }));
     }, 2500);
   }
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
-  const loadProfile = React.useCallback(() => {
+  const loadProfile = useCallback(() => {
     setProfileError(false);
     api.seller.getProfile()
       .then((profile) => {
         setAvatarUri(profile.profileImageUrl ?? null);
-        setFields({
+        setLogoUri(profile.logoUrl ?? null);
+        setBannerUri(profile.bannerUrl ?? null);
+        const loadedFields: Fields = {
           name: profile.brandName ?? profile.displayName ?? '',
-          username: profile.username ? `@${profile.username}` : '',
+          username: profile.username ?? '',
           bio: profile.bio ?? '',
-          pronoun: '',
-          category: '',
           website: profile.website ?? '',
-        });
+          category: profile.category ?? '',
+          tagsText: (profile.tags ?? []).join(', '),
+          location: profile.location ?? '',
+          contactEmail: profile.contactEmail ?? '',
+          instagram: profile.socialLinks?.instagram ?? '',
+          tiktok: profile.socialLinks?.tiktok ?? '',
+        };
+        setFields(loadedFields);
+        setInitial(loadedFields);
         setProfileLoaded(true);
       })
       .catch(() => setProfileError(true));
@@ -83,45 +123,140 @@ export default function EditProfileScreen() {
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
 
-  async function pickAvatar() {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo access to update your brand avatar.'); return; }
-    const res = await ImagePicker.launchImageLibraryAsync({
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.85,
-      mediaTypes: ['images'],
+  const isDirty = useMemo(
+    () => (Object.keys(fields) as (keyof Fields)[]).some(key => fields[key] !== initial[key]),
+    [fields, initial],
+  );
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+      if (!isDirty || saving) return;
+      e.preventDefault();
+      Alert.alert(
+        'Discard changes?',
+        'You have unsaved changes. If you leave now, they will be lost.',
+        [
+          { text: 'Keep editing', style: 'cancel' },
+          { text: 'Discard', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+        ],
+      );
     });
-    if (res.canceled || !res.assets[0]) return;
-    setUploadingAvatar(true);
+    return unsubscribe;
+  }, [navigation, isDirty, saving]);
+
+  function set(key: keyof Fields, val: string) {
+    setFields(prev => ({ ...prev, [key]: val }));
+    setErrors(prev => ({ ...prev, [key]: undefined }));
+  }
+
+  async function checkUsernameAvailability(raw: string): Promise<boolean> {
+    const u = raw.trim().toLowerCase();
+    if (!u) { setUsernameStatus('invalid'); setUsernameError('Username is required'); return false; }
+    if (!USERNAME_RE.test(u)) {
+      setUsernameStatus('invalid');
+      setUsernameError('Letters, numbers and underscores only (3–30 chars)');
+      return false;
+    }
+    setUsernameStatus('checking');
     try {
-      const updated = await api.seller.uploadAvatar(res.assets[0]);
-      setAvatarUri(updated.profileImageUrl);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const result = await api.auth.checkUsername(u);
+      if (result.available) { setUsernameStatus('ok'); setUsernameError(''); return true; }
+      setUsernameStatus('taken'); setUsernameError(result.error ?? 'Username already taken');
+      return false;
     } catch {
-      Alert.alert('Could not update photo', 'Check your connection and try again.');
-    } finally {
-      setUploadingAvatar(false);
+      setUsernameStatus('idle'); setUsernameError('');
+      return true;
     }
   }
 
-  function set(key: string, val: string) {
-    setFields((prev) => ({ ...prev, [key]: val }));
+  async function uploadSlot(
+    key: ImageSlotKey,
+    aspect: [number, number],
+    title: string,
+    path: string,
+    setUri: (uri: string | null) => void,
+    responseKey: 'profileImageUrl' | 'logoUrl' | 'bannerUrl',
+    setupTaskOnSuccess?: boolean,
+  ) {
+    const asset = await pickProfileImage({ aspect, title });
+    if (!asset) return;
+    setUploadError(prev => ({ ...prev, [key]: null }));
+    setUploading(prev => ({ ...prev, [key]: true }));
+    setUploadProgress(prev => ({ ...prev, [key]: 0 }));
+    const previousUri = key === 'avatar' ? avatarUri : key === 'logo' ? logoUri : bannerUri;
+    setUri(asset.uri);
+    try {
+      const token = await getToken();
+      const result = await uploadImageWithProgress<Record<string, string>>(
+        path,
+        { uri: asset.uri, mimeType: asset.mimeType ?? 'image/jpeg' },
+        token,
+        (pct) => setUploadProgress(prev => ({ ...prev, [key]: pct })),
+      );
+      setUri(result[responseKey]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(`${title.replace('Update ', '')} updated`);
+      if (setupTaskOnSuccess) void completeSetupTaskWhen('customize_store', true);
+    } catch {
+      setUri(previousUri);
+      setUploadError(prev => ({ ...prev, [key]: 'Upload failed. Check your connection and try again.' }));
+    } finally {
+      setUploading(prev => ({ ...prev, [key]: false }));
+    }
+  }
+
+  const pickAvatar = () => uploadSlot('avatar', [1, 1], 'Update avatar', '/api/seller/profile/avatar/upload', setAvatarUri, 'profileImageUrl');
+  const pickLogo = () => uploadSlot('logo', [1, 1], 'Update logo', '/api/seller/profile/logo/upload', setLogoUri, 'logoUrl', true);
+  const pickBanner = () => uploadSlot('banner', [3, 1], 'Update banner', '/api/seller/profile/banner/upload', setBannerUri, 'bannerUrl', true);
+
+  function validate(): boolean {
+    const nextErrors: Partial<Record<keyof Fields, string>> = {};
+    if (!fields.name.trim()) nextErrors.name = 'Brand name is required';
+    if (!fields.username.trim()) nextErrors.username = 'Username is required';
+    else if (!USERNAME_RE.test(fields.username.trim())) nextErrors.username = 'Letters, numbers and underscores only (3–30 chars)';
+    if (fields.website.trim() && !LINK_RE.test(fields.website.trim())) nextErrors.website = 'Enter a valid website';
+    if (fields.contactEmail.trim() && !EMAIL_RE.test(fields.contactEmail.trim())) nextErrors.contactEmail = 'Enter a valid email address';
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   }
 
   async function handleSave() {
-    if (saving || uploadingAvatar || !profileLoaded) return;
+    if (saving || Object.values(uploading).some(Boolean) || !profileLoaded) return;
+    if (!validate()) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
+    const rawUsername = fields.username.trim().toLowerCase();
+    if (rawUsername !== initial.username.trim().toLowerCase()) {
+      const available = await checkUsernameAvailability(rawUsername);
+      if (!available) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        return;
+      }
+    }
+
     setSaving(true);
     try {
+      const tags = fields.tagsText.split(',').map(t => t.trim()).filter(Boolean).slice(0, 20);
       await api.seller.updateProfile({
-        name:        fields.name,
-        brandName:   fields.name,
-        username:    fields.username.replace(/^@/, ''),
-        bio:         fields.bio,
-        website:     fields.website,
+        name:        fields.name.trim(),
+        brandName:   fields.name.trim(),
+        username:    rawUsername,
+        bio:         fields.bio.trim(),
+        website:     fields.website.trim(),
+        category:    fields.category.trim(),
+        location:    fields.location.trim(),
+        contactEmail: fields.contactEmail.trim(),
+        tags,
+        socialLinks: {
+          instagram: fields.instagram.trim(),
+          tiktok:    fields.tiktok.trim(),
+        },
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.back();
+      setInitial(fields);
+      showToast('Profile updated');
+      setTimeout(() => router.back(), 500);
     } catch {
       Alert.alert('Error', 'Could not save profile. Please try again.');
     } finally {
@@ -141,18 +276,17 @@ export default function EditProfileScreen() {
   const username = fields.username.replace(/^@/, '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? topPad + 44 : 0}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 10 }]}>
-        <TouchableOpacity
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          onPress={() => router.back()}
-        >
+        <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} onPress={() => router.back()}>
           <Feather name="chevron-left" size={24} color={theme.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit profile</Text>
-        <TouchableOpacity onPress={handleSave} disabled={saving || !profileLoaded} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Text style={[styles.saveText, (saving || !profileLoaded) && { opacity: 0.4 }]}>{saving ? 'Saving…' : 'Save'}</Text>
+        <TouchableOpacity onPress={handleSave} disabled={!isDirty || saving || !profileLoaded} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          {saving ? <ActivityIndicator size="small" color={theme.accentLight} /> : (
+            <Text style={[styles.saveText, (!isDirty || !profileLoaded) && { opacity: 0.4 }]}>Save</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -166,7 +300,7 @@ export default function EditProfileScreen() {
         <View style={styles.errorState}>
           <Feather name="alert-circle" size={28} color={theme.muted} />
           <Text style={styles.errorTitle}>Couldn't load your profile</Text>
-          <Text style={styles.errorBody}>Pull to retry.</Text>
+          <Text style={styles.errorBody}>Check your connection and try again.</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={loadProfile} activeOpacity={0.8}>
             <Text style={styles.retryBtnText}>Retry</Text>
           </TouchableOpacity>
@@ -176,48 +310,141 @@ export default function EditProfileScreen() {
           <ActivityIndicator color={theme.accent} />
         </View>
       ) : (
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 60 }}
-      >
-        {/* Avatar */}
-        <View style={styles.avatarSection}>
-          <TouchableOpacity activeOpacity={0.8} onPress={pickAvatar} disabled={uploadingAvatar}>
-            <View style={styles.avatarWrap}>
-              {avatarUri ? (
-                <Image source={{ uri: avatarUri }} style={styles.avatar} />
-              ) : (
-                <LinearGradient colors={theme.primaryGradient as any} style={styles.avatar}>
-                  <Text style={styles.avatarText}>{(fields.name || fields.username || '?').slice(0, 2).toUpperCase()}</Text>
-                </LinearGradient>
-              )}
-              <View style={styles.cameraOverlay}>
-                <Feather name="camera" size={18} color={theme.onAccent} />
-              </View>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity activeOpacity={0.7} onPress={pickAvatar}>
-            <Text style={styles.editPhotoLink}>{uploadingAvatar ? 'Uploading photo…' : 'Edit photo or avatar'}</Text>
-          </TouchableOpacity>
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 60 }}>
+
+        {/* Live storefront header preview */}
+        <Text style={styles.sectionLabel}>Storefront preview</Text>
+        <View style={styles.previewCard}>
+          <View style={styles.previewBannerWrap}>
+            {bannerUri ? (
+              <Image source={{ uri: bannerUri }} style={styles.previewBanner} />
+            ) : (
+              <LinearGradient colors={theme.heroGradient as any} style={styles.previewBanner} />
+            )}
+          </View>
+          <View style={styles.previewLogoWrap}>
+            {(logoUri ?? avatarUri) ? (
+              <Image source={{ uri: (logoUri ?? avatarUri) as string }} style={styles.previewLogo} />
+            ) : (
+              <LinearGradient colors={theme.primaryGradient as any} style={styles.previewLogo}>
+                <Text style={styles.previewLogoText}>{(fields.name || 'B').slice(0, 2).toUpperCase()}</Text>
+              </LinearGradient>
+            )}
+          </View>
+          <View style={styles.previewInfo}>
+            <Text style={styles.previewName} numberOfLines={1}>{fields.name || 'Your brand name'}</Text>
+            <Text style={styles.previewMeta} numberOfLines={1}>
+              {[fields.category, fields.location].filter(Boolean).join(' · ') || 'Category · Location'}
+            </Text>
+          </View>
         </View>
 
-        {/* Profile fields card */}
+        {/* Banner */}
+        <ImageUploadRow
+          label="Banner / cover"
+          hint="Wide image shown at the top of your storefront"
+          uploading={uploading.banner}
+          progress={uploadProgress.banner}
+          error={uploadError.banner}
+          onPress={pickBanner}
+          theme={theme}
+        >
+          <View style={styles.bannerPreviewSlot}>
+            {bannerUri ? (
+              <Image source={{ uri: bannerUri }} style={styles.bannerPreviewImage} />
+            ) : (
+              <View style={[styles.bannerPreviewImage, styles.bannerPreviewEmpty]}>
+                <Feather name="image" size={20} color={theme.muted} />
+              </View>
+            )}
+          </View>
+        </ImageUploadRow>
+
+        {/* Avatar + Logo */}
+        <View style={styles.avatarSection}>
+          <View style={styles.avatarLogoRow}>
+            <View style={styles.avatarColumn}>
+              <TouchableOpacity activeOpacity={0.8} onPress={pickAvatar} disabled={uploading.avatar}>
+                <View style={styles.avatarWrap}>
+                  {avatarUri ? (
+                    <Image source={{ uri: avatarUri }} style={styles.avatar} />
+                  ) : (
+                    <LinearGradient colors={theme.primaryGradient as any} style={styles.avatar}>
+                      <Text style={styles.avatarText}>{(fields.name || fields.username || '?').slice(0, 2).toUpperCase()}</Text>
+                    </LinearGradient>
+                  )}
+                  {uploading.avatar && (
+                    <View style={styles.imageOverlay}>
+                      <ActivityIndicator color="#FFF" size="small" />
+                      <Text style={styles.imageOverlayText}>{uploadProgress.avatar}%</Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+              <Text style={styles.editPhotoLink}>{uploading.avatar ? 'Uploading…' : 'Avatar'}</Text>
+              {uploadError.avatar && <RetryLink onPress={pickAvatar} theme={theme} />}
+            </View>
+
+            <View style={styles.avatarColumn}>
+              <TouchableOpacity activeOpacity={0.8} onPress={pickLogo} disabled={uploading.logo}>
+                <View style={styles.avatarWrap}>
+                  {logoUri ? (
+                    <Image source={{ uri: logoUri }} style={styles.avatar} />
+                  ) : (
+                    <View style={[styles.avatar, styles.logoEmpty]}>
+                      <Feather name="award" size={22} color={theme.muted} />
+                    </View>
+                  )}
+                  {uploading.logo && (
+                    <View style={styles.imageOverlay}>
+                      <ActivityIndicator color="#FFF" size="small" />
+                      <Text style={styles.imageOverlayText}>{uploadProgress.logo}%</Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+              <Text style={styles.editPhotoLink}>{uploading.logo ? 'Uploading…' : 'Logo'}</Text>
+              {uploadError.logo && <RetryLink onPress={pickLogo} theme={theme} />}
+            </View>
+          </View>
+        </View>
+
+        {/* Identity */}
+        <Text style={styles.sectionLabel}>Identity</Text>
         <View style={[styles.card, { marginBottom: 8 }]}>
-          <EditRow
-            label="Name"
-            value={fields.name}
-            onChange={(v) => set('name', v)}
-            theme={theme}
-          />
+          <FieldRow label="Brand name" value={fields.name} onChange={v => set('name', v)} theme={theme} error={errors.name} />
           <Divider theme={theme} />
-          <EditRow
-            label="Username"
-            value={fields.username}
-            onChange={(v) => set('username', v)}
-            theme={theme}
-          />
+          <View>
+            <View style={styles.row}>
+              <Text style={styles.rowLabel}>Username</Text>
+              <TextInput
+                style={[
+                  styles.rowInput,
+                  usernameStatus === 'taken' && { color: theme.error },
+                  usernameStatus === 'invalid' && { color: theme.warning },
+                ]}
+                value={fields.username}
+                onChangeText={v => {
+                  const cleaned = v.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 30);
+                  set('username', cleaned);
+                  if (cleaned.length === 0) { setUsernameStatus('idle'); setUsernameError(''); }
+                  else if (cleaned.length < 3) { setUsernameStatus('invalid'); setUsernameError('At least 3 characters'); }
+                  else if (usernameStatus === 'taken' || usernameStatus === 'ok') { setUsernameStatus('idle'); setUsernameError(''); }
+                }}
+                onBlur={() => { if (fields.username.trim()) void checkUsernameAvailability(fields.username); }}
+                placeholder="Username"
+                placeholderTextColor={theme.muted}
+                autoCorrect={false}
+                autoCapitalize="none"
+                returnKeyType="done"
+              />
+              {usernameStatus === 'checking' && <ActivityIndicator size="small" color={theme.accent} style={{ marginLeft: 6 }} />}
+              {usernameStatus === 'ok' && <Feather name="check-circle" size={17} color={theme.success} style={{ marginLeft: 6 }} />}
+              {usernameStatus === 'taken' && <Feather name="x-circle" size={17} color={theme.error} style={{ marginLeft: 6 }} />}
+            </View>
+            {(usernameError || errors.username) && <Text style={styles.inlineError}>{usernameError || errors.username}</Text>}
+          </View>
           <Divider theme={theme} />
-          {/* Non-editable link row with copy */}
           <View style={styles.row}>
             <Text style={styles.rowLabel} />
             <Text style={[styles.rowValue, { flex: 1 }]} numberOfLines={1}>
@@ -229,77 +456,60 @@ export default function EditProfileScreen() {
           </View>
         </View>
 
-        {/* Basic info */}
-        <Text style={styles.sectionLabel}>Basic info</Text>
+        {/* Brand bio */}
+        <Text style={styles.sectionLabel}>About</Text>
         <View style={[styles.card, { marginBottom: 8 }]}>
-          <EditRow
-            label="Bio"
-            value={fields.bio}
-            placeholder="Write a short description about your brand"
-            multiline
-            onChange={(v) => set('bio', v)}
-            theme={theme}
-          />
-          <Divider theme={theme} />
-          <EditRow
-            label="Pronoun"
-            value={fields.pronoun}
-            placeholder="Add pronouns"
-            onChange={(v) => set('pronoun', v)}
-            theme={theme}
-          />
-          <Divider theme={theme} />
-          <EditRow
-            label="Category"
-            value={fields.category}
-            placeholder="Add category"
-            onChange={(v) => set('category', v)}
-            theme={theme}
-          />
-        </View>
-
-        {/* Others */}
-        <Text style={styles.sectionLabel}>Others</Text>
-        <View style={[styles.card, { marginBottom: 8 }]}>
-          <EditRow
-            label="Website"
-            value={fields.website}
-            placeholder="Add website"
-            onChange={(v) => set('website', v)}
-            theme={theme}
-          />
-        </View>
-
-        {/* Change display order */}
-        <Text style={styles.sectionLabel}>Change display order</Text>
-        <View style={styles.card}>
-          {order.map((label, i) => (
-            <View key={label}>
-              {i > 0 && <Divider theme={theme} />}
-              <View style={styles.row}>
-                <Text style={[styles.rowLabel, { color: theme.text, flex: 1, fontFamily: 'Inter_500Medium', fontSize: 15 }]}>
-                  {label}
-                </Text>
-                <TouchableOpacity
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    if (i > 0) {
-                      const next = [...order];
-                      [next[i - 1], next[i]] = [next[i], next[i - 1]];
-                      setOrder(next);
-                    }
-                  }}
-                >
-                  <Feather name="menu" size={20} color={theme.muted} />
-                </TouchableOpacity>
-              </View>
+          <View style={[styles.row, { alignItems: 'flex-start', paddingVertical: 14 }]}>
+            <Text style={styles.rowLabel}>Bio</Text>
+            <View style={{ flex: 1 }}>
+              <TextInput
+                style={[styles.rowInput, { height: 74, textAlignVertical: 'top' }]}
+                value={fields.bio}
+                onChangeText={v => set('bio', v.slice(0, BIO_MAX))}
+                placeholder="Write a short description about your brand"
+                placeholderTextColor={theme.muted}
+                multiline
+                maxLength={BIO_MAX}
+              />
+              <Text style={[styles.charCounter, fields.bio.length >= BIO_MAX && { color: theme.warning }]}>{fields.bio.length}/{BIO_MAX}</Text>
             </View>
+          </View>
+          <Divider theme={theme} />
+          <FieldRow label="Category" value={fields.category} placeholder="e.g. Streetwear" onChange={v => set('category', v)} theme={theme} />
+          <Divider theme={theme} />
+          <FieldRow label="Tags" value={fields.tagsText} placeholder="handmade, vintage, sustainable" onChange={v => set('tagsText', v)} theme={theme} />
+          <Divider theme={theme} />
+          <FieldRow label="Location" value={fields.location} placeholder="City, Country" onChange={v => set('location', v)} theme={theme} />
+        </View>
+
+        {/* Contact & links */}
+        <Text style={styles.sectionLabel}>Contact & links</Text>
+        <View style={[styles.card, { marginBottom: 8 }]}>
+          <FieldRow label="Website" value={fields.website} placeholder="Add website" onChange={v => set('website', v)} theme={theme} error={errors.website} keyboardType="url" />
+          <Divider theme={theme} />
+          <FieldRow label="Contact email" value={fields.contactEmail} placeholder="hello@yourbrand.com" onChange={v => set('contactEmail', v)} theme={theme} error={errors.contactEmail} keyboardType="email-address" />
+          <Divider theme={theme} />
+          <FieldRow label="Instagram" value={fields.instagram} placeholder="@yourbrand" onChange={v => set('instagram', v)} theme={theme} />
+          <Divider theme={theme} />
+          <FieldRow label="TikTok" value={fields.tiktok} placeholder="@yourbrand" onChange={v => set('tiktok', v)} theme={theme} />
+        </View>
+
+        {/* Quick links to existing seller settings — never duplicated here */}
+        <Text style={styles.sectionLabel}>Store settings</Text>
+        <View style={{ gap: 8, paddingHorizontal: 14 }}>
+          {QUICK_LINKS.map(link => (
+            <NavigationCard
+              key={link.route}
+              icon={link.icon}
+              label={link.label}
+              description={link.description}
+              onPress={() => router.push(link.route as any)}
+            />
           ))}
         </View>
       </ScrollView>
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -309,31 +519,70 @@ function Divider({ theme }: { theme: AppThemePreset }) {
   return <View style={{ height: 1, backgroundColor: theme.border, marginLeft: 16 }} />;
 }
 
-function EditRow({
-  label, value, placeholder, multiline, onChange, theme,
+function RetryLink({ onPress, theme }: { onPress: () => void; theme: AppThemePreset }) {
+  return (
+    <TouchableOpacity onPress={onPress} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+      <Text style={{ fontSize: 11, fontFamily: 'Inter_600SemiBold', color: theme.error, marginTop: 2 }}>Retry</Text>
+    </TouchableOpacity>
+  );
+}
+
+function FieldRow({
+  label, value, placeholder, onChange, theme, error, keyboardType,
 }: {
   label: string;
   value: string;
   placeholder?: string;
-  multiline?: boolean;
   onChange: (v: string) => void;
   theme: AppThemePreset;
+  error?: string;
+  keyboardType?: 'default' | 'email-address' | 'url';
 }) {
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   return (
-    <View style={[styles.row, multiline && { alignItems: 'flex-start', paddingVertical: 14 }]}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <TextInput
-        style={[styles.rowInput, multiline && { height: 64 }]}
-        value={value}
-        onChangeText={onChange}
-        placeholder={placeholder ?? label}
-        placeholderTextColor={theme.muted}
-        multiline={multiline}
-        returnKeyType={multiline ? 'default' : 'done'}
-        autoCorrect={false}
-      />
-      {!multiline && <Feather name="chevron-right" size={17} color={theme.muted} />}
+    <View>
+      <View style={styles.row}>
+        <Text style={styles.rowLabel}>{label}</Text>
+        <TextInput
+          style={[styles.rowInput, error && { color: theme.error }]}
+          value={value}
+          onChangeText={onChange}
+          placeholder={placeholder ?? label}
+          placeholderTextColor={theme.muted}
+          returnKeyType="done"
+          autoCorrect={false}
+          autoCapitalize={keyboardType === 'email-address' || keyboardType === 'url' ? 'none' : 'sentences'}
+          keyboardType={keyboardType}
+        />
+      </View>
+      {error && <Text style={styles.inlineError}>{error}</Text>}
+    </View>
+  );
+}
+
+function ImageUploadRow({
+  label, hint, uploading, progress, error, onPress, theme, children,
+}: {
+  label: string;
+  hint: string;
+  uploading: boolean;
+  progress: number;
+  error: string | null;
+  onPress: () => void;
+  theme: AppThemePreset;
+  children: React.ReactNode;
+}) {
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
+  return (
+    <View style={[styles.card, { marginBottom: 8 }]}>
+      <TouchableOpacity style={[styles.row, { paddingVertical: 14 }]} activeOpacity={0.8} onPress={onPress} disabled={uploading}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.rowLabel, { width: undefined, color: theme.text, fontFamily: 'Inter_500Medium' }]}>{label}</Text>
+          <Text style={styles.rowHint}>{uploading ? `Uploading… ${progress}%` : hint}</Text>
+          {error && <Text style={styles.inlineErrorNoIndent}>{error} · Tap to retry</Text>}
+        </View>
+        {children}
+      </TouchableOpacity>
     </View>
   );
 }
@@ -364,20 +613,45 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   retryBtn:   { marginTop: 12, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10, backgroundColor: theme.accent },
   retryBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: theme.onAccent },
 
-  avatarSection: { alignItems: 'center', paddingVertical: 22 },
-  avatarWrap: { width: 96, height: 96, borderRadius: 48, overflow: 'hidden', position: 'relative' },
-  avatar: { width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 32, fontFamily: 'Inter_700Bold', color: theme.onAccent },
-  cameraOverlay: {
-    position: 'absolute', bottom: 0, left: 0, right: 0, height: 32,
-    backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', // theme-exempt: scrim over avatar media
-  },
-  editPhotoLink: { marginTop: 10, fontSize: 14, fontFamily: 'Inter_500Medium', color: theme.accentLight },
-
   sectionLabel: {
     fontSize: 13, fontFamily: 'Inter_500Medium', color: theme.muted,
-    paddingHorizontal: 18, paddingTop: 12, paddingBottom: 8,
+    paddingHorizontal: 18, paddingTop: 16, paddingBottom: 8,
   },
+
+  // Storefront header preview
+  previewCard: {
+    marginHorizontal: 14, borderRadius: 16, borderWidth: 1, borderColor: theme.border,
+    backgroundColor: theme.card, overflow: 'hidden', paddingBottom: 14,
+  },
+  previewBannerWrap: { width: '100%', height: 88 },
+  previewBanner: { width: '100%', height: '100%' },
+  previewLogoWrap: {
+    marginTop: -28, marginLeft: 14, width: 56, height: 56, borderRadius: 16,
+    borderWidth: 3, borderColor: theme.card, overflow: 'hidden',
+  },
+  previewLogo: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+  previewLogoText: { fontSize: 18, fontFamily: 'Inter_700Bold', color: theme.onAccent },
+  previewInfo: { paddingHorizontal: 14, paddingTop: 8, gap: 2 },
+  previewName: { fontSize: 16, fontFamily: 'Inter_700Bold', color: theme.text },
+  previewMeta: { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: theme.muted },
+
+  bannerPreviewSlot: { marginLeft: 8 },
+  bannerPreviewImage: { width: 64, height: 40, borderRadius: 8 },
+  bannerPreviewEmpty: { backgroundColor: theme.surface, alignItems: 'center', justifyContent: 'center' },
+
+  avatarSection: { paddingVertical: 8 },
+  avatarLogoRow: { flexDirection: 'row', justifyContent: 'center', gap: 36 },
+  avatarColumn: { alignItems: 'center', gap: 6 },
+  avatarWrap: { width: 84, height: 84, borderRadius: 42, overflow: 'hidden', position: 'relative' },
+  avatar: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 28, fontFamily: 'Inter_700Bold', color: theme.onAccent },
+  logoEmpty: { backgroundColor: theme.surface },
+  imageOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', gap: 2, // theme-exempt: scrim over avatar media
+  },
+  imageOverlayText: { color: '#FFF', fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  editPhotoLink: { fontSize: 12.5, fontFamily: 'Inter_500Medium', color: theme.accentLight },
 
   card: {
     backgroundColor: theme.card, marginHorizontal: 14, borderRadius: 12,
@@ -389,13 +663,17 @@ const createStyles = (theme: AppThemePreset) => StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 13, gap: 12,
   },
   rowLabel: {
-    fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.text, width: 90,
+    fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.text, width: 100,
   },
+  rowHint: { fontSize: 12, fontFamily: 'Inter_400Regular', color: theme.muted, marginTop: 2 },
   rowValue: {
     fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.muted,
   },
   rowInput: {
     flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.text,
-    padding: 0,   // Remove default TextInput padding
+    padding: 0, textAlign: 'right',
   },
+  charCounter: { fontSize: 11, fontFamily: 'Inter_400Regular', color: theme.muted, textAlign: 'right', marginTop: 4 },
+  inlineError: { fontSize: 11.5, fontFamily: 'Inter_400Regular', color: theme.error, paddingHorizontal: 16, paddingBottom: 10, marginTop: -6 },
+  inlineErrorNoIndent: { fontSize: 11, fontFamily: 'Inter_400Regular', color: theme.error, marginTop: 2 },
 });

@@ -595,7 +595,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         appThemeId?: string;
         appIconId?: string | null;
         expectedClerkId?: string;
+        category?:     string;
+        location?:     string;
+        contactEmail?: string;
+        tags?:         string[];
+        socialLinks?:  Record<string, string>;
       }) => patch<any>('/api/auth/profile', body),
+      /** Upload the current account's profile photo (buyer or seller). Cropped to a
+       *  square client-side and displayed as a circle. Shared with the seller avatar
+       *  endpoint — any authenticated user owns exactly one `profileImageUrl`. */
+      uploadAvatar: (image: { uri: string; mimeType?: string | null }) =>
+        uploadImage<{ profileImageUrl: string }>('/api/seller/profile/avatar/upload', image, getToken, getCacheScope),
       /** Permanently erase this account after the explicit DELETE confirmation. */
       deleteAccount: () => request<{ ok: true }>(
         '/api/auth/account',
@@ -1293,6 +1303,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           website:     string | null;
           username:    string | null;
           profileImageUrl: string | null;
+          logoUrl:     string | null;
+          bannerUrl:   string | null;
+          category:    string | null;
+          tags:        string[];
+          location:    string | null;
+          socialLinks: Record<string, string>;
+          contactEmail: string | null;
           verified:    boolean;
           returnPolicy:       string | null;
           cancellationPolicy: string | null;
@@ -1309,6 +1326,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Upload a seller-owned brand avatar after the server validates its bytes. */
       uploadAvatar: (image: { uri: string; mimeType?: string | null }) =>
         uploadImage<{ profileImageUrl: string }>('/api/seller/profile/avatar/upload', image, getToken, getCacheScope),
+      /** Upload the storefront logo (square, shown in the header preview). */
+      uploadLogo: (image: { uri: string; mimeType?: string | null }) =>
+        uploadImage<{ logoUrl: string }>('/api/seller/profile/logo/upload', image, getToken, getCacheScope),
+      /** Upload the storefront banner / cover image (wide aspect). */
+      uploadBanner: (image: { uri: string; mimeType?: string | null }) =>
+        uploadImage<{ bannerUrl: string }>('/api/seller/profile/banner/upload', image, getToken, getCacheScope),
       /** Update return / cancellation policy text. */
       updatePolicy: (body: { returnPolicy?: string; cancellationPolicy?: string }) =>
         patch<{ returnPolicy: string | null; cancellationPolicy: string | null }>(
@@ -1356,6 +1379,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         username?: string;
         appThemeId?: string;
         appIconId?: string | null;
+        category?:     string;
+        location?:     string;
+        contactEmail?: string;
+        tags?:         string[];
+        socialLinks?:  Record<string, string>;
       }) =>
         patch<any>('/api/auth/profile', body),
       /** Platform subscription — billed to the seller's own payment method (sellers only).
