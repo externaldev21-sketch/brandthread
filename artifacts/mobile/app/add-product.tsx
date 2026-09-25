@@ -25,7 +25,6 @@ import { hapticPrimaryAction, hapticToggle, hapticSuccessAction, hapticDestructi
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
 import { SuccessSheet } from '@/components/ui/SuccessSheet';
-import { SuccessSheet } from '@/components/ui/SuccessSheet';
 
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, FilterChip, StatusBadge, SectionHeader, FormInput, ProgressCard, EmptyState } from '@/components/BrandthreadUI';
 

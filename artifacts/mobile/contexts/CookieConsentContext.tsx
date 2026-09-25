@@ -51,10 +51,105 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
   // The banner is outside the navigation tree. Screens with bottom controls
   // can reserve its actual rendered height without guessing text wrapping.
   const noticeClearance = showNotice && bannerHeight ? tabBarInset + SP.sm + bannerHeight + SP.sm : 0;
-  return <Context.Provider value={{ consent, saveConsent, openPreferences, noticeClearance }}>{children}{showNotice && <View pointerEvents="box-none" style={[s.bannerWrap, { bottom: tabBarInset + SP.sm }]}><View onLayout={event => setBannerHeight(event.nativeEvent.layout.height)} style={[s.banner, { backgroundColor: theme.card, borderColor: theme.border }]} accessibilityRole="alert"><Text style={[s.copy, { color: theme.text }]}>Brandthread uses cookies and similar storage technologies. Necessary storage is always on; optional analytics and marketing storage are off until you choose. You can change your choices at any time using “Change cookie preferences.”</Text>{customizing && <View style={s.choices}><View style={s.choiceRow}><Text style={[s.choice, { color: theme.text }]}>✓ Necessary</Text><Text style={[s.choiceDescription, { color: theme.muted }]}>Always on. Keeps Brandthread secure, remembers your consent, and supports core features.</Text></View><View style={s.choiceRow}><PressableScale onPress={() => setAnalytics(v => !v)}><Text style={[s.choice, { color: theme.text }]}>{analytics ? '✓' : '○'} Analytics</Text></PressableScale><Text style={[s.choiceDescription, { color: theme.muted }]}>Optional. Helps us understand aggregate use of Brandthread so we can measure and improve features.</Text></View><View style={s.choiceRow}><PressableScale onPress={() => setMarketing(v => !v)}><Text style={[s.choice, { color: theme.text }]}>{marketing ? '✓' : '○'} Marketing</Text></PressableScale><Text style={[s.choiceDescription, { color: theme.muted }]}>Optional. Helps us measure campaigns and personalize Brandthread promotional communications.</Text></View></View>}<View style={s.actions}><PressableScale onPress={() => setCustomizing(v => !v)}><Text style={[s.link, { color: theme.muted }]}>{customizing ? 'Close' : 'Customize'}</Text></PressableScale><PressableScale onPress={() => saveConsent({ analytics: false, marketing: false })}><Text style={[s.link, { color: theme.muted }]}>Necessary only</Text></PressableScale><PressableScale onPress={() => saveConsent(customizing ? { analytics, marketing } : { analytics: true, marketing: true })}><Text style={[s.accept, { color: theme.accentLight }]}>{customizing ? 'Save choices' : 'Accept all'}</Text></PressableScale></View></View></Context.Provider>;
+  return (
+    <Context.Provider value={{ consent, saveConsent, openPreferences, noticeClearance }}>
+      {children}
+      {showNotice && (
+        <View
+          pointerEvents="box-none"
+          style={[s.bannerWrap, { bottom: tabBarInset + SP.sm }]}
+        >
+          <View
+            onLayout={event => setBannerHeight(event.nativeEvent.layout.height)}
+            style={[s.banner, { backgroundColor: theme.card, borderColor: theme.border }]}
+            accessibilityRole="alert"
+          >
+            <Text style={[s.copy, { color: theme.text }]}>
+              Brandthread uses cookies and similar storage technologies. Necessary storage is always on;
+              optional analytics and marketing storage are off until you choose. You can change your
+              choices at any time using “Change cookie preferences.”
+            </Text>
+            {customizing && (
+              <View style={s.choices}>
+                <View style={s.choiceRow}>
+                  <Text style={[s.choice, { color: theme.text }]}>✓ Necessary</Text>
+                  <Text style={[s.choiceDescription, { color: theme.muted }]}>
+                    Always on. Keeps Brandthread secure, remembers your consent, and supports core features.
+                  </Text>
+                </View>
+                <View style={s.choiceRow}>
+                  <PressableScale onPress={() => setAnalytics(value => !value)}>
+                    <Text style={[s.choice, { color: theme.text }]}>
+                      {analytics ? '✓' : '○'} Analytics
+                    </Text>
+                  </PressableScale>
+                  <Text style={[s.choiceDescription, { color: theme.muted }]}>
+                    Optional. Helps us understand aggregate use of Brandthread so we can measure and improve features.
+                  </Text>
+                </View>
+                <View style={s.choiceRow}>
+                  <PressableScale onPress={() => setMarketing(value => !value)}>
+                    <Text style={[s.choice, { color: theme.text }]}>
+                      {marketing ? '✓' : '○'} Marketing
+                    </Text>
+                  </PressableScale>
+                  <Text style={[s.choiceDescription, { color: theme.muted }]}>
+                    Optional. Helps us measure campaigns and personalize Brandthread promotional communications.
+                  </Text>
+                </View>
+              </View>
+            )}
+            <View style={s.actions}>
+              <PressableScale onPress={() => setCustomizing(value => !value)}>
+                <Text style={[s.link, { color: theme.muted }]}>
+                  {customizing ? 'Close' : 'Customize'}
+                </Text>
+              </PressableScale>
+              <PressableScale onPress={() => saveConsent({ analytics: false, marketing: false })}>
+                <Text style={[s.link, { color: theme.muted }]}>Necessary only</Text>
+              </PressableScale>
+              <PressableScale
+                onPress={() => saveConsent(customizing ? { analytics, marketing } : { analytics: true, marketing: true })}
+              >
+                <Text style={[s.accept, { color: theme.accentLight }]}>
+                  {customizing ? 'Save choices' : 'Accept all'}
+                </Text>
+              </PressableScale>
+            </View>
+          </View>
+        </View>
+      )}
+    </Context.Provider>
+  );
 }
 export function ChangeCookiePreferences({ style }: { style?: any }) {
   const { openPreferences } = useCookieConsent();
   return <PressableScale style={style} onPress={openPreferences}><Text style={s.link}>Change cookie preferences</Text></PressableScale>;
 }
-const s = StyleSheet.create({ bannerWrap:{position:'absolute',left:0,right:0,alignItems:'center',zIndex:2000,elevation:2000,paddingHorizontal:SP.md}, banner:{width:'100%',maxWidth:WEB_SHELL_MAX_WIDTH-SP.md*2,borderWidth:1,borderRadius:RADIUS.md,padding:SP.md,gap:SP.sm},copy:{fontFamily:FONT.regular,fontSize:FS.xs,lineHeight:18},choices:{gap:SP.sm},choiceRow:{gap:3},choiceDescription:{fontFamily:FONT.regular,fontSize:FS.xs,lineHeight:17},actions:{flexDirection:'row',flexWrap:'wrap',gap:SP.md,alignItems:'center'},link:{fontFamily:FONT.semibold,fontSize:FS.xs},accept:{fontFamily:FONT.bold,fontSize:FS.sm},choice:{fontFamily:FONT.medium,fontSize:FS.sm} });
+const s = StyleSheet.create({
+  bannerWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 2000,
+    elevation: 2000,
+    paddingHorizontal: SP.md,
+  },
+  banner: {
+    width: '100%',
+    maxWidth: WEB_SHELL_MAX_WIDTH - SP.md * 2,
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    padding: SP.md,
+    gap: SP.sm,
+  },
+  copy: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 18 },
+  choices: { gap: SP.sm },
+  choiceRow: { gap: 3 },
+  choiceDescription: { fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 17 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.md, alignItems: 'center' },
+  link: { fontFamily: FONT.semibold, fontSize: FS.xs },
+  accept: { fontFamily: FONT.bold, fontSize: FS.sm },
+  choice: { fontFamily: FONT.medium, fontSize: FS.sm },
+});

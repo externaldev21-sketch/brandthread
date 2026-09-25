@@ -83,9 +83,9 @@ CREATE INDEX IF NOT EXISTS posts_created_published_idx
 
 -- Style-tag candidate generation filters posts by JSONB containment.
 CREATE INDEX IF NOT EXISTS posts_style_tags_gin_idx
-  ON posts USING GIN (style_tags jsonb_path_ops);
+  ON posts USING GIN ((style_tags::jsonb) jsonb_path_ops);
 CREATE INDEX IF NOT EXISTS products_style_tags_gin_idx
-  ON products USING GIN (style_tags jsonb_path_ops);
+  ON products USING GIN ((style_tags::jsonb) jsonb_path_ops);
 
 -- ─── Buyer taste profile ─────────────────────────────────────────────────────
 -- Incrementally-updated per-user affinity vector, seeded from onboarding style
