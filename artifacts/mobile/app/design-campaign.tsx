@@ -930,24 +930,48 @@ export default function CreateAdScreen() {
       </ScrollView>
 
       {/* 7 — Sticky Launch button */}
-      <View style={[styles.stickyBottom, { borderTopColor: colors.border, backgroundColor: colors.background, paddingBottom: insets.bottom + (Platform.OS === 'web' ? 34 : 0) + SP.md }]}>
+      <View style={[styles.stickyBottom, { borderTopColor: colors.border, backgroundColor: colors.background, paddingBottom: insets.bottom + (Platform.OS === 'web' ? 34 : 0) + SP.md, flexDirection: 'column', gap: SP.sm }]}>
+        {/* Alternate entry point: run a real ad on Meta's own platform instead of
+            Brandthread's in-house boost above. Carries over whatever CTA
+            destination is already selected here, mapped the same way the
+            "Launch" flow does via CTA_OPTIONS' destinationKind. */}
         <TouchableOpacity
-          style={[styles.primaryBtn, { flex: 1, backgroundColor: theme.accent }, launchDisabled && { opacity: 0.5 }]}
-          onPress={handleLaunch}
-          disabled={launchDisabled}
+          style={[styles.metaAdsLink, { borderColor: colors.border }]}
+          onPress={() => {
+            const kind = selectedCta?.destinationKind === 'product' ? 'product'
+              : selectedCta?.destinationKind === 'store' ? 'store'
+              : undefined;
+            router.push({
+              pathname: '/meta-ads-setup',
+              params: kind ? { promoteKind: kind, ...(ctaDestId ? { promoteRefId: ctaDestId } : {}) } : {},
+            } as never);
+          }}
           accessibilityRole="button"
-          accessibilityLabel={`Launch, ${budgetDollars} dollars`}
-          testID="stage-continue-btn"
+          accessibilityLabel="Run as a Meta ad, Facebook and Instagram"
+          testID="run-as-meta-ad-btn"
         >
-          {(loading || paying) ? (
-            <ActivityIndicator color={theme.onAccent} size="small" />
-          ) : (
-            <>
-              <Feather name="zap" size={18} color={theme.onAccent} />
-              <Text style={[styles.primaryBtnText, getOnAccentTextStyle(theme)]}>Launch · ${budgetDollars}</Text>
-            </>
-          )}
+          <Feather name="facebook" size={14} color={colors.mutedForeground} />
+          <Text style={[styles.metaAdsLinkText, { color: colors.mutedForeground }]}>Run as a Meta ad (Facebook & Instagram)</Text>
         </TouchableOpacity>
+        <View style={{ flexDirection: 'row' }}>
+          <TouchableOpacity
+            style={[styles.primaryBtn, { flex: 1, backgroundColor: theme.accent }, launchDisabled && { opacity: 0.5 }]}
+            onPress={handleLaunch}
+            disabled={launchDisabled}
+            accessibilityRole="button"
+            accessibilityLabel={`Launch, ${budgetDollars} dollars`}
+            testID="stage-continue-btn"
+          >
+            {(loading || paying) ? (
+              <ActivityIndicator color={theme.onAccent} size="small" />
+            ) : (
+              <>
+                <Feather name="zap" size={18} color={theme.onAccent} />
+                <Text style={[styles.primaryBtnText, getOnAccentTextStyle(theme)]}>Launch · ${budgetDollars}</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -980,7 +1004,9 @@ const styles = StyleSheet.create({
   reachLabel:      { fontSize: FS.sm, fontFamily: FONT.semibold, marginBottom: 2 },
   reachRange:      { fontSize: FS.lg, fontFamily: FONT.bold },
   reachDisclaimer: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 4, lineHeight: 16 },
-  stickyBottom:    { borderTopWidth: 1, paddingHorizontal: SP.md, paddingTop: SP.sm, flexDirection: 'row', gap: SP.sm },
+  stickyBottom:    { borderTopWidth: 1, paddingHorizontal: SP.md, paddingTop: SP.sm },
+  metaAdsLink:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderRadius: RADIUS.md, paddingVertical: SP.sm },
+  metaAdsLinkText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   primaryBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, borderRadius: RADIUS.md, paddingVertical: SP.md, paddingHorizontal: SP.lg, minHeight: 52 },
   primaryBtnText:  { fontSize: FS.base, fontFamily: FONT.bold },
   successIcon:     { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },

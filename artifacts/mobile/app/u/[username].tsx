@@ -22,7 +22,6 @@ import {
   View,
   Text,
   StyleSheet,
-  ActivityIndicator,
   Image,
   ScrollView,
   Platform,
@@ -39,8 +38,10 @@ import {
 } from '@/lib/theme';
 import { normalizeUsername } from '@/lib/shareProfile';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
-import { ResponsiveContainer } from '@/components/layout';
-import { CONTENT_MAX_WIDTH } from '@/lib/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SkeletonBlock } from '@/components/layout';
+import { ProfileHeroMedia } from '@/components/profile/ProfileHeroMedia';
+import { useProfileLayout } from '@/components/profile/profileLayout';
 
 // ─── Public profile DTO (mirrors GET /api/v1/public/profiles/:username) ──────
 
@@ -70,10 +71,17 @@ async function fetchPublicProfile(username: string): Promise<PublicProfileDto> {
     (process.env.EXPO_PUBLIC_DOMAIN
       ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
       : PROD_ORIGIN);
-  const res = await fetch(
-    `${apiBase}/api/v1/public/profiles/${encodeURIComponent(username)}`,
-    { headers: { Accept: 'application/json' } },
-  );
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), 15_000) : null;
+  let res: Response;
+  try {
+    res = await fetch(
+      `${apiBase}/api/v1/public/profiles/${encodeURIComponent(username)}`,
+      { headers: { Accept: 'application/json' }, signal: controller?.signal },
+    );
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw Object.assign(new Error(text || `HTTP ${res.status}`), {
@@ -103,6 +111,9 @@ function getInitials(displayName: string | null, username: string): string {
 }
 
 // ─── Public landing (signed-out) ─────────────────────────────────────────────
+// Same visual shell as every in-app profile (full-bleed hero with the
+// Brandthread thread, avatar over the media, name + role chip), trimmed to the
+// safe public DTO fields, with the Join / Sign in calls to action.
 
 function PublicProfileLanding({
   profile,
@@ -117,136 +128,141 @@ function PublicProfileLanding({
 }) {
   const { theme } = useAppTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const layout = useProfileLayout();
   const initials = getInitials(profile.displayName, profile.username);
   const displayName = profile.displayName || `@${profile.username}`;
   const accountLabel =
     profile.accountType === 'seller' ? 'Seller on Brandthread' : 'On Brandthread';
 
   return (
-    <ScrollView
-      style={styles.root}
-      contentContainerStyle={[
-        styles.landingContent,
-        { paddingTop: insets.top + SP.lg, paddingBottom: insets.bottom + SP.xxl },
-      ]}
-      showsVerticalScrollIndicator={false}
-      accessible
-    >
-      <ResponsiveContainer maxWidth={CONTENT_MAX_WIDTH} style={{ paddingHorizontal: 0, alignItems: 'center' }}>
-      {/* Brandthread wordmark */}
-      <View style={styles.logoRow}>
-        <BrandthreadLogo size={28} />
-        <Text style={styles.logoText} accessibilityRole="text">
-          Brandthread
-        </Text>
-      </View>
-
-      {/* Avatar */}
-      <View style={styles.avatarContainer}>
-        {profile.avatarUrl ? (
-          <Image
-            source={{ uri: profile.avatarUrl }}
-            style={styles.avatarImage}
-            accessible
-            accessibilityLabel={`${displayName}'s profile photo`}
+    <View style={[styles.root, styles.landingRoot]}>
+      <ScrollView
+        style={{ width: layout.columnWidth }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + SP.xxl }}
+        showsVerticalScrollIndicator={false}
+        accessible
+      >
+        {/* Hero */}
+        <View style={[styles.landingHero, { height: layout.heroHeight }]}>
+          <ProfileHeroMedia active={false} height={layout.heroHeight} />
+          <LinearGradient
+            pointerEvents="none"
+            colors={[`${theme.background}00`, `${theme.background}F2`, theme.background]}
+            locations={[0.4, 0.9, 1]}
+            style={StyleSheet.absoluteFill}
           />
-        ) : (
-          <View
-            style={styles.avatarPlaceholder}
-            accessible
-            accessibilityLabel={`${displayName}'s profile photo`}
-          >
-            <Text style={styles.avatarInitials} accessibilityElementsHidden>
-              {initials}
+          <View style={[styles.logoRow, { top: insets.top + SP.md }]}>
+            <BrandthreadLogo size={28} />
+            <Text style={styles.logoText} accessibilityRole="text">
+              Brandthread
             </Text>
           </View>
-        )}
-        {profile.verified && (
-          <View style={styles.verifiedBadge} accessibilityLabel="Verified">
-            <Feather name="check" size={10} color={theme.background} />
+          <View style={styles.landingIdentity}>
+            <View style={styles.avatarContainer}>
+              {profile.avatarUrl ? (
+                <Image
+                  source={{ uri: profile.avatarUrl }}
+                  style={styles.avatarImage}
+                  accessible
+                  accessibilityLabel={`${displayName}'s profile photo`}
+                />
+              ) : (
+                <View
+                  style={styles.avatarPlaceholder}
+                  accessible
+                  accessibilityLabel={`${displayName}'s profile photo`}
+                >
+                  <Text style={styles.avatarInitials} accessibilityElementsHidden>
+                    {initials}
+                  </Text>
+                </View>
+              )}
+              {profile.verified && (
+                <View style={styles.verifiedBadge} accessibilityLabel="Verified">
+                  <Feather name="check" size={10} color={theme.background} />
+                </View>
+              )}
+            </View>
+            <View style={styles.landingIdentityCopy}>
+              <Text style={styles.displayName} accessibilityRole="header" numberOfLines={2}>
+                {displayName}
+              </Text>
+              <View style={styles.handleRow}>
+                <Text style={styles.handle} accessibilityRole="text">
+                  @{profile.username}
+                </Text>
+                {profile.verified && (
+                  <View style={styles.verifiedInline} accessibilityLabel="Verified account">
+                    <Feather name="check-circle" size={ICON.xs} color={theme.success} />
+                    <Text style={styles.verifiedText}>Verified</Text>
+                  </View>
+                )}
+              </View>
+            </View>
           </View>
-        )}
-      </View>
+        </View>
 
-      {/* Name + handle */}
-      <Text
-        style={styles.displayName}
-        accessibilityRole="header"
-        numberOfLines={2}
-      >
-        {displayName}
-      </Text>
-      <View style={styles.handleRow}>
-        <Text style={styles.handle} accessibilityRole="text">
-          @{profile.username}
-        </Text>
-        {profile.verified && (
-          <View style={styles.verifiedInline} accessibilityLabel="Verified account">
-            <Feather name="check-circle" size={ICON.xs} color={theme.success} />
-            <Text style={styles.verifiedText}>Verified</Text>
+        <View style={styles.landingBody}>
+          {/* Account type label */}
+          <View style={styles.accountTypePill}>
+            <Feather
+              name={profile.accountType === 'seller' ? 'shopping-bag' : 'user'}
+              size={ICON.xs}
+              color={theme.muted}
+            />
+            <Text style={styles.accountTypeText}>{accountLabel}</Text>
           </View>
-        )}
-      </View>
 
-      {/* Account type label */}
-      <View style={styles.accountTypePill}>
-        <Feather
-          name={profile.accountType === 'seller' ? 'shopping-bag' : 'user'}
-          size={ICON.xs}
-          color={theme.muted}
-        />
-        <Text style={styles.accountTypeText}>{accountLabel}</Text>
-      </View>
+          {/* Bio (optional) */}
+          {!!profile.bio && (
+            <Text
+              style={styles.bio}
+              accessibilityRole="text"
+              numberOfLines={5}
+            >
+              {profile.bio}
+            </Text>
+          )}
 
-      {/* Bio (optional) */}
-      {!!profile.bio && (
-        <Text
-          style={styles.bio}
-          accessibilityRole="text"
-          numberOfLines={5}
-        >
-          {profile.bio}
-        </Text>
-      )}
+          {/* Divider */}
+          <View style={styles.divider} />
 
-      {/* Divider */}
-      <View style={styles.divider} />
+          {/* CTA block */}
+          <View style={styles.ctaBlock}>
+            <Text style={styles.ctaLabel}>
+              View {displayName}'s full profile on Brandthread
+            </Text>
 
-      {/* CTA block */}
-      <View style={styles.ctaBlock}>
-        <Text style={styles.ctaLabel}>
-          View {displayName}'s full profile on Brandthread
-        </Text>
+            {/* Primary: Open / Join */}
+            <PressableScale
+              style={styles.primaryBtn}
+              onPress={() => { hapticLight(); onJoin(); }}
+              accessibilityRole="button"
+              accessibilityLabel="Join Brandthread to view this profile"
+              activeOpacity={0.85}
+            >
+              <Text style={styles.primaryBtnText}>Join Brandthread</Text>
+            </PressableScale>
 
-        {/* Primary: Open / Join */}
-        <PressableScale
-          style={styles.primaryBtn}
-          onPress={() => { hapticLight(); onJoin(); }}
-          accessibilityRole="button"
-          accessibilityLabel="Join Brandthread to view this profile"
-          activeOpacity={0.85}
-        >
-          <Text style={styles.primaryBtnText}>Join Brandthread</Text>
-        </PressableScale>
+            {/* Secondary: Sign in */}
+            <PressableScale
+              style={styles.secondaryBtn}
+              onPress={() => { hapticLight(); onSignIn(); }}
+              accessibilityRole="button"
+              accessibilityLabel="Sign in to Brandthread"
+              activeOpacity={0.85}
+            >
+              <Text style={styles.secondaryBtnText}>Sign in</Text>
+            </PressableScale>
+          </View>
 
-        {/* Secondary: Sign in */}
-        <PressableScale
-          style={styles.secondaryBtn}
-          onPress={() => { hapticLight(); onSignIn(); }}
-          accessibilityRole="button"
-          accessibilityLabel="Sign in to Brandthread"
-          activeOpacity={0.85}
-        >
-          <Text style={styles.secondaryBtnText}>Sign in</Text>
-        </PressableScale>
-      </View>
-
-      {/* Fine print */}
-      <Text style={styles.finePrint} accessibilityRole="text">
-        Brandthread · Fashion &amp; Commerce
-      </Text>
-      </ResponsiveContainer>
-    </ScrollView>
+          {/* Fine print */}
+          <Text style={styles.finePrint} accessibilityRole="text">
+            Brandthread · Fashion &amp; Commerce
+          </Text>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -337,12 +353,19 @@ export default function PublicProfileRoute() {
     (state.kind === 'ready' && (!authLoaded || isSignedIn));
 
   if (isWaiting) {
+    // Skeleton in the profile shell's shape (hero, avatar, name) — the fetch
+    // itself is time-boxed, so this always resolves to data or an error.
     return (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
-        <View style={styles.center}>
-          <ActivityIndicator color={theme.text} size="large" />
-          <Text style={styles.loadingText}>Loading profile…</Text>
+      <View style={[styles.root, { paddingTop: insets.top }]} accessibilityLabel="Loading profile" accessible>
+        <SkeletonBlock width="100%" height={260} radius={0} />
+        <View style={styles.skeletonIdentity}>
+          <SkeletonBlock width={84} height={84} radius={42} />
+          <View style={styles.skeletonLines}>
+            <SkeletonBlock width="70%" height={24} />
+            <SkeletonBlock width="40%" height={14} />
+          </View>
         </View>
+        <Text style={styles.loadingText}>Loading profile…</Text>
       </View>
     );
   }
@@ -513,15 +536,22 @@ function makeStyles(theme: AppThemePreset) {
   retryBtnText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: theme.text },
 
   // ── Public landing layout ──────────────────────────────────────────────────
-  landingContent: {
-    alignItems: 'center',
-    paddingHorizontal: SP.xl,
+  landingRoot: { alignItems: 'center' },
+  landingHero: { width: '100%', overflow: 'hidden', justifyContent: 'flex-end', backgroundColor: theme.card },
+  landingIdentity: {
+    flexDirection: 'row', alignItems: 'flex-end', gap: SP.md,
+    paddingHorizontal: SP.md, paddingBottom: SP.md,
   },
+  landingIdentityCopy: { flex: 1, minWidth: 0 },
+  landingBody: { alignItems: 'center', paddingHorizontal: SP.xl, paddingTop: SP.sm },
+  skeletonIdentity: { flexDirection: 'row', alignItems: 'center', gap: SP.md, padding: SP.md },
+  skeletonLines: { flex: 1, gap: SP.sm },
   logoRow: {
+    position: 'absolute',
+    left: SP.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.sm,
-    marginBottom: SP.xxl,
   },
   logoText: {
     fontFamily: FONT.bold,
@@ -535,7 +565,6 @@ function makeStyles(theme: AppThemePreset) {
     position: 'relative',
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
-    marginBottom: SP.lg,
   },
   avatarImage: {
     width: AVATAR_SIZE,
@@ -576,11 +605,10 @@ function makeStyles(theme: AppThemePreset) {
   // Name / handle
   displayName: {
     fontFamily: FONT.bold,
-    fontSize: FS.xl,
+    fontSize: FS.h2,
     color: theme.text,
-    textAlign: 'center',
-    lineHeight: 30,
-    maxWidth: 280,
+    lineHeight: 34,
+    letterSpacing: -0.8,
   },
   handleRow: {
     flexDirection: 'row',
@@ -588,7 +616,6 @@ function makeStyles(theme: AppThemePreset) {
     gap: SP.sm,
     marginTop: SP.xs,
     flexWrap: 'wrap',
-    justifyContent: 'center',
   },
   handle: {
     fontFamily: FONT.regular,

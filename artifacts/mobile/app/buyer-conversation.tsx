@@ -170,7 +170,10 @@ export default function BuyerConversationScreen() {
     contextOrderId?: string;
     contextOrderNumber?: string;
     contextOrderStatus?: string;
+    contextProductId?: string;
     contextProductName?: string;
+    contextProductPriceCents?: string;
+    contextProductImage?: string;
     contextSellerName?: string;
   }>();
 
@@ -213,6 +216,23 @@ export default function BuyerConversationScreen() {
 
   // Attachment state
   const [selectedAttachment, setSelectedAttachment] = useState<MessageAttachment | null>(null);
+  // "Message seller" from a product page stages that product's card in the
+  // composer once, so the first message carries the product as context.
+  const stagedProductRef = useRef<string | null>(null);
+  useEffect(() => {
+    const productId = params.contextProductId;
+    if (!productId || !params.contextProductName || stagedProductRef.current === productId) return;
+    stagedProductRef.current = productId;
+    const price = Number(params.contextProductPriceCents);
+    setSelectedAttachment({
+      type: 'product',
+      title: params.contextProductName,
+      subtitle: Number.isFinite(price) && price > 0 ? formatCents(price) : 'Product',
+      uri: params.contextProductImage || undefined,
+      accentColor: theme.accent,
+      meta: { productId },
+    });
+  }, [params.contextProductId, params.contextProductName, params.contextProductPriceCents, params.contextProductImage, theme.accent]);
   const [showAttachmentPicker, setShowAttachmentPicker] = useState(false);
   const [attachmentTab, setAttachmentTab] = useState<'product' | 'post'>('product');
   const [sellerProducts, setSellerProducts] = useState<SellerProduct[]>([]);
@@ -253,6 +273,7 @@ export default function BuyerConversationScreen() {
           contextOrderId:     params.contextOrderId,
           contextOrderNumber: params.contextOrderNumber,
           contextOrderStatus: params.contextOrderStatus,
+          contextProductId:   params.contextProductId,
           contextProductName: params.contextProductName,
           contextSellerName:  params.contextSellerName,
         });
@@ -867,7 +888,7 @@ export default function BuyerConversationScreen() {
     const isRead = msg.status === 'read' || !!msg.readAt;
 
     return (
-      <View style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start' }]}>
+      <View style={[s.msgOuter, { justifyContent: isOwn ? 'flex-end' : 'flex-start', marginTop: isFirstInGroup ? SP.sm : 0 }]}>
         {/* Other-user avatar — only on the last bubble of a run */}
         {!isOwn && (
           isLastInGroup ? (
@@ -892,11 +913,16 @@ export default function BuyerConversationScreen() {
               s.bubble,
               {
                 backgroundColor: isOwn ? theme.accent : theme.cardElevated,
-                borderTopLeftRadius: (!isOwn && !isFirstInGroup) ? RADIUS.sm : RADIUS.lg,
-                borderTopRightRadius: (isOwn && !isFirstInGroup) ? RADIUS.sm : RADIUS.lg,
-                borderBottomRightRadius: isOwn ? (isLastInGroup ? 4 : RADIUS.lg) : RADIUS.lg,
-                borderBottomLeftRadius: !isOwn ? (isLastInGroup ? 4 : RADIUS.lg) : RADIUS.lg,
+                borderTopLeftRadius: (!isOwn && !isFirstInGroup) ? RADIUS.xs : RADIUS.xl,
+                borderTopRightRadius: (isOwn && !isFirstInGroup) ? RADIUS.xs : RADIUS.xl,
+                borderBottomRightRadius: isOwn ? (isLastInGroup ? 6 : RADIUS.xl) : RADIUS.xl,
+                borderBottomLeftRadius: !isOwn ? (isLastInGroup ? 6 : RADIUS.xl) : RADIUS.xl,
                 alignSelf: isOwn ? 'flex-end' : 'flex-start',
+                shadowColor: theme.shadowColor,
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: isOwn ? 0.16 : 0.08,
+                shadowRadius: 6,
+                elevation: 2,
               },
             ]}
           >
@@ -1035,7 +1061,11 @@ export default function BuyerConversationScreen() {
             accessibilityLabel={`View ${displayName}'s profile`}
           >
             <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
-            {statusLine ? <Text style={s.headerStatusLine} numberOfLines={1}>{statusLine}</Text> : null}
+            {statusLine ? (
+              <Text style={[s.headerStatusLine, { color: participant?.isOnline ? theme.success : theme.muted }]} numberOfLines={1}>
+                {statusLine}
+              </Text>
+            ) : null}
           </PressableScale>
 
           {participant && (
@@ -1045,8 +1075,11 @@ export default function BuyerConversationScreen() {
               accessibilityRole="button"
               accessibilityLabel={`View ${displayName}'s profile`}
             >
-              <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
-                <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
+              <View style={s.headerAvatarWrap}>
+                <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
+                  <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
+                </View>
+                {participant.isOnline && <View style={s.headerAvatarOnlineDot} />}
               </View>
             </PressableScale>
           )}
@@ -1114,11 +1147,16 @@ export default function BuyerConversationScreen() {
         <PressableScale
           style={s.orderCard}
           onPress={() => {
-            if (participant) {
-              router.push(('/seller-profile?id=' + participant.userId) as never);
+            // The product card opens the product; without an id, the store.
+            if (conv.contextProductId) {
+              router.push(('/buyer-product-detail?productId=' + encodeURIComponent(conv.contextProductId)) as never);
+            } else if (participant) {
+              router.push(('/seller-profile?id=' + encodeURIComponent(participant.userId)) as never);
             }
           }}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={conv.contextProductId ? `View ${conv.contextProductName}` : 'View store'}
         >
           <Feather name="shopping-bag" size={ICON.md} color={theme.accent} />
           <View style={{ flex: 1, marginLeft: SP.sm }}>
@@ -1128,7 +1166,7 @@ export default function BuyerConversationScreen() {
             ) : null}
           </View>
           <View style={s.orderStatusBadge}>
-            <Text style={s.orderStatusText}>View store</Text>
+            <Text style={s.orderStatusText}>{conv.contextProductId ? 'View product' : 'View store'}</Text>
           </View>
         </PressableScale>
       )}
@@ -1612,11 +1650,16 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingHorizontal: SP.xs,
     paddingVertical: SP.xs,
     gap: 2,
+    shadowColor: theme.shadowColor,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 3,
   },
   roundBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1626,27 +1669,40 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingHorizontal: SP.xs,
   },
   headerName: {
-    fontSize: FS.base,
-    fontFamily: FONT.semibold,
+    fontSize: FS.md,
+    fontFamily: FONT.bold,
     color: theme.text,
+    letterSpacing: -0.2,
   },
   headerStatusLine: {
     fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: theme.muted,
+    fontFamily: FONT.medium,
+    color: theme.success,
     marginTop: 1,
   },
+  headerAvatarWrap: { position: 'relative' },
   headerAvatarCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerAvatarInitials: {
-    fontSize: FS.xs,
+    fontSize: FS.sm,
     fontFamily: FONT.bold,
     color: '#FFFFFF',
+  },
+  headerAvatarOnlineDot: {
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    backgroundColor: theme.success,
+    borderWidth: 2,
+    borderColor: theme.background,
   },
 
   // Order context card
@@ -1711,20 +1767,22 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // Date separator
   dateSeparatorWrap: {
     alignItems: 'center',
-    marginVertical: SP.md,
+    marginVertical: SP.lg,
   },
   dateSeparator: {
-    backgroundColor: theme.cardGlass,
+    backgroundColor: theme.cardElevated,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
     borderColor: theme.border,
-    paddingHorizontal: SP.sm,
-    paddingVertical: SP.xs,
+    paddingHorizontal: SP.md,
+    paddingVertical: 6,
   },
   dateSeparatorText: {
     fontSize: FS.xs,
-    fontFamily: FONT.medium,
+    fontFamily: FONT.bold,
     color: theme.muted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
 
   // Unread divider
@@ -1752,31 +1810,32 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: SP.md,
-    marginBottom: 2,
+    marginBottom: 3,
   },
   msgAvatar: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SP.sm,
     marginBottom: 2,
   },
   msgAvatarSpacer: {
-    width: 26,
+    width: 30,
     marginRight: SP.sm,
   },
   msgAvatarInitials: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: FONT.bold,
     color: '#FFFFFF',
   },
 
   // Bubble
   bubble: {
-    borderRadius: RADIUS.lg,
-    padding: SP.md,
+    borderRadius: RADIUS.xl,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm + 4,
   },
   bubbleMeta: {
     flexDirection: 'row',
@@ -1855,6 +1914,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   msgText: {
     fontSize: FS.base,
     fontFamily: FONT.regular,
+    lineHeight: 21,
   },
 
   // Quoted reply snippet
@@ -1928,26 +1988,27 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     gap: SP.sm,
   },
   roundInputBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.cardElevated,
-    marginBottom: 2,
+    marginBottom: 0,
   },
   textInput: {
     flex: 1,
     backgroundColor: theme.cardElevated,
-    borderRadius: RADIUS.xl,
+    borderRadius: RADIUS.xxl,
     borderWidth: 1,
     borderColor: theme.border,
     paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
+    paddingVertical: SP.sm + 2,
     fontSize: FS.base,
     fontFamily: FONT.regular,
     color: theme.text,
     maxHeight: 120,
+    minHeight: 44,
   },
   morphContainer: {
     width: 44,

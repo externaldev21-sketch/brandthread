@@ -18,6 +18,7 @@ import {
   BuyerRefundRequest, BuyerProblemReport, BuyerProblemType,
 } from './cartTypes';
 import { formatCents } from '@/lib/money';
+import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
 
 // ─── Storage keys (scoped by user ID so two accounts never share storage) ─────
 
@@ -293,6 +294,17 @@ export async function addToCart(params: AddToCartParams): Promise<{ success: boo
   }
 
   await saveCart(cart, k);
+
+  // Meta Pixel + Conversions API — this is the single choke point every
+  // "Add to cart" entry point (product detail, shop sheet, …) funnels
+  // through, so it's the correct place to fire AddToCart once.
+  const itemValueCents = (variant.priceCents ?? product.priceCents) * quantity;
+  void trackAndRelayConversionEvent(
+    'AddToCart',
+    { content_ids: [product.id], content_type: 'product', value: itemValueCents / 100, currency: 'usd' },
+    { productId: product.id, valueCents: itemValueCents, currency: 'usd' },
+  );
+
   return { success: true, cart };
 }
 

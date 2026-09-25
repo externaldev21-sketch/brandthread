@@ -2084,10 +2084,19 @@ export default function OnboardingScreen() {
     if (!selectedFlow) return;
     const initiatedAt = performance.now();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // After AccountType (step 0), go to path-specific Auth (step 1)
-    const next = selectedFlow === 'buyer'
-      ? BUYER_STEP_INDEX.AUTH
-      : SELLER_STEP_INDEX.AUTH;
+    // A session is already active here in two cases: this flow's own sign-up
+    // just verified (isSignedIn flipped true, but a remount lost `flow` and
+    // routed back through AccountType to re-pick it), or a signed-in user is
+    // resuming onboarding they never finished. Neither should ever be sent
+    // back into the Auth/sign-up screen — only a deliberate "add another
+    // account" flow (isAddAccount) still needs it, to create a second,
+    // separate Clerk identity while the first stays signed in.
+    const skipAuth = isSignedIn && !isAddAccount;
+    // After AccountType (step 0), go to path-specific Auth (step 1), unless
+    // already signed in, in which case go straight to the next step (Name).
+    const next = skipAuth
+      ? (selectedFlow === 'buyer' ? BUYER_STEP_INDEX.NAME : SELLER_STEP_INDEX.NAME)
+      : (selectedFlow === 'buyer' ? BUYER_STEP_INDEX.AUTH : SELLER_STEP_INDEX.AUTH);
     void AsyncStorage.multiSet([
       [PENDING_FLOW_KEY, selectedFlow],
       [ONBOARDING_KEY, 'false'],

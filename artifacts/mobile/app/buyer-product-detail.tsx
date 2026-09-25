@@ -25,6 +25,7 @@ import { BuyerProduct, BuyerProductOption, BuyerProductVariant, CheckoutAttribut
 import { useApi } from '@/hooks/useApi';
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import { reportHref } from '@/lib/safety';
+import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
 import { useAuth } from '@clerk/expo';
 import {
   BG, CARD, CARD_ELEVATED, BORDER,
@@ -43,6 +44,10 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { hapticToggle, hapticPrimaryAction, hapticWarning } from '@/lib/haptics';
+import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
+import {
+  messageSellerAboutProductHref, profileHref, profileVideosHref,
+} from '@/lib/profileNavigation';
 
 type ThemeAliases = {
   theme: AppThemePreset;
@@ -577,6 +582,18 @@ export default function BuyerProductDetailScreen() {
     return () => { cancelled = true; };
   }, [productId]);
 
+  // Meta Pixel + Conversions API — ViewContent, once per loaded product. This
+  // is the real buyer-facing product page (product-detail.tsx is the seller's
+  // own management view), so it's the correct place to fire ViewContent.
+  useEffect(() => {
+    if (!product?.id) return;
+    void trackAndRelayConversionEvent(
+      'ViewContent',
+      { content_ids: [product.id], content_type: 'product', value: product.priceCents / 100, currency: 'usd' },
+      { productId: product.id, valueCents: product.priceCents, currency: 'usd' },
+    );
+  }, [product?.id]);
+
   useEffect(() => {
     if (!product || !editVariantId) return;
     const cartVariant = product.variants.find(candidate => candidate.id === editVariantId);
@@ -774,6 +791,29 @@ export default function BuyerProductDetailScreen() {
     }
   }
 
+  // DM the seller about this product: opens (or reuses) the buyer↔seller
+  // product thread with this product's card staged in the composer.
+  function handleMessageSeller() {
+    if (!product) return;
+    if (sellerVacationMessage) {
+      Alert.alert('Seller is away', sellerVacationMessage);
+      return;
+    }
+    if (!isSignedIn) {
+      router.push('/sign-in' as never);
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push(messageSellerAboutProductHref({
+      sellerId: product.sellerId,
+      sellerName: product.sellerName,
+      productId: product.id,
+      productName: product.name,
+      productPriceCents: variantPrice,
+      productImageUri: product.imageUris[0] ?? null,
+    }) as never);
+  }
+
   async function handleBuyNow() {
     if (sellerVacationMessage) {
       Alert.alert('Seller is away', sellerVacationMessage);
@@ -880,7 +920,7 @@ export default function BuyerProductDetailScreen() {
 
           {/* Title & Seller */}
           <Text style={s.productName} numberOfLines={3}>{product.name}</Text>
-          <TouchableOpacity style={s.sellerCard} onPress={() => router.push(('/seller-profile?id=' + product.sellerId) as never)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`View seller ${product.sellerName}`}>
+          <TouchableOpacity style={s.sellerCard} onPress={() => router.push(profileHref({ userId: product.sellerId, accountType: 'seller' }) as never)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`View seller ${product.sellerName}`} testID="product-seller-link">
             <View style={s.sellerAvatar}><Text style={s.sellerInitial}>{product.sellerName.charAt(0)}</Text></View>
             <View style={{ flex: 1 }}>
               <Text style={s.sellerName} numberOfLines={1}>{product.sellerName}</Text>
@@ -891,6 +931,16 @@ export default function BuyerProductDetailScreen() {
               <Feather name="chevron-right" size={14} color={MUTED} />
             </View>
           </TouchableOpacity>
+          <Button
+            label="Message seller"
+            icon="message-circle"
+            onPress={handleMessageSeller}
+            variant="secondary"
+            size="small"
+            accessibilityHint="Opens a chat with the seller about this product"
+            style={{ alignSelf: 'flex-start', marginBottom: SP.sm }}
+            testID="product-message-seller"
+          />
 
           {/* Buyer protection trust cues */}
           <View style={s.trustRow}>
@@ -1091,6 +1141,7 @@ export default function BuyerProductDetailScreen() {
           <View style={s.divider} />
           <PolicyRow icon="refresh-ccw" label="Returns" value={product.refundPolicy} />
           <PolicyRow icon="x-circle" label="Cancellation" value={product.cancellationPolicy} />
+          <BuyerProtectionNote preorder={product.isPreOrder} style={{ marginTop: SP.sm }} />
 
           {/* Size Chart — expandable table */}
           {!!(product as any).sizeChart && (
@@ -1325,7 +1376,7 @@ function WornInVideos({ productId, productName }: { productId: string; productNa
   if (videos.length === 0) return null;
 
   return (
-    <View style={{ marginBottom: SP.lg }}>
+    <View style={{ marginBottom: SP.lg }} testID="product-featured-videos">
       <View style={[wv.divider, { backgroundColor: theme.border }]} />
       <Text style={[wv.header, { color: theme.muted }]}>Worn in these videos</Text>
       <ScrollView
@@ -1341,13 +1392,12 @@ function WornInVideos({ productId, productName }: { productId: string; productNa
             activeOpacity={0.85}
             accessibilityRole="button"
             accessibilityLabel={`Watch ${video.authorName}'s video of ${productName}`}
+            testID={`product-video-${video.postId}`}
             onPress={() => {
-              const qs = new URLSearchParams({
-                postId: video.postId,
-                postType: 'video',
-                postAuthorName: video.authorName,
-              });
-              router.push(`/buyer-post-viewer?${qs.toString()}` as never);
+              // Same full-screen feed player as the main feed, scoped to the
+              // videos that tag this product and starting at the tapped one,
+              // so the buyer can swipe through every video of it.
+              router.push(profileVideosHref({ source: 'product', id: productId, startPostId: video.postId, title: productName }) as never);
             }}
           >
             {video.thumbnailUrl ? (

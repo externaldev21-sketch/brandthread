@@ -26,6 +26,7 @@ import pushRouter from "./push";
 import aiRouter from "./ai";
 // New: buyer-facing, public browsing, Stripe Connect, webhooks
 import publicRouter from "./public";
+import profileMediaRouter from "./profile-media";
 import buyerRouter from "./buyer";
 import guestCheckoutRouter from "./guest-checkout";
 import connectRouter from "./connect";
@@ -83,6 +84,7 @@ import freelancerConnectRouter from "./freelancer-connect";
 import freelancerJobsRouter from "./freelancer-jobs";
 import boostsRouter    from "./boosts";
 import adCampaignsRouter from "./ad-campaigns";
+import metaAdsRouter from "./meta-ads";
 import vacationRouter  from "./vacation";
 import loyaltyRouter   from "./loyalty";
 import threadCashRouter from "./thread-cash";
@@ -99,6 +101,7 @@ const router = Router();
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/config/features", featureFlagsRouter);
 router.use("/public",          publicRouter);
+router.use("/public",          profileMediaRouter); // /users/:id/videos, /products/:id/feed-videos
 router.use("/guest/checkout",  guestCheckoutRouter);
 router.use("/webhooks",        webhooksRouter);
 router.use("/webhooks/shippo", webhooksShippoRouter);
@@ -213,6 +216,7 @@ router.use("/live",                      tc, requirePlan("pro"), liveRouter);
 // ─── Paid boosts, vacation mode, loyalty/rewards ──────────────────────────────
 router.use("/boosts",                    tc, requirePlan("pro"), boostsRouter);
 router.use("/ad-campaigns",              tc, adCampaignsRouter);
+router.use("/meta-ads",                  tc, metaAdsRouter);
 router.use("/seller/vacation",          tc, vacationRouter);
 router.use("/seller/notification-prefs", tc, notificationPrefsRouter);
 router.use("/loyalty",             loyaltyRouter); // buyer-scoped; no tc

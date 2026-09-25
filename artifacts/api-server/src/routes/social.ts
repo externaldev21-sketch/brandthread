@@ -59,7 +59,11 @@ function formatUser(u: UserRow) {
     username:    u.username ?? null,
     displayName: u.displayName ?? null,
     bio:         u.bio ?? null,
-    avatarUrl:   (u as any).avatarUrl ?? null,
+    // Uploaded profile photos win over the Clerk avatar; private /objects/
+    // storage paths are never exposed.
+    avatarUrl:   (typeof u.profileImageUrl === "string" && u.profileImageUrl.startsWith("http")
+      ? u.profileImageUrl
+      : (u as any).avatarUrl) ?? null,
     accountType: u.accountType,
     initials:    initials(nm),
     color:       avatarColor(u.clerkId),
@@ -471,16 +475,46 @@ router.get("/friends/activity", async (req, res) => {
   res.json(await buildBuyerPosts(myId, authorIds, limit, offset));
 });
 
+/**
+ * Whose follower/following list is being read: the viewer by default, or the
+ * profile named by `?userId=` (Clerk ID or users.id alias). Another person's
+ * list is hidden (404) when either side has blocked the other. Returns null
+ * after sending the error response.
+ */
+async function resolveListOwner(req: any, res: any, myId: string): Promise<string | null> {
+  const raw = typeof req.query.userId === "string" ? req.query.userId.trim() : "";
+  if (!raw || raw === myId) return myId;
+  const owner = await resolveToClerkId(raw);
+  if (!owner) { res.status(404).json({ error: "User not found" }); return null; }
+  if (owner !== myId && (await blockRelation(myId, owner)) !== "none") {
+    res.status(404).json({ error: "User not found" }); return null;
+  }
+  return owner;
+}
+
+/** Which of `ids` the viewer follows — drives the list's Follow / Following state. */
+async function viewerFollowsSet(myId: string, ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const rows = await db
+    .select({ followingId: follows.followingId })
+    .from(follows)
+    .where(and(eq(follows.followerId, myId), inArray(follows.followingId, ids)));
+  return new Set(rows.map(r => r.followingId));
+}
+
 // ─── GET /api/social/following ────────────────────────────────────────────────
-// Query params: ?limit=&offset= (default 100, capped at MAX_PAGE_LIMIT).
+// Query params: ?userId=&limit=&offset= (default 100, capped at MAX_PAGE_LIMIT).
+// Without userId the list is the viewer's own.
 router.get("/following", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const page = parsePagination(req.query, { limit: 100 });
   if (!page.success) { res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" }); return; }
+  const ownerId = await resolveListOwner(req, res, myId);
+  if (!ownerId) return;
   const { limit, offset } = page.data;
   const rows = await db
     .select({ followingId: follows.followingId, createdAt: follows.createdAt })
-    .from(follows).where(eq(follows.followerId, myId))
+    .from(follows).where(eq(follows.followerId, ownerId))
     .orderBy(desc(follows.createdAt))
     .limit(limit).offset(offset);
   setPaginationHeaders(res, page.data, rows.length);
@@ -489,6 +523,7 @@ router.get("/following", async (req, res) => {
   const ids      = rows.map(r => r.followingId);
   const userRows = await db.select().from(users).where(inArray(users.clerkId, ids));
   const byId     = Object.fromEntries(userRows.map(u => [u.clerkId, u]));
+  const iFollow  = ownerId === myId ? new Set(ids) : await viewerFollowsSet(myId, ids);
 
   res.json(rows.map(r => ({
     ...(byId[r.followingId] ? formatUser(byId[r.followingId]) : {
@@ -497,19 +532,23 @@ router.get("/following", async (req, res) => {
       initials: "?", color: avatarColor(r.followingId), handle: "@unknown",
     }),
     followedAt: r.createdAt,
+    isFollowing: iFollow.has(r.followingId),
   })));
 });
 
 // ─── GET /api/social/followers ────────────────────────────────────────────────
-// Query params: ?limit=&offset= (default 100, capped at MAX_PAGE_LIMIT).
+// Query params: ?userId=&limit=&offset= (default 100, capped at MAX_PAGE_LIMIT).
+// Without userId the list is the viewer's own.
 router.get("/followers", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const page = parsePagination(req.query, { limit: 100 });
   if (!page.success) { res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" }); return; }
+  const ownerId = await resolveListOwner(req, res, myId);
+  if (!ownerId) return;
   const { limit, offset } = page.data;
   const rows = await db
     .select({ followerId: follows.followerId, createdAt: follows.createdAt })
-    .from(follows).where(eq(follows.followingId, myId))
+    .from(follows).where(eq(follows.followingId, ownerId))
     .orderBy(desc(follows.createdAt))
     .limit(limit).offset(offset);
   setPaginationHeaders(res, page.data, rows.length);
@@ -519,14 +558,8 @@ router.get("/followers", async (req, res) => {
   const userRows = await db.select().from(users).where(inArray(users.clerkId, ids));
   const byId     = Object.fromEntries(userRows.map(u => [u.clerkId, u]));
 
-  // Who I already follow back
-  const iFollowBack = new Set(
-    (await db
-      .select({ followingId: follows.followingId })
-      .from(follows)
-      .where(and(eq(follows.followerId, myId), inArray(follows.followingId, ids)))
-    ).map(r => r.followingId)
-  );
+  // Who the viewer already follows (on their own list: who they follow back)
+  const iFollowBack = await viewerFollowsSet(myId, ids);
 
   res.json(rows.map(r => ({
     ...(byId[r.followerId] ? formatUser(byId[r.followerId]) : {
@@ -536,6 +569,7 @@ router.get("/followers", async (req, res) => {
     }),
     followedAt:       r.createdAt,
     isFollowingBack:  iFollowBack.has(r.followerId),
+    isFollowing:      iFollowBack.has(r.followerId),
   })));
 });
 

@@ -20,6 +20,15 @@ vi.mock("@/lib/serviceConfig", () => ({
   serviceRequest,
 }));
 
+// cartService fires a fire-and-forget AddToCart pixel/CAPI event on success;
+// stub it out here (real react-native/expo-crypto aren't loadable in this
+// node test environment, and the event itself is exercised in
+// lib/marketingPixels.test.ts).
+vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
+vi.mock("@/lib/marketingPixels", () => ({
+  trackAndRelayConversionEvent: vi.fn(() => false),
+}));
+
 import {
   initCartService, getCartForScreen, addToCart, removeCartItems,
 } from "./cartService";

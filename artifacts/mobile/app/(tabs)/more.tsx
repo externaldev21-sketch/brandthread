@@ -57,6 +57,7 @@ const STUDIO_ITEMS: NavItem[] = [
   { icon: 'scissors', label: 'Background Removal', desc: 'Clean image backgrounds', accent: 'secondary', route: '/design-bg-removal' },
   { icon: 'trending-up', label: 'Campaign Generator', desc: 'Create campaign assets', accent: 'warning', route: '/design-campaign' },
   { icon: 'layers', label: 'Brand Assets', desc: 'Logos, colors and graphics', accent: 'secondary', route: '/design-brand-assets' },
+  { icon: 'facebook', label: 'Meta Ads', desc: 'Run Facebook & Instagram ads', accent: 'accent', route: '/meta-ads-manage' },
 ];
 
 const OPERATIONS_ITEMS: NavItem[] = [
