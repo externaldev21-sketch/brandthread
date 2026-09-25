@@ -14,6 +14,8 @@ import {
 } from '@expo-google-fonts/inter';
 import { Keyboard, Platform, Pressable, Text, View, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as SystemUI from 'expo-system-ui';
+import * as NavigationBar from 'expo-navigation-bar';
 import { Stack, useGlobalSearchParams, useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import { DarkTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import * as SplashScreen from 'expo-splash-screen';
@@ -23,7 +25,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { flushPendingBuyerOnboardingSync } from '@/lib/buyerOnboardingSync';
 import { RoleProvider } from '@/contexts/RoleContext';
 import { ThreadPullProvider } from '@/contexts/ThreadPullTransitionContext';
-import { AppThemeProvider, useAppTheme } from '@/contexts/AppThemeContext';
+import { AppThemeProvider, useAppTheme, peekPersistedTheme } from '@/contexts/AppThemeContext';
 import { PrimaryButton } from '@/components/BrandthreadUI';
 import { AppIconProvider } from '@/contexts/AppIconContext';
 import BootScreen from '@/components/BootScreen';
@@ -96,6 +98,45 @@ function RuntimeThemeShell({ children }: { children: React.ReactNode }) {
   const palette = theme as typeof theme & Record<string, any>;
   const background = palette.background ?? '#0A0A0B';
   const heroGradient = (palette.heroGradient ?? [background, palette.surface ?? background]) as [string, string, ...string[]];
+
+  // Without this, the native root window/root view's background stays the
+  // OS default (white) underneath everything the JS side renders. Almost
+  // every layer in this app is a themed opaque View sitting on top of that
+  // window, but a few real native moments briefly show the window itself
+  // through the gaps between those layers instead: native-stack screen push/
+  // pop transitions (the outgoing/incoming screen's own layers can detach
+  // from the view hierarchy for a frame), ScrollView/FlatList bounce/
+  // overscroll past the content edges (iOS reveals whatever is behind the
+  // scroll view, not the scroll view's own "background"), and the very first
+  // paint before React has mounted anything. This is the actual "white
+  // strip/flash at the bottom" bug — setting the window's real background
+  // color removes the white fallback everywhere at once, for every theme.
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(background).catch(() => {});
+    // Android (SDK 35+ / Android 15+, what this app targets) always runs
+    // edge-to-edge: the system navigation bar is transparent by default and
+    // shows the app's own root view through it — the SystemUI call above is
+    // what actually colors that area, the same fix as everywhere else. The
+    // one thing still owned separately here is icon contrast: every one of
+    // the 12 themes is a dark background, so the nav bar's home/back icons
+    // need to stay "light" to read against it (expo-navigation-bar no longer
+    // exposes a background-color setter in edge-to-edge mode — style is all
+    // that's left to set).
+    if (Platform.OS === 'android') {
+      try { NavigationBar.setStyle('light'); } catch { /* best-effort */ }
+    }
+  }, [background]);
+
+  // Exposes the active theme's accent as a CSS custom property so the
+  // static stylesheet in app/+html.tsx (keyboard focus glow — see its
+  // comment) reads the real per-theme color instead of a fixed value. This
+  // is the only bridge from the JS theme into that plain <style> tag.
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      document.documentElement.style.setProperty('--bt-accent', `${theme.accent}99`);
+    }
+  }, [theme.accent]);
+
   const navigationTheme = {
     ...DarkTheme,
     dark: true,
@@ -311,10 +352,25 @@ if (Platform.OS !== 'web') {
 
 SplashScreen.preventAutoHideAsync();
 
-// On web, the document body is white by default — paint it dark so the
-// pre-render moment matches the app instead of flashing a white screen.
+// Paint the native root window the same dark default as app.json's splash
+// background (#0A0A0B) immediately at module load — before RuntimeThemeShell
+// mounts and corrects it to the user's actual persisted theme (see its
+// SystemUI.setBackgroundColorAsync effect below). Without this, the very
+// first native frames before React renders anything can show through as the
+// OS default background (white), which reads as a white flash on launch.
+if (Platform.OS !== 'web') {
+  SystemUI.setBackgroundColorAsync('#0A0A0B').catch(() => {});
+}
+
+// On web, the document body is white by default — paint it dark immediately
+// so the pre-render moment matches the app instead of flashing a white
+// screen, then correct it to the user's actual persisted theme (falls back
+// to the same dark default) as soon as it's known, ahead of React mounting.
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
   document.body.style.backgroundColor = '#0A0A0B';
+  peekPersistedTheme(AsyncStorage)
+    .then((persisted) => { document.body.style.backgroundColor = persisted.background; })
+    .catch(() => {});
 }
 
 // ─── DEV design-preview bypass (web + dev builds only) ───────────────────────
