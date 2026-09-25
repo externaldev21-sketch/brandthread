@@ -115,6 +115,7 @@ export default function InboxScreen() {
   const [activeTab, setActiveTab] = useState<Tab>('Messages');
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [requestActionLoading, setRequestActionLoading] = useState<string | null>(null);
+  const [messagingId, setMessagingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -606,34 +607,74 @@ export default function InboxScreen() {
     );
   }
 
+  async function messageFollower(notif: Notification) {
+    if (!notif.targetId || messagingId) return;
+    hapticPrimaryAction();
+    setMessagingId(notif.id);
+    try {
+      const conv = await createOrGetConversation({
+        type: 'buyer_to_buyer',
+        participant: {
+          userId: notif.targetId,
+          name: notif.actorName ?? 'this person',
+          handle: notif.actorName ?? '',
+          initials: notif.actorInitials ?? '?',
+          color: notif.actorColor ?? theme.cardElevated,
+          accountType: 'buyer',
+        },
+      });
+      router.push(`/buyer-conversation?id=${conv.id}` as never);
+    } catch {
+      Alert.alert('Could not start conversation', 'Check your connection and try again.');
+    } finally {
+      setMessagingId(null);
+    }
+  }
+
   function renderFollowRow({ item: notif }: { item: Notification }) {
     const isUnread = !notif.isRead;
     return (
-      <PressableScale
-        style={s.convRow}
-        onPress={() => openFollow(notif)}
-        accessibilityRole="button"
-        accessibilityLabel={notif.title}
-      >
-        <View style={s.avatarContainer}>
-          <View style={[s.avatar48, { backgroundColor: notif.actorColor ?? theme.cardElevated }]}>
-            <Text style={s.avatarInitials}>{notif.actorInitials ?? '?'}</Text>
+      <View style={s.followCard}>
+        <PressableScale
+          style={s.followCardTap}
+          onPress={() => openFollow(notif)}
+          accessibilityRole="button"
+          accessibilityLabel={notif.title}
+        >
+          <View style={s.avatarContainer}>
+            <View style={[s.avatar56, { backgroundColor: notif.actorColor ?? theme.cardElevated }]}>
+              <Text style={s.avatarInitials}>{notif.actorInitials ?? '?'}</Text>
+            </View>
+            {isUnread && <View style={[s.unreadDot, { backgroundColor: theme.accent }]} />}
           </View>
-          {isUnread && <View style={[s.unreadDot, { backgroundColor: theme.accent }]} />}
-        </View>
-        <View style={s.convCenter}>
-          <View style={s.convNameRow}>
-            <Text style={[s.convName, { color: theme.text, fontFamily: isUnread ? FONT.bold : FONT.semibold }]} numberOfLines={1}>
-              {notif.actorName ?? notif.title}
+          <View style={s.convCenter}>
+            <View style={s.convNameRow}>
+              <Text style={[s.convName, { color: theme.text, fontFamily: isUnread ? FONT.bold : FONT.semibold }]} numberOfLines={1}>
+                {notif.actorName ?? notif.title}
+              </Text>
+              <Text style={s.convTime}>{timeAgo(new Date(notif.createdAt).getTime())}</Text>
+            </View>
+            <Text style={[s.convPreview, isUnread && { color: theme.text }]} numberOfLines={2}>
+              {notif.body || 'Started following you'}
             </Text>
-            <Text style={s.convTime}>{timeAgo(new Date(notif.createdAt).getTime())}</Text>
           </View>
-          <Text style={[s.convPreview, isUnread && { color: theme.text }]} numberOfLines={2}>
-            {notif.body || 'Started following you'}
-          </Text>
-        </View>
-        <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
-      </PressableScale>
+        </PressableScale>
+        {notif.targetId && (
+          <PressableScale
+            style={[s.followMessageBtn, { borderColor: theme.border }]}
+            onPress={() => messageFollower(notif)}
+            disabled={messagingId === notif.id}
+            accessibilityRole="button"
+            accessibilityLabel={`Message ${notif.actorName ?? 'this person'}`}
+          >
+            {messagingId === notif.id ? (
+              <ActivityIndicator size="small" color={theme.text} />
+            ) : (
+              <Text style={[s.followMessageBtnText, { color: theme.text }]}>Message</Text>
+            )}
+          </PressableScale>
+        )}
+      </View>
     );
   }
 
@@ -690,7 +731,13 @@ export default function InboxScreen() {
           return (
             <PressableScale
               key={tab}
-              style={s.primaryTab}
+              style={[
+                s.primaryTab,
+                {
+                  backgroundColor: isActive ? theme.cardElevated : 'transparent',
+                  borderColor: isActive ? theme.border : 'transparent',
+                },
+              ]}
               onPress={() => { hapticPrimaryAction(); setActiveTab(tab); }}
               accessibilityRole="tab"
               accessibilityState={{ selected: isActive }}
@@ -929,10 +976,9 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SP.sm,
-    paddingBottom: 10,
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.md,
     backgroundColor: 'transparent',
-    borderBottomWidth: 1,
   },
   headerSide: {
     width: 44,
@@ -942,28 +988,32 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
     position: 'relative',
   },
   headerTitle: {
-    fontSize: FS.md,
-    fontFamily: FONT.semibold,
+    fontSize: FS.lg,
+    fontFamily: FONT.bold,
   },
+  // Roomy pill-segmented control (Bumble/Discord-style) instead of thin
+  // underline tabs crammed against the search row below it.
   primaryTabs: {
     flexDirection: 'row',
-    minHeight: 48,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
+    minHeight: 44,
     backgroundColor: 'transparent',
-    paddingHorizontal: SP.sm,
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.md,
+    gap: SP.sm,
   },
   primaryTab: {
     flex: 1,
-    minHeight: 48,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
+    gap: 6,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
   },
-  primaryTabText: { fontSize: 13, fontFamily: FONT.regular },
-  primaryTabTextActive: { fontFamily: FONT.semibold },
-  primaryTabCount: { fontSize: 13, fontFamily: FONT.semibold },
+  primaryTabText: { fontSize: FS.sm, fontFamily: FONT.medium },
+  primaryTabTextActive: { fontFamily: FONT.bold },
+  primaryTabCount: { fontSize: FS.xs, fontFamily: FONT.bold },
   notifBadge: {
     position: 'absolute',
     top: 4,
@@ -1056,11 +1106,41 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
     marginHorizontal: 0,
     marginTop: 0,
     paddingHorizontal: SP.md,
-    paddingVertical: SP.md,
-    minHeight: 78,
+    paddingVertical: SP.md + 4,
+    minHeight: 92,
     borderBottomWidth: 1,
     borderBottomColor: theme.border,
     backgroundColor: 'transparent',
+  },
+  // Follows tab: roomy card (avatar + text tap area, plus an inline Message
+  // pill) rather than a plain list row — Azar/Discord "new friend" cards.
+  followCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.md + 4,
+    minHeight: 96,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+    gap: SP.sm,
+  },
+  followCardTap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  followMessageBtn: {
+    borderWidth: 1,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.md,
+    height: 36,
+    minWidth: 84,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  followMessageBtnText: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
   },
   avatarContainer: {
     position: 'relative',
@@ -1069,6 +1149,13 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
     width: 48,
     height: 48,
     borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatar56: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1101,11 +1188,11 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
     alignItems: 'center',
     gap: 8,
     marginHorizontal: SP.md,
-    marginTop: SP.sm,
-    marginBottom: SP.xs,
-    paddingHorizontal: SP.sm,
-    height: 40,
-    borderRadius: RADIUS.md,
+    marginTop: 0,
+    marginBottom: SP.sm,
+    paddingHorizontal: SP.md,
+    height: 44,
+    borderRadius: RADIUS.pill,
     borderWidth: 1,
   },
   searchInput: {
