@@ -14,6 +14,8 @@ import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { HapticSwitch } from '@/components/BrandthreadUI';
+import { TYPE_SCALE } from '@/constants/typography';
+import { RADII } from '@/constants/radii';
 
 type DigestMode = 'realtime' | 'daily';
 type Role = 'buyer' | 'seller';
@@ -286,27 +288,27 @@ function makeStyles(theme: AppThemePreset) {
     container:        { flex: 1 },
     section:          { paddingHorizontal: 20, paddingVertical: 18 },
     sectionTitle:     { fontSize: FS.sm + 1, lineHeight: 18, fontFamily: FONT.semibold, color: theme.text, marginBottom: 6 },
-    sectionSubtitle:  { fontSize: 12, fontFamily: FONT.regular, color: theme.muted, lineHeight: 17, marginBottom: 14 },
+    sectionSubtitle:  { fontSize: TYPE_SCALE.footnote.fontSize, fontFamily: FONT.regular, color: theme.muted, lineHeight: TYPE_SCALE.footnote.lineHeight, marginBottom: 14 },
     divider:          { height: 10 },
 
-    digestCard:        { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
+    digestCard:        { borderRadius: RADII.card, borderWidth: 1, overflow: 'hidden' },
     digestOption:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, minHeight: 52 },
-    digestIconBox:     { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-    digestOptionLabel: { fontSize: 14, lineHeight: 18, fontFamily: FONT.semibold, marginBottom: 2 },
-    digestOptionDesc:  { fontSize: 12, fontFamily: FONT.regular, color: theme.muted, lineHeight: 16 },
+    digestIconBox:     { width: 38, height: 38, borderRadius: RADII.chip, alignItems: 'center', justifyContent: 'center' },
+    digestOptionLabel: { fontSize: TYPE_SCALE.callout.fontSize, lineHeight: 18, fontFamily: FONT.semibold, marginBottom: 2 },
+    digestOptionDesc:  { fontSize: TYPE_SCALE.footnote.fontSize, fontFamily: FONT.regular, color: theme.muted, lineHeight: 16 },
     optionDivider:     { height: StyleSheet.hairlineWidth, marginHorizontal: 14 },
     savingRow:         { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, paddingTop: 4 },
-    savingText:        { fontSize: 12, fontFamily: FONT.regular, color: theme.muted },
+    savingText:        { fontSize: TYPE_SCALE.footnote.fontSize, fontFamily: FONT.regular, color: theme.muted },
 
-    masterRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1, minHeight: 52 },
+    masterRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: RADII.card, borderWidth: 1, minHeight: 52 },
     presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    presetChip: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1 },
-    presetChipLabel: { fontSize: 13, lineHeight: 17, fontFamily: FONT.medium },
+    presetChip: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: RADII.pill, borderWidth: 1 },
+    presetChipLabel: { fontSize: TYPE_SCALE.footnote.fontSize, lineHeight: 17, fontFamily: FONT.medium },
 
-    listCard:    { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
+    listCard:    { borderRadius: RADII.card, borderWidth: 1, overflow: 'hidden' },
     row:         { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14, minHeight: 52 },
     rowIcon:     { width: 20, marginTop: 2 },
-    rowLabel:    { fontSize: 14, lineHeight: 18, fontFamily: FONT.semibold },
-    rowDescription: { fontSize: 12, fontFamily: FONT.regular, color: theme.muted, marginTop: 3, lineHeight: 17 },
+    rowLabel:    { fontSize: TYPE_SCALE.callout.fontSize, lineHeight: 18, fontFamily: FONT.semibold },
+    rowDescription: { fontSize: TYPE_SCALE.footnote.fontSize, fontFamily: FONT.regular, color: theme.muted, marginTop: 3, lineHeight: 17 },
   });
 }
