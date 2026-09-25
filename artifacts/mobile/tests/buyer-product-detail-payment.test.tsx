@@ -271,6 +271,12 @@ vi.mock('@/services/cartService', () => ({
   replaceCartItemVariant: vi.fn(),
 }));
 
+// The screen fires a fire-and-forget ViewContent pixel/CAPI event on mount;
+// stub it out (real expo-crypto isn't loadable in this test environment).
+vi.mock('@/lib/marketingPixels', () => ({
+  trackAndRelayConversionEvent: vi.fn(() => false),
+}));
+
 import BuyerProductDetailScreen from '@/app/buyer-product-detail';
 
 const product = {

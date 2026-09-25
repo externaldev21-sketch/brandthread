@@ -1071,6 +1071,9 @@ function RootLayoutNav() {
         <Stack.Screen name="design-bg-removal"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="design-bg-replace"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="design-campaign"          options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="meta-ads-connect"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="meta-ads-setup"           options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="meta-ads-manage"          options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="design-mockup-preview"    options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="design-export"            options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="design-versions"          options={{ headerShown: false, animation: 'ios_from_right' }} />

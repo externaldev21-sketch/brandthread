@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('react-native', () => ({ Platform: { OS: 'web' } }));
 vi.mock('expo-crypto', () => ({ randomUUID: vi.fn(() => 'generated-uuid') }));
 
-const conversionEvent = vi.fn(async () => ({ ok: true }));
+const { conversionEvent } = vi.hoisted(() => ({ conversionEvent: vi.fn(async () => ({ ok: true })) }));
 vi.mock('@/lib/api', () => ({ api: { metaAds: { conversionEvent } } }));
 
 import {
@@ -65,6 +65,12 @@ describe('trackAndRelayConversionEvent', () => {
     resetMarketingPixelsForTest();
     conversionEvent.mockClear();
     fbqCalls = [];
+    // trackAndRelayConversionEvent (unlike trackMarketingPixelEvent) always
+    // resolves its pixel config from env, mirroring the caller pattern used
+    // throughout product/checkout screens — so stub env here instead of
+    // passing a `config` override.
+    vi.stubEnv('EXPO_PUBLIC_META_PIXEL_ID', config.metaPixelId);
+    vi.stubEnv('EXPO_PUBLIC_TIKTOK_PIXEL_ID', config.tiktokPixelId);
     const win: any = {};
     win.fbq = (...args: unknown[]) => { fbqCalls.push(args); };
     (globalThis as any).window = win;
