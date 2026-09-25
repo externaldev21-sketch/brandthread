@@ -10,9 +10,13 @@
  * local time zone, so this stays correct without depending on ICU/Intl.
  */
 
-export type SellerHomeTimeRange = 'live' | 'today' | 'yesterday' | 'week';
+export type SellerHomeTimeRange = 'live' | 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'all';
 
 export const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
+export const MONTH_LABELS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+] as const;
 
 const HAS_EXPLICIT_ZONE = /(?:[Zz]|[+-]\d{2}:?\d{2})$/;
 
@@ -52,6 +56,12 @@ export function bucketLabel(value: string, range: SellerHomeTimeRange): string {
   const date = parseBucketTimestamp(value);
   if (range === 'week') {
     return WEEKDAY_LABELS[date.getDay()];
+  }
+  if (range === 'month') {
+    return String(date.getDate());
+  }
+  if (range === 'year' || range === 'all') {
+    return MONTH_LABELS[date.getMonth()];
   }
   return formatClockLabel(date, range === 'live');
 }

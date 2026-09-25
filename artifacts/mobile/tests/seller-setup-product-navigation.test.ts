@@ -33,11 +33,16 @@ describe('seller setup destination navigation', () => {
   });
 
   it('replaces transparent checklist scenes from both launch surfaces', () => {
-    const dashboard = read('app/(tabs)/index.tsx');
+    // The dashboard's own "add first product" shortcut still replaces (not
+    // pushes) into the setup origin; the full per-task checklist itself now
+    // lives in the guided walkthrough sheet the dashboard's "Continue setup"
+    // banner opens, rather than being duplicated inline in the dashboard.
+    const dashboard = read('components/SellerHomeCommerceDashboard.tsx');
+    const walkthrough = read('components/SetupWalkthroughSheet.tsx');
     const setup = read('app/setup.tsx');
 
     expect(dashboard).toContain('router.replace(withSellerSetupOrigin(task.route) as never)');
-    expect(dashboard).toContain('onPress={task.completed ? undefined : () => openSetupTask(task)}');
+    expect(walkthrough).toContain('onPress={() => openTask(task)}');
     expect(setup).toContain('router.replace(withSellerSetupOrigin(task.route) as never)');
   });
 
