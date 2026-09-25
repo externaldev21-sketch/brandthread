@@ -19,6 +19,7 @@ import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollV
 import { RADII } from '@/constants/radii';
 import { SPACING } from '@/constants/spacing';
 import { FADE_MS, SHEET_SPRING } from '@/constants/motion';
+import { useIsWebShell, WEB_SHELL_MAX_WIDTH } from '@/components/web/WebAppShell';
 
 export interface BottomSheetProps {
   visible: boolean;
@@ -30,6 +31,11 @@ export interface BottomSheetProps {
 export function BottomSheet({ visible, onClose, children, testID }: BottomSheetProps) {
   const palette = useColors();
   const insets = useSafeAreaInsets();
+  // Modal portals straight to <body> on web, outside WebAppShell's centered
+  // column, so an un-capped sheet would stretch edge-to-edge across a wide
+  // desktop window instead of reading as a card. The backdrop still dims the
+  // whole viewport (correct); only the sheet itself is capped and centered.
+  const isWebShell = useIsWebShell();
   const translateY = useSharedValue(400);
   const backdropOpacity = useSharedValue(0);
 
@@ -62,6 +68,7 @@ export function BottomSheet({ visible, onClose, children, testID }: BottomSheetP
         <Animated.View
           style={[
             styles.sheet,
+            isWebShell && styles.sheetWebShell,
             {
               backgroundColor: palette.card,
               borderColor: palette.border,
@@ -89,6 +96,11 @@ const styles = StyleSheet.create({
     borderTopRightRadius: RADII.sheet,
     borderWidth: 1,
     maxHeight: '88%',
+  },
+  sheetWebShell: {
+    width: '100%',
+    maxWidth: WEB_SHELL_MAX_WIDTH,
+    alignSelf: 'center',
   },
   handleWrap: { alignItems: 'center', paddingTop: SPACING.xs, paddingBottom: SPACING.xxs },
   handle: { width: 36, height: 4, borderRadius: RADII.pill, opacity: 0.3 },
