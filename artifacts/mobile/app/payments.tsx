@@ -72,22 +72,21 @@ interface BroadcastPreview {
 interface DropCardProps {
   drop: Drop;
   colors: ReturnType<typeof useColors>;
-  isDark: boolean;
   isLast: boolean;
   broadcastState: BroadcastState;
   broadcastPreview?: BroadcastPreview;
   onBroadcast: () => void;
 }
 
-function DropCard({ drop, colors, isDark, isLast, broadcastState, broadcastPreview, onBroadcast }: DropCardProps) {
+function DropCard({ drop, colors, isLast, broadcastState, broadcastPreview, onBroadcast }: DropCardProps) {
   const primary = colors.primary;
   const isPreOrder = drop.type === 'pre-order';
   const s = statusConfig[drop.status];
 
-  const typeColor   = isPreOrder ? colors.primary : '#10B981';
-  const typeBg      = isPreOrder ? colors.accent : 'rgba(16,185,129,0.09)';
-  const typeBorder  = isPreOrder ? colors.primary : 'rgba(16,185,129,0.20)';
-  const progressBg  = isDark ? '#33302A' : '#E8E1CF';
+  const typeColor   = isPreOrder ? colors.primary : colors.success;
+  const typeBg      = isPreOrder ? colors.accent : `${colors.success}17`;
+  const typeBorder  = isPreOrder ? colors.primary : `${colors.success}33`;
+  const progressBg  = colors.border;
   const launchAt = drop.releaseAt ? new Date(drop.releaseAt) : null;
   const hasFutureLaunch = Boolean(
     launchAt &&
@@ -188,7 +187,7 @@ function DropCard({ drop, colors, isDark, isLast, broadcastState, broadcastPrevi
       {drop.status === 'processing' && (
         <View style={[styles.broadcastWrap, { borderTopColor: colors.border }]}>
           {notificationScheduled ? (
-            <View style={[styles.scheduledNotice, { backgroundColor: 'rgba(16,185,129,0.10)', borderColor: 'rgba(16,185,129,0.25)' }]}>
+            <View style={[styles.scheduledNotice, { backgroundColor: `${colors.success}1A`, borderColor: `${colors.success}40` }]}>
               <Feather name="clock" size={14} color={colors.success} />
               <Text style={[styles.scheduledNoticeText, { color: colors.success }]}>
                 Notification scheduled for {fmtDate(drop.scheduledBroadcastAt ?? drop.releaseAt!)}
@@ -215,7 +214,7 @@ function DropCard({ drop, colors, isDark, isLast, broadcastState, broadcastPrevi
                 style={[
                   styles.broadcastBtn,
                   broadcastState === 'sent' || broadcastState === 'already_sent'
-                    ? { backgroundColor: 'rgba(16,185,129,0.12)', borderColor: 'rgba(16,185,129,0.30)' }
+                    ? { backgroundColor: `${colors.success}1F`, borderColor: `${colors.success}4D` }
                     : { backgroundColor: colors.accent, borderColor: colors.primary },
                   broadcastState === 'loading' && { opacity: 0.6 },
                 ]}
@@ -255,6 +254,7 @@ function DropCard({ drop, colors, isDark, isLast, broadcastState, broadcastPrevi
 
 function Toast({ message, visible }: { message: string; visible: boolean }) {
   const opacity = useRef(new Animated.Value(0)).current;
+  const colors = useColors();
 
   useEffect(() => {
     Animated.timing(opacity, {
@@ -265,9 +265,16 @@ function Toast({ message, visible }: { message: string; visible: boolean }) {
   }, [visible]);
 
   return (
-    <Animated.View style={[toastStyles.wrap, { opacity }]} pointerEvents="none">
-      <Feather name="check-circle" size={14} color="#FFFFFF" />
-      <Text style={toastStyles.text}>{message}</Text>
+    <Animated.View
+      style={[
+        toastStyles.wrap,
+        { backgroundColor: colors.card, borderColor: `${colors.success}44`, shadowColor: colors.shadowColor },
+        { opacity },
+      ]}
+      pointerEvents="none"
+    >
+      <Feather name="check-circle" size={14} color={colors.success} />
+      <Text style={[toastStyles.text, { color: colors.success }]}>{message}</Text>
     </Animated.View>
   );
 }
@@ -276,11 +283,11 @@ const toastStyles = StyleSheet.create({
   wrap: {
     position: 'absolute', top: 60, alignSelf: 'center', zIndex: 99,
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(16,185,129,0.92)', borderRadius: 24,
+    borderRadius: 24, borderWidth: 1,
     paddingHorizontal: 18, paddingVertical: 10,
-    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 4 },
   },
-  text: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
+  text: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -391,7 +398,6 @@ export default function PaymentsScreen() {
   useEffect(() => { load(); }, [load]);
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
-  const isDark = colors.background === '#121110' || colors.background.startsWith('#0');
   const primary = colors.primary;
 
   const preOrderDrops = drops.filter((d) => d.type === 'pre-order');
@@ -479,7 +485,7 @@ export default function PaymentsScreen() {
                 </View>
                 {preOrderDrops.map((d, i) => (
                   <DropCard
-                    key={d.id} drop={d} colors={colors} isDark={isDark}
+                    key={d.id} drop={d} colors={colors}
                     isLast={i === preOrderDrops.length - 1}
                     broadcastState={broadcastStates[d.id] ?? 'idle'}
                     broadcastPreview={broadcastPreviews[d.id]}
@@ -497,7 +503,7 @@ export default function PaymentsScreen() {
                   <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Pre Made Drops</Text>
                   <Text style={[styles.sectionCount, { color: colors.mutedForeground }]}>{preMadeDrops.length}</Text>
                 </View>
-                <View style={[styles.preOrderNote, { backgroundColor: isDark ? 'rgba(16,185,129,0.09)' : '#DCFCE7', borderColor: isDark ? 'rgba(16,185,129,0.20)' : '#BBF7D0' }]}>
+                <View style={[styles.preOrderNote, { backgroundColor: `${colors.success}17`, borderColor: `${colors.success}33` }]}>
                   <Feather name="package" size={13} color={colors.success} />
                   <Text style={[styles.preOrderNoteText, { color: colors.success }]}>
                     Standard payout 2–3 business days after order fulfillment
@@ -505,7 +511,7 @@ export default function PaymentsScreen() {
                 </View>
                 {preMadeDrops.map((d, i) => (
                   <DropCard
-                    key={d.id} drop={d} colors={colors} isDark={isDark}
+                    key={d.id} drop={d} colors={colors}
                     isLast={i === preMadeDrops.length - 1}
                     broadcastState={broadcastStates[d.id] ?? 'idle'}
                     broadcastPreview={broadcastPreviews[d.id]}

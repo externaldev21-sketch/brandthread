@@ -24,7 +24,6 @@ type ApiCustomer = {
   createdAt: string;
 };
 
-const AVATAR_COLORS = ['#0F766E', '#4A6FA5', '#22D3EE', '#B98A2E', '#EF4444', '#0EA5E9', '#F59E0B', '#1D4ED8'];
 
 type SortOption = 'recent' | 'spend' | 'name';
 
@@ -37,13 +36,6 @@ const SORT_OPTIONS: { key: SortOption; label: string }[] = [
 function getInitials(name: string): string {
   return name.split(' ').map((p) => p[0] ?? '').join('').slice(0, 2).toUpperCase();
 }
-
-function getAvatarColor(id: string): string {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
-  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
-}
-
 
 export default function CustomersScreen() {
   const colors = useColors();
@@ -183,7 +175,9 @@ export default function CustomersScreen() {
           </View>
         ) : (
           sortedCustomers.map((c, i) => {
-            const color = getAvatarColor(c.id);
+            // Monochrome avatar tint (theme foreground) — no saturated per-user hues,
+            // so it reads correctly across all 12 app themes.
+            const color = colors.foreground;
             const initials = getInitials(c.name);
             return (
               <TouchableOpacity

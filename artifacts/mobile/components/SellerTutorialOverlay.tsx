@@ -26,13 +26,11 @@ const HIGHLIGHTS: { icon: keyof typeof Feather.glyphMap; title: string; desc: st
     icon:  'bar-chart-2',
     title: 'Analytics',
     desc:  'Understand your revenue, traffic sources, and top-performing products.',
-    color: '#F59E0B',
   },
   {
     icon:  'tool',
     title: 'Manufacturer Hub',
     desc:  'Source production partners, request samples, and manage bulk orders.',
-    color: '#34D399',
   },
 ];
 
@@ -40,7 +38,11 @@ export default function SellerTutorialOverlay({ visible, onDismiss }: Props) {
   const { theme } = useAppTheme();
   const highlights = HIGHLIGHTS.map((highlight, index) => ({
     ...highlight,
-    color: index === 0 ? theme.accent : index === 1 ? theme.secondary : highlight.color!,
+    color:
+      index === 0 ? theme.accent :
+      index === 1 ? theme.secondary :
+      index === 2 ? theme.warning :
+      theme.success,
   }));
   return (
     <Modal

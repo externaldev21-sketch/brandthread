@@ -9,9 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
 import { Header } from '@/components/layout';
 import {
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
-  ORANGE, ORANGE_DIM, GOLD, GRAD_CARD_GLOW,
+  GRAD_CARD_GLOW,
   FONT, FS, SP, ICON,
 } from '@/lib/theme';
 import {
@@ -52,7 +50,12 @@ function categoryVariant(cat: StoreAISuggestion['category']): 'purple' | 'info' 
 }
 
 export default function StoreAiImproveScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const colors = useColors();
+  const {
+    primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN,
+    foreground: FG, mutedForeground: MUTED, subtle: SUBTLE, success: SUCCESS,
+  } = colors;
+  const ai = React.useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const [suggestions, setSuggestions] = useState<StoreAISuggestion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -227,7 +230,9 @@ export default function StoreAiImproveScreen() {
   );
 }
 
-const ai = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useColors>) => {
+  const { foreground: FG, mutedForeground: MUTED, subtle: SUBTLE } = colors;
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   scroll: { paddingBottom: 60, paddingTop: SP.md },
   subtitle: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginHorizontal: SP.md, marginBottom: SP.md },
@@ -251,4 +256,5 @@ const ai = StyleSheet.create({
   dismissedToggle: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, justifyContent: 'center', padding: SP.md },
   dismissedToggleText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   dismissedCard: { opacity: 0.5 },
-});
+  });
+};

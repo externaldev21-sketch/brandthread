@@ -14,7 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { createReturnRequest } from '@/services/cartService';
 import { RETURN_REASON_OPTIONS, BuyerReturnReason, BuyerReturnResolution } from '@/services/cartTypes';
 import { getBuyerOrder } from '@/services/orderService';
@@ -27,6 +27,7 @@ import {
   RED, RED_DIM,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
+import { PrimaryButton } from '@/components/BrandthreadUI';
 
 function fmtDate(iso: string) { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
 
@@ -124,11 +125,7 @@ export default function BuyerReturnRequestScreen() {
         <Text style={s.successTitle}>Return Request Submitted</Text>
         <Text style={s.successSub}>Your request has been received. The seller will review it and respond within 1–3 business days.</Text>
         <Text style={s.successNote}>Return requests will appear here once confirmed.</Text>
-        <TouchableOpacity style={s.doneBtn} onPress={() => router.back()} activeOpacity={0.85}>
-          <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.doneBtnGrad}>
-            <Text style={[s.doneBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Back to Order</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+        <PrimaryButton label="Back to Order" onPress={() => router.back()} style={s.doneBtn} />
       </View>
     );
   }
@@ -253,11 +250,7 @@ export default function BuyerReturnRequestScreen() {
 
       {/* Submit bar */}
       <View style={[s.bottomBar, { paddingBottom: insets.bottom + SP.sm }]}>
-        <TouchableOpacity style={s.submitBtn} onPress={handleSubmit} activeOpacity={0.88} disabled={submitting}>
-          <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.submitGrad}>
-            {submitting ? <ActivityIndicator color={theme.onAccent} size="small" /> : <Text style={[s.submitText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Submit Return Request</Text>}
-          </LinearGradient>
-        </TouchableOpacity>
+        <PrimaryButton label="Submit Return Request" onPress={handleSubmit} loading={submitting} disabled={submitting} />
       </View>
     </View>
   );

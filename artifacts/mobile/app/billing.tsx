@@ -171,15 +171,15 @@ export default function BillingScreen() {
 
           {isReadOnly ? (
             <View style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.cardBrand}>
-                <Feather name="credit-card" size={18} color="#FFFFFF" />
+              <View style={[styles.cardBrand, { backgroundColor: colors.secondary }]}>
+                <Feather name="credit-card" size={18} color={colors.foreground} />
               </View>
               <Text style={[styles.cardText, { color: colors.foreground }]}>{billingStatus.paymentMethodLabel ?? 'No payment method on file'}</Text>
             </View>
           ) : (
             <TouchableOpacity testID="seller-billing-payment-method" onPress={() => openBillingPortal()} activeOpacity={0.7} style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.cardBrand}>
-                <Feather name="credit-card" size={18} color="#FFFFFF" />
+              <View style={[styles.cardBrand, { backgroundColor: colors.secondary }]}>
+                <Feather name="credit-card" size={18} color={colors.foreground} />
               </View>
               <Text style={[styles.cardText, { color: colors.foreground }]}>{billingStatus.paymentMethodLabel ?? 'No payment method on file'}</Text>
                <Feather name={Platform.OS === 'web' ? 'edit-2' : 'external-link'} size={16} color={colors.mutedForeground} />
@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
   infoText: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17, marginBottom: 4 },
   infoLink: { fontSize: 12, fontFamily: 'Inter_600SemiBold', textDecorationLine: 'underline' },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14 },
-  cardBrand: { width: 34, height: 24, borderRadius: 4, backgroundColor: '#1F2937', alignItems: 'center', justifyContent: 'center' },
+  cardBrand: { width: 34, height: 24, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
   cardText: { flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium' },
   noteBar: { paddingHorizontal: 20, paddingVertical: 14 },
   noteText: { fontSize: 12, fontFamily: 'Inter_400Regular' },

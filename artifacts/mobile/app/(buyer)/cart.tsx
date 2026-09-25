@@ -37,7 +37,7 @@ import {
 } from '@/lib/theme';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import {
-  BrandthreadScreen, BrandthreadHeader, StatusBadge, EmptyState, BrandedLoader, PressableScale, useUndoToast,
+  BrandthreadHeader, EmptyState, BrandedLoader, PressableScale, useUndoToast,
 } from '@/components/BrandthreadUI';
 import { InlineError } from '@/components/InlineFeedback';
 import {
@@ -844,18 +844,21 @@ export default function CartScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      {/* Header — full-cart totals stay visible at the top too, not just the footer */}
-      <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
-        <Text style={s.headerTitle}>Cart</Text>
-        {hasItems && (
-          <>
-            <View style={[s.headerBadge, { backgroundColor: theme.accent }]}>
-              <Text style={[s.headerBadgeText, { color: theme.onAccent }]}>{cart.items.reduce((s, i) => s + i.quantity, 0)}</Text>
+      {/* Header — full-cart totals stay visible at the top too, not just the footer.
+          Same BrandthreadHeader treatment used by Orders/Following so the tab-reachable
+          buyer screens read as one shell. */}
+      <View style={{ paddingTop: insets.top }}>
+        <BrandthreadHeader
+          title="Cart"
+          rightElement={hasItems ? (
+            <View style={s.headerRight}>
+              <View style={[s.headerBadge, { backgroundColor: theme.accent }]}>
+                <Text style={[s.headerBadgeText, { color: theme.onAccent }]}>{cart.items.reduce((s, i) => s + i.quantity, 0)}</Text>
+              </View>
+              <Text style={s.headerSubtotal}>{fmtPrice(summary.subtotalCents)}</Text>
             </View>
-            <View style={{ flex: 1 }} />
-            <Text style={s.headerSubtotal}>{fmtPrice(summary.subtotalCents)}</Text>
-          </>
-        )}
+          ) : undefined}
+        />
       </View>
 
       {!hasItems && !hasSaved && !loadError ? (
@@ -1073,14 +1076,7 @@ export default function CartScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
-    gap: SP.sm,
-  },
-  headerTitle: { ...TYPE_SCALE.title2, color: theme.text },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   headerBadge: {
     borderRadius: RADIUS.pill,
     paddingHorizontal: 8,

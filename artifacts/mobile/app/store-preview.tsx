@@ -6,7 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
-import { FG, MUTED, RED, BG, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 
 /**
  * Store Preview — a clean, full-screen render of the seller's actual store,
@@ -21,6 +22,8 @@ const DESKTOP_WIDTH = 1280;
 
 export default function StorePreview() {
   const router = useRouter();
+  const { theme } = useAppTheme();
+  const styles = React.useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const api = useApi();
   const [html, setHtml] = useState<string | null>(null);
@@ -57,7 +60,7 @@ export default function StorePreview() {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityLabel="Close preview"
         >
-          <Feather name="x" size={ICON.md} color={FG} />
+          <Feather name="x" size={ICON.md} color={theme.text} />
         </TouchableOpacity>
 
         <View style={styles.deviceToggle}>
@@ -67,7 +70,7 @@ export default function StorePreview() {
               onPress={() => { Haptics.selectionAsync(); setDevice(mode); }}
               style={[styles.deviceBtn, device === mode && styles.deviceBtnActive]}
             >
-              <Feather name={mode === 'mobile' ? 'smartphone' : 'monitor'} size={ICON.sm} color={device === mode ? BG : MUTED} />
+              <Feather name={mode === 'mobile' ? 'smartphone' : 'monitor'} size={ICON.sm} color={device === mode ? theme.background : theme.muted} />
             </TouchableOpacity>
           ))}
         </View>
@@ -77,11 +80,11 @@ export default function StorePreview() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator color={FG} size="large" />
+          <ActivityIndicator color={theme.text} size="large" />
         </View>
       ) : error || !html ? (
         <View style={styles.center}>
-          <Feather name="alert-circle" size={ICON.lg} color={MUTED} />
+          <Feather name="alert-circle" size={ICON.lg} color={theme.muted} />
           <Text style={styles.errorText}>Couldn't load your store preview.</Text>
           <TouchableOpacity onPress={load} style={styles.retryBtn}>
             <Text style={styles.retryText}>Try again</Text>
@@ -113,8 +116,8 @@ export default function StorePreview() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: theme.background },
   bar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: SP.md, paddingVertical: SP.sm, height: 52,
@@ -125,16 +128,16 @@ const styles = StyleSheet.create({
   },
   deviceToggle: {
     flexDirection: 'row', borderRadius: RADIUS.pill,
-    backgroundColor: 'rgba(128,128,128,0.15)', padding: 3, gap: 3,
+    backgroundColor: theme.borderSubtle, padding: 3, gap: 3,
   },
   deviceBtn: {
     width: 34, height: 30, borderRadius: RADIUS.pill,
     alignItems: 'center', justifyContent: 'center',
   },
-  deviceBtnActive: { backgroundColor: FG },
+  deviceBtnActive: { backgroundColor: theme.text },
   webviewClip: { overflow: 'hidden', width: '100%' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.md, paddingHorizontal: SP.xl },
-  errorText: { fontSize: FS.base, fontFamily: FONT.medium, color: MUTED, textAlign: 'center' },
-  retryBtn: { paddingHorizontal: SP.lg, paddingVertical: SP.sm, borderRadius: RADIUS.md, backgroundColor: FG },
-  retryText: { fontSize: FS.sm, fontFamily: FONT.bold, color: BG },
+  errorText: { fontSize: FS.base, fontFamily: FONT.medium, color: theme.muted, textAlign: 'center' },
+  retryBtn: { paddingHorizontal: SP.lg, paddingVertical: SP.sm, borderRadius: RADIUS.md, backgroundColor: theme.text },
+  retryText: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.background },
 });

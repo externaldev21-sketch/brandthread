@@ -9,9 +9,6 @@ import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
-  BG, SURFACE, CARD, BORDER,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT,
-  RED, RED_DIM,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { BrandthreadCard, PrimaryButton, SectionHeader } from '@/components/BrandthreadUI';
@@ -20,7 +17,14 @@ import { Storefront, StoreSEO } from '@/services/storeTypes';
 import { useApi } from '@/lib/api';
 
 export default function StoreSEOScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const colors = useColors();
+  const {
+    primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN,
+    foreground: FG, mutedForeground: MUTED, subtle: SUBTLE, card: CARD, surface: SURFACE,
+    border: BORDER, destructive: RED,
+  } = colors;
+  const RED_DIM = `${RED}20`;
+  const se = React.useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const headerTopInset = useHeaderTopInset();
   const [store, setStore] = useState<Storefront | null>(null);
@@ -168,7 +172,7 @@ export default function StoreSEOScreen() {
             <Switch
               value={seo.sitemapEnabled}
               onValueChange={v => patch({ sitemapEnabled: v })}
-              trackColor={{ false: 'rgba(255,255,255,0.1)', true: PURPLE }}
+              trackColor={{ false: colors.border, true: PURPLE }}
               thumbColor={FG}
             />
           </View>
@@ -181,7 +185,7 @@ export default function StoreSEOScreen() {
             <Switch
               value={seo.searchVisible}
               onValueChange={v => patch({ searchVisible: v })}
-              trackColor={{ false: 'rgba(255,255,255,0.1)', true: PURPLE }}
+              trackColor={{ false: colors.border, true: PURPLE }}
               thumbColor={FG}
             />
           </View>
@@ -259,23 +263,25 @@ export default function StoreSEOScreen() {
   );
 }
 
-const se = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useColors>) => {
+  const { foreground: FG, mutedForeground: MUTED, subtle: SUBTLE, card: CARD, surface: SURFACE, border: BORDER } = colors;
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   header: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: SP.md, paddingVertical: SP.sm,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)',
+    borderBottomWidth: 1, borderBottomColor: BORDER,
   },
   backBtn: {
     width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1, borderColor: BORDER,
     alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, flex: 1, marginLeft: SP.sm },
   scroll: { paddingBottom: 60 },
   sh: { marginTop: SP.lg, marginBottom: SP.sm },
   card: { marginHorizontal: SP.md, gap: SP.md },
-  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.07)' },
+  divider: { height: 1, backgroundColor: BORDER },
   fieldRow: { gap: 6 },
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   fieldLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
@@ -284,7 +290,7 @@ const se = StyleSheet.create({
   input: {
     fontSize: FS.base, fontFamily: FONT.regular, color: FG,
     backgroundColor: SURFACE, borderRadius: RADIUS.sm,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: SP.md, paddingVertical: 10,
   },
   multiline: { minHeight: 72, paddingTop: 10 },
@@ -295,6 +301,8 @@ const se = StyleSheet.create({
   },
   uploadBtnText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   socialImagePreview: { width: '100%', height: 140, borderRadius: RADIUS.sm, marginBottom: SP.sm },
+  // Mimics Google's actual search-result snippet styling (its blue title / green
+  // URL), not app chrome — intentionally not theme-derived.
   previewTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: '#4285F4' },
   previewUrl: { fontSize: FS.sm, fontFamily: FONT.regular, color: '#34A853', marginTop: 2 },
   previewDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 4, lineHeight: 18 },
@@ -307,4 +315,5 @@ const se = StyleSheet.create({
   },
   warnText: { fontSize: FS.sm, fontFamily: FONT.medium, flex: 1 },
   saveBtn: { marginHorizontal: SP.md, marginTop: SP.lg },
-});
+  });
+};

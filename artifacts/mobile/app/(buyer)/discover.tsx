@@ -36,12 +36,9 @@ import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/hooks/useApi';
-import {
-  BG, SURFACE, CARD,
-  FG, MUTED, SUBTLE, ON_DARK,
-  FONT, SP, GUTTER, GRID_MAX_WIDTH,
-} from '@/lib/theme';
+import { FONT, SP, GUTTER, GRID_MAX_WIDTH } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useAuth } from '@clerk/expo';
 import { formatCents } from '@/lib/money';
@@ -111,11 +108,11 @@ function SectionHead({
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 14 }}>
       <View style={{ flex: 1, marginRight: 12 }}>
-        <Text style={[TYPE_SCALE.headline, { fontFamily: FONT.bold, color: FG, letterSpacing: -0.3 }]} numberOfLines={1}>
+        <Text style={[TYPE_SCALE.headline, { fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.3 }]} numberOfLines={1}>
           {title}
         </Text>
         {sub && (
-          <Text style={[TYPE_SCALE.caption, { color: MUTED, marginTop: 2 }]} numberOfLines={1}>
+          <Text style={[TYPE_SCALE.caption, { color: theme.muted, marginTop: 2 }]} numberOfLines={1}>
             {sub}
           </Text>
         )}
@@ -180,8 +177,8 @@ const HighDemandRow = React.memo(function HighDemandRow({ item }: { item: HighDe
         </View>
       )}
       <View style={{ flex: 1 }}>
-        <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: FG }]} numberOfLines={1}>{item.name}</Text>
-        <Text style={[TYPE_SCALE.caption, { color: MUTED, marginTop: 2 }]} numberOfLines={1}>{item.brand}</Text>
+        <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: theme.text }]} numberOfLines={1}>{item.name}</Text>
+        <Text style={[TYPE_SCALE.caption, { color: theme.muted, marginTop: 2 }]} numberOfLines={1}>{item.brand}</Text>
         <CommerceSignalRow
           claimedUnits={item.commerce.claimedUnits}
           remainingUnits={item.commerce.remainingUnits}
@@ -192,7 +189,7 @@ const HighDemandRow = React.memo(function HighDemandRow({ item }: { item: HighDe
         />
       </View>
       {item.commerce.currentPriceCents != null && (
-        <Text style={[TYPE_SCALE.footnote, TABULAR_NUMS, { fontFamily: FONT.bold, color: isUrgent ? theme.accent : FG }]}>
+        <Text style={[TYPE_SCALE.footnote, TABULAR_NUMS, { fontFamily: FONT.bold, color: isUrgent ? theme.accent : theme.text }]}>
           {formatCents(item.commerce.currentPriceCents)}
         </Text>
       )}
@@ -229,6 +226,7 @@ function ShowcaseGap() {
 function ProductShowcase({ items }: { items: ProductCardItem[] }) {
   const { push } = useThreadPull();
   const { theme } = useAppTheme();
+  const showcase = React.useMemo(() => makeShowcaseStyles(theme), [theme]);
   const { width: viewportWidth } = useWindowDimensions();
   const [listWidth, setListWidth] = useState(viewportWidth);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -325,8 +323,8 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
               >
                 <View style={showcase.topline}>
                   <View style={{ flex: 1 }}>
-                    <Text style={[TYPE_SCALE.caption, { color: MUTED }]} numberOfLines={1}>{item.brand}</Text>
-                    <Text style={[TYPE_SCALE.headline, { marginTop: 2, fontFamily: FONT.bold, color: FG, letterSpacing: -0.2 }]} numberOfLines={1}>{item.name}</Text>
+                    <Text style={[TYPE_SCALE.caption, { color: theme.muted }]} numberOfLines={1}>{item.brand}</Text>
+                    <Text style={[TYPE_SCALE.headline, { marginTop: 2, fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.2 }]} numberOfLines={1}>{item.name}</Text>
                   </View>
                   <HeartToggle
                     liked={saved}
@@ -366,12 +364,14 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
                   )}
                   {item.tag && (
                     <View style={showcase.tag}>
-                      <Text style={[TYPE_SCALE.caption, { color: ON_DARK, letterSpacing: 0.7, textTransform: 'uppercase' }]}>{item.tag}</Text>
+                      {/* Scrim is a fixed black overlay on the product photo — text
+                          stays a fixed light color in every theme for contrast. */}
+                      <Text style={[TYPE_SCALE.caption, { color: '#FFFFFF', letterSpacing: 0.7, textTransform: 'uppercase' }]}>{item.tag}</Text>
                     </View>
                   )}
                   {item.commerce.currentPriceCents != null && (
                     <View style={showcase.pricePill}>
-                      <Text style={[TYPE_SCALE.footnote, TABULAR_NUMS, { fontFamily: FONT.bold, color: BG }]}>{formatCents(item.commerce.currentPriceCents)}</Text>
+                      <Text style={[TYPE_SCALE.footnote, TABULAR_NUMS, { fontFamily: FONT.bold, color: theme.background }]}>{formatCents(item.commerce.currentPriceCents)}</Text>
                     </View>
                   )}
                 </View>
@@ -418,19 +418,19 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
   );
 }
 
-const showcase = StyleSheet.create({
+const makeShowcaseStyles = (theme: AppThemePreset) => StyleSheet.create({
   shell:          { marginBottom: 32 },
   card:           { overflow: 'hidden' },
   topline:        { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  visual:         { height: 330, marginTop: 8, position: 'relative', overflow: 'hidden', borderRadius: RADII.card, backgroundColor: SURFACE },
+  visual:         { height: 330, marginTop: 8, position: 'relative', overflow: 'hidden', borderRadius: RADII.card, backgroundColor: theme.surface },
   visualFallback: { alignItems: 'center', justifyContent: 'center' },
-  initials:       { fontSize: 56, fontFamily: FONT.bold, color: ON_DARK },
+  initials:       { fontSize: 56, fontFamily: FONT.bold, color: theme.text },
   tag:            { position: 'absolute', top: 12, left: 12, paddingHorizontal: 9, paddingVertical: 5, borderRadius: RADII.chip, backgroundColor: 'rgba(0,0,0,0.72)' },
-  pricePill:      { position: 'absolute', bottom: 12, alignSelf: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: RADII.pill, backgroundColor: FG, borderWidth: 3, borderColor: CARD },
+  pricePill:      { position: 'absolute', bottom: 12, alignSelf: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: RADII.pill, backgroundColor: theme.text, borderWidth: 3, borderColor: theme.card },
   signalRow:      { minHeight: 34, paddingTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   pagination:     { height: 22, marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  dot:            { width: 5, height: 5, borderRadius: 3, backgroundColor: SUBTLE },
-  dotActive:      { width: 18, backgroundColor: FG },
+  dot:            { width: 5, height: 5, borderRadius: 3, backgroundColor: theme.subtle },
+  dotActive:      { width: 18, backgroundColor: theme.text },
 });
 
 // ─── Drop row ─────────────────────────────────────────────────────────────────
@@ -475,8 +475,8 @@ const DropRow = React.memo(function DropRow({ item }: { item: DropRowItem }) {
         </View>
       )}
       <View style={{ flex: 1 }}>
-        <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: FG }]} numberOfLines={1}>{item.name}</Text>
-        <Text style={[TYPE_SCALE.caption, { color: MUTED, marginTop: 2 }]} numberOfLines={1}>{item.brand}</Text>
+        <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: theme.text }]} numberOfLines={1}>{item.name}</Text>
+        <Text style={[TYPE_SCALE.caption, { color: theme.muted, marginTop: 2 }]} numberOfLines={1}>{item.brand}</Text>
         <ClaimedRemainingLabel
           claimedUnits={item.commerce.claimedUnits ?? 0}
           remainingUnits={item.commerce.remainingUnits ?? 0}
@@ -487,7 +487,7 @@ const DropRow = React.memo(function DropRow({ item }: { item: DropRowItem }) {
       </View>
       <View style={{ alignItems: 'flex-end', gap: 5 }}>
         {item.commerce.currentPriceCents != null && (
-          <Text style={[TYPE_SCALE.footnote, TABULAR_NUMS, { fontFamily: FONT.bold, color: FG }]}>{formatCents(item.commerce.currentPriceCents)}</Text>
+          <Text style={[TYPE_SCALE.footnote, TABULAR_NUMS, { fontFamily: FONT.bold, color: theme.text }]}>{formatCents(item.commerce.currentPriceCents)}</Text>
         )}
         {item.isLive ? (
           <View style={dr.liveRow}>
@@ -548,8 +548,8 @@ const TrendingRow = React.memo(function TrendingRow({ item }: { item: TrendingRo
         <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.bold, color: theme.text }]}>{item.initials}</Text>
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: FG }]} numberOfLines={1}>{item.name}</Text>
-        <Text style={[TYPE_SCALE.caption, { color: MUTED, marginTop: 2 }]} numberOfLines={1}>{item.brand}</Text>
+        <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: theme.text }]} numberOfLines={1}>{item.name}</Text>
+        <Text style={[TYPE_SCALE.caption, { color: theme.muted, marginTop: 2 }]} numberOfLines={1}>{item.brand}</Text>
         {/* No commerce signals — trending posts have no product demand data */}
       </View>
     </Card>
@@ -569,7 +569,6 @@ export default function DiscoverScreen() {
   const { push }  = useThreadPull();
   const api       = useApi();
   const { theme } = useAppTheme();
-  const palette = theme as typeof theme & { background?: string; card?: string; border?: string; text?: string; muted?: string; };
   const { isSignedIn } = useAuth();
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -771,7 +770,7 @@ export default function DiscoverScreen() {
 
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: palette.background ?? BG }}
+      style={{ flex: 1, backgroundColor: theme.background }}
       contentContainerStyle={{ paddingBottom: barInset + SP.md }}
       showsVerticalScrollIndicator={false}
       refreshControl={
@@ -782,8 +781,8 @@ export default function DiscoverScreen() {
       <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
         <View style={[s.header, { paddingTop: topPad + 16 }]}>
           <View>
-            <Text style={[TYPE_SCALE.caption, { color: palette.muted ?? MUTED, letterSpacing: 0.3 }]}>What's dropping</Text>
-            <Text style={[TYPE_SCALE.title1, { color: palette.text ?? FG, letterSpacing: -0.6 }]}>Discover</Text>
+            <Text style={[TYPE_SCALE.caption, { color: theme.muted, letterSpacing: 0.3 }]}>What's dropping</Text>
+            <Text style={[TYPE_SCALE.title1, { color: theme.text, letterSpacing: -0.6 }]}>Discover</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <IconButton
@@ -843,10 +842,10 @@ export default function DiscoverScreen() {
             <Feather name="zap" size={18} color={theme.accent} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: FG }]}>For You, full screen</Text>
-            <Text style={[TYPE_SCALE.caption, { color: MUTED, marginTop: 2 }]}>Swipe through products one at a time</Text>
+            <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: theme.text }]}>For You, full screen</Text>
+            <Text style={[TYPE_SCALE.caption, { color: theme.muted, marginTop: 2 }]}>Swipe through products one at a time</Text>
           </View>
-          <Feather name="chevron-right" size={18} color={MUTED} />
+          <Feather name="chevron-right" size={18} color={theme.muted} />
         </Card>
       </ResponsiveContainer>
       {forYouLoading ? (

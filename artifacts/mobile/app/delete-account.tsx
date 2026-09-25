@@ -277,7 +277,7 @@ export default function DeleteAccountScreen() {
               accessibilityLabel="Permanently delete account"
             >
               {deleting
-                ? <ActivityIndicator color="#1A0A0A" />
+                ? <ActivityIndicator color={theme.onAccent} />
                 : <Text style={s.deleteText}>Permanently delete account</Text>}
             </PressableScale>
             <SecondaryButton label="Cancel" onPress={goBack} accent={theme.text} style={{ marginTop: SP.sm }} />
@@ -358,7 +358,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
     height: 54, borderRadius: RADIUS.md, backgroundColor: theme.error, marginTop: SP.xl,
     alignItems: 'center', justifyContent: 'center',
   },
-  deleteText: { color: '#1A0A0A', fontFamily: FONT.bold, fontSize: FS.base },
+  deleteText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: FS.base },
   doneBody: { flex: 1, paddingHorizontal: SP.lg, alignItems: 'center' },
   doneIcon: {
     width: 68, height: 68, borderRadius: 34, backgroundColor: theme.accent,

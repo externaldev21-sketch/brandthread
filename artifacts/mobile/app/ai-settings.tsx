@@ -19,7 +19,7 @@ import { getAISettings, saveAISettings, clearSession } from '../services/aiServi
 import { clearAuditLog } from '../services/aiAuditLog';
 import { useColors } from '@/hooks/useColors';
 import { HapticSwitch } from '@/components/BrandthreadUI';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
 type Colors = ReturnType<typeof useColors>;
 
@@ -251,7 +251,7 @@ export default function AiSettingsScreen() {
 
   return (
     <View style={styles.container}>
-      <Header title="AI Settings" />
+      <ScreenHeader title="AI Settings" />
 
       <ScrollView
         style={styles.scroll}

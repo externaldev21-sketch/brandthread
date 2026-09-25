@@ -59,12 +59,14 @@ describe('InlineFeedback primitives — source structure', () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const src = readFileSync(resolve(__dirname, './InlineFeedback.tsx'), 'utf8');
-    // Token imports are present
+    // Static spacing/type tokens still come from lib/theme
     expect(src).toContain("from '@/lib/theme'");
-    // The rgba for RED border is constructed from RED constant, not hardcoded
-    expect(src).toContain('RED');
-    expect(src).toContain('MUTED');
-    expect(src).toContain('SUBTLE');
+    // Colors are read live from the active theme (re-skins across all 12
+    // themes) rather than the static, theme-independent hex constants.
+    expect(src).toContain("from '@/hooks/useColors'");
+    expect(src).toContain('colors.destructive');
+    expect(src).toContain('colors.mutedForeground');
+    expect(src).toContain('colors.subtle');
   });
 });
 

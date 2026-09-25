@@ -9,7 +9,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE, SUCCESS,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -125,9 +125,9 @@ export default function BuyerInviteScreen() {
                 <Feather
                   name={copied ? 'check' : 'copy'}
                   size={14}
-                  color={copied ? '#22C55E' : PURPLE}
+                  color={copied ? SUCCESS : PURPLE}
                 />
-                <Text style={[styles.copyPillText, copied && { color: '#22C55E' }]}>
+                <Text style={[styles.copyPillText, copied && { color: SUCCESS }]}>
                   {copied ? 'Copied!' : 'Copy'}
                 </Text>
               </View>

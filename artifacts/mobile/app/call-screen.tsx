@@ -20,8 +20,8 @@ import { Feather } from '@expo/vector-icons';
 import { randomUUID } from 'expo-crypto';
 import { useApi } from '@/lib/api';
 import {
-  BG, PURPLE, PURPLE_DIM, BORDER,
-  FG, MUTED, SUBTLE, CARD, FONT, FS, SP, RADIUS,
+  BORDER,
+  FG, MUTED, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';

@@ -26,17 +26,6 @@ import { formatCents, integerPercent } from '@/lib/money';
 const { width: SCREEN_W } = Dimensions.get('window');
 const GALLERY_H = 380;
 
-// ─── Category placeholder gradients ──────────────────────────────────────────
-
-const CATEGORY_GRADS: Record<string, readonly [string, string]> = {
-  'T-shirt':    ['#1a1a2e', '#16213e'],
-  'Hoodie':     ['#0f3460', '#16213e'],
-  'Jacket':     ['#1a1a2e', '#0F766E'],
-  'Sweatpants': ['#0f3460', '#0F766E'],
-  default:      ['#12121F', '#1a1a2e'],
-};
-
-
 // ─── Helper Components ────────────────────────────────────────────────────────
 
 function StarRow({ rating, count, styles, theme }: { rating: number; count?: number; styles: ReturnType<typeof makeStyles>; theme: ReturnType<typeof useAppTheme>['theme'] }) {
@@ -265,7 +254,9 @@ export default function ProductStoreScreen() {
   }
 
   const stockBadge = getStockBadge();
-  const gradColors = CATEGORY_GRADS[product.category] ?? CATEGORY_GRADS.default;
+  // Neutral placeholder gradient shown behind the gallery when a product has
+  // no photo — theme-driven so it stays monochrome across all presets.
+  const gradColors = [theme.cardElevated, theme.background] as const;
   const coverMedia = product.media[0];
   const isPreorder = product.salesModel === 'pre-order' || product.salesModel === 'both';
   const preorder = product.preorderSettings;

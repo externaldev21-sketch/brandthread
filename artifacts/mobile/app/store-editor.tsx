@@ -73,7 +73,11 @@ function ChipGroup({
   );
 }
 
-const makeChipStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
+const makeChipStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const CARD = theme.card;
+  const BORDER = theme.border;
+  const MUTED = theme.muted;
+  return StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs },
   chip: {
     paddingHorizontal: 12, paddingVertical: 6,
@@ -83,14 +87,16 @@ const makeChipStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Style
   active: { backgroundColor: theme.accentDim, borderColor: theme.accentLight },
   label: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   activeLabel: { color: theme.accentLight, fontFamily: FONT.semibold },
-});
+  });
+};
 
 function FieldLabel({ children }: { children: string }) {
-  return <Text style={fieldStyles.label}>{children}</Text>;
+  const { theme } = useAppTheme();
+  return <Text style={[fieldStyles.label, { color: theme.muted }]}>{children}</Text>;
 }
 
 const fieldStyles = StyleSheet.create({
-  label: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, marginBottom: SP.xs },
+  label: { fontSize: FS.sm, fontFamily: FONT.semibold, marginBottom: SP.xs },
 });
 
 function FieldRow({ children }: { children: React.ReactNode }) {
@@ -114,7 +120,7 @@ function StyledInput({
       value={value}
       onChangeText={onChange}
       placeholder={placeholder}
-      placeholderTextColor={SUBTLE}
+      placeholderTextColor={theme.subtle}
       multiline={multiline}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
@@ -128,7 +134,11 @@ function StyledInput({
   );
 }
 
-const makeInputStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
+const makeInputStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const CARD = theme.card;
+  const BORDER = theme.border;
+  const FG = theme.text;
+  return StyleSheet.create({
   input: {
     backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
     borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: SP.sm,
@@ -137,7 +147,8 @@ const makeInputStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => Styl
   focused: { borderColor: theme.accent },
   multiline: { minHeight: 80, textAlignVertical: 'top', paddingTop: SP.sm },
   tall: { minHeight: 120 },
-});
+  });
+};
 
 function SwitchRow({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
   const { theme } = useAppTheme();
@@ -1216,6 +1227,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE_LIGHT = theme.accentLight;
   const PURPLE_DIM = theme.accentDim;
   const BORDER_ACTIVE = theme.accentLight;
+  const CARD = theme.card;
+  const BORDER = theme.border;
+  const FG = theme.text;
+  const MUTED = theme.muted;
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   header: { paddingHorizontal: SP.md, paddingVertical: SP.xs },
@@ -1272,6 +1287,12 @@ const makeSectionStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE_LIGHT = theme.accentLight;
   const PURPLE_DIM = theme.accentDim;
   const BORDER_ACTIVE = theme.accentLight;
+  const CARD = theme.card;
+  const CARD_ELEVATED = theme.cardElevated;
+  const BORDER = theme.border;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const RED = theme.error;
   return StyleSheet.create({
   row: {
     backgroundColor: CARD, borderRadius: RADIUS.md,
@@ -1321,6 +1342,11 @@ const makePanelStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE_LIGHT = theme.accentLight;
   const PURPLE_DIM = theme.accentDim;
   const BORDER_ACTIVE = theme.accentLight;
+  const SURFACE = theme.surface;
+  const CARD = theme.card;
+  const CARD_ELEVATED = theme.cardElevated;
+  const BORDER = theme.border;
+  const FG = theme.text;
   return StyleSheet.create({
   root: {
     borderTopWidth: 1, borderTopColor: BORDER,
@@ -1350,6 +1376,11 @@ const makePanelStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
 const makeBrandStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE_DIM = theme.accentDim;
+  const CARD = theme.card;
+  const CARD_ELEVATED = theme.cardElevated;
+  const BORDER = theme.border;
+  const FG = theme.text;
+  const MUTED = theme.muted;
   return StyleSheet.create({
   themeSwitchCard: {
     flexDirection: 'row',
