@@ -714,7 +714,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     analytics: {
       dashboard:  () => get('/api/analytics/dashboard'),
-      home: (range: 'live' | 'today' | 'yesterday' | 'week') =>
+      home: (range: 'live' | 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'all') =>
         get<{
           range: string;
           totalCents: number;
@@ -1362,6 +1362,16 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           status: string;
           verified: boolean;
           bankLast4: string | null;
+          /** false when this environment has no Stripe key configured. */
+          providerConfigured?: boolean;
+          payoutSchedule?: {
+            interval: string | null;
+            delayDays: number | null;
+            weeklyAnchor: string | null;
+            monthlyAnchor: number | null;
+          } | null;
+          requirementsDue?: string[];
+          taxInfoStatus?: 'submitted' | 'needed' | 'unknown';
         }>('/api/seller/connect/status'),
       },
       /** Update the current user's public profile. username must be letters/numbers/underscores, 3-30 chars. */

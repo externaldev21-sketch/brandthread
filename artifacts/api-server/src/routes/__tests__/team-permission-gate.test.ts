@@ -37,28 +37,19 @@ vi.mock("drizzle-orm", () => ({
 
 vi.mock("@workspace/db", () => {
   const columns = new Proxy({}, { get: (_target, key) => String(key) });
-  const membershipQuery = {
-    from: () => ({
-      where: () => ({
-        orderBy: () => ({
-          limit: async () => [{
-            id: "team-membership-id",
-            ownerId: state.ownerId,
-            role: state.actorRole,
-          }],
-        }),
-        limit: async () => [],
-      }),
-    }),
-  };
 
   return {
     db: {
       select: () => ({
-        from: () => ({
+        from: (table: unknown) => ({
           where: () => ({
             orderBy: () => ({ limit: async () => [{ id: "team-membership-id", ownerId: state.ownerId, role: state.actorRole }] }),
-            limit: async () => [],
+            // callerRunsOwnStore() queries `users` directly with `.where().limit()`
+            // (no `.orderBy()`); onboardingComplete: false keeps it from
+            // fail-opening into "this caller runs their own store" — otherwise
+            // resolveTeamContext short-circuits to owner before ever reading
+            // the mocked team membership role above.
+            limit: async () => ((table as any) === "usersTable" ? [{ onboardingComplete: false }] : []),
           }),
         }),
       }),
@@ -68,6 +59,7 @@ vi.mock("@workspace/db", () => {
     teamMembers: columns,
     discountCodes: columns,
     products: columns,
+    users: "usersTable",
   };
 });
 

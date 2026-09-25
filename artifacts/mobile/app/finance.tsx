@@ -13,6 +13,8 @@ import { useTeamRole } from '@/hooks/useTeamRole';
 import { formatCents } from '@/lib/money';
 import { FinanceMoneyFlow } from '@/components/FinanceMoneyFlow';
 import type { FinanceSummary } from '@/lib/financeSummary';
+import { TABULAR_NUMS } from '@/constants/typography';
+import { hapticPrimaryAction } from '@/lib/haptics';
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -142,15 +144,15 @@ export default function FinanceScreen() {
       {subStatus && (
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => router.push('/subscription' as any)}
+          onPress={() => { hapticPrimaryAction(); router.push('/subscription' as any); }}
           style={[styles.subCard, { borderColor: colors.border, backgroundColor: colors.card }]}
         >
           <View style={styles.subCardLeft}>
             <Text style={[styles.subCardLabel, { color: colors.mutedForeground }]}>Platform subscription</Text>
-            <Text style={[styles.subCardPlan, { color: colors.foreground }]}>
+            <Text style={[styles.subCardPlan, TABULAR_NUMS, { color: colors.foreground }]}>
               {subStatus.plan === 'growth' ? 'Growth' : subStatus.plan === 'pro' ? 'Pro' : 'Starter'}
               {' '}
-              <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular' }}>
+              <Text style={[{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular' }, TABULAR_NUMS]}>
                  {subStatus.amountCents > 0 ? `${formatCents(subStatus.amountCents)}/mo` : formatCents(2900) + '/mo'}
               </Text>
             </Text>
@@ -196,7 +198,7 @@ export default function FinanceScreen() {
         {overviewCards.map((card) => (
           <View key={card.label} style={[styles.overviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name={card.icon} size={16} color={card.color} />
-            <Text style={[styles.overviewVal, { color: card.color }]}>{card.value}</Text>
+            <Text style={[styles.overviewVal, TABULAR_NUMS, { color: card.color }]}>{card.value}</Text>
             <Text style={[styles.overviewLabel, { color: colors.mutedForeground }]}>{card.label}</Text>
           </View>
         ))}
@@ -218,7 +220,7 @@ export default function FinanceScreen() {
             <Text style={[styles.plLabel, { color: item.highlight ? colors.foreground : colors.mutedForeground, fontFamily: item.highlight ? 'Inter_600SemiBold' : 'Inter_400Regular' }]}>
               {item.label}
             </Text>
-            <Text style={[styles.plValue, { color: item.positive ? (item.highlight ? colors.primary : colors.success) : colors.destructive, fontFamily: item.highlight ? 'Inter_700Bold' : 'Inter_500Medium' }]}>
+            <Text style={[styles.plValue, TABULAR_NUMS, { color: item.positive ? (item.highlight ? colors.primary : colors.success) : colors.destructive, fontFamily: item.highlight ? 'Inter_700Bold' : 'Inter_500Medium' }]}>
               {item.value}
             </Text>
           </View>
@@ -246,7 +248,7 @@ export default function FinanceScreen() {
                   <Text style={[styles.expDate, { color: colors.mutedForeground }]}>{e.date}</Text>
                 </View>
               </View>
-              <Text style={[styles.expAmount, { color: e.positive ? colors.success : colors.foreground }]}>{e.amount}</Text>
+              <Text style={[styles.expAmount, TABULAR_NUMS, { color: e.positive ? colors.success : colors.foreground }]}>{e.amount}</Text>
             </View>
           ))
         )}
@@ -256,7 +258,7 @@ export default function FinanceScreen() {
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Documents</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {documents.map((item, i) => (
-          <TouchableOpacity key={item.label} onPress={item.onPress} activeOpacity={0.75} style={[styles.docRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+          <TouchableOpacity key={item.label} onPress={() => { hapticPrimaryAction(); item.onPress(); }} activeOpacity={0.75} style={[styles.docRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
             <View style={[styles.docIcon, { backgroundColor: colors.secondary }]}>
               <Feather name={item.icon} size={15} color={colors.mutedForeground} />
             </View>

@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Platform, ActivityIndicator, RefreshControl, useWindowDimensions,
+  Platform, ActivityIndicator, useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@clerk/expo';
 import { type SearchResult, type TrendingTerm, type SuggestedBrand, type SuggestedProduct } from '@/lib/searchData';
@@ -18,11 +17,15 @@ import { CachedImage } from '@/components/CachedImage';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useBuyerSearch } from '@/contexts/BuyerSearchContext';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
-import { FONT, FS, GUTTER, GRID_MAX_WIDTH } from '@/lib/theme';
+import { FONT, GUTTER, GRID_MAX_WIDTH } from '@/lib/theme';
 import { GridSkeleton, ResponsiveContainer, useGridColumns } from '@/components/layout';
 import { ProductTile } from '@/components/search/ProductTile';
 import { PersonRow, type SearchPerson } from '@/components/search/PersonRow';
-import { SegmentedTabs, type SearchTabKey } from '@/components/search/SegmentedTabs';
+import { SEARCH_TABS, type SearchTabKey } from '@/components/search/SegmentedTabs';
+import { IconButton, ListRow, SegmentedControl, ThemedRefreshControl } from '@/components/ui';
+import { TYPE_SCALE } from '@/constants/typography';
+import { RADII } from '@/constants/radii';
+import { hapticLight, hapticSelection } from '@/lib/haptics';
 
 type PersonResult = SearchPerson;
 type ProductResult = Extract<SearchResult, { kind: 'product' }>;
@@ -124,13 +127,13 @@ export default function SearchScreen() {
   }
 
   function clearRecentSearches() {
-    Haptics.selectionAsync().catch(() => {});
+    hapticSelection();
     setRecentSearches([]);
     AsyncStorage.removeItem(recentKey).catch(() => {});
   }
 
   function removeRecentSearch(term: string) {
-    Haptics.selectionAsync().catch(() => {});
+    hapticSelection();
     setRecentSearches((current) => {
       const next = current.filter((item) => item.toLowerCase() !== term.toLowerCase());
       AsyncStorage.setItem(recentKey, JSON.stringify(next)).catch(() => {});
@@ -202,7 +205,7 @@ export default function SearchScreen() {
   const handleRefresh = useCallback(() => {
     const q = query.trim();
     setRefreshing(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    hapticLight();
     const tasks: Promise<unknown>[] = [];
     if (q.length >= 1) tasks.push(performSearch(q));
     tasks.push(
@@ -217,7 +220,7 @@ export default function SearchScreen() {
   }, [query, performSearch]);
 
   function goToBrand(sellerId?: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    hapticLight();
     if (sellerId) {
       router.push({ pathname: '/seller-profile' as any, params: { sellerId } });
     } else {
@@ -230,7 +233,7 @@ export default function SearchScreen() {
   }
 
   function handleResultPress(r: SearchResult) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticLight();
     rememberSearch(query || r.name);
     if (r.kind === 'brand' && (r as any).sellerId) {
       goToBrand((r as any).sellerId);
@@ -243,7 +246,7 @@ export default function SearchScreen() {
 
   function handlePersonPress(p: PersonResult) {
     rememberSearch(query || p.name);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticLight();
     router.push({
       pathname: '/buyer-other-profile' as any,
       params: { userId: p.userId, name: p.name, handle: p.handle, initials: p.initials, color: p.color },
@@ -261,7 +264,7 @@ export default function SearchScreen() {
         await api.social.follow(person.userId);
       }
       setPeople((prev) => prev.map((p) => (p.userId === person.userId ? { ...p, isFollowing: !wasFollowing } : p)));
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      hapticLight();
     } catch {
       // Keep the previous state on failure — no destructive optimistic flip.
     } finally {
@@ -313,8 +316,8 @@ export default function SearchScreen() {
         <Text style={styles.avatarText}>{r.initials}</Text>
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[styles.rowText, { color: fg }]} numberOfLines={1}>{r.name}</Text>
-        <Text style={[styles.rowSub, { color: muted }]} numberOfLines={1}>{r.handle}</Text>
+        <Text style={[TYPE_SCALE.body, { fontFamily: FONT.medium, color: fg }]} numberOfLines={1}>{r.name}</Text>
+        <Text style={[TYPE_SCALE.footnote, { color: muted, marginTop: 2 }]} numberOfLines={1}>{r.handle}</Text>
       </View>
       <Feather name="chevron-right" size={16} color={muted} />
     </TouchableOpacity>
@@ -363,7 +366,7 @@ export default function SearchScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={`Search for ${term}`}
               >
-                <Text style={[styles.tryChipText, { color: fg }]}>{term}</Text>
+                <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.medium, color: fg }]}>{term}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -433,17 +436,12 @@ export default function SearchScreen() {
         keyboardDismissMode="on-drag"
         contentContainerStyle={{ paddingTop: topPad + 12 }}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={primary}
-            colors={[primary]}
-          />
+          <ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
         <View style={styles.titleBlock}>
-          <Text style={[styles.title, { color: fg }]} accessibilityRole="header">Search</Text>
-          <Text style={[styles.subtitle, { color: muted }]}>
+          <Text style={[TYPE_SCALE.title1, { fontFamily: FONT.bold, letterSpacing: -0.6, color: fg }]} accessibilityRole="header">Search</Text>
+          <Text style={[TYPE_SCALE.footnote, { color: muted, marginTop: 4 }]}>
             {trimmedQuery.length === 0
               ? 'Brands, pieces and people on Brandthread'
               : `Showing matches for "${trimmedQuery}"`}
@@ -462,7 +460,7 @@ export default function SearchScreen() {
                     accessibilityLabel="Clear recent searches"
                     hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   >
-                    <Text style={[styles.sectionAction, { color: fg }]}>Clear all</Text>
+                    <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: fg, paddingTop: 16, paddingBottom: 6 }]}>Clear all</Text>
                   </TouchableOpacity>
                 </View>
                 {recentSearches.map((term) => (
@@ -475,16 +473,16 @@ export default function SearchScreen() {
                       onPress={() => submitTerm(term)}
                     >
                       <Feather name="clock" size={16} color={muted} />
-                      <Text style={[styles.rowText, { color: fg, flex: 1 }]} numberOfLines={1}>{term}</Text>
+                      <Text style={[TYPE_SCALE.body, { fontFamily: FONT.medium, color: fg, flex: 1 }]} numberOfLines={1}>{term}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
+                    <IconButton
+                      name="x"
+                      variant="plain"
+                      size={16}
+                      color={muted}
                       onPress={() => removeRecentSearch(term)}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      accessibilityRole="button"
                       accessibilityLabel={`Remove ${term} from recent searches`}
-                    >
-                      <Feather name="x" size={16} color={muted} />
-                    </TouchableOpacity>
+                    />
                   </View>
                 ))}
               </>
@@ -507,7 +505,7 @@ export default function SearchScreen() {
                         accessibilityLabel={`Search for ${t.term}`}
                       >
                         <Feather name={t.type === 'brand' ? 'trending-up' : 'hash'} size={12} color={primary} />
-                        <Text style={[styles.tryChipText, { color: fg }]}>{t.term}</Text>
+                        <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.medium, color: fg }]}>{t.term}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -527,16 +525,16 @@ export default function SearchScreen() {
                         key={b.id}
                         style={styles.brandAvatarItem}
                         activeOpacity={0.75}
-                        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); goToBrand(b.sellerId); }}
+                        onPress={() => { hapticLight(); goToBrand(b.sellerId); }}
                         accessibilityRole="button"
                         accessibilityLabel={`Visit ${b.name}`}
                       >
                         <View style={[styles.brandAvatar, { backgroundColor: b.color }]}>
                           <Text style={styles.avatarText}>{b.initials}</Text>
                         </View>
-                        <Text style={[styles.brandAvatarName, { color: fg }]} numberOfLines={1}>{b.name}</Text>
+                        <Text style={[TYPE_SCALE.caption, { fontFamily: FONT.semibold, color: fg, textAlign: 'center' }]} numberOfLines={1}>{b.name}</Text>
                         {b.followerCount > 0 && (
-                          <Text style={[styles.brandAvatarSub, { color: muted }]} numberOfLines={1}>
+                          <Text style={[TYPE_SCALE.caption, { color: muted, textAlign: 'center', marginTop: 1 }]} numberOfLines={1}>
                             {b.followerCount} {b.followerCount === 1 ? 'follower' : 'followers'}
                           </Text>
                         )}
@@ -577,19 +575,25 @@ export default function SearchScreen() {
             )}
 
             <Text style={[styles.sectionLabel, { color: muted, marginTop: 8 }]}>DISCOVER</Text>
-            <TouchableOpacity
-              style={styles.row}
-              activeOpacity={0.7}
+            <ListRow
+              icon="compass"
+              iconColor={primary}
+              title="Browse trending brands and drops"
+              chevron
               onPress={() => goToBrand()}
-            >
-              <Feather name="compass" size={17} color={primary} />
-              <Text style={[styles.rowText, { color: fg }]}>Browse trending brands and drops</Text>
-              <Feather name="chevron-right" size={17} color={muted} />
-            </TouchableOpacity>
+              style={{ paddingHorizontal: 16 }}
+            />
           </View>
         ) : (
           <>
-            <SegmentedTabs active={activeTab} onChange={setActiveTab} />
+            <View style={{ marginHorizontal: 16, marginTop: 12, marginBottom: 4 }}>
+              <SegmentedControl
+                options={SEARCH_TABS.map((tab) => ({ id: tab.key, label: tab.label }))}
+                selectedId={activeTab}
+                onChange={(id) => setActiveTab(id as SearchTabKey)}
+                testID="search-tab"
+              />
+            </View>
             <View testID="buyer-search-results-state" accessibilityLabel={`Search results for ${query}`}>
               {renderTabContent()}
             </View>
@@ -603,19 +607,15 @@ export default function SearchScreen() {
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   titleBlock: { paddingHorizontal: 16, paddingBottom: 6 },
-  title: { fontSize: FS.h2, fontFamily: FONT.bold, letterSpacing: -0.6 },
-  subtitle: { fontSize: FS.sm, fontFamily: FONT.regular, marginTop: 4 },
   sectionHeaderRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16,
   },
-  sectionAction: { fontSize: FS.sm, fontFamily: FONT.semibold, paddingTop: 16, paddingBottom: 6 },
   tryChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
   tryChip: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    minHeight: 36, paddingHorizontal: 14, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, justifyContent: 'center',
+    minHeight: 36, paddingHorizontal: 14, borderRadius: RADII.pill, borderWidth: StyleSheet.hairlineWidth, justifyContent: 'center',
   },
-  tryChipText: { fontSize: FS.sm, fontFamily: FONT.medium },
   sectionLabel: {
     fontSize: 11.5, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.4,
     paddingHorizontal: 16, paddingTop: 16, paddingBottom: 6,
@@ -625,17 +625,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
     paddingHorizontal: 16, paddingVertical: 11,
   },
   recentTouchArea: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  rowText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
-  rowSub: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
   avatar: {
-    width: 38, height: 38, borderRadius: 19,
+    width: 38, height: 38, borderRadius: RADII.pill,
     alignItems: 'center', justifyContent: 'center',
   },
   avatarText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: theme.onAccent },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GUTTER },
   brandAvatarRow: { flexDirection: 'row', gap: 16, paddingHorizontal: 16, paddingVertical: 4 },
   brandAvatarItem: { alignItems: 'center', width: 74 },
-  brandAvatar: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
-  brandAvatarName: { fontSize: 12, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
-  brandAvatarSub: { fontSize: 10, fontFamily: 'Inter_400Regular', textAlign: 'center', marginTop: 1 },
+  brandAvatar: { width: 58, height: 58, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
 });

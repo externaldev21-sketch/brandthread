@@ -4,7 +4,15 @@
 process.env.TZ = 'Pacific/Kiritimati'; // UTC+14, deliberately far from UTC
 
 import { beforeAll, describe, expect, it } from 'vitest';
-import { bucketLabel, formatClockLabel, parseBucketTimestamp, WEEKDAY_LABELS } from './sellerHomeChartLabels';
+import { bucketLabel, formatClockLabel, MONTH_LABELS, parseBucketTimestamp, WEEKDAY_LABELS } from './sellerHomeChartLabels';
+
+const TZ_OFFSET_MINUTES = 14 * 60; // matches process.env.TZ below (Pacific/Kiritimati)
+
+/** A local-calendar-month-start instant, expressed as the UTC timestamp the
+ * API's `floorToLocalMonth`/`addLocalMonths` would emit for this runtime tz. */
+function localMonthStartIso(year: number, monthIndex0: number): string {
+  return new Date(Date.UTC(year, monthIndex0, 1, 0, 0, 0) - TZ_OFFSET_MINUTES * 60_000).toISOString();
+}
 
 function isoWeekBuckets(): string[] {
   // Seven consecutive local-midnight UTC instants, exactly as the API's
@@ -59,5 +67,28 @@ describe('seller home chart labels', () => {
     // local the same calendar day, not on the following/previous day.
     const utcMidnight = new Date(Date.UTC(2024, 0, 10, 0, 0)).toISOString();
     expect(formatClockLabel(parseBucketTimestamp(utcMidnight), false)).toBe('2 PM');
+  });
+
+  it('buckets "Month" by local day-of-month, 30 daily bars', () => {
+    const start = Date.UTC(2024, 5, 1); // Jun 1 UTC
+    const buckets = Array.from({ length: 30 }, (_, i) => new Date(start + i * 24 * 60 * 60 * 1000).toISOString());
+    const labels = buckets.map((bucket) => bucketLabel(bucket, 'month'));
+    // Local day-of-month for a UTC day-1 instant at +14h is still day 1 (no
+    // day-boundary crossing), climbing 1..30 in order.
+    expect(labels).toEqual(Array.from({ length: 30 }, (_, i) => String(i + 1)));
+  });
+
+  it('buckets "Year" and "All" by local month, 12 correctly-ordered, unique labels', () => {
+    const buckets = Array.from({ length: 12 }, (_, i) => localMonthStartIso(2024, i));
+    expect(buckets.map((bucket) => bucketLabel(bucket, 'year'))).toEqual([...MONTH_LABELS]);
+    expect(buckets.map((bucket) => bucketLabel(bucket, 'all'))).toEqual([...MONTH_LABELS]);
+    expect(new Set(buckets.map((bucket) => bucketLabel(bucket, 'year'))).size).toBe(12);
+  });
+
+  it('"Year"/"All" month buckets are correct across a year boundary', () => {
+    const decBucket = localMonthStartIso(2023, 11);
+    const janBucket = localMonthStartIso(2024, 0);
+    expect(bucketLabel(decBucket, 'year')).toBe('Dec');
+    expect(bucketLabel(janBucket, 'year')).toBe('Jan');
   });
 });

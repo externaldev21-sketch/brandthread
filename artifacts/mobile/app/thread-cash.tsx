@@ -12,6 +12,7 @@ import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { BrandthreadScreen, BrandthreadHeader, BrandthreadCard } from '@/components/BrandthreadUI';
+import { TABULAR_NUMS, tabularType } from '@/constants/typography';
 import type { ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 
 function historyLabel(entry: ThreadCashEntry): string {
@@ -64,7 +65,7 @@ export default function ThreadCashScreen() {
             {/* Balance */}
             <BrandthreadCard glow style={styles.balanceCard}>
               <Text style={[styles.balanceLabel, { color: theme.muted }]}>Your balance</Text>
-              <Text style={[styles.balanceValue, { color: theme.text }]}>
+              <Text style={[styles.balanceValue, tabularType('display'), { color: theme.text }]}>
                 {formatCents(status?.balanceCents ?? 0)}
               </Text>
               <Text style={[styles.balanceHint, { color: theme.subtle }]}>
@@ -92,12 +93,12 @@ export default function ThreadCashScreen() {
                         lit && { backgroundColor: theme.accent, borderColor: theme.accent },
                       ]}
                     >
-                      <Text style={[styles.streakDayText, { color: lit ? theme.onAccent : theme.muted }]}>{day}</Text>
+                      <Text style={[styles.streakDayText, TABULAR_NUMS, { color: lit ? theme.onAccent : theme.muted }]}>{day}</Text>
                     </View>
                   );
                 })}
               </View>
-              <Text style={[styles.streakSub, { color: theme.muted }]}>
+              <Text style={[styles.streakSub, TABULAR_NUMS, { color: theme.muted }]}>
                 Longest streak: {status?.streak.longestStreak ?? 0} days · Earn ${(((status?.config.dailyAmountCents ?? 10)) / 100).toFixed(2)}/day,
                 {' '}${(((status?.config.streakBonusCents ?? 100)) / 100).toFixed(2)} bonus every {streakBonusDays} days
               </Text>
@@ -116,7 +117,7 @@ export default function ThreadCashScreen() {
                       {new Date(entry.createdAt).toLocaleDateString()}
                     </Text>
                   </View>
-                  <Text style={[styles.historyAmount, { color: entry.amountCents >= 0 ? theme.success : theme.muted }]}>
+                  <Text style={[styles.historyAmount, TABULAR_NUMS, { color: entry.amountCents >= 0 ? theme.success : theme.muted }]}>
                     {entry.amountCents >= 0 ? '+' : '−'}{formatCents(Math.abs(entry.amountCents))}
                   </Text>
                 </View>
@@ -145,7 +146,9 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   balanceCard: { alignItems: 'center', paddingVertical: SP.lg, marginTop: SP.sm },
   balanceLabel: { fontSize: FS.sm, fontFamily: FONT.medium },
-  balanceValue: { fontSize: 40, fontFamily: FONT.bold, marginTop: SP.xs },
+  // Balance snaps to the `display` type-scale role (44/48 Bold) via tabularType('display')
+  // applied at the call site, rather than the old one-off fontSize: 40 (see design doc audit).
+  balanceValue: { marginTop: SP.xs },
   balanceHint: { fontSize: FS.xs, fontFamily: FONT.regular, textAlign: 'center', marginTop: SP.sm, paddingHorizontal: SP.md },
   streakCard: { marginTop: SP.md },
   streakHeading: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginBottom: SP.sm },
