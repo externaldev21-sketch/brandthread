@@ -7,9 +7,9 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { Header } from '@/components/layout';
 import {
-  BG, CARD, SURFACE,
+  BG, SURFACE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
@@ -38,7 +38,6 @@ export default function StoreVersionsScreen() {
   const vs = makeStyles(theme);
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
-  const headerTopInset = useHeaderTopInset();
   const [versions, setVersions] = useState<StoreVersion[]>([]);
   const [creating, setCreating] = useState(false);
   const [newLabel, setNewLabel] = useState('');
@@ -88,20 +87,10 @@ export default function StoreVersionsScreen() {
 
   return (
     <View style={vs.root}>
-      <View style={[vs.header, { paddingTop: headerTopInset + SP.sm }]}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={vs.backBtn}
-          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-        >
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={vs.headerTitle}>Version History</Text>
-        <TouchableOpacity onPress={() => setCreating(true)} style={vs.saveVersionBtn}>
-          <Feather name="plus" size={ICON.sm} color={PURPLE_LIGHT} />
-          <Text style={vs.saveVersionText}>Save Version</Text>
-        </TouchableOpacity>
-      </View>
+      <Header
+        title="Version History"
+        actions={[{ icon: 'plus', onPress: () => setCreating(true), accessibilityLabel: 'Save version' }]}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={vs.scroll}>
 
@@ -162,21 +151,11 @@ export default function StoreVersionsScreen() {
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE_LIGHT = theme.accentLight;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const SURFACE = theme.surface;
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    paddingHorizontal: SP.md, paddingVertical: SP.sm,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)',
-  },
-  backBtn: {
-    width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  headerTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, flex: 1 },
-  saveVersionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  saveVersionText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
   scroll: { paddingBottom: 60, paddingTop: SP.md },
   card: { marginHorizontal: SP.md, marginBottom: SP.sm, gap: SP.md },
   fieldLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },

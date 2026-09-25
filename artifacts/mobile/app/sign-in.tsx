@@ -4,20 +4,27 @@
  */
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  View, Text, TextInput, StyleSheet,
   KeyboardAvoidingView, Platform, ActivityIndicator,
   ScrollView, StatusBar,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { useSignIn, useSSO, useAuth, useUser } from '@clerk/expo';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { Feather, Ionicons } from '@expo/vector-icons';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
+import { Avatar } from '@/components/ui/Avatar';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
+import { FONT } from '@/lib/theme';
+import { TYPE_SCALE } from '@/constants/typography';
+import { SPACING } from '@/constants/spacing';
+import { RADII } from '@/constants/radii';
 import {
   APPLE_OAUTH_STRATEGY,
   isOAuthCancellationError,
@@ -55,14 +62,34 @@ export default function SignInScreen() {
   const [loading, setLoading]       = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
+  // Second-factor (TOTP) step, shown when the account has 2FA turned on.
+  const [needsTotp, setNeedsTotp]   = useState(false);
+  const [totpCode, setTotpCode]     = useState('');
+  const [totpError, setTotpError]   = useState('');
+  const [totpLoading, setTotpLoading] = useState(false);
+
   const isFetching   = fetchStatus === 'fetching' || loading;
   const canSubmit    = email.includes('@') && password.length >= 1;
+  const canVerifyTotp = totpCode.length === 6;
   const currentEmail = user?.primaryEmailAddress?.emailAddress ?? '';
+
+  function finalizeSignIn() {
+    return signIn.finalize({
+      navigate: ({ decorateUrl }) => {
+        const destination = isAddAccount ? '/account-switcher' : '/';
+        const url = decorateUrl(destination);
+        if (url.startsWith('http') && typeof window !== 'undefined') {
+          window.location.href = url;
+        } else {
+          router.replace(destination as Href);
+        }
+      },
+    });
+  }
 
   // ─── Email sign-in ───────────────────────────────────────────────────────────
   async function handleSignIn() {
     if (!canSubmit || isFetching) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
     setError('');
     try {
@@ -72,22 +99,36 @@ export default function SignInScreen() {
       });
       if (err) { setError(mapError(err)); return; }
       if (signIn.status === 'complete') {
-        await signIn.finalize({
-          navigate: ({ decorateUrl }) => {
-            const destination = isAddAccount ? '/account-switcher' : '/';
-            const url = decorateUrl(destination);
-            if (url.startsWith('http') && typeof window !== 'undefined') {
-              window.location.href = url;
-            } else {
-              router.replace(destination as Href);
-            }
-          },
-        });
+        await finalizeSignIn();
+      } else if (signIn.status === 'needs_second_factor') {
+        setNeedsTotp(true);
+      } else {
+        setError("Couldn't sign you in. Try again.");
       }
     } catch (e: any) {
       setError(mapError(e));
     } finally {
       setLoading(false);
+    }
+  }
+
+  // ─── 2FA (TOTP) ───────────────────────────────────────────────────────────────
+  async function handleVerifyTotp() {
+    if (!canVerifyTotp || totpLoading) return;
+    setTotpLoading(true);
+    setTotpError('');
+    try {
+      const { error: err } = await signIn.mfa.verifyTOTP({ code: totpCode });
+      if (err) { setTotpError("That code isn't right. Try again."); return; }
+      if (signIn.status === 'complete') {
+        await finalizeSignIn();
+      } else {
+        setTotpError("Couldn't sign you in. Try again.");
+      }
+    } catch (e: any) {
+      setTotpError(mapError(e));
+    } finally {
+      setTotpLoading(false);
     }
   }
 
@@ -143,15 +184,15 @@ export default function SignInScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Back */}
-          <TouchableOpacity
+          <IconButton
+            name="arrow-left"
+            variant="plain"
+            size={20}
+            color={theme.muted}
             style={s.backBtn}
-            accessibilityRole="button"
             accessibilityLabel="Go back"
-            onPress={() => { Haptics.selectionAsync(); router.back(); }}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <Feather name="arrow-left" size={20} color={theme.muted} />
-          </TouchableOpacity>
+            onPress={() => router.back()}
+          />
 
           {/* Logo */}
           <View style={s.logoRow}>
@@ -169,11 +210,10 @@ export default function SignInScreen() {
           {/* Info card */}
           <View style={s.sessionCard}>
             <View style={s.sessionAvatarRow}>
-              <LinearGradient colors={[theme.accent, theme.secondary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.sessionAvatar}>
-                <Text style={[s.sessionAvatarText, getOnAccentTextStyle(theme)]}>
-                  {(currentEmail[0] ?? 'B').toUpperCase()}
-                </Text>
-              </LinearGradient>
+              <Avatar
+                name={user?.firstName ? `${user.firstName} ${user.lastName ?? ''}` : currentEmail}
+                size={48}
+              />
               <View style={{ flex: 1 }}>
                 <Text style={s.sessionName} numberOfLines={1}>
                   {user?.firstName ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}` : 'Your account'}
@@ -184,32 +224,88 @@ export default function SignInScreen() {
           </View>
 
           {/* Continue */}
-          <TouchableOpacity
+          <Button
+            label="Continue with this account"
+            onPress={() => router.replace('/' as never)}
+            fullWidth
             style={s.primaryWrap}
-            accessibilityRole="button"
-            accessibilityLabel="Continue with this account"
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.replace('/' as never); }}
-            activeOpacity={0.88}
-          >
-            <LinearGradient colors={[theme.accent, theme.secondary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.primaryBtn}>
-              <Text style={[s.primaryBtnText, getOnAccentTextStyle(theme)]}>Continue with this account</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+          />
 
           {/* Sign out */}
-          <TouchableOpacity
-            style={[s.secondaryBtn, signingOut && { opacity: 0.5 }]}
-            accessibilityRole="button"
-            accessibilityLabel="Sign out"
+          <Button
+            label="Sign out"
+            variant="secondary"
             onPress={handleSignOut}
-            disabled={signingOut}
-            activeOpacity={0.85}
-          >
-            {signingOut
-              ? <ActivityIndicator color={theme.text} size="small" />
-              : <Text style={s.secondaryBtnText}>Sign out</Text>}
-          </TouchableOpacity>
+            loading={signingOut}
+            fullWidth
+          />
         </ScrollView>
+      </View>
+    );
+  }
+
+  // ─── Two-factor (TOTP) screen ─────────────────────────────────────────────────
+  if (needsTotp) {
+    return (
+      <View style={[s.root, { paddingTop: insets.top }]}>
+        <StatusBar barStyle="light-content" />
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView
+            contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 36 }]}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <IconButton
+              name="arrow-left"
+              variant="plain"
+              size={20}
+              color={theme.muted}
+              style={s.backBtn}
+              accessibilityLabel="Go back"
+              onPress={() => { setNeedsTotp(false); setTotpCode(''); setTotpError(''); }}
+            />
+
+            <View style={s.logoRow}>
+              <BrandthreadLogo size={36} />
+              <Text style={s.logoText}>BRANDTHREAD</Text>
+            </View>
+
+            <Text style={s.headline}>Two-factor authentication</Text>
+            <Text style={s.subtitle}>Enter the 6-digit code from your authenticator app.</Text>
+
+            <View style={s.fieldWrap}>
+              <Text style={s.label}>Code</Text>
+              <TextInput
+                style={s.input}
+                placeholder="000000"
+                placeholderTextColor={theme.subtle}
+                value={totpCode}
+                onChangeText={t => { setTotpCode(t.replace(/[^0-9]/g, '').slice(0, 6)); setTotpError(''); }}
+                keyboardType="number-pad"
+                maxLength={6}
+                autoFocus
+                returnKeyType="go"
+                onSubmitEditing={handleVerifyTotp}
+              />
+            </View>
+
+            {totpError ? (
+              <View style={s.errorBox}>
+                <Feather name="alert-circle" size={14} color={theme.error} />
+                <Text style={s.errorText}>{totpError}</Text>
+              </View>
+            ) : null}
+
+            <Button
+              label="Verify code"
+              onPress={handleVerifyTotp}
+              disabled={!canVerifyTotp}
+              loading={totpLoading}
+              fullWidth
+              style={s.primaryWrap}
+            />
+          </ScrollView>
+        </KeyboardAvoidingView>
       </View>
     );
   }
@@ -228,15 +324,15 @@ export default function SignInScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Back */}
-          <TouchableOpacity
+          <IconButton
+            name="arrow-left"
+            variant="plain"
+            size={20}
+            color={theme.muted}
             style={s.backBtn}
-            accessibilityRole="button"
             accessibilityLabel="Go back"
-            onPress={() => { Haptics.selectionAsync(); router.back(); }}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <Feather name="arrow-left" size={20} color={theme.muted} />
-          </TouchableOpacity>
+            onPress={() => router.back()}
+          />
 
           {/* Logo */}
           <View style={s.logoRow}>
@@ -253,41 +349,43 @@ export default function SignInScreen() {
           </Text>
 
           {/* ── OAuth ─────────────────────────────────────────────────────────── */}
-          {/* Google — dark surface with Google logo, per Google brand guidelines */}
-          <TouchableOpacity
-            style={s.oauthBtn}
-            onPress={() => handleOAuth('oauth_google', 'Google')}
-            activeOpacity={0.85}
-            disabled={!!oauthLoading || isFetching}
-          >
-            {oauthLoading === 'Google' ? (
-              <ActivityIndicator color={theme.text} size="small" />
-            ) : (
-              <>
-                <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: 'Inter_700Bold', fontSize: 11, color: '#FFFFFF', lineHeight: 13 }}>G</Text></View>
-                <Text style={s.oauthText}>Continue with Google</Text>
-              </>
-            )}
-          </TouchableOpacity>
-
-          {/* Apple — solid black button per Apple HIG, iOS only */}
+          {/* Apple first — solid black button per Apple HIG, iOS only. Shown above
+              Google per App Store guideline 4.8: Sign in with Apple must be at
+              least as prominent as other third-party social login options. */}
           {Platform.OS === 'ios' && (
-            <TouchableOpacity
+            <PressableScale
               style={[s.oauthBtn, s.appleBtn]}
-              onPress={() => handleOAuth('oauth_apple', 'Apple')}
-              activeOpacity={0.85}
+              onPress={() => { hapticPrimaryAction(); handleOAuth('oauth_apple', 'Apple'); }}
+              accessibilityLabel="Continue with Apple"
               disabled={!!oauthLoading || isFetching}
             >
               {oauthLoading === 'Apple' ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <>
-                  <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 18, color: '#FFFFFF', lineHeight: 20 }}></Text>
+                  <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
                   <Text style={[s.oauthText, { color: '#FFFFFF' }]}>Continue with Apple</Text>
                 </>
               )}
-            </TouchableOpacity>
+            </PressableScale>
           )}
+
+          {/* Google — dark surface with Google logo, per Google brand guidelines */}
+          <PressableScale
+            style={s.oauthBtn}
+            onPress={() => { hapticPrimaryAction(); handleOAuth('oauth_google', 'Google'); }}
+            accessibilityLabel="Continue with Google"
+            disabled={!!oauthLoading || isFetching}
+          >
+            {oauthLoading === 'Google' ? (
+              <ActivityIndicator color={theme.text} size="small" />
+            ) : (
+              <>
+                <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: FONT.bold, fontSize: 11, color: '#FFFFFF', lineHeight: 13 }}>G</Text></View>
+                <Text style={s.oauthText}>Continue with Google</Text>
+              </>
+            )}
+          </PressableScale>
 
           {/* Divider */}
           <View style={s.divider}>
@@ -315,9 +413,13 @@ export default function SignInScreen() {
           <View style={s.fieldWrap}>
             <View style={s.pwLabelRow}>
               <Text style={s.label}>Password</Text>
-              <TouchableOpacity onPress={() => router.push('/forgot-password' as never)}>
+              <PressableScale
+                onPress={() => { hapticToggle(); router.push('/forgot-password' as never); }}
+                accessibilityLabel="Forgot password?"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
                 <Text style={[s.forgotLink, { color: theme.accent }]}>Forgot password?</Text>
-              </TouchableOpacity>
+              </PressableScale>
             </View>
             <View style={s.pwRow}>
               <TextInput
@@ -329,9 +431,15 @@ export default function SignInScreen() {
                 secureTextEntry={!showPw}
                 autoComplete="current-password"
               />
-              <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPw(v => !v)}>
-                <Feather name={showPw ? 'eye-off' : 'eye'} size={18} color={theme.muted} />
-              </TouchableOpacity>
+              <IconButton
+                name={showPw ? 'eye-off' : 'eye'}
+                variant="plain"
+                size={18}
+                color={theme.muted}
+                style={s.eyeBtn}
+                accessibilityLabel={showPw ? 'Hide password' : 'Show password'}
+                onPress={() => setShowPw(v => !v)}
+              />
             </View>
           </View>
 
@@ -344,36 +452,22 @@ export default function SignInScreen() {
           ) : null}
 
           {/* ── Sign in ────────────────────────────────────────────────────────── */}
-          <TouchableOpacity
-            style={[s.primaryWrap, (!canSubmit || isFetching) && { opacity: 0.5 }]}
-            accessibilityRole="button"
-            accessibilityLabel="Sign in"
+          <Button
+            label="Sign in"
             onPress={handleSignIn}
-            disabled={!canSubmit || isFetching}
-            activeOpacity={0.88}
-          >
-            <LinearGradient
-                colors={[theme.accent, theme.secondary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={s.primaryBtn}
-            >
-              {isFetching
-                ? <ActivityIndicator color={theme.onAccent} size="small" />
-                : <Text style={[s.primaryBtnText, getOnAccentTextStyle(theme)]}>Sign in</Text>}
-            </LinearGradient>
-          </TouchableOpacity>
+            disabled={!canSubmit}
+            loading={isFetching}
+            fullWidth
+            style={s.primaryWrap}
+          />
 
           {/* ── Create account ─────────────────────────────────────────────────── */}
-          <TouchableOpacity
-            style={s.secondaryBtn}
-            accessibilityRole="button"
-            accessibilityLabel="Create an account"
-            onPress={() => { Haptics.selectionAsync(); router.replace('/onboarding' as never); }}
-            activeOpacity={0.85}
-          >
-            <Text style={s.secondaryBtnText}>Create an account</Text>
-          </TouchableOpacity>
+          <Button
+            label="Create an account"
+            variant="secondary"
+            onPress={() => router.replace('/onboarding' as never)}
+            fullWidth
+          />
 
           <View nativeID="clerk-captcha" />
         </ScrollView>
@@ -414,92 +508,79 @@ function mapError(err: any): string {
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root:    { flex: 1, backgroundColor: theme.background },
 
-  scroll: { paddingHorizontal: 24, paddingTop: 16 },
+  scroll: { paddingHorizontal: SPACING.xl, paddingTop: SPACING.md },
 
-  backBtn: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
+  backBtn: { marginBottom: SPACING.lg, alignSelf: 'flex-start' },
 
-  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 36 },
-  logoText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: theme.text, letterSpacing: 2.5 },
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.xxxl - 4 },
+  logoText: { fontSize: 12, fontFamily: FONT.bold, color: theme.text, letterSpacing: 2.5 },
 
   headline: {
-    fontSize: 32, fontFamily: 'Inter_700Bold',
-    color: theme.text, letterSpacing: -0.8, marginBottom: 8,
+    ...TYPE_SCALE.title1,
+    color: theme.text, letterSpacing: -0.8, marginBottom: SPACING.xs,
   },
   subtitle: {
-    fontSize: 15, fontFamily: 'Inter_400Regular',
-    color: theme.muted, lineHeight: 22, marginBottom: 32,
+    ...TYPE_SCALE.body,
+    color: theme.muted, marginBottom: SPACING.xl + SPACING.xxs,
   },
 
   oauthBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    backgroundColor: theme.cardGlass, borderRadius: 14, borderWidth: 1, borderColor: theme.border,
-    paddingVertical: 15, marginBottom: 10,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm,
+    backgroundColor: theme.cardGlass, borderRadius: RADII.card, borderWidth: 1, borderColor: theme.border,
+    paddingVertical: 15, marginBottom: SPACING.xs,
   },
   // Apple button: solid black per Apple Human Interface Guidelines
   appleBtn: { backgroundColor: '#000000', borderColor: 'rgba(255,255,255,0.15)' },
-  oauthText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: theme.text },
+  oauthText: { fontSize: 15, fontFamily: FONT.semibold, color: theme.text },
 
-  divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 20 },
-  divLine: { flex: 1, height: 1, backgroundColor: theme.border },
-  divText: { fontSize: 13, fontFamily: 'Inter_400Regular', color: theme.muted },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginVertical: SPACING.lg },
+  divLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: theme.border },
+  divText: { ...TYPE_SCALE.footnote, color: theme.muted },
 
-  fieldWrap: { marginBottom: 16 },
-  label:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: theme.muted, marginBottom: 6 },
+  fieldWrap: { marginBottom: SPACING.md },
+  label:     { fontSize: 12, fontFamily: FONT.semibold, color: theme.muted, marginBottom: SPACING.xs - 2 },
   input: {
     backgroundColor: theme.cardGlass, borderWidth: 1, borderColor: theme.border,
-    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13,
-    fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.text,
+    borderRadius: RADII.input, paddingHorizontal: SPACING.sm + 2, paddingVertical: 13,
+    ...TYPE_SCALE.body, color: theme.text,
   },
 
   pwLabelRow: {
     flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 6,
+    alignItems: 'center', marginBottom: SPACING.xs - 2,
   },
-  forgotLink: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  forgotLink: { fontSize: 12, fontFamily: FONT.semibold },
   pwRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: theme.cardGlass, borderWidth: 1, borderColor: theme.border, borderRadius: 12,
+    backgroundColor: theme.cardGlass, borderWidth: 1, borderColor: theme.border, borderRadius: RADII.input,
   },
   pwInput: { flex: 1, borderWidth: 0, backgroundColor: 'transparent' },
-  eyeBtn:  { paddingHorizontal: 14 },
+  eyeBtn:  {},
 
   errorBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-     backgroundColor: `${theme.error}22`, borderRadius: 10,
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.xs,
+     backgroundColor: `${theme.error}22`, borderRadius: RADII.input,
      borderWidth: 1, borderColor: theme.error,
-    paddingHorizontal: 12, paddingVertical: 10, marginBottom: 16,
+    paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs + 2, marginBottom: SPACING.md,
   },
-  errorText: { fontSize: 13, fontFamily: 'Inter_400Regular', color: theme.error, flex: 1 },
+  errorText: { ...TYPE_SCALE.footnote, color: theme.error, flex: 1 },
 
-  primaryWrap: { marginBottom: 10 },
-  primaryBtn:  { borderRadius: 14, paddingVertical: 17, alignItems: 'center' },
-  primaryBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: theme.onAccent },
-
-  secondaryBtn: {
-    borderRadius: 14, paddingVertical: 16, alignItems: 'center',
-    borderWidth: 1, borderColor: theme.border,
-  },
-  secondaryBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: theme.text },
+  primaryWrap: { marginBottom: SPACING.xs + 2 },
 
   // Active session screen
   sessionScroll: { justifyContent: 'flex-start' },
   sessionCard: {
-    backgroundColor: theme.cardGlass, borderRadius: 18,
+    backgroundColor: theme.cardGlass, borderRadius: RADII.sheet,
     borderWidth: 1, borderColor: theme.border,
-    padding: 18, marginBottom: 24,
+    padding: SPACING.md + 2, marginBottom: SPACING.xl,
   },
   sessionAvatarRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.md - 2,
   },
-  sessionAvatar: {
-    width: 48, height: 48, borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  sessionAvatarText: { fontSize: 20, fontFamily: 'Inter_700Bold', color: theme.text },
   sessionName: {
-    fontSize: 15, fontFamily: 'Inter_600SemiBold', color: theme.text, marginBottom: 2,
+    fontSize: 15, fontFamily: FONT.semibold, color: theme.text, marginBottom: 2,
   },
   sessionEmail: {
-    fontSize: 13, fontFamily: 'Inter_400Regular', color: theme.muted,
+    ...TYPE_SCALE.footnote, color: theme.muted,
   },
 });

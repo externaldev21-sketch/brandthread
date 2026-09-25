@@ -227,7 +227,7 @@ export default function BrandScreen() {
                     key={i}
                     activeOpacity={0.85}
                     onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedLogo(i); }}
-                    style={[styles.logoCard, { borderColor: isSelected ? colors.primary : colors.border, borderWidth: isSelected ? 2 : 1 }]}
+                    style={[styles.logoCard, { backgroundColor: colors.card, borderColor: isSelected ? colors.primary : colors.border, borderWidth: isSelected ? 2 : 1 }]}
                   >
                     <Image
                       source={{ uri: `data:image/png;base64,${b64}` }}
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
   styleText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
   subLabel: { fontSize: 11, fontFamily: 'Inter_500Medium', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
   logoGrid: { flexDirection: 'row', gap: 10 },
-  logoCard: { flex: 1, borderRadius: 14, overflow: 'hidden', position: 'relative', backgroundColor: '#0D0B08' },
+  logoCard: { flex: 1, borderRadius: 14, overflow: 'hidden', position: 'relative' },
   logoImage: { width: '100%', aspectRatio: 1, borderRadius: 12 },
   logoCheckBadge: { position: 'absolute', top: 8, right: 8, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   checkRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, gap: 12 },

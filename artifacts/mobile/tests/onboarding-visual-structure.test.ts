@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { BUYER_STEP_INDEX, DRAFT_VERSION } from '../lib/onboardingFlow';
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 
@@ -25,12 +26,11 @@ describe('onboarding visual structure', () => {
     );
   });
 
-  it('buyer step 0 is account-type (role choice before Clerk account creation)', () => {
-    const onboarding = read('app/onboarding.tsx');
-    // ACCOUNT_TYPE is now step 0 in v6 order
-    expect(onboarding).toContain('ACCOUNT_TYPE: 0');
-    // AUTH is step 1 in the new buyer ordering
-    expect(onboarding).toContain('AUTH: 1,');
+  it('buyer step 1 is account-type, after the Welcome opener, before Clerk account creation', () => {
+    // Step ordering now lives in lib/onboardingFlow.ts (v7): 0=Welcome, 1=AccountType, 2=Auth.
+    expect(BUYER_STEP_INDEX.WELCOME).toBe(0);
+    expect(BUYER_STEP_INDEX.ACCOUNT_TYPE).toBe(1);
+    expect(BUYER_STEP_INDEX.AUTH).toBe(2);
   });
 
   it('splash is a logo-only auto-advancing screen with no CTA button', () => {
@@ -73,7 +73,8 @@ describe('onboarding visual structure', () => {
     expect(onboarding).toContain('<Text style={ssa.divText}>or</Text>');
     expect(onboarding).toContain('disabled={!!oauthLoading || loading}');
     expect(onboarding).not.toContain('disabled={!!oauthLoading || loading || !isUsernameValid}');
-    expect(onboarding).toContain("oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 14");
+    // OAuth options are pill-shaped secondary buttons (onboarding restyle).
+    expect(onboarding).toContain("oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 999");
   });
 
   it('thread explainer screen exists and routes buyers to the feed', () => {
@@ -87,10 +88,12 @@ describe('onboarding visual structure', () => {
     expect(layout).toContain("router.replace('/thread-explainer'");
   });
 
-  it('draft version incremented to 6 and v5 migration exists', () => {
+  it('draft version incremented to 7, migration lives in lib/onboardingFlow.ts', () => {
     const onboarding = read('app/onboarding.tsx');
-    expect(onboarding).toContain('DRAFT_VERSION = 6');
-    expect(onboarding).toContain('version === 5');
+    const flowModule = read('lib/onboardingFlow.ts');
+    expect(DRAFT_VERSION).toBe(7);
+    expect(flowModule).toContain('export const DRAFT_VERSION = 7');
+    expect(flowModule).toContain('version === 5');
     expect(onboarding).toContain("PENDING_FLOW_KEY = 'onboarding_pending_flow'");
     expect(onboarding).toContain('[PENDING_FLOW_KEY, selectedFlow]');
   });
@@ -119,9 +122,9 @@ describe('onboarding visual structure', () => {
     expect(onboarding).toContain('brandNameInputRef.current?.focus()');
     expect(onboarding).toContain('}, 260);');
   });
-  it('does not navigate backward from the root account-type step', () => {
+  it('does not navigate backward from the root Welcome step', () => {
     const onboarding = read('app/onboarding.tsx');
-    expect(onboarding).toContain('if (step === 0) return;');
+    expect(onboarding).toContain('if (!canGoBack(step)) return;');
     expect(onboarding).toContain('{!isAccountTypeStep && (');
     expect(onboarding).not.toContain("if (step === 0) { router.back(); return; }");
   });

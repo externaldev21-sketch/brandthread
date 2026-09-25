@@ -34,24 +34,22 @@ describe('seller profile action layout', () => {
 });
 
 describe('seller analytics overview layout', () => {
-  it('renders the requested ranges, dates, metrics, chart, and source card', () => {
-    expect(analyticsSource).toContain("label: '7 Days'");
-    expect(analyticsSource).toContain("label: '14 Days'");
-    expect(analyticsSource).toContain("label: 'Custom'");
-    expect(analyticsSource).toContain('label=\"Start\"');
-    expect(analyticsSource).toContain('label=\"End\"');
-    expect(analyticsSource).toContain('label=\"Visits\"');
-    expect(analyticsSource).toContain('label=\"Revenue\"');
-    expect(analyticsSource).toContain('label=\"Leads\"');
+  // The "14 Days"/"Custom" ranges and the "Leads"/"Traffic sources" cards
+  // were non-functional stubs (always empty, no backing API) and were
+  // removed as a P0 fix — see docs/polish/punch-list.md, Seller Analytics.
+  // Only the working 7-day range ships now.
+  it('renders only the working 7-day range, real metrics, and the chart', () => {
+    expect(analyticsSource).not.toContain("label: '14 Days'");
+    expect(analyticsSource).not.toContain("label: 'Custom'");
+    expect(analyticsSource).not.toContain('label="Leads"');
+    expect(analyticsSource).toContain('Last 7 days');
+    expect(analyticsSource).toContain('label="Visits"');
+    expect(analyticsSource).toContain('label="Revenue"');
     expect(analyticsSource).toContain('Daily Revenue');
-    expect(analyticsSource).toContain('Where are my customers from?');
   });
 
   it('uses zero-safe data and omits fabricated trends and traffic sources', () => {
-    expect(analyticsSource).toContain('leads: 0');
-    expect(analyticsSource).toContain('setSources([])');
     expect(analyticsSource).toContain('Number.isFinite(changePct)');
-    expect(analyticsSource).toContain('No data yet');
     expect(analyticsSource).not.toContain('TikTok');
     expect(analyticsSource).not.toContain('-65%');
   });

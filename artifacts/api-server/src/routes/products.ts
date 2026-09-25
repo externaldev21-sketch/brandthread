@@ -1,4 +1,4 @@
-import { Router } from "express";
+import express, { Router } from "express";
 import { db, products, productVariants } from "@workspace/db";
 import { eq, desc, sql, and, isNull, gt, ne } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -7,8 +7,28 @@ import { logActivity, reqActor } from "../lib/activityLog";
 import crypto from "crypto";
 import { canRestoreProduct, PRODUCT_DELETE_RECOVERY_WINDOW_MS } from "../lib/productRecovery";
 import { getVerifiedPlanAccess, sendPlanLimitReached, sendPlanLookupUnavailable } from "../lib/planAccess";
+import { ObjectStorageService } from "../lib/objectStorage";
+import { notifyNewProduct } from "../lib/activityEvents";
+import { parsePagination, setPaginationHeaders } from "../lib/pagination";
+import { notifyBackInStock, notifyPriceDrop, notifyStockLevelChanged } from "../lib/stockNotifications";
 
 const router = Router();
+const objectStorage = new ObjectStorageService();
+
+const PRODUCT_IMAGE_MIMES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+const MAX_PRODUCT_IMAGE_BYTES = 8 * 1024 * 1024;
+
+function hasValidImageSignature(bytes: Buffer, contentType: string): boolean {
+  if (contentType === "image/jpeg" || contentType === "image/jpg") {
+    return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  }
+  if (contentType === "image/png") {
+    return bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  }
+  return bytes.length >= 12
+    && bytes.subarray(0, 4).toString() === "RIFF"
+    && bytes.subarray(8, 12).toString() === "WEBP";
+}
 /** Short server-side recovery interval; exported so integration tests need not
  * depend on a magic number. */
 export { PRODUCT_DELETE_RECOVERY_WINDOW_MS } from "../lib/productRecovery";
@@ -42,9 +62,57 @@ async function hasProductCapacity(tx: any, ownerId: string, limit: number | null
   return (result?.count ?? 0) + requested <= limit;
 }
 
+// POST /api/products/images — upload a raw product photo, return its object
+// path for inclusion in a product's `images` array. Mirrors the seller
+// avatar upload route: raw image bytes in the body, Content-Type declares
+// the mime type, stored via ObjectStorageService.
+router.post(
+  "/images",
+  requireRole("manager"),
+  express.raw({ type: "image/*", limit: MAX_PRODUCT_IMAGE_BYTES }),
+  async (req, res): Promise<void> => {
+    const ownerId = (req as any).clerkUserId as string;
+    const contentType = String(req.headers["content-type"] ?? "").split(";")[0].toLowerCase();
+    const bytes = req.body as Buffer;
+
+    if (!PRODUCT_IMAGE_MIMES.has(contentType)) {
+      res.status(400).json({ error: "Use a JPEG, PNG, or WebP image for a product photo." });
+      return;
+    }
+    if (!Buffer.isBuffer(bytes) || bytes.length === 0 || bytes.length > MAX_PRODUCT_IMAGE_BYTES) {
+      res.status(400).json({ error: "Product images must be no larger than 8 MB." });
+      return;
+    }
+    if (!hasValidImageSignature(bytes, contentType)) {
+      res.status(400).json({ error: "The uploaded file does not match its declared image type." });
+      return;
+    }
+
+    let objectPath: string | null = null;
+    try {
+      objectPath = await objectStorage.createObjectEntityFromBuffer(bytes, contentType);
+      await objectStorage.trySetObjectEntityAclPolicy(objectPath, {
+        owner: ownerId,
+        visibility: "private",
+      });
+      res.status(201).json({ objectPath });
+    } catch (err) {
+      if (objectPath) await objectStorage.deleteObjectEntity(objectPath).catch(() => {});
+      req.log.error({ err, ownerId }, "Could not upload product image");
+      res.status(500).json({ error: "Product image could not be uploaded" });
+    }
+  },
+);
+
 // GET /api/products — scoped to the authenticated user's brand
+// Query params: ?limit=&offset= (default 100, capped at MAX_PAGE_LIMIT) — a
+// long-lived seller's full catalog was previously loaded unbounded on every
+// dashboard visit.
 router.get("/", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
+  const page = parsePagination(req.query, { limit: 100 });
+  if (!page.success) return res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" });
+  const { limit, offset } = page.data;
   const rows = await db
     .select({
       id: products.id,
@@ -63,14 +131,21 @@ router.get("/", async (req, res) => {
     .leftJoin(productVariants, eq(productVariants.productId, products.id))
     .where(and(eq(products.ownerId, ownerId), isNull(products.deletedAt)))
     .groupBy(products.id)
-    .orderBy(desc(products.createdAt));
-  res.json(rows);
+    .orderBy(desc(products.createdAt))
+    .limit(limit)
+    .offset(offset);
+  setPaginationHeaders(res, page.data, rows.length);
+  return res.json(rows);
 });
 
 // POST /api/products (manager+)
 router.post("/", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const { name, description, category = "apparel", status = "draft", images = [], tags = [], styleTags = [], variant, variants } = req.body;
+  const {
+    name, description, category = "apparel", status = "draft", images = [], tags = [], styleTags = [], variant, variants,
+    // Pre-order fields — mirrors PUT /:id so a listing can be created directly as a pre-order.
+    isPreOrder, preOrderClosingDate, preOrderEstShipDate, dropId,
+  } = req.body;
   if (!name || typeof name !== "string" || name.trim() === "") {
     res.status(400).json({ error: "name required" }); return;
   }
@@ -124,7 +199,13 @@ router.post("/", requireRole("manager"), async (req, res) => {
     if (!await hasProductCapacity(tx, ownerId, access.limits.products, status === "archived" ? 0 : 1)) return null;
     const [prod] = await tx
       .insert(products)
-      .values({ ownerId, name: name.trim(), description, category, status, images, tags, styleTags })
+      .values({
+        ownerId, name: name.trim(), description, category, status, images, tags, styleTags,
+        ...(isPreOrder !== undefined && { isPreOrder }),
+        ...(preOrderClosingDate ? { preOrderClosingDate: new Date(preOrderClosingDate) } : {}),
+        ...(preOrderEstShipDate ? { preOrderEstShipDate: new Date(preOrderEstShipDate) } : {}),
+        ...(dropId !== undefined && { dropId: dropId ?? null }),
+      })
       .returning();
 
     if (validatedVariants.length > 0) {
@@ -153,6 +234,8 @@ router.post("/", requireRole("manager"), async (req, res) => {
       "product", product.id,
     );
   }
+
+  if (product.status === "active") void notifyNewProduct({ productId: product.id });
 
   res.status(201).json(product);
 });
@@ -206,13 +289,13 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
       .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId)))
       .limit(1)
       .for("update");
-    if (!existing) return { updated: null, limited: false, moderationLocked: false };
+    if (!existing) return { updated: null, limited: false, moderationLocked: false, published: false };
     if (
       existing.removalKind?.startsWith("moderation_")
       && status !== undefined
       && status !== "archived"
     ) {
-      return { updated: null, limited: false, moderationLocked: true };
+      return { updated: null, limited: false, moderationLocked: true, published: false };
     }
     if (
       !existing.deletedAt
@@ -222,14 +305,20 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
       && access
       && !await hasProductCapacity(tx, ownerId, access.limits.products, 1)
     ) {
-      return { updated: null, limited: true, moderationLocked: false };
+      return { updated: null, limited: true, moderationLocked: false, published: false };
     }
     const [updated] = await tx
       .update(products)
       .set(updateValues)
       .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId)))
       .returning();
-    return { updated, limited: false, moderationLocked: false };
+    return {
+      updated,
+      limited: false,
+      moderationLocked: false,
+      // Going live (draft/archived → active) is what followers hear about.
+      published: !!updated && updated.status === "active" && existing.status !== "active" && !updated.deletedAt,
+    };
   });
   if (result.moderationLocked) {
     res.status(409).json({
@@ -258,6 +347,8 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
       "product", updated.id,
     );
   }
+
+  if (result.published) void notifyNewProduct({ productId: updated.id });
 
   res.json(updated);
 });
@@ -377,7 +468,7 @@ router.post("/:id/variants", requireRole("manager"), async (req, res) => {
 router.patch("/:id/variants/:variantId", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   // Verify product ownership
-  const [product] = await db.select({ id: products.id }).from(products)
+  const [product] = await db.select({ id: products.id, name: products.name }).from(products)
     .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId)))
     .limit(1);
   if (!product) { res.status(404).json({ error: "Product not found" }); return; }
@@ -386,6 +477,11 @@ router.patch("/:id/variants/:variantId", requireRole("manager"), async (req, res
   if (stock !== undefined && (!Number.isInteger(stock) || stock < 0)) {
     res.status(400).json({ error: "stock must be a non-negative integer" }); return;
   }
+
+  const [before] = await db.select({ stock: productVariants.stock, priceCents: productVariants.priceCents })
+    .from(productVariants)
+    .where(and(eq(productVariants.id, req.params.variantId), eq(productVariants.productId, req.params.id)));
+
   const [updated] = await db.update(productVariants)
     .set({
       ...(stock             !== undefined && { stock }),
@@ -404,6 +500,21 @@ router.patch("/:id/variants/:variantId", requireRole("manager"), async (req, res
       `Updated variant ${updated.sku}`,
       "product", req.params.id, { variantId: updated.id },
     );
+  }
+
+  if (before) {
+    void notifyStockLevelChanged({
+      productId: req.params.id, ownerId, productName: product.name,
+      previousStock: before.stock, newStock: updated.stock, lowStockThreshold: updated.lowStockThreshold,
+    });
+    void notifyBackInStock({
+      productId: req.params.id, ownerId, productName: product.name,
+      previousStock: before.stock, newStock: updated.stock,
+    });
+    void notifyPriceDrop({
+      productId: req.params.id, ownerId, productName: product.name,
+      previousPriceCents: before.priceCents, newPriceCents: updated.priceCents,
+    });
   }
 
   res.json(updated);

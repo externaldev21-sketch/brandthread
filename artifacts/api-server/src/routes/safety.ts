@@ -12,6 +12,7 @@ import { Router } from "express";
 import { and, asc, count, eq } from "drizzle-orm";
 import { db, mutedWords } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
+import { rateLimit } from "../middlewares/rateLimit";
 import { MAX_MUTED_WORDS, MAX_MUTED_WORD_LENGTH, normalizeMutedPhrase } from "../lib/contentModerator";
 
 const router = Router();
@@ -30,7 +31,7 @@ router.get("/muted-words", async (req, res) => {
   });
 });
 
-router.post("/muted-words", async (req, res) => {
+router.post("/muted-words", rateLimit("report"), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const phrase = normalizeMutedPhrase((req.body as { phrase?: unknown })?.phrase);
   if (!phrase) {

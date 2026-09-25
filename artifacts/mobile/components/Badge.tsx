@@ -46,3 +46,39 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 });
+
+// ─── CountBadge (Phase 1 design system) ───────────────────────────────────────
+// A small numeric count bubble (unread counts, cart quantity, notification
+// dots) — the same shape used by the buyer/seller tab bar badge
+// (components/tab-bar/TabBarParts.tsx TabBarBadge), exposed here for reuse
+// outside the tab bar. Renders nothing when count is 0 or less.
+
+export interface CountBadgeProps {
+  count: number;
+  max?: number;
+  accentColor?: string;
+  onAccentColor?: string;
+}
+
+export function CountBadge({ count, max = 99, accentColor, onAccentColor }: CountBadgeProps) {
+  const themeColors = useColors();
+  const bg = accentColor ?? themeColors.primary;
+  const fg = onAccentColor ?? themeColors.primaryForeground;
+  if (count <= 0) return null;
+  const label = count > max ? `${max}+` : String(count);
+  return (
+    <View style={[countBadgeStyles.root, { backgroundColor: bg }, label.length > 1 && countBadgeStyles.wide]}>
+      <Text style={[countBadgeStyles.label, { color: fg }]} maxFontSizeMultiplier={1.1}>{label}</Text>
+    </View>
+  );
+}
+
+const countBadgeStyles = StyleSheet.create({
+  root: {
+    minWidth: 18, height: 18, borderRadius: 9,
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  wide: { paddingHorizontal: 4 },
+  label: { fontSize: 11, fontFamily: 'Inter_700Bold', lineHeight: 13 },
+});

@@ -24,11 +24,10 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Animated,
   Platform,
-  RefreshControl,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -36,19 +35,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
-import {
-  BG, SURFACE, CARD,
-  BORDER,
-  FG, MUTED, SUBTLE, ON_DARK,
-  FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
+import { FONT, SP, GUTTER, GRID_MAX_WIDTH } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useAuth } from '@clerk/expo';
 import { formatCents } from '@/lib/money';
 import { CachedImage } from '@/components/CachedImage';
+import { CardSkeleton, ListSkeleton, ResponsiveContainer, SkeletonBlock } from '@/components/layout';
+import { LinearGradient } from 'expo-linear-gradient';
+import { EmptyState } from '@/components/BrandthreadUI';
+import { saveItem, removeSavedItem, getSavedItems } from '@/services/socialService';
+import { SaveToCollectionSheet, SaveToCollectionItem } from '@/components/SaveToCollectionSheet';
 import {
   CommerceSignalRow,
   ClaimedRemainingLabel,
@@ -61,6 +60,10 @@ import {
   type CommerceSignalData,
 } from '@/components/CommerceSignal';
 import { SectionError } from '@/components/InlineFeedback';
+import { Card, IconButton, HeartToggle, ThemedRefreshControl } from '@/components/ui';
+import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
+import { RADII } from '@/constants/radii';
+import { hapticLight, hapticMedium, hapticToggle } from '@/lib/haptics';
 
 // ─── API-backed types ──────────────────────────────────────────────────────────
 
@@ -106,27 +109,27 @@ function SectionHead({
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 14 }}>
       <View style={{ flex: 1, marginRight: 12 }}>
-        <Text style={{ fontSize: 18, fontFamily: FONT.bold, color: FG, letterSpacing: -0.3 }} numberOfLines={1}>
+        <Text style={[TYPE_SCALE.headline, { fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.3 }]} numberOfLines={1}>
           {title}
         </Text>
         {sub && (
-          <Text style={{ fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 }} numberOfLines={1}>
+          <Text style={[TYPE_SCALE.caption, { color: theme.muted, marginTop: 2 }]} numberOfLines={1}>
             {sub}
           </Text>
         )}
       </View>
       {action && (
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => { Haptics.selectionAsync(); onAction?.(); }}
+        <Pressable
+          onPress={() => { hapticToggle(); onAction?.(); }}
           accessibilityRole="button"
           accessibilityLabel={`${action}, ${title}`}
           style={{ minHeight: 44, justifyContent: 'center' }}
+          hitSlop={8}
         >
-          <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.accent }}>
+          <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: theme.accent }]}>
             {action}
           </Text>
-        </TouchableOpacity>
+        </Pressable>
       )}
     </View>
   );
@@ -148,7 +151,7 @@ interface HighDemandRowItem {
   commerce: CommerceSignalData;
 }
 
-function HighDemandRow({ item }: { item: HighDemandRowItem }) {
+const HighDemandRow = React.memo(function HighDemandRow({ item }: { item: HighDemandRowItem }) {
   const { push } = useThreadPull();
   const { theme } = useAppTheme();
 
@@ -157,28 +160,26 @@ function HighDemandRow({ item }: { item: HighDemandRowItem }) {
     (item.commerce.remainingUnits ?? 0) <= URGENCY_UNITS_THRESHOLD;
 
   function handlePress() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticLight();
     push((`/thread-product-detail?productId=${encodeURIComponent(item.productId)}&productName=${encodeURIComponent(item.name)}`) as never);
   }
 
   return (
-    <TouchableOpacity
-      style={[hd.row, { borderColor: isUrgent ? `${theme.accent}44` : BORDER }]}
-      activeOpacity={0.8}
+    <Card
       onPress={handlePress}
-      accessibilityRole="button"
       accessibilityLabel={`${item.name} by ${item.brand}`}
+      style={[hd.row, { borderColor: isUrgent ? `${theme.accent}44` : theme.border }]}
     >
       {item.imageUri ? (
         <CachedImage source={{ uri: item.imageUri }} style={hd.avatar} contentFit="cover" />
       ) : (
-        <View style={[hd.avatar, { backgroundColor: item.colorHex, alignItems: 'center', justifyContent: 'center' }]}>
-          <Text style={hd.initials}>{item.initials}</Text>
+        <View style={[hd.avatar, { backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' }]}>
+          <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.bold, color: theme.text }]}>{item.initials}</Text>
         </View>
       )}
       <View style={{ flex: 1 }}>
-        <Text style={hd.name} numberOfLines={1}>{item.name}</Text>
-        <Text style={hd.brand} numberOfLines={1}>{item.brand}</Text>
+        <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: theme.text }]} numberOfLines={1}>{item.name}</Text>
+        <Text style={[TYPE_SCALE.caption, { color: theme.muted, marginTop: 2 }]} numberOfLines={1}>{item.brand}</Text>
         <CommerceSignalRow
           claimedUnits={item.commerce.claimedUnits}
           remainingUnits={item.commerce.remainingUnits}
@@ -189,21 +190,16 @@ function HighDemandRow({ item }: { item: HighDemandRowItem }) {
         />
       </View>
       {item.commerce.currentPriceCents != null && (
-        <Text style={[hd.price, isUrgent && { color: theme.accent }]}>
+        <Text style={[TYPE_SCALE.footnote, TABULAR_NUMS, { fontFamily: FONT.bold, color: isUrgent ? theme.accent : theme.text }]}>
           {formatCents(item.commerce.currentPriceCents)}
         </Text>
       )}
-    </TouchableOpacity>
-  );
-}
+    </Card>
+  );});
 
 const hd = StyleSheet.create({
-  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.xs, borderWidth: 1, backgroundColor: CARD },
-  avatar:   { width: 44, height: 44, borderRadius: RADIUS.xs, overflow: 'hidden' },
-  initials: { fontSize: 13, fontFamily: FONT.bold, color: ON_DARK },
-  name:     { fontSize: 13, fontFamily: FONT.semibold, color: FG },
-  brand:    { fontSize: 11, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
-  price:    { fontSize: 13, fontFamily: FONT.bold, color: FG },
+  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13 },
+  avatar:   { width: 44, height: 44, borderRadius: RADII.chip, overflow: 'hidden' },
 });
 
 // ─── Swipeable product showcase (For You) ─────────────────────────────────────
@@ -222,13 +218,37 @@ interface ProductCardItem {
 
 const SHOWCASE_GAP = 12;
 
+// Declared once: an inline separator component would be a new component type
+// on every render, remounting every separator in the carousel.
+function ShowcaseGap() {
+  return <View style={{ width: SHOWCASE_GAP }} />;
+}
+
 function ProductShowcase({ items }: { items: ProductCardItem[] }) {
   const { push } = useThreadPull();
   const { theme } = useAppTheme();
+  const showcase = React.useMemo(() => makeShowcaseStyles(theme), [theme]);
   const { width: viewportWidth } = useWindowDimensions();
   const [listWidth, setListWidth] = useState(viewportWidth);
   const [activeIndex, setActiveIndex] = useState(0);
   const [savedIds, setSavedIds] = useState<Record<string, boolean>>({});
+  const [saveToSheetItem, setSaveToSheetItem] = useState<SaveToCollectionItem | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getSavedItems().then(saved => {
+      if (cancelled) return;
+      const savedTargetIds = new Set(saved.map(item => item.targetId));
+      setSavedIds(current => {
+        const next = { ...current };
+        for (const item of items) {
+          if (savedTargetIds.has(item.productId ?? item.id)) next[item.id] = true;
+        }
+        return next;
+      });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
   const scrollX = useRef(new Animated.Value(0)).current;
   const measuredWidth = Math.max(1, listWidth);
   const cardWidth = Math.min(Math.max(measuredWidth - 54, 1), 370);
@@ -237,7 +257,6 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
   const snapOffsets = items.map((_, index) => index * snapInterval);
 
   function openProduct(item: ProductCardItem) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const pid = encodeURIComponent(item.productId ?? item.id);
     push((`/thread-product-detail?productId=${pid}&productName=${encodeURIComponent(item.name)}`) as never);
   }
@@ -264,7 +283,7 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
         bounces={items.length > 1}
         ListHeaderComponent={<View style={{ width: sideInset }} />}
         ListFooterComponent={<View style={{ width: sideInset }} />}
-        ItemSeparatorComponent={() => <View style={{ width: SHOWCASE_GAP }} />}
+        ItemSeparatorComponent={ShowcaseGap}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { x: scrollX } } }],
           { useNativeDriver: true },
@@ -273,7 +292,7 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
         onMomentumScrollEnd={event => {
           const nextIndex = Math.round(event.nativeEvent.contentOffset.x / snapInterval);
           setActiveIndex(Math.max(0, Math.min(items.length - 1, nextIndex)));
-          Haptics.selectionAsync();
+          hapticToggle();
         }}
         renderItem={({ item, index }) => {
           const isUrgent =
@@ -298,47 +317,62 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
 
           return (
             <Animated.View style={{ width: cardWidth, opacity, transform: [{ scale }] }}>
-              <TouchableOpacity
-                style={[showcase.card, { borderColor: isUrgent ? `${theme.accent}55` : BORDER }]}
-                activeOpacity={0.92}
-                accessibilityRole="button"
-                accessibilityLabel={`${item.name} by ${item.brand}${item.commerce.currentPriceCents != null ? `, ${formatCents(item.commerce.currentPriceCents)}` : ''}`}
+              <Card
                 onPress={() => openProduct(item)}
+                accessibilityLabel={`${item.name} by ${item.brand}${item.commerce.currentPriceCents != null ? `, ${formatCents(item.commerce.currentPriceCents)}` : ''}`}
+                style={[showcase.card, { borderColor: isUrgent ? `${theme.accent}55` : theme.border }]}
               >
                 <View style={showcase.topline}>
                   <View style={{ flex: 1 }}>
-                    <Text style={showcase.brand} numberOfLines={1}>{item.brand}</Text>
-                    <Text style={showcase.name} numberOfLines={1}>{item.name}</Text>
+                    <Text style={[TYPE_SCALE.caption, { color: theme.muted }]} numberOfLines={1}>{item.brand}</Text>
+                    <Text style={[TYPE_SCALE.headline, { marginTop: 2, fontFamily: FONT.bold, color: theme.text, letterSpacing: -0.2 }]} numberOfLines={1}>{item.name}</Text>
                   </View>
-                  <TouchableOpacity
-                    style={showcase.save}
-                    onPress={() => {
-                      setSavedIds(current => ({ ...current, [item.id]: !current[item.id] }));
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  <HeartToggle
+                    liked={saved}
+                    onChange={(nextSaved) => {
+                      setSavedIds(current => ({ ...current, [item.id]: nextSaved }));
+                      const targetId = item.productId ?? item.id;
+                      const action = nextSaved
+                        ? saveItem({ type: 'product', targetId, title: item.name, subtitle: item.brand, accentColor: item.colorHex, priceCents: item.commerce.currentPriceCents ?? undefined })
+                        : removeSavedItem(targetId);
+                      action.catch(() => {
+                        setSavedIds(current => ({ ...current, [item.id]: !nextSaved }));
+                      });
                     }}
-                    accessibilityRole="button"
+                    onLongPress={() => {
+                      hapticMedium();
+                      setSavedIds(current => ({ ...current, [item.id]: true }));
+                      setSaveToSheetItem({
+                        type: 'product',
+                        targetId: item.productId ?? item.id,
+                        title: item.name,
+                        subtitle: item.brand,
+                        accentColor: item.colorHex,
+                        priceCents: item.commerce.currentPriceCents ?? undefined,
+                      });
+                    }}
                     accessibilityLabel={saved ? 'Remove from saved' : 'Save product'}
-                  >
-                    <Feather name="bookmark" size={18} color={saved ? FG : MUTED} />
-                  </TouchableOpacity>
+                  />
                 </View>
 
                 <View style={showcase.visual}>
                   {item.imageUri ? (
                     <CachedImage source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} contentFit="contain" />
                   ) : (
-                    <View style={[StyleSheet.absoluteFill, showcase.visualFallback, { backgroundColor: item.colorHex }]}>
-                      <Text style={showcase.initials}>{item.initials}</Text>
+                    <View style={[StyleSheet.absoluteFill, showcase.visualFallback, { backgroundColor: theme.cardElevated }]}>
+                      <Text style={[showcase.initials, { color: theme.text }]}>{item.initials}</Text>
                     </View>
                   )}
                   {item.tag && (
                     <View style={showcase.tag}>
-                      <Text style={showcase.tagText}>{item.tag}</Text>
+                      {/* Scrim is a fixed black overlay on the product photo — text
+                          stays a fixed light color in every theme for contrast. */}
+                      <Text style={[TYPE_SCALE.caption, { color: '#FFFFFF', letterSpacing: 0.7, textTransform: 'uppercase' }]}>{item.tag}</Text>
                     </View>
                   )}
                   {item.commerce.currentPriceCents != null && (
                     <View style={showcase.pricePill}>
-                      <Text style={showcase.priceText}>{formatCents(item.commerce.currentPriceCents)}</Text>
+                      <Text style={[TYPE_SCALE.footnote, TABULAR_NUMS, { fontFamily: FONT.bold, color: theme.background }]}>{formatCents(item.commerce.currentPriceCents)}</Text>
                     </View>
                   )}
                 </View>
@@ -361,7 +395,7 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
                     accentColor={theme.accent}
                   />
                 )}
-              </TouchableOpacity>
+              </Card>
             </Animated.View>
           );
         }}
@@ -376,28 +410,28 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
           ))}
         </View>
       )}
+      <SaveToCollectionSheet
+        visible={!!saveToSheetItem}
+        item={saveToSheetItem}
+        onClose={() => setSaveToSheetItem(null)}
+      />
     </View>
   );
 }
 
-const showcase = StyleSheet.create({
+const makeShowcaseStyles = (theme: AppThemePreset) => StyleSheet.create({
   shell:          { marginBottom: 32 },
-  card:           { overflow: 'hidden', borderRadius: RADIUS.md, borderWidth: 1, backgroundColor: CARD, padding: 14 },
+  card:           { overflow: 'hidden' },
   topline:        { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  brand:          { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
-  name:           { marginTop: 2, fontSize: 16, fontFamily: FONT.bold, color: FG, letterSpacing: -0.2 },
-  save:           { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER },
-  visual:         { height: 330, marginTop: 8, position: 'relative', overflow: 'hidden', borderRadius: RADIUS.sm, backgroundColor: SURFACE },
+  visual:         { height: 330, marginTop: 8, position: 'relative', overflow: 'hidden', borderRadius: RADII.card, backgroundColor: theme.surface },
   visualFallback: { alignItems: 'center', justifyContent: 'center' },
-  initials:       { fontSize: 56, fontFamily: FONT.bold, color: ON_DARK },
-  tag:            { position: 'absolute', top: 12, left: 12, paddingHorizontal: 9, paddingVertical: 5, borderRadius: RADIUS.xs, backgroundColor: 'rgba(0,0,0,0.72)' },
-  tagText:        { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK, letterSpacing: 0.7, textTransform: 'uppercase' },
-  pricePill:      { position: 'absolute', bottom: 12, alignSelf: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: FG, borderWidth: 3, borderColor: CARD },
-  priceText:      { fontSize: FS.sm, fontFamily: FONT.bold, color: BG },
+  initials:       { fontSize: 56, fontFamily: FONT.bold, color: theme.text },
+  tag:            { position: 'absolute', top: 12, left: 12, paddingHorizontal: 9, paddingVertical: 5, borderRadius: RADII.chip, backgroundColor: 'rgba(0,0,0,0.72)' },
+  pricePill:      { position: 'absolute', bottom: 12, alignSelf: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: RADII.pill, backgroundColor: theme.text, borderWidth: 3, borderColor: theme.card },
   signalRow:      { minHeight: 34, paddingTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   pagination:     { height: 22, marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  dot:            { width: 5, height: 5, borderRadius: 3, backgroundColor: SUBTLE },
-  dotActive:      { width: 18, backgroundColor: FG },
+  dot:            { width: 5, height: 5, borderRadius: 3, backgroundColor: theme.subtle },
+  dotActive:      { width: 18, backgroundColor: theme.text },
 });
 
 // ─── Drop row ─────────────────────────────────────────────────────────────────
@@ -416,7 +450,7 @@ interface DropRowItem {
   commerce: CommerceSignalData;
 }
 
-function DropRow({ item }: { item: DropRowItem }) {
+const DropRow = React.memo(function DropRow({ item }: { item: DropRowItem }) {
   const router = useRouter();
   const { theme } = useAppTheme();
   const isUrgentUnits =
@@ -424,28 +458,26 @@ function DropRow({ item }: { item: DropRowItem }) {
     (item.commerce.remainingUnits ?? 0) <= URGENCY_UNITS_THRESHOLD;
 
   function handlePress() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    hapticMedium();
     router.push((`/buyer-drop-detail?dropId=${encodeURIComponent(item.dropId)}&dropName=${encodeURIComponent(item.name)}`) as never);
   }
 
   return (
-    <TouchableOpacity
-      style={[dr.row, { borderColor: item.isLive ? `${theme.accent}55` : BORDER }]}
-      activeOpacity={0.8}
+    <Card
       onPress={handlePress}
-      accessibilityRole="button"
       accessibilityLabel={`${item.name} by ${item.brand}${item.isLive ? ', live now' : ''}`}
+      style={[dr.row, { borderColor: item.isLive ? `${theme.accent}55` : theme.border }]}
     >
       {item.imageUri ? (
         <CachedImage source={{ uri: item.imageUri }} style={dr.avatar} contentFit="cover" />
       ) : (
-        <View style={[dr.avatar, { backgroundColor: item.colorHex, alignItems: 'center', justifyContent: 'center' }]}>
-          <Text style={dr.initials}>{item.initials}</Text>
+        <View style={[dr.avatar, { backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' }]}>
+          <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.bold, color: theme.text }]}>{item.initials}</Text>
         </View>
       )}
       <View style={{ flex: 1 }}>
-        <Text style={dr.name} numberOfLines={1}>{item.name}</Text>
-        <Text style={dr.brand} numberOfLines={1}>{item.brand}</Text>
+        <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: theme.text }]} numberOfLines={1}>{item.name}</Text>
+        <Text style={[TYPE_SCALE.caption, { color: theme.muted, marginTop: 2 }]} numberOfLines={1}>{item.brand}</Text>
         <ClaimedRemainingLabel
           claimedUnits={item.commerce.claimedUnits ?? 0}
           remainingUnits={item.commerce.remainingUnits ?? 0}
@@ -456,12 +488,12 @@ function DropRow({ item }: { item: DropRowItem }) {
       </View>
       <View style={{ alignItems: 'flex-end', gap: 5 }}>
         {item.commerce.currentPriceCents != null && (
-          <Text style={dr.price}>{formatCents(item.commerce.currentPriceCents)}</Text>
+          <Text style={[TYPE_SCALE.footnote, TABULAR_NUMS, { fontFamily: FONT.bold, color: theme.text }]}>{formatCents(item.commerce.currentPriceCents)}</Text>
         )}
         {item.isLive ? (
           <View style={dr.liveRow}>
             <LivePulseDot color={theme.accent} />
-            <Text style={[dr.liveText, { color: theme.accent }]}>Live now</Text>
+            <Text style={[TYPE_SCALE.caption, { fontFamily: FONT.semibold, color: theme.accent }]}>Live now</Text>
           </View>
         ) : item.releaseAt ? (
           <UpcomingCountdown releaseAt={item.releaseAt} />
@@ -470,19 +502,13 @@ function DropRow({ item }: { item: DropRowItem }) {
           <TimeRemainingLabel endsAt={item.endsAt} accent={theme.accent} />
         )}
       </View>
-    </TouchableOpacity>
-  );
-}
+    </Card>
+  );});
 
 const dr = StyleSheet.create({
-  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.xs, borderWidth: 1, backgroundColor: CARD },
-  avatar:   { width: 44, height: 44, borderRadius: RADIUS.xs, overflow: 'hidden' },
-  initials: { fontSize: 13, fontFamily: FONT.bold, color: ON_DARK },
-  name:     { fontSize: 13, fontFamily: FONT.semibold, color: FG },
-  brand:    { fontSize: 11, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
-  price:    { fontSize: 13, fontFamily: FONT.bold, color: FG },
+  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13 },
+  avatar:   { width: 44, height: 44, borderRadius: RADII.chip, overflow: 'hidden' },
   liveRow:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  liveText: { fontSize: 11, fontFamily: FONT.semibold },
 });
 
 // ─── Trending post row ────────────────────────────────────────────────────────
@@ -500,12 +526,12 @@ interface TrendingRowItem {
   colorHex: string;
 }
 
-function TrendingRow({ item }: { item: TrendingRowItem }) {
+const TrendingRow = React.memo(function TrendingRow({ item }: { item: TrendingRowItem }) {
   const router = useRouter();
   const { theme } = useAppTheme();
 
   function handlePress() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticLight();
     if (item.brandId) {
       // Trending posts navigate to seller profile via brandId — they have no productId
       router.push((`/seller-profile?id=${encodeURIComponent(item.brandId)}`) as never);
@@ -513,92 +539,172 @@ function TrendingRow({ item }: { item: TrendingRowItem }) {
   }
 
   return (
-    <TouchableOpacity
-      style={[tr.row, { borderColor: BORDER }]}
-      activeOpacity={0.8}
+    <Card
       onPress={handlePress}
-      accessibilityRole="button"
       accessibilityLabel={`#${item.rank}, ${item.name} by ${item.brand}`}
+      style={tr.row}
     >
-      <Text style={[tr.rank, { color: theme.accent }]}>#{item.rank}</Text>
-      <View style={[tr.avatar, { backgroundColor: item.colorHex, alignItems: 'center', justifyContent: 'center' }]}>
-        <Text style={tr.initials}>{item.initials}</Text>
+      <Text style={[TYPE_SCALE.callout, TABULAR_NUMS, { fontFamily: FONT.bold, color: theme.accent, width: 28 }]}>#{item.rank}</Text>
+      <View style={[tr.avatar, { backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' }]}>
+        <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.bold, color: theme.text }]}>{item.initials}</Text>
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={tr.name} numberOfLines={1}>{item.name}</Text>
-        <Text style={tr.brand} numberOfLines={1}>{item.brand}</Text>
+        <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: theme.text }]} numberOfLines={1}>{item.name}</Text>
+        <Text style={[TYPE_SCALE.caption, { color: theme.muted, marginTop: 2 }]} numberOfLines={1}>{item.brand}</Text>
         {/* No commerce signals — trending posts have no product demand data */}
       </View>
-    </TouchableOpacity>
-  );
-}
+    </Card>
+  );});
 
 const tr = StyleSheet.create({
-  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.xs, borderWidth: 1, backgroundColor: CARD },
-  rank:     { fontSize: 14, fontFamily: FONT.bold, width: 28 },
-  avatar:   { width: 44, height: 44, borderRadius: RADIUS.xs, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  initials: { fontSize: 13, fontFamily: FONT.bold, color: ON_DARK },
-  name:     { fontSize: 13, fontFamily: FONT.semibold, color: FG },
-  brand:    { fontSize: 11, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13 },
+  avatar:   { width: 44, height: 44, borderRadius: RADII.chip, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
 });
 
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
+// ─── Discover Hero — full-bleed "Just Dropped" spotlight ───────────────────────
+//
+// Layout inspired by GOAT's immersive drop page (see attached_assets/
+// image_1790033866493.png): full-bleed gradient backdrop, one product floating
+// centered with a price pill, a slim top bar (counter chip · title · Shop all
+// pill), and horizontal swipe between products with a peek of the next one.
+//
+// The buyer product API only returns a single flat product photo per item —
+// there is no background-removed cutout or a separate seller lifestyle photo
+// in the data yet (the seller's cutout toggle in add-product.tsx never makes
+// it into the saved `images` array, and there's no lifestyle-shot field at
+// all), so this renders the real product photo on the theme's hero gradient
+// rather than fabricating an image. Follow-up: plumb the seller's chosen
+// cutout image through to `images[0]` so this can render true floating cutouts.
+function DiscoverHero({ items, theme, onOpenProduct, onShopAll }: {
+  items: ProductCardItem[];
+  theme: AppThemePreset;
+  onOpenProduct: (item: ProductCardItem) => void;
+  onShopAll: () => void;
+}) {
+  const { width: windowWidth } = useWindowDimensions();
+  const [activeIndex, setActiveIndex] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
+  const heroHeight = Math.min(560, Math.max(420, windowWidth * 1.05));
+  // Page is slightly narrower than the viewport so the next card peeks in at
+  // the edge, matching the reference's horizontal-swipe behavior.
+  const pagePeek = 28;
+  const pageWidth = Math.min(windowWidth, GRID_MAX_WIDTH) - pagePeek;
+  const sideInset = (windowWidth - pageWidth) / 2;
 
-function SkeletonRow() {
-  const opacity = useRef(new Animated.Value(0.35)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 0.7, duration: 700, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.35, duration: 700, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [opacity]);
+  if (items.length === 0) return null;
+  const active = items[Math.min(activeIndex, items.length - 1)];
+
   return (
-    <Animated.View style={[skRow.row, { opacity }]}>
-      <View style={skRow.avatar} />
-      <View style={{ flex: 1, gap: 8 }}>
-        <View style={[skRow.line, { width: '65%' }]} />
-        <View style={[skRow.line, { width: '45%' }]} />
+    <View style={{ height: heroHeight, marginBottom: SP.xl }}>
+      <LinearGradient
+        colors={theme.heroGradient}
+        start={{ x: 0.15, y: 0 }}
+        end={{ x: 0.85, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
+      {/* Top bar — counter chip · title · Shop all pill */}
+      <View style={[dh.topBar, { paddingHorizontal: Math.max(SP.md, sideInset) }]}>
+        <View style={dh.counterChip}>
+          <Text style={dh.counterChipText}>{activeIndex + 1}/{items.length}</Text>
+        </View>
+        <Text style={dh.title} numberOfLines={1}>JUST DROPPED</Text>
+        <Pressable onPress={onShopAll} style={dh.shopAllPill} accessibilityRole="button" accessibilityLabel="Shop all">
+          <Text style={dh.shopAllText}>Shop all</Text>
+        </Pressable>
       </View>
-      <View style={[skRow.line, { width: 44 }]} />
-    </Animated.View>
+
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled={false}
+        snapToInterval={pageWidth}
+        decelerationRate="fast"
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: sideInset }}
+        onMomentumScrollEnd={(e) => {
+          const next = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
+          setActiveIndex(Math.max(0, Math.min(items.length - 1, next)));
+        }}
+      >
+        {items.map((item) => (
+          <Pressable
+            key={item.id}
+            onPress={() => onOpenProduct(item)}
+            style={{ width: pageWidth, alignItems: 'center' }}
+            accessibilityRole="button"
+            accessibilityLabel={`${item.name} by ${item.brand}${item.commerce.currentPriceCents != null ? `, ${formatCents(item.commerce.currentPriceCents)}` : ''}`}
+          >
+            <View style={dh.productWrap}>
+              {item.imageUri ? (
+                <CachedImage source={{ uri: item.imageUri }} style={dh.productImage} contentFit="contain" />
+              ) : (
+                <View style={[dh.productImage, dh.productImageFallback, { backgroundColor: `${theme.onAccent}22` }]}>
+                  <Text style={[dh.productFallbackInitials, { color: theme.onAccent }]}>{item.initials}</Text>
+                </View>
+              )}
+            </View>
+            {item.commerce.currentPriceCents != null && (
+              <View style={dh.pricePill}>
+                <Text style={dh.pricePillText}>{formatCents(item.commerce.currentPriceCents)}</Text>
+              </View>
+            )}
+          </Pressable>
+        ))}
+      </ScrollView>
+
+      {/* Anchor — brand/seller identity, standing in for a lifestyle shot the
+          product data doesn't carry yet. */}
+      <View style={[dh.anchorRow, { paddingHorizontal: Math.max(SP.md, sideInset) }]} pointerEvents="none">
+        <View style={[dh.anchorAvatar, { backgroundColor: `${theme.onAccent}22` }]}>
+          <Text style={[dh.anchorAvatarText, { color: theme.onAccent }]}>{active.initials}</Text>
+        </View>
+        <Text style={dh.anchorText} numberOfLines={1}>{active.brand}</Text>
+      </View>
+    </View>
   );
 }
-const skRow = StyleSheet.create({
-  row:    { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.xs, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
-  avatar: { width: 44, height: 44, borderRadius: RADIUS.xs, backgroundColor: SURFACE },
-  line:   { height: 10, borderRadius: 4, backgroundColor: SURFACE },
-});
 
-function SkeletonCard() {
-  const opacity = useRef(new Animated.Value(0.35)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 0.7, duration: 700, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.35, duration: 700, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [opacity]);
-  return (
-    <Animated.View style={[skCard.card, { opacity }]}>
-      <View style={skCard.visual} />
-      <View style={{ padding: 10, gap: 8 }}>
-        <View style={[skRow.line, { width: '60%' }]} />
-        <View style={[skRow.line, { width: '85%' }]} />
-        <View style={[skRow.line, { width: '40%' }]} />
-      </View>
-    </Animated.View>
-  );
-}
-const skCard = StyleSheet.create({
-  card:   { width: 158, borderRadius: RADIUS.xs, overflow: 'hidden', backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
-  visual: { height: 130, backgroundColor: SURFACE },
+const dh = StyleSheet.create({
+  topBar: {
+    position: 'absolute', top: SP.sm, left: 0, right: 0, zIndex: 2,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+  },
+  counterChip: {
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADII.pill,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  counterChipText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 11, ...TABULAR_NUMS },
+  title: {
+    flex: 1, textAlign: 'center', color: '#FFFFFF', fontFamily: FONT.bold,
+    fontSize: 13, letterSpacing: 1, textTransform: 'uppercase',
+  },
+  shopAllPill: {
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: RADII.pill,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  shopAllText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 12 },
+  productWrap: {
+    flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center', paddingTop: 56,
+  },
+  productImage: { width: '68%', height: '62%' },
+  productImageFallback: { alignItems: 'center', justifyContent: 'center', borderRadius: RADII.card },
+  productFallbackInitials: { fontFamily: FONT.bold, fontSize: 40 },
+  pricePill: {
+    marginTop: SP.sm, marginBottom: SP.lg,
+    paddingHorizontal: 16, paddingVertical: 8, borderRadius: RADII.pill,
+    backgroundColor: '#FFFFFF',
+  },
+  pricePillText: { color: '#0A0A0A', fontFamily: FONT.bold, fontSize: 15, ...TABULAR_NUMS },
+  anchorRow: {
+    position: 'absolute', bottom: SP.md, left: 0, right: 0,
+    flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center',
+  },
+  anchorAvatar: {
+    width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+  },
+  anchorAvatarText: { fontFamily: FONT.bold, fontSize: 10 },
+  anchorText: { color: '#FFFFFF', fontFamily: FONT.medium, fontSize: 12, opacity: 0.85 },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -607,12 +713,14 @@ export default function DiscoverScreen() {
   const insets    = useSafeAreaInsets();
   const barInset = useBuyerTabBarInset();
   const router    = useRouter();
+  const { push }  = useThreadPull();
   const api       = useApi();
   const { theme } = useAppTheme();
-  const palette = theme as typeof theme & { background?: string; card?: string; border?: string; text?: string; muted?: string; };
   const { isSignedIn } = useAuth();
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const { width: winWidth } = useWindowDimensions();
+  const showcaseSkeletonWidth = Math.min(Math.max(winWidth - 54 - GUTTER * 2, 1), 370);
 
   // ─ Each section has independent loading, error, and data ──────────
 
@@ -802,73 +910,81 @@ export default function DiscoverScreen() {
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticLight();
     Promise.all([fetchHighDemand(), fetchProducts(), fetchDrops(), fetchTrending()])
       .finally(() => setRefreshing(false));
   }, [fetchHighDemand, fetchProducts, fetchDrops, fetchTrending]);
 
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: palette.background ?? BG }}
+      style={{ flex: 1, backgroundColor: theme.background }}
       contentContainerStyle={{ paddingBottom: barInset + SP.md }}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
-          tintColor={theme.accent}
-          colors={[theme.accent]}
-        />
+        <ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
       }
     >
       {/* ─ Header ─ */}
-      <View style={[s.header, { paddingTop: topPad + 16, paddingHorizontal: 20 }]}>
-        <View>
-          <Text style={[s.greeting, { color: palette.muted ?? MUTED }]}>What's dropping</Text>
-          <Text style={[s.pageTitle, { color: palette.text ?? FG }]}>Discover</Text>
+      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
+        <View style={[s.header, { paddingTop: topPad + 16 }]}>
+          <View>
+            <Text style={[TYPE_SCALE.caption, { color: theme.muted, letterSpacing: 0.3 }]}>What's dropping</Text>
+            <Text style={[TYPE_SCALE.title1, { color: theme.text, letterSpacing: -0.6 }]}>Discover</Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <IconButton
+              name="search"
+              onPress={() => router.push('/(buyer)/search' as never)}
+              accessibilityLabel="Search products and brands"
+            />
+            {isSignedIn && (
+              <IconButton
+                name="bell"
+                onPress={() => router.push('/(buyer)/inbox' as never)}
+                accessibilityLabel="Notifications"
+              />
+            )}
+          </View>
         </View>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <TouchableOpacity
-            style={[s.headerBtn, { backgroundColor: palette.card ?? CARD, borderColor: palette.border ?? BORDER }]}
-            activeOpacity={0.75}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/search' as never); }}
-            accessibilityRole="button"
-            accessibilityLabel="Search products and brands"
-          >
-            <Feather name="search" size={18} color={MUTED} />
-          </TouchableOpacity>
-          {isSignedIn && (
-            <TouchableOpacity
-              style={[s.headerBtn, { backgroundColor: palette.card ?? CARD, borderColor: palette.border ?? BORDER }]}
-              activeOpacity={0.75}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/inbox' as never); }}
-              accessibilityRole="button"
-              accessibilityLabel="Notifications"
-            >
-              <Feather name="bell" size={18} color={MUTED} />
-            </TouchableOpacity>
-          )}
+      </ResponsiveContainer>
+
+      {/* ─ Hero — full-bleed "Just Dropped" spotlight, sourced from the same
+          For You catalogue fetched below (no separate endpoint yet). ─ */}
+      {forYouLoading ? (
+        <View style={{ marginBottom: SP.xl, paddingHorizontal: SP.md }}>
+          <SkeletonBlock width="100%" height={420} radius={RADII.card} />
         </View>
-      </View>
+      ) : forYouError ? null : forYouItems.length === 0 ? null : (
+        <DiscoverHero
+          items={forYouItems.slice(0, 6)}
+          theme={theme}
+          onOpenProduct={(item) => {
+            hapticLight();
+            const pid = encodeURIComponent(item.productId ?? item.id);
+            push((`/thread-product-detail?productId=${pid}&productName=${encodeURIComponent(item.name)}`) as never);
+          }}
+          onShopAll={() => router.push('/(buyer)/search' as never)}
+        />
+      )}
 
       {/* ─ High Demand — publicProducts.highDemand(6) only, no trending posts ─ */}
-      <View style={{ paddingHorizontal: 20, marginBottom: 32 }}>
+      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
         <HighDemandSectionHead
           title="High Demand"
           subtitle="Products moving fast across the platform"
           style={{ marginBottom: 14 }}
         />
         {highDemandLoading ? (
-          <View style={{ gap: 10 }}>
-            {[0, 1, 2].map(i => <SkeletonRow key={i} />)}
-          </View>
+          <ListSkeleton rows={3} />
         ) : highDemandError ? (
           <SectionError message={highDemandError} onRetry={fetchHighDemand} />
         ) : highDemandItems.length === 0 ? (
-          <View style={s.emptyRow}>
-            <Feather name="trending-up" size={22} color={SUBTLE} />
-            <Text style={s.emptyText}>No high-demand products right now</Text>
-          </View>
+          <EmptyState
+            icon="trending-up"
+            title="No high-demand products right now"
+            description="Check back soon, or browse everything sellers have listed."
+            action={{ label: 'Browse products', onPress: () => router.push('/(buyer)/search' as never) }}
+          />
         ) : (
           <View style={{ gap: 10 }}>
             {highDemandItems.slice(0, 6).map(item => (
@@ -876,85 +992,109 @@ export default function DiscoverScreen() {
             ))}
           </View>
         )}
-      </View>
+      </ResponsiveContainer>
 
       {/* ─ For You ─ */}
-      <View style={{ paddingHorizontal: 20, marginBottom: 4 }}>
+      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: 4 }}>
         <SectionHead
           title="For You"
           sub="Products from across the platform"
-          action="See all"
-          onAction={() => router.push('/(buyer)/' as never)}
         />
-      </View>
-      {forYouLoading ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 20, gap: 12, paddingBottom: 4 }}
-          style={{ marginBottom: 32 }}
-          scrollEnabled={false}
+      </ResponsiveContainer>
+
+      {/* ─ Entry point into the full-screen, swipeable Discover pager ─ */}
+      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.md }}>
+        <Card
+          onPress={() => push('/(buyer)/discover-feed' as never)}
+          accessibilityLabel="Open full-screen For You feed"
+          style={fy.banner}
         >
-          {[0, 1, 2].map(i => <SkeletonCard key={i} />)}
-        </ScrollView>
+          <View style={[fy.bannerIcon, { backgroundColor: theme.accentDim }]}>
+            <Feather name="zap" size={18} color={theme.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: theme.text }]}>For You, full screen</Text>
+            <Text style={[TYPE_SCALE.caption, { color: theme.muted, marginTop: 2 }]}>Swipe through products one at a time</Text>
+          </View>
+          <Feather name="chevron-right" size={18} color={theme.muted} />
+        </Card>
+      </ResponsiveContainer>
+      {forYouLoading ? (
+        <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
+          <CardSkeleton width={showcaseSkeletonWidth} />
+        </ResponsiveContainer>
       ) : forYouError ? (
-        <View style={{ paddingHorizontal: 20, marginBottom: 32 }}>
+        <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
           <SectionError message={forYouError} onRetry={fetchProducts} />
-        </View>
+        </ResponsiveContainer>
       ) : forYouItems.length === 0 ? (
-        <View style={[s.emptyRow, { marginBottom: 32 }]}>
-          <Feather name="package" size={24} color={SUBTLE} />
-          <Text style={s.emptyText}>No products available right now</Text>
-        </View>
+        <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
+          <EmptyState
+            icon="package"
+            title="No products available right now"
+            description="New arrivals show up here as sellers add them."
+            action={{ label: 'Search products', onPress: () => router.push('/(buyer)/search' as never) }}
+          />
+        </ResponsiveContainer>
       ) : (
-        <ProductShowcase items={forYouItems} />
+        <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
+          <ProductShowcase items={forYouItems} />
+        </ResponsiveContainer>
       )}
 
       {/* ─ Drops ─ */}
-      <View style={{ paddingHorizontal: 20, marginBottom: 4 }}>
+      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: 4 }}>
         <SectionHead
           title="Drops"
           sub={dropsItems.some(d => d.isLive) ? 'Live now and coming up' : 'Coming up'}
-          action="All drops"
-          onAction={() => router.push('/(buyer)/' as never)}
+          action="See all"
+          onAction={() => router.push('/buyer-drops' as never)}
         />
-      </View>
-      <View style={{ paddingHorizontal: 20, gap: 10, marginBottom: 32 }}>
-        {dropsLoading ? (
-          [0, 1, 2].map(i => <SkeletonRow key={i} />)
-        ) : dropsError ? (
-          <SectionError message={dropsError} onRetry={fetchDrops} />
-        ) : dropsItems.length === 0 ? (
-          <View style={s.emptyRow}>
-            <Feather name="calendar" size={22} color={SUBTLE} />
-            <Text style={s.emptyText}>No upcoming drops right now</Text>
-          </View>
-        ) : (
-          dropsItems.map(item => <DropRow key={item.id} item={item} />)
-        )}
-      </View>
+      </ResponsiveContainer>
+      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
+        <View style={{ gap: 10 }}>
+          {dropsLoading ? (
+            <ListSkeleton rows={3} />
+          ) : dropsError ? (
+            <SectionError message={dropsError} onRetry={fetchDrops} />
+          ) : dropsItems.length === 0 ? (
+            <EmptyState
+              icon="calendar"
+              title="No upcoming drops right now"
+              description="Follow sellers to get notified the moment a new drop goes live."
+              action={{ label: 'See all drops', onPress: () => router.push('/buyer-drops' as never) }}
+            />
+          ) : (
+            dropsItems.map(item => <DropRow key={item.id} item={item} />)
+          )}
+        </View>
+      </ResponsiveContainer>
 
       {/* ─ Trending — engagement-ranked posts, separate from High Demand ─ */}
-      <View style={{ paddingHorizontal: 20, marginBottom: 4 }}>
+      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: 4 }}>
         <SectionHead
           title="Trending"
           sub="Real-time engagement across the platform"
         />
-      </View>
-      <View style={{ paddingHorizontal: 20, gap: 10, marginBottom: 32 }}>
-        {trendingLoading ? (
-          [0, 1, 2].map(i => <SkeletonRow key={i} />)
-        ) : trendingError ? (
-          <SectionError message={trendingError} onRetry={fetchTrending} />
-        ) : trendingItems.length === 0 ? (
-          <View style={s.emptyRow}>
-            <Feather name="activity" size={22} color={SUBTLE} />
-            <Text style={s.emptyText}>No trending posts right now</Text>
-          </View>
-        ) : (
-          trendingItems.slice(0, 10).map(item => <TrendingRow key={item.id} item={item} />)
-        )}
-      </View>
+      </ResponsiveContainer>
+      <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
+        <View style={{ gap: 10 }}>
+          {trendingLoading ? (
+            <ListSkeleton rows={3} />
+          ) : trendingError ? (
+            <SectionError message={trendingError} onRetry={fetchTrending} />
+          ) : trendingItems.length === 0 ? (
+            <EmptyState
+              icon="activity"
+              title="No trending posts right now"
+              description="Posts with the most likes and saves across the platform show up here."
+              action={{ label: 'Explore feed', onPress: () => router.push('/(buyer)/feed' as never) }}
+            />
+          ) : (
+            trendingItems.slice(0, 10).map(item => <TrendingRow key={item.id} item={item} />)
+          )}
+        </View>
+      </ResponsiveContainer>
     </ScrollView>
   );
 }
@@ -962,10 +1102,10 @@ export default function DiscoverScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  header:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 },
-  greeting:  { fontSize: 12, fontFamily: FONT.medium, letterSpacing: 0.3 },
-  pageTitle: { fontSize: 28, fontFamily: FONT.bold, letterSpacing: -0.6 },
-  headerBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  emptyRow:  { paddingHorizontal: 20, paddingVertical: 24, alignItems: 'center', gap: 10 },
-  emptyText: { color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.sm },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 },
+});
+
+const fy = StyleSheet.create({
+  banner:     { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13 },
+  bannerIcon: { width: 40, height: 40, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center' },
 });

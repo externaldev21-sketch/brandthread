@@ -2,7 +2,7 @@
  * Design Mockup Preview — /design-mockup-preview
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
@@ -12,6 +12,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { captureRef } from 'react-native-view-shot';
 import Svg, { Path, Rect } from 'react-native-svg';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
@@ -23,8 +24,10 @@ import {
   BrandthreadCard, PrimaryButton, SecondaryButton,
   SectionHeader, StatusBadge,
 } from '@/components/BrandthreadUI';
-import { getProject, exportProject, createBrandAsset } from '@/services/designService';
+import { getProject, createBrandAsset } from '@/services/designService';
 import { DesignProject } from '@/services/designTypes';
+import DesignLayerCompositor from '@/components/DesignLayerCompositor';
+import { Header } from '@/components/layout';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const PANEL_H = SCREEN_H * 0.6;
@@ -55,34 +58,35 @@ export default function DesignMockupPreviewScreen() {
   const [activeView, setActiveView] = useState<ViewTab>('Front');
   const [bgColor, setBgColor]       = useState('#000000');
   const [shadow, setShadow]         = useState<ShadowStyle>('Soft');
-  const [exporting, setExporting]   = useState(false);
+  const [saving, setSaving]         = useState(false);
+  const previewShotRef = useRef<View>(null);
 
   useEffect(() => {
     if (!projectId) { setLoading(false); return; }
     getProject(projectId).then(p => { setProject(p); setLoading(false); });
   }, [projectId]);
 
-  const handleExport = useCallback(async () => {
-    if (!project) return;
-    Alert.alert('Export Mockup', 'Export this mockup to your device?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Export',
-        onPress: async () => {
-          setExporting(true);
-          await exportProject(project.id, 'png');
-          setExporting(false);
-          Alert.alert('Success', 'Mockup exported successfully!');
-        },
-      },
-    ]);
-  }, [project]);
-
+  // Flattens the on-screen preview panel (garment + composited design layers
+  // + background + labels) into a real PNG via react-native-view-shot, the
+  // same capture approach BgRefineCanvas uses for background removal exports.
   const handleSaveMockup = useCallback(async () => {
-    if (!project) return;
-    await createBrandAsset({ name: `${project.name} Mockup`, type: 'mockup', tags: [] });
-    Alert.alert('Saved', 'Mockup saved to Brand Assets.');
-  }, [project]);
+    if (!project || !previewShotRef.current || saving) return;
+    setSaving(true);
+    try {
+      const uri = await captureRef(previewShotRef, { format: 'png', quality: 1, result: 'data-uri' });
+      await createBrandAsset({
+        name: `${project.name} Mockup`,
+        type: 'mockup',
+        uri: uri.startsWith('data:') ? uri : `data:image/png;base64,${uri}`,
+        tags: [],
+      });
+      Alert.alert('Saved', 'Mockup saved to Brand Assets.');
+    } catch {
+      Alert.alert('Couldn’t save mockup', 'Something went wrong capturing this preview. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  }, [project, saving]);
 
   const handleAddToProduct = useCallback(() => {
     Alert.alert('Add to Product', 'Choose an option:', [
@@ -97,10 +101,6 @@ export default function DesignMockupPreviewScreen() {
       { text: 'Cancel', style: 'cancel' },
     ]);
   }, [project, router]);
-
-  const handleCustomBg = useCallback(() => {
-    Alert.alert('Custom Background', 'Enter a hex color in the next version. Using current color for now.');
-  }, []);
 
   const renderGarmentSvg = () => {
     const garment = project?.garmentType ?? 'tshirt';
@@ -145,14 +145,8 @@ export default function DesignMockupPreviewScreen() {
 
   if (!project) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Feather name="arrow-left" size={ICON.md} color={FG} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Mockup Preview</Text>
-          <View style={{ width: 40 }} />
-        </View>
+      <View style={styles.root}>
+        <Header title="Mockup Preview" />
         <View style={styles.centered}>
           <Feather name="image" size={48} color={SUBTLE} />
           <Text style={styles.disclaimer}>Open a garment project to see the mockup preview.</Text>
@@ -163,15 +157,8 @@ export default function DesignMockupPreviewScreen() {
   }
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mockup Preview</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <View style={styles.root}>
+      <Header title="Mockup Preview" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* View tabs */}
@@ -189,9 +176,25 @@ export default function DesignMockupPreviewScreen() {
         </ScrollView>
 
         {/* Main preview panel */}
-        <View style={[styles.previewPanel, { backgroundColor: bgColor, height: PANEL_H }]}>
-          <View style={styles.garmentWrap}>
+        <View
+          ref={previewShotRef}
+          collapsable={false}
+          style={[styles.previewPanel, { backgroundColor: bgColor, height: PANEL_H }]}
+        >
+          <View style={[styles.garmentWrap, { width: SCREEN_W * 0.7, height: PANEL_H * 0.7 }]}>
             {renderGarmentSvg()}
+            {/* Composite the actual design onto the chest print zone, in place
+                of the plain garment outline. This is an approximate chest-area
+                placement, not a pixel-accurate print-zone mask. */}
+            {project.layers && project.layers.length > 0 && (
+              <View style={styles.designOverlay} pointerEvents="none">
+                <DesignLayerCompositor
+                  project={project}
+                  displaySize={SCREEN_W * 0.7 * 0.34}
+                  borderRadius={0}
+                />
+              </View>
+            )}
           </View>
           <View style={styles.overlayLabels}>
             <Text style={[styles.overlayName, { color: bgColor === '#FFFFFF' || bgColor === '#FFF8F0' ? '#000' : FG }]}>
@@ -214,13 +217,6 @@ export default function DesignMockupPreviewScreen() {
               activeOpacity={0.8}
             />
           ))}
-          <TouchableOpacity
-            onPress={handleCustomBg}
-            style={[styles.bgSwatchCustom, { borderColor: BORDER }]}
-            activeOpacity={0.8}
-          >
-            <Feather name="plus" size={16} color={MUTED} />
-          </TouchableOpacity>
         </ScrollView>
 
         {/* Shadow style */}
@@ -240,12 +236,7 @@ export default function DesignMockupPreviewScreen() {
 
         {/* Actions */}
         <View style={styles.actionsWrap}>
-          {exporting ? (
-            <ActivityIndicator color={PURPLE} style={{ marginBottom: SP.sm }} />
-          ) : (
-            <PrimaryButton label="Export mockup" onPress={handleExport} style={styles.actionBtn} />
-          )}
-          <SecondaryButton label="Save mockup" onPress={handleSaveMockup} style={styles.actionBtn} />
+          <PrimaryButton label="Save mockup" onPress={handleSaveMockup} loading={saving} style={styles.actionBtn} />
           <SecondaryButton label="Add to product" onPress={handleAddToProduct} accent={CYAN} style={styles.actionBtn} />
         </View>
       </ScrollView>
@@ -260,13 +251,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   scrollContent: { paddingBottom: 120 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.lg },
   disclaimer: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', marginTop: SP.md },
-
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SP.md, paddingVertical: SP.sm,
-  },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
 
   tabsRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
   tabBtn: {
@@ -284,7 +268,15 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     justifyContent: 'center',
     position: 'relative',
   },
-  garmentWrap: { alignItems: 'center', justifyContent: 'center' },
+  garmentWrap: { alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  designOverlay: {
+    position: 'absolute',
+    top: '30%',
+    left: '33%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
   overlayLabels: {
     position: 'absolute', bottom: SP.md, left: SP.md, right: SP.md,
   },

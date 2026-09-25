@@ -1,26 +1,21 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, Switch, Alert, StyleSheet,
+  View, ScrollView, Alert, StyleSheet,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { PrimaryButton } from '@/components/BrandthreadUI';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
-import { useRouter } from 'expo-router';
-import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  ON_DARK,
-  FONT, FS, SP, RADIUS, COMP, ICON,
-} from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { SP } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { SectionHeader } from '@/components/BrandthreadUI';
+import { Card, ListRow, Button } from '@/components/ui';
 import { getPrivacySettings, updatePrivacySettings } from '@/services/socialService';
 import { PrivacySettings, AudienceOption, DmPrivacy } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 
 export default function BuyerPrivacySettings() {
-  const { theme } = useAppTheme();
-  const PURPLE = theme.accent;
-  const styles = makeStyles();
+  const colors = useColors();
+  const styles = React.useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api    = useApi();
@@ -68,65 +63,25 @@ export default function BuyerPrivacySettings() {
     setHasChanges(true);
   }
 
-  async function saveSettings() {
+  async function saveSettings(showConfirmation: boolean) {
     if (!settings) return;
-    // Save local settings (stored in AsyncStorage)
-    await updatePrivacySettings(settings);
-    // Save server-side DM privacy setting
-    await api.privacy.update({ dmPrivacy }).catch(() => {});
-    setHasChanges(false);
-    Alert.alert('Saved', 'Privacy settings updated.');
+    try {
+      // Save local settings (stored in AsyncStorage)
+      await updatePrivacySettings(settings);
+      // Save server-side DM privacy setting
+      await api.privacy.update({ dmPrivacy });
+      setHasChanges(false);
+      if (showConfirmation) Alert.alert('Saved', 'Privacy updated.');
+    } catch {
+      if (showConfirmation) Alert.alert('Error', "Couldn't save. Try again.");
+      // On silent (back-navigation) saves, leave hasChanges set so the user
+      // isn't told their change was saved when it wasn't.
+    }
   }
 
   async function handleBack() {
-    if (hasChanges) await saveSettings();
+    if (hasChanges) await saveSettings(false);
     router.back();
-  }
-
-  function PickerRow({
-    icon, label, subtitle, value, onPress,
-  }: { icon: string; label: string; subtitle?: string; value: string; onPress: () => void }) {
-    return (
-      <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
-        <Feather name={icon as any} size={ICON.md} color={PURPLE} />
-        <View style={styles.rowContent}>
-          <Text style={styles.rowLabel}>{label}</Text>
-          {subtitle ? <Text style={styles.rowSubtitle}>{subtitle}</Text> : null}
-        </View>
-        <View style={styles.rowRight}>
-          <Text style={styles.rowValue}>{value}</Text>
-          <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />
-        </View>
-      </TouchableOpacity>
-    );
-  }
-
-  function ToggleRow({
-    icon, label, subtitle, value, onToggle,
-  }: { icon: string; label: string; subtitle?: string; value: boolean; onToggle: (v: boolean) => void }) {
-    return (
-      <View style={styles.row}>
-        <Feather name={icon as any} size={ICON.md} color={PURPLE} />
-        <View style={styles.rowContent}>
-          <Text style={styles.rowLabel}>{label}</Text>
-          {subtitle ? <Text style={styles.rowSubtitle}>{subtitle}</Text> : null}
-        </View>
-        <Switch
-          value={value}
-          onValueChange={onToggle}
-          trackColor={{ false: BORDER, true: PURPLE }}
-          thumbColor={ON_DARK}
-        />
-      </View>
-    );
-  }
-
-  function SectionHeader({ title }: { title: string }) {
-    return (
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionHeaderText}>{title}</Text>
-      </View>
-    );
   }
 
   if (!settings) {
@@ -135,27 +90,22 @@ export default function BuyerPrivacySettings() {
 
   return (
     <View style={styles.root}>
-      {/* HEADER */}
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <TouchableOpacity onPress={handleBack} style={styles.headerBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="arrow-left" size={ICON.lg} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Privacy</Text>
-        {hasChanges ? (
-          <PrimaryButton label="Save" onPress={saveSettings} small />
-        ) : (
-          <View style={styles.headerBtn} />
-        )}
-      </View>
+      <ScreenHeader
+        title="Privacy"
+        variant="push"
+        onBack={handleBack}
+        rightElement={hasChanges ? <Button label="Save" size="small" onPress={() => saveSettings(true)} /> : undefined}
+      />
 
-      <ScrollView contentContainerStyle={{ paddingBottom: SP.xxl }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: SP.md, paddingTop: SP.md, paddingBottom: SP.xxl }} showsVerticalScrollIndicator={false}>
         {/* PROFILE VISIBILITY */}
-        <SectionHeader title="Profile" />
-        <View style={styles.card}>
-          <PickerRow
+        <SectionHeader title="PROFILE" />
+        <Card style={styles.card}>
+          <ListRow
             icon="eye"
-            label="Profile visibility"
+            title="Profile visibility"
             value={settings.profileVisibility === 'public' ? 'Public' : 'Private'}
+            chevron
             onPress={() =>
               Alert.alert('Profile Visibility', undefined, [
                 { text: 'Public', onPress: () => update('profileVisibility', 'public') },
@@ -164,15 +114,16 @@ export default function BuyerPrivacySettings() {
               ])
             }
           />
-        </View>
+        </Card>
 
         {/* INTERACTIONS */}
-        <SectionHeader title="Who can..." />
-        <View style={[styles.card, styles.cardOverflow]}>
-          <PickerRow
+        <SectionHeader title="WHO CAN..." style={styles.sectionSpacing} />
+        <Card style={styles.card}>
+          <ListRow
             icon="user-plus"
-            label="Send friend requests"
+            title="Send friend requests"
             value={audienceLabel(settings.whoCanSendFriendRequests)}
+            chevron
             onPress={() =>
               showAudiencePicker(
                 'Friend Requests',
@@ -182,10 +133,12 @@ export default function BuyerPrivacySettings() {
               )
             }
           />
-          <PickerRow
+          <View style={styles.divider} />
+          <ListRow
             icon="grid"
-            label="See your posts"
+            title="See your posts"
             value={audienceLabel(settings.whoCanSeePosts)}
+            chevron
             onPress={() =>
               showAudiencePicker(
                 'Post Visibility',
@@ -195,10 +148,12 @@ export default function BuyerPrivacySettings() {
               )
             }
           />
-          <PickerRow
+          <View style={styles.divider} />
+          <ListRow
             icon="users"
-            label="See your friends list"
+            title="See your friends list"
             value={audienceLabel(settings.whoCanSeeFriendsList)}
+            chevron
             onPress={() =>
               showAudiencePicker(
                 'Friends List',
@@ -208,10 +163,12 @@ export default function BuyerPrivacySettings() {
               )
             }
           />
-          <PickerRow
+          <View style={styles.divider} />
+          <ListRow
             icon="message-square"
-            label="Reply to stories"
+            title="Reply to stories"
             value={audienceLabel(settings.whoCanReplyToStories)}
+            chevron
             onPress={() =>
               showAudiencePicker(
                 'Story Replies',
@@ -221,10 +178,12 @@ export default function BuyerPrivacySettings() {
               )
             }
           />
-          <PickerRow
+          <View style={styles.divider} />
+          <ListRow
             icon="at-sign"
-            label="Mention you"
+            title="Mention you"
             value={audienceLabel(settings.whoCanMention)}
+            chevron
             onPress={() =>
               showAudiencePicker(
                 'Mentions',
@@ -234,58 +193,57 @@ export default function BuyerPrivacySettings() {
               )
             }
           />
-        </View>
+        </Card>
 
         {/* ACTIVITY */}
-        <SectionHeader title="Activity" />
-        <View style={[styles.card, styles.cardOverflow]}>
-          <ToggleRow
+        <SectionHeader title="ACTIVITY" style={styles.sectionSpacing} />
+        <Card style={styles.card}>
+          <ListRow
             icon="activity"
-            label="Activity status"
+            title="Activity status"
             subtitle="Let friends see when you're active"
-            value={settings.activityStatusVisible}
-            onToggle={v => update('activityStatusVisible', v)}
+            toggle={{ value: settings.activityStatusVisible, onChange: v => update('activityStatusVisible', v) }}
           />
-          <ToggleRow
+          <View style={styles.divider} />
+          <ListRow
             icon="check-square"
-            label="Read receipts"
+            title="Read receipts"
             subtitle="Show when you've read messages"
-            value={settings.readReceiptsEnabled}
-            onToggle={v => update('readReceiptsEnabled', v)}
+            toggle={{ value: settings.readReceiptsEnabled, onChange: v => update('readReceiptsEnabled', v) }}
           />
-        </View>
+        </Card>
 
         {/* SEARCH & DISCOVERY */}
-        <SectionHeader title="Search & Discovery" />
-        <View style={[styles.card, styles.cardOverflow]}>
-          <ToggleRow
+        <SectionHeader title="SEARCH & DISCOVERY" style={styles.sectionSpacing} />
+        <Card style={styles.card}>
+          <ListRow
             icon="search"
-            label="Appear in search"
+            title="Appear in search"
             subtitle="Let others find your profile in search"
-            value={settings.searchable}
-            onToggle={v => update('searchable', v)}
+            toggle={{ value: settings.searchable, onChange: v => update('searchable', v) }}
           />
-          <ToggleRow
+          <View style={styles.divider} />
+          <ListRow
             icon="phone"
-            label="Contact discovery"
+            title="Contact discovery"
             subtitle="Find friends from contacts (no contacts uploaded without permission)"
-            value={settings.contactDiscovery}
-            onToggle={v => update('contactDiscovery', v)}
+            toggle={{ value: settings.contactDiscovery, onChange: v => update('contactDiscovery', v) }}
           />
-        </View>
+        </Card>
 
         {/* MESSAGES */}
-        <SectionHeader title="Messages" />
-        <View style={[styles.card, styles.cardOverflow]}>
-          <PickerRow
+        <SectionHeader title="MESSAGES" style={styles.sectionSpacing} />
+        <Card style={styles.card}>
+          <ListRow
             icon="message-circle"
-            label="Who can message you"
+            title="Who can message you"
             subtitle={
               dmPrivacy === 'followers_only'
                 ? 'Only people you follow can send you DMs'
                 : 'Others go to your Requests inbox until you accept'
             }
-            value={dmPrivacy === 'followers_only' ? 'Followers only' : 'Everyone (with requests)'}
+            value={dmPrivacy === 'followers_only' ? 'Followers only' : 'Everyone'}
+            chevron
             onPress={() =>
               Alert.alert(
                 'Who can message you',
@@ -304,110 +262,48 @@ export default function BuyerPrivacySettings() {
               )
             }
           />
-        </View>
+        </Card>
 
         {/* BLOCKED & MUTED & RESTRICTED */}
-        <SectionHeader title="Blocked & Muted" />
-        <View style={[styles.card, styles.cardOverflow]}>
-          <PickerRow
+        <SectionHeader title="BLOCKED & MUTED" style={styles.sectionSpacing} />
+        <Card style={styles.card}>
+          <ListRow
             icon="slash"
-            label="Blocked accounts"
+            title="Blocked accounts"
             value="Manage"
+            chevron
             onPress={() => router.push({ pathname: '/buyer-blocked' } as never)}
           />
-          <PickerRow
+          <View style={styles.divider} />
+          <ListRow
             icon="volume-x"
-            label="Muted accounts"
+            title="Muted accounts"
             value="Manage"
+            chevron
             onPress={() => router.push('/buyer-muted' as never)}
           />
-          <PickerRow
+          <View style={styles.divider} />
+          <ListRow
             icon="user-x"
-            label="Restricted accounts"
+            title="Restricted accounts"
             value="Manage"
+            chevron
             onPress={() => router.push('/buyer-restricted' as never)}
           />
-        </View>
+        </Card>
       </ScrollView>
     </View>
   );
 }
 
-const makeStyles = () => StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
-  },
-  headerBtn: {
-    width: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: FS.md,
-    fontFamily: FONT.semibold,
-    color: FG,
-  },
-  sectionHeader: {
-    paddingHorizontal: SP.md,
-    paddingTop: SP.lg,
-    paddingBottom: SP.sm,
-  },
-  sectionHeaderText: {
-    color: MUTED,
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  card: {
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: RADIUS.md,
-    marginHorizontal: SP.md,
-  },
-  cardOverflow: {
-    overflow: 'hidden',
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.md,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-  },
-  rowContent: {
-    flex: 1,
-    marginLeft: SP.md,
-  },
-  rowLabel: {
-    color: FG,
-    fontFamily: FONT.medium,
-    fontSize: FS.base,
-  },
-  rowSubtitle: {
-    color: MUTED,
-    fontSize: FS.xs,
-    marginTop: 2,
-  },
-  rowRight: {
-    marginLeft: 'auto',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.xs,
-  },
-  rowValue: {
-    color: MUTED,
-    fontSize: FS.sm,
-  },
-});
+function makeStyles(colors: ReturnType<typeof useColors>) {
+  return StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    sectionSpacing: { marginTop: SP.lg },
+    card: { padding: 0, paddingHorizontal: SP.md },
+    divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+  });
+}

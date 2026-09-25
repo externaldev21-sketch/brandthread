@@ -150,20 +150,19 @@ function OptionChip({
       accessibilityState={{ selected, disabled: !available }}
       style={[
         chipS.chip,
-        selected && { borderColor: accentColor, backgroundColor: `${accentColor}1A` },
+        selected && { borderColor: accentColor, borderWidth: 2, backgroundColor: `${accentColor}1A` },
         !available && chipS.unavail,
       ]}
     >
       <Text
         style={[
           chipS.text,
-          selected && { color: accentColor },
+          selected && { color: accentColor, fontFamily: FONT.bold },
           !available && chipS.textUnavail,
         ]}
       >
         {label}
       </Text>
-      {!available && <View style={chipS.strikethrough} />}
     </TouchableOpacity>
   );
 }
@@ -181,16 +180,10 @@ const chipS = StyleSheet.create({
     overflow: 'hidden',
   },
   text: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
-  textUnavail: { textDecorationLine: 'line-through', color: SUBTLE },
-  unavail: { opacity: 0.5 },
-  strikethrough: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: '50%',
-    height: 1,
-    backgroundColor: RED,
-  },
+  textUnavail: { color: SUBTLE },
+  // Dashed = unavailable, per the shop sheet's variant-chip convention
+  // (bold solid border = selected).
+  unavail: { borderStyle: 'dashed', borderColor: SUBTLE, backgroundColor: 'transparent' },
 });
 
 // ─── Quantity control ─────────────────────────────────────────────────────────
@@ -437,9 +430,9 @@ export function ShopProductSheet({
 
       const hasAnyStock = p.variants.some(v => v.isAvailable);
       setPhase(hasAnyStock ? 'ready' : 'sold_out');
-    } catch (err) {
+    } catch {
       setPhase('error');
-      setErrorMsg(err instanceof Error ? err.message : 'Could not load product.');
+      setErrorMsg("Couldn't load this product. Tap to retry.");
     }
   }, [selection.tags]);
 
@@ -501,9 +494,9 @@ export function ShopProductSheet({
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setPhase('added');
       void flyProductToCart(newCount);
-    } catch (err) {
+    } catch {
       setPhase('ready');
-      setVariantError(err instanceof Error ? err.message : 'Could not add to cart.');
+      setVariantError("Couldn't add to bag. Try again.");
     }
   }
 
@@ -527,9 +520,9 @@ export function ShopProductSheet({
       dismissSheet(() => {
         router.push('/thread-checkout' as never);
       });
-    } catch (err) {
+    } catch {
       setPhase('ready');
-      setVariantError(err instanceof Error ? err.message : 'Could not start checkout.');
+      setVariantError("Couldn't start checkout. Try again.");
     }
   }
 
@@ -591,37 +584,56 @@ export function ShopProductSheet({
           </TouchableOpacity>
         </View>
 
-        {/* ─ Multi-tag switcher ─ */}
+        {/* ─ Multi-tag switcher — roomy product rows, not overlapping thumbnails ─ */}
         {selection.tags.length > 1 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={ss.tagRow}
-          >
-            {selection.tags.map((tag, idx) => (
-              <TouchableOpacity
-                key={tag.productId + idx}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setActiveTagIdx(idx);
-                }}
-                style={[
-                  ss.tagChip,
-                  activeTagIdx === idx && { borderColor: accent, backgroundColor: `${accent}18` },
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={`Switch to ${tag.productName}`}
-              >
-                <Feather name="shopping-bag" size={11} color={activeTagIdx === idx ? accent : MUTED} />
-                <Text
-                  style={[ss.tagChipText, activeTagIdx === idx && { color: accent }]}
-                  numberOfLines={1}
-                >
-                  {tag.productName}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          <View style={ss.tagListWrap}>
+            <Text style={ss.tagListLabel}>
+              {selection.tags.length} products tagged in this post
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={ss.tagRow}
+            >
+              {selection.tags.map((tag, idx) => {
+                const isActiveTag = activeTagIdx === idx;
+                const tagPreview = tag.productId === product?.id ? product : (
+                  selection.previewProduct?.id === tag.productId ? selection.previewProduct : null
+                );
+                const thumbUri = tagPreview?.imageUris?.[0];
+                return (
+                  <TouchableOpacity
+                    key={tag.productId + idx}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setActiveTagIdx(idx);
+                    }}
+                    style={[
+                      ss.tagCard,
+                      isActiveTag && { borderColor: accent, borderWidth: 2 },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isActiveTag }}
+                    accessibilityLabel={`Switch to ${tag.productName}, ${formatCents(tag.priceCents)}`}
+                  >
+                    <View style={ss.tagCardImageWrap}>
+                      {thumbUri ? (
+                        <CachedImage source={{ uri: thumbUri }} style={ss.tagCardImage} contentFit="cover" />
+                      ) : (
+                        <View style={[ss.tagCardImage, ss.productImagePlaceholder]}>
+                          <Feather name="shopping-bag" size={16} color={SUBTLE} />
+                        </View>
+                      )}
+                    </View>
+                    <Text style={[ss.tagCardName, isActiveTag && { color: accent }]} numberOfLines={2}>
+                      {tag.productName}
+                    </Text>
+                    <Text style={ss.tagCardPrice}>{formatCents(tag.priceCents)}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
         )}
 
         {/* ─ Content ─ */}
@@ -678,6 +690,9 @@ export function ShopProductSheet({
             keyboardShouldPersistTaps="handled"
             bounces={false}
           >
+            {/* Swipeable image gallery */}
+            <ProductImageCarousel imageUris={product.imageUris} />
+
             {/* Product header row */}
             <ProductHeader
               product={product}
@@ -766,7 +781,19 @@ export function ShopProductSheet({
               <TrustCue icon="truck" label="Fast shipping" />
             </View>
 
-            {/* Action buttons */}
+            <TouchableOpacity onPress={handleViewDetail} style={ss.viewDetailBtn}>
+              <Text style={ss.viewDetailText}>View full product details</Text>
+              <Feather name="chevron-right" size={13} color={MUTED} />
+            </TouchableOpacity>
+
+            {/* Spacer so content never sits behind the sticky action bar below */}
+            <View style={{ height: 84 }} />
+          </ScrollView>
+        )}
+
+        {/* Sticky Add to Cart + Buy Now — always reachable, never scrolls away */}
+        {(phase === 'ready' || phase === 'adding' || phase === 'buying' || phase === 'added') && product && (
+          <View style={ss.stickyActionsWrap}>
             <View style={ss.actions}>
               <TouchableOpacity
                 onPress={phase === 'added' ? handleViewCart : handleAddToCart}
@@ -804,12 +831,7 @@ export function ShopProductSheet({
                 )}
               </TouchableOpacity>
             </View>
-
-            <TouchableOpacity onPress={handleViewDetail} style={ss.viewDetailBtn}>
-              <Text style={ss.viewDetailText}>View full product details</Text>
-              <Feather name="chevron-right" size={13} color={MUTED} />
-            </TouchableOpacity>
-          </ScrollView>
+          </View>
         )}
 
         {phase === 'sold_out' && product && (
@@ -960,6 +982,58 @@ function ProductHeader({
   );
 }
 
+// ─── Product image carousel — swipeable, with a 1/N counter ─────────────────
+
+function ProductImageCarousel({ imageUris }: { imageUris: string[] }) {
+  const { width: windowWidth } = useWindowDimensions();
+  const pageWidth = Math.min(windowWidth, 520);
+  const [index, setIndex] = useState(0);
+  const images = imageUris.length > 0 ? imageUris : [''];
+
+  if (images.length === 1) {
+    return (
+      <View style={[ss.carouselWrap, { height: pageWidth }]}>
+        {images[0] ? (
+          <CachedImage source={{ uri: images[0] }} style={StyleSheet.absoluteFill} contentFit="cover" />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, ss.productImagePlaceholder]}>
+            <Feather name="image" size={28} color={SUBTLE} />
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  return (
+    <View style={[ss.carouselWrap, { height: pageWidth }]}>
+      <ScrollView
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={e => {
+          const next = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
+          setIndex(Math.max(0, Math.min(images.length - 1, next)));
+        }}
+      >
+        {images.map((uri, i) => (
+          <View key={`${uri}-${i}`} style={{ width: pageWidth, height: pageWidth }}>
+            {uri ? (
+              <CachedImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+            ) : (
+              <View style={[StyleSheet.absoluteFill, ss.productImagePlaceholder]}>
+                <Feather name="image" size={28} color={SUBTLE} />
+              </View>
+            )}
+          </View>
+        ))}
+      </ScrollView>
+      <View style={ss.carouselCounter} pointerEvents="none">
+        <Text style={ss.carouselCounterText}>{index + 1}/{images.length}</Text>
+      </View>
+    </View>
+  );
+}
+
 // ─── Trust cue pill ───────────────────────────────────────────────────────────
 
 function TrustCue({ icon, label }: { icon: string; label: string }) {
@@ -1060,31 +1134,41 @@ const ss = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Tag switcher
+  // Tagged-products list — roomy cards, one per tagged product, never overlapping.
+  tagListWrap: { paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE, marginBottom: 4 },
+  tagListLabel: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: MUTED,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
   tagRow: {
     paddingHorizontal: 16,
-    paddingBottom: 10,
-    gap: 8,
+    gap: 10,
     flexDirection: 'row',
   },
-  tagChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 11,
-    paddingVertical: 6,
-    borderRadius: RADIUS.pill,
+  tagCard: {
+    width: 112,
+    borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: BORDER,
     backgroundColor: CARD,
-    maxWidth: 180,
+    padding: 8,
+    gap: 4,
   },
-  tagChipText: {
+  tagCardImageWrap: { width: '100%', aspectRatio: 1, borderRadius: RADIUS.sm, overflow: 'hidden', backgroundColor: CARD_ELEVATED },
+  tagCardImage: { width: '100%', height: '100%' },
+  tagCardName: {
     fontSize: FS.xs,
-    fontFamily: FONT.medium,
-    color: MUTED,
-    flexShrink: 1,
+    fontFamily: FONT.semibold,
+    color: FG,
+    lineHeight: 15,
+    minHeight: 30,
   },
+  tagCardPrice: { fontSize: FS.xs, fontFamily: FONT.bold, color: MUTED },
 
   // Loading / error
   centerBox: {
@@ -1135,7 +1219,15 @@ const ss = StyleSheet.create({
   productImagePlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: CARD_ELEVATED,
   },
+  carouselWrap: { width: '100%', backgroundColor: CARD_ELEVATED },
+  carouselCounter: {
+    position: 'absolute', right: 10, bottom: 10,
+    paddingHorizontal: 9, paddingVertical: 4, borderRadius: RADIUS.pill,
+    backgroundColor: 'rgba(0,0,0,0.62)',
+  },
+  carouselCounterText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 11 },
   preOrderBadge: {
     position: 'absolute',
     bottom: 6,
@@ -1248,6 +1340,16 @@ const ss = StyleSheet.create({
   trustCueText: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
 
   // Action buttons
+  stickyActionsWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingTop: 10,
+    backgroundColor: CARD,
+    borderTopWidth: 1,
+    borderTopColor: BORDER_SUBTLE,
+  },
   actions: {
     flexDirection: 'row',
     gap: 10,

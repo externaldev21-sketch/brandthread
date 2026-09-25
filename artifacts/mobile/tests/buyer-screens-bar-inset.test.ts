@@ -11,10 +11,13 @@ describe('screens behind the floating buyer bar', () => {
       'app/(buyer)/profile.tsx': 'paddingBottom: barInset + SP.lg',
       'app/(buyer)/inbox.tsx': '{ paddingBottom: barInset + SP.md }',
       'app/(buyer)/orders.tsx': 'paddingBottom: barInset + SP.md',
-      'app/(buyer)/friends.tsx': 'paddingBottom: barInset + SP.md',
+      // Phase 2 design-system pass migrated these two screens from the legacy
+      // `SP` alias (lib/theme.ts) to the canonical `SPACING` token
+      // (constants/spacing.ts) — same 16pt value, new shared-token source.
+      'app/(buyer)/friends.tsx': 'paddingBottom: barInset + SPACING.md',
       'app/(buyer)/edit-profile.tsx': 'paddingBottom: barInset + SP.lg',
       'app/(buyer)/cart.tsx': 'paddingBottom: barInset + 150',
-      'app/(tabs)/following.tsx': 'Math.max(120, barInset + SP.md)',
+      'app/(tabs)/following.tsx': 'Math.max(120, barInset + SPACING.md)',
     };
     for (const [file, padding] of Object.entries(screens)) {
       const source = read(file);
@@ -26,7 +29,7 @@ describe('screens behind the floating buyer bar', () => {
 
   it('lifts the cart checkout summary above the bar', () => {
     const cart = read('app/(buyer)/cart.tsx');
-    expect(cart).toContain('<View style={[s.checkoutBar, { paddingBottom: barInset + SP.xs }]}>');
+    expect(cart).toContain('<StickyFooter tabBarInset={barInset}>');
   });
 });
 

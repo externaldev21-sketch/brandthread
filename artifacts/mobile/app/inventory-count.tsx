@@ -11,6 +11,7 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
 import { getCounts, createCount, updateCountItem, completeCount, getInventoryItems, getLocations } from '@/services/inventoryService';
 import { InventoryCount, InventoryCountItem, CountType, CountStatus, InventoryItem, InventoryLocation } from '@/services/inventoryTypes';
+import { Header } from '@/components/layout';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -324,14 +325,8 @@ export default function InventoryCountScreen() {
     const needsLocation = newType === 'location' || newType === 'cycle';
     const estimate = countItemEstimate();
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
-        <View style={s.header}>
-          <TouchableOpacity onPress={() => setMode('list')} style={s.backBtn}>
-            <Feather name="arrow-left" size={ICON.md} color={FG} />
-          </TouchableOpacity>
-          <Text style={s.headerTitle}>New Count</Text>
-          <View style={{ width: 60 }} />
-        </View>
+      <View style={s.root}>
+        <Header title="New Count" onBack={() => setMode('list')} />
 
         <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled">
           <Text style={s.fieldLabel}>Count Type</Text>
@@ -392,14 +387,8 @@ export default function InventoryCountScreen() {
   // ══════════ VIEW MODE ══════════
   if (!currentCount) {
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
-        <View style={s.header}>
-          <TouchableOpacity onPress={() => setMode('list')} style={s.backBtn}>
-            <Feather name="arrow-left" size={ICON.md} color={FG} />
-          </TouchableOpacity>
-          <Text style={s.headerTitle}>Count</Text>
-          <View style={{ width: 60 }} />
-        </View>
+      <View style={s.root}>
+        <Header title="Count" onBack={() => setMode('list')} />
         <EmptyState icon="clipboard" title="Count not found" description="This inventory count could not be loaded." />
       </View>
     );

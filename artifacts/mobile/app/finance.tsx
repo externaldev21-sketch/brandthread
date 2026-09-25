@@ -6,13 +6,15 @@ import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
-import { isManagerRole } from '@/lib/roleError';
+import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
-import { SUCCESS, ORANGE, FS } from '@/lib/theme';
+import { FS } from '@/lib/theme';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { formatCents } from '@/lib/money';
 import { FinanceMoneyFlow } from '@/components/FinanceMoneyFlow';
 import type { FinanceSummary } from '@/lib/financeSummary';
+import { TABULAR_NUMS } from '@/constants/typography';
+import { hapticPrimaryAction } from '@/lib/haptics';
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -85,7 +87,7 @@ export default function FinanceScreen() {
   const overviewCards = [
     { label: 'Available', value: formatCents(availAmt), color: colors.success, icon: 'trending-up' as const },
     { label: 'Pending',   value: formatCents(pendAmt),  color: colors.primary, icon: 'activity' as const },
-    { label: 'Net (30d)', value: formatCents(Math.abs(totalNet)), color: colors.info, icon: 'percent' as const },
+    { label: 'Net (recent)', value: formatCents(totalNet), color: colors.info, icon: 'percent' as const },
   ];
 
   // Build expenses list from real transactions
@@ -101,14 +103,12 @@ export default function FinanceScreen() {
   const PL_DATA_FALLBACK = [
      { label: 'Gross Revenue', value: formatCents(transactions.filter(t => t.net > 0).reduce((a, t) => a + t.amount, 0)), positive: true },
      { label: 'Fees',          value: '-' + formatCents(transactions.reduce((a, t) => a + Math.abs(t.fee ?? 0), 0)),        positive: false },
-     { label: 'Net Total',     value: formatCents(Math.abs(totalNet)), positive: totalNet >= 0, highlight: true },
+     { label: 'Net (recent)',  value: formatCents(totalNet), positive: totalNet >= 0, highlight: true },
   ];
 
   const documents = [
     ...(!isReadOnly ? [{ label: 'Download Statement (CSV)', icon: 'file-text' as const, onPress: handleDownloadStatement }] : []),
     { label: 'Tax Report / 1099-K', icon: 'percent' as const, onPress: () => router.push('/taxes-duties' as any) },
-    { label: 'Manufacturer PO', icon: 'shopping-cart' as const, onPress: undefined },
-    { label: 'Inventory Valuation', icon: 'package' as const, onPress: undefined },
   ];
 
   if (isLoadingRole) {
@@ -122,7 +122,7 @@ export default function FinanceScreen() {
     );
   }
 
-  if (currentRole !== 'owner' && !isReadOnly) {
+  if (!hasPayoutsAccess(currentRole) && !isReadOnly) {
     return (
       <View style={[styles.container, { backgroundColor: 'transparent' }]}>
         <ScreenHeader title="Finance" subtitle="P&L, cash flow & expenses" />
@@ -144,15 +144,15 @@ export default function FinanceScreen() {
       {subStatus && (
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => router.push('/subscription' as any)}
+          onPress={() => { hapticPrimaryAction(); router.push('/subscription' as any); }}
           style={[styles.subCard, { borderColor: colors.border, backgroundColor: colors.card }]}
         >
           <View style={styles.subCardLeft}>
             <Text style={[styles.subCardLabel, { color: colors.mutedForeground }]}>Platform subscription</Text>
-            <Text style={[styles.subCardPlan, { color: colors.foreground }]}>
+            <Text style={[styles.subCardPlan, TABULAR_NUMS, { color: colors.foreground }]}>
               {subStatus.plan === 'growth' ? 'Growth' : subStatus.plan === 'pro' ? 'Pro' : 'Starter'}
               {' '}
-              <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular' }}>
+              <Text style={[{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular' }, TABULAR_NUMS]}>
                  {subStatus.amountCents > 0 ? `${formatCents(subStatus.amountCents)}/mo` : formatCents(2900) + '/mo'}
               </Text>
             </Text>
@@ -166,14 +166,14 @@ export default function FinanceScreen() {
             <View style={[
               styles.subStatusPill,
               { backgroundColor: subStatus.status === 'trialing' ? colors.infoDim
-                  : subStatus.status === 'active' ? `${SUCCESS}22`
-                  : `${ORANGE}22` },
+                  : subStatus.status === 'active' ? `${colors.success}22`
+                  : `${colors.warning}22` },
             ]}>
               <Text style={[
                 styles.subStatusText,
                 { color: subStatus.status === 'trialing' ? colors.info
-                    : subStatus.status === 'active' ? SUCCESS
-                    : ORANGE },
+                    : subStatus.status === 'active' ? colors.success
+                    : colors.warning },
               ]}>
                 {subStatus.status === 'trialing' ? 'Trial'
                   : subStatus.status === 'active' ? 'Active'
@@ -198,7 +198,7 @@ export default function FinanceScreen() {
         {overviewCards.map((card) => (
           <View key={card.label} style={[styles.overviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name={card.icon} size={16} color={card.color} />
-            <Text style={[styles.overviewVal, { color: card.color }]}>{card.value}</Text>
+            <Text style={[styles.overviewVal, TABULAR_NUMS, { color: card.color }]}>{card.value}</Text>
             <Text style={[styles.overviewLabel, { color: colors.mutedForeground }]}>{card.label}</Text>
           </View>
         ))}
@@ -220,7 +220,7 @@ export default function FinanceScreen() {
             <Text style={[styles.plLabel, { color: item.highlight ? colors.foreground : colors.mutedForeground, fontFamily: item.highlight ? 'Inter_600SemiBold' : 'Inter_400Regular' }]}>
               {item.label}
             </Text>
-            <Text style={[styles.plValue, { color: item.positive ? (item.highlight ? colors.primary : colors.success) : colors.destructive, fontFamily: item.highlight ? 'Inter_700Bold' : 'Inter_500Medium' }]}>
+            <Text style={[styles.plValue, TABULAR_NUMS, { color: item.positive ? (item.highlight ? colors.primary : colors.success) : colors.destructive, fontFamily: item.highlight ? 'Inter_700Bold' : 'Inter_500Medium' }]}>
               {item.value}
             </Text>
           </View>
@@ -248,7 +248,7 @@ export default function FinanceScreen() {
                   <Text style={[styles.expDate, { color: colors.mutedForeground }]}>{e.date}</Text>
                 </View>
               </View>
-              <Text style={[styles.expAmount, { color: e.positive ? colors.success : colors.foreground }]}>{e.amount}</Text>
+              <Text style={[styles.expAmount, TABULAR_NUMS, { color: e.positive ? colors.success : colors.foreground }]}>{e.amount}</Text>
             </View>
           ))
         )}
@@ -258,7 +258,7 @@ export default function FinanceScreen() {
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Documents</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {documents.map((item, i) => (
-          <TouchableOpacity key={item.label} onPress={item.onPress} activeOpacity={0.75} style={[styles.docRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+          <TouchableOpacity key={item.label} onPress={() => { hapticPrimaryAction(); item.onPress(); }} activeOpacity={0.75} style={[styles.docRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
             <View style={[styles.docIcon, { backgroundColor: colors.secondary }]}>
               <Feather name={item.icon} size={15} color={colors.mutedForeground} />
             </View>

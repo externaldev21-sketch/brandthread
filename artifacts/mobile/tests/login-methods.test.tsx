@@ -29,13 +29,70 @@ vi.mock('react-native', () => {
     ActivityIndicator: nativeComponent('ActivityIndicator'),
     Alert: { alert: alertMock },
     Modal: nativeComponent('Modal'),
-    Platform: { OS: 'ios' },
+    Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
+    Pressable: nativeComponent('Pressable'),
     ScrollView: nativeComponent('ScrollView'),
-    StyleSheet: { create: (styles: unknown) => styles },
+    StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
     Text: nativeComponent('Text'),
     TextInput: nativeComponent('TextInput'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),
     View: nativeComponent('View'),
+    Animated: {
+      Value: class { constructor(_v?: number) {} },
+      View: nativeComponent('Animated.View'),
+      Text: nativeComponent('Animated.Text'),
+      event: () => () => {},
+      timing: () => ({ start: (cb?: () => void) => cb?.() }),
+      spring: () => ({ start: (cb?: () => void) => cb?.() }),
+      sequence: () => ({ start: (cb?: () => void) => cb?.() }),
+      parallel: () => ({ start: (cb?: () => void) => cb?.() }),
+      loop: () => ({ start: () => {}, stop: () => {} }),
+    },
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
+  };
+});
+
+// The Phase 2 design-system components (Button/IconButton/PressableScale)
+// pull in expo-haptics (native bridge) and BrandthreadUI's other native-only
+// dependencies at module load time — none of which are available in this
+// unit-test environment, so they're stubbed the same way the rest of the
+// native surface above is.
+vi.mock('expo-haptics', () => ({
+  impactAsync: vi.fn(),
+  notificationAsync: vi.fn(),
+  selectionAsync: vi.fn(),
+  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium', Heavy: 'heavy' },
+  NotificationFeedbackType: { Success: 'success', Warning: 'warning', Error: 'error' },
+}));
+
+vi.mock('@/lib/haptics', () => ({
+  hapticLight: vi.fn(),
+  hapticMedium: vi.fn(),
+  hapticSelection: vi.fn(),
+  hapticSuccess: vi.fn(),
+  hapticError: vi.fn(),
+  hapticWarning: vi.fn(),
+  hapticPrimaryAction: vi.fn(),
+  hapticToggle: vi.fn(),
+  hapticSuccessAction: vi.fn(),
+  hapticDestructiveConfirm: vi.fn(),
+}));
+
+vi.mock('expo-linear-gradient', () => {
+  const React = require('react');
+  return {
+    LinearGradient: (props: Record<string, unknown>) =>
+      React.createElement('LinearGradient', props, props.children as React.ReactNode),
+  };
+});
+
+vi.mock('react-native-svg', () => {
+  const React = require('react');
+  const svgComponent = (name: string) => (props: Record<string, unknown>) =>
+    React.createElement(name, props, props.children as React.ReactNode);
+  return {
+    default: svgComponent('Svg'),
+    Line: svgComponent('SvgLine'),
   };
 });
 
@@ -53,6 +110,7 @@ vi.mock('react-native-safe-area-context', () => ({
 
 vi.mock('@expo/vector-icons', () => ({
   Feather: ({ name }: { name: string }) => React.createElement('Feather', { name }),
+  Ionicons: ({ name }: { name: string }) => React.createElement('Ionicons', { name }),
 }));
 
 vi.mock('expo-web-browser', () => ({
@@ -69,6 +127,16 @@ vi.mock('@/hooks/useColors', () => ({
     primary: '#ffffff',
     primaryForeground: '#000000',
     accent: '#222222',
+    text: '#ffffff',
+    foreground: '#ffffff',
+    background: '#000000',
+    card: '#111111',
+    elevated: '#1a1a1a',
+    border: '#222222',
+    mutedForeground: '#999999',
+    subtle: '#777777',
+    success: '#10b981',
+    destructive: '#f87171',
   }),
 }));
 
@@ -77,6 +145,13 @@ vi.mock('@/components/KeyboardAwareScrollViewCompat', () => {
   return {
     KeyboardAwareScrollViewCompat: (props: Record<string, unknown>) =>
       React.createElement('KeyboardAwareScrollViewCompat', props, props.children as React.ReactNode),
+  };
+});
+
+vi.mock('react-native-qrcode-svg', () => {
+  const React = require('react');
+  return {
+    default: (props: Record<string, unknown>) => React.createElement('QRCode', props),
   };
 });
 
@@ -249,8 +324,8 @@ describe('LoginMethods linked-account removal', () => {
 
     expect(currentUser.reload).not.toHaveBeenCalled();
     expect(alertMock).toHaveBeenLastCalledWith(
-      'Could not remove Apple',
-      'Session expired. Sign in again and retry.',
+      'Removal failed',
+      "Couldn't remove Apple. Try again.",
     );
     expect(rendererForTest.root.findByProps({ testID: 'remove-apple-login-method' })).toBeTruthy();
     expect(rendererForTest.root.findAllByProps({ testID: 'connect-apple-login-method' })).toHaveLength(0);
@@ -298,6 +373,6 @@ describe('LoginMethods linked-account removal', () => {
     expect(currentUser.reload).not.toHaveBeenCalled();
     expect(rendererForTest.root.findByProps({ testID: 'setup-password-login-method' })).toBeTruthy();
     expect(rendererForTest.root.findByProps({ testID: 'password-setup-error' }).props.children)
-      .toBe('Password was rejected by Clerk.');
+      .toBe("Couldn't add your password. Try again.");
   });
 });

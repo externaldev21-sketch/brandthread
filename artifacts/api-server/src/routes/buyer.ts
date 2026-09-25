@@ -4,8 +4,8 @@
  */
 import { Router } from "express";
 import {
-  db, checkoutSessions, orders, orderItems, productVariants, products, users, shippingRates, discountCodes, buyerAddresses,
-  drops,
+  db, checkoutSessions, orders, orderItems, productVariants, products, users, shippingRates, buyerAddresses,
+  drops, shippingZones, shippingZoneWeightTiers,
 } from "@workspace/db";
 import { eq, and, desc, sql, isNull, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -15,6 +15,7 @@ import {
   mapStripeError,
 } from "../lib/stripe";
 import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
+import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
 import { refundOrder, RefundError } from "../lib/money/refunds";
 import {
   bindLoyaltyRedemptionToCheckout,
@@ -24,6 +25,7 @@ import {
   reversePurchasePointsOnce,
 } from "./loyalty";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
+import { validateDiscountCode, DiscountValidationError } from "../lib/discounts";
 import { logger } from "../lib/logger";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
@@ -63,6 +65,8 @@ const checkoutBodySchema = z.object({
   clientIdempotencyKey: z.string().trim().min(8).max(160).optional(),
   dropId: requestPrimitives.uuid.nullable().optional(),
   loyaltyToken: z.string().trim().min(1).max(512).optional(),
+  threadCashToken: z.string().trim().min(1).max(512).optional(),
+  discountCode: z.string().trim().min(1).max(64).optional(),
 }).passthrough();
 const addressSuggestionQuerySchema = z.object({
   q: z.string().trim().min(3).max(160),
@@ -339,6 +343,7 @@ router.delete("/addresses/:id", validateRequest({ params: uuidParamsSchema }), a
  * before the buyer reaches Stripe.
  */
 router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }), async (req, res) => {
+  const buyerId = (req as any).clerkUserId as string;
   const items = req.body?.items;
   const discountCodeValues = Array.isArray(req.body?.discountCodes) ? req.body.discountCodes : [];
   if (!Array.isArray(items) || items.length === 0) {
@@ -353,6 +358,7 @@ router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }
   }> = [];
   const sellerIds = new Set<string>();
   let subtotalCents = 0;
+  const lines: Array<{ productId: string; priceCents: number; quantity: number }> = [];
 
   for (const item of items) {
     const [row] = await db
@@ -398,6 +404,7 @@ router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }
       });
     }
     subtotalCents += row.priceCents * quantity;
+    lines.push({ productId: item.productId, priceCents: row.priceCents, quantity });
   }
   for (const sellerId of sellerIds) {
     const vacation = await getSellerVacationStatus(sellerId);
@@ -414,21 +421,19 @@ router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }
   if (issues.length === 0 && sellerIds.size === 1) {
     const sellerId = [...sellerIds][0];
     for (const codeValue of discountCodeValues) {
-      const code = String(codeValue ?? "").trim().toUpperCase();
+      const code = String(codeValue ?? "").trim();
       if (!code) continue;
-      const [discount] = await db
-        .select()
-        .from(discountCodes)
-        .where(and(eq(discountCodes.sellerId, sellerId), eq(discountCodes.code, code), eq(discountCodes.active, true)))
-        .limit(1);
-      const expired = !!discount?.expiresAt && discount.expiresAt.getTime() <= Date.now();
-      const exhausted = discount?.maxUses != null && discount.usesCount >= discount.maxUses;
-      const belowMinimum = !!discount && subtotalCents < discount.minOrderCents;
-      if (!discount || expired || exhausted || belowMinimum) {
+      try {
+        await validateDiscountCode({
+          sellerId, code, customerKey: buyerId, cartSubtotalCents: subtotalCents, lines,
+        });
+      } catch (err) {
+        const message = err instanceof DiscountValidationError
+          ? err.message
+          : `${code} is no longer valid for this order. Remove it to continue.`;
         issues.push({
           itemId: "discount", productName: "Discount code", type: "unavailable",
-          message: `${code} is no longer valid for this order. Remove it to continue.`,
-          canContinue: false,
+          message, canContinue: false,
         });
       }
     }
@@ -461,8 +466,28 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     const buyerId = (req as any).clerkUserId as string;
     const {
       items, successUrl, cancelUrl, contactEmail, contactPhone, shippingAddress,
-      clientIdempotencyKey, dropId, loyaltyToken,
+      clientIdempotencyKey, dropId, loyaltyToken, threadCashToken, discountCode,
     } = req.body;
+
+    // ── THREAD CASH HOOK POINT ────────────────────────────────────────────
+    // Thread Cash (platform-funded reward credit) is not yet wired into the
+    // Stripe money flow here. Doing so without changing seller payout
+    // requires (a) feeding paymentIntentMoney the PRE-Thread-Cash amount so
+    // the destination transfer/application fee are computed as if the buyer
+    // paid full price, and (b) a supplemental Stripe Transfer to the seller
+    // for the discounted gap, funded from the platform's balance and posted
+    // as its own ledger entry — see docs/payments/thread-cash-checkout-todo.md
+    // for the exact plan. Until that lands (and the 'threadCashCheckoutDiscount'
+    // feature flag is reviewed and turned on), reject any redeem attempt here
+    // rather than silently ignoring it or reusing the loyalty-coupon path,
+    // which would reduce the seller's payout.
+    if (typeof threadCashToken === "string" && threadCashToken.trim()) {
+      res.status(400).json({
+        error: "Using Thread Cash at checkout isn't available yet.",
+        code: "THREAD_CASH_CHECKOUT_NOT_IMPLEMENTED",
+      });
+      return;
+    }
 
     if (!Array.isArray(items) || items.length === 0) {
       res.status(400).json({ error: "items required" });
@@ -510,6 +535,11 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       priceCents: number;
     }> = [];
     const sellerIds = new Set<string>();
+    const discountLines: Array<{ productId: string; priceCents: number; quantity: number }> = [];
+    // Tracked separately (not persisted on the checkout-session row) so it
+    // can feed weight-tiered shipping zones without changing the shape of
+    // the stored cart item snapshot.
+    let cartWeightGrams = 0;
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
@@ -530,6 +560,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
           productImages: products.images,
           sellerId: products.ownerId,
           productStatus: products.status,
+          weightGrams: productVariants.weightGrams,
         })
         .from(productVariants)
         .innerJoin(products, eq(productVariants.productId, products.id))
@@ -588,6 +619,8 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         quantity: qty,
         priceCents: row.priceCents,
       });
+      discountLines.push({ productId: item.productId, priceCents: row.priceCents, quantity: qty });
+      cartWeightGrams += (row.weightGrams ?? 0) * qty;
     }
 
     // ── Verify seller has an active Connect account ───────────────────────
@@ -634,6 +667,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       chargePlan = await resolveChargePlan({
         productIds: items.map((item: { productId: string }) => item.productId),
         sellerId,
+        buyerId,
         clientDropId: typeof dropId === "string" && dropId.trim() ? dropId.trim() : null,
       });
     } catch (planError) {
@@ -788,26 +822,86 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       (sum, item) => sum + item.priceCents * item.quantity,
       0,
     );
-    const [configuredShippingRate] = await db
-      .select()
-      .from(shippingRates)
-      .where(and(eq(shippingRates.sellerId, sellerId), eq(shippingRates.active, true)))
-      .limit(1);
-    const shippingCents = !configuredShippingRate ||
-      (configuredShippingRate.freeAboveCents != null && subtotalCents >= configuredShippingRate.freeAboveCents)
-      ? 0
-      : configuredShippingRate.flatRateCents;
+    // Prefer the seller's worldwide shipping zones; fall back to the legacy
+    // single flat-rate row when they have no zones configured yet. This only
+    // decides the shipping line item amount below — Stripe payment-intent
+    // construction and the seller's payout amount are unaffected by which
+    // path priced it.
+    const sellerZoneRows = await db.select().from(shippingZones)
+      .where(and(eq(shippingZones.sellerId, sellerId), eq(shippingZones.active, true)));
+    let shippingCents = 0;
+    let shippingLineName = "Shipping";
+    if (sellerZoneRows.length > 0) {
+      const [sellerHome] = await db.select({ country: users.sellerShipFromCountry }).from(users)
+        .where(eq(users.clerkId, sellerId)).limit(1);
+      const weightTierRows: ShippingZoneWeightTierRow[] = [];
+      for (const z of sellerZoneRows) {
+        if (z.pricingModel !== "weight_tiered") continue;
+        const rows = await db.select().from(shippingZoneWeightTiers).where(eq(shippingZoneWeightTiers.zoneId, z.id));
+        weightTierRows.push(...rows);
+      }
+      const resolved = resolveShippingForDestination({
+        zones: sellerZoneRows as unknown as ShippingZoneRow[],
+        weightTiers: weightTierRows,
+        destinationCountry: validatedShipping.country,
+        sellerHomeCountry: sellerHome?.country ?? "US",
+        subtotalCents,
+        weightGrams: cartWeightGrams,
+      });
+      if (resolved.unavailable) {
+        res.status(400).json({ error: "This seller does not ship to the selected destination" });
+        return;
+      }
+      shippingCents = resolved.shippingCents;
+      shippingLineName = resolved.zoneName ? `Shipping (${resolved.zoneName})` : "Shipping";
+    } else {
+      const [configuredShippingRate] = await db
+        .select()
+        .from(shippingRates)
+        .where(and(eq(shippingRates.sellerId, sellerId), eq(shippingRates.active, true)))
+        .limit(1);
+      shippingCents = !configuredShippingRate ||
+        (configuredShippingRate.freeAboveCents != null && subtotalCents >= configuredShippingRate.freeAboveCents)
+        ? 0
+        : configuredShippingRate.flatRateCents;
+      shippingLineName = configuredShippingRate?.name ?? "Shipping";
+    }
     if (shippingCents > 0) {
       lineItems.push({
         price_data: {
           currency: "usd",
           unit_amount: shippingCents,
           tax_behavior: "exclusive",
-          product_data: { name: configuredShippingRate?.name ?? "Shipping" },
+          product_data: { name: shippingLineName },
         },
         quantity: 1,
       });
     }
+    // ── Discount code (validated fresh at charge time — never trusts the
+    // client's earlier /cart/validate check) ──────────────────────────────
+    let discountApplication: Awaited<ReturnType<typeof validateDiscountCode>> | null = null;
+    if (typeof discountCode === "string" && discountCode.trim()) {
+      try {
+        discountApplication = await validateDiscountCode({
+          sellerId,
+          code: discountCode,
+          customerKey: buyerId,
+          cartSubtotalCents: subtotalCents,
+          lines: discountLines,
+        });
+      } catch (err) {
+        if (err instanceof DiscountValidationError) {
+          res.status(400).json({ error: err.message, code: err.code, ...err.details });
+          return;
+        }
+        throw err;
+      }
+    }
+    const discountShippingCents = discountApplication?.freeShipping ? 0 : shippingCents;
+    const discountCodeAmountCents = discountApplication
+      ? Math.min(discountApplication.appliedAmountCents + (shippingCents - discountShippingCents), subtotalCents + shippingCents)
+      : 0;
+
     const totalBeforeLoyaltyDiscountCents = subtotalCents + shippingCents;
     const normalizedLoyaltyToken =
       typeof loyaltyToken === "string" && loyaltyToken.trim()
@@ -833,11 +927,12 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     // Persist the checkout before Stripe is contacted. Its ID is included in
     // the initial Stripe metadata, so a paid session is always reconstructable
     // by the webhook even if the later session-ID write is interrupted.
+    const combinedDiscountCents = (loyaltyRedemption?.discountCents ?? 0) + discountCodeAmountCents;
     const money = paymentIntentMoney({
       plan: chargePlan,
       sellerStripeAccountId: seller.stripeAccountId,
-      merchandiseCents: Math.max(0, subtotalCents - (loyaltyRedemption?.discountCents ?? 0)),
-      preTaxTotalCents: Math.max(0, totalBeforeLoyaltyDiscountCents - (loyaltyRedemption?.discountCents ?? 0)),
+      merchandiseCents: Math.max(0, subtotalCents - combinedDiscountCents),
+      preTaxTotalCents: Math.max(0, totalBeforeLoyaltyDiscountCents - combinedDiscountCents),
     });
     const insertValues = {
       buyerId,
@@ -850,6 +945,10 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       ...(loyaltyRedemption ? {
         loyaltyToken: loyaltyRedemption.token,
         loyaltyDiscountCents: loyaltyRedemption.discountCents,
+      } : {}),
+      ...(discountApplication ? {
+        discountCodeId: discountApplication.discount.id,
+        discountCodeAmountCents: discountCodeAmountCents,
       } : {}),
       ...(validatedShipping ? { shippingAddress: validatedShipping } : {}),
       ...(hasKey ? { clientIdempotencyKey } : {}),
@@ -905,19 +1004,25 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       loyaltyReservation.reservationId = csId;
     }
 
-    // Loyalty points are represented as a Stripe once-off coupon. This keeps
-    // tax and the buyer-facing Stripe total authoritative, unlike attempting to
-    // rewrite individual line-item prices or accepting a client-provided total.
-    let loyaltyCouponId: string | undefined;
-    if (loyaltyRedemption) {
+    // Loyalty points and a seller discount code are both represented as ONE
+    // combined Stripe once-off coupon — Checkout Sessions only accept a single
+    // `discounts` entry in payment mode. This keeps tax and the buyer-facing
+    // Stripe total authoritative, unlike rewriting individual line-item prices.
+    let combinedCouponId: string | undefined;
+    if (combinedDiscountCents > 0) {
+      const couponName = loyaltyRedemption && discountApplication
+        ? `Brandthread rewards + ${discountApplication.discount.code}`
+        : loyaltyRedemption
+          ? "Brandthread rewards"
+          : discountApplication!.discount.code;
       const coupon = await stripe.coupons.create({
-        amount_off: loyaltyRedemption.discountCents,
+        amount_off: combinedDiscountCents,
         currency: "usd",
         duration: "once",
         max_redemptions: 1,
-        name: "Brandthread rewards",
+        name: couponName,
       });
-      loyaltyCouponId = coupon.id;
+      combinedCouponId = coupon.id;
     }
 
     const validDropId = chargePlan.dropId;
@@ -942,7 +1047,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
           allowed_countries: [validatedShipping?.country ?? "US"],
         },
         customer_update: { shipping: "auto" },
-        ...(loyaltyCouponId ? { discounts: [{ coupon: loyaltyCouponId }] } : {}),
+        ...(combinedCouponId ? { discounts: [{ coupon: combinedCouponId }] } : {}),
         success_url: successUrl,
         cancel_url: cancelUrl,
         customer: stripeCustomerId,
@@ -1130,6 +1235,7 @@ router.get("/orders", async (req, res) => {
         carrier:                 orders.carrier,
         trackingStatus:          orders.trackingStatus,
         estimatedDelivery:       orders.estimatedDelivery,
+        shippedAt:               orders.shippedAt,
         shippingAddress:         orders.shippingAddress,
         stripePaymentIntentId:   orders.stripePaymentIntentId,
         cancellationReason:      orders.cancellationReason,
@@ -1163,6 +1269,7 @@ router.get("/orders/:id", async (req, res) => {
         carrier:                 orders.carrier,
         trackingStatus:          orders.trackingStatus,
         estimatedDelivery:       orders.estimatedDelivery,
+        shippedAt:               orders.shippedAt,
         shippingAddress:         orders.shippingAddress,
         stripePaymentIntentId:   orders.stripePaymentIntentId,
         cancellationReason:      orders.cancellationReason,

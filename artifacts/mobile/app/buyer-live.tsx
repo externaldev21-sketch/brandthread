@@ -5,10 +5,11 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, TextInput,
+  View, Text, StyleSheet, TextInput,
   ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator,
-  Alert, Dimensions,
+  Alert, Dimensions, Share,
 } from 'react-native';
+import * as ExpoLinking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -24,6 +25,10 @@ import { formatCents } from '@/lib/money';
 import * as WebBrowser from 'expo-web-browser';
 import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 import { apiErrorMessage, confirmBlock, reportHref } from '@/lib/safety';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { IconButton } from '@/components/ui/IconButton';
+import { Snackbar } from '@/components/ui/Snackbar';
+import { hapticLight, hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
 
 const LIVE_RED = '#FF3B30';
 const { width: W, height: H } = Dimensions.get('window');
@@ -41,7 +46,7 @@ export default function BuyerLiveScreen() {
       <NativeOnlyFeature
         icon="video-off"
         title="Live video is available in the mobile app"
-        description="Brandthread live broadcasts use device video technology that is not enabled in the browser. Product pages and standard checkout remain available on web."
+        description="Live video works in the Brandthread app. Product pages and standard checkout remain available on web."
       />
     );
   }
@@ -74,6 +79,7 @@ function BuyerLiveNativeScreen() {
   const [selectedVariantId, setSelectedVariantId] = useState('');
   const [checkoutBusy, setCheckoutBusy]   = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
+  const [orderSnackbar, setOrderSnackbar] = useState('');
   const [buyerEmail, setBuyerEmail]       = useState(user?.primaryEmailAddress?.emailAddress ?? '');
   const [buyerName, setBuyerName]         = useState(user?.fullName ?? '');
   const [buyerPhone, setBuyerPhone]       = useState('');
@@ -87,6 +93,12 @@ function BuyerLiveNativeScreen() {
   const scrollRef   = useRef<ScrollView>(null);
   const pollRef     = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastTs      = useRef<string>(new Date().toISOString());
+
+  useEffect(() => {
+    if (!orderSnackbar) return;
+    const t = setTimeout(() => setOrderSnackbar(''), 2500);
+    return () => clearTimeout(t);
+  }, [orderSnackbar]);
 
   // ─── Load stream + join ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -121,7 +133,7 @@ function BuyerLiveNativeScreen() {
           engine.enableVideo();
           engine.registerEventHandler({
             onUserJoined: (uid: number) => { setBroadcastUid(uid); setAgoraReady(true); },
-            onUserOffline: () => { setEnded(true); Alert.alert('Stream ended', 'The seller has ended the live stream.'); },
+            onUserOffline: () => { setEnded(true); },
             onJoinChannelSuccess: () => {},
             onError: (err: any) => console.warn('[Agora viewer]', err),
           });
@@ -137,7 +149,7 @@ function BuyerLiveNativeScreen() {
         }
       }
     } catch (e: any) {
-      Alert.alert('Could not join stream', e?.message ?? 'Please try again.');
+      Alert.alert('Couldn’t join the live', 'Try again.');
     } finally {
       setLoading(false);
     }
@@ -202,6 +214,22 @@ function BuyerLiveNativeScreen() {
       setComments(prev => prev.filter(c => c.id !== optimistic.id));
       setCommentText(msg);
       Alert.alert('Message not sent', apiErrorMessage(error, 'Check your connection and try again.'));
+    }
+  }
+
+  async function shareStream() {
+    const sellerName: string = stream?.brand_name ?? stream?.seller_name ?? 'this seller';
+    const title = stream?.title ?? `${sellerName} live`;
+    const streamUrl = ExpoLinking.createURL('/buyer-live', {
+      queryParams: { streamId: params.streamId },
+    });
+    try {
+      await Share.share({
+        message: `Watch ${sellerName} live on Brandthread: ${title}\n${streamUrl}`,
+        url: streamUrl,
+      });
+    } catch {
+      // User dismissed the native share sheet — nothing to do.
     }
   }
 
@@ -272,7 +300,7 @@ function BuyerLiveNativeScreen() {
       const firstAvailable = (product?.variants ?? []).find((variant: any) => (variant.stock ?? 0) > 0);
       setSelectedVariantId(firstAvailable?.id ?? '');
     } catch (error: any) {
-      setCheckoutError(error?.message ?? 'This product could not be loaded.');
+      setCheckoutError('Couldn’t load this piece.');
     } finally {
       setPurchaseLoading(false);
     }
@@ -322,12 +350,13 @@ function BuyerLiveNativeScreen() {
         setCheckoutError(verification?.declineReason ?? 'Payment is still pending. Please check your orders shortly.');
         return;
       }
-      Alert.alert('Order confirmed', verification.orderNumber
-        ? `Order ${verification.orderNumber} was placed without leaving the live stream.`
-        : 'Your order was placed without leaving the live stream.');
+      hapticSuccessAction();
+      setOrderSnackbar(verification.orderNumber
+        ? `Order ${verification.orderNumber} confirmed`
+        : 'Order confirmed');
       setPurchaseTag(null);
     } catch (error: any) {
-      setCheckoutError(error?.message ?? 'Checkout could not be started.');
+      setCheckoutError('Couldn’t start checkout. Try again.');
     } finally {
       setCheckoutBusy(false);
     }
@@ -352,9 +381,9 @@ function BuyerLiveNativeScreen() {
         </View>
         <Text style={[s.endedTitle, { color: FG }]}>Stream ended</Text>
         <Text style={[s.endedSub, { color: MUTED }]}>The replay will appear in the feed shortly.</Text>
-        <TouchableOpacity onPress={() => router.back()} style={[s.backBtn, { backgroundColor: LIVE_RED }]}>
+        <PressableScale onPress={() => router.back()} style={[s.backBtn, { backgroundColor: LIVE_RED }]}>
           <Text style={s.backBtnText}>Back to feed</Text>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
     );
   }
@@ -371,7 +400,7 @@ function BuyerLiveNativeScreen() {
         <View style={[StyleSheet.absoluteFill, s.videoPlaceholder]}>
           <Feather name="video" size={40} color={MUTED} />
           <Text style={s.videoPlaceholderText}>
-            {AgoraModule ? 'Connecting to stream…' : 'Live video available on device'}
+            {AgoraModule ? 'Connecting…' : 'Live video works in the Brandthread app.'}
           </Text>
         </View>
       )}
@@ -395,17 +424,27 @@ function BuyerLiveNativeScreen() {
             <Feather name="eye" size={13} color="#fff" />
             <Text style={s.viewerText}>{viewerCount.toLocaleString()}</Text>
           </View>
-          <TouchableOpacity
+          <IconButton
+            name="share"
+            onPress={shareStream}
+            variant="plain"
+            color="#fff"
+            accessibilityLabel="Share this live stream"
+          />
+          <IconButton
+            name="more-horizontal"
             onPress={openStreamOptions}
-            style={s.leaveBtn}
-            accessibilityRole="button"
+            variant="plain"
+            color="#fff"
             accessibilityLabel="Live stream options"
-          >
-            <Feather name="more-horizontal" size={20} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleLeave(true)} style={s.leaveBtn} accessibilityLabel="Leave live stream">
-            <Feather name="x" size={20} color="#fff" />
-          </TouchableOpacity>
+          />
+          <IconButton
+            name="x"
+            onPress={() => handleLeave(true)}
+            variant="plain"
+            color="#fff"
+            accessibilityLabel="Leave live stream"
+          />
         </View>
       </View>
 
@@ -419,16 +458,18 @@ function BuyerLiveNativeScreen() {
         <View style={s.productStrip}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.productStripInner}>
             {productTags.map(tag => (
-              <TouchableOpacity
+              <PressableScale
                 key={tag.productId}
-                onPress={() => openPurchase(tag)}
+                onPress={() => { hapticLight(); openPurchase(tag); }}
                 activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={`Shop ${tag.productName}, ${formatCents(tag.priceCents)}`}
                 style={[s.productChip, { backgroundColor: 'rgba(0,0,0,0.7)' }]}
               >
                 <Feather name="shopping-bag" size={12} color={LIVE_RED} />
                 <Text style={s.productChipName} numberOfLines={1}>{tag.productName}</Text>
                 <Text style={s.productChipPrice}>{formatCents(tag.priceCents)}</Text>
-              </TouchableOpacity>
+              </PressableScale>
             ))}
           </ScrollView>
         </View>
@@ -447,7 +488,7 @@ function BuyerLiveNativeScreen() {
           pointerEvents="box-none"
         >
           {comments.map(c => (
-            <TouchableOpacity
+            <PressableScale
               key={c.id}
               style={s.commentRow}
               activeOpacity={0.85}
@@ -457,7 +498,7 @@ function BuyerLiveNativeScreen() {
             >
               <Text style={s.commentName}>{c.display_name} </Text>
               <Text style={s.commentMsg}>{c.message}</Text>
-            </TouchableOpacity>
+            </PressableScale>
           ))}
         </ScrollView>
         <View style={[s.inputRow, { paddingBottom: insets.bottom + 8 }]}>
@@ -470,23 +511,38 @@ function BuyerLiveNativeScreen() {
             returnKeyType="send"
             style={s.textInput}
           />
-          <TouchableOpacity onPress={sendComment} activeOpacity={0.7} style={s.sendBtn}>
+          <PressableScale
+            onPress={() => { hapticLight(); sendComment(); }}
+            activeOpacity={0.7}
+            style={s.sendBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Send comment"
+          >
             <Feather name="send" size={18} color="#fff" />
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       </KeyboardAvoidingView>
 
       {purchaseTag && (
-        <View style={[s.purchaseSheet, { paddingBottom: insets.bottom + SP.sm }]}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={[s.purchaseSheet, { paddingBottom: insets.bottom + SP.sm }]}
+        >
           <View style={s.purchaseHandle} />
           <View style={s.purchaseHeader}>
             <View style={{ flex: 1 }}>
-              <Text style={s.purchaseEyebrow}>BUY WITHOUT LEAVING LIVE</Text>
-              <Text style={s.purchaseTitle}>{purchaseTag.productName}</Text>
+              <Text style={s.purchaseEyebrow}>Buy without leaving</Text>
+              <Text style={s.purchaseTitle} numberOfLines={1}>{purchaseTag.productName}</Text>
             </View>
-            <TouchableOpacity onPress={() => setPurchaseTag(null)} style={s.purchaseClose}>
+            <PressableScale
+              onPress={() => { hapticLight(); setPurchaseTag(null); }}
+              style={s.purchaseClose}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel="Close purchase sheet"
+            >
               <Feather name="x" size={20} color={FG} />
-            </TouchableOpacity>
+            </PressableScale>
           </View>
           {purchaseLoading ? (
             <ActivityIndicator color={PURPLE} style={{ marginVertical: SP.lg }} />
@@ -508,10 +564,12 @@ function BuyerLiveNativeScreen() {
                   const available = (variant.stock ?? 0) > 0;
                   const label = [variant.size, variant.color].filter(Boolean).join(' / ') || 'Default';
                   return (
-                    <TouchableOpacity
+                    <PressableScale
                       key={variant.id}
                       disabled={!available}
-                      onPress={() => setSelectedVariantId(variant.id)}
+                      onPress={() => { hapticLight(); setSelectedVariantId(variant.id); }}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: selectedVariantId === variant.id, disabled: !available }}
                       style={[
                         s.variantChip,
                         selectedVariantId === variant.id && { borderColor: PURPLE },
@@ -519,7 +577,7 @@ function BuyerLiveNativeScreen() {
                       ]}
                     >
                       <Text style={s.variantText}>{label}</Text>
-                    </TouchableOpacity>
+                    </PressableScale>
                   );
                 })}
               </View>
@@ -534,9 +592,10 @@ function BuyerLiveNativeScreen() {
                 <TextInput value={postalCode} onChangeText={setPostalCode} placeholder="ZIP" placeholderTextColor={SUBTLE} keyboardType="numbers-and-punctuation" style={[s.purchaseInput, s.postalInput]} />
               </View>
               {checkoutError ? <Text style={s.checkoutError}>{checkoutError}</Text> : null}
-              <TouchableOpacity
-                onPress={checkoutInStream}
+              <PressableScale
+                onPress={() => { hapticPrimaryAction(); checkoutInStream(); }}
                 disabled={checkoutBusy || !!purchaseProduct?.sellerVacationMode}
+                accessibilityRole="button"
                 style={[s.buyNowButton, { backgroundColor: PURPLE }, (checkoutBusy || purchaseProduct?.sellerVacationMode) && s.buyNowDisabled]}
               >
                 {checkoutBusy ? <ActivityIndicator color={BG} /> : (
@@ -544,12 +603,18 @@ function BuyerLiveNativeScreen() {
                     {purchaseProduct?.sellerVacationMode ? 'Seller is away' : 'Buy now'}
                   </Text>
                 )}
-              </TouchableOpacity>
+              </PressableScale>
               <Text style={s.purchaseFootnote}>Secure payment opens over the live stream. Return here when finished.</Text>
             </ScrollView>
           )}
-        </View>
+        </KeyboardAvoidingView>
       )}
+
+      <Snackbar
+        visible={!!orderSnackbar}
+        message={orderSnackbar}
+        onDismiss={() => setOrderSnackbar('')}
+      />
     </View>
   );
 }

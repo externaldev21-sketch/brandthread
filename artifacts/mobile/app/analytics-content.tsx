@@ -16,6 +16,7 @@ import {
 } from '@/lib/theme';
 import { getContentAnalytics, getFilterState } from '@/services/analyticsService';
 import { ContentAnalytics, ContentPostRow, VideoRetentionPoint, AnalyticsMetric, AnalyticsFilterState } from '@/services/analyticsTypes';
+import { EmptyState } from '@/components/BrandthreadUI';
 
 function MetricTile({ m }: { m: AnalyticsMetric }) {
   const colors = useColors();
@@ -186,11 +187,11 @@ export default function AnalyticsContentScreen() {
       </View>
 
       {posts.length === 0 ? (
-        <View style={s.emptyState}>
-          <Feather name="video" size={36} color={MUTED} />
-          <Text style={s.emptyTitle}>No content data</Text>
-          <Text style={s.emptyBody}>Publish Seller content to begin tracking performance.</Text>
-        </View>
+        <EmptyState
+          icon="video"
+          title="No post stats yet"
+          description="Post stats will land here soon."
+        />
       ) : (
         <View style={s.card}>
           {posts.map((p, i) => (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Switch, Alert, TextInput, ActivityIndicator, Modal, Share, RefreshControl } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, TextInput, ActivityIndicator, Modal, Share, RefreshControl } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
@@ -42,9 +42,29 @@ function initials(name: string) {
   return name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('');
 }
 
-const AVATAR_COLORS = ['#0F766E', '#4A6FA5', '#22D3EE', '#B98A2E', '#EC4899', '#10B981'];
 
-function avatarColor(idx: number) { return AVATAR_COLORS[idx % AVATAR_COLORS.length]; }
+type InviteRole = 'admin' | 'finance' | 'orders' | 'marketing' | 'viewer';
+const INVITE_ROLES: { key: InviteRole; title: string; sub: string }[] = [
+  { key: 'admin', title: 'Admin', sub: 'Everything but billing' },
+  { key: 'finance', title: 'Finance', sub: 'Balance & payouts' },
+  { key: 'orders', title: 'Orders', sub: 'Orders & fulfillment' },
+  { key: 'marketing', title: 'Marketing', sub: 'Ads, boosts & discounts' },
+  { key: 'viewer', title: 'Viewer', sub: 'Read-only analytics' },
+];
+const ROLE_LABEL: Record<string, string> = {
+  owner: 'Owner', admin: 'Admin', finance: 'Finance', orders: 'Orders', marketing: 'Marketing', viewer: 'Viewer',
+  manager: 'Manager', staff: 'Staff',
+};
+const ROLE_ACCESS: Record<string, string> = {
+  owner: 'Full Access',
+  admin: 'Products, orders, payouts, marketing & team',
+  finance: 'Balance, payouts & transactions',
+  orders: 'Orders, fulfillment & inventory',
+  marketing: 'Ads, boosts & discount codes',
+  viewer: 'Read-only analytics',
+  manager: 'Orders, Products, Inventory',
+  staff: 'Fulfillment only',
+};
 
 const ACTIVITY_PAGE = 10;
 
@@ -53,8 +73,6 @@ export default function TeamScreen() {
   const router  = useRouter();
   const api     = useApi();
   const { currentRole } = useTeamRole();
-  const [twoFactor, setTwoFactor] = useState(true);
-  const [fraud, setFraud]         = useState(true);
   const [members,  setMembers]    = useState<any[]>([]);
   const [activity, setActivity]   = useState<any[]>([]);
   const [hasMoreActivity, setHasMoreActivity] = useState(false);
@@ -65,12 +83,13 @@ export default function TeamScreen() {
   // Invite modal state
   const [inviteVisible, setInviteVisible] = useState(false);
   const [inviteEmail, setInviteEmail]     = useState('');
-  const [inviteRole, setInviteRole]       = useState<'staff' | 'manager'>('staff');
+  const [inviteRole, setInviteRole]       = useState<InviteRole>('viewer');
   const [inviting, setInviting]           = useState(false);
   const [inviteResult, setInviteResult]   = useState<{ inviteUrl: string; emailSent: boolean; email: string } | null>(null);
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
   const [dismissingId, setDismissingId] = useState<string | null>(null);
   const [showExpired, setShowExpired] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -81,7 +100,10 @@ export default function TeamScreen() {
       setMembers(m);
       setActivity(a.logs ?? []);
       setHasMoreActivity(!!a.hasMore);
-    } catch { /* no-op if not connected */ }
+      setLoadError(false);
+    } catch {
+      setLoadError(true);
+    }
     setLoading(false);
   }, []);
 
@@ -107,18 +129,20 @@ export default function TeamScreen() {
   const openInvite = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setInviteEmail('');
-    setInviteRole('staff');
+    setInviteRole('viewer');
     setInviteResult(null);
     setInviteVisible(true);
   };
 
   const handleInvite = async () => {
-    const email = inviteEmail.trim();
-    if (!email) return;
+    const value = inviteEmail.trim();
+    if (!value) return;
     setInviting(true);
     try {
-      const res = await api.team.invite({ email, role: inviteRole });
-      setInviteResult({ inviteUrl: res.inviteUrl, emailSent: !!res.emailSent, email });
+      const isEmail = value.includes('@') && value.includes('.');
+      const payload = isEmail ? { email: value, role: inviteRole } : { username: value.replace(/^@/, ''), role: inviteRole };
+      const res = await api.team.invite(payload);
+      setInviteResult({ inviteUrl: res.inviteUrl, emailSent: !!res.emailSent, email: res.member?.email ?? value });
       await load();
     } catch (err: any) {
       const rejection = getEntitlementRejection(err);
@@ -203,15 +227,17 @@ export default function TeamScreen() {
   const currentMembers = members.filter(member => !isExpiredInvite(member));
 
   const renderMemberRow = (m: any, i: number) => {
-    const color = avatarColor(i);
+    // Monochrome avatar tint (theme foreground) — no saturated per-user hues,
+    // so it reads correctly across all 12 app themes.
+    const color = colors.foreground;
     const ini   = initials(m.name ?? m.email ?? '?');
     const isPending = m.status === 'pending';
     const isExpired = isExpiredInvite(m);
-    const roleLabel = m.role === 'owner' ? 'Owner' : m.role === 'manager' ? 'Manager' : 'Staff';
+    const roleLabel = ROLE_LABEL[m.role] ?? m.role;
     const expLabel  = isPending ? expiryLabel(m.expiresAt) : null;
     const accessLabel = isPending
       ? `Invited ${m.invitedAt ? relTime(m.invitedAt) : ''}${expLabel ? ` · ${expLabel}` : ' · awaiting acceptance'}`
-      : m.role === 'owner' ? 'Full Access' : m.role === 'manager' ? 'Orders, Products, Inventory' : 'Fulfillment only';
+      : ROLE_ACCESS[m.role] ?? '';
     const isRegenerating = regeneratingId === m.id;
     const isDismissing = dismissingId === m.id;
     return (
@@ -225,7 +251,7 @@ export default function TeamScreen() {
           <View style={[styles.avatar, { backgroundColor: color + '33' }]}>
             <Text style={[styles.avatarText, { color }]}>{ini}</Text>
           </View>
-          {m.online && <View style={[styles.onlineDot, { backgroundColor: colors.success }]} />}
+          {m.online && <View style={[styles.onlineDot, { backgroundColor: colors.success, borderColor: colors.card }]} />}
         </View>
         <View style={styles.memberInfo}>
           <Text style={[styles.memberName, { color: colors.foreground }]}>{m.name ?? m.email}</Text>
@@ -236,7 +262,14 @@ export default function TeamScreen() {
         </View>
         {isPending && (
           <TouchableOpacity
-            onPress={() => isExpired ? handleRegenerate(m) : (m.inviteUrl ? copyLink(m.inviteUrl) : null)}
+            onPress={(e) => {
+              // Stop this nested action button from also bubbling into the
+              // row's own onPress (which navigates to the member's profile) —
+              // two nested tappables sharing one gesture is a web a11y bug
+              // (nested interactive elements) and a native mis-tap trap.
+              e?.stopPropagation?.();
+              isExpired ? handleRegenerate(m) : (m.inviteUrl ? copyLink(m.inviteUrl) : null);
+            }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={[styles.linkBtn, { borderColor: isExpired ? colors.warning + '44' : colors.border }]}
             disabled={isRegenerating || isDismissing}
@@ -249,7 +282,7 @@ export default function TeamScreen() {
         )}
         {isExpired && currentRole === 'owner' && (
           <TouchableOpacity
-            onPress={() => dismissExpiredInvite(m)}
+            onPress={(e) => { e?.stopPropagation?.(); dismissExpiredInvite(m); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={[styles.dismissBtn, { borderColor: colors.border }]}
             disabled={isDismissing || isRegenerating}
@@ -290,9 +323,36 @@ export default function TeamScreen() {
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{ margin: 16 }} />
+        ) : loadError ? (
+          <View style={{ padding: 24, alignItems: 'center', gap: 10 }}>
+            <View style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
+              <Feather name="alert-triangle" size={22} color={colors.mutedForeground} />
+            </View>
+            <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: '600', textAlign: 'center' }}>Couldn't load your team</Text>
+            <TouchableOpacity
+              onPress={() => { setLoading(true); load(); }}
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading team"
+              style={{ marginTop: 4, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999, backgroundColor: colors.primary }}
+            >
+              <Text style={{ color: colors.primaryForeground, fontSize: 13, fontWeight: '600' }}>Retry</Text>
+            </TouchableOpacity>
+          </View>
         ) : currentMembers.length === 0 ? (
-          <View style={{ padding: 20, alignItems: 'center' }}>
-            <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>No team members yet. Invite someone to get started.</Text>
+          <View style={{ padding: 24, alignItems: 'center', gap: 10 }}>
+            <View style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
+              <Feather name="user-plus" size={22} color={colors.mutedForeground} />
+            </View>
+            <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: '600', textAlign: 'center' }}>No team members yet</Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 13, textAlign: 'center' }}>Invite someone to help you run your store.</Text>
+            <TouchableOpacity
+              onPress={openInvite}
+              accessibilityRole="button"
+              accessibilityLabel="Invite teammate"
+              style={{ marginTop: 4, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999, backgroundColor: colors.primary }}
+            >
+              <Text style={{ color: colors.primaryForeground, fontSize: 13, fontWeight: '600' }}>Invite teammate</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           currentMembers.map(renderMemberRow)
@@ -371,30 +431,6 @@ export default function TeamScreen() {
         )}
       </View>
 
-      {/* Security Toggles */}
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Security</Text>
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {[
-          { label: 'Two-Factor Authentication', sub: 'Required for all staff', value: twoFactor, setter: setTwoFactor },
-          { label: 'Fraud Monitoring', sub: 'AI-powered transaction alerts', value: fraud, setter: setFraud },
-        ].map((s, i) => (
-          <View key={s.label} style={[styles.secRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.secLabel, { color: colors.foreground }]}>{s.label}</Text>
-              <Text style={[styles.secSub, { color: colors.mutedForeground }]}>{s.sub}</Text>
-            </View>
-            <Switch
-              value={s.value}
-              onValueChange={(v) => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                s.setter(v);
-              }}
-              trackColor={{ false: colors.secondary, true: colors.primary }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-        ))}
-      </View>
     </ScrollView>
 
     {/* Invite modal — email + shareable link options */}
@@ -410,31 +446,29 @@ export default function TeamScreen() {
               <TextInput
                 value={inviteEmail}
                 onChangeText={setInviteEmail}
-                placeholder="Email address"
+                placeholder="Email address or @username"
                 placeholderTextColor={colors.mutedForeground}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoFocus
                 style={[styles.inviteInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
               />
-              <View style={styles.roleRow}>
-                {(['staff', 'manager'] as const).map(r => (
+              <View style={styles.roleGrid}>
+                {INVITE_ROLES.map(r => (
                   <TouchableOpacity
-                    key={r}
-                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setInviteRole(r); }}
+                    key={r.key}
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setInviteRole(r.key); }}
                     activeOpacity={0.8}
                     style={[
-                      styles.rolePill,
-                      { borderColor: inviteRole === r ? colors.primary : colors.border,
-                        backgroundColor: inviteRole === r ? colors.primary + '22' : 'transparent' },
+                      styles.rolePillWrap,
+                      { borderColor: inviteRole === r.key ? colors.primary : colors.border,
+                        backgroundColor: inviteRole === r.key ? colors.primary + '22' : 'transparent' },
                     ]}
                   >
-                    <Text style={[styles.rolePillTitle, { color: inviteRole === r ? colors.primary : colors.foreground }]}>
-                      {r === 'staff' ? 'Staff' : 'Manager'}
+                    <Text style={[styles.rolePillTitle, { color: inviteRole === r.key ? colors.primary : colors.foreground }]}>
+                      {r.title}
                     </Text>
-                    <Text style={[styles.rolePillSub, { color: colors.mutedForeground }]}>
-                      {r === 'staff' ? 'Fulfillment only' : 'Products, orders & inventory'}
-                    </Text>
+                    <Text style={[styles.rolePillSub, { color: colors.mutedForeground }]}>{r.sub}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -514,7 +548,7 @@ const styles = StyleSheet.create({
   memberLeft: { position: 'relative' },
   avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
-  onlineDot: { width: 10, height: 10, borderRadius: 5, position: 'absolute', bottom: 0, right: 0, borderWidth: 2, borderColor: '#181818' },
+  onlineDot: { width: 10, height: 10, borderRadius: 5, position: 'absolute', bottom: 0, right: 0, borderWidth: 2 },
   memberInfo: { flex: 1 },
   memberName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   memberAccess: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
@@ -545,6 +579,8 @@ const styles = StyleSheet.create({
   modalSub: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 6, lineHeight: 18 },
   roleRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
   rolePill: { flex: 1, borderWidth: 1.5, borderRadius: 12, padding: 12 },
+  roleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 14 },
+  rolePillWrap: { width: '47%', borderWidth: 1.5, borderRadius: 12, padding: 12 },
   rolePillTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   rolePillSub: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
   modalActions: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18 },

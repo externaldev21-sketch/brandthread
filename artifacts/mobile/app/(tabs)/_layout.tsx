@@ -17,6 +17,7 @@
 
 import { Tabs } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { TabScreenErrorFallback } from '@/components/ErrorBoundary';
 
 // ─── Tab label constants (referenced by navigation contract tests) ─────────────
 // Keep these assignments even though the tab bar is hidden — they satisfy
@@ -38,9 +39,15 @@ export default function TabLayout() {
     <Tabs
       detachInactiveScreens
       tabBar={() => null}
+      // A render crash in one tab shows a friendly per-tab fallback instead
+      // of taking down the whole app; the root layout's ErrorBoundary is
+      // still the last-resort catch-all above this.
+      unstable_screenErrorBoundary={TabScreenErrorFallback}
       screenOptions={{
         freezeOnBlur: true,
         headerShown: false,
+        // Same tab-switch motion as the buyer side.
+        animation: 'shift',
         sceneStyle: { backgroundColor: theme.background },
       }}
     >

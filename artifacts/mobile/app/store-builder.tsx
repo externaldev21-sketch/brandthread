@@ -28,6 +28,7 @@ import {
 } from '@/services/storeTypes';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 function getStatusVariant(status: StorePublishStatus): 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple' {
   switch (status) {
@@ -475,9 +476,9 @@ export default function StoreBuilderScreen() {
         </View>
       </ScrollView>
 
-      <Modal visible={transferOpen} transparent animationType="slide" onRequestClose={() => setTransferOpen(false)}>
+      <Modal visible={transferOpen} transparent animationType="fade" onRequestClose={() => setTransferOpen(false)}>
         <KeyboardAvoidingView style={s.modalBackdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={[s.transferSheet, { paddingBottom: insets.bottom + SP.lg }]}>
+          <SheetRise style={[s.transferSheet, { paddingBottom: insets.bottom + SP.lg }]}>
             <View style={s.transferHeader}>
               <View style={s.shopifyLogo}><Text style={s.shopifyLogoText}>S</Text></View>
               <View style={{ flex: 1 }}>
@@ -543,7 +544,7 @@ export default function StoreBuilderScreen() {
                 {!!importError && <Text style={s.importError}>{importError}</Text>}
               </View>
             )}
-          </View>
+          </SheetRise>
         </KeyboardAvoidingView>
       </Modal>
     </View>
@@ -556,6 +557,23 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const CYAN = theme.secondary;
   const CYAN_DIM = theme.secondaryDim;
   const BORDER_ACTIVE = theme.accentLight;
+  const BG = theme.background;
+  const SURFACE = theme.surface;
+  const CARD = theme.card;
+  const CARD_ELEVATED = theme.cardElevated;
+  const BORDER = theme.border;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const SUBTLE = theme.subtle;
+  const SUCCESS = theme.success;
+  const SUCCESS_DIM = `${theme.success}20`;
+  const ORANGE = theme.warning;
+  const ORANGE_DIM = `${theme.warning}20`;
+  const RED = theme.error;
+  const RED_DIM = `${theme.error}20`;
+  const BLUE = theme.accent;
+  const BLUE_DIM = theme.accentDim;
+  const PURPLE_LIGHT = theme.accentLight;
   return StyleSheet.create({
   root: { flex: 1 },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },

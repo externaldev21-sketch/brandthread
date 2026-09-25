@@ -18,8 +18,16 @@ import { useApi } from '@/lib/api';
 
 export const PENDING_INVITE_KEY = 'bt:pendingTeamInvite';
 
-const ROLE_LABEL: Record<string, string> = { owner: 'Owner', manager: 'Manager', staff: 'Staff' };
+const ROLE_LABEL: Record<string, string> = {
+  owner: 'Owner', admin: 'Admin', finance: 'Finance', orders: 'Orders', marketing: 'Marketing', viewer: 'Viewer',
+  manager: 'Manager', staff: 'Staff',
+};
 const ROLE_DESC: Record<string, string> = {
+  admin: 'Manage products, orders, inventory, analytics, customers, marketing, payouts and the team',
+  finance: 'View balance, payouts, transactions and statements',
+  orders: 'Manage orders, fulfillment and inventory',
+  marketing: 'Manage ads, boosts and discount codes',
+  viewer: 'Read-only access to analytics and store data',
   manager: 'Manage products, orders, inventory, and analytics',
   staff: 'View and fulfill orders',
 };
@@ -99,8 +107,8 @@ export default function TeamInviteScreen() {
           <ActivityIndicator color={colors.primary} style={{ margin: 24 }} />
         ) : invite?.expired ? (
           <>
-            <View style={[styles.icon, { backgroundColor: '#B98A2E22' }]}>
-              <Feather name="clock" size={26} color="#B98A2E" />
+            <View style={[styles.icon, { backgroundColor: colors.warning + '22' }]}>
+              <Feather name="clock" size={26} color={colors.warning} />
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>Invite link expired</Text>
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>

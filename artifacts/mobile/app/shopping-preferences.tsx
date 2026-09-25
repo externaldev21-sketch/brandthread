@@ -18,6 +18,7 @@ import {
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { Header } from '@/components/layout';
 import { loadBuyerSettings, patchBuyerSettings, type BuyerSettingsState } from '@/lib/buyerSettings';
 
 const TOPS = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL+'];
@@ -116,15 +117,8 @@ export default function ShoppingPreferences() {
   if (!settings) return <View style={{ flex: 1, backgroundColor: 'transparent' }} />;
 
   return (
-    <View style={[s.page, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity style={s.iconBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={21} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.title}>Shopping Preferences</Text>
-        <View style={s.iconBtn} />
-      </View>
+    <View style={s.page}>
+      <Header title="Shopping Preferences" />
 
       <ScrollView
         contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 100 }}
@@ -185,7 +179,7 @@ export default function ShoppingPreferences() {
         </View>
 
         {/* Alerts */}
-        <Text style={s.sectionTitle}>Alerts &amp; Notifications</Text>
+        <Text style={s.sectionTitle}>Alerts and notifications</Text>
         <Text style={s.sectionDesc}>Stay in the loop on products you care about.</Text>
         <View style={s.card}>
           {([
@@ -258,9 +252,6 @@ export default function ShoppingPreferences() {
 
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
-  header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
-  iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
 
   sectionTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: SP.lg, marginBottom: 4 },
   sectionDesc: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginBottom: SP.sm, lineHeight: 18 },

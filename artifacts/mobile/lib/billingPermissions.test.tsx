@@ -51,12 +51,21 @@ vi.mock('react-native', () => {
     Alert: { alert: alertMock },
     AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
     Linking: { openURL: linkMock },
-    Platform: { OS: 'web' },
+    Platform: { OS: 'web', select: (obj: Record<string, unknown>) => obj.web ?? obj.default },
     ScrollView: nativeComponent('ScrollView'),
-    StyleSheet: { create: (styles: unknown) => styles },
+    StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
     Text: nativeComponent('Text'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),
     View: nativeComponent('View'),
+    Animated: {
+      Value: class { constructor(_v?: number) {} },
+      View: nativeComponent('Animated.View'),
+      event: () => () => {},
+      timing: () => ({ start: (cb?: () => void) => cb?.() }),
+      sequence: () => ({ start: (cb?: () => void) => cb?.() }),
+      loop: () => ({ start: () => {}, stop: () => {} }),
+    },
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
   };
 });
 
@@ -177,6 +186,22 @@ vi.mock('@/lib/theme', () => ({
   FS: { xs: 11, sm: 13, md: 15, lg: 18, xl: 22, xxl: 28 },
   SP: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 },
   RADIUS: { sm: 8, md: 10, lg: 14, xl: 18, pill: 999 },
+  ICON: { xs: 12, sm: 16, md: 20, lg: 24, xl: 28, xxl: 36 },
+  GUTTER: 16,
+  SECTION_GAP: 24,
+  CONTENT_MAX_WIDTH: 720,
+  GRID_MAX_WIDTH: 1080,
+  BREAKPOINT: { tablet: 768, desktopWeb: 1024 },
+  TYPE: {
+    largeTitle: { fontSize: 36, fontFamily: 'Inter_700Bold', lineHeight: 42 },
+    title: { fontSize: 30, fontFamily: 'Inter_700Bold', lineHeight: 36 },
+    heading: { fontSize: 22, fontFamily: 'Inter_600SemiBold', lineHeight: 28 },
+    subheading: { fontSize: 19, fontFamily: 'Inter_600SemiBold', lineHeight: 24 },
+    body: { fontSize: 15, fontFamily: 'Inter_400Regular', lineHeight: 22 },
+    bodyMedium: { fontSize: 15, fontFamily: 'Inter_500Medium', lineHeight: 22 },
+    caption: { fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 18 },
+    label: { fontSize: 11, fontFamily: 'Inter_600SemiBold', lineHeight: 14 },
+  },
 }));
 
 vi.mock('@/lib/growthTools', () => ({
@@ -257,14 +282,14 @@ describe('owner-only billing actions', () => {
     renderer.unmount();
   });
 
-  it('preserves the billing portal fallback for non-role failures', async () => {
+  it('shows a human error instead of the deleted billing portal fallback for non-role failures', async () => {
     subscriptionPortalMock.mockRejectedValueOnce(serverError());
     const renderer = await renderScreen(BillingScreen);
 
     await press(renderer, 'seller-billing-payment-method');
 
-    expect(alertMock).not.toHaveBeenCalled();
-    expect(pushMock).toHaveBeenCalledWith('/plan-details');
+    expect(alertMock).toHaveBeenCalledWith("Couldn't open billing. Try again.");
+    expect(pushMock).not.toHaveBeenCalledWith('/plan-details');
     renderer.unmount();
   });
 

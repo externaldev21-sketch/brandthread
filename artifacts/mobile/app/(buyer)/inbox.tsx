@@ -1,30 +1,71 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity,
-  Alert, StyleSheet,
+  View, Text, FlatList, SectionList,
+  Alert, StyleSheet, ScrollView, RefreshControl,
+  Modal, TextInput, ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { ListSkeleton } from '@/components/layout';
+import { EmptyState, SearchBar, SheetHandle } from '@/components/BrandthreadUI';
 import { useFocusEffect, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
-import {
-  BG, SCREEN_BG, CARD, CARD_ELEVATED, BORDER,
-  FG, MUTED, SUBTLE, RED,
-  SURFACE, FONT, FS, SP, RADIUS, COMP, ICON,
-} from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON, SCREEN_BG } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   getConversations, markConversationRead, archiveConversation,
   subscribeSocial, getNotifications, markNotificationRead,
+  searchProfiles, createOrGetConversation, muteUser, MY_USER_ID,
+  getFriendSuggestions,
 } from '@/services/socialService';
-import type { Conversation, Notification } from '@/services/socialTypes';
+import type { Conversation, Notification, ProfileSearchResult, AccountType } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
-import SwipeActionRow from '@/components/SwipeActionRow';
+import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
+import { ConversationPreview } from '@/components/inbox/ConversationPreview';
+import { IconButton } from '@/components/ui/IconButton';
+import { Snackbar } from '@/components/ui/Snackbar';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { hapticPrimaryAction, hapticDestructiveConfirm } from '@/lib/haptics';
+
+// ─── Compose sheet: unified "person" shape ────────────────────────────────────
+// Friends/followers/following come from the follow-graph endpoints in
+// lib/api.ts's `social` namespace; suggested people reuse the existing (today
+// stubbed-empty) getFriendSuggestions() extension point from socialService
+// rather than inventing a new backend endpoint. All are buyer accounts, since
+// this sheet only starts buyer_to_buyer conversations.
+type ComposePerson = {
+  userId: string;
+  name: string;
+  handle: string;
+  initials: string;
+  color: string;
+  accountType: AccountType;
+};
+
+type ComposeSection = { key: string; title: string; data: ComposePerson[] };
+
+function matchesQuery(p: ComposePerson, q: string): boolean {
+  return p.name.toLowerCase().includes(q) || p.handle.toLowerCase().includes(q);
+}
+
+function dedupePeople(groups: ComposePerson[][]): ComposePerson[] {
+  const seen = new Set<string>();
+  const out: ComposePerson[] = [];
+  for (const group of groups) {
+    for (const p of group) {
+      if (seen.has(p.userId)) continue;
+      seen.add(p.userId);
+      out.push(p);
+    }
+  }
+  return out;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+/** Relative-then-absolute timestamp: "2m" / "3h" → weekday ("Tue") → date. */
 function timeAgo(ts: number): string {
   const diff = Date.now() - ts;
   const mins = Math.floor(diff / 60_000);
@@ -32,7 +73,9 @@ function timeAgo(ts: number): string {
   if (mins < 60) return `${mins}m`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h`;
-  return `${Math.floor(hrs / 24)}d`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return new Date(ts).toLocaleDateString(undefined, { weekday: 'short' });
+  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 function getParticipant(conv: Conversation) {
@@ -62,7 +105,7 @@ export default function InboxScreen() {
   const router = useRouter();
   const api = useApi();
   const { theme } = useAppTheme();
-  const palette = theme as typeof theme & { background?: string; };
+  const s = React.useMemo(() => createStyles(theme), [theme]);
   const { userId } = useAuth();
   const accountRef = useRef(userId);
   accountRef.current = userId;
@@ -72,8 +115,32 @@ export default function InboxScreen() {
   const [activeTab, setActiveTab] = useState<Tab>('Messages');
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [requestActionLoading, setRequestActionLoading] = useState<string | null>(null);
+  const [messagingId, setMessagingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [composeVisible, setComposeVisible] = useState(false);
+  const [composeQuery, setComposeQuery] = useState('');
+  const [composeResults, setComposeResults] = useState<ProfileSearchResult[]>([]);
+  const [composeLoading, setComposeLoading] = useState(false);
+  const [composeStartingId, setComposeStartingId] = useState<string | null>(null);
+  const composeSearchSeq = useRef(0);
+  // Default directory shown before the person types anything: friends
+  // (mutual follows) → followers → following → suggested, deduplicated.
+  const [composeDirLoading, setComposeDirLoading] = useState(false);
+  const [composeFriends, setComposeFriends] = useState<ComposePerson[]>([]);
+  const [composeFollowers, setComposeFollowers] = useState<ComposePerson[]>([]);
+  const [composeFollowing, setComposeFollowing] = useState<ComposePerson[]>([]);
+  const [composeSuggested, setComposeSuggested] = useState<ComposePerson[]>([]);
+  const [messagesSearchQuery, setMessagesSearchQuery] = useState('');
+  const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
+  const snackbarTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showSnackbar = useCallback((message: string) => {
+    if (snackbarTimer.current) clearTimeout(snackbarTimer.current);
+    setSnackbarMessage(message);
+    snackbarTimer.current = setTimeout(() => setSnackbarMessage(null), 2500);
+  }, []);
 
   const loadData = useCallback(async () => {
     if (!userId) {
@@ -91,7 +158,7 @@ export default function InboxScreen() {
       setNotifications(notifs);
       setUnreadNotifCount(notifs.filter(n => !n.isRead).length);
     } catch {
-      setLoadError(false);
+      setLoadError(true);
       setConversations([]);
       setNotifications([]);
       setUnreadNotifCount(0);
@@ -99,6 +166,15 @@ export default function InboxScreen() {
       setLoading(false);
     }
   }, [userId]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadData();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadData]);
 
   useFocusEffect(useCallback(() => {
     loadData();
@@ -111,6 +187,8 @@ export default function InboxScreen() {
 
   // ── Filter logic ────────────────────────────────────────────────────────────
 
+  const messagesSearchLower = messagesSearchQuery.trim().toLowerCase();
+
   const filteredConvs = conversations.filter(conv => {
     // Tab filter
     let tabMatch = false;
@@ -120,6 +198,13 @@ export default function InboxScreen() {
       case 'Requests': tabMatch = conv.isRequest === true && !conv.isArchived; break;
     }
     if (!tabMatch) return false;
+    if (activeTab === 'Messages' && messagesSearchLower) {
+      const participant = getParticipant(conv);
+      const haystack = [
+        participant?.name, participant?.handle, conv.lastMessage,
+      ].filter(Boolean).join(' ').toLowerCase();
+      if (!haystack.includes(messagesSearchLower)) return false;
+    }
     return true;
   });
 
@@ -130,13 +215,13 @@ export default function InboxScreen() {
   function openConversation(conv: Conversation) {
     // Don't open request conversations inline — user must accept first
     if (conv.isRequest) return;
-    Haptics.selectionAsync();
+    hapticPrimaryAction();
     markConversationRead(conv.id);
     router.push(`/buyer-conversation?id=${conv.id}` as never);
   }
 
   async function acceptRequest(conv: Conversation) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticPrimaryAction();
     setRequestActionLoading(conv.id);
     try {
       await api.conversations.accept(conv.id);
@@ -147,7 +232,7 @@ export default function InboxScreen() {
       markConversationRead(conv.id);
       router.push(`/buyer-conversation?id=${conv.id}` as never);
     } catch {
-      Alert.alert('Error', 'Could not accept request. Try again.');
+      Alert.alert('Couldn’t accept request', 'Please try again.');
     } finally {
       setRequestActionLoading(null);
     }
@@ -169,7 +254,7 @@ export default function InboxScreen() {
               await api.conversations.decline(conv.id);
               setConversations(prev => prev.filter(c => c.id !== conv.id));
             } catch {
-              Alert.alert('Error', 'Could not decline request. Try again.');
+              Alert.alert('Couldn’t decline request', 'Please try again.');
             } finally {
               setRequestActionLoading(null);
             }
@@ -180,9 +265,9 @@ export default function InboxScreen() {
   }
 
   function longPressConversation(conv: Conversation) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    hapticDestructiveConfirm();
     Alert.alert('Options', undefined, [
-      { text: 'Archive', onPress: () => archiveConversation(conv.id), style: 'destructive' },
+      { text: 'Archive', onPress: () => swipeArchiveConversation(conv), style: 'destructive' },
       { text: 'Cancel', style: 'cancel' },
     ]);
   }
@@ -192,19 +277,180 @@ export default function InboxScreen() {
     setConversations(prev => prev.map(item =>
       item.id === conv.id ? { ...item, isArchived: true } : item
     ));
+    showSnackbar('Conversation archived');
+  }
+
+  // Swipe actions on a Messages-tab row: delete removes it from the inbox
+  // (there is no true delete-conversation endpoint, so this archives it,
+  // matching the existing long-press "Archive" behavior), mute silences the
+  // other participant (reusing the existing user-mute feature), and mark
+  // read clears the unread badge without opening the thread.
+  async function swipeDeleteConversation(conv: Conversation) {
+    await swipeArchiveConversation(conv);
+  }
+
+  async function swipeMuteConversation(conv: Conversation) {
+    const participant = getParticipant(conv);
+    if (!participant) return;
+    try {
+      await muteUser({
+        userId: participant.userId,
+        name: participant.name,
+        handle: participant.handle,
+        initials: participant.initials,
+        color: participant.color,
+      });
+      showSnackbar(`Muted ${participant.name}`);
+    } catch {
+      Alert.alert('Couldn’t mute', 'Please try again.');
+    }
+  }
+
+  async function swipeMarkReadConversation(conv: Conversation) {
+    if (conv.unreadCount <= 0) return;
+    try {
+      await markConversationRead(conv.id);
+      setConversations(prev => prev.map(item =>
+        item.id === conv.id ? { ...item, unreadCount: 0 } : item
+      ));
+    } catch {
+      Alert.alert('Couldn’t mark as read', 'Please try again.');
+    }
   }
 
   function openCompose() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert(
-      'New Conversation',
-      'Start a conversation with:',
-      [{ text: 'Cancel', style: 'cancel' }],
-    );
+    setComposeQuery('');
+    setComposeResults([]);
+    setComposeVisible(true);
+  }
+
+  function closeCompose() {
+    setComposeVisible(false);
+    setComposeQuery('');
+    setComposeResults([]);
+  }
+
+  // Load the default directory (friends/followers/following/suggested) once
+  // per sheet open, from the same follow-graph endpoints friends.tsx uses.
+  useEffect(() => {
+    if (!composeVisible) return;
+    let cancelled = false;
+    setComposeDirLoading(true);
+    Promise.all([
+      api.social.following().catch(() => []),
+      api.social.followers().catch(() => []),
+      getFriendSuggestions().catch(() => []),
+    ]).then(([followingRows, followerRows, suggestionRows]) => {
+      if (cancelled) return;
+      const followingList = Array.isArray(followingRows) ? followingRows : [];
+      const followerList = Array.isArray(followerRows) ? followerRows : [];
+      const suggestionList = Array.isArray(suggestionRows) ? suggestionRows : [];
+      // isFollowingBack on a follower row means the relationship is mutual
+      // (I follow them and they follow me) — that's what this app's UI
+      // treats as a "friend" (there is no separate friend-request table).
+      const mutualIds = new Set(followerList.filter(f => f.isFollowingBack).map(f => f.userId));
+      const toPerson = (u: { userId: string; name: string; handle: string; initials: string; color: string }): ComposePerson => ({
+        userId: u.userId, name: u.name, handle: u.handle, initials: u.initials, color: u.color, accountType: 'buyer',
+      });
+      const friendsList = followerList.filter(f => mutualIds.has(f.userId)).map(toPerson);
+      const followersOnly = followerList.filter(f => !mutualIds.has(f.userId)).map(toPerson);
+      const followingOnly = followingList.filter(f => !mutualIds.has(f.userId)).map(toPerson);
+      const alreadyShownIds = new Set([...friendsList, ...followersOnly, ...followingOnly].map(p => p.userId));
+      const suggested = suggestionList.filter(s => !alreadyShownIds.has(s.userId)).map(toPerson);
+      setComposeFriends(friendsList);
+      setComposeFollowers(followersOnly);
+      setComposeFollowing(followingOnly);
+      setComposeSuggested(suggested);
+    }).finally(() => {
+      if (!cancelled) setComposeDirLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [composeVisible, api]);
+
+  // Network-wide search (people outside the loaded directory) once the
+  // person types — the directory above already covers friends/followers/
+  // following/suggested, so this only needs to surface everyone else.
+  useEffect(() => {
+    if (!composeVisible) return;
+    const q = composeQuery.trim();
+    if (!q) {
+      setComposeResults([]);
+      setComposeLoading(false);
+      return;
+    }
+    const seq = ++composeSearchSeq.current;
+    setComposeLoading(true);
+    const timer = setTimeout(() => {
+      searchProfiles(q)
+        .then(results => {
+          if (composeSearchSeq.current !== seq) return;
+          setComposeResults(results);
+        })
+        .catch(() => {
+          if (composeSearchSeq.current !== seq) return;
+          setComposeResults([]);
+        })
+        .finally(() => {
+          if (composeSearchSeq.current !== seq) return;
+          setComposeLoading(false);
+        });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [composeQuery, composeVisible]);
+
+  const composeDirectory = useMemo(
+    () => dedupePeople([composeFriends, composeFollowers, composeFollowing, composeSuggested]),
+    [composeFriends, composeFollowers, composeFollowing, composeSuggested]
+  );
+
+  const composeQueryLower = composeQuery.trim().toLowerCase();
+
+  const composeSections: ComposeSection[] = useMemo(() => {
+    if (!composeQueryLower) {
+      return [
+        { key: 'friends', title: 'Friends', data: composeFriends },
+        { key: 'followers', title: 'Followers', data: composeFollowers },
+        { key: 'following', title: 'Following', data: composeFollowing },
+        { key: 'suggested', title: 'Suggested', data: composeSuggested },
+      ].filter(sec => sec.data.length > 0);
+    }
+    const inDirectory = composeDirectory.filter(p => matchesQuery(p, composeQueryLower));
+    const directoryIds = new Set(composeDirectory.map(p => p.userId));
+    const morePeople: ComposePerson[] = composeResults
+      .filter(r => !directoryIds.has(r.userId))
+      .map(r => ({ userId: r.userId, name: r.name, handle: r.handle, initials: r.initials, color: r.color, accountType: r.accountType }));
+    return [
+      { key: 'in-network', title: 'In your network', data: inDirectory },
+      { key: 'more-people', title: 'More people', data: morePeople },
+    ].filter(sec => sec.data.length > 0);
+  }, [composeQueryLower, composeDirectory, composeFriends, composeFollowers, composeFollowing, composeSuggested, composeResults]);
+
+  async function startConversationWith(person: ComposePerson) {
+    if (composeStartingId) return;
+    setComposeStartingId(person.userId);
+    try {
+      const conv = await createOrGetConversation({
+        type: 'buyer_to_buyer',
+        participant: {
+          userId: person.userId,
+          name: person.name,
+          handle: person.handle,
+          initials: person.initials,
+          color: person.color,
+          accountType: person.accountType,
+        },
+      });
+      closeCompose();
+      router.push(`/buyer-conversation?id=${conv.id}` as never);
+    } catch {
+      Alert.alert('Couldn’t start conversation', 'Try again.');
+    } finally {
+      setComposeStartingId(null);
+    }
   }
 
   function openFollow(notif: Notification) {
-    Haptics.selectionAsync();
+    hapticPrimaryAction();
     if (!notif.isRead) {
       markNotificationRead(notif.id);
       setNotifications(prev => prev.map(item =>
@@ -212,7 +458,16 @@ export default function InboxScreen() {
       ));
     }
     if (notif.targetId) {
-      router.push(`/buyer-other-profile?userId=${encodeURIComponent(notif.targetId)}` as never);
+      router.push({
+        pathname: '/buyer-other-profile' as any,
+        params: {
+          userId: notif.targetId,
+          name: notif.actorName ?? '',
+          handle: notif.actorHandle ?? '',
+          initials: notif.actorInitials ?? '',
+          color: notif.actorColor ?? '',
+        },
+      });
     }
   }
 
@@ -246,61 +501,92 @@ export default function InboxScreen() {
 
             {/* Accept / Decline buttons */}
             <View style={s.requestActions}>
-              <TouchableOpacity
+              <PressableScale
                 style={[s.requestAcceptBtn, { backgroundColor: theme.accent }, isLoadingAction && s.requestBtnDisabled]}
                 onPress={() => acceptRequest(conv)}
                 disabled={isLoadingAction}
                 activeOpacity={0.8}
               >
                 <Text style={[s.requestAcceptText, { color: theme.onAccent }]}>Accept</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </PressableScale>
+              <PressableScale
                 style={[s.requestDeclineBtn, isLoadingAction && s.requestBtnDisabled]}
                 onPress={() => declineRequest(conv)}
                 disabled={isLoadingAction}
                 activeOpacity={0.8}
               >
                 <Text style={s.requestDeclineText}>Decline</Text>
-              </TouchableOpacity>
+              </PressableScale>
             </View>
           </View>
         </View>
       );
     }
 
+    const swipeActions: InboxSwipeAction[] = [
+      {
+        key: 'read',
+        label: 'Read',
+        icon: 'check-circle',
+        color: theme.accentDim,
+        textColor: theme.accentLight,
+        onPress: () => swipeMarkReadConversation(conv),
+        accessibilityLabel: `Mark conversation with ${participant.name} as read`,
+      },
+      {
+        key: 'mute',
+        label: 'Mute',
+        icon: 'bell-off',
+        color: theme.cardElevated,
+        textColor: theme.muted,
+        onPress: () => swipeMuteConversation(conv),
+        accessibilityLabel: `Mute ${participant.name}`,
+      },
+      {
+        key: 'delete',
+        label: 'Delete',
+        icon: 'trash-2',
+        color: theme.cardElevated,
+        textColor: theme.error,
+        onPress: () => swipeDeleteConversation(conv),
+        accessibilityLabel: `Delete conversation with ${participant.name}`,
+      },
+    ];
+
     return (
-      <SwipeActionRow
-        label="Archive"
-        icon="archive"
-        color={RED}
-        onAction={() => swipeArchiveConversation(conv)}
-        accessibilityLabel={`Archive conversation with ${participant.name}`}
-      >
-        <TouchableOpacity
+      <InboxSwipeRow rowId={conv.id} actions={swipeActions}>
+        <PressableScale
           style={s.convRow}
           onPress={() => openConversation(conv)}
           onLongPress={() => longPressConversation(conv)}
           activeOpacity={0.75}
+          testID={`inbox-conversation-${conv.id}`}
         >
-        {/* Avatar with unread dot */}
+        {/* Avatar with unread + online dots */}
         <View style={s.avatarContainer}>
           <View style={[s.avatar48, { backgroundColor: participant.color }]}>
             <Text style={s.avatarInitials}>{participant.initials}</Text>
           </View>
-          {isUnread && <View style={[s.unreadDot, { backgroundColor: theme.accent }]} />}
+          {isUnread && <View style={[s.unreadDot, { backgroundColor: theme.accent, borderColor: theme.background }]} />}
+          {participant.isOnline && (
+            <View
+              style={[s.onlineDot, { backgroundColor: theme.success, borderColor: theme.background }]}
+              testID={`inbox-online-dot-${conv.id}`}
+            />
+          )}
         </View>
 
         {/* Center content */}
         <View style={s.convCenter}>
           <View style={s.convNameRow}>
             <Text
-              style={[s.convName, { fontFamily: isUnread ? FONT.bold : FONT.semibold }]}
+              style={[s.convName, { color: theme.text, fontFamily: isUnread ? FONT.bold : FONT.regular }]}
               numberOfLines={1}
             >
               {participant.name}
             </Text>
             {conv.lastMessageTs ? (
-              <Text style={s.convTime}>{timeAgo(conv.lastMessageTs)}</Text>
+              <Text style={[s.convTime, { color: theme.muted }]}>{timeAgo(conv.lastMessageTs)}</Text>
             ) : null}
           </View>
           {conv.contextOrderNumber ? (
@@ -308,97 +594,138 @@ export default function InboxScreen() {
                 <Text style={[s.orderPillText, { color: theme.accent }]}>{conv.contextOrderNumber}</Text>
             </View>
           ) : null}
-          <Text
-            style={[s.convPreview, isUnread && { color: FG }]}
-            numberOfLines={1}
-          >
-            {previewText(conv.lastMessage, 'No messages yet')}
-          </Text>
+          <ConversationPreview
+            text={previewText(conv.lastMessage, 'No messages yet')}
+            attachmentType={conv.lastMessageType}
+            isFromMe={!!conv.lastMessageSenderId && conv.lastMessageSenderId === MY_USER_ID}
+            bold={isUnread}
+            color={isUnread ? theme.text : theme.muted}
+          />
         </View>
 
-        {/* Trailing */}
-          {isUnread ? (
-          <View style={[s.unreadBadge, { backgroundColor: theme.accent }]}>
+        {/* Trailing: unread pill badge, hidden when there is nothing unread */}
+        {isUnread ? (
+          <View style={[s.unreadBadge, { backgroundColor: theme.accent }]} testID={`inbox-unread-badge-${conv.id}`}>
             <Text style={[s.unreadBadgeText, { color: theme.onAccent }]}>{conv.unreadCount > 99 ? '99+' : conv.unreadCount}</Text>
           </View>
         ) : (
-            <Feather name="chevron-right" size={ICON.sm} color="#8A8A8E" />
+            <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
         )}
-        </TouchableOpacity>
-      </SwipeActionRow>
+        </PressableScale>
+      </InboxSwipeRow>
     );
+  }
+
+  async function messageFollower(notif: Notification) {
+    if (!notif.targetId || messagingId) return;
+    hapticPrimaryAction();
+    setMessagingId(notif.id);
+    try {
+      const conv = await createOrGetConversation({
+        type: 'buyer_to_buyer',
+        participant: {
+          userId: notif.targetId,
+          name: notif.actorName ?? 'this person',
+          handle: notif.actorName ?? '',
+          initials: notif.actorInitials ?? '?',
+          color: notif.actorColor ?? theme.cardElevated,
+          accountType: 'buyer',
+        },
+      });
+      router.push(`/buyer-conversation?id=${conv.id}` as never);
+    } catch {
+      Alert.alert('Could not start conversation', 'Check your connection and try again.');
+    } finally {
+      setMessagingId(null);
+    }
   }
 
   function renderFollowRow({ item: notif }: { item: Notification }) {
     const isUnread = !notif.isRead;
     return (
-      <TouchableOpacity
-        style={s.convRow}
-        onPress={() => openFollow(notif)}
-        activeOpacity={0.75}
-        accessibilityRole="button"
-        accessibilityLabel={notif.title}
-      >
-        <View style={s.avatarContainer}>
-          <View style={[s.avatar48, { backgroundColor: notif.actorColor ?? CARD }]}>
-            <Text style={s.avatarInitials}>{notif.actorInitials ?? '?'}</Text>
+      <View style={s.followCard}>
+        <PressableScale
+          style={s.followCardTap}
+          onPress={() => openFollow(notif)}
+          accessibilityRole="button"
+          accessibilityLabel={notif.title}
+        >
+          <View style={s.avatarContainer}>
+            <View style={[s.avatar56, { backgroundColor: notif.actorColor ?? theme.cardElevated }]}>
+              <Text style={s.avatarInitials}>{notif.actorInitials ?? '?'}</Text>
+            </View>
+            {isUnread && <View style={[s.unreadDot, { backgroundColor: theme.accent }]} />}
           </View>
-          {isUnread && <View style={[s.unreadDot, { backgroundColor: theme.accent }]} />}
-        </View>
-        <View style={s.convCenter}>
-          <View style={s.convNameRow}>
-            <Text style={[s.convName, { fontFamily: isUnread ? FONT.bold : FONT.semibold }]} numberOfLines={1}>
-              {notif.actorName ?? notif.title}
+          <View style={s.convCenter}>
+            <View style={s.convNameRow}>
+              <Text style={[s.convName, { color: theme.text, fontFamily: isUnread ? FONT.bold : FONT.semibold }]} numberOfLines={1}>
+                {notif.actorName ?? notif.title}
+              </Text>
+              <Text style={s.convTime}>{timeAgo(new Date(notif.createdAt).getTime())}</Text>
+            </View>
+            <Text style={[s.convPreview, isUnread && { color: theme.text }]} numberOfLines={2}>
+              {notif.body || 'Started following you'}
             </Text>
-            <Text style={s.convTime}>{timeAgo(new Date(notif.createdAt).getTime())}</Text>
           </View>
-          <Text style={[s.convPreview, isUnread && { color: FG }]} numberOfLines={2}>
-            {notif.body || 'Started following you'}
-          </Text>
-        </View>
-        <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
-      </TouchableOpacity>
+        </PressableScale>
+        {notif.targetId && (
+          <PressableScale
+            style={[s.followMessageBtn, { borderColor: theme.border }]}
+            onPress={() => messageFollower(notif)}
+            disabled={messagingId === notif.id}
+            accessibilityRole="button"
+            accessibilityLabel={`Message ${notif.actorName ?? 'this person'}`}
+          >
+            {messagingId === notif.id ? (
+              <ActivityIndicator size="small" color={theme.text} />
+            ) : (
+              <Text style={[s.followMessageBtnText, { color: theme.text }]}>Message</Text>
+            )}
+          </PressableScale>
+        )}
+      </View>
     );
   }
 
   function renderEmptyState() {
-    if (loading) return <View style={s.emptyState}><Text style={s.emptySubtitle}>Loading conversations…</Text></View>;
+    if (activeTab === 'Messages' && messagesSearchLower && !loadError) {
+      return (
+        <EmptyState
+          icon="search"
+          title="No matches"
+          description={`No conversations match "${messagesSearchQuery.trim()}"`}
+        />
+      );
+    }
     const { icon, title, subtitle } = EMPTY_MESSAGES[activeTab];
+    const isMessages = activeTab === 'Messages';
     return (
-      <View style={s.emptyState}>
-        <Feather name={icon} size={48} color={MUTED} />
-        <Text style={s.emptyTitle}>{title}</Text>
-        <Text style={s.emptySubtitle}>{subtitle}</Text>
-      </View>
+      <EmptyState
+        icon={loadError ? 'alert-circle' : icon}
+        title={loadError ? 'Could not load your inbox' : title}
+        description={loadError ? 'Pull to refresh and try again.' : subtitle}
+        action={isMessages && !loadError ? { label: 'New message', onPress: openCompose } : undefined}
+      />
     );
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <View style={[s.root, { backgroundColor: palette.background ?? BG }]}>
-      {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
-        <TouchableOpacity
-          style={s.headerSide}
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <Feather name="arrow-left" size={22} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Inbox</Text>
-        <TouchableOpacity
-          style={s.headerSide}
+    <View style={[s.root, { backgroundColor: SCREEN_BG }]}>
+      {/* Header — tab root: no back arrow, just the title and the compose action */}
+      <View style={[s.header, { paddingTop: insets.top + SP.sm, borderBottomColor: theme.border }]}>
+        <View style={s.headerSide} />
+        <Text style={[s.headerTitle, { color: theme.text }]}>Inbox</Text>
+        <IconButton
+          name="edit-3"
+          size={20}
+          variant="plain"
+          color={theme.text}
           onPress={openCompose}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel="New conversation"
-        >
-          <Feather name="edit-3" size={21} color={FG} />
-          {unreadNotifCount > 0 && <View style={[s.headerUnreadDot, { backgroundColor: theme.accent }]} />}
-        </TouchableOpacity>
+          accessibilityLabel="New message"
+          testID="inbox-header-compose"
+        />
       </View>
 
       {/* Inbox categories */}
@@ -409,65 +736,258 @@ export default function InboxScreen() {
             ? conversations.filter(conv => conv.isRequest && !conv.isArchived).length
             : tab === 'Follows'
               ? followNotifications.filter(notif => !notif.isRead).length
-              : conversations.filter(conv => !conv.isRequest && !conv.isArchived).length;
+              : conversations.filter(conv => !conv.isRequest && !conv.isArchived && conv.unreadCount > 0).length;
           return (
-            <TouchableOpacity
+            <PressableScale
               key={tab}
-              style={s.primaryTab}
-              onPress={() => setActiveTab(tab)}
-              activeOpacity={0.8}
+              style={[
+                s.primaryTab,
+                {
+                  backgroundColor: isActive ? theme.cardElevated : 'transparent',
+                  borderColor: isActive ? theme.border : 'transparent',
+                },
+              ]}
+              onPress={() => { hapticPrimaryAction(); setActiveTab(tab); }}
               accessibilityRole="tab"
               accessibilityState={{ selected: isActive }}
+              accessibilityLabel={tab}
             >
-              <Text style={[s.primaryTabText, isActive && s.primaryTabTextActive]}>{tab}</Text>
-              {count > 0 && <Text style={s.primaryTabCount}>{count > 99 ? '99+' : count}</Text>}
-            </TouchableOpacity>
+              <Text style={[s.primaryTabText, isActive && s.primaryTabTextActive, { color: isActive ? theme.text : theme.muted }]}>{tab}</Text>
+              {count > 0 && <Text style={[s.primaryTabCount, { color: theme.accent }]}>{count > 99 ? '99+' : count}</Text>}
+            </PressableScale>
           );
         })}
       </View>
 
-      {/* Conversations list */}
-      {activeTab === 'Follows' ? (
-        <FlatList
-          data={followNotifications}
-          keyExtractor={item => item.id}
-          renderItem={renderFollowRow}
-          ListEmptyComponent={renderEmptyState}
-          style={s.listSurface}
-          contentContainerStyle={[s.listContent, { paddingBottom: barInset + SP.md }, followNotifications.length === 0 && s.listEmptyContainer]}
-          showsVerticalScrollIndicator={false}
-        />
-      ) : (
-        <FlatList
-          data={filteredConvs}
-          keyExtractor={item => item.id}
-          renderItem={renderConvRow}
-          ListEmptyComponent={renderEmptyState}
-          style={s.listSurface}
-          contentContainerStyle={[s.listContent, { paddingBottom: barInset + SP.md }, filteredConvs.length === 0 && s.listEmptyContainer]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        />
+      {/* Search conversations (Messages tab only) */}
+      {activeTab === 'Messages' && !loading && (
+        <View style={[s.searchRow, { borderColor: theme.border, backgroundColor: theme.cardElevated }]}>
+          <Feather name="search" size={15} color={theme.muted} />
+          <TextInput
+            style={[s.searchInput, { color: theme.text }]}
+            value={messagesSearchQuery}
+            onChangeText={setMessagesSearchQuery}
+            placeholder="Search conversations"
+            placeholderTextColor={theme.muted}
+            autoCorrect={false}
+            testID="inbox-search-input"
+            accessibilityLabel="Search conversations"
+          />
+          {messagesSearchQuery.length > 0 && (
+            <PressableScale
+              onPress={() => setMessagesSearchQuery('')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+            >
+              <Feather name="x" size={15} color={theme.muted} />
+            </PressableScale>
+          )}
+        </View>
       )}
+
+      {/* Conversations list */}
+      {loading ? (
+        <View style={[s.listSurface, s.listContent, { paddingBottom: barInset + SP.md }]}>
+          <ListSkeleton rows={6} />
+        </View>
+      ) : activeTab === 'Follows' ? (
+        followNotifications.length === 0 ? (
+          <ScrollView
+            style={s.listSurface}
+            contentContainerStyle={[s.listContent, { paddingBottom: barInset + SP.md }, s.listEmptyContainer]}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
+          >
+            {renderEmptyState()}
+          </ScrollView>
+        ) : (
+          <View style={s.listSurface}>
+            <FlashList
+              data={followNotifications}
+              keyExtractor={item => item.id}
+              renderItem={renderFollowRow}
+              contentContainerStyle={StyleSheet.flatten([s.listContent, { paddingBottom: barInset + SP.md }])}
+              showsVerticalScrollIndicator={false}
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+            />
+          </View>
+        )
+      ) : filteredConvs.length === 0 ? (
+        <ScrollView
+          style={s.listSurface}
+          contentContainerStyle={[s.listContent, { paddingBottom: barInset + SP.md }, s.listEmptyContainer]}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
+        >
+          {renderEmptyState()}
+        </ScrollView>
+      ) : (
+        <View style={s.listSurface}>
+          <FlashList
+            data={filteredConvs}
+            keyExtractor={item => item.id}
+            renderItem={renderConvRow}
+            contentContainerStyle={StyleSheet.flatten([s.listContent, { paddingBottom: barInset + SP.md }])}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+          />
+        </View>
+      )}
+
+      {/* New message FAB */}
+      {activeTab === 'Messages' && !loading && (
+        <PressableScale
+          style={[s.fab, { bottom: barInset + SP.md, backgroundColor: theme.accent, shadowColor: theme.shadowColor }]}
+          onPress={() => { hapticPrimaryAction(); openCompose(); }}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="New message"
+          testID="inbox-fab-new-message"
+        >
+          <Feather name="edit-3" size={22} color={theme.onAccent} />
+        </PressableScale>
+      )}
+
+      <Modal
+        visible={composeVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={closeCompose}
+      >
+        <View style={s.composeBackdrop}>
+          <View style={[s.composeSheet, { paddingBottom: insets.bottom + SP.md, backgroundColor: theme.card }]}>
+            <SheetHandle />
+            <View style={s.composeHeader}>
+              <Text style={s.composeTitle}>New message</Text>
+              <PressableScale
+                onPress={closeCompose}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Feather name="x" size={22} color={theme.text} />
+              </PressableScale>
+            </View>
+            <SearchBar
+              value={composeQuery}
+              onChange={setComposeQuery}
+              placeholder="Search people"
+              style={s.composeSearchBar}
+            />
+            {composeDirLoading && !composeQueryLower ? (
+              <View style={s.composeCenter}><ActivityIndicator color={theme.accent} /></View>
+            ) : composeSections.length === 0 ? (
+              composeLoading ? (
+                <View style={s.composeCenter}><ActivityIndicator color={theme.accent} /></View>
+              ) : (
+                <View style={s.composeCenter}>
+                  <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm }}>
+                    {composeQueryLower ? 'No one found' : 'No one to show yet'}
+                  </Text>
+                </View>
+              )
+            ) : (
+              <SectionList
+                sections={composeSections}
+                keyExtractor={item => item.userId}
+                keyboardShouldPersistTaps="handled"
+                stickySectionHeadersEnabled={false}
+                ListFooterComponent={
+                  composeQueryLower && composeLoading
+                    ? <View style={s.composeCenter}><ActivityIndicator color={theme.accent} size="small" /></View>
+                    : null
+                }
+                renderSectionHeader={({ section }) => (
+                  <Text style={[s.composeSectionTitle, { color: theme.muted, backgroundColor: theme.card }]}>{section.title}</Text>
+                )}
+                renderItem={({ item }) => (
+                  <PressableScale
+                    style={s.composeResultRow}
+                    onPress={() => startConversationWith(item)}
+                    disabled={!!composeStartingId}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Message ${item.name}`}
+                  >
+                    <View style={[s.composeAvatar, { backgroundColor: theme.cardElevated }]}>
+                      <Text style={{ color: theme.text, fontFamily: FONT.bold, fontSize: FS.sm }}>{item.initials}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }} numberOfLines={1}>{item.name}</Text>
+                      <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs }} numberOfLines={1}>{item.handle}</Text>
+                    </View>
+                    {composeStartingId === item.userId && <ActivityIndicator color={theme.accent} size="small" />}
+                  </PressableScale>
+                )}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      <Snackbar
+        visible={!!snackbarMessage}
+        message={snackbarMessage ?? ''}
+        onDismiss={() => setSnackbarMessage(null)}
+      />
     </View>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: SCREEN_BG },
+function createStyles(theme: ReturnType<typeof useAppTheme>['theme']) {
+  return StyleSheet.create({
+  root: { flex: 1 },
+
+  // Compose modal
+  composeBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  composeSheet: {
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    paddingTop: SP.sm,
+    paddingHorizontal: SP.md,
+    height: '70%',
+  },
+  composeHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: 'center', marginBottom: SP.sm },
+  composeHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: SP.sm,
+  },
+  composeTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: theme.text },
+  composeSearchRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.md, paddingHorizontal: SP.sm, height: 44,
+    marginBottom: SP.sm,
+  },
+  composeSearchInput: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, height: 44 },
+  composeSearchBar: { marginBottom: SP.sm },
+  composeSectionTitle: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingTop: SP.sm,
+    paddingBottom: SP.xs,
+  },
+  composeCenter: { paddingVertical: SP.xl, alignItems: 'center' },
+  composeResultRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: SP.sm, minHeight: 52,
+  },
+  composeAvatar: {
+    width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
+  },
 
   // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SP.sm,
-    paddingBottom: 10,
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.md,
     backgroundColor: 'transparent',
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
   },
   headerSide: {
     width: 44,
@@ -477,33 +997,32 @@ const s = StyleSheet.create({
     position: 'relative',
   },
   headerTitle: {
-    fontSize: FS.md,
-    fontFamily: FONT.semibold,
-    color: FG,
+    fontSize: FS.lg,
+    fontFamily: FONT.bold,
   },
-  headerUnreadDot: {
-    position: 'absolute', top: 8, right: 7, width: 7, height: 7, borderRadius: 4,
-    borderWidth: 1.5, borderColor: BG,
-  },
+  // Roomy pill-segmented control (Bumble/Discord-style) instead of thin
+  // underline tabs crammed against the search row below it.
   primaryTabs: {
     flexDirection: 'row',
-    minHeight: 48,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
+    minHeight: 44,
     backgroundColor: 'transparent',
-    paddingHorizontal: SP.sm,
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.md,
+    gap: SP.sm,
   },
   primaryTab: {
     flex: 1,
-    minHeight: 48,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
+    gap: 6,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
   },
-  primaryTabText: { fontSize: 13, fontFamily: FONT.regular, color: MUTED },
-  primaryTabTextActive: { fontFamily: FONT.semibold, color: FG },
-  primaryTabCount: { fontSize: 13, fontFamily: FONT.semibold, color: RED },
+  primaryTabText: { fontSize: FS.sm, fontFamily: FONT.medium },
+  primaryTabTextActive: { fontFamily: FONT.bold },
+  primaryTabCount: { fontSize: FS.xs, fontFamily: FONT.bold },
   notifBadge: {
     position: 'absolute',
     top: 4,
@@ -518,7 +1037,7 @@ const s = StyleSheet.create({
   notifBadgeText: {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: FG,
+    color: theme.text,
   },
 
   // Tabs
@@ -547,7 +1066,7 @@ const s = StyleSheet.create({
     paddingHorizontal: SP.md,
     paddingVertical: SP.md,
     borderBottomWidth: 1,
-    borderBottomColor: BORDER,
+    borderBottomColor: theme.border,
     backgroundColor: 'transparent',
     gap: SP.md,
   },
@@ -560,28 +1079,30 @@ const s = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 36,
     paddingVertical: SP.xs,
     borderRadius: RADIUS.md,
   },
   requestAcceptText: {
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
-    color: '#FFFFFF',
+    color: theme.onAccent,
   },
   requestDeclineBtn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 36,
     paddingVertical: SP.xs,
-    backgroundColor: CARD,
+    backgroundColor: theme.card,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
   },
   requestDeclineText: {
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
-    color: MUTED,
+    color: theme.muted,
   },
   requestBtnDisabled: {
     opacity: 0.5,
@@ -594,11 +1115,41 @@ const s = StyleSheet.create({
     marginHorizontal: 0,
     marginTop: 0,
     paddingHorizontal: SP.md,
-    paddingVertical: SP.md,
-    minHeight: 78,
+    paddingVertical: SP.md + 4,
+    minHeight: 92,
     borderBottomWidth: 1,
-    borderBottomColor: BORDER,
+    borderBottomColor: theme.border,
     backgroundColor: 'transparent',
+  },
+  // Follows tab: roomy card (avatar + text tap area, plus an inline Message
+  // pill) rather than a plain list row — Azar/Discord "new friend" cards.
+  followCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.md + 4,
+    minHeight: 96,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+    gap: SP.sm,
+  },
+  followCardTap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  followMessageBtn: {
+    borderWidth: 1,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.md,
+    height: 44,
+    minWidth: 88,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  followMessageBtnText: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
   },
   avatarContainer: {
     position: 'relative',
@@ -607,6 +1158,13 @@ const s = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatar56: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -623,7 +1181,47 @@ const s = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: BG,
+    borderColor: theme.background,
+  },
+  onlineDot: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+    borderWidth: 2,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: SP.md,
+    marginTop: 0,
+    marginBottom: SP.sm,
+    paddingHorizontal: SP.md,
+    height: 44,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    height: 40,
+  },
+  fab: {
+    position: 'absolute',
+    right: SP.md,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
   },
   convCenter: {
     flex: 1,
@@ -637,12 +1235,11 @@ const s = StyleSheet.create({
   convName: {
     flex: 1,
     fontSize: FS.base,
-    color: FG,
   },
   convTime: {
     fontSize: FS.xs,
     fontFamily: FONT.regular,
-    color: MUTED,
+    color: theme.muted,
     marginLeft: SP.xs,
   },
   orderPill: {
@@ -659,7 +1256,7 @@ const s = StyleSheet.create({
   convPreview: {
     fontSize: FS.sm,
     fontFamily: FONT.regular,
-    color: MUTED,
+    color: theme.muted,
   },
   unreadBadge: {
     minWidth: 20,
@@ -673,7 +1270,7 @@ const s = StyleSheet.create({
   unreadBadgeText: {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: '#FFFFFF',
+    color: theme.onAccent,
   },
 
   // Empty state
@@ -692,13 +1289,14 @@ const s = StyleSheet.create({
   emptyTitle: {
     fontSize: FS.base,
     fontFamily: FONT.semibold,
-    color: MUTED,
+    color: theme.muted,
     marginTop: SP.sm,
   },
   emptySubtitle: {
     fontSize: FS.sm,
     fontFamily: FONT.regular,
-    color: SUBTLE,
+    color: theme.subtle,
   },
   retryText: { fontSize: FS.sm, fontFamily: FONT.semibold, marginTop: SP.sm },
-});
+  });
+}

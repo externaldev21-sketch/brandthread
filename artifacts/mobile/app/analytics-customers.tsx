@@ -185,31 +185,6 @@ export default function AnalyticsCustomersScreen() {
         )}
       </View>
 
-      {/* Risk */}
-      <View style={s.riskRow}>
-        <View style={[s.riskCard, { borderColor: ORANGE + '44' }]}>
-          <View style={[s.riskIcon, { backgroundColor: ORANGE_DIM }]}>
-            <Feather name="alert-triangle" size={18} color={ORANGE} />
-          </View>
-          <Text style={[s.riskValue, { color: ORANGE }]}>—</Text>
-          <Text style={s.riskLabel}>At-Risk</Text>
-        </View>
-        <View style={[s.riskCard, { borderColor: GOLD + '44' }]}>
-          <View style={[s.riskIcon, { backgroundColor: 'rgba(245,158,11,0.12)' }]}>
-            <Feather name="star" size={18} color={GOLD} />
-          </View>
-          <Text style={[s.riskValue, { color: GOLD }]}>—</Text>
-          <Text style={s.riskLabel}>VIP</Text>
-        </View>
-        <View style={[s.riskCard, { borderColor: RED + '44' }]}>
-          <View style={[s.riskIcon, { backgroundColor: RED_DIM }]}>
-            <Feather name="user-x" size={18} color={RED} />
-          </View>
-          <Text style={[s.riskValue, { color: RED }]}>—</Text>
-          <Text style={s.riskLabel}>Churn Risk</Text>
-        </View>
-      </View>
-
       {/* Cohorts */}
       <Text style={s.sectionTitle}>Cohort Retention</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>

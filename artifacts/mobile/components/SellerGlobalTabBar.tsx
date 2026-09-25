@@ -1,11 +1,14 @@
 /**
  * SellerGlobalTabBar — reusable global seller navigation shell.
  *
- * Renders the exact same Brandthread seller tab bar (Studio radial menu trigger,
- * four-tab center pill, AI brain button) that previously lived inside
- * app/(tabs)/_layout.tsx. Now mounted once at the root layout level so it
+ * Renders the Brandthread seller tab bar (Studio radial menu trigger, four-tab
+ * center capsule, AI brain button). Mounted once at the root layout level so it
  * persists across every seller screen — including detail/editor screens that
  * are root Stack siblings of (tabs).
+ *
+ * It is the same floating, icon-only glass bar as the buyer side, built from
+ * the shared parts in components/tab-bar and sized by the shared tab bar
+ * metrics, so both sides look and feel like one app. Only the icons differ.
  *
  * Active-tab state is derived from useSegments() / usePathname() rather than
  * the nested tab navigator index, so it works anywhere in the stack.
@@ -15,31 +18,18 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { StyleSheet, View } from 'react-native';
 import { useRouter, useSegments } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 
-import {
-  BORDER,
-  BG,
-  SURFACE_GLASS,
-  MUTED,
-  FG,
-  FONT,
-  FS,
-  SP,
-} from '@/lib/theme';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { useColors } from '@/hooks/useColors';
+import { hapticLight, hapticSelection } from '@/lib/haptics';
+import { BuyerNavIcon, type BuyerNavIconName } from '@/components/buyer-nav/BuyerNavIcon';
+import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
+import {
+  TAB_BAR_SHADOW, TabBarBadge, TabBarCircle, TabBarGlass, TabBarIndicator, TabBarSlot, tabIconColor,
+} from '@/components/tab-bar/TabBarParts';
 import {
   getLastViewedAt,
   setBadgeCount,
@@ -55,8 +45,9 @@ import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 
 const TABS: {
   name: string;
+  /** Accessibility label only — the bar itself is icon-only. */
   label: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: BuyerNavIconName;
   /** Root routes that map to this tab being active */
   matchSegments: string[];
   destination: string;
@@ -64,14 +55,14 @@ const TABS: {
   {
     name: 'index',
     label: 'Dashboard',
-    icon: 'home',
+    icon: 'dashboard',
     matchSegments: ['(tabs)', 'index'],
     destination: '/(tabs)/',
   },
   {
     name: 'products',
     label: 'Products',
-    icon: 'package',
+    icon: 'products',
     matchSegments: [
       'products', 'add-product', 'product-detail', 'product-editor',
       'product-store', 'product-import', 'product-size-chart',
@@ -84,7 +75,7 @@ const TABS: {
   {
     name: 'orders',
     label: 'Orders',
-    icon: 'shopping-bag',
+    icon: 'orders',
     matchSegments: [
       'orders', 'order-detail', 'shipping-label', 'return-detail',
       'refund-detail', 'dispute-detail', 'return-request',
@@ -94,7 +85,7 @@ const TABS: {
   {
     name: 'profile',
     label: 'Profile',
-    icon: 'user',
+    icon: 'profile',
     matchSegments: [
       'profile', 'settings', 'seller-settings', 'edit-profile',
       'billing', 'users', 'roles', 'security', 'general-settings',
@@ -105,8 +96,6 @@ const TABS: {
     destination: '/(tabs)/profile',
   },
 ];
-
-const INACTIVE_COLOR = 'rgba(244,244,255,0.72)';
 
 // ─── Route → active tab classification ───────────────────────────────────────
 // Maps the first or second segment to the closest primary tab.
@@ -189,13 +178,12 @@ interface SellerGlobalTabBarProps {
 }
 
 export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
-  const insets = useSafeAreaInsets();
+  const metrics = useTabBarMetrics(2);
   const router = useRouter();
   const segments = useSegments();
   const api = useApi();
   const { userId } = useAuth();
   const { theme } = useAppTheme();
-  const colors = useColors();
 
   const activeTab = getActiveTab(segments as string[]);
 
@@ -271,6 +259,7 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
   }, [api, userId]);
 
   const openAI = () => {
+    hapticLight();
     // Map active tab to AI context
     const screen =
       activeTab === 'products' ? 'products' :
@@ -282,98 +271,91 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
     });
   };
 
+  const openStudio = () => {
+    hapticLight();
+    onOpenStudio();
+  };
+
+  const activeIndex = TABS.findIndex((tabDef) => tabDef.name === activeTab);
+
   return (
     <View
-      style={[
-        styles.bar,
-        {
-          height: 76 + insets.bottom,
-          paddingBottom: insets.bottom,
-          backgroundColor: colors.tabBarBackground,
-          borderColor: colors.border,
-        },
-      ]}
+      style={[styles.bar, { bottom: metrics.bottomOffset, gap: metrics.gap }]}
       testID="seller-global-tab-bar"
     >
-      <Pressable
+      <TabBarCircle
+        theme={theme}
+        size={metrics.circleSize}
         testID="seller-bottom-menu"
-        accessibilityRole="button"
         accessibilityLabel="Open Studio tools"
-        onPress={onOpenStudio}
-        style={({ pressed }) => [
-          styles.sideButton,
-          { backgroundColor: theme.surfaceGlass, borderColor: theme.border },
-          pressed && styles.pressed,
+        onPress={openStudio}
+      >
+        <BuyerNavIcon name="studio" color={theme.text} size={metrics.iconSize} />
+      </TabBarCircle>
+
+      <View
+        style={[
+          TAB_BAR_SHADOW,
+          {
+            width: metrics.capsuleWidth,
+            height: metrics.capsuleHeight,
+            borderRadius: metrics.capsuleHeight / 2,
+          },
         ]}
       >
-        <Feather name="menu" size={20} color={colors.foreground} />
-        <Text style={[styles.sideLabel, { color: colors.foreground }]}>Studio</Text>
-      </Pressable>
+        <TabBarGlass theme={theme} radius={metrics.capsuleHeight / 2} />
+        <TabBarIndicator activeIndex={activeIndex} visible metrics={metrics} theme={theme} />
 
-      <View style={[
-        styles.centerBar,
-        { backgroundColor: theme.surfaceGlass, borderColor: theme.border },
-      ]}>
-        {TABS.map((tabDef) => {
-          const isFocused = activeTab === tabDef.name;
-          const color = isFocused ? theme.accent : INACTIVE_COLOR;
-          const showOrderBadge =
-            tabDef.name === 'orders' && newOrderCount > 0 && !isFocused;
+        <View
+          accessibilityRole="tablist"
+          style={[styles.slotRow, { marginLeft: metrics.capsulePadding }]}
+        >
+          {TABS.map((tabDef) => {
+            const isFocused = activeTab === tabDef.name;
+            const showOrderBadge =
+              tabDef.name === 'orders' && newOrderCount > 0 && !isFocused;
 
-          const onPress = () => {
-            Haptics.selectionAsync().catch(() => {});
-            router.replace(tabDef.destination as never);
-          };
+            const onPress = () => {
+              if (!isFocused) hapticSelection();
+              router.replace(tabDef.destination as never);
+            };
 
-          return (
-            <Pressable
-              key={tabDef.name}
-              accessibilityRole="tab"
-              accessibilityState={isFocused ? { selected: true } : {}}
-              accessibilityLabel={
-                showOrderBadge
-                  ? `${tabDef.label} tab, ${newOrderCount} new orders`
-                  : `${tabDef.label} tab`
-              }
-              onPress={onPress}
-              style={[styles.tab, isFocused && [styles.tabActive, { backgroundColor: colors.accent }]]}
-              testID={`seller-tab-${tabDef.name}`}
-            >
-              <View style={styles.iconWrap}>
-                <Feather name={tabDef.icon} size={24} color={color} />
-                {showOrderBadge && (
-                  <View style={[styles.badge, { backgroundColor: theme.accent, borderColor: colors.background }]}>
-                    <Text style={[styles.badgeText, { color: theme.onAccent }]}>
-                      {newOrderCount > 99 ? '99+' : String(newOrderCount)}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              <Text
-                numberOfLines={1}
-                style={[styles.tabLabel, { color }]}
+            return (
+              <TabBarSlot
+                key={tabDef.name}
+                focused={isFocused}
+                width={metrics.itemWidth}
+                height={metrics.capsuleHeight}
+                accessibilityLabel={
+                  showOrderBadge
+                    ? `${tabDef.label} tab, ${newOrderCount} new orders`
+                    : `${tabDef.label} tab`
+                }
+                onPress={onPress}
+                testID={`seller-tab-${tabDef.name}`}
+                badge={showOrderBadge ? <TabBarBadge count={newOrderCount} theme={theme} /> : null}
               >
-                {tabDef.label}
-              </Text>
-            </Pressable>
-          );
-        })}
+                <BuyerNavIcon
+                  name={tabDef.icon}
+                  color={tabIconColor(theme, isFocused)}
+                  focused={isFocused}
+                  size={metrics.iconSize}
+                />
+              </TabBarSlot>
+            );
+          })}
+        </View>
       </View>
 
-      <Pressable
+      <TabBarCircle
+        theme={theme}
+        size={metrics.circleSize}
         testID="seller-bottom-ai"
-        accessibilityRole="button"
         accessibilityLabel="Open Brandthread AI"
         onPress={openAI}
-        style={({ pressed }) => [
-          styles.sideButton,
-          { backgroundColor: theme.surfaceGlass, borderColor: theme.border },
-          pressed && styles.pressed,
-        ]}
       >
-        <BrandthreadLogo size={22} opacity={1} />
-        <Text style={[styles.sideLabel, { color: colors.foreground }]}>AI</Text>
-      </Pressable>
+        <BrandthreadLogo size={metrics.iconSize - 1} opacity={1} />
+      </TabBarCircle>
     </View>
   );
 }
@@ -382,83 +364,19 @@ export function SellerGlobalTabBar({ onOpenStudio }: SellerGlobalTabBarProps) {
 
 const styles = StyleSheet.create({
   bar: {
-    position:         'absolute',
-    left:             0,
-    right:            0,
-    bottom:           0,
-    zIndex:           30,
-    flexDirection:    'row',
-    alignItems:       'flex-start',
-    gap:              12,
-    backgroundColor:  'transparent',
-    paddingTop:       8,
-    paddingHorizontal: 12,
-  },
-  centerBar: {
-    flex:             1,
-    height:           52,
-    flexDirection:    'row',
-    alignItems:       'center',
-    paddingHorizontal: 4,
-    borderRadius:     26,
-    borderWidth:      1,
-    borderColor:      'rgba(255,255,255,0.14)',
-    backgroundColor:  'rgba(8,8,10,0.58)',
-  },
-  sideButton: {
-    width:           52,
-    height:          52,
-    borderRadius:    26,
-    alignItems:      'center',
-    justifyContent:  'center',
-    borderWidth:     1,
-    borderColor:     'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(8,8,10,0.58)',
-    paddingTop:       4,
-  },
-  pressed: { opacity: 0.82, transform: [{ scale: 0.95 }] },
-  tab: {
-    flex:           1,
+    position:       'absolute',
+    left:           0,
+    right:          0,
+    zIndex:         30,
+    flexDirection:  'row',
     alignItems:     'center',
     justifyContent: 'center',
-    minHeight:      48,
-    borderRadius:   22,
-    gap:            1,
+    pointerEvents:  'box-none',
   },
-  tabActive: { backgroundColor: 'rgba(255,255,255,0.14)' },
-  iconWrap: {
-    position: 'relative',
-  },
-  tabLabel: {
-    maxWidth:   '100%',
-    fontFamily: FONT.bold,
-    fontSize:   11,
-    lineHeight: 13,
-  },
-  sideLabel: {
-    color:      FG,
-    fontFamily: FONT.bold,
-    fontSize:   11,
-    lineHeight: 13,
-  },
-  badge: {
-    position:         'absolute',
-    top:              -5,
-    right:            -8,
-    minWidth:         16,
-    height:           16,
-    borderRadius:     8,
-    alignItems:       'center',
-    justifyContent:   'center',
-    paddingHorizontal: 3,
-    borderWidth:      1.5,
-    borderColor:      'transparent',
-  },
-  badgeText: {
-    fontSize:   FS.xs,
-    fontFamily: FONT.medium,
-    color:      FG,
-    lineHeight: 11,
+  slotRow: {
+    flexDirection: 'row',
+    alignSelf:     'flex-start',
+    alignItems:    'center',
   },
 });
 

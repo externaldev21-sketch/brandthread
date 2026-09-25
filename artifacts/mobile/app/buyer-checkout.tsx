@@ -20,14 +20,13 @@ import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '@/hooks/useColors';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import {
-  applyDiscount, clearCart, clearCheckoutSession, createCheckoutSession,
-  getCart, getCheckoutSession, removeDiscount, saveCheckoutProgress, validateCart,
+  applyDiscount, clearCheckoutSession, createCheckoutSession,
+  getCart, getCheckoutSession, removeCartItems, removeDiscount, saveCheckoutProgress, validateCart,
 } from '@/services/cartService';
 import {
   CheckoutAddress, CheckoutContact, CheckoutDiscount, CheckoutSession, CheckoutStep,
@@ -37,7 +36,7 @@ import { useAuth } from '@clerk/expo';
 import {
   BG, BORDER, CARD, CARD_ELEVATED, FG, FONT, FS,
   MUTED, ON_DARK, RADIUS, RED, RED_DIM,
-  SP, SUCCESS, SUCCESS_DIM, SUBTLE, COMP, ICON, ORANGE, ORANGE_DIM,
+  SP, SUCCESS, SUCCESS_DIM, SUBTLE, COMP, ICON, ORANGE, ORANGE_DIM, TYPE,
 } from '@/lib/theme';
 
 type ThemeAliases = {
@@ -47,6 +46,22 @@ type ThemeAliases = {
   RED: string; RED_DIM: string; SUCCESS: string; SUCCESS_DIM: string;
   ORANGE: string; ORANGE_DIM: string;
 };
+
+// Maps known Stripe decline reason codes to plain-language copy. Falls back to a
+// generic decline message when the code is unrecognized, and to a "still
+// confirming" message when there's no decline reason at all (e.g. a timeout).
+function humanDeclineReason(reason?: string | null): string {
+  if (!reason) return "We're still confirming your payment. This can take a minute — check your order status shortly.";
+  const known: Record<string, string> = {
+    card_declined: 'Your card was declined. Try another card or contact your bank.',
+    insufficient_funds: 'Your card was declined for insufficient funds. Try another card.',
+    expired_card: 'That card has expired. Try another card.',
+    incorrect_cvc: 'The security code didn’t match. Check it and try again.',
+    processing_error: 'Something went wrong processing your card. Try again.',
+    incorrect_number: 'That card number looks incorrect. Check it and try again.',
+  };
+  return known[reason] ?? 'Your card was declined. Try another card or contact your bank.';
+}
 
 function useThemeAliases(): ThemeAliases {
   const { theme } = useAppTheme();
@@ -64,8 +79,14 @@ import {
   getFirstIncompleteCheckoutSection,
   mergeCheckoutFormState,
 } from '@/lib/checkoutReadiness';
-import { CheckoutSkeleton, HapticSwitch } from '@/components/BrandthreadUI';
+import { CheckoutSkeleton, HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
 import { AddressAutocompleteInput } from '@/components/AddressAutocompleteInput';
+import { SheetRise } from '@/components/motion/SheetRise';
+import { StickyFooter } from '@/components/layout';
+import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
+import { Button, IconButton } from '@/components/ui';
+import { RADII } from '@/constants/radii';
+import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -182,9 +203,9 @@ function ReceiptSheet({
   const insets = useSafeAreaInsets();
   if (!visible) return null;
   return (
-    <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
       <TouchableOpacity style={s.sheetBackdrop} activeOpacity={1} onPress={onClose} accessibilityLabel="Close receipt" />
-      <View style={[s.sheetContainer, { paddingBottom: insets.bottom + SP.md }]}>
+      <SheetRise style={[s.sheetContainer, { paddingBottom: insets.bottom + SP.md }]}>
         <View style={s.sheetHandle} />
         <View style={s.sheetHeaderRow}>
           <Text style={s.sheetTitle}>Order summary</Text>
@@ -244,7 +265,7 @@ function ReceiptSheet({
             Final amount confirmed by Stripe Checkout. Tax calculated at payment.
           </Text>
         </ScrollView>
-      </View>
+      </SheetRise>
     </Modal>
   );
 }
@@ -910,11 +931,11 @@ function Review({
         </View>
         <View style={s.line}>
           <Text style={s.muted}>Tax</Text>
-          <Text style={s.lineName}>{money(session.summary.taxTotalCents)}</Text>
+          <Text style={s.lineName}>Calculated at payment</Text>
         </View>
         <View style={s.divider} />
         <View style={s.line}>
-          <Text style={s.total}>Total</Text>
+          <Text style={s.total}>Estimated total</Text>
           <Text style={s.total}>{money(session.summary.totalCents)}</Text>
         </View>
       </Card>
@@ -956,7 +977,7 @@ function Review({
           accessibilityHint={ack.required ? 'Required before payment' : undefined}
         >
           <View style={[s.checkbox, ack.acknowledged && { backgroundColor: PURPLE, borderColor: PURPLE }]}>
-            {ack.acknowledged && <Feather name="check" size={12} color={ON_DARK} />}
+            {ack.acknowledged && <Feather name="check" size={12} color={theme.onAccent} />}
           </View>
           <Text style={s.ackText}>{ack.label}</Text>
         </TouchableOpacity>
@@ -967,17 +988,19 @@ function Review({
 
 // ─── Confirmation screen ──────────────────────────────────────────────────────
 
+// Colors are theme keywords resolved at render time (never literal hex) so
+// confetti stays monochrome-brand and reacts to all 12 themes.
 const CONFETTI = [
-  { left: '5%', color: SUCCESS, delay: 0, x: -14 },
+  { left: '5%', color: 'success', delay: 0, x: -14 },
   { left: '13%', color: 'accent', delay: 90, x: 18 },
   { left: '22%', color: 'secondary', delay: 180, x: -8 },
   { left: '31%', color: 'secondary', delay: 50, x: 14 },
-  { left: '42%', color: '#F87171', delay: 230, x: -18 },
-  { left: '53%', color: SUCCESS, delay: 110, x: 10 },
+  { left: '42%', color: 'foreground', delay: 230, x: -18 },
+  { left: '53%', color: 'success', delay: 110, x: 10 },
   { left: '64%', color: 'accent', delay: 20, x: -12 },
   { left: '73%', color: 'secondary', delay: 260, x: 17 },
   { left: '82%', color: 'secondary', delay: 140, x: -10 },
-  { left: '92%', color: '#F87171', delay: 70, x: 13 },
+  { left: '92%', color: 'foreground', delay: 70, x: 13 },
 ] as const;
 
 function Confirmation({
@@ -992,7 +1015,8 @@ function Confirmation({
 }) {
   const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM } = useThemeAliases();
   const s = makeStyles(theme);
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, userId } = useAuth();
+  const api = useApi();
   const router = useRouter();
   const PURPLE = theme.accent;
   const PURPLE_LIGHT = theme.accentLight;
@@ -1013,6 +1037,12 @@ function Confirmation({
 
   // First verified order — used for navigation. Only set once we have a real server ID.
   const firstVerified = verifiedOrders[0] ?? null;
+
+  useEffect(() => {
+    // A completed purchase is a meaningful, server-backed moment — exactly
+    // when contextualPushPermission.ts wants to ask, never on first launch.
+    if (firstVerified?.id) void requestContextualPushPermission(userId, api);
+  }, [firstVerified?.id, userId, api]);
 
   useEffect(() => {
     Animated.parallel([
@@ -1059,7 +1089,8 @@ function Confirmation({
                   backgroundColor:
                     particle.color === 'accent' ? theme.accent
                     : particle.color === 'secondary' ? theme.secondary
-                    : particle.color,
+                    : particle.color === 'success' ? theme.success
+                    : theme.text,
                   opacity: confettiProgress.interpolate({ inputRange: [0, 0.82, 1], outputRange: [1, 1, 0] }),
                   transform: [
                     { translateX: confettiProgress.interpolate({ inputRange: [0, 1], outputRange: [0, particle.x] }) },
@@ -1148,73 +1179,55 @@ function Confirmation({
 
       {/* Actions */}
       {finalizing ? (
-        <TouchableOpacity
-          style={s.refreshButton}
+        <Button
+          label="Check order status"
+          variant="tertiary"
+          loading={refreshing}
           onPress={onRefresh}
-          disabled={refreshing}
-          accessibilityRole="button"
-          accessibilityLabel="Check order status"
-          accessibilityState={{ disabled: refreshing, busy: refreshing }}
-        >
-          {refreshing
-            ? <ActivityIndicator color={PURPLE_LIGHT} />
-            : <Text style={[s.refreshText, { color: PURPLE_LIGHT }]}>Check order status</Text>}
-        </TouchableOpacity>
+          style={{ marginTop: SP.lg }}
+        />
       ) : (
         <View style={{ marginTop: SP.xl, width: '100%', gap: SP.sm }}>
           {/* Message seller + View purchase — mirroring Depop Thank you screen */}
           {firstGroup && (
             <View style={{ flexDirection: 'row', gap: SP.sm }}>
-              <TouchableOpacity
-                style={s.actionBtnOutline}
+              <Button
+                label="Message seller"
+                icon="message-circle"
+                variant="secondary"
                 onPress={handleMessageSeller}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityLabel="Message seller"
-              >
-                <Feather name="message-circle" size={16} color={FG} />
-                <Text style={s.actionBtnOutlineText}>Message seller</Text>
-              </TouchableOpacity>
+                style={{ flex: 1 }}
+              />
               {/*
                 "View purchase" is ONLY rendered when we have a verified server order ID.
                 If orderId is absent (still finalizing / webhook not yet received),
                 this button stays hidden — never falls back to orderNumber for routing.
               */}
               {firstVerified?.id && (
-                <TouchableOpacity
-                  style={s.actionBtnOutline}
+                <Button
+                  label="View purchase"
+                  icon="package"
+                  variant="secondary"
                   onPress={handleViewPurchase}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
-                  accessibilityLabel="View purchase"
-                >
-                  <Feather name="package" size={16} color={FG} />
-                  <Text style={s.actionBtnOutlineText}>View purchase</Text>
-                </TouchableOpacity>
+                  style={{ flex: 1 }}
+                />
               )}
             </View>
           )}
 
           {!isSignedIn && (
-            <TouchableOpacity
-              style={s.createAccountBtn}
+            <Button
+              label="Create an account"
               onPress={() => router.replace('/sign-in' as never)}
-              activeOpacity={0.8}
-              accessibilityRole="button"
-              accessibilityLabel="Create an account"
-            >
-              <Text style={s.createAccountText}>Create an account</Text>
-            </TouchableOpacity>
+              fullWidth
+            />
           )}
-          <TouchableOpacity
-            style={s.continueShopBtn}
+          <Button
+            label="Continue shopping"
+            variant="secondary"
             onPress={() => router.replace('/(buyer)/discover' as never)}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="Continue shopping"
-          >
-            <Text style={s.continueShopText}>Continue shopping</Text>
-          </TouchableOpacity>
+            fullWidth
+          />
         </View>
       )}
     </View>
@@ -1478,6 +1491,17 @@ export default function BuyerCheckoutScreen() {
               ...(current.loyaltyRedemption && current.deliveryGroups.length === 1
                 ? { loyaltyToken: current.loyaltyRedemption.token }
                 : {}),
+              // THREAD CASH HOOK POINT: server currently rejects this token
+              // outright (see routes/buyer.ts) until checkout can fund the
+              // discount without changing seller payout — see
+              // docs/payments/thread-cash-checkout-todo.md. Wired here so the
+              // rest of the flow needs no changes once that lands.
+              ...(current.threadCashRedemption && current.deliveryGroups.length === 1
+                ? { threadCashToken: current.threadCashRedemption.token }
+                : {}),
+              ...(current.deliveryGroups.length === 1 && current.discounts.find(d => d.isValid)
+                ? { discountCode: current.discounts.find(d => d.isValid)!.code }
+                : {}),
             },
           );
         } else {
@@ -1528,7 +1552,7 @@ export default function BuyerCheckoutScreen() {
         }
 
         if (verification?.paymentStatus !== 'paid') {
-          setError(verification?.declineReason ?? 'Your payment was declined. Please try a different card or contact your card issuer.');
+          setError(humanDeclineReason(verification?.declineReason));
           setCanRetryPayment(true);
           setPlacing(false);
           return;
@@ -1558,7 +1582,12 @@ export default function BuyerCheckoutScreen() {
 
       setVerifiedOrders(confirmed);
       setPendingSessionIds(unresolved);
-      if (!unresolved.length) await clearCart();
+      // Remove only the items that were actually part of this checkout
+      // session — a single-item Buy Now (or a partial "checkout selected")
+      // must never wipe unrelated items still sitting in the buyer's cart.
+      if (!unresolved.length) {
+        await removeCartItems(current.deliveryGroups.flatMap(group => group.items.map(item => item.id)));
+      }
 
       // Save address if requested
       if (isSignedIn && address.saveAddress !== false && !address.id) {
@@ -1640,7 +1669,7 @@ export default function BuyerCheckoutScreen() {
     await persist({ ...current, paidGroups, step: 'confirmation' });
     if (!remaining.length) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      await clearCart();
+      await removeCartItems(current.deliveryGroups.flatMap(group => group.items.map(item => item.id)));
     }
     setPlacing(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1655,7 +1684,7 @@ export default function BuyerCheckoutScreen() {
   const reviewComplete = current.acknowledgments.every(ack => !ack.required || ack.acknowledged);
 
   const ctaLabel = current.step === 'review'
-    ? canRetryPayment ? 'Try a different card' : `Pay securely · ${money(current.summary.totalCents)}`
+    ? canRetryPayment ? 'Try a different card' : 'Continue to payment'
     : 'Continue';
 
   return (
@@ -1663,14 +1692,12 @@ export default function BuyerCheckoutScreen() {
       {/* Header */}
       {current.step !== 'confirmation' && (
         <View style={[s.header, { paddingTop: insets.top + SP.xs }]}>
-          <TouchableOpacity
-            style={s.back}
+          <IconButton
+            name="chevron-left"
+            variant="plain"
             onPress={leaveCheckout}
-            accessibilityRole="button"
             accessibilityLabel="Back"
-          >
-            <Feather name="chevron-left" size={ICON.md} color={FG} />
-          </TouchableOpacity>
+          />
           <View style={{ flex: 1, alignItems: 'center' }}>
             <Text style={s.stepLabel}>Secure checkout</Text>
             <Progress step={current.step} />
@@ -1805,32 +1832,15 @@ export default function BuyerCheckoutScreen() {
 
       {/* Persistent Pay securely CTA — hidden on confirmation */}
       {current.step !== 'confirmation' && (
-        <View style={[s.bottom, { paddingBottom: insets.bottom + SP.sm }]}>
-          <TouchableOpacity
-            style={s.continue}
-            disabled={placing}
-            onPress={() => {
-              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              void (canRetryPayment ? retryPayment() : handleContinue());
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={ctaLabel}
-            accessibilityState={{ disabled: placing, busy: placing }}
-          >
-            <LinearGradient colors={theme.primaryGradient} style={s.continueGradient}>
-              {placing
-                ? <ActivityIndicator color={theme.onAccent} />
-                : (
-                  <>
-                    {current.step === 'review' && <Feather name="lock" size={16} color={theme.onAccent} style={{ marginRight: 6 }} />}
-                    <Text style={[s.continueText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
-                      {ctaLabel}
-                    </Text>
-                  </>
-                )}
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
+        <StickyFooter style={s.bottom}>
+          <Button
+            label={ctaLabel}
+            icon={current.step === 'review' ? 'lock' : undefined}
+            loading={placing}
+            fullWidth
+            onPress={() => void (canRetryPayment ? retryPayment() : handleContinue())}
+          />
+        </StickyFooter>
       )}
 
       {/* Receipt bottom sheet */}
@@ -1881,7 +1891,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     back: { width: COMP.minTouchTarget, height: COMP.minTouchTarget, justifyContent: 'center', alignItems: 'center' },
     stepLabel: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, marginBottom: 5 },
     progress: { flexDirection: 'row', gap: 4, width: 120 },
-    progressSegment: { height: 4, flex: 1, borderRadius: 2, backgroundColor: CARD_ELEVATED },
+    progressSegment: { height: 4, flex: 1, borderRadius: RADII.pill, backgroundColor: CARD_ELEVATED },
     progressSegmentActive: { backgroundColor: PURPLE },
 
     // Card
@@ -1913,7 +1923,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
       minHeight: 72, flexDirection: 'row', alignItems: 'center',
       gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm,
     },
-    guidedStatus: { width: 26, height: 26, borderRadius: 13, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+    guidedStatus: { width: 26, height: 26, borderRadius: RADII.pill, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
     guidedStatusComplete: { backgroundColor: SUCCESS, borderColor: SUCCESS },
     guidedTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
     guidedSummary: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 3 },
@@ -1925,13 +1935,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
       width: 56, height: 68, borderRadius: RADIUS.sm,
       overflow: 'hidden', borderWidth: 1, borderColor: BORDER,
     },
-    summaryItemName: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, lineHeight: 18 },
-    summaryItemVariant: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
-    summaryItemPrice: { fontFamily: FONT.bold, fontSize: FS.sm, color: FG },
+    summaryItemName: { ...TYPE.bodyMedium, fontFamily: FONT.semibold, color: FG },
+    summaryItemVariant: { ...TYPE.caption, color: MUTED, marginTop: 2 },
+    summaryItemPrice: { ...TYPE.bodyMedium, fontFamily: FONT.bold, color: FG },
     summaryTotalRow: {
       flexDirection: 'row', alignItems: 'center', paddingVertical: SP.sm,
     },
-    summaryTotalLabel: { fontFamily: FONT.bold, fontSize: FS.base, color: FG },
+    summaryTotalLabel: { ...TYPE.subheading, color: FG },
     freeShippingLabel: { fontFamily: FONT.medium, fontSize: FS.xs, color: SUCCESS, marginTop: 2 },
     summaryEditRow: {
       flexDirection: 'row', alignItems: 'center', gap: SP.sm,
@@ -1948,18 +1958,18 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
       borderTopWidth: 1, borderTopColor: BORDER,
       maxHeight: '80%', padding: SP.md,
     },
-    sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: SP.md },
+    sheetHandle: { width: 36, height: 4, borderRadius: RADII.pill, backgroundColor: BORDER, alignSelf: 'center', marginBottom: SP.md },
     sheetHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.md },
     sheetTitle: { fontFamily: FONT.bold, fontSize: FS.md, color: FG },
     receiptItemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginBottom: SP.sm },
     receiptThumb: { width: 48, height: 60, borderRadius: RADIUS.sm, overflow: 'hidden', borderWidth: 1, borderColor: BORDER },
-    receiptItemName: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, lineHeight: 18 },
-    receiptItemVariant: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
-    receiptItemPrice: { fontFamily: FONT.bold, fontSize: FS.sm, color: FG },
+    receiptItemName: { ...TYPE.bodyMedium, fontFamily: FONT.semibold, color: FG },
+    receiptItemVariant: { ...TYPE.caption, color: MUTED, marginTop: 2 },
+    receiptItemPrice: { ...TYPE.bodyMedium, fontFamily: FONT.bold, color: FG },
 
     // Delivery methods
     method: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.sm, borderRadius: RADIUS.md, marginBottom: 6 },
-    radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: MUTED },
+    radio: { width: 18, height: 18, borderRadius: RADII.pill, borderWidth: 2, borderColor: MUTED },
     methodTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
 
     // Promo code
@@ -1974,23 +1984,17 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     // Review
     address: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, marginBottom: SP.md },
     line: { flexDirection: 'row', justifyContent: 'space-between', gap: SP.sm, paddingVertical: 5 },
-    lineName: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
+    lineName: { ...TYPE.bodyMedium, fontFamily: FONT.semibold, color: FG },
     divider: { height: 1, backgroundColor: BORDER, marginVertical: SP.sm },
-    total: { color: FG, fontFamily: FONT.bold, fontSize: FS.lg },
+    total: { ...TYPE.subheading, color: FG },
     multiSeller: { flexDirection: 'row', gap: SP.sm, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md },
     multiSellerText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
     ack: { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', minHeight: COMP.minTouchTarget, marginBottom: SP.sm },
-    checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1, borderColor: MUTED, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+    checkbox: { width: 20, height: 20, borderRadius: RADII.chip, borderWidth: 1, borderColor: MUTED, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
     ackText: { flex: 1, color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
 
     // Bottom CTA bar
-    bottom: {
-      position: 'absolute', left: 0, right: 0, bottom: 0,
-      padding: SP.md, backgroundColor: BG, borderTopWidth: 1, borderColor: BORDER,
-    },
-    continue: { overflow: 'hidden', borderRadius: RADIUS.lg, ...SHADOW_PURPLE },
-    continueGradient: { height: COMP.buttonH, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-    continueText: { fontFamily: FONT.bold, fontSize: FS.base },
+    bottom: {},
     continueBtn: { borderRadius: RADIUS.lg, height: COMP.buttonH, alignItems: 'center', justifyContent: 'center' },
     continueBtnText: { fontFamily: FONT.bold, fontSize: FS.base },
 
@@ -2008,13 +2012,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     confirmation: { alignItems: 'center', paddingTop: SP.xl, position: 'relative', overflow: 'hidden' },
     confettiLayer: { position: 'absolute', top: 0, left: 0, right: 0, height: 220 },
     confetti: { position: 'absolute', top: 0, width: 8, height: 14, borderRadius: 2 },
-    successHalo: { width: 112, height: 112, borderRadius: 56, backgroundColor: SUCCESS_DIM, alignItems: 'center', justifyContent: 'center', marginBottom: SP.md },
-    confirmIcon: { width: 78, height: 78, borderRadius: 39, alignItems: 'center', justifyContent: 'center', backgroundColor: SUCCESS },
+    successHalo: { width: 112, height: 112, borderRadius: RADII.pill, backgroundColor: SUCCESS_DIM, alignItems: 'center', justifyContent: 'center', marginBottom: SP.md },
+    confirmIcon: { width: 78, height: 78, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: SUCCESS },
     confirmEyebrow: { color: SUCCESS, fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1.8, marginBottom: 7 },
     headline: { color: FG, fontFamily: FONT.extrabold ?? FONT.bold, fontSize: FS.h1, letterSpacing: -1.2, marginBottom: SP.sm },
     confirmText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 22, textAlign: 'center', maxWidth: 330 },
     deliveryHero: { width: '100%', alignItems: 'center', backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.xl, padding: SP.lg, marginTop: SP.xl },
-    deliveryIcon: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm },
+    deliveryIcon: { width: 46, height: 46, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm },
     deliveryLabel: { color: SUBTLE, fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1.5, marginBottom: 5 },
     deliveryDate: { color: FG, fontFamily: FONT.extrabold ?? FONT.bold, fontSize: FS.xl, textAlign: 'center', letterSpacing: -0.35 },
     deliverySub: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 6, textAlign: 'center' },
@@ -2024,26 +2028,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     confirmProduct: { width: 112 },
     confirmProductImage: { width: 112, height: 126, borderRadius: RADIUS.md, backgroundColor: CARD },
     confirmProductFallback: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER },
-    confirmQty: { position: 'absolute', top: 7, right: 7, minWidth: 23, height: 23, paddingHorizontal: 5, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.72)', alignItems: 'center', justifyContent: 'center' },
+    confirmQty: { position: 'absolute', top: 7, right: 7, minWidth: 23, height: 23, paddingHorizontal: 5, borderRadius: RADII.pill, backgroundColor: 'rgba(0,0,0,0.72)', alignItems: 'center', justifyContent: 'center' },
     confirmQtyText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs },
     confirmProductName: { color: FG, fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 16, marginTop: 7 },
     confirmProductVariant: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
     orderNumbers: { width: '100%', marginTop: SP.lg, backgroundColor: CARD, borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: SP.sm },
     orderNumber: { color: FG, fontFamily: FONT.bold, fontSize: FS.sm, textAlign: 'center', paddingVertical: 3 },
-    refreshButton: { borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: SP.lg, paddingVertical: SP.sm, marginTop: SP.lg },
-    refreshText: { fontFamily: FONT.bold, fontSize: FS.sm },
-
-    // Confirmation action buttons (Message seller / View purchase)
-    actionBtnOutline: {
-      flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-      gap: 6, height: COMP.buttonH, borderRadius: RADIUS.md,
-      borderWidth: 1, borderColor: BORDER, backgroundColor: CARD,
-    },
-    actionBtnOutlineText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
-    createAccountBtn: { backgroundColor: PURPLE, height: COMP.buttonH, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
-    createAccountText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.base },
-    continueShopBtn: { borderWidth: 1, borderColor: BORDER, height: COMP.buttonH, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
-    continueShopText: { color: FG, fontFamily: FONT.bold, fontSize: FS.base },
 
     // Address cards
     savedAddressCard: { padding: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginBottom: SP.sm },

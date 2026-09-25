@@ -40,7 +40,7 @@ import {
   BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE,
   PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  FONT, FS, SP, RADIUS, SHADOW_SM,
+  FONT, FS, SP, RADIUS, ICON, SHADOW_SM,
 } from '@/lib/theme';
 import { divideCents, formatCents } from '@/lib/money';
 import {
@@ -53,6 +53,7 @@ import {
   buildBoostReturnUrl,
 } from '@/services/boostService';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { Header } from '@/components/layout';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -396,7 +397,6 @@ export default function BoostScreen() {
   const api     = useApi();
   const params  = useLocalSearchParams<{ id?: string; paymentReturn?: string; bt_preview?: string }>();
 
-  const topPad    = insets.top + (Platform.OS === 'web' ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === 'web' ? 34 : 0) + 90;
   const inSellerPreview = isSellerDevPreview(
     params.bt_preview === 'buyer' ? '?bt_preview=buyer' : '?bt_preview=seller',
@@ -748,27 +748,11 @@ export default function BoostScreen() {
 
   function renderHeader(title: string) {
     return (
-      <View style={[s.header, { paddingTop: topPad + 8 }]}>
-        <TouchableOpacity
-          onPress={goBack}
-          style={s.headerBtn}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Feather name="arrow-left" size={20} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>{title}</Text>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={s.headerBtn}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          accessibilityLabel="Close"
-          accessibilityRole="button"
-        >
-          <Feather name="x" size={20} color={MUTED} />
-        </TouchableOpacity>
-      </View>
+      <Header
+        title={title}
+        onBack={goBack}
+        actions={[{ icon: 'x', onPress: () => router.back(), accessibilityLabel: 'Close' }]}
+      />
     );
   }
 
@@ -782,7 +766,7 @@ export default function BoostScreen() {
             <Image source={{ uri: thumbnailUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
           ) : (
             <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: CARD_ELEVATED }]}>
-              <Feather name="film" size={14} color={MUTED} />
+              <Feather name="film" size={ICON.xs} color={MUTED} />
             </View>
           )}
         </View>
@@ -925,7 +909,7 @@ export default function BoostScreen() {
             </View>
           ) : targetsError ? (
             <View style={s.emptyState}>
-              <Feather name="lock" size={28} color={MUTED} />
+              <Feather name="lock" size={ICON.xl} color={MUTED} />
               <Text style={s.emptyTitle}>Sign in to continue</Text>
               <Text style={s.emptyBody}>
                 Your session may have expired. Sign in again to load your eligible posts.
@@ -936,7 +920,7 @@ export default function BoostScreen() {
             </View>
           ) : targets.length === 0 ? (
             <View style={s.emptyState}>
-              <Feather name="film" size={28} color={MUTED} />
+              <Feather name="film" size={ICON.xl} color={MUTED} />
               <Text style={s.emptyTitle}>No eligible posts yet</Text>
               <Text style={s.emptyBody}>
                 Publish a video or a slideshow with 2+ images, then come back to Promote.
@@ -1037,7 +1021,7 @@ export default function BoostScreen() {
           {/* Estimated reach */}
           <View style={s.reachCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs }}>
-              <Feather name="users" size={14} color={PURPLE_LIGHT} />
+              <Feather name="users" size={ICON.xs} color={PURPLE_LIGHT} />
               <Text style={s.reachLabel}>Estimated reach</Text>
             </View>
             <Text style={s.reachValue}>
@@ -1069,7 +1053,7 @@ export default function BoostScreen() {
             ) : (
               <>
                 <Text style={s.primaryBtnText}>Boost post · {formatCents(budgetCents)}</Text>
-                <Feather name="zap" size={16} color="#000" />
+                <Feather name="zap" size={ICON.sm} color="#000" />
               </>
             )}
           </TouchableOpacity>
@@ -1160,30 +1144,6 @@ export default function BoostScreen() {
 
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: BG },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
-    backgroundColor: BG,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontFamily: FONT.semibold,
-    fontSize: FS.md,
-    color: FG,
-  },
-  headerBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 
   // Summary card
   summaryCard: {

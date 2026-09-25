@@ -17,6 +17,7 @@ import techpackRouter from "./techpack";
 import manufacturersRouter from "./manufacturers";
 import manufacturerPublicRouter from "./manufacturer-public";
 import manufacturerConnectRouter from "./manufacturer-connect";
+import manufacturerFlowRouter from "./manufacturer-flow";
 import sampleOrdersRouter from "./sample-orders";
 import dropWalletRouter from "./drop-wallet";
 import inventoryRouter from "./inventory";
@@ -34,10 +35,12 @@ import reviewsRouter from "./reviews";
 import sellerProfileRouter from "./seller-profile";
 import conversationsRouter from "./conversations";
 import savedRouter from "./saved";
+import collectionsRouter from "./collections";
 import cartDbRouter from "./cart-db";
 import notificationsFeedRouter from "./notifications-feed";
 import notificationPrefsRouter from "./notification-prefs";
 import postsRouter from "./posts";
+import feedRouter from "./feed";
 import reportsRouter from "./reports";
 import postCommentsRouter from "./post-comments";
 import moderationRouter from "./moderation";
@@ -45,6 +48,7 @@ import safetyRouter from "./safety";
 import socialRouter from "./social";
 import referralsRouter from "./referrals";
 import shippingRatesRouter from "./shipping-rates";
+import shippingZonesRouter from "./shipping-zones";
 import shippingLabelsRouter from "./shipping-labels";
 import disputesRouter from "./disputes";
 import financeRouter from "./finance";
@@ -80,11 +84,14 @@ import boostsRouter    from "./boosts";
 import adCampaignsRouter from "./ad-campaigns";
 import vacationRouter  from "./vacation";
 import loyaltyRouter   from "./loyalty";
+import threadCashRouter from "./thread-cash";
 import callRouter      from "./call";
 import featureFlagsRouter from "./feature-flags";
 import ipCasesRouter from "./ip-cases";
 import shopifyImportRouter from "./shopify-import";
 import designStudioRouter from "./design-studio";
+import packagePresetsRouter from "./package-presets";
+import webhooksShippoRouter from "./webhooks-shippo";
 
 const router = Router();
 
@@ -93,6 +100,7 @@ router.use("/config/features", featureFlagsRouter);
 router.use("/public",          publicRouter);
 router.use("/guest/checkout",  guestCheckoutRouter);
 router.use("/webhooks",        webhooksRouter);
+router.use("/webhooks/shippo", webhooksShippoRouter);
 router.use("/support",         supportRouter);
 router.use("/support-chat",    supportChatRouter);
 router.use("/ip-cases",        ipCasesRouter);
@@ -126,6 +134,8 @@ router.use("/techpack",        tc, requirePlan("growth"), techpackRouter);
 router.use("/manufacturers/public",          manufacturerPublicRouter);
 router.use("/manufacturers/connect",         tc, manufacturerConnectRouter);
 // Growth-plan-gated Manufacturer Hub
+// Order cards + tracker (auth handled per route; falls through otherwise)
+router.use("/manufacturers",   tc, manufacturerFlowRouter);
 router.use("/manufacturers",   tc, manufacturersRouter);
 router.use("/inventory",       tc, inventoryRouter);
 router.use("/seller-hub",      tc, sellerHubRouter);
@@ -142,6 +152,7 @@ router.use("/waitlist",                  tc, waitlistRouter);
 router.use("/bundles",                   tc, bundlesRouter);
 router.use("/buyer/products",            buyerProductsRouter);
 router.use("/buyer/saved",               savedRouter);
+router.use("/buyer/collections",         collectionsRouter);
 router.use("/buyer/cart",                cartDbRouter);
 router.use("/buyer/notifications",       notificationsFeedRouter);
 router.use("/notifications",             notificationEventsRouter);
@@ -156,12 +167,14 @@ router.use("/reviews",                   tc, reviewsRouter);
 // ahead of the team-context posts router.
 router.use("/posts",                     postCommentsRouter);
 router.use("/posts",                     tc, postsRouter);
+router.use("/feed",                      feedRouter); // buyer-scoped (For You ranking + event ingestion); no tc
 router.use("/reports",                   reportsRouter);
 router.use("/moderation",                moderationRouter);
 router.use("/safety",                    safetyRouter);
 router.use("/social",                    socialRouter);
 router.use("/referrals",                 referralsRouter);
 router.use("/shipping-rates",            tc, shippingRatesRouter);
+router.use("/shipping-zones",            shippingZonesRouter); // router mounts requireAuth/teamContext itself after its public /resolve endpoint
 router.use("/shipping-labels",           shippingLabelsRouter);
 router.use("/discount-codes",            tc, discountCodesRouter);
 router.use("/returns",                   tc, returnsRouter);
@@ -201,5 +214,6 @@ router.use("/ad-campaigns",              tc, adCampaignsRouter);
 router.use("/seller/vacation",          tc, vacationRouter);
 router.use("/seller/notification-prefs", tc, notificationPrefsRouter);
 router.use("/loyalty",             loyaltyRouter); // buyer-scoped; no tc
+router.use("/thread-cash",         threadCashRouter); // buyer-scoped; no tc
 
 export default router;

@@ -40,6 +40,12 @@ import { useRevenueCat } from '@/lib/revenueCat';
 import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { recommendSellerPlan, SELLER_PLANS, type SellerPlanDefinition } from '@/lib/sellerPlans';
+import {
+  comparisonRows,
+  displayPriceFor,
+  planIncludesFeature,
+  PLAN_FAQ,
+} from '@/lib/sellerPlansDisplay';
 
 // ─── Local palette constants ──────────────────────────────────────────────────
 // (plans.tsx predates the theme migration; keep these local so the screen is
@@ -66,6 +72,25 @@ export default function PlansScreen() {
   const [currentPlanId,     setCurrentPlanId]     = useState<string | null>(null);
   /** 'none' means no paid subscription yet — Starter must remain selectable. */
   const [currentPlanStatus, setCurrentPlanStatus] = useState<string | null>(null);
+  const [pricesTimedOut,    setPricesTimedOut]    = useState(false);
+  const [openFaqIndex,      setOpenFaqIndex]      = useState<number | null>(null);
+
+  // Native pricing comes from RevenueCat asynchronously. If packages never
+  // arrive, treat it as a real failure rather than leaving the CTA active
+  // against a null price forever.
+  useEffect(() => {
+    if (Platform.OS === 'web' || packages.length > 0) return;
+    const timer = setTimeout(() => setPricesTimedOut(true), 6000);
+    return () => clearTimeout(timer);
+  }, [packages.length]);
+
+  const pricesLoading = Platform.OS !== 'web' && packages.length === 0 && revenueCatAvailable && !pricesTimedOut;
+  const pricesFailed   = Platform.OS !== 'web' && packages.length === 0 && (!revenueCatAvailable || pricesTimedOut);
+  // Whether the store actually returned a free-trial intro offer for this user
+  // on ANY plan — used to avoid promising a trial that isn't really there.
+  const hasRealTrialOffer = Platform.OS === 'web'
+    ? true
+    : packages.some((pkg) => !!pkg.product.introPrice);
 
   // AppState ref to detect return from Stripe Checkout browser tab
   const checkoutOpenedRef = useRef(false);
@@ -227,7 +252,7 @@ export default function PlansScreen() {
         <LinearGradient colors={theme.heroGradient as any} style={StyleSheet.absoluteFill} />
         <ActivityIndicator color={theme.accent} size="large" />
         <Text style={styles.awaitTitle}>Confirming your trial…</Text>
-        <Text style={styles.awaitSub}>Syncing with Stripe — this takes a moment.</Text>
+        <Text style={styles.awaitSub}>Confirming your plan — this takes a moment.</Text>
       </View>
     );
   }
@@ -254,11 +279,8 @@ export default function PlansScreen() {
           </TouchableOpacity>
         )}
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>
+          <Text style={styles.headerTitle} numberOfLines={1}>
             {isOnboarding ? 'Choose your plan' : 'Subscription plans'}
-          </Text>
-          <Text style={styles.headerSub}>
-            5-day free trial · cancel anytime
           </Text>
         </View>
         <View style={{ width: 40 }} />
@@ -268,6 +290,23 @@ export default function PlansScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ padding: 16, paddingBottom: bottomPad + 48, gap: 14 }}
       >
+
+        {/* Hero */}
+        <View style={styles.hero}>
+          <LinearGradient
+            colors={theme.heroGradient as any}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={styles.heroInner}
+          >
+            <Text style={styles.heroEyebrow} allowFontScaling={false}>BRANDTHREAD FOR SELLERS</Text>
+            <Text style={styles.heroTitle} allowFontScaling={false}>
+              Everything to build, run, and grow your brand
+            </Text>
+            <Text style={styles.heroSub}>
+              {hasRealTrialOffer ? '5-day free trial on every plan · cancel anytime' : 'Pick the plan that fits your brand'}
+            </Text>
+          </LinearGradient>
+        </View>
 
         {/* Recommendation banner */}
         {recommendedId && (
@@ -292,22 +331,26 @@ export default function PlansScreen() {
           </Text>
         </View>
 
-        {/* Trial callout */}
-        <View style={styles.trialCallout}>
-          <LinearGradient
-            colors={theme.glowGradient as any}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={styles.trialCalloutInner}
-          >
-                 <Feather name="shield" size={16} color={theme.accent} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.trialCalloutTitle}>5-day free trial on every plan</Text>
-              <Text style={styles.trialCalloutSub}>
-                Enter your card now — you won't be charged until day 6. Cancel before then for free.
-              </Text>
-            </View>
-          </LinearGradient>
-        </View>
+        {/* Trial callout — only claim a trial when the store actually has one to offer */}
+        {hasRealTrialOffer && (
+          <View style={styles.trialCallout}>
+            <LinearGradient
+              colors={theme.glowGradient as any}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={styles.trialCalloutInner}
+            >
+                   <Feather name="shield" size={16} color={theme.accent} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.trialCalloutTitle}>5-day free trial on every plan</Text>
+                <Text style={styles.trialCalloutSub}>
+                  {Platform.OS === 'web'
+                    ? "Enter your card now — you won't be charged until day 6. Cancel before then for free."
+                    : "You won't be charged until your trial ends. Cancel anytime in your App Store settings."}
+                </Text>
+              </View>
+            </LinearGradient>
+          </View>
+        )}
 
         {/* Plan cards */}
         {SELLER_PLANS.map((plan) => {
@@ -315,10 +358,16 @@ export default function PlansScreen() {
           const isCurrent     = !isOnboarding && plan.id === currentPlanId;
           const isLoading     = loadingId === plan.id;
           const revenueCatPackage = packages.find((pkg) => pkg.identifier === SELLER_PACKAGE_IDS[plan.id]);
+          // Web shows our own literal monthly price string; native purchases
+          // always use RevenueCat's real priceString for the same monthly
+          // product. No yearly option exists, so there's nothing to toggle.
+          const webPrice = displayPriceFor(plan);
           const priceLabel = Platform.OS === 'web'
-            ? plan.priceLabel
-            : revenueCatPackage?.product.priceString ?? '—';
+            ? webPrice.price
+            : revenueCatPackage?.product.priceString ?? null;
           const trial = revenueCatPackage?.product.introPrice;
+          const cardPriceLoading = Platform.OS !== 'web' && !priceLabel && !pricesFailed;
+          const cardPriceFailed  = Platform.OS !== 'web' && !priceLabel && pricesFailed;
 
           return (
             <View
@@ -358,16 +407,31 @@ export default function PlansScreen() {
                   <Text style={styles.planTagline}>{plan.tagline}</Text>
                 </View>
                 <View style={styles.priceCol}>
-                  <Text style={[styles.priceLabel, plan.id === 'growth' && { color: theme.accent }]}>
-                     {priceLabel}
-                  </Text>
-                   <Text style={styles.pricePeriod}>{Platform.OS === 'web' ? '/mo' : 'per month'}</Text>
+                  {cardPriceLoading ? (
+                    <View style={styles.priceSkeleton} />
+                  ) : (
+                    <Text style={[styles.priceLabel, plan.id === 'growth' && { color: theme.accent }]}>
+                       {cardPriceFailed ? '—' : priceLabel}
+                    </Text>
+                  )}
+                   <Text style={styles.pricePeriod}>
+                     {Platform.OS === 'web' ? webPrice.period : 'per month'}
+                   </Text>
                 </View>
               </View>
-               {Platform.OS !== 'web' && trial && (
-                 <Text style={styles.nativeTrial}>
-                   Intro offer: {trial.priceString} for {trial.periodNumberOfUnits} {trial.periodUnit.toLowerCase()} {trial.periodNumberOfUnits === 1 ? '' : 's'}
-                 </Text>
+               {Platform.OS !== 'web' && trial && priceLabel && (() => {
+                 const isFree = /^\$?0(\.00?)?$/.test(trial.priceString.trim());
+                 const unitLabel = `${trial.periodNumberOfUnits} ${trial.periodUnit.toLowerCase()}${trial.periodNumberOfUnits === 1 ? '' : 's'}`;
+                 return (
+                   <Text style={styles.nativeTrial}>
+                     {isFree
+                       ? `Free for ${unitLabel}, then ${priceLabel}/month`
+                       : `${trial.priceString} for ${unitLabel}, then ${priceLabel}/month`}
+                   </Text>
+                 );
+               })()}
+               {cardPriceFailed && (
+                 <Text style={styles.nativeTrial}>Prices unavailable. Pull to retry.</Text>
                )}
 
               {/* Included features */}
@@ -389,13 +453,13 @@ export default function PlansScreen() {
               {/* CTA */}
               <TouchableOpacity
                 activeOpacity={0.85}
-                disabled={isCurrent || loadingId !== null}
+                disabled={isCurrent || loadingId !== null || cardPriceFailed || cardPriceLoading}
                 onPress={() => handleSelect(plan)}
                 style={[
                   styles.ctaBtn,
                    plan.id === 'growth' ? styles.ctaBtnHighlight : styles.ctaBtnDefault,
                   isCurrent         && styles.ctaBtnCurrent,
-                  (isCurrent || loadingId !== null) && { opacity: 0.5 },
+                  (isCurrent || loadingId !== null || cardPriceFailed || cardPriceLoading) && { opacity: 0.5 },
                 ]}
               >
                 {isLoading ? (
@@ -404,9 +468,11 @@ export default function PlansScreen() {
                   <Text style={[styles.ctaText, isCurrent && { color: theme.accent }]}>
                     {isCurrent
                       ? 'Current plan'
-                      : isOnboarding
-                        ? 'Start free trial'
-                        : `Switch to ${plan.name}`}
+                      : cardPriceFailed
+                        ? 'Prices unavailable'
+                        : isOnboarding
+                          ? (hasRealTrialOffer ? 'Start free trial' : `Choose ${plan.name}`)
+                          : `Switch to ${plan.name}`}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -414,7 +480,58 @@ export default function PlansScreen() {
           );
         })}
 
-        {/* Skip during onboarding */}
+        {/* Full comparison table */}
+        <View style={styles.compareSection} testID="seller-plans-comparison-table">
+          <Text style={styles.compareTitle}>Compare every plan</Text>
+          <View style={styles.compareHeaderRow}>
+            <View style={{ flex: 1.4 }} />
+            {SELLER_PLANS.map((plan) => (
+              <Text key={plan.id} style={styles.compareHeaderCell} numberOfLines={1}>{plan.name}</Text>
+            ))}
+          </View>
+          {comparisonRows().map((feature, index) => (
+            <View
+              key={feature}
+              style={[styles.compareRow, index % 2 === 1 && styles.compareRowAlt]}
+            >
+              <Text style={styles.compareFeatureCell} numberOfLines={2}>{feature}</Text>
+              {SELLER_PLANS.map((plan) => (
+                <View key={plan.id} style={styles.compareValueCell}>
+                  {planIncludesFeature(plan, feature) ? (
+                    <Feather name="check" size={15} color={theme.success} />
+                  ) : (
+                    <Feather name="minus" size={15} color={theme.muted} />
+                  )}
+                </View>
+              ))}
+            </View>
+          ))}
+        </View>
+
+        {/* FAQ */}
+        <View style={styles.faqSection} testID="seller-plans-faq">
+          <Text style={styles.compareTitle}>Frequently asked questions</Text>
+          {PLAN_FAQ.map((item, index) => {
+            const isOpen = openFaqIndex === index;
+            return (
+              <View key={item.question} style={styles.faqItem}>
+                <TouchableOpacity
+                  style={styles.faqQuestionRow}
+                  onPress={() => { haptic(); setOpenFaqIndex(isOpen ? null : index); }}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: isOpen }}
+                  testID={`seller-plans-faq-${index}`}
+                >
+                  <Text style={styles.faqQuestion}>{item.question}</Text>
+                  <Feather name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color={theme.muted} />
+                </TouchableOpacity>
+                {isOpen && <Text style={styles.faqAnswer}>{item.answer}</Text>}
+              </View>
+            );
+          })}
+        </View>
+
+        {/* Skip during onboarding — Starter is a paid plan, so this must not read as "free" */}
         {isOnboarding && (
           <TouchableOpacity
             style={styles.skipRow}
@@ -422,7 +539,7 @@ export default function PlansScreen() {
             disabled={loadingId !== null}
             activeOpacity={0.7}
           >
-            <Text style={styles.skipText}>Skip for now — start with Starter</Text>
+            <Text style={styles.skipText}>Not now</Text>
              <Feather name="arrow-right" size={14} color={theme.muted} />
           </TouchableOpacity>
         )}
@@ -436,6 +553,28 @@ export default function PlansScreen() {
              {loadingId === 'restore' ? <ActivityIndicator color={theme.muted} size="small" /> : <Text style={styles.skipText}>Restore purchases</Text>}
           </TouchableOpacity>
         )}
+
+        {/* Apple guideline 3.1.2 — auto-renew disclosure + Terms/Privacy links */}
+        <View style={styles.legalFooter}>
+          <Text style={styles.legalFooterText}>
+            Subscriptions renew automatically at the price shown unless you cancel at least 24 hours before the period ends. Manage or cancel in your App Store account settings.
+          </Text>
+          <View style={styles.legalLinksRow}>
+            <Text
+              style={styles.legalLink}
+              onPress={() => { haptic(); router.push('/terms' as never); }}
+            >
+              Terms of Use
+            </Text>
+            <Text style={styles.legalLinkDivider}>·</Text>
+            <Text
+              style={styles.legalLink}
+              onPress={() => { haptic(); router.push('/privacy' as never); }}
+            >
+              Privacy Policy
+            </Text>
+          </View>
+        </View>
 
       </ScrollView>
     </View>
@@ -467,6 +606,13 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   headerCenter:{ flex: 1, alignItems: 'center' },
   headerTitle: { fontSize: FS.lg, fontFamily: FONT.semibold, color: theme.text },
   headerSub:   { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
+
+  // Hero
+  hero: { borderRadius: RADIUS.xl, overflow: 'hidden', borderWidth: 1, borderColor: theme.border },
+  heroInner: { padding: SP.lg, gap: 6 },
+  heroEyebrow: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.accent, letterSpacing: 1.5 },
+  heroTitle: { fontSize: 24, fontFamily: FONT.semibold, color: theme.text, letterSpacing: -0.3, lineHeight: 30 },
+  heroSub: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
 
   // Recommendation banner
   recBanner: {
@@ -555,6 +701,37 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   skipText: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
    restoreRow: { alignItems: 'center', paddingVertical: SP.sm },
    nativeTrial: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.secondary, marginTop: -SP.xs },
+   priceSkeleton: { width: 64, height: 28, borderRadius: RADIUS.xs, backgroundColor: theme.border },
+
+  // Legal footer (Apple 3.1.2 — auto-renew disclosure + Terms/Privacy)
+  // Comparison table
+  compareSection: {
+    backgroundColor: theme.card, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: theme.border,
+    padding: SP.md, gap: 4,
+  },
+  compareTitle: { fontSize: FS.lg, fontFamily: FONT.semibold, color: theme.text, marginBottom: SP.sm },
+  compareHeaderRow: { flexDirection: 'row', alignItems: 'center', paddingBottom: SP.sm, borderBottomWidth: 1, borderBottomColor: theme.border },
+  compareHeaderCell: { flex: 1, fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text, textAlign: 'center' },
+  compareRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderRadius: RADIUS.sm },
+  compareRowAlt: { backgroundColor: `${theme.border}30` },
+  compareFeatureCell: { flex: 1.4, fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, paddingRight: 6 },
+  compareValueCell: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
+  // FAQ
+  faqSection: {
+    backgroundColor: theme.card, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: theme.border,
+    padding: SP.md, gap: 4,
+  },
+  faqItem: { borderTopWidth: 1, borderTopColor: theme.border, paddingVertical: SP.sm },
+  faqQuestionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm },
+  faqQuestion: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: theme.text },
+  faqAnswer: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 18, marginTop: SP.xs },
+
+  legalFooter: { paddingTop: SP.sm, paddingHorizontal: SP.xs, gap: 10 },
+  legalFooterText: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, lineHeight: 16, textAlign: 'center' },
+  legalLinksRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  legalLink: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.text, textDecorationLine: 'underline' },
+  legalLinkDivider: { fontSize: FS.xs, color: theme.muted },
 
   // Awaiting Stripe overlay
   awaitRoot: { flex: 1, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center', gap: 20, padding: 40 },

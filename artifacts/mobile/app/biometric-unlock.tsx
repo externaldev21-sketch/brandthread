@@ -7,11 +7,12 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Linking, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { HapticSwitch, PressableScale } from '@/components/BrandthreadUI';
+import { Header } from '@/components/layout';
 import {
   GRACE_OPTIONS, authenticateForAppLock, getDeviceSecurity, loadAppLockSettings, saveAppLockSettings,
   type AppLockSettings, type DeviceSecurity, type GraceSeconds,
@@ -21,7 +22,6 @@ export default function AppLockSettingsScreen() {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
-  const router = useRouter();
 
   const [device, setDevice] = useState<DeviceSecurity | null>(null);
   const [settings, setSettings] = useState<AppLockSettings>({ enabled: false, graceSeconds: 0 });
@@ -68,14 +68,8 @@ export default function AppLockSettingsScreen() {
   }
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
-      <View style={s.header}>
-        <PressableScale onPress={() => router.back()} style={s.headerBtn} accessibilityLabel="Back" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="arrow-left" size={ICON.lg} color={theme.text} />
-        </PressableScale>
-        <Text style={s.headerTitle}>App Lock</Text>
-        <View style={s.headerBtn} />
-      </View>
+    <View style={s.root}>
+      <Header title="App Lock" />
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color={theme.text} /></View>
@@ -173,9 +167,6 @@ export default function AppLockSettingsScreen() {
 
 const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.md },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   hero: { alignItems: 'center', paddingVertical: SP.lg },
   heroIcon: {

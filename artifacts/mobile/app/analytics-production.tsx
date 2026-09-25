@@ -16,6 +16,7 @@ import {
 } from '@/lib/theme';
 import { getProductionAnalytics, getFilterState } from '@/services/analyticsService';
 import { ProductionAnalytics, ManufacturerAnalyticsRow, AnalyticsMetric, AnalyticsFilterState } from '@/services/analyticsTypes';
+import { EmptyState } from '@/components/BrandthreadUI';
 
 function KpiTile({ m, color }: { m: AnalyticsMetric; color: string }) {
   const colors = useColors();
@@ -149,10 +150,19 @@ export default function AnalyticsProductionScreen() {
         </TouchableOpacity>
       </View>
 
+      {!data ? (
+        <EmptyState
+          icon="tool"
+          title="Production insights are on the way"
+          description="Production stats will show once you run a job."
+          style={{ marginTop: 24 }}
+        />
+      ) : (
+      <>
       {/* KPI tiles */}
       <Text style={s.sectionTitle}>Production Overview</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }} contentContainerStyle={{ gap: 10, flexDirection: 'row', paddingRight: 16 }}>
-        {data && [
+        {[
           { m: data.activeJobs,              color: PURPLE  },
           { m: data.unitsInProduction,       color: BLUE    },
           { m: data.productionValue,         color: GOLD    },
@@ -169,20 +179,20 @@ export default function AnalyticsProductionScreen() {
       <View style={s.gaugeCard}>
         <View style={s.gaugeHeader}>
           <Text style={s.gaugeTitle}>On-Time Completion</Text>
-          <Text style={[s.gaugeValue, { color: (data?.onTimeCompletionRate.value ?? 0) >= 80 ? SUCCESS : ORANGE }]}>
-            {data?.onTimeCompletionRate.formatted ?? '—'}
+          <Text style={[s.gaugeValue, { color: data.onTimeCompletionRate.value >= 80 ? SUCCESS : ORANGE }]}>
+            {data.onTimeCompletionRate.formatted}
           </Text>
         </View>
         <View style={s.gaugeBar}>
           <View style={[s.gaugeFill, {
-            width: `${data?.onTimeCompletionRate.value ?? 0}%`,
-            backgroundColor: (data?.onTimeCompletionRate.value ?? 0) >= 80 ? SUCCESS : ORANGE,
+            width: `${data.onTimeCompletionRate.value}%`,
+            backgroundColor: data.onTimeCompletionRate.value >= 80 ? SUCCESS : ORANGE,
           }]} />
         </View>
-        {(data?.delayedJobs.value ?? 0) > 0 && (
+        {data.delayedJobs.value > 0 && (
           <View style={s.gaugeWarning}>
             <Feather name="alert-circle" size={12} color={RED} />
-            <Text style={s.gaugeWarningText}>{data?.delayedJobs.value} job{(data?.delayedJobs.value ?? 0) !== 1 ? 's' : ''} delayed</Text>
+            <Text style={s.gaugeWarningText}>{data.delayedJobs.value} job{data.delayedJobs.value !== 1 ? 's' : ''} delayed</Text>
           </View>
         )}
       </View>
@@ -190,16 +200,18 @@ export default function AnalyticsProductionScreen() {
       {/* Manufacturer performance */}
       <Text style={s.sectionTitle}>Manufacturer Performance</Text>
       <Text style={s.disclaimer}>Calculated only from your recorded production activity.</Text>
-      {data?.manufacturers.length === 0 ? (
-        <View style={s.emptyState}>
-          <Feather name="tool" size={36} color={MUTED} />
-          <Text style={s.emptyTitle}>No production data</Text>
-          <Text style={s.emptyBody}>Production performance will appear after working with manufacturers.</Text>
-        </View>
+      {data.manufacturers.length === 0 ? (
+        <EmptyState
+          icon="tool"
+          title="No production data"
+          description="Production performance will appear after working with manufacturers."
+        />
       ) : (
         <View style={{ gap: 12 }}>
-          {data?.manufacturers.map(mfr => <ManufacturerCard key={mfr.manufacturerId} mfr={mfr} />)}
+          {data.manufacturers.map(mfr => <ManufacturerCard key={mfr.manufacturerId} mfr={mfr} />)}
         </View>
+      )}
+      </>
       )}
 
       <View style={{ height: 120 }} />

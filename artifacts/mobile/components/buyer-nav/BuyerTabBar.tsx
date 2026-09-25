@@ -1,11 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View,
+  Keyboard, Platform, Pressable, StyleSheet, TextInput, View,
   type LayoutChangeEvent,
 } from 'react-native';
 import type { Tabs } from 'expo-router';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -20,18 +18,23 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 
-import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useBuyerSearch } from '@/contexts/BuyerSearchContext';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
+import { PRESS_SCALE } from '@/constants/motion';
+import {
+  TAB_BAR_SHADOW, TabBarBadge, TabBarCircle, TabBarGlass, TabBarIndicator, TabBarSlot, tabIconColor,
+} from '@/components/tab-bar/TabBarParts';
 import { BuyerNavIcon, type BuyerNavIconName } from './BuyerNavIcon';
-import { BUYER_TAB_SLOT_COUNT, useBuyerTabBarMetrics, type BuyerTabBarMetrics } from './buyerTabBarMetrics';
+import { BUYER_TAB_SLOT_COUNT, useBuyerTabBarMetrics } from './buyerTabBarMetrics';
 
 type BottomTabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>['tabBar']>>[0];
 
 // ─── Navigation contract ──────────────────────────────────────────────────────
 // Capsule: Home · Discover · Inbox · Search. Separate circle: Profile, which
 // becomes Close while search is open. Home never leaves the capsule.
+// The bar is icon-only; labels are kept for accessibility.
 
 export const BUYER_TAB_ITEMS: readonly {
   route: 'index' | 'discover' | 'inbox' | 'search';
@@ -64,15 +67,9 @@ export const BUYER_ROUTE_SLOT: Record<string, Slot> = {
 // Critically damped with clamping: the morph settles in ~350ms and can never
 // overshoot, so the capsule does not bounce when search opens or closes.
 const MORPH_SPRING = { mass: 1, stiffness: 320, damping: 36, overshootClamping: true } as const;
-const INDICATOR_SPRING = { mass: 1, stiffness: 420, damping: 40, overshootClamping: true } as const;
 const REDUCED_MOTION = { duration: 160 } as const;
 
 const FIELD_GLYPH_CENTER = 22;
-
-// The active pill is sized from each tab's measured icon+label width plus
-// this much breathing room (half on each side), so it fully encloses long
-// labels like "Discover" and "Profile" instead of a fixed, guessed width.
-const INDICATOR_H_PADDING = 28;
 
 // ─── Keyboard tracking ────────────────────────────────────────────────────────
 // Mounted only while search is open, so Reanimated's Android inset listener is
@@ -105,128 +102,6 @@ function WebKeyboardSimulator({ target }: { target: SharedValue<number> }) {
     return () => window.removeEventListener('bt:simulate-keyboard', onSimulate);
   }, [target]);
   return null;
-}
-
-// ─── Glass surface ────────────────────────────────────────────────────────────
-
-function GlassSurface({ theme, radius }: { theme: AppThemePreset; radius: number }) {
-  // iOS and web get a live backdrop blur. expo-blur's Android blur needs the
-  // whole navigator wrapped in a BlurTargetView, which cannot sample video
-  // surfaces and redraws the feed every frame, so Android uses a denser tint.
-  const hasBlur = Platform.OS !== 'android';
-  return (
-    <View style={[StyleSheet.absoluteFill, { borderRadius: radius, overflow: 'hidden', pointerEvents: 'none' }]}>
-      {hasBlur && (
-        <BlurView
-          intensity={Platform.OS === 'ios' ? 60 : 70}
-          tint={Platform.OS === 'ios' ? 'systemThinMaterialDark' : 'dark'}
-          style={StyleSheet.absoluteFill}
-        />
-      )}
-      <View
-        style={[
-          StyleSheet.absoluteFill,
-          { backgroundColor: hasBlur ? `${theme.background}8C` : `${theme.surface}EB` },
-        ]}
-      />
-      <LinearGradient
-        colors={['rgba(255,255,255,0.10)', 'rgba(255,255,255,0.02)', 'rgba(255,255,255,0)']}
-        locations={[0, 0.45, 1]}
-        style={StyleSheet.absoluteFill}
-      />
-      <View
-        style={[
-          StyleSheet.absoluteFill,
-          { borderRadius: radius, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.18)' },
-        ]}
-      />
-    </View>
-  );
-}
-
-// ─── Unread badge ─────────────────────────────────────────────────────────────
-
-function UnreadBadge({ count, theme }: { count: number; theme: AppThemePreset }) {
-  if (count <= 0) return null;
-  const label = count > 99 ? '99+' : String(count);
-  return (
-    <View
-      style={[
-        styles.badge,
-        { backgroundColor: theme.accent, borderColor: theme.background },
-        label.length > 1 && { paddingHorizontal: 4 },
-      ]}
-    >
-      <Text style={[styles.badgeText, { color: theme.onAccent }]} maxFontSizeMultiplier={1.1}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-// ─── Tab slot ─────────────────────────────────────────────────────────────────
-
-function TabSlot({
-  item, index, focused, metrics, theme, badgeCount, onPress, onLongPress, testID, accessibilityLabel,
-  hiddenForSearch, onContentLayout,
-}: {
-  item: (typeof BUYER_TAB_ITEMS)[number];
-  index: number;
-  focused: boolean;
-  metrics: BuyerTabBarMetrics;
-  theme: AppThemePreset;
-  badgeCount: number;
-  onPress: () => void;
-  onLongPress: () => void;
-  testID: string;
-  accessibilityLabel: string;
-  hiddenForSearch: boolean;
-  onContentLayout: (index: number, width: number) => void;
-}) {
-  const color = focused ? theme.accent : theme.muted;
-  const handleContentLayout = useCallback(
-    (event: LayoutChangeEvent) => onContentLayout(index, event.nativeEvent.layout.width),
-    [index, onContentLayout],
-  );
-  return (
-    <Pressable
-      accessibilityRole="tab"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ selected: focused }}
-      aria-selected={focused}
-      aria-hidden={hiddenForSearch}
-      accessibilityElementsHidden={hiddenForSearch}
-      importantForAccessibility={hiddenForSearch ? 'no-hide-descendants' : 'auto'}
-      onPress={onPress}
-      onLongPress={onLongPress}
-      testID={testID}
-      style={({ pressed }) => [
-        styles.slot,
-        { width: metrics.itemWidth, height: metrics.capsuleHeight, pointerEvents: hiddenForSearch ? 'none' : 'auto' },
-        pressed && styles.pressed,
-      ]}
-    >
-      {/* Measured (not fixed) so the active pill can hug this tab's real
-          icon+label width, including the longer "Discover"/"Profile" labels. */}
-      <View onLayout={handleContentLayout} style={styles.slotContent}>
-        <View>
-          <BuyerNavIcon name={item.icon} color={color} focused={focused} size={metrics.iconSize} />
-          {item.route === 'inbox' && <UnreadBadge count={badgeCount} theme={theme} />}
-        </View>
-        <Text
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.2}
-          style={[
-            styles.label,
-            { fontSize: metrics.labelSize, color: focused ? theme.text : theme.muted },
-            focused && { fontFamily: FONT.semibold },
-          ]}
-        >
-          {item.label}
-        </Text>
-      </View>
-    </Pressable>
-  );
 }
 
 // ─── Bar ──────────────────────────────────────────────────────────────────────
@@ -290,42 +165,6 @@ export function BuyerTabBar({
     if (width > 0 && Math.abs(width - slotRowWidth.get()) > 0.5) slotRowWidth.set(width);
   }, [slotRowWidth]);
 
-  // ── Active indicator ───────────────────────────────────────────────────────
-  // Each tab's real icon+label width, measured via onLayout. Falls back to a
-  // full-slot estimate until the first layout pass lands.
-  const contentWidthFallback = metrics.itemWidth - 6 - INDICATOR_H_PADDING;
-  const contentWidths = useRef<number[]>(BUYER_TAB_ITEMS.map(() => contentWidthFallback));
-  const activeIndexRef = useRef(activeIndex);
-  useEffect(() => { activeIndexRef.current = activeIndex; }, [activeIndex]);
-
-  const indicatorX = useSharedValue(Math.max(activeIndex, 0) * metrics.itemWidth);
-  const indicatorWidth = useSharedValue(contentWidthFallback + INDICATOR_H_PADDING);
-  const indicatorVisible = useSharedValue(activeIndex >= 0 && !searchActive ? 1 : 0);
-
-  const onSlotContentLayout = useCallback((index: number, width: number) => {
-    contentWidths.current[index] = width;
-    // The tab that is already active snaps to its true size immediately,
-    // with no spring, so there is nothing to see settle.
-    if (index === activeIndexRef.current) {
-      indicatorWidth.set(Math.min(width + INDICATOR_H_PADDING, metrics.itemWidth + 32));
-    }
-  }, [indicatorWidth, metrics.itemWidth]);
-
-  useEffect(() => {
-    // Entering search only fades the pill where it is; it never glides
-    // under the field that is sliding in.
-    if (activeIndex >= 0 && !searchActive) {
-      const x = activeIndex * metrics.itemWidth;
-      const targetWidth = Math.min(
-        (contentWidths.current[activeIndex] ?? contentWidthFallback) + INDICATOR_H_PADDING,
-        metrics.itemWidth + 32,
-      );
-      indicatorX.set(reduceMotion ? withTiming(x, REDUCED_MOTION) : withSpring(x, INDICATOR_SPRING));
-      indicatorWidth.set(reduceMotion ? withTiming(targetWidth, REDUCED_MOTION) : withSpring(targetWidth, INDICATOR_SPRING));
-    }
-    indicatorVisible.set(withTiming(activeIndex >= 0 && !searchActive ? 1 : 0, { duration: 180 }));
-  }, [activeIndex, searchActive, metrics.itemWidth, contentWidthFallback, reduceMotion, indicatorX, indicatorWidth, indicatorVisible]);
-
   // ── Animated styles ────────────────────────────────────────────────────────
   const pad = metrics.capsulePadding;
   const fieldHeight = metrics.fieldHeight;
@@ -338,17 +177,6 @@ export function BuyerTabBar({
   const capsuleStyle = useAnimatedStyle(() => {
     const base = slotRowWidth.value + pad * 2;
     return { width: base + searchExtraWidth * progress.value };
-  });
-
-  const indicatorStyle = useAnimatedStyle(() => {
-    const width = indicatorWidth.value;
-    return {
-      opacity: indicatorVisible.value,
-      width,
-      // Centred within the itemWidth-wide column the pill's tab occupies,
-      // rather than pinned to the column's edge, so extra width grows evenly.
-      left: pad + indicatorX.value + (metrics.itemWidth - width) / 2,
-    };
   });
 
   const fieldStyle = useAnimatedStyle(() => {
@@ -435,7 +263,6 @@ export function BuyerTabBar({
   }, [dismissKeyboard, requestFilters]);
 
   const profileFocused = activeSlot === 'profile';
-  const circleLabel = searchActive ? 'Close' : 'Profile';
 
   return (
     <Animated.View
@@ -458,18 +285,13 @@ export function BuyerTabBar({
           capsuleStyle,
         ]}
       >
-        <GlassSurface theme={theme} radius={metrics.capsuleHeight / 2} />
+        <TabBarGlass theme={theme} radius={metrics.capsuleHeight / 2} />
 
-        <Animated.View
-          style={[
-            styles.indicator,
-            {
-              top: 4,
-              height: metrics.capsuleHeight - 8,
-              borderRadius: (metrics.capsuleHeight - 8) / 2,
-            },
-            indicatorStyle,
-          ]}
+        <TabBarIndicator
+          activeIndex={activeIndex}
+          visible={!searchActive}
+          metrics={metrics}
+          theme={theme}
         />
 
         <View
@@ -477,7 +299,7 @@ export function BuyerTabBar({
           onLayout={onSlotRowLayout}
           style={[styles.slotRow, { marginLeft: pad }]}
         >
-          {BUYER_TAB_ITEMS.map((item, index) => {
+          {BUYER_TAB_ITEMS.map((item) => {
             const focused = !searchActive && activeSlot === item.route;
             const isHome = item.route === 'index';
             const coveredBySearch = !isHome && searchActive;
@@ -486,20 +308,24 @@ export function BuyerTabBar({
               ? `${item.label} tab, ${badge} unread ${badge === 1 ? 'item' : 'items'}`
               : `${item.label} tab`;
             const slot = (
-              <TabSlot
-                item={item}
-                index={index}
+              <TabBarSlot
                 focused={focused}
-                metrics={metrics}
-                theme={theme}
-                badgeCount={badge}
+                width={metrics.itemWidth}
+                height={metrics.capsuleHeight}
                 onPress={() => openRoute(item.route)}
                 onLongPress={() => onLongPress(item.route)}
                 testID={isHome && searchActive ? 'buyer-search-home' : `buyer-tab-${item.route}`}
                 accessibilityLabel={label}
-                hiddenForSearch={coveredBySearch}
-                onContentLayout={onSlotContentLayout}
-              />
+                hidden={coveredBySearch}
+                badge={item.route === 'inbox' ? <TabBarBadge count={badge} theme={theme} /> : null}
+              >
+                <BuyerNavIcon
+                  name={item.icon}
+                  color={tabIconColor(theme, focused)}
+                  focused={focused}
+                  size={metrics.iconSize}
+                />
+              </TabBarSlot>
             );
             if (isHome) return <View key={item.route}>{slot}</View>;
             return (
@@ -589,60 +415,31 @@ export function BuyerTabBar({
       </Animated.View>
 
       {/* ── Profile / Close circle ──────────────────────────────────────── */}
-      <Pressable
+      <TabBarCircle
+        theme={theme}
+        size={metrics.circleSize}
+        active={profileFocused && !searchActive}
         accessibilityRole={searchActive ? 'button' : 'tab'}
         accessibilityLabel={searchActive ? 'Close search' : 'Profile tab'}
-        accessibilityState={searchActive ? {} : { selected: profileFocused }}
-        aria-selected={searchActive ? undefined : profileFocused}
+        selected={searchActive ? undefined : profileFocused}
         onPress={searchActive ? closeSearch : () => openRoute('profile')}
         onLongPress={searchActive ? undefined : () => onLongPress('profile')}
         testID={searchActive ? 'buyer-search-close' : 'buyer-tab-profile'}
-        style={({ pressed }) => [
-          styles.shadow,
-          {
-            width: metrics.circleSize,
-            height: metrics.circleSize,
-            borderRadius: metrics.circleSize / 2,
-          },
-          pressed && styles.pressed,
-        ]}
       >
-        <GlassSurface theme={theme} radius={metrics.circleSize / 2} />
-        {profileFocused && !searchActive && (
-          <View
-            style={[
-              styles.circleActive,
-              { borderRadius: (metrics.circleSize - 8) / 2 },
-            ]}
-          />
-        )}
-        <View style={styles.circleContent}>
-          <View style={{ width: metrics.iconSize, height: metrics.iconSize }}>
-            <Animated.View style={[StyleSheet.absoluteFill, profileIconStyle]}>
-              <BuyerNavIcon
-                name="profile"
-                color={profileFocused ? theme.accent : theme.muted}
-                focused={profileFocused}
-                size={metrics.iconSize}
-              />
-            </Animated.View>
-            <Animated.View style={[StyleSheet.absoluteFill, closeIconStyle]}>
-              <BuyerNavIcon name="close" color={theme.text} size={metrics.iconSize} strokeWidth={2} />
-            </Animated.View>
-          </View>
-          <Text
-            numberOfLines={1}
-            maxFontSizeMultiplier={1.2}
-            style={[
-              styles.label,
-              { fontSize: metrics.labelSize, color: profileFocused || searchActive ? theme.text : theme.muted },
-              (profileFocused || searchActive) && { fontFamily: FONT.semibold },
-            ]}
-          >
-            {circleLabel}
-          </Text>
+        <View style={{ width: metrics.iconSize, height: metrics.iconSize }}>
+          <Animated.View style={[StyleSheet.absoluteFill, profileIconStyle]}>
+            <BuyerNavIcon
+              name="profile"
+              color={tabIconColor(theme, profileFocused)}
+              focused={profileFocused}
+              size={metrics.iconSize}
+            />
+          </Animated.View>
+          <Animated.View style={[StyleSheet.absoluteFill, closeIconStyle]}>
+            <BuyerNavIcon name="close" color={theme.text} size={metrics.iconSize} strokeWidth={2} />
+          </Animated.View>
         </View>
-      </Pressable>
+      </TabBarCircle>
     </Animated.View>
   );
 }
@@ -658,55 +455,15 @@ const styles = StyleSheet.create({
     pointerEvents: 'box-none',
   },
   // Shadow lives on an unclipped wrapper; the glass inside clips to the radius.
-  shadow: {
-    boxShadow: '0px 10px 30px rgba(0, 0, 0, 0.38), 0px 2px 6px rgba(0, 0, 0, 0.22)',
-  },
+  shadow: TAB_BAR_SHADOW,
   slotRow: {
     flexDirection: 'row',
     alignSelf: 'flex-start',
     alignItems: 'center',
   },
-  slot: {
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  slotContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-  },
-  label: {
-    fontFamily: FONT.medium,
-    lineHeight: 14,
-    letterSpacing: 0.2,
-  },
   pressed: {
     opacity: 0.7,
-    transform: [{ scale: 0.94 }],
-  },
-  indicator: {
-    position: 'absolute',
-    pointerEvents: 'none',
-    backgroundColor: 'rgba(255,255,255,0.09)',
-  },
-  badge: {
-    position: 'absolute',
-    pointerEvents: 'none',
-    top: -6,
-    left: 14,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badgeText: {
-    fontFamily: FONT.bold,
-    fontSize: 11,
-    lineHeight: 13,
+    transform: [{ scale: PRESS_SCALE }],
   },
   field: {
     position: 'absolute',
@@ -761,21 +518,5 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     borderWidth: 1.5,
-  },
-  circleActive: {
-    position: 'absolute',
-    pointerEvents: 'none',
-    top: 4,
-    left: 4,
-    right: 4,
-    bottom: 4,
-    backgroundColor: 'rgba(255,255,255,0.09)',
-  },
-  circleContent: {
-    pointerEvents: 'none',
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
   },
 });

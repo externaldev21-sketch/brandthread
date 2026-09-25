@@ -17,13 +17,23 @@ describe('seller dashboard neutral glass surfaces', () => {
   });
 
   it('keeps dashboard-owned panels off the blue-violet surface tokens', () => {
-    const dashboard = read('app/(tabs)/index.tsx');
-    const kpiGrid = read('components/SellerDashboardKPIGrid.tsx');
+    const homeScreen = read('app/(tabs)/index.tsx');
+    const dashboard = read('components/SellerHomeCommerceDashboard.tsx');
+    const statGrid = read('components/SellerDashboardStatGrid.tsx');
     const quickActions = read('components/SellerQuickActionsGrid.tsx');
 
+    expect(homeScreen).not.toMatch(/\bCARD_GLASS\b|\bCARD_ELEVATED_GLASS\b/);
     expect(dashboard).not.toMatch(/\bCARD_GLASS\b|\bCARD_ELEVATED_GLASS\b/);
-    expect(kpiGrid).not.toMatch(/\bCARD_GLASS\b|\bCARD_ELEVATED_GLASS\b/);
+    expect(statGrid).not.toMatch(/\bCARD_GLASS\b|\bCARD_ELEVATED_GLASS\b/);
     expect(quickActions).toContain('backgroundColor: theme.card');
     expect(quickActions).toContain('borderColor: theme.border');
+  });
+
+  it('routes every dashboard color through theme tokens, not hardcoded hex/rgba', () => {
+    const dashboard = read('components/SellerHomeCommerceDashboard.tsx');
+    // Only theme.* accessors (or the SCREEN_BG fallback constant) may back a
+    // dashboard surface color — this app has 12 themes, so no hardcoded hex.
+    const hardcodedColorProps = dashboard.match(/(?:backgroundColor|borderColor|color):\s*'#[0-9a-fA-F]{3,8}'/g) ?? [];
+    expect(hardcodedColorProps).toEqual([]);
   });
 });

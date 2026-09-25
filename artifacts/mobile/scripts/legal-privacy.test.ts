@@ -21,14 +21,21 @@ describe('public legal documents', () => {
   });
 
   it('marks every legal document as a draft that needs legal review before launch', () => {
+    // The source content still flags itself as a draft pending counsel review
+    // (content/legal.ts), so whoever fills in the real entity/address/contact
+    // knows it's required. The in-app "Draft — pending legal review" /
+    // "OWNER + COUNSEL ACTION REQUIRED" banner that used to render this to
+    // real users was a P0 App Store risk and was removed from LegalDocument —
+    // see docs/polish/punch-list.md "Legal document" — so it's intentionally
+    // not asserted here anymore.
     const legal = fs.readFileSync(path.join(projectRoot, 'content', 'legal.ts'), 'utf8');
     expect(legal).toContain('not legal advice');
     expect(legal).toContain('pending review by qualified counsel');
     expect(legal).toContain('must be completed before launch');
     expect(legal).toContain('[LEGAL ENTITY NAME]');
     const component = fs.readFileSync(path.join(projectRoot, 'components', 'legal', 'LegalDocument.tsx'), 'utf8');
-    expect(component).toContain('Draft — pending legal review');
-    expect(component).toContain('OWNER + COUNSEL ACTION REQUIRED');
+    expect(component).not.toContain('Draft — pending legal review');
+    expect(component).not.toContain('OWNER + COUNSEL ACTION REQUIRED');
   });
 
   it('does not claim GPS collection or cross-app advertising tracking', () => {

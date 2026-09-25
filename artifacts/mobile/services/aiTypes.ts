@@ -46,6 +46,13 @@ export interface AIMessage {
   error?: string;
   /** Snapshot of what context was active when this message was sent */
   contextLabel?: string;
+  /** Help-doc links relevant to this answer, e.g. "Inventory" -> /inventory */
+  sources?: AISource[];
+}
+
+export interface AISource {
+  title: string;
+  route: string;
 }
 
 // ─── Screen Context ────────────────────────────────────────────────────────────
@@ -110,6 +117,7 @@ export interface AIChatRequest {
 export interface AIChatResponse {
   content: string;
   actionCard?: Omit<AIActionCard, 'id' | 'status'>;
+  sources?: AISource[];
   tokensUsed?: number;
   isDemo?: boolean;
   error?: string;

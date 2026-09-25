@@ -3,6 +3,7 @@
  * Calls https://exp.host/--/api/v2/push/send in chunks of 100.
  * Does not throw — push delivery is best-effort.
  */
+import { withRetry } from "./retry";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 const CHUNK_SIZE = 100;
@@ -26,15 +27,21 @@ export async function sendPushNotifications(
   for (let i = 0; i < messages.length; i += CHUNK_SIZE) {
     const chunk = messages.slice(i, i + CHUNK_SIZE);
     try {
-      const res = await fetch(EXPO_PUSH_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          "Accept-Encoding": "gzip, deflate",
-        },
-        body: JSON.stringify(chunk),
-      });
+      // Sending the same chunk of Expo push tokens twice on a transient
+      // network failure is a possible duplicate notification, not a
+      // duplicate charge or state change, so retrying here is acceptable.
+      const res = await withRetry(
+        () => fetch(EXPO_PUSH_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            "Accept-Encoding": "gzip, deflate",
+          },
+          body: JSON.stringify(chunk),
+        }),
+        { label: "sendPush.expoSend" },
+      );
       if (res.ok) {
         const json = await res.json() as { data?: { status: string }[] };
         // Each item in data[] has a status of 'ok' or 'error'

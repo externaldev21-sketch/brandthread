@@ -10,11 +10,11 @@ import type {
   BuyerSocialProfile, BuyerPost, RepostRecord,
   Friendship, FriendshipStatus, FriendRequest, FriendSuggestion,
   Conversation, ConversationType, ConversationParticipant,
-  Message, MessageAttachment, MessageReaction,
+  Message, MessageAttachment, MessageReaction, ReactionType,
   Story, StoryMedia, StoryPrivacySettings, StoryViewer,
   Notification, NotificationCategory, NotificationPreference,
   BlockRecord, MuteRecord, RestrictRecord,
-  SavedItem, SavedItemType, PrivacySettings, ProfileSearchResult,
+  SavedItem, SavedItemType, SavedCollection, PrivacySettings, ProfileSearchResult,
   Comment,
 } from './socialTypes';
 import { DEFAULT_PRIVACY_SETTINGS, DEFAULT_NOTIFICATION_PREFS } from './socialTypes';
@@ -216,6 +216,18 @@ export async function getMyPosts(k: SocialKeys = K()): Promise<BuyerPost[]> {
     `/api/social/profile/${encodeURIComponent(k.userId)}/posts`,
   );
   return Array.isArray(remote) ? remote : [];
+}
+/** A single post by id, regardless of author — for opening a specific post
+ *  (e.g. from Saved or a Collection) without already knowing who wrote it.
+ *  Returns null if it doesn't exist, isn't visible, or isn't shared with the
+ *  viewer (posts are friends-only unless they're the viewer's own). */
+export async function getPostById(postId: string, k: SocialKeys = K()): Promise<BuyerPost | null> {
+  if (k.userId === 'anon' || !postId) return null;
+  try {
+    return await serviceRequest<BuyerPost>(`/api/social/posts/${encodeURIComponent(postId)}`);
+  } catch {
+    return null;
+  }
 }
 export async function createPost(params: {
   type: BuyerPost['type'];
@@ -430,6 +442,7 @@ export interface SellerPostProductTag {
   productId:   string;
   productName: string;
   priceCents:  number;
+  imageUri?:   string;
   variantId?:  string;
   slideIndex?: number;
   timestamp?:  number;
@@ -544,6 +557,7 @@ function mapOwnedApiPost(p: any, userId: string): SellerThreadPost {
       productId: tag.productId,
       productName: tag.productName ?? tag.name ?? 'Product',
       priceCents: typeof tag.priceCents === 'number' ? tag.priceCents : 0,
+      imageUri: Array.isArray(tag.images) ? tag.images[0] : tag.imageUri,
       variantId: tag.variantId,
       slideIndex: tag.slideIndex,
       timestamp: tag.timestamp,
@@ -766,6 +780,7 @@ function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
       productId:   t.productId,
       productName: t.name ?? '',
       priceCents: typeof t.priceCents === 'number' ? t.priceCents : 0,
+      imageUri: Array.isArray(t.images) ? t.images[0] : t.imageUri,
     })),
     visibility:    p.visibility ?? { allowComments: true, allowReposts: true, showLikeCount: true },
     scheduledAt:   null,
@@ -1019,12 +1034,12 @@ export async function getMessages(conversationId: string, k: SocialKeys = K()): 
   if (_socialUserId === k.userId) await save(msgKey, remote);
   return remote;
 }
-export async function sendMessage(conversationId: string, text: string, attachment?: MessageAttachment): Promise<Message> {
+export async function sendMessage(conversationId: string, text: string, attachment?: MessageAttachment, replyToId?: string): Promise<Message> {
   const k = K();
   const msgKey = k.messages(conversationId);
   const message = await serviceRequest<Message>(`/api/conversations/${encodeURIComponent(conversationId)}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ text, attachment }),
+    body: JSON.stringify({ text, attachment, replyToId }),
   });
   if (_socialUserId === k.userId) {
     const messages = await load<Message[]>(msgKey, []);
@@ -1071,16 +1086,40 @@ export async function retryMessage(conversationId: string, messageId: string): P
     throw error;
   }
 }
+// Reactions are now persisted server-side (one active reaction per user per
+// message — re-reacting with the same value toggles it off, matching the
+// small fixed reaction bar; anything else upserts/replaces the caller's
+// reaction). The local AsyncStorage cache is updated only after the server
+// call succeeds, matching this file's offline-first pattern elsewhere.
 export async function addReaction(conversationId: string, messageId: string, emoji: string): Promise<void> {
   const k = K();
   const msgKey = k.messages(conversationId);
-  const msgs = await getMessages(conversationId, k);
+  const msgs = await load<Message[]>(msgKey, []);
   const idx = msgs.findIndex(m => m.id === messageId);
-  if (idx < 0) return;
-  const existing = msgs[idx].reactions.findIndex(r => r.fromId === MY_USER_ID && r.emoji === emoji);
-  if (existing >= 0) { msgs[idx].reactions.splice(existing, 1); }
-  else { msgs[idx].reactions = [...msgs[idx].reactions, { emoji, fromId: MY_USER_ID, fromName: MY_NAME }]; }
-  await save(msgKey, msgs); notify();
+  const existingMine = idx >= 0 ? msgs[idx].reactions.find(r => r.fromId === MY_USER_ID) : undefined;
+  const isToggleOff = existingMine?.emoji === emoji;
+
+  const path = `/api/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/reactions`;
+  if (isToggleOff) {
+    await serviceRequest<{ ok: boolean }>(path, { method: 'DELETE' });
+  } else {
+    await serviceRequest<MessageReaction>(path, {
+      method: 'PUT',
+      body: JSON.stringify({ reactionType: emoji }),
+    });
+  }
+
+  if (idx >= 0 && _socialUserId === k.userId) {
+    const others = msgs[idx].reactions.filter(r => r.fromId !== MY_USER_ID);
+    msgs[idx] = {
+      ...msgs[idx],
+      reactions: isToggleOff
+        ? others
+        : [...others, { emoji, fromId: MY_USER_ID, fromName: MY_NAME, reactionType: emoji as ReactionType, createdAt: iso() }],
+    };
+    await save(msgKey, msgs);
+    notify();
+  }
 }
 export async function deleteMessageForMe(conversationId: string, messageId: string): Promise<void> {
   const k = K();
@@ -1279,7 +1318,10 @@ export async function getSavedItems(k: SocialKeys = K()): Promise<SavedItem[]> {
   return authoritative;
 }
 export async function saveItem(
-  params: { type: SavedItemType; targetId: string; title: string; subtitle?: string; accentColor?: string; },
+  params: {
+    type: SavedItemType; targetId: string; title: string; subtitle?: string; accentColor?: string;
+    collectionId?: string | null; priceCents?: number;
+  },
   options?: { onRemoteSaved?: () => void },
 ): Promise<SavedItem> {
   const k = K();
@@ -1292,7 +1334,7 @@ export async function saveItem(
   const items = await getSavedItems(k);
   const existing = items.find(i => i.targetId === params.targetId);
   if (existing) return existing;
-  const item: SavedItem = { id: uid(), savedAt: iso(), ...params };
+  const item: SavedItem = { id: uid(), savedAt: iso(), ...params, collectionId: params.collectionId ?? undefined };
   await save(k.saved, [item, ...items]);
   const p = await getMyProfile(k);
   await updateMyProfile({ savedCount: p.savedCount + 1 }, k);
@@ -1316,6 +1358,62 @@ export async function isItemSaved(targetId: string): Promise<boolean> {
   const k = K();
   const items = await getSavedItems(k);
   return items.some(i => i.targetId === targetId);
+}
+/** Move (or un-file, with `collectionId: null`) an already-saved item between boards. */
+export async function moveSavedItemToCollection(targetId: string, collectionId: string | null): Promise<SavedItem> {
+  const updated = await serviceRequest<SavedItem>(
+    '/api/buyer/saved/' + encodeURIComponent(targetId),
+    { method: 'PATCH', body: JSON.stringify({ collectionId }) },
+  );
+  notify();
+  return updated;
+}
+
+// ─── Saved Collections (boards) ────────────────────────────────────────────────
+
+export async function getCollections(): Promise<SavedCollection[]> {
+  const remote = await serviceRequest<SavedCollection[]>('/api/buyer/collections');
+  return Array.isArray(remote) ? remote : [];
+}
+export async function getCollectionItems(collectionId: string): Promise<{ collection: SavedCollection; items: SavedItem[] }> {
+  return serviceRequest(`/api/buyer/collections/${encodeURIComponent(collectionId)}/items`);
+}
+export async function createCollection(name: string): Promise<SavedCollection> {
+  const collection = await serviceRequest<SavedCollection>('/api/buyer/collections', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+  notify();
+  return collection;
+}
+export async function updateCollection(
+  collectionId: string,
+  updates: { name?: string; coverImageUrl?: string | null; isPublic?: boolean },
+): Promise<SavedCollection> {
+  const collection = await serviceRequest<SavedCollection>(`/api/buyer/collections/${encodeURIComponent(collectionId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+  notify();
+  return collection;
+}
+export async function deleteCollection(collectionId: string): Promise<void> {
+  await serviceRequest(`/api/buyer/collections/${encodeURIComponent(collectionId)}`, { method: 'DELETE' });
+  notify();
+}
+export async function reorderCollections(orderedIds: string[]): Promise<void> {
+  await serviceRequest('/api/buyer/collections/reorder', {
+    method: 'POST',
+    body: JSON.stringify({ orderedIds }),
+  });
+  notify();
+}
+/** Unauthenticated read for a shared collection deep link — no token required. */
+export async function getPublicCollection(collectionId: string): Promise<{
+  collection: { id: string; name: string; coverImageUrl: string | null; itemCount: number; ownerName: string };
+  items: SavedItem[];
+}> {
+  return serviceRequest(`/api/public/collections/${encodeURIComponent(collectionId)}`, {}, false);
 }
 
 // ─── Privacy ──────────────────────────────────────────────────────────────────
@@ -1452,6 +1550,41 @@ export async function getThreadPostsPage(
     cursor: next,
     hasMore: !next.followedDone || !next.generalDone,
   };
+}
+
+/**
+ * Buyer's personalized For You ranking (GET /api/feed/for-you) — additive,
+ * does not replace `getThreadPostsPage`'s existing 'for-you'/'mixed' modes
+ * (those keep their current offset-paginated /api/public/posts behavior).
+ * Screens can opt into this real ranked feed independently. Live items in
+ * the response are passed through as-is (`kind: 'live'`) since they have no
+ * post shape to map through `mapApiPostToSellerThreadPost`.
+ */
+export type ForYouFeedEntry =
+  | { kind: 'post'; post: SellerThreadPost }
+  | { kind: 'live'; liveStreamId: string; sellerId: string; title: string; thumbnailUrl: string | null; viewerCount: number };
+
+export async function getForYouFeedPage(
+  offset = 0,
+  limit = 20,
+): Promise<{ entries: ForYouFeedEntry[]; nextOffset: number | null }> {
+  const response = await serviceRequest<{ items: any[]; nextOffset: number | null }>(
+    `/api/feed/for-you?limit=${limit}&offset=${offset}`,
+  );
+  const entries: ForYouFeedEntry[] = (response.items ?? []).map((item, index) => {
+    if (item?.type === 'live') {
+      return {
+        kind: 'live',
+        liveStreamId: item.liveStreamId,
+        sellerId: item.sellerId,
+        title: item.title,
+        thumbnailUrl: item.thumbnailUrl ?? null,
+        viewerCount: item.viewerCount ?? 0,
+      };
+    }
+    return { kind: 'post', post: mapApiPostToSellerThreadPost(item, index) };
+  });
+  return { entries, nextOffset: response.nextOffset ?? null };
 }
 
 export function createThreadFeedCursor(): ThreadFeedCursor {

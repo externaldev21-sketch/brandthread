@@ -65,4 +65,6 @@ Brandthread is a fashion-commerce platform with role-specific buyer and seller e
 
 ## Pointers
 
+- Release tooling (TestFlight/preview builds, over-the-air updates and rollback, Sentry, store screenshots): `docs/app-store/release-flow.md`. List performance notes: `docs/performance/list-performance.md`.
+
 - See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details

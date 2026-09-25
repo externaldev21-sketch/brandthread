@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
+import { FONT } from '@/lib/theme';
 
 // Compatibility route for old links. The authenticated Manufacturer Hub is the
 // only manufacturer dashboard and therefore the only source of displayed data.
@@ -16,7 +17,7 @@ export default function ManufacturerCompatibilityRoute() {
   return (
     <View style={styles.root}>
       <ActivityIndicator color={colors.primary} />
-      <Text style={styles.label}>Opening Manufacturer Hub…</Text>
+      <Text style={[styles.label, { color: colors.mutedForeground }]}>Opening Manufacturer Hub…</Text>
     </View>
   );
 }
@@ -30,8 +31,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   label: {
-    color: 'rgba(244,244,255,0.60)',
-    fontFamily: 'Inter_500Medium',
+    fontFamily: FONT.medium,
     fontSize: 13,
   },
 });

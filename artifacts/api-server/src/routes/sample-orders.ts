@@ -29,6 +29,8 @@ import { ObjectPermission } from "../lib/objectAcl";
 import { publishNotification } from "./notifications-feed";
 import { isAllowedBrandthreadCallbackUrl } from "../lib/brandthreadCallbackUrls";
 import { CreateProductionOrderBody } from "@workspace/api-zod";
+import { connectReadiness } from "./manufacturer-connect";
+import { afterStageChange } from "../lib/manufacturerOrders";
 
 const router = Router();
 router.use(requireAuth);
@@ -244,7 +246,8 @@ router.post("/", async (req, res) => {
   }
 });
 
-// Creates the single card-charge path for samples. The Checkout Session is
+// Creates the single card-charge path for sample and bulk order cards
+// (card, Apple Pay and Google Pay via Stripe Checkout). The Checkout Session is
 // deterministic per order so retries/concurrent presses reuse Stripe's session.
 router.post("/:id/checkout-session", async (req, res) => {
   try {
@@ -253,18 +256,23 @@ router.post("/:id/checkout-session", async (req, res) => {
     if (!isAllowedCheckoutReturnUrl(returnUrl)) {
       res.status(400).json({ error: "returnUrl must be an allowed Brandthread app or web URL" }); return;
     }
-    const [row] = await db.select({ order: sampleOrders, stripeAccountId: manufacturers.stripeAccountId })
+    const [row] = await db.select({
+      order: sampleOrders,
+      stripeAccountId: manufacturers.stripeAccountId,
+      manufacturerName: manufacturers.businessName,
+    })
       .from(sampleOrders).leftJoin(manufacturers, eq(sampleOrders.manufacturerId, manufacturers.id))
       .where(and(eq(sampleOrders.id, req.params.id), eq(sampleOrders.sellerId, sellerId))).limit(1);
     if (!row) { res.status(404).json({ error: "Order not found" }); return; }
-    if (row.order.orderType !== "sample" || row.order.status !== "pending_payment") {
-      res.status(409).json({ error: "Order is not awaiting sample payment" }); return;
+    if (row.order.status !== "pending_payment" || row.order.walletPaymentState !== "pending") {
+      res.status(409).json({ error: "Order is not awaiting payment" }); return;
     }
     if (!row.stripeAccountId) { res.status(409).json({ error: "Manufacturer cannot receive card payment" }); return; }
     const stripe = requireStripe();
     const connectedAccount = await stripe.accounts.retrieve(row.stripeAccountId);
-    if (connectedAccount.deleted || !connectedAccount.charges_enabled
-      || !connectedAccount.payouts_enabled || !connectedAccount.details_submitted) {
+    // Cross-border "recipient" accounts never have charges enabled; destination
+    // charges only need transfers + payouts, which connectReadiness accounts for.
+    if (connectedAccount.deleted || !connectReadiness(connectedAccount).ready) {
       res.status(409).json({
         error: "Manufacturer payouts are not ready",
         code: "MANUFACTURER_PAYOUTS_INCOMPLETE",
@@ -314,7 +322,14 @@ router.post("/:id/checkout-session", async (req, res) => {
         quantity: 1,
         price_data: {
           currency: "usd", unit_amount: row.order.priceCents,
-          product_data: { name: row.order.title, description: row.order.description ?? undefined },
+          product_data: {
+            name: `${row.order.orderType === "bulk" ? "Bulk order" : "Sample"}: ${row.order.title}`,
+            description: [
+              `${row.order.quantity.toLocaleString("en-US")} ${row.order.quantity === 1 ? "piece" : "pieces"}`,
+              row.manufacturerName ? `made by ${row.manufacturerName}` : null,
+              row.order.description,
+            ].filter(Boolean).join(" · ").slice(0, 500),
+          },
         },
       }],
       success_url: returnUrl.includes("?") ? `${returnUrl}&checkout_session_id={CHECKOUT_SESSION_ID}` : `${returnUrl}?checkout_session_id={CHECKOUT_SESSION_ID}`,
@@ -444,6 +459,7 @@ router.get("/:id", async (req, res) => {
         mfrCountry: manufacturers.country,
         mfrStripe:  manufacturers.stripeAccountId,
         mfrPaymentReady: manufacturers.paymentSetup,
+        mfrTimeZone: manufacturers.timeZone,
       })
       .from(sampleOrders)
       .leftJoin(manufacturers, eq(sampleOrders.manufacturerId, manufacturers.id))
@@ -460,6 +476,7 @@ router.get("/:id", async (req, res) => {
       manufacturerCountry:  row.mfrCountry,
       manufacturerHasStripe: !!row.mfrStripe,
       manufacturerPayoutReady: row.mfrPaymentReady,
+      manufacturerTimeZone: row.mfrTimeZone,
       stageIndex,
       stages: ORDER_STAGES,
       createdAt:  row.order.createdAt.toISOString(),
@@ -564,7 +581,7 @@ router.patch("/:id/sample-detail", async (req, res) => {
 });
 
 // ── PATCH /api/sample-orders/:id/advance ──────────────────────────────────────
-// Manufacturer (or seller for demo) advances production stage.
+// Manufacturer advances production stage.
 
 router.patch("/:id/advance", async (req, res) => {
   try {
@@ -608,10 +625,14 @@ router.patch("/:id/advance", async (req, res) => {
 
     const [updated] = await db
       .update(sampleOrders)
-      .set({ status: nextStage, ...extra, updatedAt: now })
+      .set({ status: nextStage, ...extra, updatedAt: now, revision: sql`${sampleOrders.revision} + 1` })
       .where(and(eq(sampleOrders.id, req.params.id), eq(sampleOrders.status, current)))
       .returning();
     if (!updated) { res.status(409).json({ error: "Order status changed; refresh and retry" }); return; }
+    await afterStageChange({
+      order: updated, actorRole: "manufacturer", actorClerkId: clerkUserId,
+      fromStatus: current, toStatus: nextStage, carrier: updated.carrier, trackingNumber: updated.trackingNumber,
+    }).catch((error) => req.log.error({ err: error, orderId: updated.id }, "Failed to record order stage event"));
 
     const notificationContext = orderNotificationContext(row.order);
     await publishNotification({
@@ -677,10 +698,15 @@ router.patch("/:id/tracking", async (req, res) => {
         status:          "shipped",
         shippedAt:       now,
         updatedAt:       now,
+        revision:        sql`${sampleOrders.revision} + 1`,
       })
       .where(and(eq(sampleOrders.id, req.params.id), eq(sampleOrders.status, "packing")))
       .returning();
     if (!updated) { res.status(409).json({ error: "Order status changed; refresh and retry" }); return; }
+    await afterStageChange({
+      order: updated, actorRole: "manufacturer", actorClerkId: clerkUserId,
+      fromStatus: "packing", toStatus: "shipped", carrier: updated.carrier, trackingNumber: updated.trackingNumber,
+    }).catch((error) => req.log.error({ err: error, orderId: updated.id }, "Failed to record order stage event"));
 
     res.json({
       ...updated,

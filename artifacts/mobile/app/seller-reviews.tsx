@@ -9,6 +9,7 @@ import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { Header } from '@/components/layout';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
 
@@ -211,15 +212,8 @@ export default function SellerReviewsScreen() {
   const replied = reviews.filter((r) => r.seller_reply).length;
 
   return (
-    <View style={[s.root, { paddingTop: Platform.OS === 'web' ? 20 : insets.top }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Feather name="arrow-left" size={22} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>My Reviews</Text>
-        <View style={{ width: 22 }} />
-      </View>
+    <View style={s.root}>
+      <Header title="My Reviews" />
 
       {/* Stats strip */}
       {reviews.length > 0 && (

@@ -3,9 +3,14 @@
  * Mounted at /api/public — no requireAuth middleware.
  */
 import { Router } from "express";
-import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, boosts, orders, orderItems } from "@workspace/db";
-import { eq, and, asc, desc, ne, inArray, notInArray, or, ilike, sql, count, gte, lte, isNull, isNotNull } from "drizzle-orm";
+import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems, follows, savedCollections, savedItems, searchLog } from "@workspace/db";
+import { getAuth } from "@clerk/express";
+import { effectiveDropLaunchAt } from "../lib/money/dropLaunch";
+import { adaptSavedRows } from "../lib/savedItemAdapter";
+import { fetchProductBadgeInfo } from "../lib/savedProductBadges";
+import { eq, and, asc, desc, ne, inArray, notInArray, or, ilike, sql, count, gt, gte, lte, isNull, isNotNull } from "drizzle-orm";
 import { computeTrendingForToday, isCacheFresh } from "../jobs/computeTrending";
+import { computeSellerRankingForToday, isSellerRankingCacheFresh } from "../jobs/computeSellerRanking";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { requireAuth } from "../middlewares/requireAuth";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
@@ -19,6 +24,7 @@ import {
   parsePagination,
   setPaginationHeaders,
 } from "../lib/pagination";
+import { setPublicCacheHeaders } from "../lib/httpCache";
 
 // ─── In-flight guard for synchronous cache-miss computation ──────────────────
 // Prevents concurrent requests from each triggering an independent full
@@ -26,6 +32,9 @@ import {
 // a fresh deploy before the 2-min warm job fires).  All concurrent waiters
 // share the same Promise and get the result once it resolves.
 let trendingInflight: Promise<void> | null = null;
+
+// Same pattern for the Discover seller-ranking cache — see computeSellerRanking.ts.
+let sellerRankingInflight: Promise<void> | null = null;
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -108,6 +117,7 @@ export function rankRelatedProducts<T extends {
 // Optional query params: ?category=apparel&tag=streetwear&ownerId=user_xxx&limit=50&offset=0
 router.get("/products", async (req, res) => {
   try {
+    setPublicCacheHeaders(res);
     const category = singleQueryValue(req.query.category);
     const tag = singleQueryValue(req.query.tag);
     const ownerId = singleQueryValue(req.query.ownerId);
@@ -229,6 +239,7 @@ router.get("/products/high-demand", async (req, res) => {
   const lim = Math.min(parsedLimit, 24);
 
   try {
+    setPublicCacheHeaders(res);
     const activeProducts = await db.select().from(products)
       .where(and(eq(products.status, "active"), isNull(products.deletedAt)));
     if (activeProducts.length === 0) return res.json([]);
@@ -314,6 +325,7 @@ router.get("/products/:id/related", async (req, res) => {
   const lim = Math.min(parsedLimit, 24);
 
   try {
+    setPublicCacheHeaders(res);
     const [current] = await db.select().from(products)
       .where(and(eq(products.id, req.params.id), eq(products.status, "active"), isNull(products.deletedAt))).limit(1);
     if (!current) return res.status(404).json({ error: "Product not found" });
@@ -350,6 +362,7 @@ router.get("/products/:id/related", async (req, res) => {
 // GET /api/public/products/:id
 router.get("/products/:id", async (req, res) => {
   try {
+    setPublicCacheHeaders(res);
     const [product] = await db
       .select()
       .from(products)
@@ -389,20 +402,84 @@ router.get("/products/:id", async (req, res) => {
   }
 });
 
-// GET /api/public/search?q=query&limit=20
+// GET /api/public/collections/:id — a shared "Save to collection" board (deep link).
+// Only ever returns collections the owner has explicitly marked public.
+router.get("/collections/:id", async (req, res) => {
+  try {
+    const [collection] = await db.select().from(savedCollections)
+      .where(and(eq(savedCollections.id, req.params.id), eq(savedCollections.isPublic, true)))
+      .limit(1);
+    if (!collection) {
+      res.status(404).json({ error: "Collection not found" });
+      return;
+    }
+
+    const [owner] = await db.select({ displayName: users.displayName, brandName: users.brandName })
+      .from(users)
+      .where(eq(users.clerkId, collection.userId))
+      .limit(1);
+
+    const items = await db.select().from(savedItems)
+      .where(eq(savedItems.collectionId, collection.id))
+      .orderBy(desc(savedItems.createdAt));
+    const adaptedItems = await adaptSavedRows(items);
+
+    let coverImageUrl = collection.coverImageUrl;
+    if (!coverImageUrl) {
+      const productIds = items.filter((i) => i.itemType === "product").map((i) => i.targetId);
+      const badgeInfo = await fetchProductBadgeInfo(productIds);
+      coverImageUrl = items.map((i) => badgeInfo.get(i.targetId)?.image).find(Boolean) ?? null;
+    }
+
+    res.json({
+      collection: {
+        id: collection.id,
+        name: collection.name,
+        coverImageUrl,
+        itemCount: items.length,
+        ownerName: owner?.brandName ?? owner?.displayName ?? "Brandthread",
+      },
+      items: adaptedItems,
+    });
+  } catch (err) {
+    req.log.error({ err, collectionId: req.params.id }, "Failed to fetch public collection");
+    res.status(500).json({ error: "Failed to fetch collection" });
+  }
+});
+
+// Typo-tolerance threshold for pg_trgm similarity(). Below this a term is
+// considered "not a real match" even though ILIKE substring already gates
+// most of the noise; this only widens matching to near-miss spellings.
+const SIMILARITY_THRESHOLD = 0.25;
+
+/** SQL predicate: substring match (existing behavior) OR trigram-similarity match (typo tolerance). */
+function fuzzyMatch(column: any, term: string, pattern: string) {
+  return sql`(${ilike(column, pattern)} OR similarity(${column}, ${term}) > ${SIMILARITY_THRESHOLD})`;
+}
+
+/** Best-of(substring exactness, trigram similarity) — used to order "relevance" results server-side. */
+function relevanceScore(column: any, term: string) {
+  return sql<number>`GREATEST(similarity(${column}, ${term}), CASE WHEN ${column} ILIKE ${"%" + term + "%"} THEN 0.999 ELSE 0 END)`;
+}
+
+// GET /api/public/search?q=query&limit=20&offset=0
 // Returns: { results: Array<{ id, kind:'brand'|'product', ...SearchBrand|SearchProduct fields }> }
 router.get("/search", async (req, res): Promise<void> => {
   try {
     const q = singleQueryValue(req.query.q);
     const sortValue = singleQueryValue(req.query.sort);
     const category = singleQueryValue(req.query.category);
+    const sizeValue = singleQueryValue(req.query.size);
+    const brandValue = singleQueryValue(req.query.brand);
     const parsedLimit = parseNonNegativeInteger(req.query.limit, "limit", 20);
+    const parsedOffset = parseNonNegativeInteger(req.query.offset, "offset", 0);
     const minPriceCents = req.query.minPriceCents === undefined
       ? undefined : parseNonNegativeInteger(req.query.minPriceCents, "minPriceCents");
     const maxPriceCents = req.query.maxPriceCents === undefined
       ? undefined : parseNonNegativeInteger(req.query.maxPriceCents, "maxPriceCents");
-    if (q === null || sortValue === null || category === null ||
-        typeof parsedLimit !== "number" || typeof minPriceCents === "object" || typeof maxPriceCents === "object") {
+    if (q === null || sortValue === null || category === null || sizeValue === null || brandValue === null ||
+        typeof parsedLimit !== "number" || typeof parsedOffset !== "number" ||
+        typeof minPriceCents === "object" || typeof maxPriceCents === "object") {
       res.status(400).json({ error: "Invalid search query values" }); return;
     }
     if (parsedLimit < 1) { res.status(400).json({ error: "limit must be at least 1" }); return; }
@@ -415,9 +492,10 @@ router.get("/search", async (req, res): Promise<void> => {
     const sort: SearchSort = (sortValue as SearchSort | undefined) ?? "relevance";
     const searchQuery = q ?? "";
     const term = normalizeSearchTerm(searchQuery);
-    if (!term || term.length < 2) { res.json({ results: [] }); return; }
+    if (!term || term.length < 2) { res.json({ results: [], pagination: paginationMetadata({ limit: parsedLimit, offset: parsedOffset }, 0, 0) }); return; }
 
     const lim = Math.min(parsedLimit, 50);
+    const off = parsedOffset;
     const pattern = containsSearchPattern(term);
     const viewerId = optionalViewerId(req);
 
@@ -429,15 +507,21 @@ router.get("/search", async (req, res): Promise<void> => {
         clerkId:     users.clerkId,
         displayName: users.displayName,
         brandName:   users.brandName,
+        username:    users.username,
+        relevance:   relevanceScore(sql`COALESCE(${users.brandName}, ${users.displayName}, ${users.username}, '')`, term),
       }).from(users).where(
         and(
           eq(users.accountType, "seller"),
           isNull(users.suspendedAt),
           isNull(users.deletedAt),
           notBlockedWith(viewerId, users.clerkId),
-          or(ilike(users.displayName, pattern), ilike(users.brandName, pattern)),
+          or(
+            fuzzyMatch(users.displayName, term, pattern),
+            fuzzyMatch(users.brandName, term, pattern),
+            fuzzyMatch(users.username, term, pattern),
+          ),
         ),
-      ).orderBy(asc(users.displayName), asc(users.clerkId)).limit(10),
+      ).orderBy(desc(relevanceScore(sql`COALESCE(${users.brandName}, ${users.displayName}, ${users.username}, '')`, term)), asc(users.clerkId)).limit(10),
 
       db.select({
         id:         products.id,
@@ -447,11 +531,19 @@ router.get("/search", async (req, res): Promise<void> => {
         images:     products.images,
         createdAt:  products.createdAt,
         priceCents: productPrice,
+        relevance:  sql<number>`max(${relevanceScore(products.name, term)})`,
       }).from(products)
         .leftJoin(productVariants, eq(productVariants.productId, products.id))
-        .where(and(eq(products.status, "active"), isNull(products.deletedAt), ilike(products.name, pattern),
+        .where(and(
+          eq(products.status, "active"), isNull(products.deletedAt),
+          fuzzyMatch(products.name, term, pattern),
           category ? eq(products.category, category) : undefined,
           notBlockedWith(viewerId, products.ownerId),
+          sizeValue ? sql`EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = ${products.id} AND pv.size ILIKE ${sizeValue})` : undefined,
+          brandValue ? sql`EXISTS (
+            SELECT 1 FROM users bu WHERE bu.clerk_id = ${products.ownerId}
+              AND (bu.clerk_id = ${brandValue} OR bu.brand_name ILIKE ${containsSearchPattern(normalizeSearchTerm(brandValue))})
+          )` : undefined,
           sql`NOT EXISTS (SELECT 1 FROM users su WHERE su.clerk_id = ${products.ownerId} AND su.suspended_at IS NOT NULL)`))
         .groupBy(products.id)
         .having(and(
@@ -486,16 +578,17 @@ router.get("/search", async (req, res): Promise<void> => {
     const seen = new Set<string>();
     const results: any[] = [];
 
-    // Brands first
-    for (const s of sellers) {
+    // Brands first, best relevance (typo-tolerant) match first.
+    const sortedSellers = [...sellers].sort((a, b) => Number(b.relevance) - Number(a.relevance) || a.clerkId.localeCompare(b.clerkId));
+    for (const s of sortedSellers) {
       if (seen.has(s.clerkId)) continue;
       seen.add(s.clerkId);
-      const name = s.brandName ?? s.displayName ?? "Brand";
+      const name = s.brandName ?? s.displayName ?? s.username ?? "Brand";
       results.push({
         id:       s.clerkId,
         kind:     "brand",
         name,
-        handle:   mkHandle(name),
+        handle:   s.username ? `@${s.username}` : mkHandle(name),
         color:    hashColor(s.clerkId),
         initials: mkInitials(name),
         sellerId: s.clerkId,
@@ -503,17 +596,17 @@ router.get("/search", async (req, res): Promise<void> => {
     }
 
     // Products arrive collapsed and price-filtered by the database.
-    const prodMap = new Map<string, { id: string; name: string; ownerId: string; category: string; images: string[]; createdAt: Date; minPrice: number }>();
+    const prodMap = new Map<string, { id: string; name: string; ownerId: string; category: string; images: string[]; createdAt: Date; minPrice: number; relevance: number }>();
     for (const p of prods) {
       const price = Number(p.priceCents ?? 0);
-      prodMap.set(p.id, { id: p.id, name: p.name, ownerId: p.ownerId, category: p.category, images: Array.isArray(p.images) ? p.images.filter((image): image is string => typeof image === "string") : [], createdAt: p.createdAt, minPrice: price });
+      prodMap.set(p.id, { id: p.id, name: p.name, ownerId: p.ownerId, category: p.category, images: Array.isArray(p.images) ? p.images.filter((image): image is string => typeof image === "string") : [], createdAt: p.createdAt, minPrice: price, relevance: Number(p.relevance ?? 0) });
     }
     const filteredProducts = [...prodMap.values()]
       .sort((a, b) => {
         if (sort === "price_asc") return a.minPrice - b.minPrice || b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id);
         if (sort === "price_desc") return b.minPrice - a.minPrice || b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id);
         if (sort === "newest") return b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id);
-        return a.name.localeCompare(b.name) || b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id);
+        return b.relevance - a.relevance || b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id);
       });
     for (const p of filteredProducts) {
       if (seen.has(p.id)) continue;
@@ -535,14 +628,281 @@ router.get("/search", async (req, res): Promise<void> => {
       });
     }
 
-    const limited = results.slice(0, lim);
+    const total = results.length;
+    const limited = results.slice(off, off + lim);
+
+    // Fire-and-forget query log — backs /search/recent and /search/trending.
+    // Never blocks or fails the response.
+    db.insert(searchLog).values({
+      userId: viewerId ?? null,
+      query: searchQuery.slice(0, 200),
+      normalized: term,
+      resultCount: total,
+    }).catch((err) => req.log.error({ err }, "Failed to log search query"));
+
     res.json({
       results: limited,
-      pagination: paginationMetadata({ limit: lim, offset: 0 }, limited.length),
+      pagination: paginationMetadata({ limit: lim, offset: off }, limited.length, total),
     });
   } catch (err) {
     req.log.error({ err }, "Public search failed");
     res.status(500).json({ error: "Search failed" });
+  }
+});
+
+// ─── GET /api/public/search/trending — trending searches (empty-state chips) ──
+// Real trending: the most-frequent normalized queries logged to search_log in
+// the last 48h (search_log now exists — see migration 088). Falls back to the
+// category/follower-based approximation used before search logging existed
+// when the log is too sparse (fresh environment, low traffic) to be
+// meaningful, so this never regresses to an empty/boring result.
+const TRENDING_LOG_WINDOW_MS = 48 * 60 * 60 * 1000;
+const MIN_LOGGED_QUERIES_FOR_TRENDING = 5;
+
+router.get("/search/trending", async (req, res) => {
+  try {
+    const parsedLimit = parseNonNegativeInteger(req.query.limit, "limit", 8);
+    if (typeof parsedLimit !== "number" || parsedLimit < 1) {
+      res.status(400).json({ error: "limit must be at least 1" }); return;
+    }
+    const lim = Math.min(parsedLimit, 20);
+    const since = new Date(Date.now() - TRENDING_LOG_WINDOW_MS);
+
+    const loggedTrending = await db
+      .select({ normalized: searchLog.normalized, cnt: count() })
+      .from(searchLog)
+      .where(gte(searchLog.createdAt, since))
+      .groupBy(searchLog.normalized)
+      .orderBy(desc(count()))
+      .limit(lim);
+
+    if (loggedTrending.length >= MIN_LOGGED_QUERIES_FOR_TRENDING) {
+      res.json({ trending: loggedTrending.map((t) => ({ term: t.normalized, type: "query" as const })) });
+      return;
+    }
+
+    const [topCategories, topBrands] = await Promise.all([
+      db.select({ category: products.category, count: count() })
+        .from(products)
+        .where(and(eq(products.status, "active"), isNull(products.deletedAt)))
+        .groupBy(products.category)
+        .orderBy(desc(count()))
+        .limit(lim),
+      db.select({ sellerId: follows.followingId, followerCount: count() })
+        .from(follows)
+        .innerJoin(users, eq(users.clerkId, follows.followingId))
+        .where(and(eq(users.accountType, "seller"), isNull(users.suspendedAt), isNull(users.deletedAt)))
+        .groupBy(follows.followingId)
+        .orderBy(desc(count()))
+        .limit(lim),
+    ]);
+
+    const brandIds = topBrands.map((b) => b.sellerId);
+    const brandRows = brandIds.length > 0
+      ? await db.select({ clerkId: users.clerkId, displayName: users.displayName, brandName: users.brandName })
+          .from(users).where(inArray(users.clerkId, brandIds))
+      : [];
+    const brandNameById = new Map(brandRows.map((b) => [b.clerkId, b.brandName ?? b.displayName ?? "Brand"]));
+
+    const trending = [
+      ...loggedTrending.map((t) => ({ term: t.normalized, type: "query" as const })),
+      ...topCategories.map((c) => ({ term: c.category, type: "category" as const })),
+      ...topBrands.map((b) => ({ term: brandNameById.get(b.sellerId) ?? "Brand", type: "brand" as const })),
+    ].slice(0, lim);
+
+    res.json({ trending });
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch trending searches");
+    res.status(500).json({ error: "Failed to fetch trending searches" });
+  }
+});
+
+// ─── GET /api/public/search/recent — this buyer's own recent searches ─────────
+// Signed-in only (a client-side "recent" list is meaningless without an
+// identity to scope it to). Deduped by normalized query, most recent first.
+router.get("/search/recent", requireAuth, async (req, res) => {
+  try {
+    const userId = (req as any).clerkUserId as string;
+    const parsedLimit = parseNonNegativeInteger(req.query.limit, "limit", 10);
+    if (typeof parsedLimit !== "number" || parsedLimit < 1) {
+      res.status(400).json({ error: "limit must be at least 1" }); return;
+    }
+    const lim = Math.min(parsedLimit, 30);
+
+    const rows = await db
+      .select({ query: searchLog.query, normalized: searchLog.normalized, createdAt: sql<Date>`max(${searchLog.createdAt})` })
+      .from(searchLog)
+      .where(eq(searchLog.userId, userId))
+      .groupBy(searchLog.query, searchLog.normalized)
+      .orderBy(desc(sql`max(${searchLog.createdAt})`))
+      .limit(lim);
+
+    res.json({ recent: rows.map((r) => ({ query: r.query, normalized: r.normalized })) });
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch recent searches");
+    res.status(500).json({ error: "Failed to fetch recent searches" });
+  }
+});
+
+// ─── DELETE /api/public/search/recent — clear this buyer's recent searches ────
+router.delete("/search/recent", requireAuth, async (req, res) => {
+  try {
+    const userId = (req as any).clerkUserId as string;
+    await db.delete(searchLog).where(eq(searchLog.userId, userId));
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Failed to clear recent searches");
+    res.status(500).json({ error: "Failed to clear recent searches" });
+  }
+});
+
+// ─── GET /api/public/search/suggested — suggested brands/products (empty state) ─
+// Suggested brands = most-followed sellers; suggested products = most
+// recently listed active products. Both are cheap, already-indexed queries
+// that need no new tracking tables.
+router.get("/search/suggested", async (req, res) => {
+  try {
+    const parsedLimit = parseNonNegativeInteger(req.query.limit, "limit", 6);
+    if (typeof parsedLimit !== "number" || parsedLimit < 1) {
+      res.status(400).json({ error: "limit must be at least 1" }); return;
+    }
+    const lim = Math.min(parsedLimit, 20);
+    const viewerId = optionalViewerId(req);
+
+    const [topBrands, recentProducts] = await Promise.all([
+      db.select({ sellerId: follows.followingId, followerCount: count() })
+        .from(follows)
+        .innerJoin(users, eq(users.clerkId, follows.followingId))
+        .where(and(
+          eq(users.accountType, "seller"),
+          isNull(users.suspendedAt),
+          isNull(users.deletedAt),
+          notBlockedWith(viewerId, follows.followingId),
+        ))
+        .groupBy(follows.followingId)
+        .orderBy(desc(count()))
+        .limit(lim),
+      db.select({
+        id: products.id, name: products.name, ownerId: products.ownerId,
+        category: products.category, images: products.images, createdAt: products.createdAt,
+      }).from(products)
+        .where(and(
+          eq(products.status, "active"),
+          isNull(products.deletedAt),
+          notBlockedWith(viewerId, products.ownerId),
+        ))
+        .orderBy(desc(products.createdAt))
+        .limit(lim),
+    ]);
+
+    const sellerIds = [...new Set([...topBrands.map((b) => b.sellerId), ...recentProducts.map((p) => p.ownerId)])];
+    const sellerRows = sellerIds.length > 0
+      ? await db.select({ clerkId: users.clerkId, displayName: users.displayName, brandName: users.brandName })
+          .from(users).where(inArray(users.clerkId, sellerIds))
+      : [];
+    const sellerMap = new Map(sellerRows.map((s) => [s.clerkId, s.brandName ?? s.displayName ?? "Brand"]));
+
+    const PALETTE = ["#8B5CF6", "#0891B2", "#0F766E", "#B45309", "#1D4ED8", "#BE185D", "#065F46"];
+    const hashColor = (str: string) => {
+      let h = 0;
+      for (const c of str) h = (h * 31 + c.charCodeAt(0)) & 0xffffff;
+      return PALETTE[Math.abs(h) % PALETTE.length];
+    };
+    const mkInitials = (name: string) =>
+      name.split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+    const mkHandle = (name: string) =>
+      "@" + name.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 20);
+
+    res.json({
+      brands: topBrands.map((b) => {
+        const name = sellerMap.get(b.sellerId) ?? "Brand";
+        return {
+          id: b.sellerId, sellerId: b.sellerId, name, handle: mkHandle(name),
+          color: hashColor(b.sellerId), initials: mkInitials(name),
+          followerCount: Number(b.followerCount ?? 0),
+        };
+      }),
+      products: recentProducts.map((p) => {
+        const brandName = sellerMap.get(p.ownerId) ?? "Brand";
+        const images = Array.isArray(p.images) ? p.images.filter((i): i is string => typeof i === "string") : [];
+        return {
+          id: p.id, productId: p.id, name: p.name, brand: brandName,
+          category: p.category, imageUri: images[0] ?? null,
+          color: hashColor(p.ownerId), initials: mkInitials(brandName),
+        };
+      }),
+    });
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch suggested search results");
+    res.status(500).json({ error: "Failed to fetch suggested search results" });
+  }
+});
+
+// ─── GET /api/public/brands/discover — newest active sellers to follow ────────
+// Unauthenticated, lightweight "browse brands" list used by buyer onboarding's
+// Brands-to-follow step (there is no full search term at that point, so the
+// existing /search endpoint — which requires a query — doesn't fit). Returns
+// active, non-restricted sellers newest-first. No style/category column
+// exists on `users` today, so this intentionally returns a flat list; any
+// future style/category filter should extend this query, not add a second
+// endpoint.
+export function rankDiscoverBrands<T extends { createdAt: Date; clerkId: string }>(sellers: T[]): T[] {
+  return [...sellers].sort((a, b) =>
+    b.createdAt.getTime() - a.createdAt.getTime() || a.clerkId.localeCompare(b.clerkId));
+}
+
+router.get("/brands/discover", async (req, res) => {
+  try {
+    const parsedLimit = parseNonNegativeInteger(req.query.limit, "limit", 24);
+    if (typeof parsedLimit !== "number" || parsedLimit < 1) {
+      res.status(400).json({
+        error: typeof parsedLimit === "number" ? "limit must be at least 1" : parsedLimit.error,
+      });
+      return;
+    }
+    const lim = Math.min(parsedLimit, 50);
+    const viewerId = optionalViewerId(req);
+
+    const sellers = await db
+      .select({
+        clerkId:         users.clerkId,
+        displayName:     users.displayName,
+        brandName:       users.brandName,
+        brandType:       users.brandType,
+        profileImageUrl: users.profileImageUrl,
+        avatarUrl:       users.avatarUrl,
+        verified:        users.verified,
+        verificationStatus: users.verificationStatus,
+        activeStanding:  users.activeStanding,
+        policyRestricted: users.policyRestricted,
+        createdAt:       users.createdAt,
+      })
+      .from(users)
+      .where(and(
+        eq(users.accountType, "seller"),
+        isNull(users.suspendedAt),
+        isNull(users.deletedAt),
+        eq(users.policyRestricted, false),
+        notBlockedWith(viewerId, users.clerkId),
+      ))
+      .orderBy(desc(users.createdAt), asc(users.clerkId))
+      .limit(lim * 2); // small buffer before app-side ranking/limit
+
+    const ranked = rankDiscoverBrands(sellers).slice(0, lim);
+
+    res.json({
+      brands: ranked.map((s) => ({
+        id:          s.clerkId,
+        sellerId:    s.clerkId,
+        name:        s.brandName || s.displayName || "Brand",
+        brandType:   s.brandType ?? null,
+        logoUrl:     s.profileImageUrl ?? s.avatarUrl ?? null,
+        verified:    deriveSellerVerified(s),
+      })),
+    });
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch discover brands");
+    res.status(500).json({ error: "Failed to fetch brands" });
   }
 });
 
@@ -661,24 +1021,65 @@ router.get("/sellers/:sellerId", async (req, res) => {
 });
 
 // ─── GET /api/public/drops — buyer-facing active drops with countdown ─────────
+// ?section=upcoming|live|recent narrows the browse screen's three tabs; the
+// bare endpoint (no section) keeps its original "active, soonest first"
+// shape for existing callers (Discover, Following).
 router.get("/drops", async (req, res) => {
-  const activeDrops = await db
-    .select({
-      id:                drops.id,
-      ownerId:           drops.ownerId,
-      name:              drops.name,
-      type:              drops.type,
-      status:            drops.status,
-      releaseAt:         drops.releaseAt,
-      estimatedShipDate: drops.estimatedShipDate,
-      orderCount:        drops.orderCount,
-      mfgProgress:       drops.mfgProgress,
-      createdAt:         drops.createdAt,
-    })
-    .from(drops)
-    .where(eq(drops.status, "active"))
-    .orderBy(drops.releaseAt)
-    .limit(50);
+  setPublicCacheHeaders(res);
+  const now = new Date();
+  const section = typeof req.query.section === "string" ? req.query.section : undefined;
+
+  const dropSelect = {
+    id:                drops.id,
+    ownerId:           drops.ownerId,
+    name:              drops.name,
+    type:              drops.type,
+    status:            drops.status,
+    releaseAt:         drops.releaseAt,
+    endsAt:            drops.endsAt,
+    heroImageUrl:      drops.heroImageUrl,
+    heroVideoUrl:      drops.heroVideoUrl,
+    launchTimezone:    drops.launchTimezone,
+    estimatedShipDate: drops.estimatedShipDate,
+    orderCount:        drops.orderCount,
+    mfgProgress:       drops.mfgProgress,
+    createdAt:         drops.createdAt,
+  };
+
+  let activeDrops;
+  if (section === "recent") {
+    activeDrops = await db.select(dropSelect).from(drops)
+      .where(and(
+        inArray(drops.status, ["closed", "fulfilled"]),
+        isNotNull(drops.releaseAt),
+      ))
+      .orderBy(desc(drops.releaseAt))
+      .limit(50);
+  } else if (section === "live") {
+    activeDrops = await db.select(dropSelect).from(drops)
+      .where(and(
+        eq(drops.status, "active"),
+        isNotNull(drops.releaseAt),
+        lte(drops.releaseAt, now),
+        or(isNull(drops.endsAt), gt(drops.endsAt, now)),
+      ))
+      .orderBy(drops.releaseAt)
+      .limit(50);
+  } else if (section === "upcoming") {
+    activeDrops = await db.select(dropSelect).from(drops)
+      .where(and(
+        eq(drops.status, "active"),
+        isNotNull(drops.releaseAt),
+        gt(drops.releaseAt, now),
+      ))
+      .orderBy(drops.releaseAt)
+      .limit(50);
+  } else {
+    activeDrops = await db.select(dropSelect).from(drops)
+      .where(eq(drops.status, "active"))
+      .orderBy(drops.releaseAt)
+      .limit(50);
+  }
 
   if (activeDrops.length === 0) return res.json([]);
 
@@ -692,16 +1093,21 @@ router.get("/drops", async (req, res) => {
   return res.json(activeDrops.map((d) => ({ ...d, seller: sellerMap.get(d.ownerId) ?? null })));
 });
 
-// ─── GET /api/public/drops/:id — single active drop detail ────────────────────
+// ─── GET /api/public/drops/:id — single drop detail (countdown, live, or recap) ──
+// Any non-draft status is visible: 'active' covers upcoming-countdown and live,
+// 'closed'/'fulfilled' still resolve so the buyer page can render its recap
+// state instead of a dead link once the drop is over.
 router.get("/drops/:id", async (req, res) => {
+  setPublicCacheHeaders(res);
   const [drop] = await db
     .select()
     .from(drops)
-    .where(and(eq(drops.id, req.params.id), eq(drops.status, "active")))
+    .where(and(eq(drops.id, req.params.id), ne(drops.status, "draft")))
     .limit(1);
-  if (!drop) return res.status(404).json({ error: "Drop not found or not active" });
+  if (!drop) return res.status(404).json({ error: "Drop not found" });
 
-  const [[seller], dropProducts] = await Promise.all([
+  const { userId } = getAuth(req);
+  const [[seller], dropProducts, isFollower] = await Promise.all([
     db
       .select({ displayName: users.displayName, brandName: users.brandName, verified: users.verified, verificationStatus: users.verificationStatus, activeStanding: users.activeStanding, policyRestricted: users.policyRestricted })
       .from(users)
@@ -709,22 +1115,44 @@ router.get("/drops/:id", async (req, res) => {
       .limit(1),
     db
       .select({
-        id:          products.id,
-        name:        products.name,
-        description: products.description,
-        category:    products.category,
-        status:      products.status,
-        images:      products.images,
-        isPreOrder:  products.isPreOrder,
-        createdAt:   products.createdAt,
+        id:             products.id,
+        name:           products.name,
+        description:    products.description,
+        category:       products.category,
+        status:         products.status,
+        images:         products.images,
+        isPreOrder:     products.isPreOrder,
+        createdAt:      products.createdAt,
+        stockRemaining: sql<number>`coalesce(sum(${productVariants.stock}), 0)`,
       })
       .from(products)
+      .leftJoin(productVariants, eq(productVariants.productId, products.id))
       .where(and(eq(products.dropId, req.params.id), eq(products.status, "active"), isNull(products.deletedAt)))
+      .groupBy(products.id)
       .orderBy(products.createdAt)
       .limit(50),
+    userId
+      ? db.select({ followerId: follows.followerId }).from(follows)
+          .where(and(eq(follows.followerId, userId), eq(follows.followingId, drop.ownerId)))
+          .limit(1)
+          .then((rows) => rows.length > 0)
+      : Promise.resolve(false),
   ]);
 
-  return res.json({ ...drop, seller: seller ? { ...seller, verified: deriveSellerVerified(seller) } : null, products: dropProducts });
+  // The effective moment this viewer may buy/see the drop unlock — releaseAt
+  // pulled forward by the seller's early-access window for their followers.
+  const viewerHasEarlyAccess = isFollower && drop.earlyAccessMinutes > 0;
+  const effectiveReleaseAt = drop.releaseAt
+    ? effectiveDropLaunchAt(drop.releaseAt, drop.earlyAccessMinutes, isFollower)
+    : null;
+
+  return res.json({
+    ...drop,
+    seller: seller ? { ...seller, verified: deriveSellerVerified(seller) } : null,
+    products: dropProducts.map((p) => ({ ...p, soldOut: p.stockRemaining <= 0 })),
+    viewerHasEarlyAccess,
+    effectiveReleaseAt,
+  });
 });
 
 router.get("/drops/:id/notify", requireAuth, async (req, res): Promise<void> => {
@@ -959,6 +1387,9 @@ router.get("/posts", async (req, res) => {
 // Query params: ?limit=20
 router.get("/trending", async (req, res) => {
   try {
+    // Trending is recomputed at most once a day server-side; a longer client
+    // cache window is safe and cuts repeat load meaningfully.
+    setPublicCacheHeaders(res, { maxAgeSeconds: 60, staleWhileRevalidateSeconds: 300 });
     const page = parsePagination(req.query, { limit: 20 });
     if (!page.success || page.data.limit > 50 || page.data.offset !== 0) {
       return res.status(400).json({ error: "Invalid trending query", code: "VALIDATION_ERROR" });
@@ -1111,6 +1542,73 @@ router.get("/profiles/:username", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to resolve public profile by username");
     res.status(500).json({ error: "Failed to load profile" });
+  }
+});
+
+// ─── GET /api/public/discover/feed ────────────────────────────────────────────
+// Serves the pre-computed daily Discover seller ranking from
+// seller_ranking_cache. The list is calculated once per day by the
+// computeSellerRanking background job (recency-decayed engagement,
+// follower-normalized, rotation bonus, capped at 2 products per seller,
+// cold-start fallback to newest active brands). On a cache miss, computation
+// runs synchronously so the response is still correct (deduped via an
+// in-flight promise so concurrent requests share one computation).
+// Unauthenticated — signed-out buyers can browse Discover.
+// Query params: ?limit=20&offset=0 (limit capped at 50)
+router.get("/discover/feed", async (req, res) => {
+  try {
+    const page = parsePagination(req.query, { limit: 20 });
+    if (!page.success || page.data.limit > 50 || page.data.offset < 0) {
+      return res.status(400).json({ error: "Invalid discover query", code: "VALIDATION_ERROR" });
+    }
+    const { limit, offset } = page.data;
+    const today = new Date().toISOString().slice(0, 10); // 'YYYY-MM-DD' UTC
+
+    const paginate = (allItems: any[], source: "cache" | "computed") => {
+      const items = allItems.slice(offset, offset + limit).map((item, i) => ({
+        ...item,
+        rank: offset + i + 1,
+      }));
+      const nextOffset = offset + limit < allItems.length ? offset + limit : null;
+      return { items, nextOffset, source };
+    };
+
+    // ── Attempt cache read ───────────────────────────────────────────────────
+    const [cached] = await db
+      .select()
+      .from(sellerRankingCache)
+      .where(eq(sellerRankingCache.cacheDate, today))
+      .limit(1);
+
+    if (cached && isSellerRankingCacheFresh(cached.computedAt) && Array.isArray(cached.results) && cached.results.length > 0) {
+      const { items, nextOffset } = paginate(cached.results as any[], "cache");
+      return res.json({ items, computedAt: cached.computedAt, source: "cache", nextOffset });
+    }
+
+    // ── Cache miss — compute synchronously (once per day maximum) ───────────
+    req.log.info({ cacheDate: today }, "Discover feed cache miss; computing synchronously");
+    if (!sellerRankingInflight) {
+      sellerRankingInflight = computeSellerRankingForToday().finally(() => {
+        sellerRankingInflight = null;
+      });
+    }
+    await sellerRankingInflight;
+
+    const [fresh] = await db
+      .select()
+      .from(sellerRankingCache)
+      .where(eq(sellerRankingCache.cacheDate, today))
+      .limit(1);
+
+    if (fresh && Array.isArray(fresh.results) && fresh.results.length > 0) {
+      const { items, nextOffset } = paginate(fresh.results as any[], "computed");
+      return res.json({ items, computedAt: fresh.computedAt, source: "computed", nextOffset });
+    }
+
+    return res.json({ items: [], computedAt: fresh?.computedAt ?? new Date().toISOString(), source: "empty", nextOffset: null });
+  } catch (err) {
+    req.log.error({ err }, "Failed to fetch discover feed");
+    return res.status(500).json({ error: "Failed to fetch discover feed" });
   }
 });
 

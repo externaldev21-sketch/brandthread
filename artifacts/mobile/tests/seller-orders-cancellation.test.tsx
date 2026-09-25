@@ -19,11 +19,20 @@ vi.mock('react-native', () => ({
   RefreshControl: nativeComponent('RefreshControl'),
   ScrollView: nativeComponent('ScrollView'),
   Share: { share: vi.fn() },
-  StyleSheet: { create: (styles: unknown) => styles },
+  StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
   Text: nativeComponent('Text'),
   TextInput: nativeComponent('TextInput'),
   TouchableOpacity: nativeComponent('TouchableOpacity'),
   View: nativeComponent('View'),
+  Animated: {
+    Value: class { constructor(_v?: number) {} },
+    View: nativeComponent('Animated.View'),
+    event: () => () => {},
+    timing: () => ({ start: (cb?: () => void) => cb?.() }),
+    sequence: () => ({ start: (cb?: () => void) => cb?.() }),
+    loop: () => ({ start: () => {}, stop: () => {} }),
+  },
+  Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
 }));
 
 vi.mock('@expo/vector-icons', () => ({
@@ -142,6 +151,21 @@ vi.mock('@/lib/theme', () => ({
   PURPLE_DIM: '#34383e',
   CYAN: '#22d3ee',
   CYAN_DIM: '#164e63',
+  GUTTER: 16,
+  SECTION_GAP: 24,
+  CONTENT_MAX_WIDTH: 720,
+  GRID_MAX_WIDTH: 1080,
+  BREAKPOINT: { tablet: 768, desktopWeb: 1024 },
+  TYPE: {
+    largeTitle: { fontSize: 36, fontFamily: 'System', lineHeight: 42 },
+    title: { fontSize: 30, fontFamily: 'System', lineHeight: 36 },
+    heading: { fontSize: 22, fontFamily: 'System', lineHeight: 28 },
+    subheading: { fontSize: 19, fontFamily: 'System', lineHeight: 24 },
+    body: { fontSize: 15, fontFamily: 'System', lineHeight: 22 },
+    bodyMedium: { fontSize: 15, fontFamily: 'System', lineHeight: 22 },
+    caption: { fontSize: 13, fontFamily: 'System', lineHeight: 18 },
+    label: { fontSize: 11, fontFamily: 'System', lineHeight: 14 },
+  },
 }));
 
 vi.mock('@/services/orderService', () => ({
@@ -149,7 +173,7 @@ vi.mock('@/services/orderService', () => ({
   sortOrders: (orders: unknown[]) => orders,
 }));
 
-import { apiRowToOrder, OrderCard } from '@/app/(tabs)/orders';
+import { apiRowToOrder, flattenOrderSections, OrderCard } from '@/app/(tabs)/orders';
 
 const sellerRowProps = {
   selected: false,
@@ -206,5 +230,18 @@ describe('seller cancelled order rows', () => {
     expect(textContent(renderer)).not.toContain('Cancelled · undefined');
     expect(textContent(renderer)).not.toContain('Cancelled · null');
     expect(textContent(renderer)).not.toContain('Cancelled · No reason provided');
+  });
+});
+describe('seller orders list rows', () => {
+  it('flattens date groups into header, order and gap rows that FlashList can recycle by type', () => {
+    const order = (id: string) => ({ id } as unknown as ReturnType<typeof apiRowToOrder>);
+    const rows = flattenOrderSections([
+      { title: 'Today', data: [order('a'), order('b')] },
+      { title: 'Yesterday', data: [order('c')] },
+    ]);
+    expect(rows.map((row) => row.type)).toEqual(['header', 'order', 'order', 'gap', 'header', 'order', 'gap']);
+    expect(rows[0]).toMatchObject({ title: 'Today', count: 2 });
+    expect(rows.filter((row) => row.type === 'order').map((row) => row.type === 'order' && row.isLast)).toEqual([false, true, true]);
+    expect(new Set(rows.map((row) => row.key)).size).toBe(rows.length);
   });
 });

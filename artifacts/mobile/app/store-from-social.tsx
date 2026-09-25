@@ -9,13 +9,13 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Feather } from '@expo/vector-icons';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { Header } from '@/components/layout';
 import {
   BG, CARD, SURFACE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
-import { BrandthreadCard, PrimaryButton, SecondaryButton, FilterChip } from '@/components/BrandthreadUI';
+import { BrandthreadCard, PrimaryButton, SecondaryButton, FilterChip, EmptyState } from '@/components/BrandthreadUI';
 import { generateFromSocial, getStoreApplyFailure, StoreApplyFailure } from '@/services/storeService';
 import { useApi } from '@/lib/api';
 
@@ -26,12 +26,6 @@ interface SellerPost {
   title: string;
   desc: string;
 }
-
-const FALLBACK_POSTS: SellerPost[] = [
-  { id: 'p1', title: 'New Drop — Summer Collection', desc: 'Product showcase post' },
-  { id: 'p2', title: 'Behind the Scenes', desc: 'Brand story video' },
-  { id: 'p3', title: 'Customer Feature', desc: 'Community highlight' },
-];
 
 /**
  * Re-encode social screenshots at a bounded size before converting them to
@@ -64,28 +58,28 @@ export default function StoreFromSocialScreen() {
   const ss = makeStyles(theme);
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
-  const headerTopInset = useHeaderTopInset();
   const api = useApi();
   const [activeTab, setActiveTab] = useState<TabMode>('upload');
   const [screenshots, setScreenshots] = useState<string[]>([]);
   const [screenshotBase64s, setScreenshotBase64s] = useState<string[]>([]);
   const [profileUrl, setProfileUrl] = useState('');
   const [selectedPostIds, setSelectedPostIds] = useState<string[]>([]);
-  const [sellerPosts, setSellerPosts] = useState<SellerPost[]>(FALLBACK_POSTS);
+  const [sellerPosts, setSellerPosts] = useState<SellerPost[]>([]);
+  const [postsLoading, setPostsLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisFailure, setAnalysisFailure] = useState<StoreApplyFailure | null>(null);
 
-  // Load real seller posts
+  // Load real seller posts — no fake fallback posts if this fails or is empty.
   useEffect(() => {
     (api as any).content?.myPosts?.().then((posts: any[]) => {
-      if (Array.isArray(posts) && posts.length > 0) {
+      if (Array.isArray(posts)) {
         setSellerPosts(posts.map((p: any) => ({
           id: String(p.id ?? p.postId ?? Math.random()),
           title: p.title ?? p.caption ?? 'Post',
           desc: p.type ?? 'Brand post',
         })));
       }
-    }).catch(() => {/* use fallback */});
+    }).catch(() => {}).finally(() => setPostsLoading(false));
   }, [api]);
 
   const addScreenshots = async () => {
@@ -197,16 +191,7 @@ export default function StoreFromSocialScreen() {
 
   return (
     <View style={ss.root}>
-      <View style={[ss.header, { paddingTop: headerTopInset + SP.sm }]}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={ss.backBtn}
-          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-        >
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={ss.headerTitle}>Generate from Social</Text>
-      </View>
+      <Header title="Generate from Social" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={ss.scroll}>
         <Text style={ss.subtitle}>
@@ -218,7 +203,7 @@ export default function StoreFromSocialScreen() {
           <View style={ss.bannerRow}>
             <Feather name="zap" size={ICON.sm} color={PURPLE_LIGHT} />
             <Text style={[ss.bannerText, { color: PURPLE_LIGHT }]}>
-              Powered by GPT-5 — screenshots are analyzed visually; URL and posts use brand context.
+              We'll pull your colors, type and vibe from your social presence.
             </Text>
           </View>
         </BrandthreadCard>
@@ -288,28 +273,40 @@ export default function StoreFromSocialScreen() {
         {activeTab === 'posts' && (
           <>
             <Text style={ss.tabInfo}>Select posts to base your storefront tone and theme on:</Text>
-            {sellerPosts.map(post => {
-              const selected = selectedPostIds.includes(post.id);
-              return (
-                <TouchableOpacity key={post.id} style={[ss.postRow, selected && ss.postRowSelected]} onPress={() => togglePost(post.id)}>
-                  <View style={[ss.postCheck, selected && ss.postCheckActive]}>
-                    {selected && <Feather name="check" size={12} color="#fff" />}
-                  </View>
-                  <View style={ss.postMeta}>
-                    <Text style={ss.postTitle}>{post.title}</Text>
-                    <Text style={ss.postDesc}>{post.desc}</Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-            <PrimaryButton
-              label={analyzing ? 'Generating...' : `Generate from ${selectedPostIds.length > 0 ? selectedPostIds.length + ' ' : ''}Post${selectedPostIds.length !== 1 ? 's' : ''}`}
-              onPress={handleGenerateFromPosts}
-              loading={analyzing}
-              disabled={selectedPostIds.length === 0 || analyzing}
-              icon="zap"
-              style={ss.actionBtn}
-            />
+            {postsLoading ? (
+              <ActivityIndicator color={PURPLE} style={{ marginVertical: SP.lg }} />
+            ) : sellerPosts.length === 0 ? (
+              <EmptyState
+                icon="image"
+                title="No posts yet"
+                description="Post on Brandthread, then come back."
+              />
+            ) : (
+              <>
+                {sellerPosts.map(post => {
+                  const selected = selectedPostIds.includes(post.id);
+                  return (
+                    <TouchableOpacity key={post.id} style={[ss.postRow, selected && ss.postRowSelected]} onPress={() => togglePost(post.id)}>
+                      <View style={[ss.postCheck, selected && ss.postCheckActive]}>
+                        {selected && <Feather name="check" size={12} color={theme.onAccent} />}
+                      </View>
+                      <View style={ss.postMeta}>
+                        <Text style={ss.postTitle}>{post.title}</Text>
+                        <Text style={ss.postDesc}>{post.desc}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+                <PrimaryButton
+                  label={analyzing ? 'Generating...' : `Generate from ${selectedPostIds.length > 0 ? selectedPostIds.length + ' ' : ''}Post${selectedPostIds.length !== 1 ? 's' : ''}`}
+                  onPress={handleGenerateFromPosts}
+                  loading={analyzing}
+                  disabled={selectedPostIds.length === 0 || analyzing}
+                  icon="zap"
+                  style={ss.actionBtn}
+                />
+              </>
+            )}
           </>
         )}
 
@@ -363,19 +360,14 @@ export default function StoreFromSocialScreen() {
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE_DIM = theme.accentDim;
   const PURPLE_LIGHT = theme.accentLight;
+  const PURPLE = theme.accent;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const SUBTLE = theme.subtle;
+  const CARD = theme.card;
+  const SURFACE = theme.surface;
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    paddingHorizontal: SP.md, paddingVertical: SP.sm,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)',
-  },
-  backBtn: {
-    width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  headerTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
   scroll: { paddingBottom: 80, paddingTop: SP.md },
   subtitle: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginHorizontal: SP.md, marginBottom: SP.md, lineHeight: 20 },
   card: { marginHorizontal: SP.md, marginBottom: SP.sm, gap: SP.md },

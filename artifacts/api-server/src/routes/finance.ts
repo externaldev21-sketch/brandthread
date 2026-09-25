@@ -17,9 +17,10 @@ import {
 } from "@workspace/db";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { requireRole, teamContext } from "../middlewares/requireRole";
+import { requirePermission, requirePayoutsRead, teamContext } from "../middlewares/requireRole";
 import { stripe } from "../lib/stripe";
 import { cashOutableAmount, isValidPayoutIdempotencyKey } from "../lib/payoutSafety";
+import { publishNotification } from "./notifications-feed";
 
 const router = Router();
 router.use(requireAuth);
@@ -80,9 +81,14 @@ type CashoutResult =
 
 // ─── GET /api/finance/balance ─────────────────────────────────────────────────
 
-// Finance data is owner-only: a joined-store member must not infer balances,
-// payouts, fees, or account status after teamContext rewrites the store owner.
-router.get("/balance", requireRole("owner"), async (req, res) => {
+// Reads are owner + manager + finance/admin (requirePayoutsRead — manager
+// already has the "analytics" permission on their team role, and the mobile
+// app renders a read-only Payouts/Finance view for managers) — writes that
+// move money (POST /payout below) or reveal/alter bank destinations stay on
+// requirePermission("payouts") alone. A joined-store staff/orders/marketing/
+// viewer member still can't see any of this after teamContext rewrites the
+// store owner.
+router.get("/balance", requirePayoutsRead(), async (req, res) => {
   const sellerId = getSellerId(req);
   try {
     const accountId = await getStripeAccount(sellerId);
@@ -187,7 +193,7 @@ router.get("/balance", requireRole("owner"), async (req, res) => {
 //   paidOut    everything Brandthread has sent to the seller's Stripe account
 //   owed       what the seller owes Brandthread (e.g. a failed drop's
 //              refunds after the bulk order was paid, unrecovered labels)
-router.get("/summary", requireRole("owner"), async (req, res) => {
+router.get("/summary", requirePayoutsRead(), async (req, res) => {
   const sellerId = getSellerId(req);
   try {
     const sellerSums = await db.select({
@@ -353,7 +359,7 @@ router.get("/summary", requireRole("owner"), async (req, res) => {
 
 // ─── GET /api/finance/payouts ─────────────────────────────────────────────────
 
-router.get("/payouts", requireRole("owner"), async (req, res) => {
+router.get("/payouts", requirePayoutsRead(), async (req, res) => {
   const sellerId = getSellerId(req);
   const limit = Math.min(Number(req.query.limit) || 20, 100);
   try {
@@ -397,7 +403,7 @@ router.get("/payouts", requireRole("owner"), async (req, res) => {
 
 // ─── GET /api/finance/transactions ───────────────────────────────────────────
 
-router.get("/transactions", requireRole("owner"), async (req, res) => {
+router.get("/transactions", requirePayoutsRead(), async (req, res) => {
   const sellerId = getSellerId(req);
   const limit = Math.min(Number(req.query.limit) || 50, 100);
   const type  = req.query.type as string | undefined; // e.g. 'charge', 'payout', 'refund'
@@ -443,7 +449,7 @@ router.get("/transactions", requireRole("owner"), async (req, res) => {
 
 // ─── GET /api/finance/statement.csv ──────────────────────────────────────────
 
-router.get("/statement.csv", requireRole("owner"), async (req, res) => {
+router.get("/statement.csv", requirePayoutsRead(), async (req, res) => {
   const sellerId = getSellerId(req);
   try {
     const accountId = await getStripeAccount(sellerId);
@@ -484,7 +490,7 @@ router.get("/statement.csv", requireRole("owner"), async (req, res) => {
 
 // ─── POST /api/finance/payout — manual bank payout ────────────────────────────
 
-router.post("/payout", requireRole("owner"), async (req, res) => {
+router.post("/payout", requirePermission("payouts"), async (req, res) => {
   const sellerId = getSellerId(req);
   const { amount, currency, idempotencyKey } = req.body;
 
@@ -807,6 +813,20 @@ router.post("/payout", requireRole("owner"), async (req, res) => {
           : {}),
       });
       return;
+    }
+
+    if (!result.duplicate) {
+      void publishNotification({
+        userId: sellerId,
+        category: "payout",
+        type: "payout_sent",
+        title: "Payout sent",
+        body: `${formatCents(result.payout.amount, result.payout.currency)} is on its way to your bank — arriving ${result.payout.arrivalDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}.`,
+        targetId: result.payout.id,
+        targetType: "payout",
+        cta: "View payouts",
+        pushChannelId: "payout",
+      }).catch((err) => req.log.error({ err, sellerId }, "Payout sent notification failed"));
     }
 
     res.status(result.duplicate ? 200 : 201).json({

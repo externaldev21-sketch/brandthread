@@ -24,6 +24,34 @@ export interface SearchBrand {
 
 export type SearchResult = SearchProduct | SearchBrand;
 
+// ─── Search-empty-state data (from /api/public/search/trending + /suggested) ──
+
+export interface TrendingTerm {
+  term: string;
+  type: 'category' | 'brand' | 'query';
+}
+
+export interface SuggestedBrand {
+  id: string;
+  sellerId: string;
+  name: string;
+  handle: string;
+  color: string;
+  initials: string;
+  followerCount: number;
+}
+
+export interface SuggestedProduct {
+  id: string;
+  productId: string;
+  name: string;
+  brand: string;
+  category: string;
+  imageUri: string | null;
+  color: string;
+  initials: string;
+}
+
 export const SEARCH_BRANDS: SearchBrand[] = [
   { id: 'b-vs', kind: 'brand', name: 'Vault Studio',   handle: '@vaultstudio',   color: '#00C853', initials: 'VS' },
   { id: 'b-mc', kind: 'brand', name: 'Meridian Co.',   handle: '@meridianco',    color: '#0F766E', initials: 'MC' },

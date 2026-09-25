@@ -3,7 +3,7 @@
  * Wired to real backend: GET/PUT /api/seller/settings/policies
  * Falls back to storeService (AsyncStorage) if API unavailable.
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
@@ -13,14 +13,12 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { Header } from '@/components/layout';
 import {
-  BG, CARD, SURFACE, BORDER,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, SUCCESS, ORANGE, ORANGE_DIM,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, StatusBadge } from '@/components/BrandthreadUI';
-import { generatePolicyDraft } from '@/services/storeService';
+import { generatePolicyDraft, getStorefront } from '@/services/storeService';
 import { useApi } from '@/lib/api';
 
 export type PolicyType = 'shipping' | 'return' | 'refund' | 'privacy' | 'terms' | 'pre_order';
@@ -38,7 +36,10 @@ const POLICY_TYPES: { type: PolicyType; label: string; icon: keyof typeof Feathe
 
 export default function StorePoliciesScreen() {
   const { theme } = useAppTheme();
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const {
+    primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN,
+    card: CARD, border: BORDER, foreground: FG, mutedForeground: MUTED, subtle: SUBTLE, success: SUCCESS,
+  } = useColors();
   const router = useRouter();
   const headerTopInset = useHeaderTopInset();
   const api = useApi();
@@ -46,9 +47,17 @@ export default function StorePoliciesScreen() {
   const [selectedType, setSelectedType] = useState<PolicyType | null>(null);
   const [content, setContent] = useState('');
   const [aiGenerated, setAiGenerated] = useState(false);
+  const [isTemplate, setIsTemplate] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [storeName, setStoreName] = useState('Your store');
+
+  useEffect(() => {
+    getStorefront().then(sf => {
+      if (sf?.settings?.storeName) setStoreName(sf.settings.storeName);
+    }).catch(() => {});
+  }, []);
 
   const load = async () => {
     setLoading(true);
@@ -77,12 +86,14 @@ export default function StorePoliciesScreen() {
     setSelectedType(type);
     setContent(existing?.content ?? '');
     setAiGenerated(existing?.aiGenerated ?? false);
+    setIsTemplate(false);
   };
 
   const closeEdit = () => {
     setSelectedType(null);
     setContent('');
     setAiGenerated(false);
+    setIsTemplate(false);
   };
 
   const handleGenerate = async (type: PolicyType) => {
@@ -90,29 +101,26 @@ export default function StorePoliciesScreen() {
     try {
       // Try AI via backend
       try {
-        const resp = await fetch('/api/ai/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: `Write a concise, professional ${type.replace('_', '-')} policy for a fashion brand. Return only the policy text, no extra commentary.`,
-          }),
+        const resp = await api.ai.chat({
+          messages: [{
+            role: 'user',
+            content: `Write a concise, professional ${type.replace('_', '-')} policy for ${storeName}, a fashion brand. Return only the policy text, no extra commentary.`,
+          }],
         });
-        if (resp.ok) {
-          const j = await resp.json();
-          const aiText = j.response ?? j.message ?? j.content ?? '';
-          if (aiText.trim()) {
-            setSelectedType(type);
-            setContent(aiText.trim());
-            setAiGenerated(true);
-            return;
-          }
+        if (resp?.content?.trim()) {
+          setSelectedType(type);
+          setContent(resp.content.trim());
+          setAiGenerated(true);
+          setIsTemplate(false);
+          return;
         }
       } catch {}
-      // Local fallback template
-      const draft = generatePolicyDraft(type, 'Your Store');
+      // Local fallback template — not AI-generated, so label it honestly.
+      const draft = generatePolicyDraft(type, storeName);
       setSelectedType(type);
       setContent(draft);
-      setAiGenerated(true);
+      setAiGenerated(false);
+      setIsTemplate(true);
     } finally {
       setGenerating(false);
     }
@@ -171,10 +179,10 @@ export default function StorePoliciesScreen() {
               <><Feather name="zap" size={14} color={PURPLE} /><Text style={[s.aiBtnText, { color: PURPLE }]}>Generate with AI</Text></>
             )}
           </TouchableOpacity>
-          {aiGenerated && (
+          {(aiGenerated || isTemplate) && (
             <View style={[s.aiBadge, { backgroundColor: `${CYAN}20`, borderColor: `${CYAN}40` }]}>
-              <Feather name="zap" size={12} color={CYAN} />
-              <Text style={[s.aiBadgeText, { color: CYAN }]}>AI generated</Text>
+              <Feather name={isTemplate ? 'file-text' : 'zap'} size={12} color={CYAN} />
+              <Text style={[s.aiBadgeText, { color: CYAN }]}>{isTemplate ? 'Template' : 'AI generated'}</Text>
             </View>
           )}
         </View>
@@ -196,11 +204,7 @@ export default function StorePoliciesScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: 'transparent' }]}>
-      <View style={[s.header, { borderBottomColor: BORDER, height: 56 + headerTopInset, paddingTop: headerTopInset }]}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 2, bottom: 2, left: 2, right: 2 }}><Feather name="arrow-left" size={21} color={FG} /></TouchableOpacity>
-        <Text style={[s.headerTitle, { color: FG }]}>Store policies</Text>
-        <View style={{ width: 70 }} />
-      </View>
+      <Header title="Store policies" />
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color={PURPLE} /></View>

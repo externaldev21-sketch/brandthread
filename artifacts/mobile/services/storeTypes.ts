@@ -27,10 +27,14 @@ export type StoreSectionType =
   | 'newsletter'
   | 'faq'
   | 'social_feed'
+  | 'social_links'
   | 'logo_list'
   | 'before_after'
   | 'text_banner'
   | 'spacer'
+  | 'collection_grid_tags'
+  | 'contact_form'
+  | 'footer'
   | 'custom_block';
 
 export type CountdownStyle = 'minimal' | 'bold' | 'flip' | 'digital';
@@ -94,6 +98,17 @@ export interface StoreSectionSettings {
   // seller posts
   postCount?: number;
   postLayout?: 'grid' | 'list' | 'carousel';
+  // collection grid driven by tags
+  tags?: string[];
+  tagMatch?: 'all' | 'any';
+  // social links bar
+  socialLinks?: Array<{ platform: string; url: string }>;
+  // contact form
+  contactEmail?: string;
+  contactFormFields?: Array<'name' | 'email' | 'subject' | 'message' | 'order_number' | 'phone'>;
+  contactSuccessMessage?: string;
+  // footer block (page-embedded; distinct from the global StoreThemeSettings footer)
+  footerColumns?: Array<{ heading: string; menuId?: string; links?: Array<{ label: string; url: string }> }>;
 }
 
 export interface StoreSection {
@@ -188,6 +203,8 @@ export interface StoreGenerationAnswers {
   features: StoreFeature[];
   logoUri?: string;
   moodBoardUris: string[];
+  /** Photos the seller uploaded for a given existing-content bucket (e.g. 'product_photos', 'campaign_images'). */
+  contentUploads?: Record<string, string[]>;
 }
 
 export interface StoreGenerationResult {
@@ -335,6 +352,10 @@ export interface StoreTheme {
   previewColor: string;
   accentColor: string;
   defaultTypography: TypographyStyle;
+  /** Default button treatment for this theme's style sheet — carried into StoreBranding.buttonStyle when applied. */
+  defaultButtonStyle: ButtonStyle;
+  /** Default corner rounding for this theme's style sheet — carried into StoreBranding.cornerRadius when applied. */
+  defaultCornerRadius: StoreBranding['cornerRadius'];
   supportedSections: StoreSectionType[];
   presets: StoreThemePreset[];
   tags: string[];
@@ -595,9 +616,28 @@ export const THREAD_THEME_DARK_PALETTE: StoreColorPalette = {
   buttonText: '#0B0B0B',
 };
 
+/** Every section block a fully-featured Store Builder page can be assembled from. */
+export const ALL_SECTION_TYPES: StoreSectionType[] = [
+  'announcement',
+  'hero_image', 'hero_video', 'hero_slideshow',
+  'featured_product', 'product_grid', 'featured_collection', 'collection_grid_tags',
+  'lookbook', 'image_with_text', 'video_with_text', 'before_after', 'logo_list',
+  'brand_story', 'seller_posts', 'social_feed', 'social_links',
+  'customer_reviews', 'faq', 'newsletter', 'contact_form',
+  'drop_countdown', 'text_banner', 'spacer', 'custom_block', 'footer',
+];
+
+function mono(bg: string, text: string, secondary: string, buttonText: string): StoreColorPalette {
+  return { primary: text, secondary, accent: text, background: bg, text, buttonText };
+}
+
 /**
- * Thread Theme is the only Brandthread starting template. Personalization
- * tools may change imagery, copy, and sections, but never the grayscale system.
+ * Brandthread ships twelve monochrome-first starting templates. Each pairs a
+ * light and dark palette built from black/white/gray, one typography voice,
+ * a default button treatment, and a default corner-rounding — the same three
+ * levers exposed in the Store Builder's theme/style panel. Personalization
+ * tools may change imagery, copy, and section order, but never introduce a
+ * saturated brand color into the base palette.
  */
 export const BUILTIN_THEMES: StoreTheme[] = [
   {
@@ -610,11 +650,141 @@ export const BUILTIN_THEMES: StoreTheme[] = [
     previewColor: THREAD_THEME_LIGHT_PALETTE.background,
     accentColor: THREAD_THEME_LIGHT_PALETTE.primary,
     defaultTypography: 'editorial',
-    supportedSections: ['hero_image', 'product_grid', 'featured_collection', 'brand_story', 'lookbook', 'seller_posts', 'customer_reviews', 'newsletter'],
+    defaultButtonStyle: 'filled',
+    defaultCornerRadius: 'subtle',
+    supportedSections: ALL_SECTION_TYPES,
     tags: ['brandthread', 'editorial', 'monochrome', 'fashion', 'minimal'],
     presets: [
       { paletteId: 'light', label: 'Light', colors: THREAD_THEME_LIGHT_PALETTE },
       { paletteId: 'dark', label: 'Dark', colors: THREAD_THEME_DARK_PALETTE },
+    ],
+  },
+  {
+    id: 'mono-studio', name: 'Mono Studio', category: 'minimal',
+    description: 'A quiet, gallery-white grid built for product photography to breathe.',
+    bestFor: 'Basics, essentials, and product-led catalogs', supportedModes: ['light', 'dark'],
+    previewColor: '#FFFFFF', accentColor: '#111111', defaultTypography: 'minimal',
+    defaultButtonStyle: 'outline', defaultCornerRadius: 'sharp', supportedSections: ALL_SECTION_TYPES,
+    tags: ['monochrome', 'minimal', 'clean'],
+    presets: [
+      { paletteId: 'light', label: 'Light', colors: mono('#FFFFFF', '#111111', '#767676', '#FFFFFF') },
+      { paletteId: 'dark', label: 'Dark', colors: mono('#0A0A0A', '#FAFAFA', '#8C8C8C', '#0A0A0A') },
+    ],
+  },
+  {
+    id: 'noir', name: 'Noir', category: 'luxury',
+    description: 'High-contrast black-on-black luxury, built for statement drops.',
+    bestFor: 'Luxury, high fashion, and limited drops', supportedModes: ['dark', 'light'],
+    previewColor: '#050505', accentColor: '#E7E7E7', defaultTypography: 'luxury',
+    defaultButtonStyle: 'filled', defaultCornerRadius: 'sharp', supportedSections: ALL_SECTION_TYPES,
+    tags: ['monochrome', 'luxury', 'dark', 'editorial'],
+    presets: [
+      { paletteId: 'dark', label: 'Dark', colors: mono('#050505', '#F2F2F2', '#7A7A7A', '#050505') },
+      { paletteId: 'light', label: 'Light', colors: mono('#F2F2F2', '#050505', '#5C5C5C', '#F2F2F2') },
+    ],
+  },
+  {
+    id: 'paperwhite', name: 'Paperwhite', category: 'minimal',
+    description: 'Airy off-white pages with soft gray type — nothing competes with the product.',
+    bestFor: 'Everyday basics and understated contemporary labels', supportedModes: ['light'],
+    previewColor: '#FAF9F6', accentColor: '#2B2B2B', defaultTypography: 'modern',
+    defaultButtonStyle: 'ghost', defaultCornerRadius: 'rounded', supportedSections: ALL_SECTION_TYPES,
+    tags: ['monochrome', 'minimal', 'light'],
+    presets: [
+      { paletteId: 'light', label: 'Light', colors: mono('#FAF9F6', '#2B2B2B', '#8A8580', '#FAF9F6') },
+    ],
+  },
+  {
+    id: 'ink', name: 'Ink', category: 'modern',
+    description: 'Bold sharp-edged blacks and whites with no gray in between.',
+    bestFor: 'Streetwear and graphic-forward brands', supportedModes: ['light', 'dark'],
+    previewColor: '#FFFFFF', accentColor: '#000000', defaultTypography: 'bold',
+    defaultButtonStyle: 'filled', defaultCornerRadius: 'sharp', supportedSections: ALL_SECTION_TYPES,
+    tags: ['monochrome', 'bold', 'streetwear'],
+    presets: [
+      { paletteId: 'light', label: 'Light', colors: mono('#FFFFFF', '#000000', '#4D4D4D', '#FFFFFF') },
+      { paletteId: 'dark', label: 'Dark', colors: mono('#000000', '#FFFFFF', '#B3B3B3', '#000000') },
+    ],
+  },
+  {
+    id: 'concrete', name: 'Concrete', category: 'experimental',
+    description: 'Cool technical grays with a utilitarian, industrial edge.',
+    bestFor: 'Techwear and utility-driven labels', supportedModes: ['dark', 'light'],
+    previewColor: '#1C1D1F', accentColor: '#C7C9CC', defaultTypography: 'technical',
+    defaultButtonStyle: 'outline', defaultCornerRadius: 'sharp', supportedSections: ALL_SECTION_TYPES,
+    tags: ['monochrome', 'technical', 'techwear'],
+    presets: [
+      { paletteId: 'dark', label: 'Dark', colors: mono('#1C1D1F', '#E7E8EA', '#8D9096', '#1C1D1F') },
+      { paletteId: 'light', label: 'Light', colors: mono('#E7E8EA', '#1C1D1F', '#6B6E73', '#E7E8EA') },
+    ],
+  },
+  {
+    id: 'ivory', name: 'Ivory', category: 'luxury',
+    description: 'Warm neutral monochrome — ivory backgrounds against near-black type.',
+    bestFor: 'Elevated ready-to-wear and quiet luxury', supportedModes: ['light'],
+    previewColor: '#F3ECE0', accentColor: '#211B14', defaultTypography: 'classic',
+    defaultButtonStyle: 'filled', defaultCornerRadius: 'subtle', supportedSections: ALL_SECTION_TYPES,
+    tags: ['monochrome', 'luxury', 'warm'],
+    presets: [
+      { paletteId: 'light', label: 'Light', colors: mono('#F3ECE0', '#211B14', '#8A7F6D', '#F3ECE0') },
+    ],
+  },
+  {
+    id: 'slate', name: 'Slate', category: 'modern',
+    description: 'A cool, contemporary gray system with balanced contrast.',
+    bestFor: 'Contemporary and unisex brands', supportedModes: ['light', 'dark'],
+    previewColor: '#EEF0F2', accentColor: '#20242A', defaultTypography: 'modern',
+    defaultButtonStyle: 'filled', defaultCornerRadius: 'rounded', supportedSections: ALL_SECTION_TYPES,
+    tags: ['monochrome', 'modern', 'contemporary'],
+    presets: [
+      { paletteId: 'light', label: 'Light', colors: mono('#EEF0F2', '#20242A', '#6E747C', '#EEF0F2') },
+      { paletteId: 'dark', label: 'Dark', colors: mono('#14171B', '#EEF0F2', '#8A909A', '#14171B') },
+    ],
+  },
+  {
+    id: 'carbon', name: 'Carbon', category: 'streetwear',
+    description: 'Deep matte black with silver-gray accents for drop culture.',
+    bestFor: 'Streetwear and sneaker-adjacent labels', supportedModes: ['dark'],
+    previewColor: '#0D0D0D', accentColor: '#B8B8B8', defaultTypography: 'bold',
+    defaultButtonStyle: 'filled', defaultCornerRadius: 'sharp', supportedSections: ALL_SECTION_TYPES,
+    tags: ['monochrome', 'streetwear', 'dark'],
+    presets: [
+      { paletteId: 'dark', label: 'Dark', colors: mono('#0D0D0D', '#F5F5F5', '#8F8F8F', '#0D0D0D') },
+    ],
+  },
+  {
+    id: 'chalk', name: 'Chalk', category: 'editorial',
+    description: 'Soft matte-white pages with muted charcoal type, editorial pacing.',
+    bestFor: 'Editorial, image-led fashion houses', supportedModes: ['light'],
+    previewColor: '#F6F6F4', accentColor: '#2E2E2C', defaultTypography: 'editorial',
+    defaultButtonStyle: 'underline', defaultCornerRadius: 'subtle', supportedSections: ALL_SECTION_TYPES,
+    tags: ['monochrome', 'editorial', 'light'],
+    presets: [
+      { paletteId: 'light', label: 'Light', colors: mono('#F6F6F4', '#2E2E2C', '#87857F', '#F6F6F4') },
+    ],
+  },
+  {
+    id: 'graphite', name: 'Graphite', category: 'experimental',
+    description: 'Asymmetric, gallery-style monochrome for boundary-pushing brands.',
+    bestFor: 'Avant-garde and conceptual labels', supportedModes: ['dark', 'light'],
+    previewColor: '#101010', accentColor: '#D6D6D6', defaultTypography: 'experimental',
+    defaultButtonStyle: 'ghost', defaultCornerRadius: 'pill', supportedSections: ALL_SECTION_TYPES,
+    tags: ['monochrome', 'experimental', 'conceptual'],
+    presets: [
+      { paletteId: 'dark', label: 'Dark', colors: mono('#101010', '#EDEDED', '#8F8F8F', '#101010') },
+      { paletteId: 'light', label: 'Light', colors: mono('#EDEDED', '#101010', '#6E6E6E', '#EDEDED') },
+    ],
+  },
+  {
+    id: 'onyx', name: 'Onyx', category: 'luxury',
+    description: 'Polished black and white with pill buttons and generous rounding.',
+    bestFor: 'Premium DTC brands wanting a soft, tactile feel', supportedModes: ['light', 'dark'],
+    previewColor: '#FFFFFF', accentColor: '#161616', defaultTypography: 'luxury',
+    defaultButtonStyle: 'filled', defaultCornerRadius: 'pill', supportedSections: ALL_SECTION_TYPES,
+    tags: ['monochrome', 'luxury', 'rounded'],
+    presets: [
+      { paletteId: 'light', label: 'Light', colors: mono('#FFFFFF', '#161616', '#767676', '#FFFFFF') },
+      { paletteId: 'dark', label: 'Dark', colors: mono('#161616', '#FFFFFF', '#9A9A9A', '#161616') },
     ],
   },
 ];
@@ -637,10 +807,14 @@ export const SECTION_TYPE_LABELS: Record<StoreSectionType, string> = {
   newsletter: 'Newsletter',
   faq: 'FAQ',
   social_feed: 'Social Feed',
+  social_links: 'Social Links',
   logo_list: 'Logo List',
   before_after: 'Before & After',
   text_banner: 'Text Banner',
   spacer: 'Spacer',
+  collection_grid_tags: 'Collection Grid (by Tag)',
+  contact_form: 'Contact',
+  footer: 'Footer',
   custom_block: 'Custom Content',
 };
 

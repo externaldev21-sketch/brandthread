@@ -7,13 +7,10 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { Header } from '@/components/layout';
 import {
-  BG, CARD, SURFACE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
-  ORANGE, ORANGE_DIM, GOLD, GRAD_CARD_GLOW,
-  FONT, FS, SP, RADIUS, ICON,
+  GRAD_CARD_GLOW,
+  FONT, FS, SP, ICON,
 } from '@/lib/theme';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
@@ -53,9 +50,13 @@ function categoryVariant(cat: StoreAISuggestion['category']): 'purple' | 'info' 
 }
 
 export default function StoreAiImproveScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const colors = useColors();
+  const {
+    primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN,
+    foreground: FG, mutedForeground: MUTED, subtle: SUBTLE, success: SUCCESS,
+  } = colors;
+  const ai = React.useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
-  const headerTopInset = useHeaderTopInset();
   const [suggestions, setSuggestions] = useState<StoreAISuggestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<Category>('all');
@@ -126,16 +127,7 @@ export default function StoreAiImproveScreen() {
 
   return (
     <View style={ai.root}>
-      <View style={[ai.header, { paddingTop: headerTopInset + SP.sm }]}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={ai.backBtn}
-          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-        >
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={ai.headerTitle}>Improve Store</Text>
-      </View>
+      <Header title="Improve Store" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={ai.scroll}>
         <Text style={ai.subtitle}>AI-powered suggestions to improve your storefront.</Text>
@@ -238,19 +230,10 @@ export default function StoreAiImproveScreen() {
   );
 }
 
-const ai = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useColors>) => {
+  const { foreground: FG, mutedForeground: MUTED, subtle: SUBTLE } = colors;
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    paddingHorizontal: SP.md, paddingVertical: SP.sm,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)',
-  },
-  backBtn: {
-    width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  headerTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
   scroll: { paddingBottom: 60, paddingTop: SP.md },
   subtitle: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginHorizontal: SP.md, marginBottom: SP.md },
   refreshBtn: { marginHorizontal: SP.md, marginBottom: SP.md },
@@ -273,4 +256,5 @@ const ai = StyleSheet.create({
   dismissedToggle: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, justifyContent: 'center', padding: SP.md },
   dismissedToggleText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   dismissedCard: { opacity: 0.5 },
-});
+  });
+};

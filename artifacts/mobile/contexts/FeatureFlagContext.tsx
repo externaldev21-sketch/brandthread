@@ -6,13 +6,23 @@ export type FeatureFlagKey =
   | 'aiPhotoShoot'
   | 'outfitSwap'
   | 'boosts'
-  | 'manufacturerHub';
+  | 'manufacturerHub'
+  | 'threadCash'
+  | 'threadCashCheckoutDiscount'
+  | 'threadCashSend';
 
 const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   aiPhotoShoot: true,
   outfitSwap: true,
   boosts: true,
   manufacturerHub: true,
+  threadCash: true,
+  // OFF until checkout can fund the discount without changing seller payout
+  // (see docs/payments/thread-cash-checkout-todo.md).
+  threadCashCheckoutDiscount: false,
+  // OFF until Dev confirms with a lawyer that peer-to-peer Thread Cash
+  // transfer doesn't trigger money-transmitter / App Store rules.
+  threadCashSend: false,
 };
 
 const STORAGE_KEY = 'bt:feature-flags:v1';

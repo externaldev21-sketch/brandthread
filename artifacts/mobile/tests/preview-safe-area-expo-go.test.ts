@@ -8,15 +8,22 @@ const read = (relativePath: string) =>
 describe('browser preview safe areas and Expo Go startup', () => {
   it('keeps both buyer and seller tab bars visible and reachable on web', () => {
     const buyerTabs = read('components/buyer-nav/BuyerTabBar.tsx');
+    const tabBarParts = read('components/tab-bar/TabBarParts.tsx');
+    const sellerBar = read('components/SellerGlobalTabBar.tsx');
     const buyerMetrics = read('components/buyer-nav/buyerTabBarMetrics.ts');
     const sellerTabs = read('app/(tabs)/_layout.tsx');
     const cookieConsent = read('contexts/CookieConsentContext.tsx');
 
     expect(buyerMetrics).toContain('Math.max(bottomInset - 10, 12)');
     expect(buyerTabs).toContain('bottom: metrics.bottomOffset');
-    expect(buyerTabs).toContain('minWidth: 44');
+    expect(sellerBar).toContain('bottom: metrics.bottomOffset');
+    expect(tabBarParts).toContain('minWidth: 44');
     expect(sellerTabs).not.toContain("if (Platform.OS === 'web') return null");
-    expect(cookieConsent).toContain('bottom:72+SP.md');
+    // The cookie banner's bottom offset is derived from the same tab bar
+    // metrics both bars use (occupiedHeight), rather than a hardcoded value
+    // tuned for phone proportions only — see WebAppShell / desktop web pass.
+    expect(cookieConsent).toContain('tabBarInset + SP.sm');
+    expect(cookieConsent).toContain('useTabBarMetrics().occupiedHeight');
   });
 
   it('does not statically load the unavailable keyboard-controller native module', () => {

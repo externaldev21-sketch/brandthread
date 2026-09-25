@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
-  ActivityIndicator, Alert, Switch, Image,
+  ActivityIndicator, Alert, Image,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -25,7 +25,8 @@ import {
   RED, RED_DIM,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+import { HapticSwitch, PrimaryButton } from '@/components/BrandthreadUI';
 
 export default function BuyerProblemReportScreen() {
   const { theme } = useAppTheme();
@@ -60,26 +61,28 @@ export default function BuyerProblemReportScreen() {
   }
 
   useEffect(() => {
-    if (!orderId) return;
+    if (!orderId) { setLoading(false); return; }
     getBuyerOrder(orderId).then(o => {
       setOrder(o ?? null);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [orderId]);
 
+  const isGeneralReport = !orderId;
+
   async function handleSubmit() {
     if (!problemType) { Alert.alert('Select Issue Type', 'Please select what kind of problem you experienced.'); return; }
     if (!description.trim()) { Alert.alert('Add Details', 'Please describe the problem.'); return; }
-    if (!order) return;
+    if (!isGeneralReport && !order) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSubmitting(true);
     try {
       await createProblemReport({
-        orderId: order.id,
-        orderNumber: order.orderNumber,
+        orderId: order?.id,
+        orderNumber: order?.orderNumber,
         type: problemType as BuyerProblemType,
         description: description.trim(),
-        evidenceUris: [],
+        evidenceUris: evidencePhotos,
         contactedSeller,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -98,13 +101,9 @@ export default function BuyerProblemReportScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
         <View style={s.successIcon}><Feather name="check" size={32} color={ON_DARK} /></View>
-        <Text style={s.successTitle}>Report Submitted</Text>
+        <Text style={s.successTitle}>Report submitted</Text>
         <Text style={s.successSub}>Your problem report has been received. Our team will review it and reach out if needed.</Text>
-        <TouchableOpacity style={s.doneBtn} onPress={() => router.back()} activeOpacity={0.85}>
-          <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.doneBtnGrad}>
-            <Text style={[s.doneBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Back to Order</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+        <PrimaryButton label="Back to Order" onPress={() => router.back()} style={s.doneBtn} />
       </View>
     );
   }
@@ -116,7 +115,7 @@ export default function BuyerProblemReportScreen() {
           <Feather name="chevron-left" size={ICON.md} color={FG} />
         </TouchableOpacity>
         <View>
-          <Text style={s.headerTitle}>Report a Problem</Text>
+          <Text style={s.headerTitle}>Report a problem</Text>
           {order && <Text style={s.headerSub}>{order.orderNumber} · {order.sellerName}</Text>}
         </View>
       </View>
@@ -142,7 +141,7 @@ export default function BuyerProblemReportScreen() {
 
         {/* Description */}
         <View style={s.card}>
-          <Text style={s.sectionTitle}>Describe the Problem</Text>
+          <Text style={s.sectionTitle}>Describe the problem</Text>
           <TextInput
             style={s.textarea}
             value={description}
@@ -186,30 +185,32 @@ export default function BuyerProblemReportScreen() {
         )}
 
         {/* Contacted seller */}
-        <View style={s.card}>
-          <View style={s.switchRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.switchLabel}>Contacted the Seller</Text>
-              <Text style={s.switchSub}>Have you already reached out to the seller about this issue?</Text>
+        {!isGeneralReport && (
+          <View style={s.card}>
+            <View style={s.switchRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.switchLabel}>Contacted the seller</Text>
+                <Text style={s.switchSub}>Have you already reached out to the seller about this issue?</Text>
+              </View>
+              <HapticSwitch
+                value={contactedSeller}
+                onValueChange={setContactedSeller}
+                trackColor={{ true: PURPLE, false: BORDER }}
+                thumbColor={FG}
+              />
             </View>
-            <Switch
-              value={contactedSeller}
-              onValueChange={setContactedSeller}
-              trackColor={{ true: PURPLE, false: BORDER }}
-              thumbColor={FG}
-            />
+            {!contactedSeller && (
+              <TouchableOpacity
+                style={s.contactBtn}
+                onPress={() => router.push(('/buyer-conversation?participantId=' + order?.sellerId + '&type=buyer_to_seller_order') as never)}
+                activeOpacity={0.8}
+              >
+                <Feather name="message-circle" size={14} color={PURPLE_LIGHT} />
+                <Text style={s.contactBtnText}>Message seller first</Text>
+              </TouchableOpacity>
+            )}
           </View>
-          {!contactedSeller && (
-            <TouchableOpacity
-              style={s.contactBtn}
-              onPress={() => router.push('/inbox' as never)}
-              activeOpacity={0.8}
-            >
-              <Feather name="message-circle" size={14} color={PURPLE_LIGHT} />
-              <Text style={s.contactBtnText}>Message Seller First</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        )}
 
         {/* Dispute note */}
         <View style={s.disputeNote}>
@@ -220,16 +221,12 @@ export default function BuyerProblemReportScreen() {
         </View>
 
         <Text style={s.disclaimer}>
-          Submitting a problem report opens an investigation. Do not fabricate claims or evidence. Fraudulent reports may result in account action.
+          Submitting a problem report opens an investigation. Reports are reviewed by our team.
         </Text>
       </ScrollView>
 
       <View style={[s.bottomBar, { paddingBottom: insets.bottom + SP.sm }]}>
-        <TouchableOpacity style={s.submitBtn} onPress={handleSubmit} activeOpacity={0.88} disabled={submitting}>
-          <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.submitGrad}>
-            {submitting ? <ActivityIndicator color={theme.onAccent} size="small" /> : <Text style={[s.submitText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Submit Problem Report</Text>}
-          </LinearGradient>
-        </TouchableOpacity>
+        <PrimaryButton label="Send report" onPress={handleSubmit} loading={submitting} disabled={submitting} />
       </View>
     </View>
   );

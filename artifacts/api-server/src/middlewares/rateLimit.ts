@@ -11,7 +11,12 @@ export type RateLimitPolicyName =
   | "expensive"
   | "mutation"
   | "authenticated-read"
-  | "public-read";
+  | "public-read"
+  | "messaging"
+  | "comment"
+  | "follow"
+  | "report"
+  | "feed-event";
 
 export type RateLimitPolicy = {
   id: RateLimitPolicyName;
@@ -20,54 +25,104 @@ export type RateLimitPolicy = {
   message: string;
 };
 
+// Dev/preview traffic (Replit web preview, local `pnpm dev`) reloads far more
+// often than a real client: React StrictMode double-invokes effects, HMR
+// remounts screens, and the dev preview bypass (?bt_preview=…) skips Clerk
+// auth entirely so every request from one browser tab is bucketed under a
+// single unauthenticated IP identity instead of a per-user one. That was
+// tripping the "public-read" policy (240 / 5 min) within a minute of normal
+// clicking around and flooding the client with 429s. Scale limits up for
+// `NODE_ENV=development` only — production and the `test` env (which asserts
+// exact policy numbers) are untouched.
+const RATE_LIMIT_DEV_MULTIPLIER =
+  process.env.NODE_ENV === "development"
+    ? Math.max(1, Number(process.env.RATE_LIMIT_DEV_MULTIPLIER) || 12)
+    : 1;
+
+function scaled(limit: number): number {
+  return limit * RATE_LIMIT_DEV_MULTIPLIER;
+}
+
 export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> = {
   authentication: {
     id: "authentication",
-    limit: 30,
+    limit: scaled(30),
     windowMs: 10 * 60_000,
     message: "Too many authentication requests. Please wait before trying again.",
   },
   "asset-upload": {
     id: "asset-upload",
-    limit: 6,
+    limit: scaled(6),
     windowMs: 60_000,
     message: "Too many asset uploads. Please wait a minute and try again.",
   },
   checkout: {
     id: "checkout",
-    limit: 20,
+    limit: scaled(20),
     windowMs: 5 * 60_000,
     message: "Too many checkout requests. Please wait before trying again.",
   },
   webhook: {
     id: "webhook",
-    limit: 300,
+    limit: scaled(300),
     windowMs: 60_000,
     message: "Too many webhook deliveries. Please retry shortly.",
   },
   expensive: {
     id: "expensive",
-    limit: 30,
+    limit: scaled(30),
     windowMs: 60_000,
     message: "Too many generation requests. Please wait a minute and try again.",
   },
   mutation: {
     id: "mutation",
-    limit: 120,
+    limit: scaled(120),
     windowMs: 60_000,
     message: "Too many changes were submitted. Please wait a moment and try again.",
   },
   "authenticated-read": {
     id: "authenticated-read",
-    limit: 600,
+    limit: scaled(600),
     windowMs: 5 * 60_000,
     message: "Too many requests. Please wait a moment and try again.",
   },
   "public-read": {
     id: "public-read",
-    limit: 240,
+    limit: scaled(240),
     windowMs: 5 * 60_000,
     message: "Too many requests. Please wait a moment and try again.",
+  },
+  messaging: {
+    id: "messaging",
+    limit: scaled(30),
+    windowMs: 60_000,
+    message: "Too many messages sent. Please wait a moment and try again.",
+  },
+  comment: {
+    id: "comment",
+    limit: scaled(20),
+    windowMs: 60_000,
+    message: "Too many comments. Please wait a moment and try again.",
+  },
+  follow: {
+    id: "follow",
+    limit: scaled(30),
+    windowMs: 60_000,
+    message: "Too many follow requests. Please wait a moment and try again.",
+  },
+  report: {
+    id: "report",
+    limit: scaled(10),
+    windowMs: 5 * 60_000,
+    message: "Too many reports submitted. Please wait before submitting another.",
+  },
+  "feed-event": {
+    id: "feed-event",
+    // Batched (up to 50 events/request) so this is generous per-request but
+    // still bounds a client that retries aggressively or fires unbatched.
+    limit: 120,
+    windowMs: 60_000,
+    message: "Too many feed events submitted. Please wait a moment and try again.",
   },
 };
 
@@ -171,7 +226,7 @@ function middlewareForPolicy(explicitPolicy?: RateLimitPolicyName): RequestHandl
     if (
       req.method === "OPTIONS" ||
       req.path.endsWith("/health") ||
-      req.path.endsWith("/healthz")
+      /\/healthz(\/|$)/.test(req.path)
     ) {
       next();
       return;

@@ -23,6 +23,9 @@ export const manufacturers = pgTable('manufacturers', {
   website:            text('website'),
   contactEmail:       text('contact_email'),
   contactPhone:       text('contact_phone'),
+  // IANA zone (e.g. "Asia/Ho_Chi_Minh") so sellers see the factory's local
+  // time and both sides read tracker timestamps against the same clock.
+  timeZone:           text('time_zone'),
   // 'pending' | 'active' | 'suspended'
   status:             text('status').notNull().default('pending'),
   // true  = appears in the public Discover directory
@@ -242,6 +245,9 @@ export const sampleOrders = pgTable('sample_orders', {
   clientRequestId:         text('client_request_id'),
   threadId:                uuid('thread_id').references(() => manufacturerThreads.id, { onDelete: 'set null' }),
   orderType:               text('order_type').notNull().default('sample'),  // 'sample' | 'bulk'
+  // Who issued the order: sellers can request one, manufacturers send priced
+  // order cards in chat. 'seller' | 'manufacturer'
+  issuedBy:                text('issued_by').notNull().default('seller'),
   title:                   text('title').notNull(),
   description:             text('description'),
   quantity:                integer('quantity').notNull().default(1),
@@ -279,6 +285,88 @@ export const sampleOrders = pgTable('sample_orders', {
   walletIdx: index('sample_orders_wallet_id_idx').on(t.walletId),
   sellerRequestUnique: uniqueIndex('sample_orders_seller_request_unique')
     .on(t.sellerId, t.clientRequestId),
+}));
+
+// ─── Order stage events (tracker timeline) ────────────────────────────────────
+// Append-only record of every card and production-stage change so the seller
+// sees when each stage happened. Payment itself is reconciled by the payments
+// service (manufacturer_activity_events); this table records who moved the
+// order forward afterwards.
+export const manufacturerOrderEvents = pgTable('manufacturer_order_events', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  sampleOrderId:  uuid('sample_order_id').notNull().references(() => sampleOrders.id, { onDelete: 'cascade' }),
+  manufacturerId: uuid('manufacturer_id').notNull().references(() => manufacturers.id, { onDelete: 'cascade' }),
+  actorClerkId:   text('actor_clerk_id'),
+  actorRole:      text('actor_role').notNull(), // 'seller' | 'manufacturer' | 'payment_system'
+  fromStatus:     text('from_status'),
+  toStatus:       text('to_status').notNull(),
+  carrier:        text('carrier'),
+  trackingNumber: text('tracking_number'),
+  note:           text('note'),
+  createdAt:      timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  orderCreatedIdx: index('manufacturer_order_events_order_created_idx').on(t.sampleOrderId, t.createdAt),
+  manufacturerIdx: index('manufacturer_order_events_manufacturer_idx').on(t.manufacturerId),
+}));
+
+// ─── Manufacturer Product Catalog (browsable listings, Alibaba-style) ─────────
+
+export const manufacturerProducts = pgTable('manufacturer_products', {
+  id:              uuid('id').primaryKey().defaultRandom(),
+  manufacturerId:  uuid('manufacturer_id').notNull().references(() => manufacturers.id, { onDelete: 'cascade' }),
+  name:            text('name').notNull(),
+  description:     text('description').notNull().default(''),
+  category:        text('category').notNull().default(''),
+  images:          json('images').$type<string[]>().notNull().default([]),
+  moq:             integer('moq').notNull().default(1),
+  leadTimeDays:    integer('lead_time_days').notNull().default(0),
+  samplePriceCents: integer('sample_price_cents').notNull().default(0),
+  samplePriceLabel: text('sample_price_label'),
+  customizationOptions: json('customization_options').$type<string[]>().notNull().default([]),
+  // 'draft' | 'active' | 'archived'
+  status:          text('status').notNull().default('active'),
+  createdAt:       timestamp('created_at').defaultNow().notNull(),
+  updatedAt:       timestamp('updated_at').defaultNow().notNull(),
+}, (t) => ({
+  manufacturerIdx: index('manufacturer_products_manufacturer_idx').on(t.manufacturerId, t.status),
+}));
+
+// Quantity-tiered pricing per product, e.g. Canva/Faire style "100-499: $4.20/unit".
+// maxQuantity null = unbounded top tier.
+export const manufacturerProductPriceTiers = pgTable('manufacturer_product_price_tiers', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  productId:     uuid('product_id').notNull().references(() => manufacturerProducts.id, { onDelete: 'cascade' }),
+  minQuantity:   integer('min_quantity').notNull(),
+  maxQuantity:   integer('max_quantity'),
+  unitPriceCents: integer('unit_price_cents').notNull(),
+  sortOrder:     integer('sort_order').notNull().default(0),
+  createdAt:     timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  productIdx: index('manufacturer_product_price_tiers_product_idx').on(t.productId, t.sortOrder),
+}));
+
+// ─── Seller RFQs (broadcast-to-many-manufacturers Request for Quotation) ──────
+// A seller posts one RFQ; it fans out into one seller_quote_requests row per
+// matched manufacturer (see rfqId on that table) so each manufacturer quotes
+// independently through the existing 1:1 quote lifecycle, and the seller
+// compares the resulting quotes side by side.
+
+export const sellerRfqs = pgTable('seller_rfqs', {
+  id:              uuid('id').primaryKey().defaultRandom(),
+  sellerId:        text('seller_id').notNull(),
+  garmentType:     text('garment_type').notNull(),
+  category:        text('category').notNull().default(''),
+  description:     text('description').notNull().default(''),
+  quantity:        integer('quantity').notNull(),
+  targetPriceCents: integer('target_price_cents'),
+  deadline:        timestamp('deadline'),
+  fileIds:         json('file_ids').$type<string[]>().notNull().default([]),
+  // 'open' | 'matched' | 'closed' | 'cancelled'
+  status:          text('status').notNull().default('open'),
+  createdAt:       timestamp('created_at').defaultNow().notNull(),
+  updatedAt:       timestamp('updated_at').defaultNow().notNull(),
+}, (t) => ({
+  sellerIdx: index('seller_rfqs_seller_idx').on(t.sellerId, t.createdAt),
 }));
 
 // ─── Drop Wallets ─────────────────────────────────────────────────────────────

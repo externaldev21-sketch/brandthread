@@ -2,11 +2,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import {
   ScrollView, View, Text, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Platform, Alert,
+  ActivityIndicator, Alert,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import type { ContentPost, ContentType, ContentStatus } from '@/services/types';
@@ -14,20 +12,23 @@ import {
   archiveSellerPost, deleteSellerPost, getSellerPosts, updateSellerPost,
 } from '@/services/socialService';
 import { useColors } from '@/hooks/useColors';
-import { FS } from '@/lib/theme';
+import { Header } from '@/components/layout';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 
 type FilterTab = 'all' | ContentStatus;
 
+// Only types that create-post.tsx actually supports today. See docs/polish/punch-list.md
+// ("Seller: create post, AI, analytics & finance" — content.tsx item) for why the rest were cut.
 const getContentTypes = (primary: string, secondary: string, colors: ReturnType<typeof useColors>): { type: ContentType; label: string; icon: keyof typeof Feather.glyphMap; color: string }[] => [
   { type: 'video',        label: 'Video Post',      icon: 'video',        color: primary },
   { type: 'image',        label: 'Image Post',      icon: 'image',        color: colors.subtle },
-  { type: 'slideshow',    label: 'Slideshow',       icon: 'layers',       color: secondary },
-  { type: 'story',        label: 'Story',           icon: 'circle',       color: colors.warning },
-  { type: 'announcement', label: 'Announcement',    icon: 'bell',         color: colors.success },
-  { type: 'countdown',    label: 'Drop Countdown',  icon: 'clock',        color: '#FBBF24' },
-  { type: 'behind_scenes',label: 'Behind Scenes',   icon: 'camera',       color: secondary },
-  { type: 'poll',         label: 'Poll',            icon: 'bar-chart-2',  color: colors.subtle },
 ];
+
+function formatScheduledDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
 
 function statusColor(s: ContentStatus, colors: ReturnType<typeof useColors>): string {
   switch (s) {
@@ -52,9 +53,7 @@ export default function ContentScreen() {
   const colors = useColors();
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const contentTypes = React.useMemo(() => getContentTypes(colors.primary, colors.info, colors), [colors]);
-  const insets  = useSafeAreaInsets();
   const router  = useRouter();
-  const topPad  = Platform.OS === 'web' ? 20 : insets.top;
 
   // Read optional tab query param (e.g. from /content?tab=draft)
   const params  = useLocalSearchParams<{ tab?: string }>();
@@ -76,8 +75,6 @@ export default function ContentScreen() {
   const [content, setContent] = useState<ContentPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
-
-  function back() { router.back(); }
 
   const loadContent = useCallback(async () => {
     setLoading(true);
@@ -194,153 +191,170 @@ export default function ContentScreen() {
     ]);
   }
 
+  const tabLabel = tab === 'all' ? '' : `${tab} `;
+
   return (
-    <View style={[s.root, { paddingTop: topPad }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity style={s.backBtn} onPress={back}>
-        <Feather name="arrow-left" size={20} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={s.title}>Content</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <TouchableOpacity
-            style={s.analyticsBtn}
-            onPress={() => router.push('/(tabs)/analytics' as never)}
-            activeOpacity={0.8}
-          >
-            <Feather name="bar-chart-2" size={17} color={colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.createBtn, { backgroundColor: colors.primary }]}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/create-post' as never); }}
-            activeOpacity={0.85}
-          >
-             <Feather name="plus" size={15} color={colors.primaryForeground} />
-            <Text style={s.createText}>Create</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+    <View style={[s.root, { backgroundColor: colors.background }]}>
+      <Header
+        title="Content"
+        actions={[
+          { icon: 'bar-chart-2', onPress: () => router.push('/(tabs)/analytics' as never), accessibilityLabel: 'View analytics' },
+          {
+            icon: 'plus',
+            onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/create-post' as never); },
+            accessibilityLabel: 'Create a new post',
+          },
+        ]}
+      />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-        {/* Stats strip */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
-          <View style={s.statsRow}>
-            {[
-               { label: 'Published',  value: stats.published, color: colors.success },
-               { label: 'Scheduled',  value: stats.scheduled, color: colors.info },
-               { label: 'Drafts',     value: stats.drafts, color: colors.warning },
-               { label: 'Archived',   value: stats.archived, color: colors.mutedForeground },
-            ].map(item => (
-              <View key={item.label} style={s.statCard}>
-                <Text style={[s.statValue, { color: item.color }]}>{item.value}</Text>
-                <Text style={s.statLabel}>{item.label}</Text>
-              </View>
-            ))}
-          </View>
-        </ScrollView>
-
-        {/* Create options */}
-        {(
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>Create new</Text>
-            <View style={s.typeGrid}>
-              {contentTypes.map(ct => (
-                <TouchableOpacity
-                  key={ct.type}
-                  style={s.typeCard}
-                  onPress={() => createPost(ct.type)}
-                  activeOpacity={0.8}
-                >
-                  <View style={[s.typeIcon, { backgroundColor: ct.color + '20' }]}>
-                    <Feather name={ct.icon} size={18} color={ct.color} />
-                  </View>
-                  <Text style={s.typeLabel}>{ct.label}</Text>
-                </TouchableOpacity>
-              ))}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
+        {/* Overview stats */}
+        <View style={s.statsRow}>
+          {[
+            { label: 'Published', value: stats.published, color: colors.success },
+            { label: 'Scheduled', value: stats.scheduled, color: colors.info },
+            { label: 'Drafts',    value: stats.drafts,    color: colors.warning },
+            { label: 'Archived',  value: stats.archived,  color: colors.mutedForeground },
+          ].map(item => (
+            <View key={item.label} style={[s.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[s.statValue, { color: item.color }]}>{item.value}</Text>
+              <Text style={[s.statLabel, { color: colors.mutedForeground }]}>{item.label}</Text>
             </View>
-          </View>
-        )}
-
-        {/* Filter tabs */}
-        <View style={s.filterRow}>
-          {(['all', 'published', 'scheduled', 'draft', 'archived'] as FilterTab[]).map(t => (
-            <TouchableOpacity
-              key={t}
-              style={[s.filterTab, tab === t && [s.filterTabActive, { backgroundColor: colors.accent, borderColor: colors.primary }]]}
-              onPress={() => { setTab(t); Haptics.selectionAsync(); }}
-              activeOpacity={0.8}
-            >
-              <Text style={[s.filterText, tab === t && [s.filterTextActive, { color: colors.primary }]]}>
-                {t.charAt(0).toUpperCase() + t.slice(1)}
-              </Text>
-            </TouchableOpacity>
           ))}
         </View>
 
-        {/* Content library */}
+        {/* Create new */}
         <View style={s.section}>
-          <Text style={s.sectionTitle}>Content library</Text>
+          <Text style={[s.sectionTitle, { color: colors.foreground }]}>Create new</Text>
+          <View style={s.typeGrid}>
+            {contentTypes.map(ct => (
+              <TouchableOpacity
+                key={ct.type}
+                style={[s.typeCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => createPost(ct.type)}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={`Create a ${ct.label}`}
+              >
+                <View style={[s.typeIcon, { backgroundColor: ct.color + '20' }]}>
+                  <Feather name={ct.icon} size={ICON.md} color={ct.color} />
+                </View>
+                <Text style={[s.typeLabel, { color: colors.foreground }]}>{ct.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Content library */}
+        <View style={[s.section, s.librarySection]}>
+          <View style={s.libraryHeaderRow}>
+            <Text style={[s.sectionTitle, { color: colors.foreground, marginBottom: 0 }]}>Content library</Text>
+            <Text style={[s.libraryCount, { color: colors.mutedForeground }]}>
+              {posts.length} {posts.length === 1 ? 'post' : 'posts'}
+            </Text>
+          </View>
+
+          {/* Filter tabs */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={s.filterScroll}
+            contentContainerStyle={s.filterRow}
+          >
+            {VALID_TABS.map(t => (
+              <TouchableOpacity
+                key={t}
+                style={[
+                  s.filterTab,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                  tab === t && { backgroundColor: colors.accent, borderColor: colors.primary },
+                ]}
+                onPress={() => { setTab(t); Haptics.selectionAsync(); }}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityState={{ selected: tab === t }}
+              >
+                <Text style={[
+                  s.filterText,
+                  { color: colors.mutedForeground },
+                  tab === t && { color: colors.primary, fontFamily: FONT.semibold },
+                ]}>
+                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
           {loading ? (
             <View style={s.loading}>
               <ActivityIndicator color={colors.primary} />
-              <Text style={s.loadingText}>Loading your content…</Text>
+              <Text style={[s.loadingText, { color: colors.mutedForeground }]}>Loading your content…</Text>
             </View>
           ) : posts.length === 0 ? (
             <View style={s.empty}>
-               <Feather name="video" size={32} color={colors.mutedForeground} />
-              <Text style={s.emptyTitle}>No {tab === 'all' ? '' : tab} posts yet</Text>
-              <Text style={s.emptyDesc}>Create content to engage your audience.</Text>
+              <View style={[s.emptyIconWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Feather name="video" size={ICON.lg} color={colors.mutedForeground} />
+              </View>
+              <Text style={[s.emptyTitle, { color: colors.foreground }]}>No {tabLabel}posts yet</Text>
+              <Text style={[s.emptyDesc, { color: colors.mutedForeground }]}>Create content to engage your audience.</Text>
             </View>
           ) : (
-            posts.map(post => (
-              <TouchableOpacity
-                key={post.id}
-                style={s.postCard}
-                activeOpacity={0.82}
-                onPress={() => router.push(('/post-analytics?id=' + encodeURIComponent(post.id)) as never)}
-              >
-                <View style={s.postThumb}>
-                     <Feather name={typeIcon(post.type)} size={20} color={colors.mutedForeground} />
-                </View>
-                <View style={{ flex: 1, gap: 4 }}>
-                  <View style={s.postTopRow}>
-                     <View style={[s.statusBadge, { backgroundColor: statusColor(post.status, colors) + '22', borderColor: statusColor(post.status, colors) + '44' }]}>
-                       <Text style={[s.statusText, { color: statusColor(post.status, colors) }]}>
-                        {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
-                      </Text>
-                    </View>
-                    <Text style={s.postType}>{post.type.replace('_', ' ')}</Text>
-                  </View>
-                  <Text style={s.postCaption} numberOfLines={2}>{post.caption}</Text>
-                  {post.status === 'published' && (
-                    <View style={s.postMetrics}>
-                      <View style={s.metric}>
-                         <Feather name="heart"  size={11} color={colors.mutedForeground} />
-                        <Text style={s.metricText}>{post.likes.toLocaleString()}</Text>
-                      </View>
-                      <View style={s.metric}>
-                         <Feather name="message-circle" size={11} color={colors.mutedForeground} />
-                        <Text style={s.metricText}>{post.comments}</Text>
-                      </View>
-                    </View>
-                  )}
-                  {post.status === 'scheduled' && post.scheduledFor && (
-                    <Text style={s.scheduledText}>Scheduled: {post.scheduledFor}</Text>
-                  )}
-                </View>
+            <View style={s.postList}>
+              {posts.map(post => (
                 <TouchableOpacity
-                  style={s.moreBtn}
-                  onPress={() => openPostActions(post)}
-                  disabled={deletingPostId === post.id}
+                  key={post.id}
+                  style={[s.postCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  activeOpacity={0.82}
+                  onPress={() => router.push(('/post-analytics?id=' + encodeURIComponent(post.id)) as never)}
                   accessibilityRole="button"
-                  accessibilityLabel="Manage post"
+                  accessibilityLabel={post.caption || 'Untitled post'}
                 >
-                  {deletingPostId === post.id
-                     ? <ActivityIndicator size="small" color={colors.mutedForeground} />
-                     : <Feather name="more-horizontal" size={16} color={colors.mutedForeground} />}
+                  <View style={[s.postThumb, { backgroundColor: colors.elevated }]}>
+                    <Feather name={typeIcon(post.type)} size={ICON.md} color={colors.mutedForeground} />
+                  </View>
+                  <View style={s.postBody}>
+                    <View style={s.postTopRow}>
+                      <View style={[
+                        s.statusBadge,
+                        { backgroundColor: statusColor(post.status, colors) + '22', borderColor: statusColor(post.status, colors) + '44' },
+                      ]}>
+                        <Text style={[s.statusText, { color: statusColor(post.status, colors) }]}>
+                          {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
+                        </Text>
+                      </View>
+                      <Text style={[s.postType, { color: colors.mutedForeground }]}>{post.type.replace('_', ' ')}</Text>
+                    </View>
+                    <Text style={[s.postCaption, { color: colors.foreground }]} numberOfLines={2}>{post.caption}</Text>
+                    {post.status === 'published' && (
+                      <View style={s.postMetrics}>
+                        <View style={s.metric}>
+                          <Feather name="heart" size={ICON.xs - 3} color={colors.mutedForeground} />
+                          <Text style={[s.metricText, { color: colors.mutedForeground }]}>{post.likes.toLocaleString()}</Text>
+                        </View>
+                        <View style={s.metric}>
+                          <Feather name="message-circle" size={ICON.xs - 3} color={colors.mutedForeground} />
+                          <Text style={[s.metricText, { color: colors.mutedForeground }]}>{post.comments}</Text>
+                        </View>
+                      </View>
+                    )}
+                    {post.status === 'scheduled' && post.scheduledFor && (
+                      <Text style={[s.scheduledText, { color: colors.info }]}>Goes live {formatScheduledDate(post.scheduledFor)}</Text>
+                    )}
+                  </View>
+                  <TouchableOpacity
+                    style={s.moreBtn}
+                    onPress={() => openPostActions(post)}
+                    disabled={deletingPostId === post.id}
+                    accessibilityRole="button"
+                    accessibilityLabel="Manage post"
+                  >
+                    {deletingPostId === post.id
+                      ? <ActivityIndicator size="small" color={colors.mutedForeground} />
+                      : <Feather name="more-horizontal" size={ICON.sm} color={colors.mutedForeground} />}
+                  </TouchableOpacity>
                 </TouchableOpacity>
-              </TouchableOpacity>
-            ))
+              ))}
+            </View>
           )}
         </View>
       </ScrollView>
@@ -350,44 +364,61 @@ export default function ContentScreen() {
 }
 
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
-  root:    { flex: 1, backgroundColor: colors.background },
-  header:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
-  backBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-  title:   { flex: 1, fontSize: 22, fontFamily: 'Inter_700Bold', color: colors.text },
-  analyticsBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-  createBtn:{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.success, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9 },
-  createText:{ fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primaryForeground },
-  statsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 12 },
-  statCard: { backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 16, paddingVertical: 10, alignItems: 'center', minWidth: 84 },
-  statValue:{ fontSize: 20, fontFamily: 'Inter_700Bold' },
-  statLabel:{ fontSize: FS.xs, fontFamily: 'Inter_500Medium', color: colors.mutedForeground, marginTop: 2 },
-  section:  { paddingHorizontal: 16, marginTop: 16 },
-  sectionTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.text, marginBottom: 12 },
-  typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  typeCard: { width: '22.5%', backgroundColor: colors.card, borderRadius: 14, borderWidth: 1, borderColor: colors.border, alignItems: 'center', paddingVertical: 14, gap: 8 },
-  typeIcon: { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  typeLabel:{ fontSize: FS.xs, fontFamily: 'Inter_500Medium', color: colors.mutedForeground, textAlign: 'center' },
-  filterRow:{ flexDirection: 'row', gap: 6, paddingHorizontal: 16, marginTop: 16, marginBottom: 4 },
-  filterTab:{ backgroundColor: colors.card, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: colors.border },
-  filterTabActive: { backgroundColor: colors.accent + '22', borderColor: colors.primary },
-  filterText:{ fontSize: 12, fontFamily: 'Inter_500Medium', color: colors.mutedForeground },
-  filterTextActive: { color: colors.primary },
-  postCard:  { flexDirection: 'row', gap: 12, backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.border, padding: 14, marginBottom: 10 },
-  moreBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', marginRight: -8 },
-  postThumb: { width: 56, height: 56, borderRadius: 12, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
-  postTopRow:{ flexDirection: 'row', alignItems: 'center', gap: 8 },
-  statusBadge:{ borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1 },
-  statusText:{ fontSize: FS.xs, fontFamily: 'Inter_700Bold' },
-  postType:  { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, textTransform: 'capitalize' },
-  postCaption: { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.text, lineHeight: 17 },
-  postMetrics: { flexDirection: 'row', gap: 12 },
-  metric:    { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  metricText:{ fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.mutedForeground },
-  scheduledText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: colors.info },
-  loading: { alignItems: 'center', paddingVertical: 36, gap: 10 },
-  loadingText: { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.mutedForeground },
-  empty:     { alignItems: 'center', paddingVertical: 36, gap: 8 },
-  emptyTitle:{ fontSize: 15, fontFamily: 'Inter_600SemiBold', color: colors.text },
-  emptyDesc: { fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.mutedForeground },
-});
+  root: { flex: 1 },
+  scrollContent: { paddingBottom: SP.xxl * 2 },
 
+  // Overview stats
+  statsRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: SP.xs },
+  statCard: {
+    flex: 1, borderRadius: RADIUS.md, borderWidth: 1,
+    paddingVertical: SP.sm + 2, alignItems: 'center', gap: 2,
+  },
+  statValue: { fontSize: FS.lg, fontFamily: FONT.bold },
+  statLabel: { fontSize: FS.xs, fontFamily: FONT.medium },
+
+  // Sections
+  section: { paddingHorizontal: SP.md, marginTop: SP.lg },
+  librarySection: { marginTop: SP.xl },
+  sectionTitle: { fontSize: FS.md, fontFamily: FONT.bold, marginBottom: SP.sm },
+
+  // Create new
+  typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
+  typeCard: {
+    width: '31%', minWidth: 96, borderRadius: RADIUS.md, borderWidth: 1,
+    alignItems: 'center', paddingVertical: SP.md, gap: SP.sm,
+  },
+  typeIcon: { width: 40, height: 40, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
+  typeLabel: { fontSize: FS.xs, fontFamily: FONT.medium, textAlign: 'center' },
+
+  // Content library header + filters
+  libraryHeaderRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: SP.sm },
+  libraryCount: { fontSize: FS.xs, fontFamily: FONT.regular },
+  filterScroll: { flexGrow: 0, marginBottom: SP.md },
+  filterRow: { flexDirection: 'row', gap: SP.xs },
+  filterTab: { borderRadius: RADIUS.pill, paddingHorizontal: SP.md, paddingVertical: SP.xs + 2, borderWidth: 1 },
+  filterText: { fontSize: FS.sm, fontFamily: FONT.medium },
+
+  // Post cards
+  postList: { gap: SP.sm },
+  postCard: { flexDirection: 'row', gap: SP.sm + 4, borderRadius: RADIUS.lg, borderWidth: 1, padding: SP.sm + 2 },
+  postThumb: { width: 56, height: 56, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
+  postBody: { flex: 1, gap: 4 },
+  postTopRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
+  statusBadge: { borderRadius: RADIUS.xs, paddingHorizontal: SP.xs + 3, paddingVertical: 3, borderWidth: 1 },
+  statusText: { fontSize: FS.xs, fontFamily: FONT.bold },
+  postType: { fontSize: FS.xs, fontFamily: FONT.regular, textTransform: 'capitalize' },
+  postCaption: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 17 },
+  postMetrics: { flexDirection: 'row', gap: SP.sm + 4 },
+  metric: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  metricText: { fontSize: FS.xs, fontFamily: FONT.regular },
+  scheduledText: { fontSize: FS.xs, fontFamily: FONT.medium },
+  moreBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', marginRight: -SP.xs },
+
+  // Loading / empty
+  loading: { alignItems: 'center', paddingVertical: SP.xl + SP.md, gap: SP.sm },
+  loadingText: { fontSize: FS.sm, fontFamily: FONT.regular },
+  empty: { alignItems: 'center', paddingVertical: SP.xl + SP.md, gap: SP.sm },
+  emptyIconWrap: { width: 64, height: 64, borderRadius: RADIUS.xxl, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginBottom: SP.xs },
+  emptyTitle: { fontSize: FS.md, fontFamily: FONT.semibold },
+  emptyDesc: { fontSize: FS.sm, fontFamily: FONT.regular },
+});

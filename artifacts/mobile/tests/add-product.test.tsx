@@ -27,6 +27,7 @@ vi.mock('react-native', () => {
   };
 
   return {
+    ActivityIndicator: nativeComponent('ActivityIndicator'),
     Alert: { alert: alertMock },
     Image: nativeComponent('Image'),
     KeyboardAvoidingView: nativeComponent('KeyboardAvoidingView'),
@@ -43,6 +44,42 @@ vi.mock('react-native', () => {
   };
 });
 
+vi.mock('@/components/ui/Button', () => {
+  const React = require('react') as typeof import('react');
+  return {
+    Button: ({ label, onPress, testID }: { label: string; onPress: () => void; testID?: string }) =>
+      React.createElement('Button', { testID, onPress, accessibilityLabel: label }, label),
+    StickyBottomCTA: ({ header }: { header?: React.ReactNode }) =>
+      React.createElement('View', null, header),
+  };
+});
+
+vi.mock('@/components/ui/SuccessSheet', () => {
+  const React = require('react') as typeof import('react');
+  // The real component pulls in BottomSheet -> react-native-reanimated,
+  // which this suite's plain react-native mock doesn't support (no test
+  // here exercises the publish-success sheet's content) — stub it to just
+  // render nothing when hidden and its actions as plain pressables when
+  // visible, so a future test asserting on it can still find them.
+  return {
+    SuccessSheet: ({ visible, title, primaryAction, secondaryAction, testID }: {
+      visible: boolean; title: string;
+      primaryAction: { label: string; onPress: () => void };
+      secondaryAction?: { label: string; onPress: () => void };
+      testID?: string;
+    }) => {
+      if (!visible) return null;
+      return React.createElement('View', { testID }, [
+        React.createElement('Text', { key: 'title' }, title),
+        React.createElement('Button', { key: 'primary', onPress: primaryAction.onPress, accessibilityLabel: primaryAction.label }, primaryAction.label),
+        secondaryAction
+          ? React.createElement('Button', { key: 'secondary', onPress: secondaryAction.onPress, accessibilityLabel: secondaryAction.label }, secondaryAction.label)
+          : null,
+      ]);
+    },
+  };
+});
+
 vi.mock('expo-linear-gradient', () => ({
   LinearGradient: ({ children, ...props }: { children?: React.ReactNode }) =>
     React.createElement('LinearGradient', props, children),
@@ -53,14 +90,36 @@ vi.mock('@expo/vector-icons', () => ({
 }));
 
 vi.mock('expo-haptics', () => ({
-  impactAsync: vi.fn(),
-  selectionAsync: vi.fn(),
-  ImpactFeedbackStyle: { Light: 'light' },
+  impactAsync: vi.fn().mockResolvedValue(undefined),
+  selectionAsync: vi.fn().mockResolvedValue(undefined),
+  notificationAsync: vi.fn().mockResolvedValue(undefined),
+  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium', Heavy: 'heavy' },
+  NotificationFeedbackType: { Success: 'success', Error: 'error', Warning: 'warning' },
 }));
 
 vi.mock('expo-image-picker', () => ({
   launchImageLibraryAsync: vi.fn(),
+  requestMediaLibraryPermissionsAsync: vi.fn(async () => ({ granted: true })),
   MediaTypeOptions: { Images: 'Images' },
+}));
+
+vi.mock('expo-image-manipulator', () => ({
+  manipulateAsync: vi.fn(async () => ({ uri: 'file:///cropped.jpg', width: 100, height: 100, base64: 'abc' })),
+  SaveFormat: { JPEG: 'jpeg' },
+}));
+
+vi.mock('expo-file-system', () => ({
+  File: class FakeFile {
+    uri: string;
+    exists = false;
+    constructor(dirOrUri: string, filename?: string) {
+      this.uri = filename ? `${dirOrUri}/${filename}` : dirOrUri;
+    }
+    write() {}
+    create() {}
+    delete() {}
+  },
+  Paths: { document: 'file:///documents', cache: 'file:///cache' },
 }));
 
 vi.mock('expo-router', () => ({
@@ -120,6 +179,7 @@ vi.mock('@/components/BrandthreadUI', () => {
     ProgressCard: native('ProgressCard'),
     EmptyState: native('EmptyState'),
     GuidedTip: native('GuidedTip'),
+    PressableScale: native('PressableScale'),
     FormInput: ({
       label,
       value,
@@ -152,9 +212,13 @@ vi.mock('@/lib/productUtils', () => ({
     netProfitCents: undefined,
     marginPercent: undefined,
     breakEvenPriceCents: undefined,
+    isOnSale: false,
+    discountPercent: undefined,
+    retailPriceCents: 0,
   })),
   generateVariantCombinations: vi.fn(() => []),
   validateForPublish: vi.fn(() => []),
+  applyBulkEditToVariants: vi.fn((variants: any[]) => variants),
 }));
 
 vi.mock('@/lib/money', () => ({
@@ -207,6 +271,11 @@ describe('AddProduct draft exit protection', () => {
   it('warns after an immediate edit, then skips the warning once that edit is saved', async () => {
     renderer = await renderScreen();
 
+    // The flow now opens on the Photos step — jump to Details to reach the name field.
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'add-product-step-details' }).props.onPress();
+    });
+
     const nameInput = renderer.root.findByProps({ testID: 'product-input-Product name *' });
     await act(async () => {
       nameInput.props.onChangeText('Last-second product edit');
@@ -251,6 +320,10 @@ describe('AddProduct draft exit protection', () => {
 
   it('prevents native back navigation after an immediate edit until the seller chooses to leave', async () => {
     renderer = await renderScreen();
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'add-product-step-details' }).props.onPress();
+    });
 
     const nameInput = renderer.root.findByProps({ testID: 'product-input-Product name *' });
     await act(async () => {

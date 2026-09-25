@@ -11,16 +11,16 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
-import {
-  BG, CARD, BORDER, FG, MUTED, FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@clerk/expo';
+import { Header } from '@/components/layout';
 
 type AccountType = 'seller' | 'buyer';
 
 export default function AccountTypeSettingsScreen() {
   const colors = useColors();
+  const s = React.useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
@@ -99,15 +99,8 @@ export default function AccountTypeSettingsScreen() {
   }
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Feather name="arrow-left" size={22} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Account Type</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <View style={s.root}>
+      <Header title="Account Type" />
 
       {loading ? (
         <View style={s.loadingWrap}>
@@ -176,7 +169,7 @@ export default function AccountTypeSettingsScreen() {
             {saving ? (
               <ActivityIndicator color={colors.primaryForeground} />
             ) : (
-              <Text style={[s.saveBtnText, { color: colors.primaryForeground }, !isDirty && { color: MUTED }]}>
+              <Text style={[s.saveBtnText, { color: colors.primaryForeground }, !isDirty && { color: colors.mutedForeground }]}>
                 {isDirty ? `Switch to ${selectedType ? accountInfo[selectedType].title : ''}` : 'No changes'}
               </Text>
             )}
@@ -191,32 +184,29 @@ export default function AccountTypeSettingsScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   root:        { flex: 1, backgroundColor: 'transparent' },
-  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  headerTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
-  backBtn:     { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  currentBadge:    { flexDirection: 'row', alignItems: 'center', gap: SP.xs, backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, paddingHorizontal: SP.sm, paddingVertical: SP.xs, alignSelf: 'flex-start', marginBottom: SP.md },
-  currentBadgeText:{ fontSize: FS.sm, fontFamily: FONT.semibold },
+  currentBadge:    { flexDirection: 'row', alignItems: 'center', gap: SP.xs, backgroundColor: colors.card, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: colors.border, paddingHorizontal: SP.sm, paddingVertical: SP.xs, alignSelf: 'flex-start', marginBottom: SP.md },
+  currentBadgeText:{ fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.semibold },
 
-  sectionLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SP.sm },
+  sectionLabel: { fontSize: FS.xs, lineHeight: 14, fontFamily: FONT.semibold, color: colors.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SP.sm },
 
-  typeCard:        { backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: SP.md, marginBottom: SP.sm },
+  typeCard:        { backgroundColor: colors.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: colors.border, padding: SP.md, marginBottom: SP.sm },
   typeCardTop:     { flexDirection: 'row', alignItems: 'center' },
   typeIconWrap:    { width: 44, height: 44, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
-  typeTitle:       { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  currentTag:      { fontSize: FS.xs, fontFamily: FONT.medium, marginTop: 2 },
-  radioOuter:      { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  typeTitle:       { fontSize: FS.base, lineHeight: 19, fontFamily: FONT.semibold, color: colors.foreground },
+  currentTag:      { fontSize: FS.xs, lineHeight: 14, fontFamily: FONT.medium, marginTop: 2 },
+  radioOuter:      { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   radioInner:      { width: 10, height: 10, borderRadius: 5 },
   typeCardBullets: { marginTop: SP.sm, gap: 6 },
   bulletRow:       { flexDirection: 'row', alignItems: 'flex-start' },
-  bulletText:      { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, flex: 1 },
+  bulletText:      { fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.regular, color: colors.mutedForeground, flex: 1 },
 
-  saveBtn:        { borderRadius: RADIUS.md, paddingVertical: 14, alignItems: 'center', marginTop: SP.md },
-  saveBtnDisabled:{ backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
-  saveBtnText:    { fontSize: FS.base, fontFamily: FONT.bold },
+  saveBtn:        { borderRadius: RADIUS.md, paddingVertical: 14, alignItems: 'center', marginTop: SP.md, minHeight: 48 },
+  saveBtnDisabled:{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+  saveBtnText:    { fontSize: FS.base, lineHeight: 19, fontFamily: FONT.bold },
 
-  disclaimer: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', marginTop: SP.md, lineHeight: 18 },
+  disclaimer: { fontSize: FS.xs, lineHeight: 18, fontFamily: FONT.regular, color: colors.mutedForeground, textAlign: 'center', marginTop: SP.md },
 });

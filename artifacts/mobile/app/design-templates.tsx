@@ -6,6 +6,7 @@ import React, { useState, useMemo } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList,
+  Alert, ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +20,8 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { SearchBar, EmptyState } from '@/components/BrandthreadUI';
+import { createProject } from '@/services/designService';
+import { Header } from '@/components/layout';
 
 // ─── Template data ─────────────────────────────────────────────────────────────
 type TemplateCategory = 'Garments' | 'Social' | 'Product' | 'Packaging';
@@ -74,6 +77,7 @@ export default function DesignTemplatesScreen() {
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<TemplateCategory>('Garments');
+  const [creatingId, setCreatingId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     return TEMPLATES.filter(t => {
@@ -83,24 +87,37 @@ export default function DesignTemplatesScreen() {
     });
   }, [activeCategory, search]);
 
-  function handleUseTemplate(template: DesignTemplate) {
+  function parseDimensions(dims: string): { width: number; height: number } | null {
+    const match = dims.match(/(\d+)\s*[×x]\s*(\d+)/);
+    if (!match) return null;
+    return { width: Number(match[1]), height: Number(match[2]) };
+  }
+
+  async function handleUseTemplate(template: DesignTemplate) {
+    if (creatingId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    if (template.garmentType) {
-      router.push(`/design-garment?garmentType=${template.garmentType}` as any);
-    } else if (template.presetId) {
-      router.push(`/design-canvas?preset=${template.presetId}` as any);
+    setCreatingId(template.id);
+    try {
+      if (template.garmentType) {
+        // Create the project first so "Save Placement" and "Open Editor" in
+        // design-garment have a real projectId, instead of dead-ending.
+        const project = await createProject('garment', template.name, {}, template.garmentType as any);
+        router.push(`/design-garment?projectId=${project.id}&garmentType=${template.garmentType}` as any);
+      } else if (template.presetId) {
+        const size = parseDimensions(template.dimensions);
+        const project = await createProject('canvas', template.name, size ?? {});
+        router.push(`/design-canvas?id=${project.id}` as any);
+      }
+    } catch {
+      Alert.alert('Couldn’t create project', 'Try again.');
+    } finally {
+      setCreatingId(null);
     }
   }
 
   return (
     <View style={ts.root}>
-      {/* ── TOP BAR ── */}
-      <View style={[ts.topBar, { paddingTop: insets.top + 4 }]}>
-        <TouchableOpacity style={ts.backBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={ts.topTitle}>Templates</Text>
-      </View>
+      <Header title="Templates" />
 
       {/* ── SEARCH ── */}
       <View style={ts.searchWrap}>
@@ -157,7 +174,6 @@ export default function DesignTemplatesScreen() {
                     size={ICON.xl}
                     color="rgba(255,255,255,0.6)"
                   />
-                  <Text style={ts.thumbnailLabel}>{item.subcategory.toUpperCase()}</Text>
                 </View>
               </LinearGradient>
 
@@ -170,8 +186,17 @@ export default function DesignTemplatesScreen() {
               </View>
 
               {/* Use button */}
-              <TouchableOpacity style={ts.useBtn} onPress={() => handleUseTemplate(item)} activeOpacity={0.8}>
-                <Text style={ts.useBtnText}>Use Template</Text>
+              <TouchableOpacity
+                style={ts.useBtn}
+                onPress={() => handleUseTemplate(item)}
+                activeOpacity={0.8}
+                disabled={creatingId === item.id}
+              >
+                {creatingId === item.id ? (
+                  <ActivityIndicator size="small" color={PURPLE_LIGHT} />
+                ) : (
+                  <Text style={ts.useBtnText}>Use Template</Text>
+                )}
               </TouchableOpacity>
             </View>
           )}
@@ -185,10 +210,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const { accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
   return StyleSheet.create({
   root:          { flex: 1, backgroundColor: 'transparent' },
-  topBar:        { flexDirection: 'row', alignItems: 'center', backgroundColor: SURFACE, borderBottomWidth: 1, borderBottomColor: BORDER, paddingHorizontal: SP.md, paddingBottom: SP.sm, gap: SP.sm },
-  backBtn:       { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  topTitle:      { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, letterSpacing: -0.3 },
-
   searchWrap:    { paddingHorizontal: SP.md, paddingVertical: SP.sm },
 
   tabsScroll:    { flexGrow: 0 },

@@ -1,10 +1,11 @@
-import { pgTable, uuid, text, integer, timestamp, date, json, boolean, primaryKey, index, numeric, unique, uniqueIndex, foreignKey } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, timestamp, date, json, jsonb, boolean, primaryKey, index, numeric, unique, uniqueIndex, foreignKey } from 'drizzle-orm/pg-core';
 export * from './manufacturers';
 export * from './freelancers';
 export * from './subscriptionEntitlements';
 export * from './security';
 export * from './money';
-import { manufacturers } from './manufacturers';
+export * from './threadCash';
+import { manufacturers, sellerRfqs } from './manufacturers';
 import { relations, sql } from 'drizzle-orm';
 
 // ─── Users (brand team members + buyers, linked to Clerk) ─────────────────────
@@ -30,6 +31,8 @@ export const users = pgTable('users', {
   referredByCode: text('referred_by_code'),       // code used when this user signed up
   // DM privacy: 'requests' (default) | 'followers_only'
   dmPrivacy:      text('dm_privacy').notNull().default('requests'),
+  // Buyer onboarding style picks (cold start for the For You ranking pipeline).
+  buyerStyleInterests: jsonb('buyer_style_interests').$type<string[]>().notNull().default([]),
   // Brand onboarding fields (seller side)
   brandName: text('brand_name'),
   brandType: text('brand_type'),
@@ -63,8 +66,22 @@ export const users = pgTable('users', {
   policyRestricted:             boolean('policy_restricted').notNull().default(false),
   returnPolicy:       text('return_policy'),
   cancellationPolicy: text('cancellation_policy'),
+  // ISO-3166 alpha-2 country the seller ships from. Used to resolve which
+  // shipping zone is "domestic" for that seller (see shippingZones).
+  sellerShipFromCountry: text('seller_ship_from_country').notNull().default('US'),
   // Public profile link (bio website)
   website: text('website'),
+  // Seller storefront metadata (Edit Profile — Store Details section)
+  category:     text('category'),
+  tags:         json('tags').$type<string[]>().notNull().default([]),
+  location:     text('location'),
+  socialLinks:  json('social_links').$type<Record<string, string>>().notNull().default({}),
+  contactEmail: text('contact_email'),
+  // Seller-uploaded storefront logo / banner. Same object-storage-path pattern
+  // as profileImageUrl — resolved to a signed URL on read, never overwritten
+  // by a later Clerk sync.
+  logoUrl:   text('logo_url'),
+  bannerUrl: text('banner_url'),
   // Unique @handle (letters, numbers, underscores; 3–30 chars). Nullable so
   // existing rows are unaffected; the DB-level unique index enforces platform-wide uniqueness.
   username: text('username').unique(),
@@ -80,6 +97,15 @@ export const users = pgTable('users', {
     .notNull()
     .default({}),
   notificationDigest: text('notification_digest').notNull().default('realtime'),
+  // Master push kill switch. false suppresses push sends for every category
+  // while leaving the in-app notification feed and per-category prefs intact.
+  pushEnabled: boolean('push_enabled').notNull().default(true),
+  // Quiet hours: local wall-clock "HH:MM" strings evaluated in quietHoursTimezone.
+  // A push falling inside the window is suppressed (feed row still written);
+  // null start/end means quiet hours are off.
+  quietHoursStart:    text('quiet_hours_start'),
+  quietHoursEnd:       text('quiet_hours_end'),
+  quietHoursTimezone: text('quiet_hours_timezone').notNull().default('UTC'),
   // A tombstone is retained after an account erasure request.  Keeping the
   // Clerk subject prevents a delayed client sync from creating a fresh profile.
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
@@ -194,6 +220,10 @@ export const productVariants = pgTable('product_variants', {
   priceCents: integer('price_cents').notNull(),
   stock: integer('stock').notNull().default(0),
   lowStockThreshold: integer('low_stock_threshold').notNull().default(10),
+  // Used to resolve weight-tiered shipping zone rates at checkout (see
+  // shippingZones). 0 = unknown/unset, which weight-tiered zones treat as
+  // falling into their lowest tier.
+  weightGrams: integer('weight_grams').notNull().default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -232,6 +262,15 @@ export const drops = pgTable('drops', {
   releaseAt: timestamp('release_at'),             // when the drop goes live to buyers (countdown)
   endsAt: timestamp('ends_at', { withTimezone: true }),
   scheduledBroadcastAt: timestamp('scheduled_broadcast_at'), // when the follower notification should be sent
+  // ── Cinematic launch page (buyer-facing) ─────────────────────────────────
+  heroImageUrl: text('hero_image_url'),
+  heroVideoUrl: text('hero_video_url'),
+  // IANA tz name the seller picked the launch time in, e.g. 'America/New_York'.
+  // releaseAt itself is always stored/compared in UTC; this is display-only.
+  launchTimezone: text('launch_timezone').notNull().default('UTC'),
+  // Minutes before releaseAt that followers of this seller may buy/see the
+  // drop unlock. 0 = no early access. Checked server-side in checkoutPlan.ts.
+  earlyAccessMinutes: integer('early_access_minutes').notNull().default(0),
   estimatedShipDate: timestamp('estimated_ship_date'),
   totalCollectedCents: integer('total_collected_cents').notNull().default(0),
   orderCount: integer('order_count').notNull().default(0),
@@ -298,6 +337,10 @@ export const orders = pgTable('orders', {
   // Fulfillment timestamps
   packedAt:  timestamp('packed_at'),
   shippedAt: timestamp('shipped_at'),
+  // Seller packing-checklist state for the fulfillment wizard (mobile
+  // Fulfillment.isPicked/isPacked). Not a money-path field.
+  fulfillmentPicked: boolean('fulfillment_picked').notNull().default(false),
+  fulfillmentPacked: boolean('fulfillment_packed').notNull().default(false),
   // Discount code applied at checkout
   discountCode:        text('discount_code'),
   discountAmountCents: integer('discount_amount_cents').notNull().default(0),
@@ -370,9 +413,9 @@ export const posts = pgTable('posts', {
   thumbnailUrl: text('thumbnail_url'),
   mediaUrls: json('media_urls').$type<string[]>().notNull().default([]),
   /** Ordered object storage paths for each composed slideshow slide (empty for video/photo) */
-  mediaPaths: json('media_paths').$type<string[]>().notNull().default([]),
+  mediaPaths: jsonb('media_paths').$type<string[]>().notNull().default([]),
   /** Per-slide overlay metadata. Each entry: { slideIndex, overlays: TextOverlay[] } */
-  slideOverlays: json('slide_overlays').$type<Array<{
+  slideOverlays: jsonb('slide_overlays').$type<Array<{
     slideIndex: number;
     overlays: Array<{
       id: string; text: string; x: number; y: number;
@@ -413,7 +456,14 @@ export const posts = pgTable('posts', {
   publishedAt: timestamp('published_at', { withTimezone: true }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  userCreatedPublishedIdx: index('posts_user_created_published_idx')
+    .on(table.userId, table.createdAt)
+    .where(sql`${table.postStatus} = 'published'`),
+  createdPublishedIdx: index('posts_created_published_idx')
+    .on(table.createdAt)
+    .where(sql`${table.postStatus} = 'published'`),
+}));
 
 // ─── Interactions ─────────────────────────────────────────────────────────────
 
@@ -421,11 +471,22 @@ export const interactions = pgTable('interactions', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: text('user_id').notNull(),   // Clerk user ID of actor
   postId: uuid('post_id').references(() => posts.id, { onDelete: 'cascade' }),
-  type: text('type').notNull(),        // 'like' | 'comment' | 'follow' | 'watch_time'
+  // 'like' | 'comment' | 'follow' | 'watch_time' | 'view' | 'repost' | 'share' |
+  // 'shop_click' | 'add_to_bag' | 'rewatch' | 'skip' | 'not_interested'
+  type: text('type').notNull(),
   value: text('value'),               // e.g. comment text, seconds watched, followed user ID
+  // Client-supplied idempotency key for batched event ingestion
+  // (POST /api/feed/events). Null for interactions recorded elsewhere.
+  clientEventId: text('client_event_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   postIdx: index('interactions_post_id_idx').on(table.postId),
+  postTypeIdx: index('interactions_post_type_idx').on(table.postId, table.type),
+  userCreatedIdx: index('interactions_user_created_idx').on(table.userId, table.createdAt),
+  userTypeCreatedIdx: index('interactions_user_type_created_idx').on(table.userId, table.type, table.createdAt),
+  userClientEventUnique: uniqueIndex('interactions_user_client_event_unique')
+    .on(table.userId, table.clientEventId)
+    .where(sql`${table.clientEventId} IS NOT NULL`),
 }));
 
 // ─── Checkout Sessions (server-side cart record for Stripe webhook reconstruction)
@@ -465,6 +526,10 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   // The paid-order webhook consumes it atomically with order creation.
   loyaltyToken: text('loyalty_token'),
   loyaltyDiscountCents: integer('loyalty_discount_cents').notNull().default(0),
+  // Seller discount code reserved for this session; consumed atomically with
+  // order creation by the paid-order webhook (see lib/discounts.ts).
+  discountCodeId: text('discount_code_id'),
+  discountCodeAmountCents: integer('discount_code_amount_cents').notNull().default(0),
   // Money decisions fixed when the Stripe session was created.
   chargeModel: text('charge_model'),        // 'destination' | 'held'
   dropId: uuid('drop_id'),                  // server-derived from the products
@@ -519,6 +584,13 @@ export const pushTokens = pgTable('push_tokens', {
   userId:    text('user_id').notNull(),
   token:     text('token').notNull().unique(),
   platform:  text('platform').notNull().default('unknown'), // 'ios' | 'android' | 'web'
+  // Set false when Expo's push receipt API reports DeviceNotRegistered (app
+  // uninstalled, token revoked). Inactive tokens are excluded from sends but
+  // kept for audit/debugging rather than deleted outright.
+  isActive:      boolean('is_active').notNull().default(true),
+  lastSeenAt:    timestamp('last_seen_at').defaultNow().notNull(),
+  deactivatedAt: timestamp('deactivated_at'),
+  deactivatedReason: text('deactivated_reason'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -529,6 +601,9 @@ export const sellerQuoteRequests = pgTable('seller_quote_requests', {
   id:               uuid('id').primaryKey().defaultRandom(),
   sellerId:         text('seller_id').notNull(),
   manufacturerId:   uuid('manufacturer_id').notNull().references(() => manufacturers.id, { onDelete: 'cascade' }),
+  // Set when this quote request was fanned out from a broadcast RFQ
+  // (seller_rfqs); null for a direct 1:1 quote/sample request.
+  rfqId:            uuid('rfq_id').references(() => sellerRfqs.id, { onDelete: 'set null' }),
   // 'quote' | 'sample'
   type:             text('type').notNull().default('quote'),
   productName:      text('product_name').notNull(),
@@ -556,6 +631,7 @@ export const sellerQuoteRequests = pgTable('seller_quote_requests', {
 }, (table) => ({
   manufacturerIdx: index('seller_quote_requests_mfr_idx').on(table.manufacturerId),
   sellerIdx: index('seller_quote_requests_seller_idx').on(table.sellerId),
+  rfqIdx: index('seller_quote_requests_rfq_idx').on(table.rfqId),
 }));
 
 // ─── Relations ────────────────────────────────────────────────────────────────
@@ -724,18 +800,67 @@ export const messageReports = pgTable('message_reports', {
   messageIdx: index('message_reports_message_idx').on(table.messageId, table.createdAt),
 }));
 
+// ─── Message reactions ─────────────────────────────────────────────────────────
+// A small fixed reaction bar (no free-form emoji picker). One active reaction
+// per user per message — re-reacting replaces the previous one via the unique
+// constraint below.
+export const messageReactions = pgTable('message_reactions', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  messageId:    uuid('message_id').notNull().references(() => messages.id, { onDelete: 'cascade' }),
+  userId:       text('user_id').notNull(),
+  // 'like' | 'love' | 'haha' | 'wow' | 'sad' | 'fire'
+  reactionType: text('reaction_type').notNull(),
+  createdAt:    timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  messageUserUnique: unique('message_reactions_message_user_unique').on(table.messageId, table.userId),
+  messageIdx:        index('message_reactions_message_idx').on(table.messageId),
+}));
+
+// ─── Saved collections (buyer boards, à la Pinterest) ─────────────────────────
+
+export const savedCollections = pgTable('saved_collections', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  userId:        text('user_id').notNull(),
+  name:          text('name').notNull(),
+  // Explicit override; when null the cover is auto-picked (most-recent item) client-side.
+  coverImageUrl: text('cover_image_url'),
+  isPublic:      boolean('is_public').notNull().default(false),
+  sortOrder:     integer('sort_order').notNull().default(0),
+  createdAt:     timestamp('created_at').defaultNow().notNull(),
+  updatedAt:     timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdx: index('saved_collections_user_id_idx').on(table.userId, table.sortOrder),
+}));
+
 // ─── Saved / wishlisted items ─────────────────────────────────────────────────
 
 export const savedItems = pgTable('saved_items', {
-  id:          uuid('id').primaryKey().defaultRandom(),
-  userId:      text('user_id').notNull(),
-  itemType:    text('item_type').notNull().default('product'),
-  targetId:    text('target_id').notNull(),
-  title:       text('title').notNull().default(''),
-  subtitle:    text('subtitle'),
-  accentColor: text('accent_color'),
-  createdAt:   timestamp('created_at').defaultNow().notNull(),
-});
+  id:           uuid('id').primaryKey().defaultRandom(),
+  userId:       text('user_id').notNull(),
+  itemType:     text('item_type').notNull().default('product'),
+  targetId:     text('target_id').notNull(),
+  title:        text('title').notNull().default(''),
+  subtitle:     text('subtitle'),
+  accentColor:  text('accent_color'),
+  // Nullable — items can live loose in "All" without belonging to a board.
+  collectionId: uuid('collection_id').references(() => savedCollections.id, { onDelete: 'set null' }),
+  // ── Price / stock tracking (product items only) ─────────────────────────
+  // Snapshot of the lowest variant price at save time — the "old price" a
+  // price-drop badge strikes through. Never mutated after save.
+  savedPriceCents:      integer('saved_price_cents'),
+  // Guards re-notifying for the same drop; updated each time a lower price fires a push.
+  lastNotifiedPriceCents: integer('last_notified_price_cents'),
+  // True once the tracking job has observed zero stock — flips back to false
+  // (and fires a "back in stock" push) the next time stock is seen again.
+  wasOutOfStock: boolean('was_out_of_stock').notNull().default(false),
+  // When the back-in-stock transition last fired — badge shows for a window after this.
+  backInStockAt: timestamp('back_in_stock_at'),
+  notifyOnPriceDrop:  boolean('notify_on_price_drop').notNull().default(true),
+  createdAt:    timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  collectionIdx: index('saved_items_collection_id_idx').on(table.collectionId),
+  userTargetUnique: unique('saved_items_user_id_target_id_key').on(table.userId, table.targetId),
+}));
 
 // ─── Server-side cart (full-replace sync model) ───────────────────────────────
 
@@ -767,8 +892,17 @@ export const notificationsFeed = pgTable('notifications_feed', {
   targetId:      text('target_id'),
   targetType:    text('target_type'),
   cta:           text('cta'),
+  // Clerk user ID of whoever caused the event (liker, commenter, follower,
+  // brand). Lets the Activity Center aggregate distinct actors and lets
+  // publishers skip repeat like/unlike toggles from the same person.
+  actorId:       text('actor_id'),
+  // Thumbnail of the related post/product/order. Either an absolute URL or a
+  // private `/objects/…` path that the feed route signs at read time.
+  targetImageUrl: text('target_image_url'),
   createdAt:     timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
+  userCreatedIdx: index('notifications_feed_user_created_idx')
+    .on(table.userId, table.createdAt),
   subscriptionPaymentFailureUnique: uniqueIndex('notifications_feed_subscription_payment_failed_unique')
     .on(table.userId, table.type, table.targetId)
     .where(sql`${table.type} = 'subscription_payment_failed' AND ${table.targetId} IS NOT NULL`),
@@ -778,6 +912,30 @@ export const notificationsFeed = pgTable('notifications_feed', {
   subscriptionTrialDayFourUnique: uniqueIndex('notifications_feed_subscription_trial_day_4_unique')
     .on(table.userId, table.type, table.targetId)
     .where(sql`${table.type} = 'subscription_trial_day_4' AND ${table.targetId} IS NOT NULL`),
+  // A follower hears about a brand's new product once, even if the seller
+  // toggles the listing between draft and active.
+  newProductUnique: uniqueIndex('notifications_feed_new_product_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} = 'new_product' AND ${table.targetId} IS NOT NULL`),
+  dropLiveUnique: uniqueIndex('notifications_feed_drop_live_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} = 'drop_live' AND ${table.targetId} IS NOT NULL`),
+  priceDropUnique: uniqueIndex('notifications_feed_price_drop_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} = 'price_drop' AND ${table.targetId} IS NOT NULL`),
+  backInStockUnique: uniqueIndex('notifications_feed_back_in_stock_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} = 'back_in_stock' AND ${table.targetId} IS NOT NULL`),
+  lowStockUnique: uniqueIndex('notifications_feed_low_stock_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} = 'low_stock' AND ${table.targetId} IS NOT NULL`),
+  // Stripe may redeliver a Connect payout webhook; one alert per payout.
+  payoutSentUnique: uniqueIndex('notifications_feed_payout_sent_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} = 'payout_sent' AND ${table.targetId} IS NOT NULL`),
+  returnStatusUnique: uniqueIndex('notifications_feed_return_status_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} IN ('return_approved', 'return_denied', 'return_refunded', 'return_requested') AND ${table.targetId} IS NOT NULL`),
 }));
 
 export const notificationDeliveries = pgTable('notification_deliveries', {
@@ -793,6 +951,10 @@ export const notificationDeliveries = pgTable('notification_deliveries', {
   queuedAt:           timestamp('queued_at').defaultNow().notNull(),
   sentAt:             timestamp('sent_at'),
   providerResultAt:   timestamp('provider_result_at'),
+  // Set once the Expo push *receipt* (not just the send ticket) has been
+  // checked via /getReceipts. Distinguishes "ticket accepted" from
+  // "device actually reachable" — see reconcilePushReceipts().
+  receiptCheckedAt:   timestamp('receipt_checked_at'),
   createdAt:          timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   notificationTokenUnique: uniqueIndex('notification_deliveries_notification_token_idx')
@@ -814,6 +976,9 @@ export const reviews = pgTable('reviews', {
 }, (table) => ({
   orderIdx: index('reviews_order_id_idx').on(table.orderId),
   productIdx: index('reviews_product_id_idx').on(table.productId),
+  buyerOrderUnique: uniqueIndex('reviews_buyer_order_unique')
+    .on(table.buyerId, table.orderId)
+    .where(sql`${table.orderId} IS NOT NULL`),
 }));
 
 // ─── Shoppable post tagging ────────────────────────────────────────────────────
@@ -843,11 +1008,18 @@ export const stories = pgTable('stories', {
   repliesDisabled:   boolean('replies_disabled').notNull().default(false),
   privacyVisibility: text('privacy_visibility').notNull().default('public'),
   privacyReplyPerm:  text('privacy_reply_perm').notNull().default('everyone'),
+  /** 'visible' | 'held' | 'removed' */
+  moderationStatus:  text('moderation_status').notNull().default('visible'),
+  moderationReason:  text('moderation_reason'),
+  moderatedAt:       timestamp('moderated_at'),
   likesCount:        integer('likes_count').notNull().default(0),
   viewsCount:        integer('views_count').notNull().default(0),
   createdAt:         timestamp('created_at').defaultNow().notNull(),
   expiresAt:         timestamp('expires_at').notNull(),
-});
+}, (t) => ({
+  expiresAtIdx: index('stories_expires_at_idx').on(t.expiresAt),
+  authorIdx:    index('stories_author_idx').on(t.authorId),
+}));
 
 export const storyLikes = pgTable('story_likes', {
   storyId:   uuid('story_id').notNull().references(() => stories.id, { onDelete: 'cascade' }),
@@ -862,7 +1034,8 @@ export const storyViews = pgTable('story_views', {
   userId:   text('user_id').notNull(),
   viewedAt: timestamp('viewed_at').defaultNow().notNull(),
 }, (t) => ({
-  pk: primaryKey({ columns: [t.storyId, t.userId] }),
+  pk:      primaryKey({ columns: [t.storyId, t.userId] }),
+  userIdx: index('story_views_user_idx').on(t.userId),
 }));
 
 // ─── Buyer-to-buyer follows (social graph) ────────────────────────────────────
@@ -882,19 +1055,40 @@ export const discountCodes = pgTable('discount_codes', {
   id:             text('id').primaryKey().default(''),
   sellerId:       text('seller_id').notNull(),
   code:           text('code').notNull(),
-  /** 'percentage' | 'fixed' | 'free_shipping' */
+  /** 'percentage' | 'fixed' | 'free_shipping' | 'free_item' */
   type:           text('type').notNull().default('percentage'),
-  /** Percentage 0-100, or fixed amount in cents */
+  /** Percentage 0-100, or fixed amount in dollars. Unused for free_shipping/free_item. */
   value:          numeric('value', { precision: 10, scale: 2 }).notNull().default('0'),
   minOrderCents:  integer('min_order_cents').notNull().default(0),
   maxUses:        integer('max_uses'),
   usesCount:      integer('uses_count').notNull().default(0),
   expiresAt:      timestamp('expires_at'),
+  /** 'entire_store' | 'specific_products' */
+  appliesTo:      text('applies_to').notNull().default('entire_store'),
+  /** Product ids the code applies to when appliesTo === 'specific_products' */
+  productIds:     jsonb('product_ids').$type<string[]>().notNull().default([]),
+  oneUsePerCustomer: boolean('one_use_per_customer').notNull().default(false),
+  startsAt:       timestamp('starts_at'),
   active:         boolean('active').notNull().default(true),
   createdAt:      timestamp('created_at').defaultNow().notNull(),
 }, (t) => ({
   sellerIdx: index('discount_codes_seller_idx').on(t.sellerId),
   codeIdx:   index('discount_codes_code_idx').on(t.code),
+}));
+
+/** One real redemption of a discount code — enforces one-use-per-customer and audits usage. */
+export const discountCodeUses = pgTable('discount_code_uses', {
+  id:               uuid('id').primaryKey().defaultRandom(),
+  discountCodeId:   text('discount_code_id').notNull(),
+  sellerId:         text('seller_id').notNull(),
+  /** Buyer clerk id, or "guest:<email>" for guest checkout */
+  customerKey:      text('customer_key').notNull(),
+  orderId:          uuid('order_id'),
+  appliedAmountCents: integer('applied_amount_cents').notNull().default(0),
+  usedAt:           timestamp('used_at').defaultNow().notNull(),
+}, (t) => ({
+  codeIdx: index('discount_code_uses_code_idx').on(t.discountCodeId),
+  customerIdx: index('discount_code_uses_customer_idx').on(t.discountCodeId, t.customerKey),
 }));
 
 // ─── Returns ──────────────────────────────────────────────────────────────────
@@ -944,6 +1138,61 @@ export const shippingRates = pgTable('shipping_rates', {
   updatedAt:      timestamp('updated_at').defaultNow().notNull(),
 }, (t) => ({
   sellerIdx: index('shipping_rates_seller_idx').on(t.sellerId),
+}));
+
+// ─── Shipping zones (worldwide shipping settings) ──────────────────────────────
+// Supersedes the single flat-rate `shippingRates` table above with per-zone
+// rules: domestic / named countries / rest-of-world, each either flat-rate or
+// weight-tiered, with its own free-shipping threshold, processing time, and
+// an informational carrier/service label (no live rate shopping). This table
+// is additive — `shippingRates` is kept for backward compatibility and as the
+// fallback when a seller has configured no zones yet.
+export const shippingZones = pgTable('shipping_zones', {
+  id:       text('id').primaryKey().default(''),
+  sellerId: text('seller_id').notNull(),
+  name:     text('name').notNull(),
+  /** 'domestic' | 'country' | 'rest_of_world'. Exactly one 'rest_of_world' zone
+   *  per seller acts as the catch-all; 'domestic' matches the seller's home
+   *  country; 'country' matches the ISO-3166 alpha-2 codes in `countries`. */
+  zoneType: text('zone_type').notNull().default('country'),
+  /** ISO-3166 alpha-2 country codes this zone covers. Empty for 'rest_of_world'
+   *  (matches anything not covered by another zone) and for 'domestic' when
+   *  falling back to the seller's own country. */
+  countries: json('countries').$type<string[]>().notNull().default([]),
+  /** 'flat' | 'weight_tiered'. Weight-tiered rates live in shippingZoneWeightTiers. */
+  pricingModel:  text('pricing_model').notNull().default('flat'),
+  flatRateCents: integer('flat_rate_cents').notNull().default(0),
+  /** Order subtotal (cents) at/above which shipping is free in this zone. NULL = never auto-free. */
+  freeAboveCents: integer('free_above_cents'),
+  /** Business days before the seller ships an order in this zone. */
+  processingDays: integer('processing_days').notNull().default(2),
+  /** Informational label only, e.g. "USPS Priority", "DHL Express" — not a live carrier integration. */
+  carrierLabel: text('carrier_label'),
+  /** Whether this zone ships outside the seller's home country at all. Always true for 'domestic'. */
+  shipsInternationally: boolean('ships_internationally').notNull().default(true),
+  /** 'ddp' (seller/platform prepays duties) | 'dap' (buyer pays duties/customs on delivery). Informational; coordinates with the Taxes settings slice. */
+  dutiesHandling: text('duties_handling').notNull().default('dap'),
+  active:    boolean('active').notNull().default(true),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (t) => ({
+  sellerIdx: index('shipping_zones_seller_idx').on(t.sellerId),
+  sellerActiveOrderIdx: index('shipping_zones_seller_active_order_idx').on(t.sellerId, t.active, t.sortOrder),
+}));
+
+// Weight-based rate brackets for a zone with pricingModel = 'weight_tiered'.
+// Tiers are matched by cart weight in grams; a NULL maxWeightGrams means "and up".
+export const shippingZoneWeightTiers = pgTable('shipping_zone_weight_tiers', {
+  id:             text('id').primaryKey().default(''),
+  zoneId:         text('zone_id').notNull().references(() => shippingZones.id, { onDelete: 'cascade' }),
+  minWeightGrams: integer('min_weight_grams').notNull().default(0),
+  maxWeightGrams: integer('max_weight_grams'),
+  rateCents:      integer('rate_cents').notNull(),
+  sortOrder:      integer('sort_order').notNull().default(0),
+  createdAt:      timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  zoneIdx: index('shipping_zone_weight_tiers_zone_idx').on(t.zoneId, t.sortOrder),
 }));
 
 // ─── Content reports ──────────────────────────────────────────────────────────
@@ -1116,7 +1365,7 @@ export const designStudioProjects = pgTable('design_studio_projects', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   ownerIdx: index('design_studio_projects_owner_id_idx').on(table.ownerId),
-  idOwnerUnique: uniqueIndex('design_studio_projects_id_owner_unique').on(table.id, table.ownerId),
+  idOwnerUnique: unique('design_studio_projects_id_owner_unique').on(table.id, table.ownerId),
 }));
 
 export const designStudioAssets = pgTable('design_studio_assets', {
@@ -1302,6 +1551,96 @@ export const trendingCache = pgTable('trending_cache', {
   itemCount:   integer('item_count').notNull().default(0),
 });
 
+// ─── Seller Ranking Cache (Discover feed) ─────────────────────────────────────
+// Stores the pre-computed daily seller ranking so GET /api/public/discover/feed
+// is a simple cache read rather than an expensive live aggregation. One row
+// per calendar day (UTC). Upserted by the computeSellerRanking job. Shape
+// mirrors trending_cache exactly.
+export const sellerRankingCache = pgTable('seller_ranking_cache', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  computedAt:  timestamp('computed_at').defaultNow().notNull(),
+  cacheDate:   text('cache_date').notNull().unique(),   // 'YYYY-MM-DD' UTC
+  results:     json('results').$type<any[]>().notNull().default([]),
+  itemCount:   integer('item_count').notNull().default(0),
+});
+
+// ─── For You feed (per-user ranking) ──────────────────────────────────────────
+
+/** Incrementally-updated per-user taste vector driving the For You feed. */
+export const buyerTasteProfiles = pgTable('buyer_taste_profiles', {
+  userId:            text('user_id').primaryKey(),
+  categoryAffinity:  jsonb('category_affinity').$type<Record<string, number>>().notNull().default({}),
+  styleTagAffinity:  jsonb('style_tag_affinity').$type<Record<string, number>>().notNull().default({}),
+  sellerAffinity:    jsonb('seller_affinity').$type<Record<string, number>>().notNull().default({}),
+  eventCount:        integer('event_count').notNull().default(0),
+  updatedAt:         timestamp('updated_at').defaultNow().notNull(),
+  createdAt:         timestamp('created_at').defaultNow().notNull(),
+});
+
+/** Short-TTL per-user cache of the last computed For You ranking (mirrors
+ *  trending_cache / seller_ranking_cache's shape, one row per user instead
+ *  of one row per day). */
+export const forYouFeedCache = pgTable('for_you_feed_cache', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  userId:      text('user_id').notNull().unique(),
+  computedAt:  timestamp('computed_at').defaultNow().notNull(),
+  results:     jsonb('results').$type<any[]>().notNull().default([]),
+  itemCount:   integer('item_count').notNull().default(0),
+});
+
+// ─── Search query log ──────────────────────────────────────────────────────────
+
+export const searchLog = pgTable('search_log', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  userId:       text('user_id'),
+  query:        text('query').notNull(),
+  normalized:   text('normalized').notNull(),
+  resultCount:  integer('result_count').notNull().default(0),
+  createdAt:    timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  userCreatedIdx: index('search_log_user_created_idx').on(table.userId, table.createdAt)
+    .where(sql`${table.userId} IS NOT NULL`),
+  normalizedCreatedIdx: index('search_log_normalized_created_idx').on(table.normalized, table.createdAt),
+}));
+
+// ─── Live shopping ─────────────────────────────────────────────────────────────
+
+export const liveStreams = pgTable('live_streams', {
+  id:               uuid('id').primaryKey().defaultRandom(),
+  sellerId:         text('seller_id').notNull(),
+  channelName:      text('channel_name').notNull().unique(),
+  title:            text('title').notNull(),
+  description:      text('description'),
+  status:           text('status').notNull().default('live'), // 'live' | 'ended'
+  productTags:      jsonb('product_tags').$type<any[]>().notNull().default([]),
+  agoraUid:         integer('agora_uid'),
+  thumbnailUrl:     text('thumbnail_url'),
+  viewerCount:      integer('viewer_count').notNull().default(0),
+  peakViewerCount:  integer('peak_viewer_count').notNull().default(0),
+  startedAt:        timestamp('started_at', { withTimezone: true }).defaultNow().notNull(),
+  endedAt:          timestamp('ended_at', { withTimezone: true }),
+  replayPostId:     uuid('replay_post_id').references(() => posts.id, { onDelete: 'set null' }),
+  replayUrl:        text('replay_url'),
+  createdAt:        timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  statusViewerIdx: index('live_streams_status_viewer_idx')
+    .on(table.status, table.viewerCount, table.startedAt)
+    .where(sql`${table.status} = 'live'`),
+  sellerStatusIdx: index('live_streams_seller_status_idx').on(table.sellerId, table.status),
+}));
+
+export const liveComments = pgTable('live_comments', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  streamId:     uuid('stream_id').notNull().references(() => liveStreams.id, { onDelete: 'cascade' }),
+  userId:       text('user_id').notNull(),
+  displayName:  text('display_name').notNull().default('Viewer'),
+  avatarUrl:    text('avatar_url'),
+  message:      text('message').notNull(),
+  createdAt:    timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  streamCreatedIdx: index('live_comments_stream_created_idx').on(table.streamId, table.createdAt),
+}));
+
 // ─── Seller Tax Configuration ─────────────────────────────────────────────────
 export const sellerTaxConfig = pgTable('seller_tax_config', {
   id:                  uuid('id').primaryKey().defaultRandom(),
@@ -1383,6 +1722,32 @@ export const notificationEvents = pgTable('notification_events', {
   notificationIdx: index('notification_events_notification_idx').on(table.notificationId),
 }));
 
+// ─── Notification batch queue ──────────────────────────────────────────────
+// Collapses high-frequency, low-priority events (e.g. product likes) into a
+// single notification per (userId, category, type, targetId) window instead
+// of one push per event. A periodic job flushes rows older than the batch
+// window into one publishNotification() call, then deletes them.
+export const notificationBatchQueue = pgTable('notification_batch_queue', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  userId:     text('user_id').notNull(),
+  category:   text('category').notNull(),
+  type:       text('type').notNull(),
+  targetId:   text('target_id'),
+  targetType: text('target_type'),
+  // Running count of collapsed events and a rolling sample of actor names,
+  // used to compose the eventual "X and 4 others liked your item" copy.
+  count:        integer('count').notNull().default(1),
+  actorNames:   json('actor_names').notNull().default([]).$type<string[]>(),
+  cta:          text('cta'),
+  firstEventAt: timestamp('first_event_at').defaultNow().notNull(),
+  lastEventAt:  timestamp('last_event_at').defaultNow().notNull(),
+  createdAt:    timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  windowUnique: uniqueIndex('notification_batch_queue_window_unique')
+    .on(table.userId, table.category, table.type, table.targetId),
+  firstEventIdx: index('notification_batch_queue_first_event_idx').on(table.firstEventAt),
+}));
+
 export const shippingLabels = pgTable('shipping_labels', {
   id: uuid('id').primaryKey().defaultRandom(),
   orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
@@ -1425,6 +1790,34 @@ export const orderFundReservations = pgTable('order_fund_reservations', {
   labelUnique: uniqueIndex('order_fund_reservations_label_unique').on(table.shippingLabelId),
 }));
 
+// Saved box/parcel presets a seller can reuse across the fulfillment wizard.
+// Units: ounces for weight, inches for dimensions — kept consistent with the
+// shipping-label rate request body (`weight` in lb string, but presets store
+// the finer-grained oz here and the fulfillment screen converts to lb before
+// calling /rates, matching shipping-label.tsx's existing lb-based inputs).
+export const sellerPackagePresets = pgTable('seller_package_presets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerId: text('owner_id').notNull(),
+  name: text('name').notNull(),
+  weightOz: integer('weight_oz').notNull(),
+  lengthIn: numeric('length_in', { precision: 6, scale: 2 }).notNull(),
+  widthIn: numeric('width_in', { precision: 6, scale: 2 }).notNull(),
+  heightIn: numeric('height_in', { precision: 6, scale: 2 }).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  ownerIdx: index('seller_package_presets_owner_idx').on(table.ownerId),
+}));
+
+// Dedup ledger for Shippo tracking webhook deliveries — a delivery's
+// (transaction id + tracking status) pair is claimed once so a retried or
+// duplicate delivery from the carrier is a no-op.
+export const shippoWebhookEvents = pgTable('shippo_webhook_events', {
+  id: text('id').primaryKey(), // `${transactionId}:${status}`
+  orderId: uuid('order_id'),
+  receivedAt: timestamp('received_at').defaultNow().notNull(),
+});
+
 export const sellerCashoutAttempts = pgTable('seller_cashout_attempts', {
   id: uuid('id').primaryKey().defaultRandom(),
   ownerId: text('owner_id').notNull(),
@@ -1460,9 +1853,9 @@ export const adCampaigns = pgTable('ad_campaigns', {
   /** 'video' | 'photos' — never mixed */
   mediaKind:              text('media_kind').notNull().default('photos'),
   /** Ordered object-storage paths (1 video or 1–5 photos) */
-  mediaObjectPaths:       json('media_object_paths').$type<string[]>().notNull().default([]),
+  mediaObjectPaths:       jsonb('media_object_paths').$type<string[]>().notNull().default([]),
   /** Parallel MIME type array aligned with mediaObjectPaths */
-  mediaMimeTypes:         json('media_mime_types').$type<string[]>().notNull().default([]),
+  mediaMimeTypes:         jsonb('media_mime_types').$type<string[]>().notNull().default([]),
 
   // ── Details ───────────────────────────────────────────────────────────────
   headline:               text('headline'),
@@ -1476,7 +1869,7 @@ export const adCampaigns = pgTable('ad_campaigns', {
 
   // ── Formats ────────────────────────────────────────────────────────────────
   /** JSON array of format keys: 'story_9x16' | 'square_1x1' | 'portrait_4x5' | 'landscape_16x9' */
-  formats:                json('formats').$type<string[]>().notNull().default([]),
+  formats:                jsonb('formats').$type<string[]>().notNull().default([]),
 
   // ── Budget / Duration / Reach ─────────────────────────────────────────────
   /** Integer cents: $5 (500) – $1000 (100000) */

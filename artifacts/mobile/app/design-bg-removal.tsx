@@ -30,12 +30,15 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE, BORDER_SUBTLE,
   FG, MUTED, SUBTLE,
+  RED, RED_DIM, ORANGE, ORANGE_DIM,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
-  saveResult, getResults, deleteResult, isLocalFileAvailable,
+  saveResult, getResults, deleteResult, isLocalFileAvailable, updateResultPixels,
   type BgRemovalResult,
 } from '@/services/bgRemovalService';
+import BgRefineCanvas from '@/components/design/BgRefineCanvas';
+import Checkerboard from '@/components/design/Checkerboard';
 import {
   createBrandAsset,
 } from '@/services/designService';
@@ -328,6 +331,21 @@ function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => voi
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
 
+  /** Bakes an erase/restore brush edit into the saved result file in place. */
+  async function handleApplyRefine(dataUri: string) {
+    if (!result) return;
+    const b64 = dataUri.replace(/^data:image\/png;base64,/, '');
+    const updated = await updateResultPixels(result.id, b64);
+    if (updated) {
+      setResult(updated);
+      setInMemoryB64(b64);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await loadRecent();
+    } else {
+      Alert.alert('Could not apply edit', 'Please try again.');
+    }
+  }
+
   // ── Integrations ───────────────────────────────────────────────────────────
 
   /** Display URI — prefer in-memory b64 for this session, fall back to local path */
@@ -571,39 +589,54 @@ function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => voi
         {/* ── SOURCE SELECTED (before or after processing) ── */}
         {source && (
           <View style={s.compareSection}>
-            <View style={s.compareRow}>
-              {/* Original */}
-              <View style={s.compareCol}>
-                <Text style={s.compareLabel}>ORIGINAL</Text>
-                <View style={[s.compareFrame, { backgroundColor: SURFACE, borderColor: BORDER }]}>
-                  <Image source={{ uri: source.uri }} style={s.compareImg} resizeMode="contain" />
-                </View>
+            {phase === 'result' && resultDisplayUri ? (
+              <View style={{ alignItems: 'center' }}>
+                <BgRefineCanvas
+                  originalUri={source.uri}
+                  cutoutUri={resultDisplayUri}
+                  size={SW - SP.lg * 2}
+                  checkerboardStyle={{ borderWidth: 1, borderColor: PURPLE }}
+                  accent={PURPLE}
+                  mutedColor={MUTED}
+                  fgColor={FG}
+                  cardColor={CARD}
+                  borderColor={BORDER}
+                  onExport={handleApplyRefine}
+                />
               </View>
+            ) : (
+              <View style={s.compareRow}>
+                {/* Original */}
+                <View style={s.compareCol}>
+                  <Text style={s.compareLabel}>ORIGINAL</Text>
+                  <View style={[s.compareFrame, { backgroundColor: SURFACE, borderColor: BORDER }]}>
+                    <Image source={{ uri: source.uri }} style={s.compareImg} resizeMode="contain" />
+                  </View>
+                </View>
 
-              {/* Result / Processing / Empty */}
-              <View style={s.compareCol}>
-                <Text style={s.compareLabel}>CUTOUT</Text>
-                <View style={[s.compareFrame, s.checkerboard, { borderColor: phase === 'result' ? PURPLE : BORDER }]}>
-                  {phase === 'processing' && (
-                    <View style={s.processingOverlay}>
-                      <ActivityIndicator size="large" color={PURPLE} />
-                      <Text style={s.processingText}>Removing…</Text>
-                    </View>
-                  )}
-                  {phase === 'error' && (
-                    <View style={s.errorOverlay}>
-                      <Feather name="alert-circle" size={28} color="#EF4444" />
-                    </View>
-                  )}
-                  {phase === 'result' && resultDisplayUri && (
-                    <Image source={{ uri: resultDisplayUri }} style={s.compareImg} resizeMode="contain" />
-                  )}
-                  {phase === 'pick' && (
-                    <Feather name="image" size={24} color={MUTED} />
-                  )}
+                {/* Result / Processing / Empty */}
+                <View style={s.compareCol}>
+                  <Text style={s.compareLabel}>CUTOUT</Text>
+                  <View style={[s.compareFrame, { borderColor: BORDER, overflow: 'hidden' }]}>
+                    {phase === 'processing' && <Checkerboard />}
+                    {phase === 'processing' && (
+                      <View style={s.processingOverlay}>
+                        <ActivityIndicator size="large" color={PURPLE} />
+                        <Text style={s.processingText}>Removing…</Text>
+                      </View>
+                    )}
+                    {phase === 'error' && (
+                      <View style={s.errorOverlay}>
+                        <Feather name="alert-circle" size={28} color={RED} />
+                      </View>
+                    )}
+                    {phase === 'pick' && (
+                      <Feather name="image" size={24} color={MUTED} />
+                    )}
+                  </View>
                 </View>
               </View>
-            </View>
+            )}
 
             {/* File info */}
             <Text style={s.fileInfo}>
@@ -636,7 +669,7 @@ function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => voi
               {phase === 'error' && error && (
                 <>
                   <View style={s.errorBox}>
-                    <Feather name="alert-circle" size={16} color="#EF4444" />
+                    <Feather name="alert-circle" size={16} color={RED} />
                     <Text style={s.errorText}>{error.message}</Text>
                   </View>
                   {error.retryable && (
@@ -706,7 +739,7 @@ function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => voi
         {/* Dev status banner if API URL not set */}
         {!BASE_URL && (
           <View style={s.devBanner}>
-            <Feather name="alert-triangle" size={14} color="#F59E0B" />
+            <Feather name="alert-triangle" size={14} color={ORANGE} />
             <Text style={s.devBannerText}>
               {'[DEV] EXPO_PUBLIC_API_BASE_URL is not set — API calls will fail.'}
             </Text>
@@ -779,7 +812,8 @@ function RecentResultRow({
   const s = createStyles(useAppTheme().theme);
   return (
     <TouchableOpacity style={s.recentRow} onPress={onSelect} activeOpacity={0.85}>
-      <View style={[s.recentThumbWrap, s.checkerboard]}>
+      <View style={s.recentThumbWrap}>
+        <Checkerboard />
         <Image source={{ uri: result.localPath }} style={s.recentThumb} resizeMode="contain" />
       </View>
       <View style={s.recentInfo}>
@@ -853,8 +887,8 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   ghostBtnText:     { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
 
   // Error
-  errorBox:         { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: RADIUS.sm, padding: SP.md, borderWidth: 1, borderColor: 'rgba(239,68,68,0.25)' },
-  errorText:        { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: '#EF4444', lineHeight: 18 },
+  errorBox:         { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, backgroundColor: RED_DIM, borderRadius: RADIUS.sm, padding: SP.md, borderWidth: 1, borderColor: RED_DIM },
+  errorText:        { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: RED, lineHeight: 18 },
 
   // Integration grid
   sectionLabel:     { fontSize: FS.xs, fontFamily: FONT.bold, color: MUTED, letterSpacing: 0.8, marginTop: SP.xs },
@@ -875,8 +909,8 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   recentDelete:     { padding: SP.sm },
 
   // Dev banner
-  devBanner:        { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', backgroundColor: 'rgba(245,158,11,0.1)', borderRadius: RADIUS.sm, padding: SP.md, borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)' },
-  devBannerText:    { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: '#F59E0B', lineHeight: 16 },
+  devBanner:        { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', backgroundColor: ORANGE_DIM, borderRadius: RADIUS.sm, padding: SP.md, borderWidth: 1, borderColor: ORANGE_DIM },
+  devBannerText:    { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: ORANGE, lineHeight: 16 },
 
   // Product picker modal
   pickerRoot:       { flex: 1, backgroundColor: SURFACE },

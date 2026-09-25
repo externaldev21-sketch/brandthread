@@ -14,6 +14,7 @@ import {
   sendTeamInviteEmail,
   teamInviteReminderIdempotencyKey,
 } from "../lib/teamInvites";
+import { isBrandthreadEmailConfigured } from "../lib/brandthreadEmail";
 import { logger } from "../lib/logger";
 
 const REMINDER_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -21,8 +22,7 @@ const INTERVAL_MS = 60 * 60 * 1000;
 const CLAIM_LEASE_MS = 15 * 60 * 1000;
 
 export async function runTeamInviteReminder(): Promise<void> {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) {
+  if (!(await isBrandthreadEmailConfigured())) {
     logger.warn({ job: "teamInviteReminder" }, "Invite reminder job skipped because email is not configured");
     return;
   }
@@ -124,6 +124,10 @@ export async function runTeamInviteReminder(): Promise<void> {
           .returning({ id: teamMembers.id });
         if (delivered.length > 0) reminded++;
       } else {
+        logger.warn(
+          { job: "teamInviteReminder", teamMemberId: candidate.id },
+          "Invite reminder email delivery failed",
+        );
         // A failed delivery should be eligible on the next run. Only clear
         // the lease this worker claimed, never another worker's live lease.
         await db

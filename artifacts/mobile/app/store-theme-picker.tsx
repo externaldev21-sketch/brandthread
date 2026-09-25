@@ -10,12 +10,9 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Header } from '@/components/layout';
 import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
-  ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
+  FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
@@ -23,7 +20,7 @@ import {
   EmptyState, StatCard,
 } from '@/components/BrandthreadUI';
 import { getThemes, getStorefront, applyTheme } from '@/services/storeService';
-import { StoreTheme, THREAD_THEME_NAME } from '@/services/storeTypes';
+import { StoreTheme, TYPOGRAPHY_STYLES } from '@/services/storeTypes';
 
 export default function StoreThemePicker() {
   const { theme } = useAppTheme();
@@ -55,8 +52,8 @@ export default function StoreThemePicker() {
     const theme = themes.find(t => t.id === themeId);
     if (!theme) return;
     Alert.alert(
-      `Apply ${THREAD_THEME_NAME}`,
-      'Use Brandthread’s monochrome editorial system for this storefront?',
+      `Apply ${theme.name}`,
+      `Switch your storefront to the ${theme.name} theme? Fonts, palette, button style, and corner rounding will update to match.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -154,7 +151,7 @@ export default function StoreThemePicker() {
               disabled={isCurrent || isApplying}
             >
               {isApplying ? (
-                <ActivityIndicator size="small" color={FG} />
+                <ActivityIndicator size="small" color={theme.text} />
               ) : (
                 <Text style={styles.useBtnText}>{isCurrent ? 'Active' : 'Use Theme'}</Text>
               )}
@@ -166,21 +163,11 @@ export default function StoreThemePicker() {
   }
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
-          style={styles.backBtn}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <View style={styles.headerTitles}>
-          <Text style={styles.headerTitle}>{THREAD_THEME_NAME}</Text>
-          <Text style={styles.headerSubtitle}>The original storefront theme by Brandthread.</Text>
-        </View>
-      </View>
+    <View style={styles.root}>
+      <Header
+        title="Storefront Theme"
+        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
+      />
 
       {/* Thread Theme */}
       <FlatList
@@ -208,7 +195,7 @@ export default function StoreThemePicker() {
               </Text>
               <Text style={styles.detailDesc}>{previewingTheme.description}</Text>
               <Text style={styles.detailBestFor}>
-                <Text style={{ color: MUTED }}>Best for: </Text>
+                <Text style={{ color: theme.muted }}>Best for: </Text>
                 {previewingTheme.bestFor}
               </Text>
             </View>
@@ -217,7 +204,7 @@ export default function StoreThemePicker() {
               style={styles.closeBtn}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Feather name="x" size={ICON.md} color={MUTED} />
+              <Feather name="x" size={ICON.md} color={theme.muted} />
             </TouchableOpacity>
           </View>
 
@@ -232,6 +219,24 @@ export default function StoreThemePicker() {
               <Text style={styles.modeChipText}>{previewingTheme.supportedSections.length} sections</Text>
             </View>
           </ScrollView>
+
+          {/* Style sheet: typography, button style, corner rounding */}
+          <View style={styles.styleSheetRow}>
+            <View style={styles.styleSheetChip}>
+              <Text style={styles.styleSheetLabel}>Font</Text>
+              <Text style={styles.styleSheetValue}>
+                {TYPOGRAPHY_STYLES.find(t => t.value === previewingTheme.defaultTypography)?.heading ?? previewingTheme.defaultTypography}
+              </Text>
+            </View>
+            <View style={styles.styleSheetChip}>
+              <Text style={styles.styleSheetLabel}>Button</Text>
+              <Text style={styles.styleSheetValue}>{previewingTheme.defaultButtonStyle}</Text>
+            </View>
+            <View style={styles.styleSheetChip}>
+              <Text style={styles.styleSheetLabel}>Corners</Text>
+              <Text style={styles.styleSheetValue}>{previewingTheme.defaultCornerRadius}</Text>
+            </View>
+          </View>
 
           {/* Preset Variants */}
           {previewingTheme.presets.length > 0 && (
@@ -261,7 +266,7 @@ export default function StoreThemePicker() {
           {/* Action Buttons */}
           <View style={styles.detailButtons}>
             <PrimaryButton
-              label={`Use ${THREAD_THEME_NAME}`}
+              label={`Use ${previewingTheme.name}`}
               onPress={() => handleApply(previewingTheme.id, selectedPresetId ?? undefined)}
               style={{ flex: 1 }}
             />
@@ -283,43 +288,17 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE_DIM = theme.accentDim;
   const CYAN = theme.secondary;
   const BORDER_ACTIVE = theme.accentLight;
+  const CARD = theme.card;
+  const CARD_ELEVATED = theme.cardElevated;
+  const BORDER = theme.border;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const SUBTLE = theme.subtle;
+  const SUCCESS = theme.success;
   return StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: 'transparent',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-    gap: SP.sm,
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: RADIUS.sm,
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
-  },
-  headerTitles: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: FS.xl,
-    fontFamily: FONT.bold,
-    color: FG,
-    letterSpacing: -0.3,
-  },
-  headerSubtitle: {
-    fontSize: FS.sm,
-    fontFamily: FONT.regular,
-    color: MUTED,
-    marginTop: 2,
   },
   categoryRow: {
     paddingHorizontal: SP.md,
@@ -368,7 +347,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     position: 'absolute',
     top: SP.sm,
     left: SP.sm,
-    backgroundColor: SUCCESS,
+    backgroundColor: `${SUCCESS}26`,
     borderRadius: RADIUS.pill,
     paddingHorizontal: 7,
     paddingVertical: 3,
@@ -376,14 +355,14 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   currentBadgeText: {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: '#fff',
+    color: SUCCESS,
     letterSpacing: 0.5,
   },
   previewingBadge: {
     position: 'absolute',
     top: SP.sm,
     left: SP.sm,
-    backgroundColor: CYAN,
+    backgroundColor: `${CYAN}26`,
     borderRadius: RADIUS.pill,
     paddingHorizontal: 7,
     paddingVertical: 3,
@@ -391,7 +370,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   previewingBadgeText: {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: '#000',
+    color: CYAN,
     letterSpacing: 0.5,
   },
   themeInfo: {
@@ -533,6 +512,34 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: FS.xs,
     fontFamily: FONT.medium,
     color: MUTED,
+  },
+  styleSheetRow: {
+    flexDirection: 'row',
+    gap: SP.xs,
+    marginBottom: SP.sm,
+  },
+  styleSheetChip: {
+    flex: 1,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: CARD_ELEVATED,
+    paddingHorizontal: SP.sm,
+    paddingVertical: SP.xs,
+  },
+  styleSheetLabel: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: SUBTLE,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  styleSheetValue: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    color: FG,
+    marginTop: 1,
+    textTransform: 'capitalize',
   },
   presetsRow: {
     flexGrow: 0,

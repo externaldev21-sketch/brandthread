@@ -1,25 +1,28 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
-  View, Text, ScrollView, FlatList, TouchableOpacity,
-  Alert, StyleSheet, Dimensions, Share, Image,
+  View, Text, ScrollView, FlatList,
+  Alert, StyleSheet, Dimensions, Share,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
+import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
-import * as Haptics from 'expo-haptics';
+import { useAuth, useUser } from '@clerk/expo';
+import { CachedImage } from '@/components/CachedImage';
+import { PressableScale, FeedSkeleton, EmptyState } from '@/components/BrandthreadUI';
+import { IconButton, Snackbar, ErrorState } from '@/components/ui';
+import { useColors } from '@/hooks/useColors';
 import {
-  BG, SCREEN_BG, CARD, CARD_ELEVATED, BORDER,
-  FG, MUTED, SUBTLE, SUCCESS, RED, ORANGE, BLUE,
-  FONT, FS, SP, RADIUS, COMP, ICON,
+  ICON, FONT,
 } from '@/lib/theme';
+import { TYPE_SCALE } from '@/constants/typography';
+import { SPACING } from '@/constants/spacing';
+import { RADII } from '@/constants/radii';
+import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
 import {
-  MY_USER_ID, MY_COLOR, MY_INITIALS,
-  getStories, subscribeSocial, saveItem, createOrGetConversation,
+  MY_USER_ID, subscribeSocial, saveItem, createOrGetConversation, getStories,
 } from '@/services/socialService';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import type { Friendship, Story, BuyerPost } from '@/services/socialTypes';
@@ -37,6 +40,7 @@ const { width: SCREEN_W } = Dimensions.get('window');
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'now';
   if (mins < 60) return `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
@@ -47,37 +51,46 @@ function timeAgo(iso: string): string {
 
 function PostCard({
   post,
+  saved,
   onLike,
   onRepost,
   onSave,
   onOpenComments,
+  onNotInterested,
 }: {
   post: BuyerPost;
+  saved: boolean;
   onLike: (post: BuyerPost) => void;
   onRepost: (id: string) => void;
   onSave: (post: BuyerPost) => void;
   onOpenComments: (post: BuyerPost) => void;
+  onNotInterested: (post: BuyerPost) => void;
 }) {
   const router = useRouter();
   const { theme } = useAppTheme();
+  const palette = useColors();
 
   return (
-    <View style={s.card}>
+    <View style={[s.card, { backgroundColor: palette.card, borderColor: palette.border }]}>
       {/* Header */}
       <View style={s.cardHeader}>
         <View style={[s.avatar40, { backgroundColor: post.authorColor }]}>
-          <Text style={s.avatarText}>{post.authorInitials}</Text>
+          <Text style={[TYPE_SCALE.callout, s.avatarText]}>{post.authorInitials}</Text>
         </View>
-        <View style={{ flex: 1, marginLeft: SP.sm }}>
-          <Text style={s.authorName}>{post.authorName}</Text>
-          <Text style={s.authorMeta}>
+        <View style={{ flex: 1, marginLeft: SPACING.sm }}>
+          <Text style={[TYPE_SCALE.body, s.authorName, { color: palette.foreground }]} numberOfLines={1}>{post.authorName}</Text>
+          <Text style={[TYPE_SCALE.caption, s.authorMeta, { color: palette.mutedForeground }]} numberOfLines={1}>
             {post.authorHandle}
             {' · '}
             {timeAgo(post.createdAt)}
           </Text>
         </View>
-        <TouchableOpacity
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        <IconButton
+          name="more-horizontal"
+          size={ICON.md}
+          color={palette.mutedForeground}
+          variant="plain"
+          accessibilityLabel="Post options"
           onPress={() =>
             Alert.alert('Options', undefined, [
               {
@@ -87,82 +100,82 @@ function PostCard({
                     `/buyer-report?targetType=post&targetId=${post.id}&targetLabel=Post` as never,
                   ),
               },
-              { text: 'Not Interested' },
+              { text: 'Not interested', onPress: () => onNotInterested(post) },
               { text: 'Cancel', style: 'cancel' },
             ])
           }
-        >
-          <Feather name="more-horizontal" size={ICON.md} color={MUTED} />
-        </TouchableOpacity>
+        />
       </View>
 
       {/* Media */}
-      <TouchableOpacity activeOpacity={0.9} onPress={() => onOpenComments(post)}>
+      <PressableScale onPress={() => onOpenComments(post)} style={s.mediaPress}>
         {post.mediaUrl ? (
-          <Image source={{ uri: post.mediaUrl }} style={s.media} resizeMode="cover" />
+          <CachedImage source={{ uri: post.mediaUrl }} style={s.media} contentFit="cover" />
         ) : (
-          <View style={[s.media, { backgroundColor: CARD_ELEVATED }]}>
-          <Feather
-            name={post.type === 'video' ? 'video' : 'image'}
-            size={44}
-            color="rgba(255,255,255,0.3)"
-          />
-          {post.type === 'video' && (
-            <View style={s.playBtn}>
-              <Feather name="play" size={ICON.md} color={theme.accent} />
-            </View>
-          )}
+          <View style={[s.media, { backgroundColor: palette.elevated }]}>
+            <Feather
+              name={post.type === 'video' ? 'video' : 'image'}
+              size={44}
+              color={palette.mutedForeground}
+            />
+            {post.type === 'video' && (
+              <View style={[s.playBtn, { backgroundColor: palette.elevated }]}>
+                <Feather name="play" size={ICON.md} color={theme.accent} />
+              </View>
+            )}
           </View>
         )}
-      </TouchableOpacity>
+      </PressableScale>
 
       {/* Actions */}
       <View style={s.actionRow}>
-        <TouchableOpacity style={s.actionItem} onPress={() => onLike(post)}>
-          <Feather
-            name={post.likedByMe ? 'heart' : 'heart'}
+        <PressableScale style={s.actionItem} onPress={() => onLike(post)}>
+          <FontAwesome
+            name={post.likedByMe ? 'heart' : 'heart-o'}
             size={ICON.lg}
-            color={post.likedByMe ? RED : MUTED}
+            color={post.likedByMe ? palette.destructive : palette.mutedForeground}
           />
-          <Text style={[s.actionCount, post.likedByMe && { color: RED }]}>{post.likesCount}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={s.actionItem} onPress={() => onOpenComments(post)}>
-          <Feather name="message-circle" size={ICON.lg} color={MUTED} />
-          <Text style={s.actionCount}>{post.commentsCount}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={s.actionItem} onPress={() => onRepost(post.id)}>
+          <Text style={[TYPE_SCALE.callout, s.actionCount, { color: palette.mutedForeground }, post.likedByMe && { color: palette.destructive }]}>{post.likesCount}</Text>
+        </PressableScale>
+        <PressableScale style={s.actionItem} onPress={() => onOpenComments(post)}>
+          <Feather name="message-circle" size={ICON.lg} color={palette.mutedForeground} />
+          <Text style={[TYPE_SCALE.callout, s.actionCount, { color: palette.mutedForeground }]}>{post.commentsCount}</Text>
+        </PressableScale>
+        <PressableScale style={s.actionItem} onPress={() => onRepost(post.id)}>
           <Feather
             name="repeat"
             size={ICON.lg}
-            color={post.repostedByMe ? theme.accent : MUTED}
+            color={post.repostedByMe ? theme.accent : palette.mutedForeground}
           />
-          <Text style={s.actionCount}>{post.repostsCount}</Text>
-        </TouchableOpacity>
+          <Text style={[TYPE_SCALE.callout, s.actionCount, { color: palette.mutedForeground }]}>{post.repostsCount}</Text>
+        </PressableScale>
         <View style={{ flex: 1 }} />
-        <TouchableOpacity
+        <PressableScale
           style={s.actionIcon}
           onPress={() => onSave(post)}
+          accessibilityLabel={saved ? 'Remove from saved' : 'Save post'}
         >
-          <Feather name="bookmark" size={ICON.lg} color={MUTED} />
-        </TouchableOpacity>
-        <TouchableOpacity
+          <FontAwesome name={saved ? 'bookmark' : 'bookmark-o'} size={ICON.lg} color={saved ? theme.accent : palette.mutedForeground} />
+        </PressableScale>
+        <PressableScale
           style={s.actionIcon}
-          onPress={() => Share.share({ message: `${post.authorName} posted on Brandthread — check it out!` })}
+          accessibilityLabel="Share post"
+          onPress={() => Share.share({ message: `See ${post.authorName}'s post on Brandthread` })}
         >
-          <Feather name="send" size={ICON.lg} color={MUTED} />
-        </TouchableOpacity>
+          <Feather name="send" size={ICON.lg} color={palette.mutedForeground} />
+        </PressableScale>
       </View>
 
       {/* Caption */}
       <View style={s.captionBlock}>
-        <Text style={s.captionText}>
-          <Text style={s.captionAuthor}>{post.authorName} </Text>
+        <Text style={[TYPE_SCALE.callout, s.captionText, { color: palette.foreground }]}>
+          <Text style={[s.captionAuthor, { color: palette.foreground }]}>{post.authorName} </Text>
           {post.caption}
         </Text>
         {post.hashtags.length > 0 && (
           <View style={s.hashtagRow}>
             {post.hashtags.map(tag => (
-              <Text key={tag} style={[s.hashtag, { color: theme.accent }]}>
+              <Text key={tag} style={[TYPE_SCALE.callout, s.hashtag, { color: theme.accent }]}>
                 {tag}
               </Text>
             ))}
@@ -177,19 +190,34 @@ function PostCard({
 
 export default function FriendsScreen() {
   const { theme } = useAppTheme();
+  const palette = useColors();
   const insets  = useSafeAreaInsets();
   const barInset = useBuyerTabBarInset();
   const router  = useRouter();
   const api     = useApi();
   const { userId } = useAuth();
+  const { user: clerkUser } = useUser();
+  const myName = clerkUser?.fullName || clerkUser?.firstName || clerkUser?.username || 'You';
+  const myInitials = myName.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'Y';
+  const myAvatarUrl = clerkUser?.hasImage ? clerkUser.imageUrl : null;
 
   const [friends,      setFriends]      = useState<Friendship[]>([]);
   const [apiFollowing, setApiFollowing] = useState<ApiFollowing[]>([]);
   const [stories,      setStories]      = useState<Story[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [feedPosts,    setFeedPosts]    = useState<BuyerPost[]>([]);
+  const [savedIds,     setSavedIds]     = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [snackbar, setSnackbar] = useState<{ visible: boolean; message: string }>({ visible: false, message: '' });
+  const snackbarTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showSnackbar = useCallback((message: string) => {
+    if (snackbarTimer.current) clearTimeout(snackbarTimer.current);
+    setSnackbar({ visible: true, message });
+    snackbarTimer.current = setTimeout(() => setSnackbar(prev => ({ ...prev, visible: false })), 2200);
+  }, []);
+  useEffect(() => () => { if (snackbarTimer.current) clearTimeout(snackbarTimer.current); }, []);
 
   async function loadData() {
     if (!userId) {
@@ -216,7 +244,7 @@ export default function FriendsScreen() {
       setApiFollowing(Array.isArray(followingRows) ? followingRows : []);
       setFeedPosts(Array.isArray(activityRows) ? activityRows : []);
     } catch (error) {
-      setLoadError(false);
+      setLoadError(true);
       setFriends([]);
       setApiFollowing([]);
       setStories([]);
@@ -234,7 +262,7 @@ export default function FriendsScreen() {
   }, []);
 
   function handleLike(post: BuyerPost) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticPrimaryAction();
     // Optimistic update
     setFeedPosts(prev =>
       prev.map(p =>
@@ -254,7 +282,7 @@ export default function FriendsScreen() {
   }
 
   function handleRepost(postId: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticPrimaryAction();
     setFeedPosts(prev =>
       prev.map(p =>
         p.id === postId
@@ -270,7 +298,17 @@ export default function FriendsScreen() {
   }
 
   function handleSave(post: BuyerPost) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticPrimaryAction();
+    const wasSaved = savedIds.has(post.id);
+    setSavedIds(prev => {
+      const next = new Set(prev);
+      if (wasSaved) next.delete(post.id); else next.add(post.id);
+      return next;
+    });
+    if (wasSaved) {
+      showSnackbar('Removed from saved');
+      return;
+    }
     saveItem({
       type: 'post',
       targetId: post.id,
@@ -279,6 +317,13 @@ export default function FriendsScreen() {
     }, {
       onRemoteSaved: () => { void requestContextualPushPermission(userId, api); },
     });
+    showSnackbar('Saved');
+  }
+
+  function handleNotInterested(post: BuyerPost) {
+    hapticSelection();
+    setFeedPosts(prev => prev.filter(p => p.id !== post.id));
+    showSnackbar('Post hidden');
   }
 
   function handleOpenComments(post: BuyerPost) {
@@ -320,208 +365,222 @@ export default function FriendsScreen() {
 
   const hasFriends = friends.length > 0;
 
-  return (
-    <View style={[s.container, { backgroundColor: SCREEN_BG }]}>
-      {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + SP.md }]}>
-        <TouchableOpacity
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          onPress={() => router.push('/create-post?accountType=buyer' as never)}
+  // ── Memoized header/footer so FlatList doesn't remount the stories row (and
+  // reset its scroll position) on every like/repost re-render. ──────────────
+  const ListHeader = useMemo(() => (
+    <>
+      {/* Stories row */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.storiesScroll}
+      >
+        {/* Your story */}
+        <PressableScale
+          style={s.storyItem}
+          accessibilityLabel="Add to your story"
+          onPress={() => { hapticPrimaryAction(); router.push('/buyer-story-create' as never); }}
         >
-          <Feather name="plus" size={ICON.lg} color={MUTED} />
-        </TouchableOpacity>
-
-        <Text style={s.headerTitle}>Friends</Text>
-
-        <TouchableOpacity
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          onPress={() => router.push('/buyer-friend-requests' as never)}
-        >
-          <View>
-            <Feather name="user-plus" size={ICON.lg} color={MUTED} />
-            {pendingCount > 0 && (
-                <View style={[s.badge, { backgroundColor: theme.accent }]}>
-                <Text style={[s.badgeText, { color: theme.onAccent }]}>{pendingCount}</Text>
-              </View>
-            )}
+          <View style={[s.storyCircle, { backgroundColor: theme.cardElevated, overflow: 'hidden' }]}>
+            {myAvatarUrl
+              ? <CachedImage source={{ uri: myAvatarUrl }} style={StyleSheet.absoluteFill} />
+              : <Text style={[TYPE_SCALE.body, s.storyInitials, { color: theme.text }]}>{myInitials}</Text>}
+            <View style={[s.plusBadge, { backgroundColor: theme.accent, borderColor: theme.background }]}>
+              <Feather name="plus" size={10} color={theme.onAccent} />
+            </View>
           </View>
-        </TouchableOpacity>
+          <Text style={[TYPE_SCALE.caption, s.storyLabel, { color: palette.mutedForeground }]} numberOfLines={1}>
+            Your story
+          </Text>
+        </PressableScale>
+
+        {/* Friend stories */}
+        {stories.map(story => {
+          const viewed = story.viewers.some(v => v.userId === MY_USER_ID);
+          return (
+            <PressableScale
+              key={story.id}
+              style={s.storyItem}
+              accessibilityLabel={`${story.authorName}'s story`}
+              onPress={() => {
+                hapticPrimaryAction();
+                router.push(
+                  `/buyer-story-viewer?storyId=${story.id}&allStoryIds=${allStoryIds.join(',')}` as never,
+                );
+              }}
+            >
+              <View
+                style={[
+                  s.storyCircle,
+                  { backgroundColor: story.authorColor },
+                  viewed ? [s.storyRingViewed, { borderColor: palette.mutedForeground }] : [s.storyRingUnviewed, { borderColor: theme.accent }],
+                ]}
+              >
+                <Text style={[TYPE_SCALE.body, s.storyInitials]}>{story.authorInitials}</Text>
+              </View>
+              <Text style={[TYPE_SCALE.caption, s.storyLabel, { color: palette.mutedForeground }]} numberOfLines={1}>
+                {story.authorName}
+              </Text>
+            </PressableScale>
+          );
+        })}
+      </ScrollView>
+
+      {/* ── People You Follow (real DB data) ──────────────────── */}
+      {apiFollowing.length > 0 && (
+        <View style={{ marginBottom: SPACING.sm }}>
+          <View style={s.sectionHeader}>
+            <Text style={[TYPE_SCALE.headline, s.sectionTitle, { color: palette.foreground }]}>Following</Text>
+            <PressableScale onPress={() => { hapticPrimaryAction(); router.push('/buyer-friend-requests' as never); }}>
+              <Text style={[TYPE_SCALE.callout, s.seeAll, { color: theme.accent }]}>See all</Text>
+            </PressableScale>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: SPACING.md, gap: SPACING.md, paddingBottom: SPACING.sm }}
+          >
+            {apiFollowing.map(f => (
+              <PressableScale
+                key={f.userId}
+                style={s.followingItem}
+                onPress={() => {
+                  hapticPrimaryAction();
+                  router.push({
+                    pathname: '/buyer-other-profile' as any,
+                    params: { userId: f.userId, name: f.name, handle: f.handle, initials: f.initials, color: f.color },
+                  });
+                }}
+              >
+                <View style={[s.storyCircle, { backgroundColor: f.color }]}>
+                  <Text style={[TYPE_SCALE.body, s.storyInitials]}>{f.initials}</Text>
+                </View>
+                <Text style={[TYPE_SCALE.caption, s.storyLabel, { color: palette.mutedForeground }]} numberOfLines={1}>
+                  {f.name.split(' ')[0]}
+                </Text>
+                <PressableScale
+                  style={[s.msgBubble, { backgroundColor: theme.accentDim }]}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  accessibilityLabel={`Message ${f.name}`}
+                  onPress={() => { hapticPrimaryAction(); handleMessageFriend({ userId: f.userId, name: f.name, handle: f.handle, initials: f.initials, color: f.color } as any); }}
+                >
+                  <Feather name="message-circle" size={14} color={theme.accent} />
+                </PressableScale>
+              </PressableScale>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* Section header */}
+      <View style={s.sectionHeader}>
+        <Text style={[TYPE_SCALE.headline, s.sectionTitle, { color: palette.foreground }]}>Friend activity</Text>
+        <PressableScale onPress={() => { hapticPrimaryAction(); router.push('/(buyer)/discover' as never); }}>
+          <Text style={[TYPE_SCALE.callout, s.seeAll, { color: theme.accent }]}>See all</Text>
+        </PressableScale>
       </View>
 
-      <FlatList
-        data={feedPosts}
-        keyExtractor={p => p.id}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: barInset + SP.md }}
-        ListEmptyComponent={loading ? <View style={s.emptyState}><Text style={s.emptyBody}>Loading activity…</Text></View> : null}
-        ListHeaderComponent={() => (
-          <>
-            {/* Stories row */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={s.storiesScroll}
+      {/* Empty state — converged on the shared EmptyState component */}
+      {!hasFriends && feedPosts.length === 0 && apiFollowing.length === 0 && !loading && !loadError && (
+        <EmptyState
+          icon="users"
+          title="Find your crew"
+          description="Add friends to see what they're copping, saving, and dropping."
+          action={{ label: 'Find friends', onPress: () => { hapticPrimaryAction(); router.push('/buyer-friend-requests' as never); } }}
+        />
+      )}
+    </>
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [theme, palette, stories, apiFollowing, hasFriends, feedPosts.length, myAvatarUrl, myInitials, loading, loadError, allStoryIds.join(',')]);
+
+  const ListFooter = useMemo(() => (
+    friends.length > 0 ? (
+      <View style={s.friendsSection}>
+        <Text style={[TYPE_SCALE.headline, s.sectionTitle2, { color: palette.foreground }]}>Message friends</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.friendsScroll}
+        >
+          {friends.map(f => (
+            <PressableScale
+              key={f.id}
+              style={s.friendItem}
+              onPress={() => { hapticPrimaryAction(); handleMessageFriend(f); }}
             >
-              {/* Your story */}
-              <TouchableOpacity
-                style={s.storyItem}
-                activeOpacity={0.8}
-                onPress={() => router.push('/buyer-story-create' as never)}
-              >
-                <View style={[s.storyCircle, { backgroundColor: MY_COLOR }]}>
-                  <Text style={s.storyInitials}>{MY_INITIALS}</Text>
-                  <View style={[s.plusBadge, { backgroundColor: theme.accent }]}>
-                    <Feather name="plus" size={10} color={theme.onAccent} />
-                  </View>
-                </View>
-                <Text style={s.storyLabel} numberOfLines={1}>
-                  Your Story
-                </Text>
-              </TouchableOpacity>
-
-              {/* Friend stories */}
-              {stories.map(story => {
-                const viewed = story.viewers.some(v => v.userId === MY_USER_ID);
-                return (
-                  <TouchableOpacity
-                    key={story.id}
-                    style={s.storyItem}
-                    activeOpacity={0.8}
-                    onPress={() =>
-                      router.push(
-                        `/buyer-story-viewer?storyId=${story.id}&allStoryIds=${allStoryIds.join(',')}` as never,
-                      )
-                    }
-                  >
-                    <View
-                      style={[
-                        s.storyCircle,
-                        { backgroundColor: story.authorColor },
-                        viewed ? s.storyRingViewed : [s.storyRingUnviewed, { borderColor: theme.accent }],
-                      ]}
-                    >
-                      <Text style={s.storyInitials}>{story.authorInitials}</Text>
-                    </View>
-                    <Text style={s.storyLabel} numberOfLines={1}>
-                      {story.authorName.slice(0, 8)}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-
-            {/* ── People You Follow (real DB data) ──────────────────── */}
-            {apiFollowing.length > 0 && (
-              <View style={{ marginBottom: SP.sm }}>
-                <View style={s.sectionHeader}>
-                  <Text style={s.sectionTitle}>Following</Text>
-                  <TouchableOpacity onPress={() => router.push('/buyer-friend-requests' as never)}>
-                    <Text style={[s.seeAll, { color: theme.accent }]}>See all</Text>
-                  </TouchableOpacity>
-                </View>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ paddingHorizontal: SP.md, gap: SP.md, paddingBottom: SP.sm }}
-                >
-                  {apiFollowing.map(f => (
-                    <TouchableOpacity
-                      key={f.userId}
-                      style={s.followingItem}
-                      activeOpacity={0.8}
-                      onPress={() =>
-                        router.push({
-                          pathname: '/buyer-other-profile' as any,
-                          params: { userId: f.userId, name: f.name, handle: f.handle, initials: f.initials, color: f.color },
-                        })
-                      }
-                    >
-                      <View style={[s.storyCircle, { backgroundColor: f.color }]}>
-                        <Text style={s.storyInitials}>{f.initials}</Text>
-                      </View>
-                      <Text style={s.storyLabel} numberOfLines={1}>
-                        {f.name.split(' ')[0]}
-                      </Text>
-                      <TouchableOpacity
-                        style={[s.msgBubble, { backgroundColor: theme.accentDim }]}
-                        onPress={() => handleMessageFriend({ userId: f.userId, name: f.name, handle: f.handle, initials: f.initials, color: f.color } as any)}
-                      >
-                        <Feather name="message-circle" size={14} color={theme.accent} />
-                      </TouchableOpacity>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+              <View style={[s.avatar48, { backgroundColor: f.color }]}>
+                <Text style={[TYPE_SCALE.callout, s.avatar48Text]}>{f.initials}</Text>
+                {isOnline(f) && <View style={[s.onlineDot, { backgroundColor: palette.success, borderColor: palette.background }]} />}
               </View>
-            )}
+              <Text style={[TYPE_SCALE.caption, s.friendName, { color: palette.mutedForeground }]} numberOfLines={1}>
+                {f.name.split(' ')[0]}
+              </Text>
+            </PressableScale>
+          ))}
+        </ScrollView>
+      </View>
+    ) : null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [friends, palette]);
 
-            {/* Section header */}
-            <View style={s.sectionHeader}>
-              <Text style={s.sectionTitle}>Friend Activity</Text>
-              <TouchableOpacity
-                onPress={() => router.push('/(tabs)/discover' as never)}
-              >
-                <Text style={[s.seeAll, { color: theme.accent }]}>See all</Text>
-              </TouchableOpacity>
-            </View>
+  return (
+    <View style={[s.container, { backgroundColor: palette.background }]}>
+      {/* Header */}
+      <View style={[s.header, { paddingTop: insets.top + SPACING.md }]}>
+        <IconButton
+          name="plus"
+          variant="plain"
+          size={ICON.lg}
+          color={palette.mutedForeground}
+          accessibilityLabel="Create post"
+          onPress={() => router.push('/create-post?accountType=buyer' as never)}
+        />
 
-            {/* Empty state */}
-            {!hasFriends && feedPosts.length === 0 && apiFollowing.length === 0 && (
-              <View style={s.emptyState}>
-                <Feather name="users" size={48} color={MUTED} />
-                <Text style={s.emptyTitle}>Find your crew</Text>
-                <Text style={s.emptyBody}>
-                  Add friends to see what they're copping, saving, and dropping.
-                </Text>
-                <TouchableOpacity
-                  onPress={() => router.push('/buyer-friend-requests' as never)}
-                  activeOpacity={0.85}
-                >
-                  <LinearGradient
-                    colors={[...theme.primaryGradient]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={s.findFriendsBtn}
-                  >
-                    <Text style={[s.findFriendsBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Find Friends</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-            )}
-          </>
-        )}
-        ListFooterComponent={() =>
-          friends.length > 0 ? (
-            <View style={s.friendsSection}>
-              <Text style={s.sectionTitle2}>Message Friends</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={s.friendsScroll}
-              >
-                {friends.map(f => (
-                  <TouchableOpacity
-                    key={f.id}
-                    style={s.friendItem}
-                    activeOpacity={0.8}
-                    onPress={() => handleMessageFriend(f)}
-                  >
-                    <View style={[s.avatar48, { backgroundColor: f.color }]}>
-                      <Text style={s.avatar48Text}>{f.initials}</Text>
-                      {isOnline(f) && <View style={s.onlineDot} />}
-                    </View>
-                    <Text style={s.friendName} numberOfLines={1}>
-                      {f.name.split(' ')[0]}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+        <Text style={[TYPE_SCALE.headline, s.headerTitle, { color: palette.foreground }]}>Friends</Text>
+
+        <View>
+          <IconButton
+            name="user-plus"
+            variant="plain"
+            size={ICON.lg}
+            color={palette.mutedForeground}
+            accessibilityLabel="Friend requests"
+            onPress={() => router.push('/buyer-friend-requests' as never)}
+          />
+          {pendingCount > 0 && (
+            <View pointerEvents="none" style={[s.badge, { backgroundColor: theme.accent }]}>
+              <Text style={[TYPE_SCALE.caption, s.badgeText, { color: theme.onAccent }]}>{pendingCount}</Text>
             </View>
-          ) : null
-        }
-        renderItem={({ item }) => (
-          <PostCard post={item} onLike={handleLike} onRepost={handleRepost} onSave={handleSave} onOpenComments={handleOpenComments} />
-        )}
-      />
+          )}
+        </View>
+      </View>
+
+      {loadError && feedPosts.length === 0 && !loading ? (
+        <ErrorState message="Couldn't load activity. Pull to refresh." onRetry={loadData} />
+      ) : (
+        <FlatList
+          data={feedPosts}
+          keyExtractor={p => p.id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: barInset + SPACING.md }}
+          ListEmptyComponent={loading ? <FeedSkeleton /> : null}
+          ListHeaderComponent={ListHeader}
+          ListFooterComponent={ListFooter}
+          renderItem={({ item }) => (
+            <PostCard
+              post={item}
+              saved={savedIds.has(item.id)}
+              onLike={handleLike}
+              onRepost={handleRepost}
+              onSave={handleSave}
+              onOpenComments={handleOpenComments}
+              onNotInterested={handleNotInterested}
+            />
+          )}
+        />
+      )}
+
+      <Snackbar visible={snackbar.visible} message={snackbar.message} onDismiss={() => setSnackbar(prev => ({ ...prev, visible: false }))} />
     </View>
   );
 }
@@ -535,15 +594,12 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.md,
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.md,
   },
   headerTitle: {
     flex: 1,
     textAlign: 'center',
-    fontFamily: FONT.semibold,
-    fontSize: FS.md,
-    color: FG,
   },
 
   badge: {
@@ -552,29 +608,25 @@ const s = StyleSheet.create({
     right: -6,
     minWidth: 16,
     height: 16,
-    borderRadius: RADIUS.pill,
+    borderRadius: RADII.pill,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 3,
   },
-  badgeText: {
-    fontFamily: FONT.bold,
-    fontSize: FS.xs,
-    color: '#fff',
-  },
+  badgeText: {},
 
   storiesScroll: {
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.md,
-    gap: SP.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+    gap: SPACING.md,
     alignItems: 'flex-start',
   },
-  followingItem: { alignItems: 'center', gap: SP.xs, width: 68 },
+  followingItem: { alignItems: 'center', gap: SPACING.xs, width: 68 },
   msgBubble: {
     width: 24, height: 24, borderRadius: 12,
     alignItems: 'center', justifyContent: 'center',
   },
-  storyItem: { alignItems: 'center', gap: SP.xs },
+  storyItem: { alignItems: 'center', gap: SPACING.xs },
   storyCircle: {
     width: 64,
     height: 64,
@@ -582,12 +634,10 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  storyRingViewed: { borderWidth: 2, borderColor: MUTED },
+  storyRingViewed: { borderWidth: 2 },
   storyRingUnviewed: { borderWidth: 2 },
   storyInitials: {
-    fontFamily: FONT.bold,
-    fontSize: FS.base,
-    color: '#fff',
+    color: '#FFFFFF', // theme-exempt: initials on a per-user identity color
   },
   plusBadge: {
     position: 'absolute',
@@ -595,16 +645,12 @@ const s = StyleSheet.create({
     right: 0,
     width: 18,
     height: 18,
-    borderRadius: RADIUS.pill,
+    borderRadius: RADII.pill,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: BG,
   },
   storyLabel: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    color: SUBTLE,
     textAlign: 'center',
   },
 
@@ -612,68 +658,27 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SP.md,
-    marginTop: SP.sm,
-    marginBottom: SP.sm,
+    paddingHorizontal: SPACING.md,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.sm,
   },
-  sectionTitle: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.base,
-    color: FG,
-  },
-  seeAll: {
-    fontFamily: FONT.medium,
-    fontSize: FS.sm,
-  },
-
-  emptyState: {
-    alignItems: 'center',
-    paddingHorizontal: SP.xl,
-    paddingVertical: SP.xl,
-    gap: SP.sm,
-  },
-  emptyTitle: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.md,
-    color: FG,
-    marginTop: SP.sm,
-  },
-  emptyBody: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: MUTED,
-    textAlign: 'center',
-  },
-  findFriendsBtn: {
-    marginTop: SP.sm,
-    paddingHorizontal: SP.xl,
-    height: COMP.buttonH,
-    borderRadius: RADIUS.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  findFriendsBtnText: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.base,
-    color: '#fff',
-  },
+  sectionTitle: {},
+  seeAll: {},
 
   // Post card
   card: {
-    marginHorizontal: SP.md,
-    marginBottom: SP.md,
-    backgroundColor: CARD,
+    marginHorizontal: SPACING.md,
+    marginBottom: SPACING.md,
     borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: RADIUS.lg,
+    borderRadius: RADII.card,
     overflow: 'hidden',
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SP.md,
-    paddingTop: SP.md,
-    paddingBottom: SP.sm,
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.sm,
   },
   avatar40: {
     width: 40,
@@ -683,22 +688,14 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: {
-    fontFamily: FONT.bold,
-    fontSize: FS.sm,
-    color: '#fff',
+    color: '#FFFFFF', // theme-exempt: initials on a per-user identity color
   },
-  authorName: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.base,
-    color: FG,
-  },
+  authorName: {},
   authorMeta: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    color: MUTED,
     marginTop: 1,
   },
 
+  mediaPress: {},
   media: {
     height: 240,
     alignItems: 'center',
@@ -709,7 +706,6 @@ const s = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: CARD_ELEVATED,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -717,65 +713,52 @@ const s = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-    gap: SP.lg,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    gap: SPACING.lg,
   },
   actionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SP.xs,
+    gap: SPACING.xs,
   },
-  actionCount: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: MUTED,
-  },
+  actionCount: {},
   actionIcon: { padding: 2 },
 
   captionBlock: {
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.md,
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.md,
   },
   captionText: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: FG,
     lineHeight: 20,
   },
   captionAuthor: {
     fontFamily: FONT.semibold,
-    color: FG,
   },
   hashtagRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: SP.xs,
+    marginTop: SPACING.xs,
   },
   hashtag: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    marginRight: SP.xs,
+    marginRight: SPACING.xs,
   },
 
   // Friends section
   friendsSection: {
-    paddingTop: SP.sm,
-    paddingBottom: SP.md,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.md,
   },
   sectionTitle2: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.base,
-    color: FG,
-    paddingHorizontal: SP.md,
-    marginBottom: SP.sm,
+    paddingHorizontal: SPACING.md,
+    marginBottom: SPACING.sm,
   },
   friendsScroll: {
-    paddingHorizontal: SP.md,
-    gap: SP.md,
+    paddingHorizontal: SPACING.md,
+    gap: SPACING.md,
     alignItems: 'flex-start',
   },
-  friendItem: { alignItems: 'center', gap: SP.xs, width: 56 },
+  friendItem: { alignItems: 'center', gap: SPACING.xs, width: 56 },
   avatar48: {
     width: 48,
     height: 48,
@@ -784,9 +767,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   avatar48Text: {
-    fontFamily: FONT.bold,
-    fontSize: FS.sm,
-    color: '#fff',
+    color: '#FFFFFF', // theme-exempt: initials on a per-user identity color
   },
   onlineDot: {
     position: 'absolute',
@@ -795,14 +776,9 @@ const s = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: SUCCESS,
     borderWidth: 1.5,
-    borderColor: BG,
   },
   friendName: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    color: MUTED,
     textAlign: 'center',
   },
 });

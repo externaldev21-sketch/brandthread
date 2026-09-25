@@ -13,7 +13,7 @@
  * - Share Profile button uses React Native Share.share() with platform-safe payload.
  * - Missing / invalid username shows a clear state with a link to edit-profile.
  */
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Share,
   ScrollView, ActivityIndicator, Platform, AccessibilityInfo,
@@ -25,11 +25,10 @@ import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import { useAuth, useUser } from '@clerk/expo';
-import {
-  BG, CARD, BORDER, FG, MUTED, SURFACE,
-  FONT, FS, SP, RADIUS, COMP, ICON, SUCCESS,
-} from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import type { AppThemePreset } from '@/contexts/AppThemeContext';
+import { Header } from '@/components/layout';
 import { useApi } from '@/lib/api';
 import { buildCanonicalProfileUrl, normalizeUsername } from '@/lib/shareProfile';
 
@@ -48,6 +47,7 @@ export default function ShareProfileScreen() {
   const router = useRouter();
   const api = useApi();
   const { theme } = useAppTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const { user } = useUser();
   const { isLoaded: authLoaded } = useAuth();
 
@@ -165,24 +165,8 @@ export default function ShareProfileScreen() {
   const statusMsg = autoCopied ? 'Link copied' : copied ? 'Link copied' : null;
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => router.back()}
-          activeOpacity={0.75}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} accessibilityRole="header">
-          Share Profile
-        </Text>
-        <View style={{ width: COMP.iconBtn }} />
-      </View>
+    <View style={styles.root}>
+      <Header title="Share Profile" />
 
       <ScrollView
         contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + SP.xxl }]}
@@ -191,12 +175,12 @@ export default function ShareProfileScreen() {
       >
         {loading ? (
           <View style={styles.centeredState}>
-            <ActivityIndicator color={FG} />
+            <ActivityIndicator color={theme.text} />
             <Text style={styles.loadingText}>Loading profile…</Text>
           </View>
         ) : error ? (
           <View style={styles.centeredState}>
-            <Feather name="wifi-off" size={40} color={MUTED} />
+            <Feather name="wifi-off" size={40} color={theme.muted} />
             <Text style={styles.errorTitle}>Couldn't load profile</Text>
             <Text style={styles.errorDesc}>Check your connection and try again.</Text>
             <TouchableOpacity
@@ -212,7 +196,7 @@ export default function ShareProfileScreen() {
           /* ── No username state ── */
           <View style={styles.centeredState}>
             <View style={styles.noUserIcon}>
-              <Feather name="user-x" size={36} color={MUTED} />
+              <Feather name="user-x" size={36} color={theme.muted} />
             </View>
             <Text style={styles.noUserTitle}>No username set</Text>
             <Text style={styles.noUserDesc}>
@@ -224,8 +208,8 @@ export default function ShareProfileScreen() {
               accessibilityRole="button"
               accessibilityLabel="Set username in profile settings"
             >
-              <Feather name="edit-3" size={ICON.sm} color={BG} />
-              <Text style={[styles.primaryBtnText, { color: BG }]}>Set Username</Text>
+              <Feather name="edit-3" size={ICON.sm} color={theme.onAccent} />
+              <Text style={[styles.primaryBtnText, { color: theme.onAccent }]}>Set Username</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -239,8 +223,8 @@ export default function ShareProfileScreen() {
             >
               {statusMsg ? (
                 <>
-                  <Feather name="check-circle" size={ICON.sm} color={SUCCESS} />
-                  <Text style={[styles.statusText, { color: SUCCESS }]}>{statusMsg}</Text>
+                  <Feather name="check-circle" size={ICON.sm} color={theme.success} />
+                  <Text style={[styles.statusText, { color: theme.success }]}>{statusMsg}</Text>
                 </>
               ) : null}
             </View>
@@ -277,7 +261,7 @@ export default function ShareProfileScreen() {
             <TouchableOpacity
               style={[
                 styles.copyBtn,
-                { backgroundColor: (copied || autoCopied) ? SUCCESS : theme.accent },
+                { backgroundColor: (copied || autoCopied) ? theme.success : theme.accent },
               ]}
               onPress={handleCopy}
               activeOpacity={0.85}
@@ -288,9 +272,9 @@ export default function ShareProfileScreen() {
               <Feather
                 name={(copied || autoCopied) ? 'check' : 'copy'}
                 size={ICON.sm}
-                color={BG}
+                color={theme.onAccent}
               />
-              <Text style={[styles.copyBtnText, { color: BG }]}>
+              <Text style={[styles.copyBtnText, { color: theme.onAccent }]}>
                 {(copied || autoCopied) ? 'Link Copied!' : 'Copy Link'}
               </Text>
             </TouchableOpacity>
@@ -304,7 +288,7 @@ export default function ShareProfileScreen() {
               accessibilityLabel="Share profile"
               accessibilityHint="Opens the system share sheet to share your profile link"
             >
-              <Feather name="share-2" size={ICON.sm} color={FG} />
+              <Feather name="share-2" size={ICON.sm} color={theme.text} />
               <Text style={styles.shareBtnText}>Share Profile</Text>
             </TouchableOpacity>
 
@@ -320,30 +304,13 @@ export default function ShareProfileScreen() {
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
+// Theme-aware factory (re-derived per render via useMemo) so every color reacts
+// to all 12 themes instead of a fixed static palette. The header/back-button
+// styles that used to live here are unused now that the screen renders the
+// shared <Header> component — removed rather than left as dead code.
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
-
-  header: {
-    height: COMP.headerH,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SP.md,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-  },
-  backBtn: {
-    width: COMP.iconBtn,
-    height: COMP.iconBtn,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontFamily: FONT.bold,
-    fontSize: FS.md,
-    color: FG,
-  },
+const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: theme.background },
 
   body: {
     flexGrow: 1,
@@ -362,9 +329,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.lg,
     gap: SP.md,
   },
-  loadingText: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, marginTop: SP.sm },
-  errorTitle: { fontFamily: FONT.bold, fontSize: FS.md, color: FG, textAlign: 'center' },
-  errorDesc: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', lineHeight: 19 },
+  loadingText: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted, marginTop: SP.sm },
+  errorTitle: { fontFamily: FONT.bold, fontSize: FS.md, color: theme.text, textAlign: 'center' },
+  errorDesc: { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.muted, textAlign: 'center', lineHeight: 19 },
   actionBtn: {
     marginTop: SP.sm,
     paddingHorizontal: SP.lg,
@@ -381,18 +348,18 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: SURFACE,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SP.sm,
   },
-  noUserTitle: { fontFamily: FONT.bold, fontSize: FS.lg, color: FG, textAlign: 'center' },
+  noUserTitle: { fontFamily: FONT.bold, fontSize: FS.lg, color: theme.text, textAlign: 'center' },
   noUserDesc: {
     fontFamily: FONT.regular,
     fontSize: FS.sm,
-    color: MUTED,
+    color: theme.muted,
     textAlign: 'center',
     lineHeight: 20,
     maxWidth: 300,
@@ -424,10 +391,10 @@ const styles = StyleSheet.create({
   // ── QR card ──
   qrCard: {
     width: '100%',
-    backgroundColor: CARD,
+    backgroundColor: theme.card,
     borderRadius: RADIUS.xl,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: theme.border,
     alignItems: 'center',
     paddingVertical: SP.xl,
     paddingHorizontal: SP.lg,
@@ -442,7 +409,7 @@ const styles = StyleSheet.create({
   urlText: {
     fontFamily: FONT.regular,
     fontSize: FS.sm,
-    color: MUTED,
+    color: theme.muted,
     textAlign: 'center',
     lineHeight: 20,
     flexShrink: 1,
@@ -450,7 +417,7 @@ const styles = StyleSheet.create({
   handleText: {
     fontFamily: FONT.semibold,
     fontSize: FS.base,
-    color: FG,
+    color: theme.text,
     textAlign: 'center',
   },
 
@@ -475,15 +442,15 @@ const styles = StyleSheet.create({
     minHeight: COMP.buttonH,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: CARD,
+    borderColor: theme.border,
+    backgroundColor: theme.card,
   },
-  shareBtnText: { fontFamily: FONT.semibold, fontSize: FS.base, color: FG },
+  shareBtnText: { fontFamily: FONT.semibold, fontSize: FS.base, color: theme.text },
 
   hint: {
     fontFamily: FONT.regular,
     fontSize: FS.xs,
-    color: MUTED,
+    color: theme.muted,
     textAlign: 'center',
     lineHeight: 18,
     paddingHorizontal: SP.lg,

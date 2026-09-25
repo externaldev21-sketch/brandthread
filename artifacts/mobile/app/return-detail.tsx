@@ -8,17 +8,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN, SUCCESS, SUCCESS_DIM,
-  BLUE, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
+  ORANGE, ORANGE_DIM, RED, RED_DIM,
   GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
   BrandthreadCard, BrandthreadHeader, GradientCard, PrimaryButton,
   SecondaryButton, StatusBadge,
 } from '@/components/BrandthreadUI';
-import { getOrder, updateReturnStatus } from '@/services/orderService';
 import { Order, ReturnRequest, RETURN_REASONS } from '@/services/orderTypes';
 import { useColors } from '@/hooks/useColors';
 import { formatCents } from '@/lib/money';
+import { useApi } from '@/lib/api';
+import { adaptApiOrder } from '@/app/order-detail';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -100,40 +101,83 @@ export default function ReturnDetailScreen() {
   const { orderId, returnId } = useLocalSearchParams<{ orderId: string; returnId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const api = useApi();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [returnReq, setReturnReq] = useState<ReturnRequest | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [denyReason, setDenyReason] = useState('');
   const [showDenyForm, setShowDenyForm] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const o = await getOrder(orderId);
-    if (o) {
-      setOrder(o);
-      const r = o.returns.find(x => x.id === returnId);
-      setReturnReq(r ?? null);
+    setLoadError(false);
+    try {
+      const [rawOrder, rawReturn] = await Promise.all([
+        api.orders.get(orderId),
+        api.returns.get(returnId),
+      ]);
+      const adaptedOrder = rawOrder ? adaptApiOrder(rawOrder) : null;
+      setOrder(adaptedOrder);
+      if (rawReturn) {
+        setReturnReq({
+          id: rawReturn.id ?? returnId,
+          orderId: rawReturn.orderId ?? orderId,
+          orderNumber: adaptedOrder?.orderNumber ?? '',
+          customerId: adaptedOrder?.customer.id ?? '',
+          customerName: adaptedOrder?.customer.name ?? 'Customer',
+          status: rawReturn.status,
+          items: Array.isArray(rawReturn.requestedItems) ? rawReturn.requestedItems.map((item: any, idx: number) => ({
+            lineItemId: item.lineItemId ?? String(idx),
+            productName: item.productName ?? 'Item',
+            variant: item.variantTitle ?? '',
+            quantity: item.quantity ?? 1,
+            unitPriceCents: item.unitPriceCents ?? 0,
+            reason: rawReturn.reason ?? 'other',
+          })) : [],
+          customerExplanation: rawReturn.notes ?? '',
+          imageUris: Array.isArray(rawReturn.evidenceUrls) ? rawReturn.evidenceUrls : [],
+          requestedResolution: rawReturn.resolutionRequested ?? 'refund',
+          returnDeadline: rawReturn.returnDeadline ?? rawReturn.createdAt ?? new Date().toISOString(),
+          deniedReason: rawReturn.status === 'denied' ? (rawReturn.sellerResponse ?? undefined) : undefined,
+          createdAt: rawReturn.createdAt ?? new Date().toISOString(),
+          updatedAt: rawReturn.updatedAt ?? rawReturn.createdAt ?? new Date().toISOString(),
+        });
+      } else {
+        setReturnReq(null);
+      }
+    } catch (err) {
+      if (__DEV__) console.warn('[return-detail] failed to load', err);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [orderId, returnId]);
+  }, [api, orderId, returnId]);
 
   useEffect(() => { load(); }, [load]);
 
   const doAction = async (status: ReturnRequest['status'], reason?: string) => {
     if (!order || !returnReq) return;
     setActionLoading(true);
-    await updateReturnStatus(order.id, returnReq.id, status, reason);
-    await load();
-    setActionLoading(false);
-    setShowDenyForm(false);
+    try {
+      await api.returns.updateStatus(returnReq.id, { status, sellerResponse: reason });
+      await load();
+    } catch (err) {
+      Alert.alert('Couldn’t update this return', 'Check your connection and try again.');
+    } finally {
+      setActionLoading(false);
+      setShowDenyForm(false);
+    }
   };
 
   if (loading || !returnReq || !order) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.loadingText}>{loading ? 'Loading…' : 'Return not found.'}</Text>
+        <Text style={styles.loadingText}>
+          {loading ? 'Loading…' : loadError ? 'Couldn’t load this return. Check your connection and try again.' : 'Return not found.'}
+        </Text>
       </View>
     );
   }
@@ -257,12 +301,6 @@ export default function ReturnDetailScreen() {
                 label="Approve Return"
                 onPress={() => doAction('approved')}
                 loading={actionLoading}
-                colors={[SUCCESS, '#34D399']}
-              />
-              <SecondaryButton
-                label="Request More Info"
-                onPress={() => Alert.alert('Request More Info', 'A message will be sent to the customer asking for more information.')}
-                accent={CYAN}
               />
               {!showDenyForm ? (
                 <SecondaryButton
@@ -300,7 +338,6 @@ export default function ReturnDetailScreen() {
                       loading={actionLoading}
                       disabled={!denyReason.trim()}
                       small
-                      colors={[RED, '#F87171']}
                       style={{ flex: 1 }}
                     />
                   </View>
@@ -311,19 +348,9 @@ export default function ReturnDetailScreen() {
 
           {status === 'approved' && (
             <View style={styles.actionsGap}>
-              <PrimaryButton
-                label="Issue Return Label"
-                onPress={() => {
-                  Alert.alert('Return Label', 'A prepaid return label will be generated and sent to the customer.');
-                  doAction('label_issued');
-                }}
-                loading={actionLoading}
-              />
-              <SecondaryButton
-                label="Offer Store Credit"
-                onPress={() => Alert.alert('Store Credit', 'Store credit will be issued to the customer for the return amount.')}
-                accent={GOLD}
-              />
+              {/* "Issue Return Label" and "Offer Store Credit" are hidden here
+                  until they call a real label/credit API — see shipping-label.tsx
+                  for the real label-purchase flow. */}
               <SecondaryButton
                 label="Issue Refund Without Return"
                 onPress={() => router.push(`/refund-detail?orderId=${order.id}&returnId=${returnReq.id}`)}
@@ -337,7 +364,6 @@ export default function ReturnDetailScreen() {
               label="Mark Return Received"
               onPress={() => doAction('received')}
               loading={actionLoading}
-              colors={[BLUE, '#60A5FA']}
             />
           )}
 
@@ -356,11 +382,7 @@ export default function ReturnDetailScreen() {
                 label="Issue Refund"
                 onPress={() => router.push(`/refund-detail?orderId=${order.id}&returnId=${returnReq.id}`)}
               />
-              <SecondaryButton
-                label="Issue Exchange"
-                onPress={() => Alert.alert('Issue Exchange', 'An exchange order will be created for the customer.')}
-                accent={CYAN}
-              />
+              {/* "Issue Exchange" is hidden until a real exchange-order API exists. */}
             </View>
           )}
 

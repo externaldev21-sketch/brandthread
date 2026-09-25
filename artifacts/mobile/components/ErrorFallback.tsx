@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,8 +9,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { Feather } from '@expo/vector-icons';
 import { reloadAppAsync } from 'expo';
+import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
+import { TYPE_SCALE } from '@/constants/typography';
+import { SPACING } from '@/constants/spacing';
+import { RADII } from '@/constants/radii';
+import { FONT } from '@/lib/theme';
 
 export type ErrorFallbackProps = {
   error: Error;
@@ -50,54 +54,35 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {__DEV__ ? (
-        <Pressable
+        <IconButton
+          name="alert-circle"
           onPress={() => setIsModalVisible(true)}
           accessibilityLabel="View error details"
-          accessibilityRole="button"
-          style={({ pressed }) => [
-            styles.topButton,
-            {
-              top: insets.top + 16,
-              backgroundColor: colors.card,
-              opacity: pressed ? 0.8 : 1,
-            },
-          ]}
-        >
-          <Feather name="alert-circle" size={20} color={colors.foreground} />
-        </Pressable>
+          color={colors.foreground}
+          style={[styles.topButton, { top: insets.top + SPACING.md }]}
+        />
       ) : null}
 
       <View style={styles.content}>
-        <Text style={[styles.title, { color: colors.foreground }]}>
+        <Text style={[TYPE_SCALE.title1, styles.title, { color: colors.foreground }]}>
           Something went wrong
         </Text>
 
-        <Text style={[styles.message, { color: colors.mutedForeground }]}>
+        <Text style={[TYPE_SCALE.body, styles.message, { color: colors.mutedForeground }]}>
           Please reload the app to continue.
         </Text>
         {__DEV__ ? (
-          <Text style={[styles.devMessage, { color: colors.mutedForeground }]}>
+          <Text style={[TYPE_SCALE.footnote, styles.devMessage, { color: colors.mutedForeground }]}>
             {error.message}
           </Text>
         ) : null}
 
-        <Pressable
+        <Button
+          label="Try Again"
           onPress={handleRestart}
-          style={({ pressed }) => [
-            styles.button,
-            {
-              backgroundColor: colors.primary,
-              opacity: pressed ? 0.9 : 1,
-              transform: [{ scale: pressed ? 0.98 : 1 }],
-            },
-          ]}
-        >
-          <Text
-            style={[styles.buttonText, { color: colors.primaryForeground }]}
-          >
-            Try Again
-          </Text>
-        </Pressable>
+          variant="primary"
+          style={styles.button}
+        />
       </View>
 
       {__DEV__ ? (
@@ -120,27 +105,23 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
                   { borderBottomColor: colors.border },
                 ]}
               >
-                <Text style={[styles.modalTitle, { color: colors.foreground }]}>
+                <Text style={[TYPE_SCALE.headline, { color: colors.foreground }]}>
                   Error Details
                 </Text>
-                <Pressable
+                <IconButton
+                  name="x"
                   onPress={() => setIsModalVisible(false)}
                   accessibilityLabel="Close error details"
-                  accessibilityRole="button"
-                  style={({ pressed }) => [
-                    styles.closeButton,
-                    { opacity: pressed ? 0.6 : 1 },
-                  ]}
-                >
-                  <Feather name="x" size={24} color={colors.foreground} />
-                </Pressable>
+                  color={colors.foreground}
+                  variant="plain"
+                />
               </View>
 
               <ScrollView
                 style={styles.modalScrollView}
                 contentContainerStyle={[
                   styles.modalScrollContent,
-                  { paddingBottom: insets.bottom + 16 },
+                  { paddingBottom: insets.bottom + SPACING.md },
                 ]}
                 showsVerticalScrollIndicator
               >
@@ -152,6 +133,7 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
                 >
                   <Text
                     style={[
+                      TYPE_SCALE.footnote,
                       styles.errorText,
                       {
                         color: colors.foreground,
@@ -179,61 +161,33 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: SPACING.xl,
   },
   content: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
+    gap: SPACING.md,
     width: '100%',
     maxWidth: 600,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
     textAlign: 'center',
-    lineHeight: 40,
   },
   message: {
-    fontSize: 16,
     textAlign: 'center',
-    lineHeight: 24,
   },
   devMessage: {
-    fontSize: 12,
     textAlign: 'center',
-    lineHeight: 18,
     maxWidth: 320,
   },
   topButton: {
     position: 'absolute',
-    right: 16,
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    right: SPACING.md,
     zIndex: 10,
   },
   button: {
-    paddingVertical: 16,
-    borderRadius: 8,
-    paddingHorizontal: 24,
+    marginTop: SPACING.xs,
     minWidth: 200,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  buttonText: {
-    fontWeight: '600',
-    textAlign: 'center',
-    fontSize: 16,
   },
   modalOverlay: {
     flex: 1,
@@ -243,43 +197,32 @@ const styles = StyleSheet.create({
   modalContainer: {
     width: '100%',
     height: '90%',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    borderTopLeftRadius: RADII.sheet,
+    borderTopRightRadius: RADII.sheet,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  closeButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   modalScrollView: {
     flex: 1,
   },
   modalScrollContent: {
-    padding: 16,
+    padding: SPACING.md,
   },
   errorContainer: {
     width: '100%',
-    borderRadius: 8,
+    borderRadius: RADII.chip,
     overflow: 'hidden',
-    padding: 16,
+    padding: SPACING.md,
   },
   errorText: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontFamily: FONT.regular,
     width: '100%',
   },
 });

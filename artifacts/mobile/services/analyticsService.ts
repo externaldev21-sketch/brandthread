@@ -13,7 +13,20 @@ import {
   ExportSection, DATE_RANGE_OPTIONS, COMPARISON_OPTIONS,
 } from './analyticsTypes';
 
-const FILTER_KEY = 'bt:analytics:filter:v1';
+/** Set by initAnalyticsService() after sign-in. Falls back to 'anon' so the
+ *  service is safe to call before the user ID is available. */
+let _analyticsUserId = 'anon';
+
+/** Call once after Clerk resolves the current user ID (and again on sign-out
+ *  with null, or when the signed-in user changes) so a different account
+ *  never inherits the previous account's saved date-range filter. */
+export function initAnalyticsService(userId: string | null): void {
+  _analyticsUserId = userId ?? 'anon';
+}
+
+function filterKey(uid = _analyticsUserId): string {
+  return `bt:analytics:filter:${uid}:v1`;
+}
 
 function number(value: unknown): number {
   const parsed = Number(value);
@@ -47,14 +60,14 @@ function periodFor(filter?: AnalyticsFilterState): string {
 
 export async function getFilterState(): Promise<AnalyticsFilterState> {
   try {
-    const raw = await AsyncStorage.getItem(FILTER_KEY);
+    const raw = await AsyncStorage.getItem(filterKey());
     if (raw) return JSON.parse(raw) as AnalyticsFilterState;
   } catch { /* a local preference must not block analytics */ }
   return { dateRange: DATE_RANGE_OPTIONS[3], comparison: COMPARISON_OPTIONS[0], groupBy: 'daily' };
 }
 
 export async function saveFilterState(state: AnalyticsFilterState): Promise<void> {
-  await AsyncStorage.setItem(FILTER_KEY, JSON.stringify(state));
+  await AsyncStorage.setItem(filterKey(), JSON.stringify(state));
 }
 
 export async function getOverview(filter?: AnalyticsFilterState): Promise<AnalyticsOverview> {

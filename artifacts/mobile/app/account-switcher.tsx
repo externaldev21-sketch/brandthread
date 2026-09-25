@@ -19,6 +19,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth, useSessionList } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
+import { Header } from '@/components/layout';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE,
   FONT, FS, SP, RADIUS, ICON, SURFACE, ACCENT, CARD_ELEVATED,
@@ -95,20 +96,8 @@ export default function AccountSwitcherScreen() {
   // Loading skeleton while Clerk hydrates
   if (!isLoaded && !authLoaded) {
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
-        <View style={s.header}>
-          <TouchableOpacity
-            style={s.backBtn}
-            onPress={handleBack}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <Feather name="arrow-left" size={ICON.md} color={FG} />
-          </TouchableOpacity>
-          <Text style={s.headerTitle}>Accounts</Text>
-          <View style={s.headerSpacer} />
-        </View>
+      <View style={s.root}>
+        <Header title="Accounts" onBack={handleBack} />
 
         <View style={s.skeletonContainer}>
           {[0, 1].map((i) => (
@@ -129,21 +118,9 @@ export default function AccountSwitcherScreen() {
   const activeSessions = (sessions ?? []).filter((s) => s.status === 'active');
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <View style={s.root}>
       {/* ── Header ── */}
-      <View style={s.header}>
-        <TouchableOpacity
-          style={s.backBtn}
-          onPress={handleBack}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Accounts</Text>
-        <View style={s.headerSpacer} />
-      </View>
+      <Header title="Accounts" onBack={handleBack} />
 
       <ScrollView
         style={s.scroll}
@@ -296,32 +273,6 @@ const s = StyleSheet.create({
     flex: 1,
     backgroundColor: BG,
   },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    paddingTop: SP.sm,
-    paddingBottom: SP.md,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SP.xs,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: FS.md,
-    fontFamily: FONT.bold,
-    color: FG,
-    textAlign: 'center',
-  },
-  headerSpacer: { width: 40 },
 
   // Scroll
   scroll: { flex: 1 },

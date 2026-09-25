@@ -19,6 +19,8 @@ import {
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getMyPosts, unarchivePost, deletePost } from '@/services/socialService';
 import type { BuyerPost } from '@/services/socialTypes';
+import { Header } from '@/components/layout';
+import { EmptyState } from '@/components/BrandthreadUI';
 
 const { width } = Dimensions.get('window');
 const GAP = SP.xs;
@@ -108,14 +110,8 @@ export default function BuyerArchive() {
   }
 
   return (
-    <View style={[styles.page, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={21} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.title}>Archive</Text>
-        <View style={styles.iconBtn} />
-      </View>
+    <View style={styles.page}>
+      <Header title="Archive" />
 
       {/* Tab toggle */}
       <View style={styles.tabRow}>
@@ -139,13 +135,11 @@ export default function BuyerArchive() {
 
       {tab === 'posts' ? (
         archivedPosts.length === 0 ? (
-          <View style={styles.empty}>
-            <Feather name="archive" size={40} color={MUTED} />
-            <Text style={styles.emptyTitle}>No archived posts</Text>
-            <Text style={styles.emptyDesc}>
-              Posts you archive from your profile will appear here. Only you can see them.
-            </Text>
-          </View>
+          <EmptyState
+            icon="archive"
+            title="No archived posts"
+            description="Posts you archive from your profile will appear here. Only you can see them."
+          />
         ) : (
           <FlatList
             data={archivedPosts}
@@ -158,13 +152,11 @@ export default function BuyerArchive() {
           />
         )
       ) : (
-        <View style={styles.empty}>
-          <Feather name="clock" size={40} color={MUTED} />
-          <Text style={styles.emptyTitle}>No archived stories</Text>
-          <Text style={styles.emptyDesc}>
-            Stories are automatically saved here after they expire. Only you can see them.
-          </Text>
-        </View>
+        <EmptyState
+          icon="clock"
+          title="No archived stories"
+          description="Stories are automatically saved here after they expire. Only you can see them."
+        />
       )}
 
       {/* Restore / Delete bottom sheet */}
@@ -205,9 +197,6 @@ export default function BuyerArchive() {
 
 const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
-  header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
-  iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
   tabRow: { flexDirection: 'row', paddingHorizontal: SP.md, paddingVertical: SP.sm, gap: SP.sm },
   tabPill: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: SP.sm, backgroundColor: CARD, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER },
   tabPillActive: { backgroundColor: theme.accentDim, borderColor: theme.accent },

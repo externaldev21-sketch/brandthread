@@ -49,6 +49,12 @@ const profileBodySchema = z.object({
   appThemeId: z.enum(["monochrome", "purple", "olive", "navy", "champagne", "black", "silver", "black-gold", "emerald-gold", "leopard-red", "maroon", "gold"]).optional(),
   appIconId: z.enum(["monochrome", "purple", "olive", "navy", "champagne", "black", "silver", "black-gold", "emerald-gold", "leopard-red", "maroon", "gold"]).nullable().optional(),
   expectedClerkId: z.string().min(1).optional(),
+  // Seller storefront metadata (Edit Profile — Store Details section)
+  category: optionalProfileText,
+  location: optionalProfileText,
+  contactEmail: z.union([z.literal(""), requestPrimitives.email]).optional(),
+  tags: z.array(z.string().trim().min(1).max(30)).max(20).optional(),
+  socialLinks: z.record(z.string(), z.string().trim().max(300)).optional(),
 }).passthrough();
 const privacyBodySchema = z.object({
   dmPrivacy: z.enum(["requests", "followers_only"]),
@@ -157,6 +163,8 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
           ? user.accountType
           : null,
         idempotencyKey: `welcome/${clerkUserId}`,
+      }).then((sent) => {
+        if (!sent) req.log.warn({ clerkUserId }, "Welcome email delivery failed");
       }).catch((err) => {
         req.log.warn({ err, clerkUserId }, "Welcome email delivery failed");
       });
@@ -734,7 +742,10 @@ router.patch(
 // Update editable profile fields. Validates and enforces uniqueness on username.
 router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema }), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
-  const { displayName, brandName, bio, website, name, username, accountType, appThemeId, appIconId, expectedClerkId } = req.body as {
+  const {
+    displayName, brandName, bio, website, name, username, accountType, appThemeId, appIconId, expectedClerkId,
+    category, location, contactEmail, tags, socialLinks,
+  } = req.body as {
     displayName?: string;
     brandName?:   string;
     bio?:         string;
@@ -745,6 +756,11 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
     appThemeId?: string;
     appIconId?: string | null;
     expectedClerkId?: string;
+    category?:     string;
+    location?:     string;
+    contactEmail?: string;
+    tags?:         string[];
+    socialLinks?:  Record<string, string>;
   };
   if (expectedClerkId && expectedClerkId !== clerkId) {
     (req as any).log?.warn("profile update rejected after account context changed");
@@ -777,6 +793,11 @@ router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema 
   }
   if (appThemeId !== undefined) updates.appThemeId = appThemeId;
   if (appIconId !== undefined) updates.appIconId = appIconId;
+  if (category     !== undefined) updates.category     = category;
+  if (location     !== undefined) updates.location     = location;
+  if (contactEmail !== undefined) updates.contactEmail = contactEmail;
+  if (tags         !== undefined) updates.tags         = tags;
+  if (socialLinks  !== undefined) updates.socialLinks   = socialLinks;
 
   // Username: format + uniqueness check
   if (username !== undefined) {

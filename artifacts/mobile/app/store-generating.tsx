@@ -26,30 +26,6 @@ const GEN_STEPS = [
   { icon: 'check-circle', label: 'Finalizing your storefront',    duration: 800 },
 ] as const;
 
-const DEFAULT_ANSWERS: StoreGenerationAnswers = {
-  primaryStyle: 'contemporary',
-  secondaryStyles: [],
-  moods: ['clean'],
-  colors: {
-    primary: '#0f766e',
-    secondary: '#0c4a6e',
-    accent: '#38bdf8',
-    background: '#0f0f1a',
-    text: '#f4f4ff',
-    buttonText: '#0f0f1a',
-  },
-  typography: 'modern',
-  homepagePriority: 'hero_image',
-  additionalSections: [],
-  brandStory: '',
-  targetCustomers: ['unisex'],
-  ageRange: { min: 18, max: 40 },
-  audienceDescription: '',
-  existingContent: [],
-  features: ['product_reviews', 'email_signup'],
-  moodBoardUris: [],
-};
-
 export default function StoreGeneratingScreen() {
   const { theme } = useAppTheme();
   const gen = makeStyles(theme);
@@ -112,15 +88,18 @@ export default function StoreGeneratingScreen() {
     setCurrentStep(0);
     setCompletedSteps([]);
 
-    // Load answers
-    let answers: StoreGenerationAnswers;
+    // Load answers — if the wizard's answers are missing, don't silently
+    // substitute made-up defaults. Send the seller back to pick a style.
+    let answers: StoreGenerationAnswers | null = null;
     try {
       const draft = await loadDraftAnswers();
-      answers = (draft && draft.primaryStyle)
-        ? (draft as StoreGenerationAnswers)
-        : DEFAULT_ANSWERS;
+      if (draft && draft.primaryStyle) answers = draft as StoreGenerationAnswers;
     } catch {
-      answers = DEFAULT_ANSWERS;
+      answers = null;
+    }
+    if (!answers) {
+      router.replace(('/store-generate?toast=' + encodeURIComponent("Let's pick your style first")) as never);
+      return;
     }
 
     // Run service generation in parallel with animation
@@ -262,6 +241,24 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE_LIGHT = theme.accentLight;
   const PURPLE_DIM = theme.accentDim;
   const BORDER_ACTIVE = theme.accentLight;
+  const BG = theme.background;
+  const SURFACE = theme.surface;
+  const CARD = theme.card;
+  const CARD_ELEVATED = theme.cardElevated;
+  const BORDER = theme.border;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const SUBTLE = theme.subtle;
+  const SUCCESS = theme.success;
+  const SUCCESS_DIM = `${theme.success}20`;
+  const ORANGE = theme.warning;
+  const ORANGE_DIM = `${theme.warning}20`;
+  const RED = theme.error;
+  const RED_DIM = `${theme.error}20`;
+  const BLUE = theme.accent;
+  const BLUE_DIM = theme.accentDim;
+  const CYAN = theme.secondary;
+  const CYAN_DIM = theme.secondaryDim;
   return StyleSheet.create({
   root: {
     flex: 1,

@@ -19,11 +19,9 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import {
-  BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, PURPLE_LIGHT,
-  CYAN, SUCCESS, ORANGE, RED, FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { Header } from '@/components/layout';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/hooks/useApi';
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { isManagerRole, parseRoleError } from '@/lib/roleError';
@@ -41,19 +39,19 @@ import {
   type SubscriptionBillingProvider,
 } from '@/lib/subscriptionRecovery';
 
-interface UsageStat { label: string; used: number; limit: number | null; unit?: string }
-const USAGE: UsageStat[] = [
-  { label: 'Products',       used: 18, limit: null, unit: 'of unlimited' },
-  { label: 'Orders',         used: 147, limit: null, unit: 'this month' },
-  { label: 'Storage',        used: 2.4, limit: 50, unit: 'GB' },
-  { label: 'Team seats',     used: 2, limit: 3 },
-];
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
+// Note: there is no real usage-metrics API in this codebase yet, so the Usage
+// tab (which previously showed hardcoded fake numbers) has been removed
+// rather than ship fabricated personal usage stats. Re-add it once a real
+// backing endpoint exists.
 
 export default function SubscriptionScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const {
+    accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM,
+    text: FG, muted: MUTED, subtle: SUBTLE, border: BORDER, card: CARD, cardElevated: CARD_ELEVATED,
+    success: SUCCESS, warning: ORANGE, error: RED, background: BG,
+  } = theme;
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -61,7 +59,7 @@ export default function SubscriptionScreen() {
   const { available: revenueCatAvailable, packages: revenueCatPackages, purchase, restore, managementURL } = useRevenueCat();
   const growthStudioTools = React.useMemo(() => getGrowthStudioTools(theme), [theme]);
 
-  const [activeTab,   setActiveTab]   = useState<'plan' | 'usage' | 'billing'>('plan');
+  const [activeTab,   setActiveTab]   = useState<'plan' | 'billing'>('plan');
   const { currentRole, isLoadingRole } = useTeamRole();
   const isReadOnly = isManagerRole(currentRole);
   const [statusLoading, setStatusLoading] = useState(true);
@@ -226,7 +224,7 @@ export default function SubscriptionScreen() {
       await restore();
       invalidatePlanCache();
       await fetchStatus();
-      Alert.alert('Purchases restored', 'Your RevenueCat subscription has been refreshed.');
+      Alert.alert('Purchases restored', 'Your subscription has been refreshed.');
     } catch (e: any) {
       Alert.alert('Restore error', e?.message ?? 'Could not restore purchases. Please try again.');
     }
@@ -234,11 +232,11 @@ export default function SubscriptionScreen() {
 
   // Status pill
   const statusColor =
-    currentPlan.status === 'active'    ? SUCCESS
-    : currentPlan.status === 'trialing' ? CYAN
-    : currentPlan.status === 'past_due' ? ORANGE
-    : currentPlan.status === 'canceled' ? RED
-    : MUTED;
+    currentPlan.status === 'active'    ? theme.success
+    : currentPlan.status === 'trialing' ? theme.secondary
+    : currentPlan.status === 'past_due' ? theme.warning
+    : currentPlan.status === 'canceled' ? theme.error
+    : theme.muted;
 
   const statusLabel =
     currentPlan.status === 'active'    ? 'Active'
@@ -249,16 +247,10 @@ export default function SubscriptionScreen() {
 
   if (isLoadingRole) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => { haptic(); router.back(); }} style={styles.backBtn}>
-            <Feather name="chevron-left" size={24} color={FG} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Subscription</Text>
-          <View style={styles.backBtn} />
-        </View>
+      <View style={styles.root}>
+        <Header title="Subscription" />
         <View style={styles.accessLoading}>
-          <ActivityIndicator color={PURPLE} />
+          <ActivityIndicator color={theme.accent} />
         </View>
       </View>
     );
@@ -266,33 +258,20 @@ export default function SubscriptionScreen() {
 
   if (currentRole !== 'owner' && !isReadOnly) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => { haptic(); router.back(); }} style={styles.backBtn}>
-            <Feather name="chevron-left" size={24} color={FG} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Subscription</Text>
-          <View style={styles.backBtn} />
-        </View>
+      <View style={styles.root}>
+        <Header title="Subscription" />
         <RoleLockedView screenTitle="subscription & billing" currentRole={currentRole ?? undefined} />
       </View>
     );
   }
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => { haptic(); router.back(); }} style={styles.backBtn}>
-          <Feather name="chevron-left" size={24} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Subscription</Text>
-        <View style={styles.backBtn} />
-      </View>
+    <View style={styles.root}>
+      <Header title="Subscription" />
 
       {/* Tabs */}
       <View style={styles.tabRow}>
-        {(['plan', 'usage', 'billing'] as const).map((t) => (
+        {(['plan', 'billing'] as const).map((t) => (
           <TouchableOpacity
             key={t}
             testID={`seller-subscription-tab-${t}`}
@@ -492,31 +471,22 @@ export default function SubscriptionScreen() {
                   <Text style={styles.restoreText}>Restore purchases</Text>
                 </TouchableOpacity>
               )}
-          </>
-        )}
 
-        {/* ── Usage tab ── */}
-        {activeTab === 'usage' && (
-          <>
-            <Text style={styles.sectionTitle}>Usage this period</Text>
-            {USAGE.map((u) => {
-              const pct = u.limit ? Math.min(u.used / u.limit, 1) : null;
-              return (
-                <View key={u.label} style={styles.usageCard}>
-                  <View style={styles.usageHeader}>
-                    <Text style={styles.usageLabel}>{u.label}</Text>
-                    <Text style={styles.usageValue}>
-                      {u.limit ? `${u.used} / ${u.limit} ${u.unit ?? ''}` : `${u.used} ${u.unit ?? ''}`}
-                    </Text>
-                  </View>
-                  {pct !== null && (
-                    <View style={styles.progressTrack}>
-                      <View style={[styles.progressFill, { width: `${pct * 100}%` as any, backgroundColor: pct > 0.85 ? ORANGE : PURPLE }]} />
-                    </View>
-                  )}
+              {/* Apple guideline 3.1.2 — auto-renew disclosure + Terms/Privacy links */}
+              <View style={styles.legalFooter}>
+                <Text style={styles.legalFooterText}>
+                  Subscriptions renew automatically at the price shown unless you cancel at least 24 hours before the period ends. Manage or cancel in your App Store account settings.
+                </Text>
+                <View style={styles.legalLinksRow}>
+                  <Text style={styles.legalLink} onPress={() => { haptic(); router.push('/terms' as never); }}>
+                    Terms of Use
+                  </Text>
+                  <Text style={styles.legalLinkDivider}>·</Text>
+                  <Text style={styles.legalLink} onPress={() => { haptic(); router.push('/privacy' as never); }}>
+                    Privacy Policy
+                  </Text>
                 </View>
-              );
-            })}
+              </View>
           </>
         )}
 
@@ -590,14 +560,15 @@ export default function SubscriptionScreen() {
   );
 }
 
-const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+const createStyles = (theme: AppThemePreset) => {
+  const {
+    accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM,
+    text: FG, muted: MUTED, subtle: SUBTLE, border: BORDER, card: CARD, cardElevated: CARD_ELEVATED,
+    success: SUCCESS, warning: ORANGE, error: RED, background: BG, onAccent: ON_ACCENT,
+  } = theme;
   return StyleSheet.create({
   root:               { flex: 1, backgroundColor: 'transparent' },
   accessLoading:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header:             { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
-  backBtn:            { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:        { flex: 1, textAlign: 'center', color: FG, fontSize: FS.lg, fontFamily: FONT.semibold },
   tabRow:             { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, marginHorizontal: SP.md },
   tab:                { flex: 1, paddingVertical: SP.sm, alignItems: 'center' },
   tabActive:          { borderBottomWidth: 2, borderBottomColor: PURPLE },
@@ -606,9 +577,11 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
   scroll:             { padding: SP.md },
   currentPlanCard:    { borderRadius: RADIUS.xl, padding: SP.lg, marginBottom: SP.lg },
   currentPlanRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SP.sm },
-  currentPlanLabel:   { color: 'rgba(255,255,255,0.7)', fontSize: FS.xs, fontFamily: FONT.medium },
-  currentPlanName:    { color: '#FFFFFF', fontSize: FS.xxl, fontFamily: FONT.semibold },
-  currentPlanRenews:  { color: 'rgba(255,255,255,0.65)', fontSize: FS.xs, fontFamily: FONT.regular },
+  // Text colour here is always overridden inline with theme.onAccent (+ getOnAccentTextStyle)
+  // since this card sits on primaryGradient; the base value just needs to be theme-safe.
+  currentPlanLabel:   { color: ON_ACCENT, fontSize: FS.xs, fontFamily: FONT.medium },
+  currentPlanName:    { color: ON_ACCENT, fontSize: FS.xxl, fontFamily: FONT.semibold },
+  currentPlanRenews:  { color: ON_ACCENT, fontSize: FS.xs, fontFamily: FONT.regular },
   statusPill:         { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2 },
   statusText:         { fontSize: FS.xs, fontFamily: FONT.medium },
   sectionTitle:       { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: SP.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
@@ -659,20 +632,19 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
   featureTextDim:     { color: SUBTLE },
   changePlanBtn:      { backgroundColor: PURPLE, borderRadius: RADIUS.md, paddingVertical: SP.sm, alignItems: 'center' },
   changePlanBtnOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: BORDER },
-  changePlanText:     { color: '#FFFFFF', fontSize: FS.sm, fontFamily: FONT.semibold },
+  changePlanText:     { color: ON_ACCENT, fontSize: FS.sm, fontFamily: FONT.semibold },
   cancelBtn:          { alignItems: 'center', paddingVertical: SP.lg },
   restoreBtn:         { alignItems: 'center', paddingVertical: SP.sm, marginBottom: SP.md },
   restoreText:        { color: MUTED, fontSize: FS.sm, fontFamily: FONT.medium },
   cancelText:         { color: SUBTLE, fontSize: FS.sm, fontFamily: FONT.regular },
-  usageCard:          { backgroundColor: CARD, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: BORDER, marginBottom: SP.sm },
-  usageHeader:        { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SP.sm },
-  usageLabel:         { color: FG, fontSize: FS.sm, fontFamily: FONT.medium },
-  usageValue:         { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular },
-  progressTrack:      { height: 4, backgroundColor: BORDER, borderRadius: 2, overflow: 'hidden' },
-  progressFill:       { height: 4, borderRadius: 2 },
   billingCard:        { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginBottom: SP.md, overflow: 'hidden' },
-  pastDueAlert:       { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, backgroundColor: 'rgba(239,68,68,0.12)', borderRadius: RADIUS.lg, borderWidth: 1, borderColor: 'rgba(239,68,68,0.45)', padding: SP.md, marginBottom: SP.md },
-  pastDueIcon:        { width: 32, height: 32, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239,68,68,0.16)' },
+  legalFooter:        { paddingTop: SP.sm, paddingHorizontal: SP.xs, gap: 10 },
+  legalFooterText:    { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, lineHeight: 16, textAlign: 'center' },
+  legalLinksRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  legalLink:          { fontSize: FS.xs, fontFamily: FONT.medium, color: FG, textDecorationLine: 'underline' },
+  legalLinkDivider:   { fontSize: FS.xs, color: MUTED },
+  pastDueAlert:       { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, backgroundColor: `${RED}1F`, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: `${RED}73`, padding: SP.md, marginBottom: SP.md },
+  pastDueIcon:        { width: 32, height: 32, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: `${RED}29` },
   pastDueCopy:        { flex: 1, gap: 3 },
   pastDueTitle:       { color: RED, fontSize: FS.sm, fontFamily: FONT.semibold },
   pastDueBody:        { color: FG, fontSize: FS.xs, fontFamily: FONT.regular, lineHeight: 17 },

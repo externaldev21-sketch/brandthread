@@ -9,25 +9,82 @@
  *  - Otherwise they are the owner of their own store (TEAM_OWNER_BYPASS).
  *
  * `requireRole(minRole)` returns 403 when the caller's role in the target
- * store is below `minRole`. Hierarchy: staff < manager < owner.
+ * store is below `minRole` in the legacy linear hierarchy (staff < manager <
+ * owner). `admin`/`finance`/`orders`/`marketing`/`viewer` are the newer,
+ * non-hierarchical team roles offered on invite — `requireRole` folds them
+ * onto the closest legacy rank so existing `requireRole("manager"/"staff")`
+ * gates keep working unchanged; `requirePermission(permission)` is the real
+ * enforcement for capability-specific routes (e.g. payouts) and is what new
+ * code should use.
  *
- * NOTE: mount `teamContext()` / `requireRole()` AFTER `requireAuth` inside a
- * router (they rewrite `req.clerkUserId`, which requireAuth sets).
- * `requireRole` is also safe standalone at mount level (it re-reads Clerk auth
- * internally, like requirePlan).
+ * NOTE: mount `teamContext()` / `requireRole()` / `requirePermission()` AFTER
+ * `requireAuth` inside a router (they rewrite `req.clerkUserId`, which
+ * requireAuth sets). Both are also safe standalone at mount level (they
+ * re-read Clerk auth internally, like requirePlan).
  */
 import { getAuth } from "@clerk/express";
 import type { Request, RequestHandler } from "express";
-import { db, teamMembers } from "@workspace/db";
+import { db, teamMembers, users } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { teamMembershipOrderBy } from "../lib/teamMembership";
 
-export type TeamRole = "owner" | "manager" | "staff";
+export type TeamRole =
+  | "owner"
+  | "admin"
+  | "manager"
+  | "finance"
+  | "orders"
+  | "marketing"
+  | "staff"
+  | "viewer";
 
-const ROLE_ORDER: Record<TeamRole, number> = { staff: 1, manager: 2, owner: 3 };
+const ROLE_ORDER: Record<TeamRole, number> = {
+  viewer: 0,
+  staff: 1,
+  orders: 1,
+  marketing: 1,
+  finance: 1,
+  manager: 2,
+  admin: 2,
+  owner: 3,
+};
 
 /** The account owner is always granted full access to their own store. */
 export const TEAM_OWNER_BYPASS = true;
+
+/**
+ * Fine-grained capabilities, independent of the linear role hierarchy above.
+ * This is the single source of truth other permission checks (e.g. the
+ * payouts gate in finance.ts) should read from, so a "finance" role member
+ * and any future payouts-permission work agree on what "payouts access"
+ * means.
+ */
+export type Permission =
+  | "products"
+  | "orders"
+  | "inventory"
+  | "analytics"
+  | "customers"
+  | "marketing"
+  | "payouts"
+  | "team";
+
+export const ROLE_PERMISSIONS: Record<TeamRole, Permission[] | "*"> = {
+  owner: "*",
+  admin: ["products", "orders", "inventory", "analytics", "customers", "marketing", "payouts", "team"],
+  manager: ["products", "orders", "inventory", "analytics", "customers"],
+  finance: ["payouts", "analytics"],
+  orders: ["orders", "inventory"],
+  marketing: ["marketing", "analytics"],
+  staff: ["orders"],
+  viewer: ["analytics"],
+};
+
+export function hasPermission(role: TeamRole, permission: Permission): boolean {
+  const perms = ROLE_PERMISSIONS[role];
+  if (perms === "*") return true;
+  return perms.includes(permission);
+}
 
 export interface TeamContext {
   /** Clerk id of who is actually making the request. */
@@ -53,6 +110,28 @@ function headerValue(req: Request, name: string): string | null {
   return value ?? null;
 }
 
+/**
+ * Whether this caller runs a real store of their own (completed seller
+ * onboarding), as opposed to being purely a joined team member elsewhere.
+ *
+ * Used only to pick a sane DEFAULT store context when the client hasn't said
+ * which store it wants (see the header handling below). Never throws: a
+ * lookup failure must not silently demote a real owner into someone else's
+ * store, so it fails toward "this is their own store".
+ */
+async function callerRunsOwnStore(userId: string): Promise<boolean> {
+  try {
+    const [row] = await db
+      .select({ onboardingComplete: users.onboardingComplete })
+      .from(users)
+      .where(eq(users.clerkId, userId))
+      .limit(1);
+    return row ? Boolean(row.onboardingComplete) : true;
+  } catch {
+    return true;
+  }
+}
+
 export async function resolveTeamContext(req: Request): Promise<TeamContext | null> {
   const existing = (req as any).teamContext as TeamContext | undefined;
   if (existing) return existing;
@@ -68,14 +147,26 @@ export async function resolveTeamContext(req: Request): Promise<TeamContext | nu
   };
 
   // `own` is the user's store. A membership UUID explicitly selects one of
-  // their joined stores. `joined` and an absent header preserve the legacy
-  // newest-membership behavior for older clients.
+  // their joined stores. `joined` is an explicit request for the legacy
+  // newest-membership behavior.
+  //
+  // An ABSENT header used to also mean "joined" for every caller. That
+  // silently switched a real store owner into a store they'd merely joined
+  // as staff/manager whenever they hadn't (or couldn't, on a fresh install)
+  // persist an explicit "own" preference — locking them out of their own
+  // owner-only screens (Payouts, Finance, Subscription) with a "store owner
+  // access required" error even though they ARE the owner of their own
+  // store. Callers who genuinely run their own store now default to it;
+  // only callers with no store of their own keep the legacy joined default.
   const storeContextHeader = headerValue(req, "x-store-context");
-  const wantsOwnStore = storeContextHeader === "own";
+  const explicitJoined = storeContextHeader === "joined";
   const selectedMembershipId =
-    storeContextHeader && storeContextHeader !== "own" && storeContextHeader !== "joined"
+    storeContextHeader && storeContextHeader !== "own" && !explicitJoined
       ? storeContextHeader
       : null;
+  const wantsOwnStore =
+    storeContextHeader === "own"
+    || (!selectedMembershipId && !explicitJoined && await callerRunsOwnStore(userId));
 
   if (wantsOwnStore) {
     (req as any).teamContext = ctx;
@@ -197,11 +288,109 @@ export function requireRole(minRole: TeamRole): RequestHandler<any, any, any, an
         code: "ROLE_REQUIRED",
         requiredRole: minRole,
         currentRole: role,
-        message: `This action requires the ${minRole} role or higher. Ask the store owner to change your access.`,
+        message: minRole === "owner"
+          ? "Only the store owner can do this. Ask them to grant you a role with that access."
+          : `This needs ${minRole} access or higher on this store. Ask the store owner to change your access.`,
       });
       return;
     }
 
     next();
+  };
+}
+
+/**
+ * Middleware factory enforcing a specific capability on the target store,
+ * via `ROLE_PERMISSIONS`. Unlike `requireRole`, this doesn't assume a linear
+ * hierarchy — a "finance" role member passes `requirePermission("payouts")`
+ * without needing to outrank "manager" on anything else.
+ */
+export function requirePermission(permission: Permission): RequestHandler<any, any, any, any> {
+  return async (req, res, next) => {
+    const { userId } = getAuth(req as Request);
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    let ctx: TeamContext | null;
+    try {
+      ctx = await resolveTeamContext(req as Request);
+    } catch (err) {
+      if (err instanceof InvalidStoreContextError) {
+        res.status(403).json({
+          error: err.message,
+          code: "STORE_CONTEXT_NOT_ALLOWED",
+        });
+        return;
+      }
+      throw err;
+    }
+    const role = ctx?.actorRole ?? "owner";
+
+    if (TEAM_OWNER_BYPASS && role === "owner") {
+      next();
+      return;
+    }
+
+    if (!hasPermission(role, permission)) {
+      res.status(403).json({
+        error: "Insufficient permission",
+        code: "PERMISSION_REQUIRED",
+        requiredPermission: permission,
+        currentRole: role,
+        message: `This action requires ${permission} access. Ask the store owner to change your access.`,
+      });
+      return;
+    }
+
+    next();
+  };
+}
+
+/**
+ * Read-only payouts/finance views (balance, payout history, transactions,
+ * statement): owner, "finance"/"admin" (via requirePermission("payouts")),
+ * or a legacy "manager" — the mobile app renders a read-only Payouts/Finance
+ * screen for managers today, so relaxing these GETs to admit them (alongside
+ * the new finance role) keeps that working. Money-moving writes (POST
+ * /payout) stay on requirePermission("payouts") alone: managers can view but
+ * never trigger a payout.
+ */
+export function requirePayoutsRead(): RequestHandler<any, any, any, any> {
+  return async (req, res, next) => {
+    const { userId } = getAuth(req as Request);
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    let ctx: TeamContext | null;
+    try {
+      ctx = await resolveTeamContext(req as Request);
+    } catch (err) {
+      if (err instanceof InvalidStoreContextError) {
+        res.status(403).json({
+          error: err.message,
+          code: "STORE_CONTEXT_NOT_ALLOWED",
+        });
+        return;
+      }
+      throw err;
+    }
+    const role = ctx?.actorRole ?? "owner";
+
+    if ((TEAM_OWNER_BYPASS && role === "owner") || role === "manager" || hasPermission(role, "payouts")) {
+      next();
+      return;
+    }
+
+    res.status(403).json({
+      error: "Insufficient permission",
+      code: "PERMISSION_REQUIRED",
+      requiredPermission: "payouts",
+      currentRole: role,
+      message: "This action requires payouts access. Ask the store owner to change your access.",
+    });
   };
 }

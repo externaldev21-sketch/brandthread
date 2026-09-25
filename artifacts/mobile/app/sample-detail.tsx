@@ -22,7 +22,7 @@ import { File as FSFile } from 'expo-file-system';
 import {
   BrandthreadScreen, BrandthreadHeader, BrandthreadCard, GradientCard,
   PrimaryButton, SecondaryButton, StatusBadge, SectionHeader, FormInput,
-  LoadingSkeleton,
+  LoadingSkeleton, EmptyState,
 } from '@/components/BrandthreadUI';
 
 import {
@@ -36,9 +36,9 @@ import { Sample, SampleReview, SampleStatus } from '@/services/manufacturerTypes
 
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, ON_DARK,
-  ACCENT, ACCENT_LIGHT,
-  SUCCESS, SUCCESS_DIM, RED, ORANGE,
+  FG, MUTED, SUBTLE,
+  ACCENT_LIGHT,
+  SUCCESS, SUCCESS_DIM, RED, ORANGE, GOLD,
   GRAD_CARD_GLOW,
   FONT, FS, SP, RADIUS, COMP, ICON,
   SHADOW_PURPLE,
@@ -54,6 +54,7 @@ const SAMPLE_STATUSES: SampleStatus[] = [
 
 const STATUS_LABELS: Record<string, string> = {
   requested: 'Requested',
+  pending_payment: 'Awaiting payment',
   awaiting_payment: 'Awaiting Payment',
   paid: 'Paid',
   in_development: 'In Development',
@@ -145,7 +146,7 @@ function StarRow({
           <Feather
             name="star"
             size={ICON.md}
-            color={i <= rating ? '#F59E0B' : BORDER}
+            color={i <= rating ? GOLD : BORDER}
           />
         </TouchableOpacity>
       ))}
@@ -197,11 +198,11 @@ function SampleTimeline({
 
         return (
           <View key={st} style={tl.row}>
-            {/* Left: dot + connector line */}
+            {/* Left: dot + connector line — matches ProductionTimeline's dot/rail language */}
             <View style={tl.dotCol}>
               {isCompleted && (
                 <View style={tl.dotCompleted}>
-                  <Feather name="check" size={9} color={ON_DARK} />
+                  <Feather name="check" size={13} color={BG} />
                 </View>
               )}
               {isActive && (
@@ -210,10 +211,12 @@ function SampleTimeline({
                 </View>
               )}
               {isFuture && (
-                <View style={tl.dotFuture} />
+                <View style={tl.dotFuture}>
+                  <Text style={tl.dotFutureText}>{idx + 1}</Text>
+                </View>
               )}
               {!isLast && (
-                <View style={[tl.line, isCompleted && tl.lineCompleted, isActive && tl.lineActive]} />
+                <View style={[tl.line, isCompleted && tl.lineCompleted]} />
               )}
             </View>
 
@@ -259,45 +262,51 @@ const tl = StyleSheet.create({
   },
   dotCol: {
     alignItems: 'center',
-    width: 20,
+    width: 26,
   },
   dotCompleted: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: SUCCESS,
+    borderWidth: 1,
+    borderColor: SUCCESS,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1,
   },
   dotActive: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: ACCENT,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: CARD_ELEVATED,
+    borderWidth: 2,
+    borderColor: FG,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1,
-    shadowColor: ACCENT,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.7,
-    shadowRadius: 8,
-    elevation: 6,
   },
   dotActiveInner: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: ON_DARK,
+    backgroundColor: FG,
   },
   dotFuture: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: 'transparent',
+    backgroundColor: CARD_ELEVATED,
+    alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 1,
+  },
+  dotFutureText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: SUBTLE,
   },
   line: {
     width: 2,
@@ -307,38 +316,34 @@ const tl = StyleSheet.create({
     marginVertical: 2,
   },
   lineCompleted: {
-    backgroundColor: SUCCESS + '88',
-  },
-  lineActive: {
-    backgroundColor: ACCENT + '44',
+    backgroundColor: SUCCESS,
   },
   textCol: {
     flex: 1,
     paddingBottom: SP.md,
-    paddingTop: 1,
+    paddingTop: 3,
   },
   stepTitle: {
-    fontSize: FS.sm,
-    fontFamily: FONT.bold,
-    color: SUBTLE,
-  },
-  stepTitleCompleted: {
+    fontSize: FS.base,
+    fontFamily: FONT.semibold,
     color: MUTED,
   },
+  stepTitleCompleted: {
+    color: FG,
+  },
   stepTitleActive: {
-    color: ON_DARK,
+    color: FG,
     fontSize: FS.base,
   },
   stepTitleFuture: {
-    color: SUBTLE,
-    fontFamily: FONT.regular,
+    color: MUTED,
   },
   stepDesc: {
-    fontSize: FS.xs,
+    fontSize: FS.sm,
     fontFamily: FONT.regular,
-    color: SUBTLE,
+    color: MUTED,
     marginTop: 2,
-    lineHeight: 17,
+    lineHeight: 18,
   },
   stepDescActive: {
     color: MUTED,
@@ -392,30 +397,37 @@ export default function SampleDetailScreen() {
   const [paymentError, setPaymentError] = useState('');
   const loadGeneration = useRef(0);
 
-  const load = useCallback(async () => {
+  // isInitialLoad=false (the default, used by the 15s poll) refreshes silently
+  // in the background — it never toggles the loading flag, which previously
+  // wiped the whole screen to skeletons, reset scroll position and dropped
+  // keyboard focus on every poll tick, even mid-typing in the review form.
+  const load = useCallback(async (isInitialLoad = false) => {
     if (!id) return;
     const generation = ++loadGeneration.current;
-    setLoading(true);
+    if (isInitialLoad) setLoading(true);
     try {
       const s = await getSample(id);
       if (s && generation === loadGeneration.current) {
         setSample(s);
         setManufacturerName(s.manufacturerName ?? 'Manufacturer');
-      } else if (generation === loadGeneration.current) {
+      } else if (generation === loadGeneration.current && isInitialLoad) {
         setSample(null);
       }
     } catch {
-      if (generation === loadGeneration.current) setSample(null);
+      if (generation === loadGeneration.current && isInitialLoad) setSample(null);
     } finally {
       if (generation === loadGeneration.current) setLoading(false);
     }
   }, [id]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(true); }, [load]);
   useEffect(() => {
-    const timer = setInterval(load, 15_000);
+    // Skip polling entirely while the review form is open, so a background
+    // refresh can never wipe out an in-progress review the seller is typing.
+    if (reviewMode) return;
+    const timer = setInterval(() => load(false), 15_000);
     return () => clearInterval(timer);
-  }, [load]);
+  }, [load, reviewMode]);
 
   const confirmHostedPayment = useCallback(async () => {
     if (!sample || paying) return false;
@@ -467,7 +479,7 @@ export default function SampleDetailScreen() {
       const message = String(error?.message ?? '');
       setPaymentError(
         message.includes('Manufacturer cannot receive') || message.includes('payouts are not ready')
-          ? 'The manufacturer must finish Stripe payout setup before you can pay. Message them to complete verification, then refresh this order.'
+          ? 'The manufacturer needs to finish payout setup before you can pay. Message them, then refresh.'
           : message || 'Could not open secure checkout. Please try again.',
       );
     } finally {
@@ -638,7 +650,14 @@ export default function SampleDetailScreen() {
     return (
       <BrandthreadScreen>
         <BrandthreadHeader title="Sample Details" onBack={() => router.back()} />
-        <View style={s.centered} />
+        <View style={s.centered}>
+          <EmptyState
+            icon="package"
+            title="Sample not found"
+            description="It may have been withdrawn."
+            action={{ label: 'Back', onPress: () => router.back() }}
+          />
+        </View>
       </BrandthreadScreen>
     );
   }
@@ -688,15 +707,19 @@ export default function SampleDetailScreen() {
               <Text style={s.paymentTitle}>Payment required</Text>
               <Text style={s.paymentText}>
                 {sample.manufacturerPayoutReady !== true
-                  ? 'Payment is unavailable until the manufacturer connects and verifies their Stripe payout account. Message them, then refresh this order.'
-                  : 'Pay securely to send this sample into production. Funds are routed to the manufacturer through Stripe.'}
+                  ? 'The manufacturer needs to finish payout setup before you can pay. Message them, then refresh.'
+                  : 'Pay securely. Funds are held until your sample ships.'}
               </Text>
               {!!paymentError && <Text style={s.paymentError}>{paymentError}</Text>}
             </BrandthreadCard>
           )}
 
           {/* ── STATUS TIMELINE ──────────────────────────────────── */}
-          <SectionHeader title="Progress" style={s.sectionHeader} />
+          <SectionHeader
+            title="Progress"
+            action={{ label: 'Live tracker', onPress: () => router.push({ pathname: '/production-detail', params: { id: sample.id } } as never) }}
+            style={s.sectionHeader}
+          />
           <BrandthreadCard style={s.section}>
             <SampleTimeline
               currentStatus={sample.status}

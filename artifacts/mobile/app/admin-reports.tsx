@@ -26,6 +26,7 @@ import {
 import type {
   ModerationAction, ModerationQueue, ModerationQueueItem, ProfileSummary, ReportTargetType,
 } from '@/lib/safetyTypes';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 type Status = 'open' | 'resolved';
 type TypeFilter = 'all' | ReportTargetType;
@@ -356,9 +357,9 @@ function ReviewSheet({
   );
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={s.scrim} onPress={onClose} accessibilityLabel="Close review" />
-      <View style={[s.sheet, { paddingBottom: insets.bottom + SP.md }]}>
+      <SheetRise style={[s.sheet, { paddingBottom: insets.bottom + SP.md }]}>
         <View style={s.sheetHandle} />
         <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={s.sheetHeader}>
@@ -418,7 +419,7 @@ function ReviewSheet({
                     disabled={!!busy}
                     accessibilityRole="button"
                   >
-                    {busy === 'suspend_user' ? <ActivityIndicator color="#FFFFFF" /> : <Text style={s.dangerText}>Suspend account</Text>}
+                    {busy === 'suspend_user' ? <ActivityIndicator color={theme.onAccent} /> : <Text style={s.dangerText}>Suspend account</Text>}
                   </PressableScale>
                   <PressableScale onPress={() => setConfirmSuspend(false)} style={s.ghostBtn} accessibilityRole="button">
                     <Text style={s.ghostText}>Cancel</Text>
@@ -468,7 +469,7 @@ function ReviewSheet({
             </View>
           ) : null}
         </ScrollView>
-      </View>
+      </SheetRise>
     </Modal>
   );
 }
@@ -547,7 +548,7 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   confirmTitle: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.md },
   confirmBody: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
   dangerBtn: { height: 50, borderRadius: RADIUS.md, backgroundColor: theme.error, alignItems: 'center', justifyContent: 'center', marginTop: SP.xs },
-  dangerText: { color: '#1A0A0A', fontFamily: FONT.bold, fontSize: FS.base },
+  dangerText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: FS.base },
   ghostBtn: { height: 44, alignItems: 'center', justifyContent: 'center' },
   ghostText: { color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.base },
 });

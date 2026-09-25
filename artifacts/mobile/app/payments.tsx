@@ -15,6 +15,8 @@ import {
   type DropBroadcastState,
 } from '@/lib/dropBroadcastState';
 import { FS } from '@/lib/theme';
+import { EmptyState } from '@/components/BrandthreadUI';
+import { useRouter } from 'expo-router';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,61 +48,9 @@ function dropStatusFromApiStatus(status: string): DropStatus {
   return 'held';
 }
 
-// ─── Fallback mock data (used when API has no drops yet) ─────────────────────
-
-const DROPS_FALLBACK: Drop[] = [
-  {
-    id: 'DROP-001',
-    name: 'Summer Collection Vol. 3',
-    type: 'pre-order',
-    totalOrders: 142,
-    totalCollectedCents: 1844000,
-    releaseDate: 'Aug 15, 2026',
-    payoutDate: 'Aug 18, 2026',
-    status: 'held',
-    mfgProgress: 0.65,
-  },
-  {
-    id: 'DROP-002',
-    name: 'Essential Basics – Restock',
-    type: 'pre-made',
-    totalOrders: 89,
-    totalCollectedCents: 721000,
-    payoutDate: 'Jul 9, 2026',
-    status: 'processing',
-  },
-  {
-    id: 'DROP-003',
-    name: 'Heritage Hoodie Drop',
-    type: 'pre-order',
-    totalOrders: 210,
-    totalCollectedCents: 3150000,
-    releaseDate: 'Jul 20, 2026',
-    payoutDate: 'Jul 23, 2026',
-    status: 'held',
-    mfgProgress: 0.88,
-  },
-  {
-    id: 'DROP-004',
-    name: 'Spring Capsule',
-    type: 'pre-made',
-    totalOrders: 156,
-    totalCollectedCents: 1248000,
-    payoutDate: 'Jun 30, 2026',
-    status: 'paid',
-  },
-  {
-    id: 'DROP-005',
-    name: 'Limited Collab – Artist Series',
-    type: 'pre-order',
-    totalOrders: 320,
-    totalCollectedCents: 4480000,
-    releaseDate: 'Sep 1, 2026',
-    payoutDate: 'Sep 4, 2026',
-    status: 'held',
-    mfgProgress: 0.30,
-  },
-];
+// Drops start empty — a seller with no real drops sees an EmptyState, never
+// fabricated financial data (§11a).
+const DROPS_FALLBACK: Drop[] = [];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -122,22 +72,21 @@ interface BroadcastPreview {
 interface DropCardProps {
   drop: Drop;
   colors: ReturnType<typeof useColors>;
-  isDark: boolean;
   isLast: boolean;
   broadcastState: BroadcastState;
   broadcastPreview?: BroadcastPreview;
   onBroadcast: () => void;
 }
 
-function DropCard({ drop, colors, isDark, isLast, broadcastState, broadcastPreview, onBroadcast }: DropCardProps) {
+function DropCard({ drop, colors, isLast, broadcastState, broadcastPreview, onBroadcast }: DropCardProps) {
   const primary = colors.primary;
   const isPreOrder = drop.type === 'pre-order';
   const s = statusConfig[drop.status];
 
-  const typeColor   = isPreOrder ? colors.primary : '#10B981';
-  const typeBg      = isPreOrder ? colors.accent : 'rgba(16,185,129,0.09)';
-  const typeBorder  = isPreOrder ? colors.primary : 'rgba(16,185,129,0.20)';
-  const progressBg  = isDark ? '#33302A' : '#E8E1CF';
+  const typeColor   = isPreOrder ? colors.primary : colors.success;
+  const typeBg      = isPreOrder ? colors.accent : `${colors.success}17`;
+  const typeBorder  = isPreOrder ? colors.primary : `${colors.success}33`;
+  const progressBg  = colors.border;
   const launchAt = drop.releaseAt ? new Date(drop.releaseAt) : null;
   const hasFutureLaunch = Boolean(
     launchAt &&
@@ -238,7 +187,7 @@ function DropCard({ drop, colors, isDark, isLast, broadcastState, broadcastPrevi
       {drop.status === 'processing' && (
         <View style={[styles.broadcastWrap, { borderTopColor: colors.border }]}>
           {notificationScheduled ? (
-            <View style={[styles.scheduledNotice, { backgroundColor: 'rgba(16,185,129,0.10)', borderColor: 'rgba(16,185,129,0.25)' }]}>
+            <View style={[styles.scheduledNotice, { backgroundColor: `${colors.success}1A`, borderColor: `${colors.success}40` }]}>
               <Feather name="clock" size={14} color={colors.success} />
               <Text style={[styles.scheduledNoticeText, { color: colors.success }]}>
                 Notification scheduled for {fmtDate(drop.scheduledBroadcastAt ?? drop.releaseAt!)}
@@ -265,7 +214,7 @@ function DropCard({ drop, colors, isDark, isLast, broadcastState, broadcastPrevi
                 style={[
                   styles.broadcastBtn,
                   broadcastState === 'sent' || broadcastState === 'already_sent'
-                    ? { backgroundColor: 'rgba(16,185,129,0.12)', borderColor: 'rgba(16,185,129,0.30)' }
+                    ? { backgroundColor: `${colors.success}1F`, borderColor: `${colors.success}4D` }
                     : { backgroundColor: colors.accent, borderColor: colors.primary },
                   broadcastState === 'loading' && { opacity: 0.6 },
                 ]}
@@ -301,27 +250,11 @@ function DropCard({ drop, colors, isDark, isLast, broadcastState, broadcastPrevi
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-const METHOD_CHIPS = [
-  { label: 'Shop', bg: '#0F766E', text: '#FFFFFF' },
-  { label: 'VISA', bg: '#1A1F71', text: '#FFFFFF' },
-  { label: 'MC',   bg: '#EB5C2E', text: '#FFFFFF' },
-  { label: 'AMEX', bg: '#016FD0', text: '#FFFFFF' },
-];
-
-const CONFIG_ROWS = [
-  { label: 'Payment capture method',        icon: 'zap'         as const },
-  { label: 'Manual payment methods',        icon: 'inbox'       as const },
-  { label: 'Payment method customizations', icon: 'sliders'     as const },
-  { label: 'Gift card expiration',          icon: 'gift'        as const },
-  { label: 'Apple Wallet passes',           icon: 'credit-card' as const },
-  { label: 'Payout schedule',               icon: 'calendar'    as const },
-  { label: 'Escrow & release rules',        icon: 'shield'      as const },
-];
-
 // ─── Toast component ──────────────────────────────────────────────────────────
 
 function Toast({ message, visible }: { message: string; visible: boolean }) {
   const opacity = useRef(new Animated.Value(0)).current;
+  const colors = useColors();
 
   useEffect(() => {
     Animated.timing(opacity, {
@@ -332,9 +265,16 @@ function Toast({ message, visible }: { message: string; visible: boolean }) {
   }, [visible]);
 
   return (
-    <Animated.View style={[toastStyles.wrap, { opacity }]} pointerEvents="none">
-      <Feather name="check-circle" size={14} color="#FFFFFF" />
-      <Text style={toastStyles.text}>{message}</Text>
+    <Animated.View
+      style={[
+        toastStyles.wrap,
+        { backgroundColor: colors.card, borderColor: `${colors.success}44`, shadowColor: colors.shadowColor },
+        { opacity },
+      ]}
+      pointerEvents="none"
+    >
+      <Feather name="check-circle" size={14} color={colors.success} />
+      <Text style={[toastStyles.text, { color: colors.success }]}>{message}</Text>
     </Animated.View>
   );
 }
@@ -343,11 +283,11 @@ const toastStyles = StyleSheet.create({
   wrap: {
     position: 'absolute', top: 60, alignSelf: 'center', zIndex: 99,
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(16,185,129,0.92)', borderRadius: 24,
+    borderRadius: 24, borderWidth: 1,
     paddingHorizontal: 18, paddingVertical: 10,
-    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 4 },
   },
-  text: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
+  text: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -355,6 +295,7 @@ const toastStyles = StyleSheet.create({
 export default function PaymentsScreen() {
   const colors = useColors();
   const api    = useApi();
+  const router = useRouter();
   const [drops,   setDrops]   = useState<Drop[]>(DROPS_FALLBACK);
   const [loading, setLoading] = useState(true);
 
@@ -457,7 +398,6 @@ export default function PaymentsScreen() {
   useEffect(() => { load(); }, [load]);
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
-  const isDark = colors.background === '#121110' || colors.background.startsWith('#0');
   const primary = colors.primary;
 
   const preOrderDrops = drops.filter((d) => d.type === 'pre-order');
@@ -490,130 +430,98 @@ export default function PaymentsScreen() {
         {/* ── Brandthread Payments card ── */}
         <View style={styles.cardHeaderRow}>
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>Brandthread Payments</Text>
-          <TouchableOpacity style={[styles.manageBtn, { borderColor: colors.border }]} activeOpacity={0.7}>
-            <Text style={[styles.manageBtnText, { color: colors.foreground }]}>Manage</Text>
-          </TouchableOpacity>
         </View>
 
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          {/* Status row */}
-          <View style={styles.statusRow}>
-            <View style={styles.statusItem}>
-              <View style={[styles.statusDot, { backgroundColor: colors.success }]} />
-              <Text style={[styles.statusText, { color: colors.foreground }]}>Accepting payments</Text>
-            </View>
-            <View style={[styles.statusDivider, { backgroundColor: colors.border }]} />
-            <View style={styles.statusItem}>
-              <Feather name="credit-card" size={13} color={colors.foreground} />
-              <Text style={[styles.statusText, { color: colors.foreground }]}>Ready for payouts</Text>
-            </View>
-          </View>
-
-          {/* Payment methods row */}
-          <TouchableOpacity style={[styles.listRow, { borderTopColor: colors.border }]} activeOpacity={0.7}>
-            <Feather name="credit-card" size={16} color={colors.mutedForeground} />
-            <Text style={[styles.listRowLabel, { color: colors.foreground }]}>Payment methods</Text>
-            <View style={styles.chipRow}>
-              {METHOD_CHIPS.map((c) => (
-                <View key={c.label} style={[styles.chip, { backgroundColor: c.bg }]}>
-                  <Text style={[styles.chipText, { color: c.text }]}>{c.label}</Text>
-                </View>
-              ))}
-              <View style={[styles.chip, { backgroundColor: colors.secondary }]}>
-                <Text style={[styles.chipText, { color: colors.mutedForeground }]}>+8</Text>
-              </View>
-            </View>
-            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
-          </TouchableOpacity>
-
-          {/* Payout account row */}
-          <View style={[styles.listRow, { borderTopColor: colors.border }]}>
+          {/* Payout account row — no real payout-account API is wired here yet, so this
+              never fabricates a bank account or status; it offers to add one instead. */}
+          <View style={[styles.listRow, { borderTopWidth: 0 }]}>
             <Feather name="home" size={16} color={colors.mutedForeground} />
             <View style={styles.payoutInfo}>
               <Text style={[styles.payoutLabel, { color: colors.mutedForeground }]}>Payout account</Text>
               <Text style={[styles.payoutAccount, { color: colors.foreground }]}>
-                BANK OF AMERICA, N.A. ······1649 · USD
+                No payout account on file
               </Text>
             </View>
-            <TouchableOpacity activeOpacity={0.7}>
-              <Text style={[styles.viewPayoutsLink, { color: primary }]}>View payouts</Text>
+            <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/payouts' as never)}>
+              <Text style={[styles.viewPayoutsLink, { color: primary }]}>Add account</Text>
             </TouchableOpacity>
           </View>
 
+          {/* View payouts row */}
+          <TouchableOpacity
+            style={[styles.listRow, { borderTopColor: colors.border }]}
+            activeOpacity={0.7}
+            onPress={() => router.push('/payouts' as never)}
+          >
+            <Feather name="list" size={16} color={colors.mutedForeground} />
+            <Text style={[styles.listRowLabel, { color: colors.foreground, flex: 1 }]}>View payouts</Text>
+            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+          </TouchableOpacity>
         </View>
 
-        {/* ── Additional payment providers ── */}
-        <Text style={[styles.groupTitle, { color: colors.foreground }]}>Additional payment providers</Text>
-        <Text style={[styles.groupSubtitle, { color: colors.mutedForeground }]}>
-          Offer methods processed offsite or through custom checkout integrations
-        </Text>
-        <TouchableOpacity
-          style={[styles.addProviderBtn, { borderColor: colors.border }]}
-          activeOpacity={0.7}
-        >
-          <Feather name="plus-circle" size={16} color={colors.foreground} />
-          <Text style={[styles.addProviderText, { color: colors.foreground }]}>Add provider</Text>
-        </TouchableOpacity>
-
-        {/* ── Payment configuration ── */}
-        <Text style={[styles.groupTitle, { marginTop: 24 }, { color: colors.foreground }]}>Payment configuration</Text>
-        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 10 }]}>
-          {CONFIG_ROWS.map((row, i) => (
-            <TouchableOpacity
-              key={row.label}
-              style={[styles.configRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
-              activeOpacity={0.7}
-            >
-              <Feather name={row.icon} size={16} color={colors.mutedForeground} />
-              <Text style={[styles.listRowLabel, { color: colors.foreground, flex: 1 }]}>{row.label}</Text>
-              <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* ── Pre Order Drops ── */}
-        <View style={styles.sectionHeader}>
-          <View style={[styles.sectionDot, { backgroundColor: colors.primary }]} />
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Pre Order Drops</Text>
-          <Text style={[styles.sectionCount, { color: colors.mutedForeground }]}>{preOrderDrops.length}</Text>
-        </View>
-        <View style={[styles.preOrderNote, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
-          <Feather name="clock" size={13} color={primary} />
-          <Text style={[styles.preOrderNoteText, { color: primary }]}>
-            Funds collected upfront and held until each drop ships
-          </Text>
-        </View>
-        {preOrderDrops.map((d, i) => (
-          <DropCard
-            key={d.id} drop={d} colors={colors} isDark={isDark}
-            isLast={i === preOrderDrops.length - 1}
-            broadcastState={broadcastStates[d.id] ?? 'idle'}
-            broadcastPreview={broadcastPreviews[d.id]}
-            onBroadcast={() => handleBroadcast(d.id, d.name)}
+        {!loading && drops.length === 0 ? (
+          <EmptyState
+            icon="package"
+            title="No drops yet"
+            description="Payouts for your drops show up here."
+            action={{ label: 'Create a drop', onPress: () => router.push('/add-product' as never) }}
           />
-        ))}
+        ) : (
+          <>
+            {/* ── Pre Order Drops ── */}
+            {preOrderDrops.length > 0 && (
+              <>
+                <View style={styles.sectionHeader}>
+                  <View style={[styles.sectionDot, { backgroundColor: colors.primary }]} />
+                  <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Pre Order Drops</Text>
+                  <Text style={[styles.sectionCount, { color: colors.mutedForeground }]}>{preOrderDrops.length}</Text>
+                </View>
+                <View style={[styles.preOrderNote, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
+                  <Feather name="clock" size={13} color={primary} />
+                  <Text style={[styles.preOrderNoteText, { color: primary }]}>
+                    Funds collected upfront and held until each drop ships
+                  </Text>
+                </View>
+                {preOrderDrops.map((d, i) => (
+                  <DropCard
+                    key={d.id} drop={d} colors={colors}
+                    isLast={i === preOrderDrops.length - 1}
+                    broadcastState={broadcastStates[d.id] ?? 'idle'}
+                    broadcastPreview={broadcastPreviews[d.id]}
+                    onBroadcast={() => handleBroadcast(d.id, d.name)}
+                  />
+                ))}
+              </>
+            )}
 
-        {/* ── Pre Made Drops ── */}
-        <View style={[styles.sectionHeader, { marginTop: 28 }]}>
-          <View style={[styles.sectionDot, { backgroundColor: colors.success }]} />
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Pre Made Drops</Text>
-          <Text style={[styles.sectionCount, { color: colors.mutedForeground }]}>{preMadeDrops.length}</Text>
-        </View>
-        <View style={[styles.preOrderNote, { backgroundColor: isDark ? 'rgba(16,185,129,0.09)' : '#DCFCE7', borderColor: isDark ? 'rgba(16,185,129,0.20)' : '#BBF7D0' }]}>
-          <Feather name="package" size={13} color={colors.success} />
-          <Text style={[styles.preOrderNoteText, { color: colors.success }]}>
-            Standard payout 2–3 business days after order fulfillment
-          </Text>
-        </View>
-        {preMadeDrops.map((d, i) => (
-          <DropCard
-            key={d.id} drop={d} colors={colors} isDark={isDark}
-            isLast={i === preMadeDrops.length - 1}
-            broadcastState={broadcastStates[d.id] ?? 'idle'}
-            broadcastPreview={broadcastPreviews[d.id]}
-            onBroadcast={() => handleBroadcast(d.id, d.name)}
-          />
-        ))}
+            {/* ── Pre Made Drops ── */}
+            {preMadeDrops.length > 0 && (
+              <>
+                <View style={[styles.sectionHeader, { marginTop: 28 }]}>
+                  <View style={[styles.sectionDot, { backgroundColor: colors.success }]} />
+                  <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Pre Made Drops</Text>
+                  <Text style={[styles.sectionCount, { color: colors.mutedForeground }]}>{preMadeDrops.length}</Text>
+                </View>
+                <View style={[styles.preOrderNote, { backgroundColor: `${colors.success}17`, borderColor: `${colors.success}33` }]}>
+                  <Feather name="package" size={13} color={colors.success} />
+                  <Text style={[styles.preOrderNoteText, { color: colors.success }]}>
+                    Standard payout 2–3 business days after order fulfillment
+                  </Text>
+                </View>
+                {preMadeDrops.map((d, i) => (
+                  <DropCard
+                    key={d.id} drop={d} colors={colors}
+                    isLast={i === preMadeDrops.length - 1}
+                    broadcastState={broadcastStates[d.id] ?? 'idle'}
+                    broadcastPreview={broadcastPreviews[d.id]}
+                    onBroadcast={() => handleBroadcast(d.id, d.name)}
+                  />
+                ))}
+              </>
+            )}
+          </>
+        )}
 
       </ScrollView>
     </View>

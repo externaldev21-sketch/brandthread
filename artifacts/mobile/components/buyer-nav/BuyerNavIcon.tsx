@@ -1,12 +1,14 @@
 import React from 'react';
-import Svg, { Circle, Line, Path } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 
 export type BuyerNavIconName =
   | 'home' | 'discover' | 'inbox' | 'search' | 'profile'
-  | 'close' | 'friends' | 'filters';
+  | 'close' | 'friends' | 'filters'
+  // Seller bar
+  | 'dashboard' | 'products' | 'orders' | 'studio';
 
 /**
- * Line icons for the buyer navigation. One consistent 24pt grid, rounded
+ * Line icons for the buyer and seller navigation. One consistent 24pt grid, rounded
  * joins, outline when idle and filled when selected, so every tab reads the
  * same on iOS, Android and web instead of mixing SF Symbols with fallbacks.
  */
@@ -93,6 +95,43 @@ export function BuyerNavIcon({
           <Circle cx={15} cy={7} r={2.1} fill={color} {...common} />
           <Circle cx={8.5} cy={12} r={2.1} fill={color} {...common} />
           <Circle cx={13} cy={17} r={2.1} fill={color} {...common} />
+        </Svg>
+      );
+    case 'dashboard':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Rect x={4.2} y={12.4} width={3.8} height={7.4} rx={1.2} fill={focused ? color : 'none'} {...common} />
+          <Rect x={10.1} y={7.6} width={3.8} height={12.2} rx={1.2} fill={focused ? color : 'none'} {...common} />
+          <Rect x={16} y={3.8} width={3.8} height={16} rx={1.2} fill={focused ? color : 'none'} {...common} />
+          <Line x1={3.4} y1={20.6} x2={20.6} y2={20.6} {...common} />
+        </Svg>
+      );
+    case 'products':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path d="M12 3.4 19.8 7.5 12 11.6 4.2 7.5 12 3.4Z" fill={focused ? color : 'none'} {...common} />
+          <Path d="M4.2 7.5v9L12 20.6l7.8-4.1v-9" fill="none" {...common} />
+          <Line x1={12} y1={11.6} x2={12} y2={20.6} {...common} />
+        </Svg>
+      );
+    case 'orders':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path
+            d="M5.3 8.3h13.4l-.9 10.9a1.7 1.7 0 0 1-1.7 1.5H7.9a1.7 1.7 0 0 1-1.7-1.5L5.3 8.3Z"
+            fill={focused ? color : 'none'}
+            {...common}
+          />
+          <Path d="M8.8 8.3V7.1a3.2 3.2 0 0 1 6.4 0v1.2" fill="none" {...common} />
+        </Svg>
+      );
+    case 'studio':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Rect x={3.8} y={3.8} width={7} height={8.4} rx={2} fill={focused ? color : 'none'} {...common} />
+          <Rect x={13.2} y={3.8} width={7} height={5} rx={2} fill="none" {...common} />
+          <Rect x={3.8} y={14.6} width={7} height={5.6} rx={2} fill="none" {...common} />
+          <Rect x={13.2} y={11.2} width={7} height={9} rx={2} fill={focused ? color : 'none'} {...common} />
         </Svg>
       );
     case 'close':

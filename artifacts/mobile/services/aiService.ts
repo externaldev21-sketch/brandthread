@@ -236,6 +236,110 @@ async function callAI(
   return res.json() as Promise<AIChatResponse>;
 }
 
+// ─── Streaming API call ───────────────────────────────────────────────────────
+
+/**
+ * Streams the AI reply via SSE using XMLHttpRequest — React Native's `fetch`
+ * does not expose a readable response body, but XHR's `responseText` grows
+ * incrementally during readyState 3 (LOADING), which is the standard way to
+ * consume a streaming HTTP response on this platform.
+ */
+function callAIStream(
+  request: AIChatRequest,
+  authToken: string | null,
+  onDelta: (fullTextSoFar: string) => void,
+  signal: AbortSignal,
+): Promise<AIChatResponse> {
+  return new Promise((resolve, reject) => {
+    const apiBase = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
+    if (!apiBase) {
+      reject(new Error('AI service is not configured. Check your API base URL.'));
+      return;
+    }
+    if (!authToken) {
+      reject(new Error('Sign in to use Brandthread AI.'));
+      return;
+    }
+
+    const xhr = new XMLHttpRequest();
+    let processedLength = 0;
+    let buffer = '';
+    let fullContent = '';
+    let settled = false;
+
+    const onAbort = () => xhr.abort();
+    signal.addEventListener('abort', onAbort);
+    const cleanup = () => signal.removeEventListener('abort', onAbort);
+
+    function processNewData() {
+      const text: string = xhr.responseText ?? '';
+      const chunk = text.slice(processedLength);
+      processedLength = text.length;
+      if (!chunk) return;
+      buffer += chunk;
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() ?? '';
+      for (const part of parts) {
+        const line = part.replace(/^data: /, '').trim();
+        if (!line) continue;
+        let evt: { type?: string; content?: string; actionCard?: AIActionCard; sources?: AIChatResponse['sources']; error?: string };
+        try {
+          evt = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        if (evt.type === 'delta' && typeof evt.content === 'string') {
+          fullContent += evt.content;
+          onDelta(fullContent);
+        } else if (evt.type === 'done' && !settled) {
+          settled = true;
+          cleanup();
+          resolve({ content: evt.content ?? fullContent, actionCard: evt.actionCard as any, sources: evt.sources });
+        } else if (evt.type === 'error' && !settled) {
+          settled = true;
+          cleanup();
+          reject(new Error(evt.error ?? 'AI service temporarily unavailable.'));
+        }
+      }
+    }
+
+    xhr.onreadystatechange = () => {
+      if (xhr.readyState === 3 || xhr.readyState === 4) {
+        processNewData();
+      }
+      if (xhr.readyState === 4 && !settled) {
+        settled = true;
+        cleanup();
+        if (xhr.status === 401 || xhr.status === 403) {
+          reject(new Error('Authentication error. Please sign in again.'));
+        } else if (xhr.status === 429) {
+          reject(new Error('Rate limit reached — please wait a moment and try again.'));
+        } else if (xhr.status === 0) {
+          reject(Object.assign(new Error('Request aborted'), { name: 'AbortError' }));
+        } else if (xhr.status >= 500 || xhr.status === 502 || xhr.status === 503) {
+          reject(new Error('AI service is temporarily unavailable. Please try again shortly.'));
+        } else if (xhr.status !== 200) {
+          reject(new Error(`AI request failed (${xhr.status}).`));
+        } else {
+          // Stream ended without an explicit "done" event — use what we have.
+          resolve({ content: fullContent });
+        }
+      }
+    };
+    xhr.onerror = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error("Couldn't reach Brandthread AI."));
+    };
+
+    xhr.open('POST', `${apiBase}/api/v1/ai/chat/stream`);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+    xhr.send(JSON.stringify(request));
+  });
+}
+
 // ─── Send message ─────────────────────────────────────────────────────────────
 
 export interface SendMessageParams {
@@ -263,15 +367,31 @@ export interface SendMessageResult {
  *  - Throws a user-facing Error string on auth/network/provider failures.
  *  - Never persists empty messages or streaming placeholders.
  */
-export async function sendMessage(params: SendMessageParams): Promise<SendMessageResult> {
-  const { userText, session, authToken, userId, storeContext } = params;
+async function buildChatRequest(session: AISession, userText: string): Promise<AIChatRequest> {
+  // Build history for the API request (excludes the new user message —
+  // we add it explicitly so the server sees it as the latest turn).
+  const history = repairMessages(session.messages)
+    .slice(-20)
+    .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+  history.push({ role: 'user', content: userText });
 
-  // Cancel any in-flight request from a previous turn.
-  _activeController?.abort();
-  _activeController = new AbortController();
-  const { signal } = _activeController;
+  const brandMemory = await getEnabledMemorySummary();
 
-  // Build the user message (not yet added to any session).
+  return {
+    messages: history,
+    context: session.context,
+    brandMemory: Object.keys(brandMemory).length > 0 ? brandMemory : undefined,
+    maxTokens: 700,
+  };
+}
+
+async function finalizeTurn(
+  session: AISession,
+  userText: string,
+  response: AIChatResponse,
+  userId?: string | null,
+  storeContext?: string | null,
+): Promise<{ newSession: AISession; userMsg: AIMessage; aiMsg: AIMessage }> {
   const userMsg: AIMessage = {
     id: nanoid(),
     role: 'user',
@@ -280,23 +400,51 @@ export async function sendMessage(params: SendMessageParams): Promise<SendMessag
     contextLabel: contextLabel(session.context),
   };
 
-  // Build history for the API request (excludes the new user message —
-  // we add it explicitly so the server sees it as the latest turn).
-  const history = repairMessages(session.messages)
-    .slice(-20)
-    .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
-
-  // Append the new user turn to the history slice we send.
-  history.push({ role: 'user', content: userText });
-
-  const brandMemory = await getEnabledMemorySummary();
-
-  const request: AIChatRequest = {
-    messages: history,
-    context: session.context,
-    brandMemory: Object.keys(brandMemory).length > 0 ? brandMemory : undefined,
-    maxTokens: 700,
+  const aiMsg: AIMessage = {
+    id: nanoid(),
+    role: 'assistant',
+    content: response.content ?? '',
+    ts: Date.now(),
+    isStreaming: false,
+    error: response.error,
+    contextLabel: contextLabel(session.context),
+    sources: response.sources,
+    actionCard: response.actionCard
+      ? { ...response.actionCard, id: nanoid(), status: 'pending' }
+      : undefined,
   };
+
+  const newSession: AISession = {
+    ...session,
+    messages: [...session.messages, userMsg, aiMsg],
+    updatedAt: Date.now(),
+  };
+  _currentSession = newSession;
+
+  if (aiMsg.actionCard) {
+    await addAuditEntry({
+      eventType: 'suggested',
+      screen: session.context.screen,
+      actionType: aiMsg.actionCard.type,
+      title: aiMsg.actionCard.title,
+      canUndo: aiMsg.actionCard.canUndo,
+    }).catch(() => { /* audit is best-effort */ });
+  }
+
+  await _persistSession(newSession, userId, storeContext);
+
+  return { newSession, userMsg, aiMsg };
+}
+
+export async function sendMessage(params: SendMessageParams): Promise<SendMessageResult> {
+  const { userText, session, authToken, userId, storeContext } = params;
+
+  // Cancel any in-flight request from a previous turn.
+  _activeController?.abort();
+  _activeController = new AbortController();
+  const { signal } = _activeController;
+
+  const request = await buildChatRequest(session, userText);
 
   // --- Network call (may throw) ---
   let response: AIChatResponse;
@@ -309,43 +457,37 @@ export async function sendMessage(params: SendMessageParams): Promise<SendMessag
     throw err;
   }
 
-  // Build the final assistant message.
-  const assistantId = nanoid();
-  const aiMsg: AIMessage = {
-    id: assistantId,
-    role: 'assistant',
-    content: response.content ?? '',
-    ts: Date.now(),
-    isStreaming: false,
-    error: response.error,
-    contextLabel: contextLabel(session.context),
-    actionCard: response.actionCard
-      ? { ...response.actionCard, id: nanoid(), status: 'pending' }
-      : undefined,
-  };
+  const { newSession, aiMsg } = await finalizeTurn(session, userText, response, userId, storeContext);
+  return { session: newSession, response: aiMsg };
+}
 
-  // Build the new session immutably.
-  const newSession: AISession = {
-    ...session,
-    messages: [...session.messages, userMsg, aiMsg],
-    updatedAt: Date.now(),
-  };
-  _currentSession = newSession;
+/**
+ * Same contract as sendMessage(), but streams the assistant's reply via SSE.
+ * `onDelta` is called with the cumulative text as tokens arrive so the caller
+ * can render a live-typing preview; the returned session only appears once
+ * the full turn (including sources/action card) has resolved.
+ */
+export async function sendMessageStream(
+  params: SendMessageParams,
+  onDelta: (textSoFar: string) => void,
+): Promise<SendMessageResult> {
+  const { userText, session, authToken, userId, storeContext } = params;
 
-  // Audit log for action cards.
-  if (aiMsg.actionCard) {
-    await addAuditEntry({
-      eventType: 'suggested',
-      screen: session.context.screen,
-      actionType: aiMsg.actionCard.type,
-      title: aiMsg.actionCard.title,
-      canUndo: aiMsg.actionCard.canUndo,
-    }).catch(() => { /* audit is best-effort */ });
+  _activeController?.abort();
+  _activeController = new AbortController();
+  const { signal } = _activeController;
+
+  const request = await buildChatRequest(session, userText);
+
+  let response: AIChatResponse;
+  try {
+    response = await callAIStream(request, authToken, onDelta, signal);
+  } catch (err: unknown) {
+    if ((err as Error)?.name === 'AbortError') throw err;
+    throw err;
   }
 
-  // Persist.
-  await _persistSession(newSession, userId, storeContext);
-
+  const { newSession, aiMsg } = await finalizeTurn(session, userText, response, userId, storeContext);
   return { session: newSession, response: aiMsg };
 }
 

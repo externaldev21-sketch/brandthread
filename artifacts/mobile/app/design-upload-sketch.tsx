@@ -37,13 +37,6 @@ const PROCESS_STEPS = [
   'Vectorizing…',
 ];
 
-const GRAD_PALETTES: Record<number, readonly [string, string]> = {
-  0: ['#0F766E', '#22D3EE'],
-  1: ['#F97316', '#0EA5E9'],
-  2: ['#22D3EE', '#3B82F6'],
-  3: ['#F59E0B', '#F97316'],
-};
-
 export default function UploadSketchScreen() {
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;

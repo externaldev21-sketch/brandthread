@@ -12,11 +12,11 @@
  *  - No dashboard chrome, banners, or button-pill rows on the gallery surface.
  *
  * Recovery modal (Procreate screenshots 1 & 2 as structural reference):
- *  - Full-screen, opaque BG. "Cancel" top-right in accent blue.
+ *  - Full-screen, opaque BG. "Cancel" top-right in muted text.
  *  - Prompt phase: large rounded-rect icon box, bold app name, descriptor text,
  *    two full-width dark-fill buttons (Recover / Not Now).
  *  - Running/Done phase: large bold centered title, muted subtitle, large filled
- *    blue circle with checkmark (done) or ActivityIndicator (running).
+ *    success circle with checkmark (done) or ActivityIndicator (running).
  *  - Error phase: triangle icon + retry / dismiss.
  *
  * All service contracts, recovery semantics, and account/store scoping preserved.
@@ -57,13 +57,10 @@ import DesignLayerCompositor from '@/components/DesignLayerCompositor';
 import { makeDurableUri } from '@/lib/imageUri';
 import { validateBtJson } from '@/lib/btLayerValidator';
 import { validateJsonByteLength } from '@/lib/fileValidator';
+import { SheetRise } from '@/components/motion/SheetRise';
+import { GridSkeleton } from '@/components/layout';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-// Recovery accent — mirrors iOS system blue for the Cancel button and success circle.
-// Brandthread is monochrome; this single semantic blue is used only in the recovery
-// modal (Cancel label + success mark) — not on gallery chrome.
-const RECOVERY_ACCENT = '#0A84FF';
 
 // ─── Grid geometry ─────────────────────────────────────────────────────────────
 // 3 columns, flush horizontal padding of 16px each side, 8px inter-column gaps.
@@ -104,7 +101,7 @@ const HIT = { top: 10, bottom: 10, left: 10, right: 10 };
 
 // ─── Recovery Modal ───────────────────────────────────────────────────────────
 // Full-screen, slides up. Matches screenshots 1 and 2 in structure:
-//   • Cancel top-right (blue)
+//   • Cancel top-right (muted)
 //   • Prompt: icon box, title, descriptor text, two dark-fill buttons
 //   • Running/Done: large title centred at ~40% height, subtitle, large circle mark
 //   • Error: triangle mark, retry / dismiss
@@ -161,7 +158,7 @@ function RecoveryModal({ visible, count, onClose, onRecovered }: RecoveryModalPr
     >
       <View style={[rm.screen, { paddingTop: topPad, paddingBottom: bottomPad }]}>
 
-        {/* Cancel — top-right, accent blue (matches iOS style in ref screenshots) */}
+        {/* Cancel — top-right, muted (matches iOS style in ref screenshots) */}
         <View style={rm.topBar}>
           <View style={{ flex: 1 }} />
           <TouchableOpacity
@@ -235,9 +232,9 @@ function RecoveryModal({ visible, count, onClose, onRecovered }: RecoveryModalPr
           <View style={rm.progressBody}>
             <Text style={rm.progressTitle}>Recovery Complete</Text>
             <Text style={rm.progressSub}>Projects added to your Design Studio</Text>
-            {/* Large blue filled circle with white checkmark — matches screenshot 2 */}
+            {/* Large success circle with checkmark — matches screenshot 2 */}
             <View style={[rm.circleMark, rm.circleBlue]}>
-              <Feather name="check" size={36} color="#FFFFFF" />
+              <Feather name="check" size={36} color={BG} />
             </View>
             <TouchableOpacity
               style={[rm.darkBtn, rm.doneBtn]}
@@ -310,7 +307,7 @@ const rm = StyleSheet.create({
   cancelText: {
     fontFamily: FONT.regular,
     fontSize: FS.base,
-    color: RECOVERY_ACCENT,
+    color: MUTED,
   },
 
   // Prompt layout
@@ -392,7 +389,7 @@ const rm = StyleSheet.create({
     marginBottom: SP.xl,
     maxWidth: 280,
   },
-  // Large circle mark — grey by default, blue for success
+  // Large circle mark — grey by default, success color when complete
   circleMark: {
     width: 72,
     height: 72,
@@ -402,7 +399,7 @@ const rm = StyleSheet.create({
     justifyContent: 'center',
   },
   circleBlue: {
-    backgroundColor: RECOVERY_ACCENT,
+    backgroundColor: SUCCESS,
   },
   doneBtn: {
     marginTop: SP.xl,
@@ -559,9 +556,9 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
   const sheetBottom = Platform.OS === 'web' ? 34 : insets.bottom;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} testID="new-canvas-sheet">
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} testID="new-canvas-sheet">
       <Pressable style={sh.overlay} onPress={onClose} accessibilityLabel="Close new canvas sheet" />
-      <View style={[sh.sheet, { paddingBottom: sheetBottom + SP.lg }]}>
+      <SheetRise style={[sh.sheet, { paddingBottom: sheetBottom + SP.lg }]}>
         <View style={sh.handle} />
         <View style={sh.header}>
           <TouchableOpacity
@@ -778,7 +775,7 @@ function NewCanvasSheet({ visible, onClose, onCreated }: NewCanvasSheetProps) {
             </View>
           )}
         />
-      </View>
+      </SheetRise>
     </Modal>
   );
 }
@@ -1528,8 +1525,8 @@ export default function DesignGalleryScreen() {
 
       {/* ── Project grid ── */}
       {loading ? (
-        <View style={s.loadingBox} testID="gallery-loading">
-          <ActivityIndicator color={MUTED} size="large" />
+        <View style={{ paddingHorizontal: GRID_H_PAD, paddingTop: SP.md }} testID="gallery-loading">
+          <GridSkeleton columns={GRID_COLUMNS} cardWidth={CELL_SIZE} rows={2} gap={GRID_GAP} />
         </View>
       ) : (
         <FlatList

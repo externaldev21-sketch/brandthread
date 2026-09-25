@@ -14,7 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { formatCents } from '@/lib/money';
 import { useColors } from '@/hooks/useColors';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import {
@@ -34,8 +34,14 @@ import {
   RED, RED_DIM,
   GOLD,
   GRAD_SUCCESS_G,
-  FONT, FS, SP, RADIUS, COMP, ICON,
+  FONT, FS, SP, RADIUS, COMP, ICON, TYPE,
 } from '@/lib/theme';
+import { ResponsiveContainer, StickyFooter } from '@/components/layout';
+import { Button, IconButton, Chip, QuantityStepper, Snackbar } from '@/components/ui';
+import { TYPE_SCALE } from '@/constants/typography';
+import { SPACING } from '@/constants/spacing';
+import { RADII } from '@/constants/radii';
+import { hapticToggle, hapticPrimaryAction, hapticWarning } from '@/lib/haptics';
 
 type ThemeAliases = {
   theme: AppThemePreset;
@@ -136,6 +142,9 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const fmtPrice = formatCents;
+// Shared look for the icon buttons floating over the hero image (back/cart),
+// used with IconButton's `variant="plain"` so the translucent scrim shows.
+const overlayIconBtnStyle = { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADII.pill, borderWidth: 0 } as const;
 const GALLERY_WIDTH = Dimensions.get('window').width;
 const GALLERY_HEIGHT = Math.min(520, Math.max(430, GALLERY_WIDTH * 1.22));
 
@@ -312,7 +321,7 @@ function OptionPicker({ product, option, selections, onSelect }: {
   selections: Record<string, string>;
   onSelect: (optionId: string, valueId: string) => void;
 }) {
-  const { theme, BG, BORDER, CARD, CARD_ELEVATED, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, GOLD } = useThemeAliases();
+  const { theme } = useThemeAliases();
   const op = makeOptionStyles(theme);
   const isColor = option.name.toLowerCase() === 'color';
   return (
@@ -320,7 +329,7 @@ function OptionPicker({ product, option, selections, onSelect }: {
       <View style={op.labelRow}>
         <Text style={op.optionName}>{option.name}</Text>
         {selections[option.id] && (
-          <Text style={op.selectedLabel}>
+          <Text style={op.selectedLabel} numberOfLines={1}>
             {option.values.find(v => v.id === selections[option.id])?.label}
           </Text>
         )}
@@ -340,7 +349,7 @@ function OptionPicker({ product, option, selections, onSelect }: {
                   isSelected && op.colorSwatchSelected,
                   !available && op.unavail,
                 ]}
-                onPress={() => { if (available) { Haptics.selectionAsync(); onSelect(option.id, val.id); } }}
+                onPress={() => { if (available) { hapticToggle(); onSelect(option.id, val.id); } }}
                 activeOpacity={0.8}
                 accessibilityRole="radio"
                 accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', unavailable'}`}
@@ -353,25 +362,14 @@ function OptionPicker({ product, option, selections, onSelect }: {
           }
 
           return (
-            <TouchableOpacity
+            <Chip
               key={val.id}
-              style={[
-                op.chip,
-                isSelected && op.chipSelected,
-                !available && op.chipUnavail,
-              ]}
-              onPress={() => { if (available) { Haptics.selectionAsync(); onSelect(option.id, val.id); } }}
-              activeOpacity={0.8}
+              label={val.label}
+              selected={isSelected}
               disabled={!available}
-              accessibilityRole="radio"
-              accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', unavailable'}`}
-              accessibilityState={{ selected: isSelected, disabled: !available }}
-            >
-              <Text style={[op.chipText, isSelected && op.chipTextSelected, !available && op.chipTextUnavail]}>
-                {val.label}
-              </Text>
-              {!available && <View style={op.unavailLine} />}
-            </TouchableOpacity>
+              onPress={() => onSelect(option.id, val.id)}
+              testID={`option-${option.id}-${val.id}`}
+            />
           );
         })}
       </View>
@@ -380,36 +378,22 @@ function OptionPicker({ product, option, selections, onSelect }: {
 }
 
 const makeOptionStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const PURPLE = theme.accent, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = theme.accentDim;
-  const FG = theme.text;
+  const PURPLE = theme.accent, PURPLE_LIGHT = theme.accentLight;
   const BORDER = theme.border;
-  const CARD_ELEVATED = theme.cardElevated;
   const RED = theme.error;
   return StyleSheet.create({
-  root: { marginBottom: SP.md },
-  labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },
-  optionName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  selectedLabel: { fontSize: FS.sm, fontFamily: FONT.regular, color: PURPLE_LIGHT },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
-  chip: {
-    paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER,
-    backgroundColor: CARD_ELEVATED, minWidth: 44, alignItems: 'center',
-    overflow: 'hidden',
-  },
-  chipSelected: { borderColor: PURPLE, backgroundColor: PURPLE_DIM },
-  chipUnavail: { opacity: 0.45 },
-  chipText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
-  chipTextSelected: { color: PURPLE_LIGHT },
-  chipTextUnavail: { textDecorationLine: 'line-through' },
-  unavailLine: { position: 'absolute', left: 0, right: 0, top: '50%', height: 1, backgroundColor: RED },
+  root: { marginBottom: SPACING.md },
+  labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.sm },
+  optionName: { ...TYPE_SCALE.footnote, fontFamily: FONT.semibold, color: theme.text },
+  selectedLabel: { ...TYPE_SCALE.footnote, color: PURPLE_LIGHT, flexShrink: 1, marginLeft: SPACING.sm },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
   colorSwatch: {
-    width: 44, height: 44, borderRadius: RADIUS.sm,
+    width: 44, height: 44, borderRadius: RADII.chip,
     borderWidth: 2, borderColor: BORDER,
     alignItems: 'center', justifyContent: 'center',
   },
   colorSwatchSelected: { borderColor: PURPLE },
-  colorDot: { width: 28, height: 28, borderRadius: RADIUS.xs },
+  colorDot: { width: 28, height: 28, borderRadius: RADII.chip - 2 },
   unavail: { opacity: 0.4 },
   slashOverlay: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
   slash: { fontSize: 18, color: RED, fontFamily: FONT.bold },
@@ -417,30 +401,12 @@ const makeOptionStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 };
 
 // ─── Quantity Selector ────────────────────────────────────────────────────────
+// Uses the shared QuantityStepper (components/ui); the "Qty" label and
+// low-stock hint stay inline next to it exactly as before.
 
-function QtySelector({ qty, max, onDec, onInc }: { qty: number; max: number; onDec: () => void; onInc: () => void }) {
-  return (
-    <View style={qs.root}>
-      <Text style={qs.label}>Qty</Text>
-      <View style={qs.ctrl}>
-        <TouchableOpacity style={qs.btn} onPress={onDec} disabled={qty <= 1} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Decrease quantity" accessibilityState={{ disabled: qty <= 1 }}>
-          <Feather name="minus" size={15} color={qty <= 1 ? SUBTLE : FG} />
-        </TouchableOpacity>
-        <Text style={qs.val}>{qty}</Text>
-        <TouchableOpacity style={qs.btn} onPress={onInc} disabled={qty >= max} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Increase quantity" accessibilityState={{ disabled: qty >= max }}>
-          <Feather name="plus" size={15} color={qty >= max ? SUBTLE : FG} />
-        </TouchableOpacity>
-      </View>
-      {max <= 5 && <Text style={qs.stock}>{max} left</Text>}
-    </View>
-  );
-}
 const qs = StyleSheet.create({
   root: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
   label: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
-  ctrl: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, paddingHorizontal: SP.sm },
-  btn: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 6 },
-  val: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, minWidth: 24, textAlign: 'center' },
   stock: { fontSize: FS.xs, fontFamily: FONT.medium, color: ORANGE },
 });
 
@@ -632,19 +598,16 @@ export default function BuyerProductDetailScreen() {
           <Text style={{ color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: SP.sm }}>Loading product…</Text>
         </View>
         {/* Back button remains accessible */}
-        <TouchableOpacity
-          style={[{
-            position: 'absolute', left: SP.md, width: COMP.minTouchTarget, height: COMP.minTouchTarget,
-            borderRadius: RADIUS.pill, backgroundColor: 'rgba(0,0,0,0.6)',
-            alignItems: 'center', justifyContent: 'center',
-          }, { top: insets.top + SP.sm }]}
-          onPress={leaveProduct}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-        >
-          <Feather name="chevron-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
+        <View style={{ position: 'absolute', left: SP.md, top: insets.top + SP.sm }}>
+          <IconButton
+            name="arrow-left"
+            onPress={leaveProduct}
+            accessibilityLabel="Back"
+            color={ON_DARK}
+            variant="plain"
+            style={overlayIconBtnStyle}
+          />
+        </View>
       </View>
     );
   }
@@ -659,31 +622,19 @@ export default function BuyerProductDetailScreen() {
           <Text style={{ color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 20 }}>
             This product may be unavailable or the link may have expired.
           </Text>
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: SP.sm }}
-            onPress={leaveProduct}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-          >
-            <Feather name="chevron-left" size={14} color={FG} />
-            <Text style={{ color: FG, fontFamily: FONT.semibold, fontSize: FS.sm }}>Go back</Text>
-          </TouchableOpacity>
+          <Button label="Go back" onPress={leaveProduct} variant="secondary" size="small" icon="chevron-left" />
         </View>
         {/* Back button */}
-        <TouchableOpacity
-          style={[{
-            position: 'absolute', left: SP.md, width: COMP.minTouchTarget, height: COMP.minTouchTarget,
-            borderRadius: RADIUS.pill, backgroundColor: 'rgba(0,0,0,0.6)',
-            alignItems: 'center', justifyContent: 'center',
-          }, { top: insets.top + SP.sm }]}
-          onPress={leaveProduct}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-        >
-          <Feather name="chevron-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
+        <View style={{ position: 'absolute', left: SP.md, top: insets.top + SP.sm }}>
+          <IconButton
+            name="arrow-left"
+            onPress={leaveProduct}
+            accessibilityLabel="Back"
+            color={ON_DARK}
+            variant="plain"
+            style={overlayIconBtnStyle}
+          />
+        </View>
       </View>
     );
   }
@@ -837,23 +788,31 @@ export default function BuyerProductDetailScreen() {
         <View style={s.imageArea}>
           <ProductGallery imageUris={product.imageUris} />
           {/* Back button */}
-          <TouchableOpacity style={[s.backBtn, { top: insets.top + SP.sm }]} onPress={leaveProduct} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Back to previous screen">
-            <Feather name="chevron-left" size={ICON.md} color={FG} />
-          </TouchableOpacity>
+          <View style={[s.backBtnWrap, { top: insets.top + SP.sm }]}>
+            <IconButton
+              name="arrow-left"
+              onPress={leaveProduct}
+              accessibilityLabel="Back to previous screen"
+              color={ON_DARK}
+              variant="plain"
+              style={overlayIconBtnStyle}
+            />
+          </View>
           {/* Cart button */}
-          <TouchableOpacity
-            style={[s.cartBtn, { top: insets.top + SP.sm }]}
-            onPress={() => router.push('/(buyer)/cart' as never)}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="Open cart"
-            accessibilityHint="View items in your cart"
-          >
-            <Feather name="shopping-bag" size={ICON.md} color={FG} />
-          </TouchableOpacity>
+          <View style={[s.cartBtnWrap, { top: insets.top + SP.sm }]}>
+            <IconButton
+              name="shopping-bag"
+              onPress={() => router.push('/(buyer)/cart' as never)}
+              accessibilityLabel="Open cart"
+              accessibilityHint="View items in your cart"
+              color={ON_DARK}
+              variant="plain"
+              style={overlayIconBtnStyle}
+            />
+          </View>
         </View>
 
-        <View style={s.body}>
+        <ResponsiveContainer style={s.body}>
           {/* Badges */}
           <View style={s.badgeRow}>
             {product.isPreOrder && (
@@ -870,11 +829,11 @@ export default function BuyerProductDetailScreen() {
           </View>
 
           {/* Title & Seller */}
-          <Text style={s.productName}>{product.name}</Text>
+          <Text style={s.productName} numberOfLines={3}>{product.name}</Text>
           <TouchableOpacity style={s.sellerRow} onPress={() => router.push(('/seller-profile?id=' + product.sellerId) as never)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`View seller ${product.sellerName}`}>
             <View style={s.sellerAvatar}><Text style={s.sellerInitial}>{product.sellerName.charAt(0)}</Text></View>
-            <Text style={s.sellerName}>{product.sellerName}</Text>
-            <Text style={s.sellerHandle}>{product.sellerHandle}</Text>
+            <Text style={s.sellerName} numberOfLines={1}>{product.sellerName}</Text>
+            <Text style={s.sellerHandle} numberOfLines={1}>{product.sellerHandle}</Text>
             <Feather name="chevron-right" size={14} color={MUTED} />
           </TouchableOpacity>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: SP.md, marginBottom: SP.md }}>
@@ -1045,13 +1004,10 @@ export default function BuyerProductDetailScreen() {
 
           {/* Quantity */}
           {allSelected && inStock && (
-            <View style={{ marginVertical: SP.md }}>
-              <QtySelector
-                qty={qty}
-                max={maxQty}
-                onDec={() => setQty(q => Math.max(1, q - 1))}
-                onInc={() => setQty(q => Math.min(maxQty, q + 1))}
-              />
+            <View style={[qs.root, { marginVertical: SP.md }]}>
+              <Text style={qs.label}>Qty</Text>
+              <QuantityStepper value={qty} onChange={setQty} min={1} max={maxQty} />
+              {maxQty <= 5 && <Text style={qs.stock}>{maxQty} left</Text>}
             </View>
           )}
 
@@ -1117,123 +1073,78 @@ export default function BuyerProductDetailScreen() {
           <Text style={s.reviewsHeader}>You Might Also Like</Text>
           <RelatedProducts productId={product.id} />
 
-        </View>
+        </ResponsiveContainer>
       </ScrollView>
 
       {/* Add-to-bag confirmation banner — slides in above the action bar */}
-      {addedToCart && (
-        <View
-          style={[s.addedBanner]}
-          accessibilityRole="alert"
-          accessibilityLiveRegion="polite"
-        >
-          <Feather name="check-circle" size={15} color={SUCCESS} />
-          <Text style={s.addedBannerText}>Added to your bag!</Text>
-          <TouchableOpacity
-            onPress={() => router.push('/(buyer)/cart' as never)}
-            accessibilityRole="button"
-            accessibilityLabel="View cart"
-            style={s.addedBannerLink}
-          >
-            <Text style={s.addedBannerLinkText}>View Cart</Text>
-            <Feather name="chevron-right" size={12} color={SUCCESS} />
-          </TouchableOpacity>
-        </View>
-      )}
+      <Snackbar
+        visible={addedToCart}
+        message="Added to your bag!"
+        actionLabel="View Cart"
+        onAction={() => router.push('/(buyer)/cart' as never)}
+      />
 
-      {/* Persistent purchase bar remains visible while product content scrolls. */}
+      {/* Persistent purchase bar remains visible while product content scrolls.
+          This screen is pushed as a root stack card over the whole app (not
+          nested under the buyer tab group), so it never sits behind the
+          floating tab bar — no tabBarInset is passed. */}
+      <StickyFooter style={s.actionBar}>
       <View
-        style={[s.actionBar, { paddingBottom: insets.bottom + SP.sm }]}
+        style={s.actionBarRow}
         accessibilityRole="toolbar"
         accessibilityLabel="Product purchase actions"
       >
         {addedToCart ? (
-          <TouchableOpacity
-            style={s.viewCartBtn}
+          <IconButton
+            name="check"
             onPress={() => router.push('/(buyer)/cart' as never)}
-            activeOpacity={0.85}
-            accessibilityRole="button"
             accessibilityLabel="View cart"
-          >
-            <Feather name="check" size={19} color={SUCCESS} />
-            <Text style={s.srOnly}>View Cart</Text>
-          </TouchableOpacity>
+            color={SUCCESS}
+            style={s.addToCartIconBtn}
+          />
+        ) : addingToCart ? (
+          <View style={s.addToCartIconBtn}>
+            <ActivityIndicator color={PURPLE_LIGHT} size="small" />
+          </View>
         ) : (
-          <TouchableOpacity
-            style={[s.addToCartBtn, (!allSelected || !inStock) && s.btnDisabled]}
+          <IconButton
+            name="shopping-bag"
             onPress={handleAddToCart}
-            activeOpacity={0.85}
             disabled={addingToCart || !inStock}
-            accessibilityRole="button"
-            accessibilityLabel={addingToCart ? 'Adding to cart' : !allSelected ? 'Select options to add to cart' : !inStock ? 'Out of stock' : 'Add to cart'}
-            accessibilityState={{ disabled: addingToCart || !inStock, busy: addingToCart }}
-          >
-            {addingToCart ? (
-              <ActivityIndicator color={PURPLE_LIGHT} size="small" />
-            ) : (
-              <>
-                <Feather name="shopping-bag" size={19} color={allSelected && inStock ? PURPLE_LIGHT : SUBTLE} />
-                <Text style={s.srOnly}>Add to Cart</Text>
-              </>
-            )}
-          </TouchableOpacity>
+            accessibilityLabel={!allSelected ? 'Select options to add to cart' : !inStock ? 'Out of stock' : 'Add to cart'}
+            color={allSelected && inStock ? PURPLE_LIGHT : SUBTLE}
+            style={s.addToCartIconBtn}
+          />
         )}
 
         {product.isPreOrder ? (
-          <TouchableOpacity
-            style={s.buyNowBtn}
+          <Button
+            label={reserved ? 'Reserved ✓' : 'Reserve (No Charge)'}
             onPress={handleReserve}
+            variant={reserved ? 'secondary' : 'primary'}
+            loading={reserveLoading}
             disabled={reserveLoading || reserved}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel={reserved ? 'Reserved' : 'Reserve this pre-order'}
-            accessibilityState={{ disabled: reserveLoading || reserved, busy: reserveLoading }}
-          >
-            <LinearGradient
-              colors={reserved ? [CARD_ELEVATED, CARD_ELEVATED] : [PURPLE_DIM, PURPLE_DIM]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={[s.actionGrad, { borderWidth: 1, borderColor: reserved ? SUCCESS + '44' : PURPLE + '44' }]}
-            >
-              {reserveLoading ? (
-                <ActivityIndicator color={PURPLE_LIGHT} size="small" />
-              ) : (
-                <Text style={[s.actionBtnText, { color: reserved ? SUCCESS : PURPLE_LIGHT }]}>
-                  {reserved ? 'Reserved ✓' : 'Reserve (No Charge)'}
-                </Text>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
+            accessibilityHint={reserved ? undefined : 'Reserves this pre-order at no charge'}
+            style={s.buyNowBtn}
+          />
         ) : (
-          <TouchableOpacity
-            style={[s.buyNowBtn, (!allSelected || !inStock || paymentUnavailable) && s.btnDisabled]}
+          <Button
+            label={
+              paymentUnavailable ? 'Payments unavailable'
+                : !allSelected ? 'Select options'
+                : !inStock ? 'Sold Out'
+                : 'Buy now'
+            }
+            icon={!inStock && allSelected && !paymentUnavailable ? 'clock' : undefined}
             onPress={handleBuyNow}
-            activeOpacity={0.85}
+            variant="primary"
+            loading={buyingNow}
             disabled={buyingNow || !inStock || !allSelected || paymentUnavailable}
-            accessibilityLabel={paymentUnavailable ? 'Payments unavailable' : !allSelected ? 'Select options' : !inStock ? 'Out of stock' : 'Buy now'}
-            accessibilityState={{ disabled: buyingNow || !inStock || !allSelected || paymentUnavailable }}
-          >
-            <LinearGradient
-              colors={allSelected && inStock && !paymentUnavailable ? [...GRAD_PRIMARY] : [CARD_ELEVATED, CARD_ELEVATED]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={s.actionGrad}
-            >
-              {buyingNow ? (
-                <ActivityIndicator color={ON_DARK} size="small" />
-              ) : !inStock && allSelected ? (
-                // Sold-out cue: visible in the action bar when a variant is selected but OOS
-                <>
-                  <Feather name="clock" size={15} color={ORANGE} />
-                  <Text style={[s.actionBtnText, { color: ORANGE }]}>Sold Out</Text>
-                </>
-              ) : (
-                <Text style={[s.actionBtnText, (!allSelected || !inStock || paymentUnavailable) && { color: SUBTLE }]}>
-                  {paymentUnavailable ? 'Payments unavailable' : !allSelected ? 'Select Options' : 'Buy Now'}
-                </Text>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
+            style={s.buyNowBtn}
+          />
         )}
       </View>
+      </StickyFooter>
     </View>
   );
 }
@@ -1434,28 +1345,22 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   imageArea: { height: GALLERY_HEIGHT, backgroundColor: CARD, position: 'relative' },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.sm },
   imagePlaceholderText: { fontSize: FS.sm, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', paddingHorizontal: SP.lg },
-  backBtn: {
-    position: 'absolute', left: SP.md, width: COMP.minTouchTarget, height: COMP.minTouchTarget,
-    borderRadius: RADIUS.pill, backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  cartBtn: {
-    position: 'absolute', right: SP.md, width: COMP.minTouchTarget, height: COMP.minTouchTarget,
-    borderRadius: RADIUS.pill, backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  body: { padding: SP.md },
+  // Positioning wrappers only — the translucent pill look and hit area now
+  // come from the shared IconButton (variant="plain" + overlayIconBtnStyle).
+  backBtnWrap: { position: 'absolute', left: SP.md },
+  cartBtnWrap: { position: 'absolute', right: SP.md },
+  body: { paddingVertical: SP.md },
   badgeRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
   preOrderBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: CYAN_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
   preOrderBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: CYAN, letterSpacing: 0.4 },
   saleBadge: { backgroundColor: RED_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
   saleBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: RED, letterSpacing: 0.4 },
-  productName: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, marginBottom: SP.sm, lineHeight: 28 },
+  productName: { ...TYPE.title, color: FG, marginBottom: SP.sm },
   sellerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginBottom: SP.md },
   sellerAvatar: { width: 24, height: 24, borderRadius: RADIUS.pill, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
   sellerInitial: { fontSize: FS.xs, fontFamily: FONT.bold, color: PURPLE_LIGHT },
-  sellerName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  sellerHandle: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  sellerName: { ...TYPE.bodyMedium, color: FG, flexShrink: 1 },
+  sellerHandle: { ...TYPE.caption, color: MUTED, flexShrink: 1 },
   paymentWarningBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1479,7 +1384,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   vacationTitle: { color: ORANGE, fontFamily: FONT.bold, fontSize: FS.sm, marginBottom: 3 },
   vacationText: { color: FG, fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 18 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
-  price: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
+  price: { ...TYPE.heading, fontFamily: FONT.bold, color: FG },
   priceSale: { color: SUCCESS },
   comparePrice: { fontSize: FS.base, fontFamily: FONT.regular, color: SUBTLE, textDecorationLine: 'line-through' },
   savings: { fontSize: FS.sm, fontFamily: FONT.semibold, color: SUCCESS },
@@ -1494,33 +1399,20 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   stockText: { fontSize: FS.sm, fontFamily: FONT.medium },
   descTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
   desc: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 22 },
-  actionBar: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingTop: SP.md,
-    backgroundColor: BG, borderTopWidth: 1, borderTopColor: BORDER,
-  },
-  addToCartBtn: {
-    width: COMP.buttonH, height: COMP.buttonH, borderRadius: RADIUS.md,
+  // Passed as StickyFooter's own `style` — it already supplies the absolute
+  // positioning, safe-area/tab-bar-aware bottom padding, background, and
+  // top border/shadow; only the original paddingTop is preserved here.
+  actionBar: { paddingTop: SP.md },
+  actionBarRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
+  // The add-to-cart / view-cart control uses IconButton's own 44×44pt
+  // footprint; only the fill/border are overridden so it reads as a
+  // secondary action next to the full-width primary Button.
+  addToCartIconBtn: {
+    width: COMP.iconBtn, height: COMP.iconBtn, borderRadius: RADII.chip,
     borderWidth: 1, borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm,
+    alignItems: 'center', justifyContent: 'center',
   },
-  addToCartText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
-  buyNowBtn: { flex: 1, borderRadius: RADIUS.md, overflow: 'hidden' },
-  viewCartBtn: { width: COMP.buttonH, height: COMP.buttonH, borderRadius: RADIUS.md, borderWidth: 1, borderColor: SUCCESS, backgroundColor: SUCCESS_DIM, alignItems: 'center', justifyContent: 'center' },
-  actionGrad: { height: COMP.buttonH, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm },
-  actionBtnText: { fontSize: FS.sm, fontFamily: FONT.bold, color: ON_DARK },
-  srOnly: { position: 'absolute', width: 1, height: 1, opacity: 0 },
-  btnDisabled: { opacity: 0.5 },
-  // Add-to-bag confirmation banner (sits just above action bar)
-  addedBanner: {
-    position: 'absolute', bottom: COMP.buttonH + SP.md + SP.md + SP.lg, left: SP.md, right: SP.md,
-    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    backgroundColor: SUCCESS_DIM, borderRadius: RADIUS.md, borderWidth: 1, borderColor: SUCCESS + '44',
-    paddingVertical: SP.sm, paddingHorizontal: SP.md,
-  },
-  addedBannerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.semibold, color: SUCCESS },
-  addedBannerLink: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  addedBannerLinkText: { fontSize: FS.xs, fontFamily: FONT.bold, color: SUCCESS },
+  buyNowBtn: { flex: 1 },
   reviewsHeader: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
   reviewRow: { marginBottom: SP.md, paddingBottom: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   reviewStars: { fontSize: FS.sm, fontFamily: FONT.regular, color: GOLD, marginBottom: 2 },

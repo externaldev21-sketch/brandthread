@@ -7,8 +7,12 @@
  *  2. Design Studio back arrow present (design.tsx).
  *  3. Four primary tab destinations preserved.
  *  4. Studio radial menu and AI button wiring.
- *  5. Minimal exclusion list (boot/auth/onboarding/legal/buyer-group only).
- *     Seller routes that were previously wrongly excluded are now INCLUDED.
+ *  5. Deny-list of full-screen seller routes: the bar shows by default on
+ *     every seller route — including normal pushed screens like settings,
+ *     billing, team, customers, payments, order-detail, seller-profile,
+ *     manufacturer-hub — and is hidden ONLY on the curated set of genuine
+ *     full-screen creation/camera/checkout flows (create-post, add-product,
+ *     plans, etc.), since the bar (position: absolute) would overlay them.
  *  6. Seller root route inclusion: key routes map to a primary tab.
  *  7. Route-to-active-tab classification present in SellerGlobalTabBar.
  *  8. SellerShellContext is used as the authoritative source — no parallel
@@ -129,67 +133,132 @@ describe('tab freeze/detach behavior', () => {
   });
 });
 
-// ─── 5. Minimal exclusion list — only boot/auth/onboarding/legal/buyer ────────
+// ─── 5. Deny-list of full-screen seller routes ────────────────────────────────
 
-describe('minimal seller bar exclusion list', () => {
-  // These routes MUST be excluded (no seller session)
-  const mustExclude = [
-    'index',      // boot BootScreen
-    'splash',
-    'sign-in',
-    'forgot-password',
-    'onboarding',
-    'privacy',
-    'terms',
-    '(buyer)',    // buyer app group
+describe('seller bar full-screen deny-list', () => {
+  const setBlock = () =>
+    rootLayout.match(
+      /const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set\(\[([\s\S]*?)\]\)/,
+    );
+
+  it('the SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS deny-list exists', () => {
+    expect(rootLayout).toContain('SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS');
+    expect(setBlock(), 'SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS set must exist').toBeTruthy();
+  });
+
+  // The `(tabs)` shell group must never appear in a deny-list, since that
+  // would hide the bar on every primary tab screen.
+  it('does not deny-list the (tabs) shell group', () => {
+    const setBody = setBlock()![1];
+    expect(setBody).not.toContain("'(tabs)'");
+  });
+
+  // Genuine full-screen creation/camera/checkout flows: the bar
+  // (position: absolute) would overlay their own bottom-anchored controls.
+  const mustHideBar = [
+    'create-post',
+    'camera-capture',
+    'add-product',
+    'plans',
+    'design-canvas',
+    'store-generate',
+    'store-generating',
+    'quote-request',
+    'seller-go-live',
+    'seller-live',
+    // Brandthread AI screen: immersive full-screen chat with its own
+    // floating composer pinned to the safe-area bottom inset — the bar must
+    // never render underneath it (it previously did, and the AI composer
+    // rendered behind it).
+    'ai-brain',
   ];
 
-  for (const route of mustExclude) {
-    it(`correctly excludes "${route}" (no seller session on this route)`, () => {
-      expect(rootLayout).toContain(`'${route}'`);
-      expect(rootLayout).toContain('SELLER_TAB_BAR_EXCLUDED_SEGMENTS');
+  for (const route of mustHideBar) {
+    it(`hides the seller bar on genuine full-screen route "${route}"`, () => {
+      const setBody = setBlock()![1];
+      expect(setBody).toContain(`'${route}'`);
     });
   }
 
-  // These seller routes must NOT be in the exclusion set
-  const mustInclude = [
-    'create-post',
-    'camera-capture',
-    'seller-go-live',
-    'seller-live',
-    'buyer-live',
-    'plans',
-    'team-invite',
-    'seller-profile',
-    'buyer-product-detail',
-    'buyer-checkout',
-    'buyer-post-comments',
-    'buyer-report',
-    'design',
-    'design-canvas',
-    'store-builder',
-    'content',
-    'analytics-sales',
-    'finance',
-    'team',
+  // Normal pushed seller management screens — the bar must show on all of
+  // these, so none of them may appear in the deny-list.
+  const mustShowBar = [
     'settings',
-    'manufacturer',
+    'general-settings',
+    'security',
+    'notifications-settings',
+    'billing',
+    'team',
+    'team-invite',
+    'taxes-duties',
+    'integrations',
+    'edit-profile',
+    'customers',
+    'customer-accounts',
+    'customer-events',
+    'customer-privacy',
+    'payments',
+    'payouts',
+    'finance',
+    'order-detail',
+    'return-detail',
+    'refund-detail',
+    'dispute-detail',
+    'shipping',
+    'product-detail',
+    'product-import',
+    'product-store',
+    'store-collections',
+    'store-nav',
+    'store-pages',
+    'store-policies',
+    'store-publish',
+    'store-seo',
+    'store-preview',
+    'store-editor',
+    'seller-profile',
+    'seller-verification',
+    'seller-data-export',
+    'discounts',
+    'inventory',
+    'locations',
+    'admin-reports',
+    'manufacturer-hub',
+    'manufacturer-messages',
+    'manufacturer-onboard',
+    'invite-manufacturer',
+    'quote-detail',
+    'sample-detail',
+    'production-detail',
+    'automation',
+    'community-chat',
+    'request-sample',
+    'design-garment',
+    'design-templates',
+    'design-brand-assets',
+    'design-ai-photoshoot',
+    'design-bg-replace',
+    'design-campaign',
+    'design-mockup-to-model',
+    'design-text-to-design',
+    'design-mockup-preview',
+    'lifestyle-images',
+    'tech-pack-generator',
+    '(tabs)',
   ];
 
-  for (const route of mustInclude) {
-    it(`does NOT exclude seller route "${route}" from the tab bar`, () => {
-      // The route must not appear inside the SELLER_TAB_BAR_EXCLUDED_SEGMENTS set literal.
-      // We check the exclusion set block: it starts after the const declaration and
-      // ends before the closing ]);
-      const setBlock = rootLayout.match(
-        /const SELLER_TAB_BAR_EXCLUDED_SEGMENTS = new Set\(\[([\s\S]*?)\]\)/,
-      );
-      expect(setBlock, 'SELLER_TAB_BAR_EXCLUDED_SEGMENTS set must exist').toBeTruthy();
-      const setBody = setBlock![1];
-      // The route should NOT be a quoted string in the set body
+  for (const route of mustShowBar) {
+    it(`does NOT hide the seller bar on normal seller route "${route}"`, () => {
+      const setBody = setBlock()![1];
       expect(setBody).not.toContain(`'${route}'`);
     });
   }
+
+  it('uses a deny-list check (isFullScreenRoute), not an allow-list, to gate the bar', () => {
+    expect(rootLayout).toContain('isFullScreenRoute');
+    expect(rootLayout).not.toContain('SELLER_TAB_BAR_SHELL_SEGMENTS');
+    expect(rootLayout).not.toContain('isShellRoute');
+  });
 });
 
 // ─── 6. Seller root route inclusion in route-to-tab map ──────────────────────

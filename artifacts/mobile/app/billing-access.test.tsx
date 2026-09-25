@@ -22,6 +22,7 @@ const {
       balance: vi.fn(),
       transactions: vi.fn(),
       payouts: vi.fn(),
+      summary: vi.fn(),
     },
     seller: {
       connect: {
@@ -64,13 +65,23 @@ vi.mock('react-native', () => {
     Alert: { alert: vi.fn() },
     AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
     Linking: { openURL: vi.fn(), canOpenURL: vi.fn(async () => true) },
-    Platform: { OS: 'web' },
+    Platform: { OS: 'web', select: (obj: Record<string, unknown>) => obj.web ?? obj.default },
+    Pressable: nativeComponent('Pressable'),
     ScrollView: nativeComponent('ScrollView'),
     Share: { share: vi.fn() },
-    StyleSheet: { create: (styles: unknown) => styles },
+    StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
     Text: nativeComponent('Text'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),
     View: nativeComponent('View'),
+    Animated: {
+      Value: class { constructor(_v?: number) {} },
+      View: nativeComponent('Animated.View'),
+      event: () => () => {},
+      timing: () => ({ start: (cb?: () => void) => cb?.() }),
+      sequence: () => ({ start: (cb?: () => void) => cb?.() }),
+      loop: () => ({ start: () => {}, stop: () => {} }),
+    },
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
   };
 });
 
@@ -215,6 +226,7 @@ function resetApiToRoleRequired() {
   apiMock.finance.balance.mockRejectedValue(roleError());
   apiMock.finance.transactions.mockRejectedValue(roleError());
   apiMock.finance.payouts.mockRejectedValue(roleError());
+  apiMock.finance.summary.mockRejectedValue(roleError());
   apiMock.seller.connect.status.mockRejectedValue(roleError());
   apiMock.seller.subscription.status.mockRejectedValue(roleError());
   apiMock.seller.subscription.invoices.mockRejectedValue(roleError());
@@ -306,7 +318,6 @@ describe('seller financial role boundaries', () => {
     const payouts = await renderScreen(PayoutsScreen);
 
     for (const testID of [
-      'seller-billing-plan-menu',
       'seller-billing-view-bill',
       'seller-billing-view-breakdown',
       'seller-billing-payment-method',
@@ -343,7 +354,6 @@ describe('seller financial role boundaries', () => {
     const finance = await renderScreen(FinanceScreen);
     const payouts = await renderScreen(PayoutsScreen);
 
-    expect(hasTestId(billing, 'seller-billing-plan-menu')).toBe(true);
     expect(hasTestId(billing, 'seller-billing-payment-method')).toBe(true);
     expect(hasTestId(subscription, 'seller-subscription-change-growth')).toBe(true);
     expect(hasTestId(subscription, 'seller-subscription-change-pro')).toBe(true);

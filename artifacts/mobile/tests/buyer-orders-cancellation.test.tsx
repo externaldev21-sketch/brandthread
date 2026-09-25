@@ -33,10 +33,19 @@ vi.mock('react-native', () => {
       ...(data ?? []).map((item, index) => renderItem({ item, index })),
     ),
     RefreshControl: nativeComponent('RefreshControl'),
-    StyleSheet: { create: (styles: unknown) => styles },
+    StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
     Text: nativeComponent('Text'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),
     View: nativeComponent('View'),
+    Animated: {
+      Value: class { constructor(_v?: number) {} },
+      View: nativeComponent('Animated.View'),
+      event: () => () => {},
+      timing: () => ({ start: (cb?: () => void) => cb?.() }),
+      sequence: () => ({ start: (cb?: () => void) => cb?.() }),
+      loop: () => ({ start: () => {}, stop: () => {} }),
+    },
+    Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
     // The floating buyer tab bar inset reads the window size.
     useWindowDimensions: () => ({ width: 393, height: 852, scale: 3, fontScale: 1 }),
   };
@@ -71,11 +80,22 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({
     theme: {
+      background: '#07070F',
+      card: '#12121F',
+      cardElevated: '#18182E',
+      border: '#303044',
+      text: '#F4F4FF',
+      muted: '#AAAABC',
+      subtle: '#77778A',
       accent: '#C7CDD5',
       accentDim: '#34383E',
       accentLight: '#F8FAFC',
+      onAccent: '#0A0A0B',
       secondary: '#22D3EE',
       secondaryDim: '#164E63',
+      success: '#10B981',
+      warning: '#F97316',
+      error: '#F87171',
     },
   }),
 }));
@@ -111,7 +131,22 @@ vi.mock('@/lib/theme', () => ({
   SP: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 },
   RADIUS: { xs: 6, sm: 10, md: 14, lg: 18, pill: 999 },
   COMP: { tabBarH: 64 },
-  ICON: { xs: 12, sm: 16, md: 20, lg: 24, xxl: 40 },
+  ICON: { xs: 12, sm: 16, md: 20, lg: 24, xl: 28, xxl: 40 },
+  GUTTER: 16,
+  SECTION_GAP: 24,
+  CONTENT_MAX_WIDTH: 720,
+  GRID_MAX_WIDTH: 1080,
+  BREAKPOINT: { tablet: 768, desktopWeb: 1024 },
+  TYPE: {
+    largeTitle: { fontSize: 36, fontFamily: 'System', lineHeight: 42 },
+    title: { fontSize: 30, fontFamily: 'System', lineHeight: 36 },
+    heading: { fontSize: 22, fontFamily: 'System', lineHeight: 28 },
+    subheading: { fontSize: 19, fontFamily: 'System', lineHeight: 24 },
+    body: { fontSize: 15, fontFamily: 'System', lineHeight: 22 },
+    bodyMedium: { fontSize: 15, fontFamily: 'System', lineHeight: 22 },
+    caption: { fontSize: 13, fontFamily: 'System', lineHeight: 18 },
+    label: { fontSize: 11, fontFamily: 'System', lineHeight: 14 },
+  },
 }));
 
 vi.mock('@/components/BrandthreadUI', () => {
@@ -226,12 +261,17 @@ describe('buyer order cancellation banner', () => {
 
     renderer = await renderScreen();
 
+    // The card now also shows a compact OrderStatusTimeline, which renders its
+    // own 'x-circle' exception pill for a cancelled order alongside the
+    // cancellation banner's icon — both are red, so there are two now instead
+    // of one. The banner itself (checked below via its unique label/copy)
+    // still renders exactly once.
     const cancellationIcons = renderer.root.findAll(
       node => (node.type as unknown) === 'Feather'
         && node.props.name === 'x-circle'
         && node.props.color === '#F87171',
     );
-    expect(cancellationIcons).toHaveLength(1);
+    expect(cancellationIcons).toHaveLength(2);
 
     const cancellationReasons = renderer.root.findAll(
       node => (node.type as unknown) === 'Text'

@@ -4,6 +4,8 @@
  * Docs: https://developers.klaviyo.com/en/reference/api_overview
  */
 
+import { withRetry } from "./retry";
+
 const KLAVIYO_BASE = "https://a.klaviyo.com/api";
 const KLAVIYO_REVISION = "2024-10-15";
 
@@ -23,15 +25,30 @@ function authHeaders(apiKey: string) {
   };
 }
 
+/**
+ * GET a Klaviyo endpoint with retry-with-backoff. Every call in this file is
+ * a read, so retrying on transient/5xx failures is safe; a 401/403 (bad key)
+ * or other 4xx is never retried — see defaultIsRetryable in src/lib/retry.ts.
+ */
+async function klaviyoGet(url: string, apiKey: string, label: string): Promise<Response> {
+  return withRetry(
+    async () => {
+      const res = await fetch(url, { headers: authHeaders(apiKey) });
+      if (res.status === 401 || res.status === 403) {
+        throw new KlaviyoError("Invalid Klaviyo API key", res.status);
+      }
+      if (!res.ok) {
+        throw new KlaviyoError(`Klaviyo API error (${res.status})`, res.status);
+      }
+      return res;
+    },
+    { label, isRetryable: (err) => err instanceof KlaviyoError ? err.status >= 500 || err.status === 429 : true },
+  );
+}
+
 /** Validates the API key and returns basic account info. Throws KlaviyoError if invalid. */
 export async function fetchKlaviyoAccount(apiKey: string): Promise<{ accountId: string; companyName: string | null }> {
-  const res = await fetch(`${KLAVIYO_BASE}/accounts/`, { headers: authHeaders(apiKey) });
-  if (res.status === 401 || res.status === 403) {
-    throw new KlaviyoError("Invalid Klaviyo API key", 401);
-  }
-  if (!res.ok) {
-    throw new KlaviyoError(`Klaviyo API error (${res.status})`, res.status);
-  }
+  const res = await klaviyoGet(`${KLAVIYO_BASE}/accounts/`, apiKey, "klaviyo.fetchAccount");
   const body = await res.json() as any;
   const account = body?.data?.[0];
   return {
@@ -51,13 +68,11 @@ export async function fetchKlaviyoSubscriberSummary(apiKey: string): Promise<{
   emailSubscriberCount: number;
   smsSubscriberCount: number;
 }> {
-  const listsRes = await fetch(
+  const listsRes = await klaviyoGet(
     `${KLAVIYO_BASE}/lists/?additional-fields[list]=profile_count`,
-    { headers: authHeaders(apiKey) },
+    apiKey,
+    "klaviyo.fetchLists",
   );
-  if (!listsRes.ok) {
-    throw new KlaviyoError(`Failed to fetch Klaviyo lists (${listsRes.status})`, listsRes.status);
-  }
   const listsBody = await listsRes.json() as any;
   const lists: any[] = listsBody?.data ?? [];
   const listCount = lists.length;
@@ -86,8 +101,14 @@ async function fetchConsentedProfileCount(apiKey: string, channel: "email" | "sm
   let count = 0;
   let guard = 0;
   while (url && guard < 500) {
-    const res: Response = await fetch(url, { headers: authHeaders(apiKey) });
-    if (!res.ok) break;
+    let res: Response;
+    try {
+      res = await klaviyoGet(url, apiKey, "klaviyo.fetchConsentedProfileCount");
+    } catch {
+      // Preserve prior behavior: a page that still fails after retries just
+      // stops pagination and returns the partial count gathered so far.
+      break;
+    }
     const body = await res.json() as any;
     count += Array.isArray(body?.data) ? body.data.length : 0;
     url = body?.links?.next ?? null;

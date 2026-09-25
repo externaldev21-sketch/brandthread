@@ -6,7 +6,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, Modal, Animated, Dimensions, Platform,
-  ActivityIndicator, Alert, KeyboardAvoidingView, Switch, Image, Pressable,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Image, Pressable,
   StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -33,7 +33,7 @@ import { formatCents } from '@/lib/money';
 import { useApi } from '@/lib/api';
 import {
   markVideoClipUploaded, normalizeTrimBounds,
-  createPhotoSlide, updateSlideUploadState, updateSlideOverlays, removePhotoSlide,
+  createPhotoSlide, updateSlideUploadState, updateSlideOverlays, removePhotoSlide, moveSlide,
   slidesToComposePayload,
   type EditablePhotoSlide, type ComposedSlideshowResult,
 } from '@/lib/videoEditing';
@@ -41,6 +41,8 @@ import type { TextOverlay } from '@/lib/videoEditing';
 import { TextOverlayEditor, OverlayChip } from '@/components/TextOverlayEditor';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
+import { SheetRise } from '@/components/motion/SheetRise';
+import { HapticSwitch } from '@/components/BrandthreadUI';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
@@ -253,13 +255,13 @@ function DatePickerModal({ visible, initial, onConfirm, onClose, insets }: DateP
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="fade"
       transparent
       onRequestClose={onClose}
     >
       <View style={dps.overlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={[dps.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <SheetRise style={[dps.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           {/* Handle */}
           <View style={dps.handle} />
 
@@ -317,7 +319,7 @@ function DatePickerModal({ visible, initial, onConfirm, onClose, insets }: DateP
                     accessibilityLabel={`Day ${day}${past ? ', past' : ''}`}
                     testID={`calendar-day-${day}`}
                   >
-                    <Text style={[dps.calDayText, selected && { color: '#fff', fontFamily: FONT.bold }]}>
+                    <Text style={[dps.calDayText, selected && { color: theme.onAccent, fontFamily: FONT.bold }]}>
                       {day}
                     </Text>
                   </TouchableOpacity>
@@ -384,7 +386,7 @@ function DatePickerModal({ visible, initial, onConfirm, onClose, insets }: DateP
                       accessibilityLabel={val}
                       testID={`ampm-${val}`}
                     >
-                      <Text style={[dps.ampmText, ps.ampm === val && { color: '#fff' }]}>{val}</Text>
+                      <Text style={[dps.ampmText, ps.ampm === val && { color: theme.onAccent }]}>{val}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -401,7 +403,7 @@ function DatePickerModal({ visible, initial, onConfirm, onClose, insets }: DateP
           >
             <Text style={dps.confirmText}>Confirm</Text>
           </TouchableOpacity>
-        </View>
+        </SheetRise>
       </View>
     </Modal>
   );
@@ -418,6 +420,7 @@ export default function CreatePostScreen() {
   const FG = theme.text;
   const MUTED = theme.muted;
   const ORANGE = theme.warning;
+  const RED = theme.error;
   Object.assign(ts, createTs(theme));
   Object.assign(ms, createMs(theme));
   Object.assign(dps, createDps(theme));
@@ -460,6 +463,7 @@ export default function CreatePostScreen() {
   const [previewSeekTime,setPreviewSeekTime] = useState(0);
   const [previewClipIndex,setPreviewClipIndex] = useState(0);
   const [composedVideo, setComposedVideo] = useState<ComposedVideoLocal | null>(null);
+  const [settingCover, setSettingCover] = useState(false);
   const [processingPhase, setProcessingPhase] = useState<'idle'|'uploading'|'processing'|'error'|'ready'>('idle');
   const [processingError, setProcessingError] = useState<string | null>(null);
   const timelineWidthRef = useRef(1);
@@ -798,10 +802,10 @@ export default function CreatePostScreen() {
           localSlides = updateSlideUploadState(localSlides, localSlides[i].id, 'uploaded', result.objectPath);
           setEditableSlides([...localSlides]);
         } catch (uploadErr) {
-          const msg = uploadErr instanceof Error ? uploadErr.message : 'Upload failed';
+          const msg = `Couldn't upload slide ${i + 1}. Tap Retry.`;
           localSlides = updateSlideUploadState(localSlides, localSlides[i].id, 'error', undefined, msg);
           setEditableSlides([...localSlides]);
-          throw new Error(`Slide ${i + 1}: ${msg}`);
+          throw new Error(msg);
         }
       }
       // Phase 2: Compose slideshow with overlays
@@ -812,7 +816,7 @@ export default function CreatePostScreen() {
       setSlideProcessingPhase('ready');
     } catch (err) {
       setSlideProcessingPhase('error');
-      setSlideProcessingError(err instanceof Error ? err.message : 'Slideshow processing failed. Tap retry to keep working.');
+      setSlideProcessingError(err instanceof Error && err.message.startsWith("Couldn't upload slide") ? err.message : "Couldn't upload slide. Tap Retry.");
     }
   }
 
@@ -865,7 +869,26 @@ export default function CreatePostScreen() {
     } catch (error) {
       setVideoClips([...uploaded]);
       setProcessingPhase('error');
-      setProcessingError(error instanceof Error ? error.message : 'Video processing failed. Tap retry to keep working with these clips.');
+      setProcessingError("Couldn't process your video. Tap Retry.");
+    }
+  }
+
+  // Uses the video-edit step's own scrub position as the chosen cover frame
+  // — re-extracts just that frame from the already-composed video instead
+  // of re-encoding the whole clip. Previously "Edit cover" only reopened
+  // the trim screen with no way to actually change which frame was used.
+  async function useCurrentFrameAsCover() {
+    if (!composedVideo || settingCover) return;
+    setSettingCover(true);
+    try {
+      const result = await api.posts.composeVideoThumbnail(composedVideo.mediaPath, scrubTime);
+      setComposedVideo(prev => prev ? { ...prev, thumbnailUrl: result.thumbnailUrl, thumbnailPath: result.thumbnailPath } : prev);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setStep('post-details');
+    } catch {
+      Alert.alert("Couldn't set cover", 'Please try a different frame or try again.');
+    } finally {
+      setSettingCover(false);
     }
   }
 
@@ -908,48 +931,15 @@ export default function CreatePostScreen() {
             <Feather name="x" size={26} color={FG} />
           </TouchableOpacity>
 
-          {/* Sound pill */}
-          <TouchableOpacity
-            style={ts.mpSoundPill}
-            onPress={() => setShowSoundModal(true)}
-            activeOpacity={0.8}
-          >
-            <Feather name="music" size={13} color={FG} style={{ marginRight: 6 }} />
-            <Text style={ts.mpSoundPillText} numberOfLines={1}>
-              {selectedSound ? selectedSound.soundTitle : 'Add sound'}
-            </Text>
-            {selectedSound && (
-              <TouchableOpacity
-                onPress={() => setSelectedSound(null)}
-                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-                style={{ marginLeft: 6 }}
-              >
-                <Feather name="x" size={12} color={MUTED} />
-              </TouchableOpacity>
-            )}
-          </TouchableOpacity>
-
-          {/* Right-top placeholder (keeps pill centered) */}
+          {/* Right-top placeholder (keeps close button balanced) */}
+          <View style={ts.mpTopBtn} />
           <View style={ts.mpTopBtn} />
         </View>
 
         {/* ── RIGHT-EDGE TOOL COLUMN ───────────────────────────── */}
         <View style={[ts.mpRightTools, { top: topPad + 60 }]}>
-          <TouchableOpacity style={ts.mpToolBtn} activeOpacity={0.7}>
-            <Feather name="refresh-cw" size={22} color={FG} />
-          </TouchableOpacity>
-          <View style={ts.mpToolDivider} />
-          <TouchableOpacity style={ts.mpToolBtn} activeOpacity={0.7}>
+          <TouchableOpacity style={ts.mpToolBtn} activeOpacity={0.7} onPress={() => openTextEditor()}>
             <Text style={ts.mpTextTool}>Aa</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={ts.mpToolBtn} activeOpacity={0.7}>
-            <Feather name="clock" size={22} color={FG} />
-          </TouchableOpacity>
-          <TouchableOpacity style={ts.mpToolBtn} activeOpacity={0.7}>
-            <Feather name="minimize-2" size={22} color={FG} />
-          </TouchableOpacity>
-          <TouchableOpacity style={ts.mpToolBtn} activeOpacity={0.7}>
-            <Feather name="sun" size={22} color={FG} />
           </TouchableOpacity>
         </View>
 
@@ -1297,29 +1287,61 @@ export default function CreatePostScreen() {
         <View style={[ts.slideStripContainer, { bottom: botPad + 80 }]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 12, paddingVertical: 8 }}>
-              {editableSlides.map((slide, idx) => (
-                <TouchableOpacity
-                  key={slide.id}
-                  style={[
-                    ts.slideThumb,
-                    idx === currentSlideIndex && { borderColor: ORANGE, borderWidth: 2 },
-                  ]}
-                  onPress={() => setCurrentSlideIndex(idx)}
-                  accessibilityLabel={`Slide ${idx + 1}`}
-                >
-                  <Image source={{ uri: slide.uri }} style={ts.slideThumbImg} resizeMode="cover" />
-                  {slide.overlays.length > 0 && (
-                    <View style={ts.slideOverlayBadge}>
-                      <Text style={ts.slideOverlayBadgeText}>{slide.overlays.length}</Text>
-                    </View>
-                  )}
-                  {slide.uploadState === 'error' && (
-                    <View style={[ts.slideOverlayBadge, { backgroundColor: '#ef4444' }]}>
-                      <Feather name="alert-circle" size={8} color="#fff" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
+              {editableSlides.map((slide, idx) => {
+                const isActive = idx === currentSlideIndex;
+                return (
+                  <View key={slide.id} style={{ alignItems: 'center' }}>
+                    <TouchableOpacity
+                      style={[
+                        ts.slideThumb,
+                        isActive && { borderColor: ORANGE, borderWidth: 2 },
+                      ]}
+                      onPress={() => setCurrentSlideIndex(idx)}
+                      accessibilityLabel={`Slide ${idx + 1}`}
+                    >
+                      <Image source={{ uri: slide.uri }} style={ts.slideThumbImg} resizeMode="cover" />
+                      {slide.overlays.length > 0 && (
+                        <View style={ts.slideOverlayBadge}>
+                          <Text style={ts.slideOverlayBadgeText}>{slide.overlays.length}</Text>
+                        </View>
+                      )}
+                      {slide.uploadState === 'error' && (
+                        <View style={[ts.slideOverlayBadge, { backgroundColor: RED }]}>
+                          <Feather name="alert-circle" size={8} color={theme.onAccent} />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                    {isActive && editableSlides.length > 1 && (
+                      <View style={ts.slideReorderRow}>
+                        <TouchableOpacity
+                          disabled={idx === 0}
+                          onPress={() => {
+                            setEditableSlides(prev => moveSlide(prev, idx, idx - 1));
+                            setCurrentSlideIndex(idx - 1);
+                            setComposedSlideshow(null);
+                          }}
+                          accessibilityLabel="Move slide earlier"
+                          style={[ts.slideReorderBtn, idx === 0 && { opacity: 0.3 }]}
+                        >
+                          <Feather name="chevron-left" size={14} color={FG} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          disabled={idx === editableSlides.length - 1}
+                          onPress={() => {
+                            setEditableSlides(prev => moveSlide(prev, idx, idx + 1));
+                            setCurrentSlideIndex(idx + 1);
+                            setComposedSlideshow(null);
+                          }}
+                          accessibilityLabel="Move slide later"
+                          style={[ts.slideReorderBtn, idx === editableSlides.length - 1 && { opacity: 0.3 }]}
+                        >
+                          <Feather name="chevron-right" size={14} color={FG} />
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
             </View>
           </ScrollView>
         </View>
@@ -1327,7 +1349,7 @@ export default function CreatePostScreen() {
         {/* Processing error banner */}
         {slideProcessingPhase === 'error' && slideProcessingError && (
           <View style={[ts.errorBanner, { bottom: botPad + 140 }]}>
-            <Feather name="alert-triangle" size={14} color="#fbbf24" style={{ marginRight: 8 }} />
+            <Feather name="alert-triangle" size={14} color={ORANGE} style={{ marginRight: 8 }} />
             <Text style={ts.errorBannerText} numberOfLines={2}>{slideProcessingError}</Text>
             <TouchableOpacity onPress={processSlideshow} style={ts.errorRetryBtn}>
               <Text style={ts.errorRetryText}>Retry</Text>
@@ -1434,37 +1456,13 @@ export default function CreatePostScreen() {
             <Feather name="arrow-left" size={24} color={busy ? MUTED : FG} />
           </TouchableOpacity>
 
-          {/* Sound pill */}
-          {selectedSound ? (
-            <TouchableOpacity
-              style={ts.soundPill}
-              onPress={() => setShowSoundModal(true)}
-              activeOpacity={0.85}
-            >
-              <Feather name="music" size={13} color={FG} style={{ marginRight: 6 }} />
-              <Text style={ts.soundPillText} numberOfLines={1}>
-                {selectedSound.soundTitle}
-              </Text>
-              <TouchableOpacity onPress={() => setSelectedSound(null)} style={{ marginLeft: 8 }}>
-                <Feather name="x" size={13} color={MUTED} />
-              </TouchableOpacity>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity style={ts.soundPill} onPress={() => setShowSoundModal(true)} activeOpacity={0.85}>
-              <Feather name="music" size={13} color={FG} style={{ marginRight: 6 }} />
-              <Text style={ts.soundPillText}>Add sound</Text>
-            </TouchableOpacity>
-          )}
+          <View style={{ width: 44 }} />
 
           <View style={{ width: 44 }} />
         </View>
 
         {/* Right floating toolbar */}
         <View style={[ts.rightToolbar, { paddingTop: topPad + 56 }]}>
-          <ToolBtn icon="settings" onPress={() => {}} />
-          <View style={ts.toolDivider} />
-          <ToolBtn icon="sliders" />
-          <ToolBtn icon="film" />
           <ToolBtn
             icon="type"
             label="Text"
@@ -1521,7 +1519,7 @@ export default function CreatePostScreen() {
                 style={[
                   ts.timelineClip,
                   { flex: Math.max(0.05, (clip.duration / clip.speed) / Math.max(0.1, totalVideoDuration)),
-                    backgroundColor: idx % 2 === 0 ? PURPLE : '#555' },
+                    backgroundColor: idx % 2 === 0 ? PURPLE : BORDER },
                 ]}
               >
                 <Text style={ts.timelineClipText}>{idx + 1}</Text>
@@ -1574,6 +1572,24 @@ export default function CreatePostScreen() {
           </View>
         )}
 
+        {composedVideo && !busy && (
+          <TouchableOpacity
+            style={ts.coverFrameBtn}
+            onPress={useCurrentFrameAsCover}
+            disabled={settingCover}
+            accessibilityLabel="Use this frame as cover"
+          >
+            {settingCover ? (
+              <ActivityIndicator size="small" color={FG} />
+            ) : (
+              <>
+                <Feather name="image" size={13} color={FG} />
+                <Text style={ts.coverFrameBtnText}>Use this frame as cover</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+
         {/* Bottom CTA */}
         <View style={[ts.videoBottomBar, { paddingBottom: botPad + 8 }]}>
           <TouchableOpacity
@@ -1585,7 +1601,7 @@ export default function CreatePostScreen() {
             }}
           >
             <LinearGradient
-              colors={busy ? ['#333','#333'] : theme.primaryGradient}
+              colors={busy ? [theme.cardElevated, theme.cardElevated] : theme.primaryGradient}
               style={ts.nextBtnGrad}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             >
@@ -1771,26 +1787,6 @@ export default function CreatePostScreen() {
               </View>
             )}
 
-            {/* Sound */}
-            {!isBuyer && (
-              <View style={ts.settingsSeparator} />
-            )}
-            {!isBuyer && (
-              selectedSound ? (
-                <View style={ts.soundRow}>
-                  <Feather name="music" size={16} color={PURPLE} />
-                  <Text style={ts.soundRowText} numberOfLines={1}>
-                    {selectedSound.soundTitle} — {selectedSound.artist}
-                  </Text>
-                  <TouchableOpacity onPress={() => setSelectedSound(null)}>
-                    <Feather name="x" size={16} color={MUTED} />
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <SettingsRow label="Add sound" onPress={() => setShowSoundModal(true)} />
-              )
-            )}
-
             {/* Divider */}
             <View style={ts.settingsSeparator} />
 
@@ -1827,11 +1823,11 @@ export default function CreatePostScreen() {
               ]).map(({ label, key }) => (
                 <View key={key} style={ts.toggleRow}>
                   <Text style={ts.toggleLabel}>{label}</Text>
-                  <Switch
+                  <HapticSwitch
                     value={visibility[key] as boolean}
                     onValueChange={(v) => setVisibility(prev => ({ ...prev, [key]: v }))}
-                    thumbColor={(visibility[key] as boolean) ? PURPLE : '#555'}
-                    trackColor={{ false: '#333', true: PURPLE + '44' }}
+                    thumbColor={(visibility[key] as boolean) ? PURPLE : theme.muted}
+                    trackColor={{ false: BORDER, true: PURPLE + '44' }}
                   />
                 </View>
               ))}
@@ -1912,7 +1908,7 @@ export default function CreatePostScreen() {
                 } catch (error) {
                   Alert.alert(
                     'Draft not saved',
-                    error instanceof Error ? error.message : 'Could not save draft. Please try again.',
+                    "Couldn't save your draft. Check your connection and try again.",
                   );
                 } finally {
                   setIsSavingDraft(false);
@@ -1951,7 +1947,7 @@ export default function CreatePostScreen() {
                   setStep('done');
                 } catch (error) {
                   setStep('post-details');
-                  Alert.alert('Publish failed', error instanceof Error ? error.message : 'Something went wrong.');
+                  Alert.alert('Publish failed', "Couldn't post. Your edits are safe — try again.");
                 } finally {
                   setIsPublishing(false);
                 }
@@ -2211,7 +2207,7 @@ function ProductModal({ visible, onClose, productSearch, setProductSearch, produ
                   style={[ms.tagBtn, isTagged && { backgroundColor: PURPLE, borderColor: PURPLE }]}
                   onPress={() => { Haptics.selectionAsync(); onTag(p); }}
                 >
-                  <Text style={[ms.tagBtnText, isTagged && { color: '#000' }]}>{isTagged ? 'Remove' : 'Tag'}</Text>
+                  <Text style={[ms.tagBtnText, isTagged && { color: theme.onAccent }]}>{isTagged ? 'Remove' : 'Tag'}</Text>
                 </TouchableOpacity>
               </View>
             );
@@ -2411,6 +2407,8 @@ const createTs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   errorBannerText:  { fontSize: FS.xs, fontFamily: FONT.medium, color: ORANGE, flex: 1 },
   readyBanner:      { position: 'absolute', bottom: 90, left: 20, right: 20, zIndex: 15, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(20,20,20,0.90)', borderRadius: 12, padding: 12 },
   readyBannerText:  { fontSize: FS.xs, fontFamily: FONT.medium, color: FG },
+  coverFrameBtn:    { position: 'absolute', bottom: 145, alignSelf: 'center', zIndex: 15, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(20,20,20,0.90)', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
+  coverFrameBtnText:{ fontSize: FS.xs, fontFamily: FONT.semibold, color: FG },
 
   videoBottomBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20,
@@ -2503,6 +2501,8 @@ const createTs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   slideThumb:    { width: 60, height: 80, borderRadius: 6, overflow: 'hidden', borderWidth: 2, borderColor: 'transparent', position: 'relative' },
   slideThumbImg: { width: 60, height: 80 },
   slideOverlayBadge: { position: 'absolute', top: 3, right: 3, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: ORANGE, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  slideReorderRow: { flexDirection: 'row', gap: 4, marginTop: 4 },
+  slideReorderBtn: { width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   slideOverlayBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: '#fff' },
   slideNextBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20,

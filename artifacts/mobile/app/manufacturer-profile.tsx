@@ -31,9 +31,11 @@ import {
   getManufacturer, getFavoriteManufacturerIds, saveManufacturer, unfavoriteManufacturer,
   getOrCreateConversation,
 } from '@/services/manufacturerService';
+import { getManufacturerProducts, lowestTierPriceCents, type ManufacturerProduct } from '@/services/manufacturerCatalog';
 
 import { Manufacturer } from '@/services/manufacturerTypes';
 import { formatCents } from '@/lib/money';
+import { localTimeLabel } from '@workspace/manufacturer-flow';
 
 // ─── Star Rating ──────────────────────────────────────────────────────────────
 
@@ -86,6 +88,9 @@ export default function ManufacturerProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [products, setProducts] = useState<ManufacturerProduct[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [productsError, setProductsError] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -100,6 +105,18 @@ export default function ManufacturerProfileScreen() {
       setManufacturer(null);
       setLoading(false);
     });
+    return () => { active = false; };
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    let active = true;
+    setProductsLoading(true);
+    setProductsError(false);
+    getManufacturerProducts(id)
+      .then((rows) => { if (active) setProducts(rows); })
+      .catch(() => { if (active) setProductsError(true); })
+      .finally(() => { if (active) setProductsLoading(false); });
     return () => { active = false; };
   }, [id]);
 
@@ -151,7 +168,7 @@ export default function ManufacturerProfileScreen() {
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Feather name="arrow-left" size={ICON.md} color={FG} />
         </TouchableOpacity>
-        <EmptyState icon="alert-circle" title="Manufacturer unavailable" description="" />
+        <EmptyState icon="alert-circle" title="Manufacturer unavailable" description="This profile is no longer listed, or it's a private manufacturer you aren't connected to." action={{ label: 'Back to directory', onPress: () => router.back() }} />
       </View>
     );
   }
@@ -179,9 +196,13 @@ export default function ManufacturerProfileScreen() {
 
           {/* Factory icon */}
           <View style={s.factoryIconWrap}>
-            <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.factoryIconBg}>
-              <Feather name="settings" size={ICON.xxl} color={theme.onAccent} />
-            </LinearGradient>
+            {m.profileImageUri ? (
+              <Image source={{ uri: m.profileImageUri }} style={s.factoryIconBg} resizeMode="cover" accessibilityLabel={`${m.name} lead photo`} />
+            ) : (
+              <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.factoryIconBg}>
+                <Feather name="settings" size={ICON.xxl} color={theme.onAccent} />
+              </LinearGradient>
+            )}
           </View>
 
           {/* Name + verified */}
@@ -198,8 +219,24 @@ export default function ManufacturerProfileScreen() {
           {/* Location */}
           <View style={s.heroLocationRow}>
              <Feather name="map-pin" size={12} color={theme.onAccent} />
-             <Text style={[s.heroLocation, getOnAccentTextStyle(theme)]}>{m.city}, {m.country}</Text>
+             <Text style={[s.heroLocation, getOnAccentTextStyle(theme)]}>{[m.city, m.country].filter(Boolean).join(', ')}</Text>
           </View>
+          {(localTimeLabel(m.timeZone) || m.isPublicDirectory === false) && (
+            <View style={s.heroLocationRow}>
+              {localTimeLabel(m.timeZone) ? (
+                <>
+                  <Feather name="clock" size={12} color={theme.onAccent} />
+                  <Text style={[s.heroLocation, getOnAccentTextStyle(theme)]} testID="profile-local-time">{localTimeLabel(m.timeZone)}</Text>
+                </>
+              ) : null}
+              {m.isPublicDirectory === false && (
+                <View style={[s.verifiedBadge, { backgroundColor: 'rgba(0,0,0,0.35)' }]}>
+                  <Feather name="lock" size={12} color={theme.onAccent} />
+                  <Text style={[s.verifiedText, { color: theme.onAccent }]}>Private partner</Text>
+                </View>
+              )}
+            </View>
+          )}
 
           {/* Rating */}
           <View style={s.heroRatingRow}>
@@ -234,31 +271,20 @@ export default function ManufacturerProfileScreen() {
           {/* ── Overview ── */}
           <SectionCard title="Overview">
             <View style={s.overviewGrid}>
-              <View style={s.overviewItem}>
-                <Feather name="clock" size={ICON.sm} color={PURPLE_LIGHT} />
-                <Text style={s.overviewLabel}>Years in Business</Text>
-                <Text style={s.overviewValue}>{m.yearsInBusiness}</Text>
-              </View>
-              <View style={s.overviewItem}>
-                <Feather name="users" size={ICON.sm} color={CYAN} />
-                <Text style={s.overviewLabel}>Team Size</Text>
-                <Text style={s.overviewValue}>{m.teamSize}</Text>
-              </View>
-              <View style={s.overviewItem}>
-                <Feather name="package" size={ICON.sm} color={SUCCESS} />
-                <Text style={s.overviewLabel}>Capacity</Text>
-                <Text style={s.overviewValue}>{m.productionCapacity}</Text>
-              </View>
-              <View style={s.overviewItem}>
-                <Feather name="zap" size={ICON.sm} color={GOLD} />
-                <Text style={s.overviewLabel}>Response</Text>
-              <Text style={s.overviewValue}>{m.responseTimeHours > 0 ? `${m.responseTimeHours}h` : '—'}</Text>
-              </View>
-              <View style={s.overviewItem}>
-                <Feather name="calendar" size={ICON.sm} color={ORANGE} />
-                <Text style={s.overviewLabel}>Lead Time</Text>
-                <Text style={s.overviewValue}>{m.leadTimeDays}d</Text>
-              </View>
+              {([
+                { icon: 'clock', label: 'Years in business', value: m.yearsInBusiness > 0 ? `${m.yearsInBusiness} ${m.yearsInBusiness === 1 ? 'year' : 'years'}` : 'New' },
+                { icon: 'package', label: 'Minimum order', value: m.moq > 0 ? `${m.moq.toLocaleString('en-US')} pcs` : null },
+                { icon: 'tag', label: 'Price per piece', value: m.priceRangeLabel ?? null },
+                { icon: 'scissors', label: 'Sample time', value: m.sampleTurnaround ?? null },
+                { icon: 'calendar', label: 'Bulk time', value: m.bulkTurnaround ?? (m.leadTimeDays ? `${m.leadTimeDays} days` : null) },
+                { icon: 'zap', label: 'Replies in', value: m.responseTimeHours > 0 ? `~${m.responseTimeHours}h` : null },
+              ] as const).filter((item) => item.value).map((item) => (
+                <View key={item.label} style={s.overviewItem}>
+                  <Feather name={item.icon} size={ICON.sm} color={FG} />
+                  <Text style={s.overviewLabel}>{item.label}</Text>
+                  <Text style={s.overviewValue}>{item.value}</Text>
+                </View>
+              ))}
             </View>
             {!!m.description && <Text style={s.description}>{m.description}</Text>}
           </SectionCard>
@@ -356,6 +382,57 @@ export default function ManufacturerProfileScreen() {
                 <Text style={s.pricingValue}>{m.leadTimeDays} days</Text>
               </View>
             </View>
+          </SectionCard>
+
+          {/* ── Product / Sample Catalog ── */}
+          <SectionCard title="Product Catalog">
+            {productsLoading ? (
+              <ActivityIndicator color={PURPLE} />
+            ) : productsError ? (
+              <EmptyState icon="wifi-off" title="Catalog unavailable" description="Could not load this manufacturer's product catalog." />
+            ) : products.length === 0 ? (
+              <EmptyState icon="grid" title="No catalog products yet" description="This manufacturer hasn't listed browsable products with quantity pricing." />
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.catalogRow}>
+                {products.map((product) => {
+                  const from = lowestTierPriceCents(product);
+                  return (
+                    <TouchableOpacity
+                      key={product.id}
+                      style={s.catalogCard}
+                      activeOpacity={0.85}
+                      onPress={() => router.push((`/manufacturer-product?manufacturerId=${m.id}&productId=${product.id}`) as never)}
+                      testID={`catalog-product-${product.id}`}
+                    >
+                      {product.images[0] ? (
+                        <Image source={{ uri: product.images[0] }} style={s.catalogImage} resizeMode="cover" />
+                      ) : (
+                        <View style={[s.catalogImage, s.catalogImageFallback]}>
+                          <Feather name="package" size={ICON.lg} color={SUBTLE} />
+                        </View>
+                      )}
+                      <Text style={s.catalogName} numberOfLines={2}>{product.name}</Text>
+                      {from !== undefined && (
+                        <Text style={s.catalogPrice}>from {formatCents(from)}/unit</Text>
+                      )}
+                      <Text style={s.catalogMeta}>MOQ {product.moq.toLocaleString('en-US')} · {product.leadTimeDays}d lead</Text>
+                      {product.priceTiers.length > 0 && (
+                        <View style={s.tierMiniTable}>
+                          {product.priceTiers.slice(0, 3).map((tier) => (
+                            <View key={tier.id} style={s.tierMiniRow}>
+                              <Text style={s.tierMiniQty}>
+                                {tier.minQuantity}{tier.maxQuantity ? `–${tier.maxQuantity}` : '+'}
+                              </Text>
+                              <Text style={s.tierMiniPrice}>{formatCents(tier.unitPriceCents)}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
           </SectionCard>
 
           {/* ── Gallery ── */}
@@ -632,5 +709,39 @@ const s = StyleSheet.create({
   stickyBottom: {
     backgroundColor: BG, borderTopWidth: 1, borderTopColor: BORDER,
     paddingTop: SP.sm,
+  },
+  catalogRow: {
+    gap: SP.sm, paddingRight: SP.sm,
+  },
+  catalogCard: {
+    width: 156, backgroundColor: SURFACE, borderRadius: RADIUS.md, borderWidth: 1,
+    borderColor: BORDER, padding: SP.sm, gap: 4,
+  },
+  catalogImage: {
+    width: '100%', height: 96, borderRadius: RADIUS.sm, backgroundColor: CARD_ELEVATED,
+  },
+  catalogImageFallback: {
+    alignItems: 'center', justifyContent: 'center',
+  },
+  catalogName: {
+    fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginTop: 4, minHeight: 32,
+  },
+  catalogPrice: {
+    fontSize: FS.sm, fontFamily: FONT.bold, color: PURPLE_LIGHT,
+  },
+  catalogMeta: {
+    fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED,
+  },
+  tierMiniTable: {
+    marginTop: 4, gap: 2, borderTopWidth: 1, borderTopColor: BORDER, paddingTop: 4,
+  },
+  tierMiniRow: {
+    flexDirection: 'row', justifyContent: 'space-between',
+  },
+  tierMiniQty: {
+    fontSize: 10, fontFamily: FONT.regular, color: SUBTLE,
+  },
+  tierMiniPrice: {
+    fontSize: 10, fontFamily: FONT.semibold, color: FG,
   },
 });

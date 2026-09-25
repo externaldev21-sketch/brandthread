@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { getQuotesForRequest, acceptQuote, getManufacturer } from '@/services/manufacturerService';
 import { Quote, Manufacturer } from '@/services/manufacturerTypes';
 import { BrandthreadHeader, BrandthreadCard, PrimaryButton, StatusBadge } from '@/components/BrandthreadUI';
+import { ErrorState } from '@/components/ui/ErrorState';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -102,9 +103,12 @@ export default function QuoteCompareScreen() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [manufacturers, setManufacturers] = useState<Map<string, Manufacturer>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
     if (!requestId) { setLoading(false); return; }
+    setLoading(true);
+    setLoadError(false);
     try {
       const qs = await getQuotesForRequest(requestId);
       setQuotes(qs);
@@ -117,6 +121,7 @@ export default function QuoteCompareScreen() {
     } catch {
       setQuotes([]);
       setManufacturers(new Map());
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -149,7 +154,12 @@ export default function QuoteCompareScreen() {
     <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: insets.top }}>
       <BrandthreadHeader title="Compare Quotes" onBack={() => router.back()} />
 
-      {quotes.length === 0 && (
+      {loadError ? (
+        <ErrorState
+          message="Couldn't load quotes for this request."
+          onRetry={() => { void load(); }}
+        />
+      ) : quotes.length === 0 && (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl }}>
           <Feather name="inbox" size={48} color={SUBTLE} style={{ marginBottom: SP.md }} />
           <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, marginBottom: 8 }}>No Quotes Yet</Text>

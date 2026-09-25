@@ -10,21 +10,25 @@
  * GET    /api/conversations/:id           — get single conversation
  * GET    /api/conversations/:id/messages  — paginated messages
  * POST   /api/conversations/:id/messages  — send message (moderated + block-gated)
+ * PUT    /api/conversations/:id/messages/:messageId/reactions   — set my reaction (upsert)
+ * DELETE /api/conversations/:id/messages/:messageId/reactions   — remove my reaction
  * PATCH  /api/conversations/:id/read      — mark read
  * PATCH  /api/conversations/:id/accept    — accept a message request
  * DELETE /api/conversations/:id           — decline / delete conversation
  */
 import { Router } from "express";
 import {
-  db, conversations, conversationParticipants, messages, blocks, follows, users,
+  db, conversations, conversationParticipants, messages, messageReactions, blocks, follows, users,
   products, orders, posts,
 } from "@workspace/db";
 import { eq, and, desc, inArray, sql, or } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { rateLimit } from "../middlewares/rateLimit";
 import { moderateMessage } from "../lib/contentModerator";
 import { blockRelation, publishingRestriction } from "../lib/safety";
 import { publishNotification } from "./notifications-feed";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
+import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 
 const router = Router();
 router.use(requireAuth);
@@ -91,7 +95,18 @@ function buildConversationView(
   };
 }
 
-function adaptMessage(m: typeof messages.$inferSelect) {
+// Small fixed reaction bar — no free-form emoji picker.
+const REACTION_TYPES = ["like", "love", "haha", "wow", "sad", "fire"] as const;
+type ReactionType = (typeof REACTION_TYPES)[number];
+
+type ReactionView = {
+  userId: string;
+  userName: string;
+  reactionType: string;
+  createdAt: string;
+};
+
+function adaptMessage(m: typeof messages.$inferSelect, reactions: ReactionView[] = []) {
   return {
     id:             m.id,
     conversationId: m.conversationId,
@@ -106,7 +121,7 @@ function adaptMessage(m: typeof messages.$inferSelect) {
     attachments:    m.moderationStatus === "removed" ? [] : (m.attachments as any[]) ?? [],
     replyToId:      m.replyToId ?? undefined,
     replyPreview:   undefined,
-    reactions:      [],
+    reactions,
     status:         m.status,
     deliveredAt:    m.deliveredAt?.toISOString() ?? undefined,
     readAt:         m.readAt?.toISOString() ?? undefined,
@@ -116,18 +131,55 @@ function adaptMessage(m: typeof messages.$inferSelect) {
   };
 }
 
+// Fetches reactions for a set of messages and groups them, resolving display
+// names from the conversation's participant roster (reactions never leave the
+// conversation, so this avoids an extra join against `users`).
+async function loadReactionsByMessage(
+  messageIds: string[],
+  parts: (typeof conversationParticipants.$inferSelect)[],
+): Promise<Map<string, ReactionView[]>> {
+  const byMessage = new Map<string, ReactionView[]>();
+  if (messageIds.length === 0) return byMessage;
+  const nameByUserId = new Map(parts.map((p) => [p.userId, p.name]));
+  const rows = await db.select().from(messageReactions)
+    .where(inArray(messageReactions.messageId, messageIds));
+  for (const row of rows) {
+    const view: ReactionView = {
+      userId:       row.userId,
+      userName:     nameByUserId.get(row.userId) ?? "",
+      reactionType: row.reactionType,
+      createdAt:    row.createdAt?.toISOString() ?? new Date().toISOString(),
+    };
+    if (!byMessage.has(row.messageId)) byMessage.set(row.messageId, []);
+    byMessage.get(row.messageId)!.push(view);
+  }
+  return byMessage;
+}
+
 // ─── GET /api/conversations ───────────────────────────────────────────────────
+// Query params: ?limit=&offset= (default 100, capped at MAX_PAGE_LIMIT). An
+// inbox is unbounded over time, so the id lookup itself is ordered + paged
+// before any per-conversation detail is fetched — avoids loading every
+// conversation a long-lived account has ever had on every inbox open.
 router.get("/", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
+  const page = parsePagination(req.query, { limit: 100 });
+  if (!page.success) return res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" });
+  const { limit, offset } = page.data;
 
   const myParts = await db
     .select({ conversationId: conversationParticipants.conversationId })
     .from(conversationParticipants)
-    .where(eq(conversationParticipants.userId, userId));
+    .innerJoin(conversations, eq(conversations.id, conversationParticipants.conversationId))
+    .where(eq(conversationParticipants.userId, userId))
+    .orderBy(desc(conversations.updatedAt))
+    .limit(limit)
+    .offset(offset);
 
-  if (myParts.length === 0) return res.json([]);
+  if (myParts.length === 0) { setPaginationHeaders(res, page.data, 0); return res.json([]); }
 
   const convIds = myParts.map((p) => p.conversationId);
+  setPaginationHeaders(res, page.data, convIds.length);
 
   const [convs, allParts, allMessages] = await Promise.all([
     db.select().from(conversations)
@@ -168,7 +220,7 @@ router.get("/", async (req, res) => {
 });
 
 // ─── POST /api/conversations ──────────────────────────────────────────────────
-router.post("/", async (req, res) => {
+router.post("/", rateLimit("messaging"), async (req, res) => {
   const myUserId = (req as any).clerkUserId as string;
   const {
     type,
@@ -363,13 +415,17 @@ router.get("/:id/messages", async (req, res) => {
     .orderBy(desc(messages.createdAt))
     .limit(limit);
 
-  return res.json(msgs.reverse().map(adaptMessage));
+  const parts = await db.select().from(conversationParticipants)
+    .where(eq(conversationParticipants.conversationId, id));
+  const reactionsByMessage = await loadReactionsByMessage(msgs.map((m) => m.id), parts);
+
+  return res.json(msgs.reverse().map((m) => adaptMessage(m, reactionsByMessage.get(m.id) ?? [])));
 });
 
 // ─── POST /api/conversations/:id/messages ────────────────────────────────────
-router.post("/:id/messages", async (req, res) => {
+router.post("/:id/messages", rateLimit("messaging"), async (req, res) => {
   const userId = (req as any).clerkUserId as string;
-  const { id } = req.params;
+  const { id } = req.params as { id: string };
   const { text, attachment, attachments, replyToId } = req.body as {
     text: string;
     attachment?: any;
@@ -610,6 +666,87 @@ router.post("/:id/messages", async (req, res) => {
   return res.status(201).json(adaptMessage(msg));
 });
 
+// ─── PUT /api/conversations/:id/messages/:messageId/reactions ────────────────
+// Upserts the caller's reaction on a message — a user has at most one active
+// reaction per message; re-reacting replaces it.
+router.put("/:id/messages/:messageId/reactions", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const { id, messageId } = req.params;
+  const { reactionType } = req.body as { reactionType?: string };
+
+  if (!reactionType || !REACTION_TYPES.includes(reactionType as ReactionType)) {
+    return res.status(400).json({ error: `reactionType must be one of: ${REACTION_TYPES.join(", ")}` });
+  }
+
+  const [membership] = await db.select().from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
+    .limit(1);
+  if (!membership) return res.status(403).json({ error: "Not a participant" });
+
+  const [message] = await db.select().from(messages)
+    .where(and(eq(messages.id, messageId), eq(messages.conversationId, id)))
+    .limit(1);
+  if (!message) return res.status(404).json({ error: "Message not found" });
+
+  const [reaction] = await db.insert(messageReactions)
+    .values({ messageId, userId, reactionType })
+    .onConflictDoUpdate({
+      target: [messageReactions.messageId, messageReactions.userId],
+      set: { reactionType, createdAt: new Date() },
+    })
+    .returning();
+
+  // Notify the message's sender (never yourself) — fire-and-forget.
+  if (message.senderId !== userId) {
+    (async () => {
+      try {
+        await publishNotification({
+          userId:        message.senderId,
+          category:      "messages",
+          type:          "message_reaction",
+          title:         `${membership.name || "Someone"} reacted to your message`,
+          body:          message.moderationStatus === "removed" ? undefined : message.body?.slice(0, 100),
+          actorName:     membership.name,
+          actorHandle:   membership.handle,
+          actorInitials: membership.initials,
+          actorColor:    membership.color,
+          targetId:      id,
+          targetType:    "conversation",
+        });
+      } catch { /* non-critical */ }
+    })();
+  }
+
+  return res.status(200).json({
+    userId:       reaction.userId,
+    userName:     membership.name,
+    reactionType: reaction.reactionType,
+    createdAt:    reaction.createdAt?.toISOString() ?? new Date().toISOString(),
+  });
+});
+
+// ─── DELETE /api/conversations/:id/messages/:messageId/reactions ─────────────
+router.delete("/:id/messages/:messageId/reactions", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const { id, messageId } = req.params;
+
+  const [isMember] = await db.select({ userId: conversationParticipants.userId })
+    .from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
+    .limit(1);
+  if (!isMember) return res.status(403).json({ error: "Not a participant" });
+
+  const [message] = await db.select({ id: messages.id }).from(messages)
+    .where(and(eq(messages.id, messageId), eq(messages.conversationId, id)))
+    .limit(1);
+  if (!message) return res.status(404).json({ error: "Message not found" });
+
+  await db.delete(messageReactions)
+    .where(and(eq(messageReactions.messageId, messageId), eq(messageReactions.userId, userId)));
+
+  return res.json({ ok: true });
+});
+
 // ─── PATCH /api/conversations/:id/read ───────────────────────────────────────
 router.patch("/:id/read", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
@@ -669,9 +806,29 @@ router.patch("/:id/accept", async (req, res) => {
 // ─── POST /api/conversations/upload-media ────────────────────────────────────
 // Accept a base64-encoded image/video/audio and store it in object storage.
 // Returns { url } — a publicly-accessible URL for use in message attachments.
+//
+// mimeType and extension are attacker-controlled input: the extension is
+// never taken from the request (it previously allowed arbitrary characters,
+// including "/", into the generated object key) and the content-type is
+// restricted to a fixed allowlist of media types this feature supports.
+const UPLOAD_MEDIA_MIME_EXTENSIONS: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "video/mp4": "mp4",
+  "video/quicktime": "mov",
+  "video/webm": "webm",
+  "audio/mpeg": "mp3",
+  "audio/mp4": "m4a",
+  "audio/x-m4a": "m4a",
+  "audio/wav": "wav",
+};
+const UPLOAD_MEDIA_BASE64_RE = /^[A-Za-z0-9+/]+=*$/;
+
 router.post("/upload-media", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
-  const { data, mimeType = "image/jpeg", extension = "jpg" } = req.body ?? {};
+  const { data, mimeType = "image/jpeg" } = req.body ?? {};
 
   const BUCKET_ID = (process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "").trim();
   if (!BUCKET_ID) {
@@ -691,9 +848,19 @@ router.post("/upload-media", async (req, res) => {
   if (base64.length > 80 * 1024 * 1024) {
     return res.status(413).json({ error: "File too large (max ~60 MB)" });
   }
+  if (!UPLOAD_MEDIA_BASE64_RE.test(base64)) {
+    return res.status(400).json({ error: "data must be base64-encoded" });
+  }
+
+  const normalizedMimeType = typeof mimeType === "string" ? mimeType.toLowerCase() : "";
+  const ext = UPLOAD_MEDIA_MIME_EXTENSIONS[normalizedMimeType];
+  if (!ext) {
+    return res.status(400).json({
+      error: `mimeType must be one of: ${Object.keys(UPLOAD_MEDIA_MIME_EXTENSIONS).join(", ")}`,
+    });
+  }
 
   const { randomUUID } = await import("crypto");
-  const ext      = (extension as string).replace(/^\./, "").slice(0, 10);
   const filename = `messaging/${userId}/${randomUUID()}.${ext}`;
 
   try {
@@ -701,7 +868,7 @@ router.post("/upload-media", async (req, res) => {
     const buffer = Buffer.from(base64, "base64");
     const bucket = objectStorageClient.bucket(BUCKET_ID);
     const file   = bucket.file(filename);
-    await file.save(buffer, { contentType: mimeType as string, resumable: false });
+    await file.save(buffer, { contentType: normalizedMimeType, resumable: false });
     await file.makePublic();
     const url = `https://storage.googleapis.com/${BUCKET_ID}/${filename}`;
     return res.json({ url });

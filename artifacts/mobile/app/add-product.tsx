@@ -9,16 +9,23 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, TextInput, KeyboardAvoidingView, Platform, Switch, Image, LayoutAnimation, UIManager } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, TextInput, KeyboardAvoidingView, Platform, Switch, Image, LayoutAnimation, UIManager, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { File, Paths } from 'expo-file-system';
 
 import { FONT, FS, SP, RADIUS, COMP, ICON, ANIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { RADII } from '@/constants/radii';
+import { TYPE_SCALE } from '@/constants/typography';
+import { hapticPrimaryAction, hapticToggle, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { Button } from '@/components/ui/Button';
+import { SuccessSheet } from '@/components/ui/SuccessSheet';
 
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, FilterChip, StatusBadge, SectionHeader, FormInput, ProgressCard, EmptyState } from '@/components/BrandthreadUI';
 
@@ -27,10 +34,11 @@ import { useApi } from '@/hooks/useApi';
 
 import { Product, ProductDraft, ProductCategory, PRODUCT_CATEGORIES, SIZE_PRESETS, COLOR_PRESETS, SalesModel, OptionType, ProductOption, OptionValue, ProductVariant, ProductMedia, ProductCollection } from '@/services/productTypes';
 
-import { calcPricing, generateVariantCombinations, buildVariantTitle, validateForPublish } from '@/lib/productUtils';
+import { calcPricing, generateVariantCombinations, buildVariantTitle, validateForPublish, applyBulkEditToVariants } from '@/lib/productUtils';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
+import { validatePhotosStep, validateDetailsStep, validatePricingStep, validateVariantsStep, validateListingForPublish } from '@/lib/listingValidation';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -52,7 +60,23 @@ const STEP_TITLES = [
   'Review & Publish',
 ];
 
-// ─── Collapsible section component ───────────────────────────────────────────
+// ─── Stepper (the flow sellers actually navigate) ──────────────────────────
+// Six steps per the fast-listing flow spec. Advanced fields (manufacturing,
+// storefront/SEO) live as collapsible "Advanced" blocks inside the closest
+// relevant step so nothing from the original single-scroll form is lost.
+
+type FlowStep = 'photos' | 'details' | 'variants' | 'pricing' | 'shipping' | 'review';
+
+const FLOW_STEPS: { key: FlowStep; label: string; icon: keyof typeof Feather.glyphMap }[] = [
+  { key: 'photos',   label: 'Photos',   icon: 'camera' },
+  { key: 'details',  label: 'Details',  icon: 'file-text' },
+  { key: 'variants', label: 'Variants', icon: 'layers' },
+  { key: 'pricing',  label: 'Pricing',  icon: 'dollar-sign' },
+  { key: 'shipping', label: 'Shipping', icon: 'truck' },
+  { key: 'review',   label: 'Review',   icon: 'check-circle' },
+];
+
+// ─── Collapsible section component ──────────────────────────────────────────
 
 interface CollapsibleSectionProps {
   title: string;
@@ -90,7 +114,7 @@ function CollapsibleSection({ title, icon, expanded, onToggle, children, hint }:
   );
 }
 
-// ─── Local state interfaces ───────────────────────────────────────────────────
+// ─── Local state interfaces ───────────────────────────────────────────────
 
 interface LocalOption {
   id: string;
@@ -115,7 +139,7 @@ function centsToInput(cents: number | undefined): string {
   return `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, '0')}`;
 }
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
+// ─── Screen ─────────────────────────────────────────────────────────
 
 export default function AddProductScreen() {
   const { theme } = useAppTheme();
@@ -199,10 +223,32 @@ export default function AddProductScreen() {
   const [featuredHome, setFeaturedHome] = useState(false);
   const [dismissedTips, setDismissedTips] = useState<string[]>([]);
   const [publishing, setPublishing] = useState(false);
+  const [publishSuccess, setPublishSuccess] = useState<{ name: string; kind: 'created' | 'updated'; productId: string } | null>(null);
+  const [mediaUpload, setMediaUpload] = useState<Record<string, { status: 'uploading' | 'done' | 'error'; remoteUri?: string }>>({});
+  const photosUploading = Object.values(mediaUpload).some(u => u.status === 'uploading');
   const [isEditMode, setIsEditMode] = useState(false);
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [collections, setCollections] = useState<ProductCollection[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // ── Stepper state ──
+  const [stepIndex, setStepIndex] = useState(0);
+  const currentStepKey = FLOW_STEPS[stepIndex].key;
+  const [stepAttempted, setStepAttempted] = useState<Record<FlowStep, boolean>>({
+    photos: false, details: false, variants: false, pricing: false, shipping: false, review: false,
+  });
+
+  // ── Pre-order (Pricing & Stock step) ──
+  const [isPreOrder, setIsPreOrder] = useState(false);
+
+  // ── Variants: bulk-edit selection ──
+  const [bulkEditMode, setBulkEditMode] = useState(false);
+  const [selectedVariantIds, setSelectedVariantIds] = useState<Set<string>>(new Set());
+  const [bulkPrice, setBulkPrice] = useState('');
+  const [bulkQty, setBulkQty] = useState('');
+
+  // ── Photos: background removal per image ──
+  const [bgRemovalState, setBgRemovalState] = useState<Record<string, 'processing' | 'done' | 'failed'>>({});
 
   // ── Collapsible section state — advanced sections start closed ──
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -235,7 +281,7 @@ export default function AddProductScreen() {
   }
 
   function toggleSection(key: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticToggle();
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
   }
@@ -278,6 +324,9 @@ export default function AddProductScreen() {
       const qtys: Record<string, string> = {};
       source.variants.forEach(v => { qtys[v.id] = v.inventoryQuantity.toString(); });
       setVariantQtys(qtys);
+    }
+    if (source.salesModel) {
+      setIsPreOrder(source.salesModel === 'pre-order' || source.salesModel === 'both');
     }
     if (source.manufacturing) {
       if (source.manufacturing.manufacturerName) {
@@ -337,7 +386,7 @@ export default function AddProductScreen() {
     draftData, localOptions, localVariants, variantQtys,
     priceStr, compareAtStr, costStr, shippingStr, feesStr,
     trackInventory, allowOversell, stockStr, lowStockStr,
-    mfgMode, mfgName, targetCost, reqQty, prodDeadline,
+    mfgMode, mfgName, targetCost, reqQty, prodDeadline, isPreOrder,
   ]);
 
   // Intercept native back gestures/buttons so the same protection applies
@@ -501,11 +550,15 @@ export default function AddProductScreen() {
       sku: '', price: '', qty: '',
     }));
     updateUnsavedState(setLocalVariants, variants);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    hapticSuccessAction();
   }
 
   // ── Publish ──
   async function handlePublish() {
+    if (photosUploading) {
+      Alert.alert('Still uploading', 'Wait for your photos to finish uploading before publishing.');
+      return;
+    }
     const decimalFields: Array<[string, string]> = [
       ['Price', priceStr],
       ['Compare-at price', compareAtStr],
@@ -643,6 +696,9 @@ export default function AddProductScreen() {
       tags:        productPayload.tags ?? [],
       styleTags:   productPayload.styleTags ?? [],
       variants:    productVariantsForServer,
+      isPreOrder,
+      preOrderClosingDate:  isPreOrder ? (productPayload.preorderSettings?.closeDate ?? undefined) : undefined,
+      preOrderEstShipDate:  isPreOrder ? (productPayload.preorderSettings?.estimatedShippingDate ?? undefined) : undefined,
     };
 
     const serverUpdatePayload = {
@@ -653,6 +709,9 @@ export default function AddProductScreen() {
       images:      (productPayload.media ?? []).map((m: any) => m.uri ?? m.url ?? '').filter(Boolean),
       tags:        productPayload.tags ?? [],
       styleTags:   productPayload.styleTags ?? [],
+      isPreOrder,
+      preOrderClosingDate:  isPreOrder ? (productPayload.preorderSettings?.closeDate ?? undefined) : undefined,
+      preOrderEstShipDate:  isPreOrder ? (productPayload.preorderSettings?.estimatedShippingDate ?? undefined) : undefined,
     };
 
     try {
@@ -660,20 +719,14 @@ export default function AddProductScreen() {
       if (isEditMode && editProductId) {
         await api.products.update(editProductId, serverUpdatePayload);
         await deleteDraft(draftId.current);
-        Alert.alert('Product updated!', name + ' has been updated.', [
-          { text: 'View product', onPress: () => router.replace('/product-detail?id=' + editProductId as never) },
-          { text: 'Done', onPress: leaveProductFlow },
-        ]);
+        setPublishSuccess({ name, kind: 'updated', productId: editProductId });
       } else {
         const newProduct = await completeSetupTaskAfter(
           'first_product',
           () => api.products.create(serverCreatePayload),
         ) as any;
         await deleteDraft(draftId.current);
-        Alert.alert('Product published!', name + ' is now live.', [
-          { text: 'View product', onPress: () => router.replace('/product-detail?id=' + newProduct.id as never) },
-          { text: 'Done', onPress: leaveProductFlow },
-        ]);
+        setPublishSuccess({ name, kind: 'created', productId: newProduct.id });
       }
     } catch {
       Alert.alert('Error', 'Could not publish. Please try again.');
@@ -682,9 +735,112 @@ export default function AddProductScreen() {
     }
   }
 
-  // ─── Section renderers ────────────────────────────────────────────────────
+  // ─── Section renderers ────────────────────────────────────────────
   // Each is identical to the original step render, just without the outer
   // <View style={s.stepContent}> wrapper (sections provide their own padding).
+
+  // Uploads a locally-picked photo, tracking per-item status so the thumbnail
+  // can show a progress overlay and Publish can be blocked until it's done.
+  async function uploadMediaAsset(item: ProductMedia) {
+    setMediaUpload(prev => ({ ...prev, [item.id]: { status: 'uploading' } }));
+    try {
+      const uploaded = await api.products.uploadImage({ uri: item.uri });
+      const remoteUri = (uploaded as any)?.objectPath || (uploaded as any)?.url || item.uri;
+      setMediaUpload(prev => ({ ...prev, [item.id]: { status: 'done', remoteUri } }));
+      setDraftData(prev => ({ ...prev, media: (prev.media ?? []).map(m => m.id === item.id ? { ...m, uri: remoteUri } : m) }));
+    } catch {
+      setMediaUpload(prev => ({ ...prev, [item.id]: { status: 'error' } }));
+    }
+  }
+
+  // ── Photos: reorder / set cover / crop / background removal ──────────────────
+
+  function moveMedia(id: string, direction: -1 | 1) {
+    const media = draftData.media ?? [];
+    const idx = media.findIndex(m => m.id === id);
+    const target = idx + direction;
+    if (idx === -1 || target < 0 || target >= media.length) return;
+    const next = [...media];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    const resequenced = next.map((m, i) => ({ ...m, sortOrder: i }));
+    hapticToggle();
+    patchDraft({ media: resequenced });
+  }
+
+  function setCoverImage(id: string) {
+    const media = draftData.media ?? [];
+    hapticToggle();
+    patchDraft({ media: media.map(m => ({ ...m, isCover: m.id === id })) });
+  }
+
+  function toggleCutoutUse(id: string) {
+    const media = draftData.media ?? [];
+    hapticToggle();
+    patchDraft({ media: media.map(m => m.id === id ? { ...m, useCutout: !m.useCutout } : m) });
+  }
+
+  /** Center-crop a photo to a square using expo-image-manipulator. */
+  async function cropToSquare(item: ProductMedia) {
+    try {
+      const manipulated = await ImageManipulator.manipulateAsync(item.uri, [], { compress: 0.95 });
+      const size = Math.min(manipulated.width, manipulated.height);
+      const originX = Math.max(0, Math.floor((manipulated.width - size) / 2));
+      const originY = Math.max(0, Math.floor((manipulated.height - size) / 2));
+      const cropped = await ImageManipulator.manipulateAsync(
+        item.uri,
+        [{ crop: { originX, originY, width: size, height: size } }],
+        { compress: 0.92, format: ImageManipulator.SaveFormat.JPEG },
+      );
+      const media = draftData.media ?? [];
+      patchDraft({ media: media.map(m => m.id === item.id ? { ...m, uri: cropped.uri } : m) });
+      setMediaUpload(prev => ({ ...prev, [item.id]: { status: 'uploading' } }));
+      void uploadMediaAsset({ ...item, uri: cropped.uri });
+      hapticSuccessAction();
+    } catch {
+      Alert.alert('Crop failed', 'Could not crop this photo. Please try again.');
+    }
+  }
+
+  /**
+   * Calls the existing background-removal service for one photo. Stores the
+   * cutout as a local PNG (via bgRemovalService's file convention) and
+   * uploads it so both the original and cutout have remote URLs — the
+   * seller toggles which one is used per image.
+   */
+  async function removeBackgroundForMedia(item: ProductMedia) {
+    setBgRemovalState(prev => ({ ...prev, [item.id]: 'processing' }));
+    try {
+      const manipulated = await ImageManipulator.manipulateAsync(
+        item.uri, [], { base64: true, compress: 0.9, format: ImageManipulator.SaveFormat.JPEG },
+      );
+      if (!manipulated.base64) throw new Error('Could not read image data');
+      const dataUrl = `data:image/jpeg;base64,${manipulated.base64}`;
+      const result = await api.bgRemoval.remove(dataUrl);
+      if (!result?.b64_json) throw new Error('No cutout returned');
+
+      const localFile = new File(Paths.cache, `product-cutout-${item.id}-${Date.now()}.png`);
+      localFile.write(result.b64_json, { encoding: 'base64' });
+
+      const media = draftData.media ?? [];
+      patchDraft({ media: media.map(m => m.id === item.id ? { ...m, cutoutUri: localFile.uri, useCutout: true } : m) });
+      setBgRemovalState(prev => ({ ...prev, [item.id]: 'done' }));
+      hapticSuccessAction();
+
+      // Upload the cutout in the background so it has a remote URL by publish time.
+      try {
+        const uploaded = await api.products.uploadImage({ uri: localFile.uri });
+        const remoteCutoutUri = (uploaded as any)?.objectPath || (uploaded as any)?.url || localFile.uri;
+        setDraftData(prev => ({ ...prev, media: (prev.media ?? []).map(m => m.id === item.id ? { ...m, cutoutUri: remoteCutoutUri } : m) }));
+      } catch {
+        // Cutout stays local; it will be re-uploaded on publish/retry via uploadMediaAsset-style flow.
+      }
+    } catch {
+      // Network failure / offline / service error — degrade to an explicit
+      // "retry" affordance rather than silently dropping the feature. There
+      // is no reliable on-device fallback for background removal.
+      setBgRemovalState(prev => ({ ...prev, [item.id]: 'failed' }));
+    }
+  }
 
   function renderPhotos() {
     const media = draftData.media ?? [];
@@ -713,6 +869,7 @@ export default function AddProductScreen() {
                 createdAt: new Date().toISOString(),
               }));
               patchDraft({ media: [...existingMedia, ...newItems] });
+              newItems.forEach(item => { void uploadMediaAsset(item); });
             }
           }}
           style={s.uploadZone}
@@ -726,23 +883,119 @@ export default function AddProductScreen() {
 
         {media.length > 0 && (
           <View style={s.mediaGrid}>
-            {media.map(m => (
+            {media.map((m, idx) => {
+              const upload = mediaUpload[m.id];
+              const bgStatus = bgRemovalState[m.id];
+              const displayUri = m.useCutout && m.cutoutUri ? m.cutoutUri : m.uri;
+              return (
               <View key={m.id} style={s.mediaThumbnail}>
-                {m.uri && (m.uri.startsWith('http') || m.uri.startsWith('file') || m.uri.startsWith('ph://') || m.uri.startsWith('asset-library://') || m.uri.startsWith('content://')) ? (
-                  <Image source={{ uri: m.uri }} style={s.mediaThumbImg} resizeMode="cover" />
+                {displayUri && (displayUri.startsWith('http') || displayUri.startsWith('file') || displayUri.startsWith('ph://') || displayUri.startsWith('asset-library://') || displayUri.startsWith('content://') || displayUri.startsWith('/objects/')) ? (
+                  <Image source={{ uri: displayUri }} style={s.mediaThumbImg} resizeMode="cover" />
                 ) : (
                   <View style={s.mediaThumbImg}>
                     <Feather name="image" size={24} color={PURPLE_LIGHT} />
                   </View>
                 )}
+                {m.isCover && (
+                  <View style={s.mediaCoverBadge}>
+                    <Text style={s.mediaCoverBadgeText}>Cover</Text>
+                  </View>
+                )}
+                {(upload?.status === 'uploading' || bgStatus === 'processing') && (
+                  <View style={s.mediaUploadOverlay}>
+                    <ActivityIndicator color={ON_DARK} />
+                  </View>
+                )}
+                {upload?.status === 'error' && (
+                  <TouchableOpacity style={s.mediaUploadOverlay} onPress={() => uploadMediaAsset(m)} accessibilityLabel="Retry photo upload">
+                    <Feather name="refresh-cw" size={16} color={ON_DARK} />
+                    <Text style={s.mediaRetryLabel}>Retry upload</Text>
+                  </TouchableOpacity>
+                )}
+                {bgStatus === 'failed' && upload?.status !== 'error' && (
+                  <TouchableOpacity style={s.mediaUploadOverlay} onPress={() => removeBackgroundForMedia(m)} accessibilityLabel="Retry background removal">
+                    <Feather name="refresh-cw" size={16} color={ON_DARK} />
+                    <Text style={s.mediaRetryLabel}>Retry cutout</Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   style={s.mediaDeleteBtn}
-                  onPress={() => patchDraft({ media: media.filter(x => x.id !== m.id) })}
+                  onPress={() => {
+                    patchDraft({ media: media.filter(x => x.id !== m.id).map((x, i) => ({ ...x, sortOrder: i })) });
+                    setMediaUpload(prev => {
+                      const next = { ...prev };
+                      delete next[m.id];
+                      return next;
+                    });
+                    setBgRemovalState(prev => {
+                      const next = { ...prev };
+                      delete next[m.id];
+                      return next;
+                    });
+                  }}
                 >
                   <Feather name="x" size={12} color={ON_DARK} />
                 </TouchableOpacity>
+
+                {/* Reorder arrows */}
+                <View style={s.mediaReorderRow}>
+                  <TouchableOpacity
+                    disabled={idx === 0}
+                    onPress={() => moveMedia(m.id, -1)}
+                    style={[s.mediaReorderBtn, idx === 0 && { opacity: 0.3 }]}
+                  >
+                    <Feather name="chevron-left" size={12} color={ON_DARK} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    disabled={idx === media.length - 1}
+                    onPress={() => moveMedia(m.id, 1)}
+                    style={[s.mediaReorderBtn, idx === media.length - 1 && { opacity: 0.3 }]}
+                  >
+                    <Feather name="chevron-right" size={12} color={ON_DARK} />
+                  </TouchableOpacity>
+                </View>
               </View>
-            ))}
+              );
+            })}
+          </View>
+        )}
+
+        {media.length > 0 && (
+          <View style={s.mediaActionsList}>
+            {media.map(m => {
+              const bgStatus = bgRemovalState[m.id];
+              return (
+                <View key={m.id} style={s.mediaActionRow}>
+                  <Image source={{ uri: m.useCutout && m.cutoutUri ? m.cutoutUri : m.uri }} style={s.mediaActionThumb} resizeMode="cover" />
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <View style={s.chipRow}>
+                      {!m.isCover && (
+                        <TouchableOpacity style={s.mediaActionChip} onPress={() => setCoverImage(m.id)}>
+                          <Feather name="star" size={11} color={theme.accentLight} />
+                          <Text style={s.mediaActionChipText}>Set cover</Text>
+                        </TouchableOpacity>
+                      )}
+                      <TouchableOpacity style={s.mediaActionChip} onPress={() => cropToSquare(m)}>
+                        <Feather name="crop" size={11} color={theme.accentLight} />
+                        <Text style={s.mediaActionChipText}>Crop square</Text>
+                      </TouchableOpacity>
+                      {bgStatus !== 'processing' && (
+                        <TouchableOpacity style={s.mediaActionChip} onPress={() => removeBackgroundForMedia(m)}>
+                          <Feather name="scissors" size={11} color={theme.accentLight} />
+                          <Text style={s.mediaActionChipText}>{m.cutoutUri ? 'Redo cutout' : 'Remove background'}</Text>
+                        </TouchableOpacity>
+                      )}
+                      {m.cutoutUri && (
+                        <TouchableOpacity style={[s.mediaActionChip, m.useCutout && s.mediaActionChipActive]} onPress={() => toggleCutoutUse(m.id)}>
+                          <Feather name={m.useCutout ? 'toggle-right' : 'toggle-left'} size={12} color={theme.accentLight} />
+                          <Text style={s.mediaActionChipText}>{m.useCutout ? 'Using cutout' : 'Using original'}</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
           </View>
         )}
 
@@ -1133,32 +1386,127 @@ export default function AddProductScreen() {
 
         {localVariants.length > 0 && (
           <>
-            <Text style={s.variantCount}>{localVariants.length} variants will be created</Text>
-            {localVariants.map(v => (
-              <BrandthreadCard key={v.id} style={s.variantRow}>
-                <Text style={s.variantTitle}>{v.title}</Text>
+            <View style={s.variantsHeaderRow}>
+              <Text style={s.variantCount}>{localVariants.length} variant{localVariants.length !== 1 ? 's' : ''}</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  hapticToggle();
+                  setBulkEditMode(v => !v);
+                  setSelectedVariantIds(new Set());
+                }}
+              >
+                <Text style={[s.bulkEditToggle, { color: theme.accentLight }]}>
+                  {bulkEditMode ? 'Done' : 'Bulk edit'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {bulkEditMode && (
+              <BrandthreadCard style={s.bulkEditCard}>
+                <Text style={s.optionLabel}>{selectedVariantIds.size} selected</Text>
+                <View style={s.chipRow}>
+                  <FilterChip
+                    label={selectedVariantIds.size === localVariants.length ? 'Deselect all' : 'Select all'}
+                    active={selectedVariantIds.size === localVariants.length && localVariants.length > 0}
+                    onPress={() => setSelectedVariantIds(
+                      selectedVariantIds.size === localVariants.length ? new Set() : new Set(localVariants.map(v => v.id)),
+                    )}
+                  />
+                </View>
                 <View style={s.variantFields}>
                   <TextInput
                     style={s.variantInput}
+                    value={bulkPrice}
+                    onChangeText={setBulkPrice}
+                    placeholder="Set price for selected"
+                    placeholderTextColor={SUBTLE}
+                    keyboardType="decimal-pad"
+                  />
+                  <TextInput
+                    style={s.variantInput}
+                    value={bulkQty}
+                    onChangeText={setBulkQty}
+                    placeholder="Set stock for selected"
+                    placeholderTextColor={SUBTLE}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <SecondaryButton
+                  label="Apply to selected"
+                  icon="check"
+                  disabled={selectedVariantIds.size === 0 || (!bulkPrice.trim() && !bulkQty.trim())}
+                  onPress={() => {
+                    if (bulkPrice.trim()) {
+                      updateUnsavedState(setLocalVariants, prev => applyBulkEditToVariants(prev, selectedVariantIds, { price: bulkPrice }));
+                    }
+                    if (bulkQty.trim()) {
+                      updateUnsavedState(setVariantQtys, prev => {
+                        const next = { ...prev };
+                        selectedVariantIds.forEach(id => { next[id] = bulkQty; });
+                        return next;
+                      });
+                    }
+                    hapticSuccessAction();
+                    setBulkPrice(''); setBulkQty('');
+                  }}
+                />
+              </BrandthreadCard>
+            )}
+
+            {localVariants.map(v => {
+              const selected = selectedVariantIds.has(v.id);
+              return (
+              <BrandthreadCard key={v.id} style={[s.variantRow, bulkEditMode && selected && { borderColor: BORDER_ACTIVE }]}>
+                <View style={s.variantTitleRow}>
+                  {bulkEditMode && (
+                    <TouchableOpacity
+                      onPress={() => setSelectedVariantIds(prev => {
+                        const next = new Set(prev);
+                        if (next.has(v.id)) next.delete(v.id); else next.add(v.id);
+                        return next;
+                      })}
+                      style={[s.variantCheckbox, selected && { backgroundColor: theme.accent, borderColor: theme.accent }]}
+                    >
+                      {selected && <Feather name="check" size={11} color={theme.onAccent} />}
+                    </TouchableOpacity>
+                  )}
+                  <Text style={s.variantTitle}>{v.title}</Text>
+                </View>
+                <View style={s.variantFields}>
+                  <TextInput
+                    style={[s.variantInput, { flex: 1.3 }]}
                     value={v.sku}
                     onChangeText={txt => updateUnsavedState(setLocalVariants, prev => prev.map(x => x.id === v.id ? { ...x, sku: txt } : x))}
                     placeholder="SKU"
                     placeholderTextColor={SUBTLE}
+                    autoCapitalize="characters"
+                    returnKeyType="next"
                   />
                   <TextInput
-                    style={s.variantInput}
+                    style={[s.variantInput, { flex: 0.9 }]}
                     value={v.price}
                     onChangeText={txt => updateUnsavedState(setLocalVariants, prev => prev.map(x => x.id === v.id ? { ...x, price: txt } : x))}
-                    placeholder="Price override"
+                    placeholder="Price"
                     placeholderTextColor={SUBTLE}
                     keyboardType="decimal-pad"
+                    returnKeyType="next"
+                  />
+                  <TextInput
+                    style={[s.variantInput, { flex: 0.7 }]}
+                    value={variantQtys[v.id] ?? v.qty}
+                    onChangeText={txt => updateUnsavedState(setVariantQtys, prev => ({ ...prev, [v.id]: txt }))}
+                    placeholder="Stock"
+                    placeholderTextColor={SUBTLE}
+                    keyboardType="numeric"
+                    returnKeyType="done"
                   />
                   <TouchableOpacity onPress={() => updateUnsavedState(setLocalVariants, prev => prev.filter(x => x.id !== v.id))} style={{ padding: 4 }}>
                     <Feather name="trash-2" size={14} color={RED} />
                   </TouchableOpacity>
                 </View>
               </BrandthreadCard>
-            ))}
+              );
+            })}
           </>
         )}
       </>
@@ -1178,7 +1526,7 @@ export default function AddProductScreen() {
       <>
         <SectionHeader title="How will you sell this product?" style={s.sectionHdr} />
         {models.map(m => (
-          <TouchableOpacity key={m.key} onPress={() => { Haptics.selectionAsync(); patchDraft({ salesModel: m.key }); }} activeOpacity={0.8}>
+          <TouchableOpacity key={m.key} onPress={() => { hapticToggle(); patchDraft({ salesModel: m.key }); }} activeOpacity={0.8}>
             <BrandthreadCard style={[s.modelCard, sm === m.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}>
               <View style={s.modelCardHeader}>
                 <Text style={s.modelTitle}>{m.title}</Text>
@@ -1242,7 +1590,7 @@ export default function AddProductScreen() {
       <>
         <SectionHeader title="Manufacturer" style={s.sectionHdr} />
         {modes.map(m => (
-          <TouchableOpacity key={m.key} onPress={() => { Haptics.selectionAsync(); updateUnsavedState(setMfgMode, m.key); }} activeOpacity={0.8}>
+          <TouchableOpacity key={m.key} onPress={() => { hapticToggle(); updateUnsavedState(setMfgMode, m.key); }} activeOpacity={0.8}>
             <BrandthreadCard style={[s.modelCard, mfgMode === m.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}>
               <View style={s.modelCardHeader}>
                 <Text style={s.modelTitle}>{m.label}</Text>
@@ -1282,7 +1630,7 @@ export default function AddProductScreen() {
       <>
         <SectionHeader title="Store visibility" style={s.sectionHdr} />
         {statuses.map(st => (
-          <TouchableOpacity key={st.key} onPress={() => { Haptics.selectionAsync(); patchDraft({ storeSettings: { ...ss, status: st.key }, status: st.key }); }} activeOpacity={0.8}>
+          <TouchableOpacity key={st.key} onPress={() => { hapticToggle(); patchDraft({ storeSettings: { ...ss, status: st.key }, status: st.key }); }} activeOpacity={0.8}>
             <BrandthreadCard style={[s.modelCard, ss.status === st.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}>
               <View style={s.modelCardHeader}>
                 <Text style={s.modelTitle}>{st.label}</Text>
@@ -1312,23 +1660,254 @@ export default function AddProductScreen() {
     );
   }
 
-  // ─── Render ───────────────────────────────────────────────────────────────
+  // ── Pricing & Stock step: pricing + preorder toggle + inventory, merged ──
+  function renderPricingAndStock() {
+    return (
+      <>
+        {renderPricing()}
+
+        <SectionHeader title="Sales model" style={s.sectionHdr} />
+        <View style={s.switchRow}>
+          <View style={{ flex: 1, paddingRight: SP.sm }}>
+            <Text style={s.switchLabel}>Accept pre-orders</Text>
+            <Text style={s.collapsibleHint}>Take orders before the item ships. Only enable if you can fulfil later.</Text>
+          </View>
+          <Switch
+            value={isPreOrder}
+            onValueChange={v => {
+              hapticToggle();
+              setIsPreOrder(v);
+              patchDraft({ salesModel: v ? 'pre-order' : 'pre-made' });
+            }}
+            trackColor={{ false: BORDER, true: theme.accent }}
+            thumbColor={ON_DARK}
+          />
+        </View>
+        {isPreOrder && (
+          <>
+            <FormInput
+              label="Pre-order closes"
+              value={draftData.preorderSettings?.closeDate ?? ''}
+              onChange={v => patchDraft({ preorderSettings: { ...(draftData.preorderSettings ?? { unitsOrdered: 0, isFunded: false }), closeDate: v } })}
+              placeholder="YYYY-MM-DD"
+            />
+            <FormInput
+              label="Est. shipping date"
+              value={draftData.preorderSettings?.estimatedShippingDate ?? ''}
+              onChange={v => patchDraft({ preorderSettings: { ...(draftData.preorderSettings ?? { unitsOrdered: 0, isFunded: false }), estimatedShippingDate: v } })}
+              placeholder="YYYY-MM-DD"
+            />
+          </>
+        )}
+
+        <SectionHeader title="Stock" style={s.sectionHdr} />
+        {renderInventory()}
+      </>
+    );
+  }
+
+  // ── Shipping step: fulfillment + advanced manufacturing ──
+  function renderShippingStep() {
+    return (
+      <>
+        {renderFulfillment()}
+        <CollapsibleSection
+          title="Manufacturing"
+          icon="tool"
+          expanded={expandedSections.manufacturing}
+          onToggle={() => toggleSection('manufacturing')}
+          hint={mfgMode === 'none' ? 'Not set up yet' : mfgMode === 'existing' ? mfgName || 'Existing manufacturer' : 'Quote requested'}
+        >
+          {renderManufacturing()}
+        </CollapsibleSection>
+      </>
+    );
+  }
+
+  // ── Review & Publish step: live preview + advanced storefront/SEO ──
+  function renderReviewStep() {
+    const media = draftData.media ?? [];
+    const cover = media.find(m => m.isCover) ?? media[0];
+    const coverUri = cover ? (cover.useCutout && cover.cutoutUri ? cover.cutoutUri : cover.uri) : undefined;
+    const pricing = getPricing();
+    const totalStock = localVariants.length > 0
+      ? localVariants.reduce((sum, v) => sum + (parseInt(variantQtys[v.id] ?? v.qty) || 0), 0)
+      : parseInt(stockStr) || 0;
+
+    return (
+      <>
+        <SectionHeader title="Live preview" style={s.sectionHdr} />
+        <Text style={s.collapsibleHint}>Approximate render — actual layout on Discover and in the feed may vary slightly.</Text>
+
+        {/* Discover-style card preview */}
+        <BrandthreadCard style={s.previewCard}>
+          <View style={s.previewImageWrap}>
+            {coverUri ? (
+              <Image source={{ uri: coverUri }} style={s.previewImage} resizeMode="cover" />
+            ) : (
+              <View style={[s.previewImage, { alignItems: 'center', justifyContent: 'center' }]}>
+                <Feather name="image" size={28} color={SUBTLE} />
+              </View>
+            )}
+            {pricing.isOnSale && (
+              <View style={s.previewSaleBadge}>
+                <Text style={s.previewSaleBadgeText}>-{pricing.discountPercent}%</Text>
+              </View>
+            )}
+          </View>
+          <View style={s.previewInfo}>
+            <Text style={s.previewName} numberOfLines={1}>{draftData.name || 'Untitled product'}</Text>
+            <View style={s.previewPriceRow}>
+              <Text style={s.previewPrice}>{formatCents(pricing.retailPriceCents)}</Text>
+              {pricing.isOnSale && pricing.compareAtPriceCents !== undefined && (
+                <Text style={s.previewCompareAt}>{formatCents(pricing.compareAtPriceCents)}</Text>
+              )}
+            </View>
+            {isPreOrder && <StatusBadge label="Pre-order" variant="warning" />}
+          </View>
+        </BrandthreadCard>
+
+        {/* Feed product-sheet style preview */}
+        <BrandthreadCard style={s.previewSheetCard}>
+          <View style={s.previewSheetHeader}>
+            {coverUri && <Image source={{ uri: coverUri }} style={s.previewSheetThumb} resizeMode="cover" />}
+            <View style={{ flex: 1 }}>
+              <Text style={s.previewName} numberOfLines={1}>{draftData.name || 'Untitled product'}</Text>
+              <Text style={s.previewPrice}>{formatCents(pricing.retailPriceCents)}</Text>
+            </View>
+          </View>
+          <Text style={s.previewDescription} numberOfLines={3}>
+            {draftData.description || 'No description yet.'}
+          </Text>
+          <View style={s.previewMetaRow}>
+            <Text style={s.collapsibleHint}>{media.length} photo{media.length !== 1 ? 's' : ''}</Text>
+            <Text style={s.collapsibleHint}>·</Text>
+            <Text style={s.collapsibleHint}>{localVariants.length > 0 ? `${localVariants.length} variants` : 'No variants'}</Text>
+            <Text style={s.collapsibleHint}>·</Text>
+            <Text style={s.collapsibleHint}>{totalStock} in stock</Text>
+          </View>
+        </BrandthreadCard>
+
+        <CollapsibleSection
+          title="Storefront & SEO"
+          icon="globe"
+          expanded={expandedSections.storefront}
+          onToggle={() => toggleSection('storefront')}
+          hint="Visibility, collections, URL handle"
+        >
+          {renderStorefront()}
+        </CollapsibleSection>
+      </>
+    );
+  }
+
+  // ── Step progression: validate before advancing, surface inline errors ──
+  function stepErrorsFor(step: FlowStep): { field: string; message: string }[] {
+    switch (step) {
+      case 'photos':   return validatePhotosStep({ media: draftData.media ?? [] });
+      case 'details':  return validateDetailsStep({ name: draftData.name ?? '', category: draftData.category });
+      case 'variants': return validateVariantsStep({ variants: localVariants.map(v => ({ title: v.title, sku: v.sku, price: v.price })) });
+      case 'pricing':  return validatePricingStep({
+        priceStr, compareAtStr, costStr, isPreOrder,
+        preOrderOpenDate: undefined, preOrderCloseDate: draftData.preorderSettings?.closeDate,
+      });
+      default: return [];
+    }
+  }
+
+  const currentErrors = stepErrorsFor(currentStepKey);
+
+  // Inline errors are shown as soon as a step is visited, but only the final
+  // Publish is hard-blocked (see handlePublish) — sellers can freely move
+  // between steps to fill things in whatever order suits them, and a step
+  // with unresolved issues is called out with a warning banner + haptic
+  // rather than trapping navigation.
+  function goNext() {
+    setStepAttempted(prev => ({ ...prev, [currentStepKey]: true }));
+    const errs = stepErrorsFor(currentStepKey);
+    if (errs.length > 0) hapticDestructiveConfirm();
+    else hapticPrimaryAction();
+    setStepIndex(i => Math.min(i + 1, FLOW_STEPS.length - 1));
+  }
+
+  function goBack() {
+    if (stepIndex === 0) { handleExit(); return; }
+    hapticPrimaryAction();
+    setStepIndex(i => Math.max(i - 1, 0));
+  }
+
+  function goToStep(i: number) {
+    if (i === stepIndex) return;
+    hapticToggle();
+    setStepAttempted(prev => ({ ...prev, [currentStepKey]: true }));
+    setStepIndex(i);
+  }
+
+  function renderStepContent() {
+    switch (currentStepKey) {
+      case 'photos':   return renderPhotos();
+      case 'details':  return renderBasicInfo();
+      case 'variants': return renderVariants();
+      case 'pricing':  return renderPricingAndStock();
+      case 'shipping': return renderShippingStep();
+      case 'review':   return renderReviewStep();
+    }
+  }
+
+  const isLastStep = stepIndex === FLOW_STEPS.length - 1;
+
+  // ─── Render ─────────────────────────────────────────────────────
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <View style={s.root}>
 
       {/* ── Header ── */}
-      <View style={s.header}>
-        <TouchableOpacity testID="add-product-exit" onPress={handleExit} style={s.headerBack}>
-          <Feather name="x" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>{isEditMode ? 'Edit Product' : 'Add Product'}</Text>
-        <TouchableOpacity onPress={handleSaveDraftInPlace} style={s.headerSave}>
-          <Text style={[s.headerSaveText, { color: theme.accentLight }]}>Save draft</Text>
-        </TouchableOpacity>
+      <ScreenHeader
+        title={isEditMode ? 'Edit Product' : 'Add Product'}
+        variant="push"
+        onBack={handleExit}
+        backTestID="add-product-exit"
+        rightElement={
+          <Button
+            variant="tertiary"
+            size="small"
+            label="Save draft"
+            onPress={handleSaveDraftInPlace}
+            testID="add-product-save-draft"
+          />
+        }
+      />
+
+      {/* ── Sticky step progress ── */}
+      <View style={s.progressBar}>
+        {FLOW_STEPS.map((step, i) => {
+          const done = i < stepIndex;
+          const active = i === stepIndex;
+          return (
+            <TouchableOpacity
+              key={step.key}
+              style={s.progressStep}
+              onPress={() => goToStep(i)}
+              accessibilityLabel={`Step ${i + 1}: ${step.label}`}
+              testID={`add-product-step-${step.key}`}
+            >
+              <View style={[s.progressDot, done && s.progressDotDone, active && s.progressDotActive]}>
+                {done ? (
+                  <Feather name="check" size={11} color={theme.onAccent} />
+                ) : (
+                  <Text style={[s.progressDotText, active && { color: theme.onAccent }]}>{i + 1}</Text>
+                )}
+              </View>
+              <Text style={[s.progressLabel, active && { color: FG, fontFamily: FONT.semibold }]} numberOfLines={1}>
+                {step.label}
+              </Text>
+              {i < FLOW_STEPS.length - 1 && <View style={[s.progressConnector, done && s.progressConnectorDone]} />}
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
-      {/* ── Single scrollable form ── */}
+      {/* ── Current step form ── */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -1339,81 +1918,72 @@ export default function AddProductScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-
-          {/* ═══ ESSENTIAL: Photos ═══════════════════════════════════════════ */}
           <View style={s.essentialSection}>
-            <Text style={s.essentialLabel}>Photos</Text>
-            {renderPhotos()}
+            <Text style={s.essentialLabel}>{FLOW_STEPS[stepIndex].label}</Text>
+            {renderStepContent()}
+
+            {stepAttempted[currentStepKey] && currentErrors.length > 0 && (
+              <View style={s.errorBanner}>
+                {currentErrors.map((e, i) => (
+                  <Text key={i} style={s.errorBannerText}>• {e.message}</Text>
+                ))}
+              </View>
+            )}
           </View>
-
-          <View style={s.divider} />
-
-          {/* ═══ ESSENTIAL: Basic Information ═══════════════════════════════ */}
-          <View style={s.essentialSection}>
-            <Text style={s.essentialLabel}>Basic Information</Text>
-            {renderBasicInfo()}
-          </View>
-
-          <View style={s.divider} />
-
-          {/* ═══ ESSENTIAL: Pricing ══════════════════════════════════════════ */}
-          <View style={s.essentialSection}>
-            <Text style={s.essentialLabel}>Pricing</Text>
-            {renderPricing()}
-          </View>
-
-          <View style={s.divider} />
-
-          {/* ═══ ESSENTIAL: Inventory ════════════════════════════════════════ */}
-          <View style={s.essentialSection}>
-            <Text style={s.essentialLabel}>Inventory</Text>
-            {renderInventory()}
-          </View>
-
-          <View style={s.divider} />
-
-          {/* ─── ADVANCED (collapsible) ─────────────────────────────────── */}
-
-          <CollapsibleSection
-            title="Variants"
-            icon="layers"
-            expanded={expandedSections.variants}
-            onToggle={() => toggleSection('variants')}
-            hint={localOptions.length > 0 ? `${localOptions.length} option${localOptions.length > 1 ? 's' : ''} · ${localVariants.length} variant${localVariants.length !== 1 ? 's' : ''}` : 'Sizes, colors, and other options'}
-          >
-            {renderVariants()}
-          </CollapsibleSection>
-
-          <CollapsibleSection
-            title="Sales Model"
-            icon="shopping-bag"
-            expanded={expandedSections.salesModel}
-            onToggle={() => toggleSection('salesModel')}
-            hint={draftData.salesModel === 'pre-order' ? 'Pre-order' : draftData.salesModel === 'both' ? 'Pre-made + pre-order' : 'Pre-made (in stock)'}
-          >
-            {renderSalesModel()}
-          </CollapsibleSection>
-
         </ScrollView>
-        {/* The action area is outside the scroll view so publishing is always
+
+        {/* The action area is outside the scroll view so it's always
             available without losing the form's draft state or scroll position. */}
         <View style={[s.stickyFooter, { paddingBottom: Math.max(insets.bottom, SP.sm) }]}>
           <View style={s.publishButtons}>
-            <SecondaryButton label="Save draft" onPress={handleSaveDraftAndExit} style={{ flex: 1 }} />
-            <PrimaryButton
-              label={publishing ? 'Publishing...' : 'Publish'}
-              disabled={publishing}
-              onPress={handlePublish}
+            <SecondaryButton
+              label={stepIndex === 0 ? 'Cancel' : 'Back'}
+              onPress={goBack}
               style={{ flex: 1 }}
             />
+            {isLastStep ? (
+              <PrimaryButton
+                label={photosUploading ? 'Uploading photos…' : publishing ? 'Publishing...' : 'Publish'}
+                disabled={publishing || photosUploading}
+                onPress={handlePublish}
+                style={{ flex: 1 }}
+              />
+            ) : (
+              <PrimaryButton
+                label="Next"
+                icon="arrow-right"
+                onPress={goNext}
+                style={{ flex: 1 }}
+              />
+            )}
           </View>
+          <TouchableOpacity onPress={handleSaveDraftAndExit} style={{ alignSelf: 'center', paddingTop: 4 }}>
+            <Text style={[s.headerSaveText, { color: MUTED }]}>Save as draft & exit</Text>
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      <SuccessSheet
+        visible={!!publishSuccess}
+        onClose={() => setPublishSuccess(null)}
+        title={publishSuccess?.kind === 'updated' ? 'Product updated!' : 'Product published!'}
+        subtitle={publishSuccess ? `${publishSuccess.name} ${publishSuccess.kind === 'updated' ? 'has been updated.' : 'is now live.'}` : undefined}
+        primaryAction={{
+          label: 'View product',
+          onPress: () => {
+            const id = publishSuccess?.productId;
+            setPublishSuccess(null);
+            if (id) router.replace(('/product-detail?id=' + id) as never);
+          },
+        }}
+        secondaryAction={{ label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }}
+        testID="add-product-success-sheet"
+      />
     </View>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── Styles ─────────────────────────────────────────────────────────
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const {
@@ -1433,41 +2003,43 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     backgroundColor: 'transparent',
   },
 
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-    minHeight: COMP.headerH,
-  },
-  headerBack: {
-    width: 36,
-    height: 36,
-    borderRadius: RADIUS.sm,
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: FS.base,
-    fontFamily: FONT.bold,
-    color: FG,
-    textAlign: 'center',
-  },
-  headerSave: {
-    paddingHorizontal: SP.sm,
-    paddingVertical: SP.xs,
-  },
+  // Footer "Save as draft & exit" link (header itself is now ScreenHeader)
   headerSaveText: {
-    fontSize: FS.sm,
+    ...TYPE_SCALE.footnote,
     fontFamily: FONT.semibold,
   },
+
+  // Sticky step progress
+  progressBar: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: SP.md,
+    paddingTop: SP.sm,
+    paddingBottom: SP.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+  },
+  progressStep: { flex: 1, alignItems: 'center', position: 'relative' },
+  progressDot: {
+    width: 22, height: 22, borderRadius: RADII.pill,
+    backgroundColor: CARD, borderWidth: 1.5, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  progressDotActive: { borderColor: theme.accent, backgroundColor: theme.accent },
+  progressDotDone: { borderColor: theme.accent, backgroundColor: theme.accent },
+  progressDotText: { ...TYPE_SCALE.caption, fontFamily: FONT.bold, color: MUTED },
+  progressLabel: { ...TYPE_SCALE.caption, color: MUTED, marginTop: 4, textAlign: 'center' },
+  progressConnector: {
+    position: 'absolute', top: 10, right: '-50%', width: '100%', height: 1.5, backgroundColor: BORDER, zIndex: -1,
+  },
+  progressConnectorDone: { backgroundColor: theme.accent },
+
+  // Inline step validation
+  errorBanner: {
+    backgroundColor: 'rgba(248,113,113,0.12)', borderRadius: RADIUS.sm, borderWidth: 1, borderColor: RED,
+    padding: SP.sm, gap: 4, marginTop: SP.xs,
+  },
+  errorBannerText: { fontSize: FS.sm, fontFamily: FONT.medium, color: RED },
 
   // Scroll
   scrollView: { flex: 1 },
@@ -1566,10 +2138,39 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   mediaThumbImg: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   mediaDeleteBtn: {
     position: 'absolute', top: 4, right: 4,
-    width: 20, height: 20, borderRadius: 10,
+    width: 20, height: 20, borderRadius: RADII.pill,
     backgroundColor: 'rgba(0,0,0,0.7)',
     alignItems: 'center', justifyContent: 'center',
   },
+  mediaUploadOverlay: {
+    // theme-exempt: scrim over media thumbnail, not a themed surface
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center', justifyContent: 'center', gap: 4,
+  },
+  mediaRetryLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: ON_DARK },
+  mediaCoverBadge: {
+    position: 'absolute', bottom: 4, left: 4,
+    backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: RADIUS.xs, paddingHorizontal: 6, paddingVertical: 2,
+  },
+  mediaCoverBadgeText: { ...TYPE_SCALE.caption, fontFamily: FONT.bold, color: ON_DARK },
+  mediaReorderRow: {
+    position: 'absolute', top: 4, left: 4, flexDirection: 'row', gap: 2,
+  },
+  mediaReorderBtn: {
+    width: 18, height: 18, borderRadius: RADII.pill, backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  mediaActionsList: { gap: SP.sm, marginTop: SP.xs },
+  mediaActionRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start' },
+  mediaActionThumb: { width: 44, height: 44, borderRadius: RADIUS.sm, backgroundColor: CARD },
+  mediaActionChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: CARD, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER,
+    paddingHorizontal: 8, paddingVertical: 4,
+  },
+  mediaActionChipActive: { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED },
+  mediaActionChipText: { ...TYPE_SCALE.caption, fontFamily: FONT.medium, color: MUTED },
 
   // Pricing
   pricingCard: { gap: SP.sm },
@@ -1609,7 +2210,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingHorizontal: 10, paddingVertical: 4,
     borderWidth: 1, borderColor: BORDER_ACTIVE,
   },
-  valueDot: { width: 10, height: 10, borderRadius: 5, borderWidth: 1, borderColor: BORDER },
+  valueDot: { width: 10, height: 10, borderRadius: RADII.pill, borderWidth: 1, borderColor: BORDER },
   valueChipText: { fontSize: FS.xs, fontFamily: FONT.medium },
   customValueRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
@@ -1620,8 +2221,16 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   customValueAdd: { padding: SP.xs },
   deleteOptionBtn: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, alignSelf: 'flex-start', marginTop: SP.xs },
   deleteOptionText: { fontSize: FS.xs, fontFamily: FONT.medium, color: RED },
-  variantCount: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, textAlign: 'center', marginTop: SP.xs },
+  variantCount: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
+  variantsHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.xs },
+  bulkEditToggle: { fontSize: FS.sm, fontFamily: FONT.semibold },
+  bulkEditCard: { gap: SP.sm },
   variantRow: { gap: SP.sm },
+  variantTitleRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
+  variantCheckbox: {
+    width: 18, height: 18, borderRadius: RADIUS.xs, borderWidth: 1.5, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center',
+  },
   variantTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   variantFields: { flexDirection: 'row', gap: SP.sm, alignItems: 'center' },
   variantInput: {
@@ -1629,6 +2238,26 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER,
     paddingHorizontal: SP.sm, fontSize: FS.sm, fontFamily: FONT.regular, color: FG,
   },
+
+  // Review step: live preview cards
+  previewCard: { padding: 0, overflow: 'hidden' },
+  previewImageWrap: { width: '100%', aspectRatio: 1, backgroundColor: CARD },
+  previewImage: { width: '100%', height: '100%' },
+  previewSaleBadge: {
+    position: 'absolute', top: SP.sm, left: SP.sm,
+    backgroundColor: RED, borderRadius: RADIUS.xs, paddingHorizontal: 6, paddingVertical: 2,
+  },
+  previewSaleBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK },
+  previewInfo: { padding: SP.md, gap: 4 },
+  previewName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
+  previewPriceRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
+  previewPrice: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
+  previewCompareAt: { fontSize: FS.sm, fontFamily: FONT.regular, color: SUBTLE, textDecorationLine: 'line-through' },
+  previewSheetCard: { gap: SP.sm },
+  previewSheetHeader: { flexDirection: 'row', gap: SP.sm, alignItems: 'center' },
+  previewSheetThumb: { width: 48, height: 48, borderRadius: RADIUS.sm, backgroundColor: CARD },
+  previewDescription: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 18 },
+  previewMetaRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
 
   // Model selection cards
   modelCard: { gap: SP.xs },

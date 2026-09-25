@@ -1,396 +1,486 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, Alert, StyleSheet, Dimensions,
+  View, Text, FlatList, Alert, StyleSheet, Dimensions,
+  Modal, TextInput, Animated, Platform, Pressable,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK,
-
-  FONT, FS, SP, RADIUS, COMP, ICON,
+  FG, SUBTLE, OVERLAY,
+  SUCCESS, ORANGE, RED,
+  FONT, ICON,
 } from '@/lib/theme';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
-import { getSavedItems, removeSavedItem, subscribeSocial } from '@/services/socialService';
-import { SavedItem, SavedItemType } from '@/services/socialTypes';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useColors } from '@/hooks/useColors';
+import {
+  getSavedItems, removeSavedItem, subscribeSocial,
+  getCollections, createCollection,
+} from '@/services/socialService';
+import { SavedItem, SavedCollection } from '@/services/socialTypes';
+import { getBuyerProduct, addToCart, createBuyNowSession, getCart } from '@/services/cartService';
 import { reportNetworkError } from '@/lib/networkNotice';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { CachedImage } from '@/components/CachedImage';
+import { GridSkeleton } from '@/components/layout/Skeleton';
+import { EmptyState } from '@/components/BrandthreadUI';
+import { SaveToCollectionSheet, SaveToCollectionItem } from '@/components/SaveToCollectionSheet';
+import { formatCents } from '@/lib/money';
+import { Card, IconButton, Button, ListRow, SegmentedControl, BottomSheet, ThemedRefreshControl } from '@/components/ui';
+import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
+import { SPACING } from '@/constants/spacing';
+import { RADII } from '@/constants/radii';
+import { PRESS_DURATION_MS, PRESS_SCALE } from '@/constants/motion';
+import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
 
 const { width: W } = Dimensions.get('window');
-const TILE_SIZE = (W - SP.md * 2 - SP.sm) / 2;
+const GAP = SPACING.xs;
+const TILE_SIZE = (W - SPACING.md * 2 - GAP) / 2;
 
-const TABS: { key: SavedItemType; label: string; icon: string }[] = [
-  { key: 'post', label: 'Posts', icon: 'bookmark' },
-  { key: 'product', label: 'Products', icon: 'shopping-bag' },
-  { key: 'collection', label: 'Collections', icon: 'folder' },
-  { key: 'store', label: 'Stores', icon: 'home' },
+type MainTab = 'all' | 'collections' | 'drops';
+const MAIN_TABS: { id: MainTab; label: string }[] = [
+  { id: 'all',         label: 'All' },
+  { id: 'collections', label: 'Collections' },
+  { id: 'drops',       label: 'Price drops' },
 ];
+
+/** Local press-feel wrapper matching Card's motion, extended with onLongPress
+ * (used by the "post"/"store" save tiles, whose long-press is the only way to
+ * remove them — Card itself doesn't expose onLongPress). */
+function TilePressable({ onPress, onLongPress, accessibilityLabel, children, style }: {
+  onPress: () => void;
+  onLongPress?: () => void;
+  accessibilityLabel?: string;
+  children: React.ReactNode;
+  style?: any;
+}) {
+  const scale = React.useRef(new Animated.Value(1)).current;
+  const nativeDriver = Platform.OS !== 'web';
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      onPress={() => { hapticLight(); onPress(); }}
+      onLongPress={onLongPress}
+      onPressIn={() => Animated.timing(scale, { toValue: PRESS_SCALE, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
+      onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: nativeDriver, speed: 18, bounciness: 6 }).start()}
+    >
+      <Animated.View style={[{ transform: [{ scale }] }, style]}>{children}</Animated.View>
+    </Pressable>
+  );
+}
 
 export default function BuyerSaved() {
   const { theme } = useAppTheme();
-  const PURPLE = theme.accent;
-  const PURPLE_DIM = theme.accentDim;
-  const styles = makeStyles(theme);
+  const palette = useColors();
+  const styles = makeStyles(theme, palette);
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [items, setItems] = useState<SavedItem[]>([]);
-  const [activeTab, setActiveTab] = useState<SavedItemType>('post');
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
 
-  async function loadData() {
-    setLoadError(false);
+  const [items, setItems] = useState<SavedItem[]>([]);
+  const [collections, setCollections] = useState<SavedCollection[]>([]);
+  const [mainTab, setMainTab] = useState<MainTab>('all');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const [actionsFor, setActionsFor] = useState<SavedItem | null>(null);
+  const [actionsBusy, setActionsBusy] = useState(false);
+  const [saveToSheetItem, setSaveToSheetItem] = useState<SaveToCollectionItem | null>(null);
+  const [newCollectionModal, setNewCollectionModal] = useState(false);
+  const [newCollectionName, setNewCollectionName] = useState('');
+  const [creatingCollection, setCreatingCollection] = useState(false);
+
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     try {
-      setItems(await getSavedItems());
+      const [savedRows, collectionRows] = await Promise.all([getSavedItems(), getCollections()]);
+      setItems(savedRows);
+      setCollections(collectionRows);
     } catch (error) {
-      setLoadError(true);
-      reportNetworkError(error, loadData);
+      reportNetworkError(error, () => load());
     } finally {
       setLoading(false);
     }
-  }
-
-  useFocusEffect(useCallback(() => { loadData(); }, []));
-
-  useEffect(() => {
-    const unsub = subscribeSocial(() => loadData());
-    return unsub;
   }, []);
 
-  const filtered = items.filter(i => i.type === activeTab);
-  const activeTabDef = TABS.find(t => t.key === activeTab)!;
+  useFocusEffect(useCallback(() => { load({ silent: true }); }, [load]));
 
-  function emptyTitle(): string {
-    switch (activeTab) {
-      case 'post': return 'No saved posts yet';
-      case 'product': return 'No saved products yet';
-      case 'collection': return 'No saved collections yet';
-      case 'store': return 'No saved stores yet';
+  useEffect(() => {
+    const unsub = subscribeSocial(() => load({ silent: true }));
+    return unsub;
+  }, [load]);
+
+  async function onRefresh() {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }
+
+  const priceDrops = useMemo(() => items.filter(i => i.priceDropped), [items]);
+
+  function openItem(item: SavedItem) {
+    switch (item.type) {
+      case 'post':
+        router.push(`/buyer-post-viewer?postId=${encodeURIComponent(item.targetId)}&postAuthorColor=${encodeURIComponent(item.accentColor ?? '')}` as never);
+        return;
+      case 'product':
+        router.push(`/thread-product-detail?productId=${encodeURIComponent(item.targetId)}&productName=${encodeURIComponent(item.title)}` as never);
+        return;
+      case 'store':
+        router.push(`/seller-profile?sellerId=${encodeURIComponent(item.targetId)}` as never);
+        return;
+      case 'collection':
+        return;
     }
   }
 
-  function emptyDesc(): string {
-    switch (activeTab) {
-      case 'post': return 'Tap the bookmark icon on any post to save it here.';
-      case 'product': return 'Save products you love and come back to them anytime.';
-      case 'collection': return 'Save collections from your favorite brands.';
-      case 'store': return 'Follow stores to save them and get updates.';
-    }
-  }
-
-  function handleItemPress(item: SavedItem) {
-    Alert.alert(
-      'Saved Item',
-      item.title,
-      [
-        { text: 'View', onPress: () => {} },
-        {
-          text: 'Remove from saved',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await removeSavedItem(item.targetId);
-              await loadData();
-            } catch {
-              Alert.alert('Could not remove saved item', 'Try again.');
-            }
-          },
+  function removeSaved(item: SavedItem) {
+    Alert.alert('Remove from saved?', item.title, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove', style: 'destructive',
+        onPress: async () => {
+          try { await removeSavedItem(item.targetId); await load(); }
+          catch { Alert.alert('Couldn’t remove item', 'Try again.'); }
         },
-        { text: 'Cancel', style: 'cancel' },
-      ]
+      },
+    ]);
+  }
+
+  async function handleBuyNow(item: SavedItem) {
+    setActionsBusy(true);
+    try {
+      const product = await getBuyerProduct(item.targetId);
+      const variant = product?.variants.find(v => v.isAvailable);
+      if (!product || !variant) {
+        Alert.alert('Unavailable', 'This item is no longer available to buy.');
+        return;
+      }
+      const cart = await getCart();
+      await createBuyNowSession(product, variant, 1, cart);
+      setActionsFor(null);
+      router.push('/buyer-checkout?source=buynow' as never);
+    } catch {
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    } finally {
+      setActionsBusy(false);
+    }
+  }
+
+  async function handleAddToCart(item: SavedItem) {
+    setActionsBusy(true);
+    try {
+      const product = await getBuyerProduct(item.targetId);
+      const variant = product?.variants.find(v => v.isAvailable);
+      if (!product || !variant) {
+        Alert.alert('Unavailable', 'This item is no longer available to add to cart.');
+        return;
+      }
+      const result = await addToCart({ product, variant, quantity: 1 });
+      if (result.success) {
+        hapticSuccessAction();
+        setActionsFor(null);
+      } else {
+        Alert.alert('Cannot Add to Cart', result.message ?? 'Please try again.');
+      }
+    } catch {
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    } finally {
+      setActionsBusy(false);
+    }
+  }
+
+  async function handleCreateCollection() {
+    const name = newCollectionName.trim();
+    if (!name) return;
+    setCreatingCollection(true);
+    try {
+      await createCollection(name);
+      setNewCollectionModal(false);
+      setNewCollectionName('');
+      await load({ silent: true });
+    } catch {
+      Alert.alert('Couldn’t create collection', 'Try again.');
+    } finally {
+      setCreatingCollection(false);
+    }
+  }
+
+  function renderBadges(item: SavedItem) {
+    if (item.type !== 'product') return null;
+    return (
+      <View style={styles.badgeRow}>
+        {item.soldOut ? <Badge label="Sold out" color={RED} /> : null}
+        {!item.soldOut && item.lowStock ? <Badge label="Low stock" color={ORANGE} /> : null}
+        {!item.soldOut && item.backInStock ? <Badge label="Back in stock" color={theme.accent} /> : null}
+        {item.priceDropped ? <Badge label="Price drop" color={SUCCESS} /> : null}
+      </View>
     );
   }
 
-  function renderTile({ item }: { item: SavedItem }) {
+  function renderProductTile({ item }: { item: SavedItem }) {
+    const isProduct = item.type === 'product';
     return (
-      <TouchableOpacity
+      <TilePressable
         style={styles.tile}
-        onPress={() => handleItemPress(item)}
-        onLongPress={() => handleItemPress(item)}
-        activeOpacity={0.85}
+        accessibilityLabel={item.title}
+        onPress={() => openItem(item)}
+        onLongPress={() => (isProduct ? setActionsFor(item) : removeSaved(item))}
       >
-        <LinearGradient
-          colors={[item.accentColor || PURPLE, BG]}
-          style={styles.tileGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <View style={styles.tileTop}>
-            <Feather
-              name={activeTabDef.icon as any}
-              size={20}
-              color="white"
-              style={{ opacity: 0.7 }}
+        <View style={styles.tileImageWrap}>
+          {item.image ? (
+            <CachedImage source={{ uri: item.image }} style={styles.tileImage} />
+          ) : (
+            <View style={[styles.tileImage, styles.tilePlaceholder, { backgroundColor: item.accentColor || theme.accentDim }]}>
+              <Feather name={item.type === 'post' ? 'image' : item.type === 'store' ? 'home' : 'shopping-bag'} size={ICON.md} color={theme.accent} style={{ opacity: 0.8 }} />
+            </View>
+          )}
+          {isProduct && (
+            <IconButton
+              name="more-horizontal"
+              variant="glass"
+              size={16}
+              onPress={() => setActionsFor(item)}
+              accessibilityLabel="More actions"
+              style={styles.tileMore}
             />
-          </View>
-          <View style={styles.tileBottom}>
-            <Text style={styles.tileTitle} numberOfLines={2}>{item.title}</Text>
-            {item.subtitle ? (
-              <Text style={styles.tileSubtitle} numberOfLines={1}>{item.subtitle}</Text>
-            ) : null}
-          </View>
-        </LinearGradient>
-      </TouchableOpacity>
+          )}
+          {renderBadges(item)}
+        </View>
+        <View style={styles.tileInfo}>
+          {item.brand ? <Text style={styles.tileBrand} numberOfLines={1}>{item.brand}</Text> : null}
+          <Text style={styles.tileTitle} numberOfLines={2}>{item.title}</Text>
+          {isProduct && item.priceCents != null ? (
+            <View style={styles.priceRow}>
+              <Text style={[styles.tilePrice, TABULAR_NUMS, item.priceDropped && { color: SUCCESS }]}>
+                {formatCents(item.priceCents)}
+              </Text>
+              {item.priceDropped && item.oldPriceCents != null ? (
+                <Text style={[styles.tileOldPrice, TABULAR_NUMS]}>{formatCents(item.oldPriceCents)}</Text>
+              ) : null}
+            </View>
+          ) : item.subtitle ? (
+            <Text style={styles.tileSubtitle} numberOfLines={1}>{item.subtitle}</Text>
+          ) : null}
+        </View>
+      </TilePressable>
     );
   }
 
-  function renderRow({ item }: { item: SavedItem }) {
+  function renderCollectionTile({ item }: { item: SavedCollection }) {
     return (
-      <TouchableOpacity
-        style={styles.listRow}
-        onPress={() => handleItemPress(item)}
-        onLongPress={() => handleItemPress(item)}
-        activeOpacity={0.7}
+      <Card
+        style={styles.collectionCard}
+        onPress={() => router.push(`/buyer-collection?collectionId=${encodeURIComponent(item.id)}` as never)}
+        accessibilityLabel={item.name}
+        accessibilityHint={`Opens the ${item.name} collection`}
       >
-        <View style={[styles.rowIcon, { backgroundColor: item.accentColor || PURPLE }]}>
-          <Feather name={activeTabDef.icon as any} size={ICON.md} color="white" />
+        <View style={styles.tileImageWrap}>
+          {item.coverImageUrl ? (
+            <CachedImage source={{ uri: item.coverImageUrl }} style={styles.tileImage} />
+          ) : (
+            <View style={[styles.tileImage, styles.tilePlaceholder, { backgroundColor: theme.accentDim }]}>
+              <Feather name="folder" size={ICON.lg} color={theme.accent} />
+            </View>
+          )}
+          {item.isPublic ? (
+            <View style={styles.publicBadge}><Feather name="globe" size={10} color="#fff" /></View>
+          ) : null}
         </View>
-        <View style={styles.rowContent}>
-          <Text style={styles.rowTitle}>{item.title}</Text>
-          {item.subtitle ? <Text style={styles.rowSubtitle}>{item.subtitle}</Text> : null}
+        <View style={styles.tileInfo}>
+          <Text style={styles.tileTitle} numberOfLines={1}>{item.name}</Text>
+          <Text style={styles.tileSubtitle}>{item.itemCount} saved</Text>
         </View>
-        <Feather name="chevron-right" size={ICON.md} color={SUBTLE} />
-      </TouchableOpacity>
+      </Card>
     );
   }
 
-  const isGrid = activeTab === 'post' || activeTab === 'product';
+  function newCollectionTile() {
+    return (
+      <Card style={styles.collectionCard} onPress={() => setNewCollectionModal(true)} accessibilityLabel="New collection" accessibilityHint="Creates a new collection">
+        <View style={[styles.tileImageWrap, styles.newCollectionSquare]}>
+          <Feather name="plus" size={ICON.lg} color={theme.accent} />
+        </View>
+        <View style={styles.tileInfo}>
+          <Text style={[styles.tileTitle, { color: theme.accent }]}>New collection</Text>
+        </View>
+      </Card>
+    );
+  }
+
+  const list = mainTab === 'drops' ? priceDrops : items;
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* HEADER */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="arrow-left" size={ICON.lg} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Saved</Text>
-        <View style={styles.headerBtn}>
-          <Feather name="bookmark" size={ICON.md} color={MUTED} />
-        </View>
-      </View>
+    <View style={styles.root}>
+      <ScreenHeader title="Saved" variant="push" />
 
-      {/* TAB BAR */}
-      <View>
-        <FlatList
-          data={TABS}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={t => t.key}
-          contentContainerStyle={styles.tabBar}
-          renderItem={({ item: tab }) => (
-            <TouchableOpacity
-              style={[styles.tab, activeTab === tab.key && styles.tabActive]}
-              onPress={() => setActiveTab(tab.key)}
-              activeOpacity={0.7}
-            >
-              <Feather
-                name={tab.icon as any}
-                size={ICON.sm}
-                color={activeTab === tab.key ? PURPLE : MUTED}
-              />
-              <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
-                {tab.label}
-              </Text>
-            </TouchableOpacity>
-          )}
+      <View style={styles.tabBar}>
+        <SegmentedControl
+          options={MAIN_TABS}
+          selectedId={mainTab}
+          onChange={(id) => setMainTab(id as MainTab)}
         />
       </View>
 
-      {/* CONTENT */}
-       {loading ? <View style={styles.emptyContainer}><Text style={styles.emptyDesc}>Loading saved items…</Text></View> : filtered.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Feather name={activeTabDef.icon as any} size={48} color={MUTED} />
-          <Text style={styles.emptyTitle}>{emptyTitle()}</Text>
-          <Text style={styles.emptyDesc}>{emptyDesc()}</Text>
-          <TouchableOpacity
-            onPress={() => router.push('/(buyer)/discover')}
-            activeOpacity={0.85}
-            style={styles.discoverBtnWrap}
-          >
-            <LinearGradient
-              colors={theme.primaryGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.discoverBtn}
-            >
-              <Text style={[styles.discoverBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Discover</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+      {loading ? (
+        <View style={styles.gridContent}>
+          <GridSkeleton columns={2} cardWidth={TILE_SIZE} rows={3} gap={GAP} />
         </View>
-      ) : isGrid ? (
-        <FlatList
-          data={filtered}
-          keyExtractor={item => item.id}
-          numColumns={2}
-          columnWrapperStyle={{ gap: SP.sm }}
-          contentContainerStyle={styles.gridContent}
-          renderItem={renderTile}
+      ) : mainTab === 'collections' ? (
+        collections.length === 0 ? (
+          <EmptyState
+            icon="folder"
+            title="No collections yet"
+            description="Save something, then organize it into a board — like a Pinterest for your wishlist."
+            action={{ label: 'New collection', onPress: () => setNewCollectionModal(true) }}
+            style={{ marginTop: SPACING.xxl }}
+          />
+        ) : (
+          <FlatList
+            data={collections}
+            keyExtractor={c => c.id}
+            numColumns={2}
+            columnWrapperStyle={{ gap: GAP }}
+            contentContainerStyle={styles.gridContent}
+            refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            renderItem={renderCollectionTile}
+            ListFooterComponent={newCollectionTile}
+          />
+        )
+      ) : list.length === 0 ? (
+        <EmptyState
+          icon="bookmark"
+          title={mainTab === 'drops' ? 'No price drops yet' : 'Nothing saved yet'}
+          description={mainTab === 'drops'
+            ? 'We’ll flag it here the moment something you saved gets cheaper.'
+            : 'Tap the bookmark on anything to save it here.'}
+          action={{ label: 'Discover', onPress: () => router.push('/(buyer)/discover') }}
+          style={{ marginTop: SPACING.xxl }}
         />
       ) : (
         <FlatList
-          data={filtered}
+          data={list}
           keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContent}
-          renderItem={renderRow}
+          numColumns={2}
+          columnWrapperStyle={{ gap: GAP }}
+          contentContainerStyle={styles.gridContent}
+          renderItem={renderProductTile}
+          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         />
       )}
+
+      {/* ─ Quick actions ─ */}
+      <BottomSheet visible={!!actionsFor} onClose={() => setActionsFor(null)}>
+        <View style={styles.actionsContent}>
+          <Text style={styles.actionsTitle} numberOfLines={1}>{actionsFor?.title}</Text>
+          <ListRow icon="zap" title="Buy Now" onPress={() => actionsFor && handleBuyNow(actionsFor)} disabled={actionsBusy} />
+          <ListRow icon="shopping-cart" title="Add to Cart" onPress={() => actionsFor && handleAddToCart(actionsFor)} disabled={actionsBusy} />
+          <ListRow
+            icon="folder"
+            title="Move to collection"
+            onPress={() => {
+              if (!actionsFor) return;
+              setSaveToSheetItem({
+                type: actionsFor.type, targetId: actionsFor.targetId, title: actionsFor.title,
+                subtitle: actionsFor.subtitle, accentColor: actionsFor.accentColor, priceCents: actionsFor.priceCents,
+              });
+              setActionsFor(null);
+            }}
+          />
+          <ListRow icon="trash-2" title="Remove" destructive onPress={() => { const it = actionsFor; setActionsFor(null); if (it) removeSaved(it); }} />
+        </View>
+      </BottomSheet>
+
+      <SaveToCollectionSheet
+        visible={!!saveToSheetItem}
+        item={saveToSheetItem}
+        onClose={() => setSaveToSheetItem(null)}
+        onSaved={() => load({ silent: true })}
+      />
+
+      {/* ─ New collection ─ */}
+      <Modal transparent animationType="fade" visible={newCollectionModal} onRequestClose={() => setNewCollectionModal(false)}>
+        <Pressable style={styles.backdrop} onPress={() => setNewCollectionModal(false)} accessibilityRole="button" accessibilityLabel="Close" />
+        <View style={styles.centerModal} pointerEvents="box-none">
+          <View style={styles.newCollectionCard}>
+            <Text style={styles.actionsTitle}>New collection</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Fall Fits"
+              placeholderTextColor={SUBTLE}
+              value={newCollectionName}
+              onChangeText={setNewCollectionName}
+              autoFocus
+              onSubmitEditing={handleCreateCollection}
+              returnKeyType="done"
+            />
+            <View style={styles.modalActions}>
+              <Button label="Cancel" variant="secondary" size="small" onPress={() => setNewCollectionModal(false)} />
+              <Button
+                label="Create"
+                variant="primary"
+                size="small"
+                onPress={handleCreateCollection}
+                loading={creatingCollection}
+                disabled={!newCollectionName.trim() || creatingCollection}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
-const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
-  },
-  headerBtn: {
-    width: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: FS.md,
-    fontFamily: FONT.bold,
-    color: FG,
-  },
-  tabBar: {
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-    gap: SP.sm,
-  },
-  tab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.xs,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.xs + 2,
-    borderRadius: RADIUS.pill,
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-  },
-  tabActive: {
-    backgroundColor: theme.accentDim,
-    borderColor: theme.accent,
-  },
-  tabText: {
-    color: MUTED,
-    fontFamily: FONT.medium,
-    fontSize: FS.sm,
-  },
-  tabTextActive: {
-    color: theme.accent,
-    fontFamily: FONT.semibold,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    marginTop: SP.xxl,
-    paddingHorizontal: SP.lg,
-  },
-  emptyTitle: {
-    color: FG,
-    fontFamily: FONT.semibold,
-    fontSize: FS.md,
-    marginTop: SP.md,
-    textAlign: 'center',
-  },
-  emptyDesc: {
-    color: MUTED,
-    fontSize: FS.sm,
-    textAlign: 'center',
-    marginTop: SP.sm,
-  },
-  discoverBtnWrap: {
-    marginTop: SP.lg,
-  },
-  discoverBtn: {
-    height: COMP.buttonH,
-    borderRadius: RADIUS.pill,
-    paddingHorizontal: SP.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  discoverBtnText: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.base,
-  },
-  gridContent: {
-    paddingHorizontal: SP.md,
-    paddingTop: SP.sm,
-    gap: SP.sm,
-    paddingBottom: SP.xxl,
-  },
+function Badge({ label, color }: { label: string; color: string }) {
+  return (
+    <View style={[bs.badge, { backgroundColor: color }]}>
+      <Text style={bs.badgeText}>{label}</Text>
+    </View>
+  );
+}
+const bs = StyleSheet.create({
+  badge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: RADII.chip, marginRight: SPACING.xxs, marginBottom: SPACING.xxs },
+  badgeText: { color: '#fff', fontSize: 10, fontFamily: FONT.bold },
+});
+
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: ReturnType<typeof useColors>) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: 'transparent' },
+  tabBar: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
+  gridContent: { paddingHorizontal: SPACING.md, paddingTop: SPACING.xs, gap: GAP, paddingBottom: SPACING.xxl },
   tile: {
-    width: TILE_SIZE,
-    aspectRatio: 1,
-    borderRadius: RADIUS.lg,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: BORDER,
+    width: TILE_SIZE, marginBottom: GAP, borderRadius: RADII.card,
+    backgroundColor: palette.card, borderWidth: 1, borderColor: palette.border, overflow: 'hidden',
   },
-  tileGradient: {
-    flex: 1,
-    padding: SP.sm,
-    justifyContent: 'space-between',
+  collectionCard: { width: TILE_SIZE, marginBottom: GAP, padding: 0, overflow: 'hidden' },
+  tileImageWrap: { width: '100%', aspectRatio: 1 },
+  tileImage: { width: '100%', height: '100%' },
+  tilePlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  newCollectionSquare: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.accent, borderStyle: 'dashed', backgroundColor: 'transparent' },
+  tileMore: { position: 'absolute', top: SPACING.xxs, right: SPACING.xxs },
+  publicBadge: {
+    position: 'absolute', top: SPACING.xxs, right: SPACING.xxs, width: 22, height: 22, borderRadius: RADII.pill,
+    backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center',
   },
-  tileTop: {
-    alignItems: 'flex-start',
+  badgeRow: { position: 'absolute', left: SPACING.xxs, bottom: SPACING.xxs, right: SPACING.xxs, flexDirection: 'row', flexWrap: 'wrap' },
+  tileInfo: { paddingHorizontal: SPACING.xs, paddingTop: SPACING.xs, paddingBottom: SPACING.sm, gap: 1 },
+  tileBrand: { ...TYPE_SCALE.caption, color: palette.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.3 },
+  tileTitle: { ...TYPE_SCALE.footnote, fontFamily: FONT.semibold, color: FG },
+  tileSubtitle: { ...TYPE_SCALE.caption, color: palette.mutedForeground },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: SPACING.xxs },
+  tilePrice: { ...TYPE_SCALE.footnote, fontFamily: FONT.semibold, color: FG },
+  tileOldPrice: { ...TYPE_SCALE.caption, color: SUBTLE, textDecorationLine: 'line-through' },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: OVERLAY },
+  actionsContent: { paddingHorizontal: SPACING.md, paddingTop: SPACING.xs },
+  actionsTitle: { ...TYPE_SCALE.headline, fontFamily: FONT.bold, color: FG, marginBottom: SPACING.xs, textAlign: 'center' },
+  centerModal: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACING.lg },
+  newCollectionCard: {
+    width: '100%', backgroundColor: palette.card, borderRadius: RADII.sheet, borderWidth: 1, borderColor: palette.border,
+    padding: SPACING.lg, gap: SPACING.md,
   },
-  tileBottom: {
-    gap: 2,
+  input: {
+    height: 48, borderRadius: RADII.chip, borderWidth: 1, borderColor: palette.border,
+    backgroundColor: palette.elevated, paddingHorizontal: SPACING.md, color: FG, fontSize: TYPE_SCALE.body.fontSize,
   },
-  tileTitle: {
-    color: ON_DARK,
-    fontFamily: FONT.semibold,
-    fontSize: FS.sm,
-  },
-  tileSubtitle: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: FS.xs,
-  },
-  listContent: {
-    paddingHorizontal: SP.md,
-    paddingTop: SP.sm,
-    gap: SP.sm,
-    paddingBottom: SP.xxl,
-  },
-  listRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.md,
-  },
-  rowIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rowContent: {
-    flex: 1,
-    marginLeft: SP.md,
-  },
-  rowTitle: {
-    color: FG,
-    fontFamily: FONT.semibold,
-    fontSize: FS.base,
-  },
-  rowSubtitle: {
-    color: MUTED,
-    fontSize: FS.sm,
-    marginTop: 2,
-  },
+  modalActions: { flexDirection: 'row', gap: SPACING.sm, justifyContent: 'flex-end' },
 });

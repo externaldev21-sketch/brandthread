@@ -13,20 +13,68 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useColors } from '@/hooks/useColors';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
+import { CachedImage } from '@/components/CachedImage';
 import {
   BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK,
   FONT, FS, SP, RADIUS, ICON, OVERLAY, RED,
 } from '@/lib/theme';
 import {
-  getComments, likePost, repostPost, saveItem, getMyPosts, updatePost, deletePost,
+  getComments, likePost, repostPost, saveItem, getMyPosts, getPostById, updatePost, deletePost,
   MY_USER_ID, MY_COLOR, MY_INITIALS, MY_NAME, MY_HANDLE,
 } from '@/services/socialService';
 import type { BuyerPost, Comment } from '@/services/socialTypes';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/lib/api';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
+import { Header } from '@/components/layout';
+
+function PostVideo({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; });
+  useEffect(() => {
+    player.play();
+    return () => { player.pause(); };
+  }, [player]);
+  return (
+    <VideoView
+      player={player}
+      style={StyleSheet.absoluteFill}
+      contentFit="contain"
+      nativeControls
+    />
+  );
+}
+
+function PostMedia({
+  mediaUrl, type, mediaColor1, mediaColor2, typeIcon,
+}: {
+  mediaUrl?: string; type: BuyerPost['type'];
+  mediaColor1: string; mediaColor2: string; typeIcon: keyof typeof Feather.glyphMap;
+}) {
+  if (mediaUrl && type === 'video') {
+    return <PostVideo uri={mediaUrl} />;
+  }
+  if (mediaUrl) {
+    return (
+      <CachedImage
+        source={{ uri: mediaUrl }}
+        style={StyleSheet.absoluteFill}
+        contentFit="contain"
+        cachePolicy="memory-disk"
+        transition={150}
+      />
+    );
+  }
+  return (
+    <LinearGradient colors={[mediaColor1, mediaColor2] as [string, string]} style={StyleSheet.absoluteFill}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <Feather name={typeIcon} size={ICON.xl} color={MUTED} />
+      </View>
+    </LinearGradient>
+  );
+}
 
 export default function BuyerPostViewer() {
   const { userId } = useAuth();
@@ -67,7 +115,7 @@ export default function BuyerPostViewer() {
 
   const loadPost = useCallback(async () => {
     const all = await getMyPosts();
-    const found = all.find(p => p.id === params.postId);
+    const found = all.find(p => p.id === params.postId) ?? await getPostById(params.postId);
     if (found) {
       setPost(found);
       setLiked(found.likedByMe ?? false);
@@ -129,26 +177,23 @@ export default function BuyerPostViewer() {
     postType === 'photo' ? 'image' : postType === 'slideshow' ? 'layers' : 'video';
 
   return (
-    <View style={[s.page, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity style={s.iconBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={21} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle} numberOfLines={1}>{authorName}</Text>
-        <TouchableOpacity style={s.iconBtn} onPress={handleShare}>
-          <Feather name="send" size={20} color={FG} />
-        </TouchableOpacity>
-      </View>
+    <View style={s.page}>
+      <Header
+        title={authorName}
+        actions={[{ icon: 'send', onPress: handleShare, accessibilityLabel: 'Share' }]}
+      />
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
         {/* Media display */}
-        <LinearGradient
-          colors={[mediaColor1, mediaColor2] as [string, string]}
-          style={s.media}
-        >
-          <Feather name={typeIcon} size={ICON.xl} color={MUTED} />
-        </LinearGradient>
+        <View style={s.media}>
+          <PostMedia
+            mediaUrl={post?.mediaUrl}
+            type={postType}
+            mediaColor1={mediaColor1}
+            mediaColor2={mediaColor2}
+            typeIcon={typeIcon}
+          />
+        </View>
 
         {/* Author row */}
         <View style={s.authorRow}>
@@ -184,8 +229,8 @@ export default function BuyerPostViewer() {
         {/* Engagement bar */}
         <View style={s.engagementBar}>
           <TouchableOpacity style={s.engageBtn} onPress={handleLike}>
-            <Feather name="heart" size={22} color={liked ? '#F472B6' : FG} />
-            <Text style={[s.engageCount, liked && { color: '#F472B6' }]}>{likeCount}</Text>
+            <Feather name="heart" size={22} color={liked ? RED : FG} />
+            <Text style={[s.engageCount, liked && { color: RED }]}>{likeCount}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={s.engageBtn}
@@ -302,7 +347,7 @@ export default function BuyerPostViewer() {
                 <Text style={s.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.modalSave} onPress={handleSaveCaption}>
-                <Text style={s.modalSaveText}>Save</Text>
+                <Text style={[s.modalSaveText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Save</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -337,9 +382,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const SHADOW_PURPLE = { shadowColor: theme.shadowColor, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 };
   return StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
-  header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
-  iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { flex: 1, textAlign: 'center', color: FG, fontFamily: FONT.bold, fontSize: FS.md },
   media: { width: '100%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
   authorRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingTop: SP.md, gap: 10 },
   avatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },

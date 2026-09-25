@@ -45,10 +45,10 @@ describe('seller dashboard native interaction contract', () => {
 
   it('keeps the floating create menu and every create destination covered', () => {
     expect(createFab).toContain('testID="seller-create-fab"');
-    for (const route of ['/create-post', '/add-product', '/add-product?intent=drop', '/boost']) {
+    for (const route of ['/create-post', '/add-product', '/boost']) {
       expect(createFab).toContain(`route: '${route}'`);
     }
-    expect(deviceFlow).toContain("for (const label of ['New post', 'New product', 'New drop', 'Start a boost'])");
+    expect(deviceFlow).toContain("for (const label of ['New post', 'New product', 'Start a boost'])");
     expect(deviceFlow).toContain("await tap('New post')");
     expect(deviceFlow).toContain('await verifyCreateRoutes()');
     expect(packageJson).toContain('"test:seller-dashboard:native"');

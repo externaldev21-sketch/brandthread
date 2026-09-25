@@ -10,14 +10,14 @@ import {
   CheckoutSession, CheckoutContact, CheckoutAddress,
   CheckoutDeliveryGroup, CheckoutShippingMethod, CheckoutDiscount,
   CheckoutTax, CheckoutSummary,
-  CheckoutLoyaltyRedemption,
+  CheckoutLoyaltyRedemption, CheckoutThreadCashRedemption,
   CheckoutAcknowledgment, CheckoutAttribution,
   CartValidationResult, CartValidationIssue,
   BuyerProduct, BuyerProductOption, BuyerProductVariant,
   BuyerReturnRequest, BuyerReturnReason, BuyerReturnResolution,
   BuyerRefundRequest, BuyerProblemReport, BuyerProblemType,
 } from './cartTypes';
-import { centsAtPercent, formatCents } from '@/lib/money';
+import { formatCents } from '@/lib/money';
 
 // ─── Storage keys (scoped by user ID so two accounts never share storage) ─────
 
@@ -169,7 +169,7 @@ async function syncToDb(items: any[], savedItems: any[], expectedUserId: string)
 
 // ─── Cart storage ─────────────────────────────────────────────────────────────
 
-async function loadCart(k: CartKeys = keys()): Promise<Cart> {
+async function loadCartWithStatus(k: CartKeys = keys()): Promise<{ cart: Cart; remoteConfirmed: boolean }> {
   let cart: Cart;
   try {
     const raw = await AsyncStorage.getItem(k.cart);
@@ -182,10 +182,12 @@ async function loadCart(k: CartKeys = keys()): Promise<Cart> {
     cart = { id: uid(), items: [], savedItems: [], updatedAt: now() };
   }
 
-  // Background: attempt to load from DB and merge if DB has data.
+  // Attempt to load from DB and merge if DB has data.
   // Uses the already-captured k so the continuation can't pick up a changed userId.
+  let remoteConfirmed = false;
   try {
     const { items, savedItems } = await serviceRequest<{ items: any[]; savedItems: any[] }>('/api/buyer/cart', {});
+    remoteConfirmed = true;
     if (items.length > 0 || savedItems.length > 0) {
       // DB has data — use it and update local cache.
       // Guard: skip cache write if account switched while the request was in-flight.
@@ -195,9 +197,30 @@ async function loadCart(k: CartKeys = keys()): Promise<Cart> {
         await AsyncStorage.setItem(k.cart, JSON.stringify(cart));
       }
     }
-  } catch { /* ignore */ }
+  } catch { /* remoteConfirmed stays false — see getCartForScreen() */ }
 
-  return cart;
+  return { cart, remoteConfirmed };
+}
+
+async function loadCart(k: CartKeys = keys()): Promise<Cart> {
+  return (await loadCartWithStatus(k)).cart;
+}
+
+/**
+ * Cart-screen-only read: on top of the cart, reports whether we could
+ * actually confirm its contents against the server this time.
+ *
+ * Root-cause note: a plain empty local cache can mean either "the buyer's
+ * cart is genuinely empty" or "we couldn't reach /api/buyer/cart to confirm
+ * it" (a signed-out token race, a network blip). Silently treating both the
+ * same way is what made the cart page look empty even when the buyer really
+ * did have items pending sync — the screen should only ever show the real
+ * empty state when it's actually confirmed empty, not merely unconfirmed.
+ */
+export async function getCartForScreen(): Promise<{ cart: Cart; loadError: boolean }> {
+  const { cart, remoteConfirmed } = await loadCartWithStatus();
+  const loadError = !remoteConfirmed && cart.items.length === 0 && cart.savedItems.length === 0;
+  return { cart, loadError };
 }
 
 async function saveCart(cart: Cart, k: CartKeys = keys()): Promise<void> {
@@ -342,6 +365,25 @@ export async function removeCartItem(itemId: string): Promise<Cart> {
   const k = keys();
   const cart = await loadCart(k);
   cart.items = cart.items.filter(i => i.id !== itemId);
+  await saveCart(cart, k);
+  return cart;
+}
+
+/**
+ * Remove exactly these line IDs, leaving every other cart line untouched.
+ * Used after a checkout completes (whole-cart, selected, or single-item Buy)
+ * so only the item(s) that were actually paid for ever leave the cart —
+ * a Buy Now purchase on one item must never wipe unrelated items sitting in
+ * the buyer's cart alongside it. IDs with no matching line (e.g. a Buy Now
+ * from the product sheet, which never touches the persisted cart) are
+ * harmlessly ignored.
+ */
+export async function removeCartItems(itemIds: string[]): Promise<Cart> {
+  if (itemIds.length === 0) return getCart();
+  const k = keys();
+  const cart = await loadCart(k);
+  const idSet = new Set(itemIds);
+  cart.items = cart.items.filter(i => !idSet.has(i.id));
   await saveCart(cart, k);
   return cart;
 }
@@ -537,6 +579,11 @@ export async function createCheckoutSession(
   isBuyNow = false,
   buyNowItems?: CartItem[],
   loyaltyRedemption?: CheckoutLoyaltyRedemption,
+  // THREAD CASH HOOK POINT: additive trailing param, mirrors loyaltyRedemption.
+  // Not yet sent to the server as a real discount — see
+  // docs/payments/thread-cash-checkout-todo.md — but already flows through the
+  // session/summary math so the UI can be built and reviewed ahead of that.
+  threadCashRedemption?: CheckoutThreadCashRedemption,
 ): Promise<CheckoutSession> {
   const items = isBuyNow && buyNowItems ? buyNowItems : cart.items;
   const groups = groupCartBySeller(items);
@@ -568,11 +615,11 @@ export async function createCheckoutSession(
     const selected = group.availableMethods.find(method => method.id === group.selectedMethodId);
     return total + (selected?.priceCents ?? 0);
   }, 0);
-  const loyaltyDiscountCents = Math.min(
-    loyaltyRedemption?.discountCents ?? 0,
+  const rewardsDiscountCents = Math.min(
+    (loyaltyRedemption?.discountCents ?? 0) + (threadCashRedemption?.discountCents ?? 0),
     items.reduce((total, item) => total + item.priceCents * item.quantity, 0) + shippingTotalCents,
   );
-  const summary = calculateCartSummary(items, loyaltyDiscountCents, shippingTotalCents);
+  const summary = calculateCartSummary(items, rewardsDiscountCents, shippingTotalCents);
 
   const acks: CheckoutAcknowledgment[] = [];
   const hasPreOrder = items.some(i => i.isPreOrder);
@@ -605,6 +652,7 @@ export async function createCheckoutSession(
     deliveryGroups,
     discounts: [],
     loyaltyRedemption,
+    threadCashRedemption,
     summary,
     acknowledgments: acks,
     isBuyNow,
@@ -643,33 +691,6 @@ export async function clearCheckoutSession(): Promise<void> {
 
 // ─── Discounts ────────────────────────────────────────────────────────────────
 
-const DEMO_DISCOUNT_CODES: Record<string, CheckoutDiscount> = {
-  'THREAD10': {
-    code: 'THREAD10',
-    type: 'percentage',
-    value: 10,
-    appliedAmountCents: 0,
-    description: '10% off your order',
-    isValid: true,
-  },
-  'FREESHIP': {
-    code: 'FREESHIP',
-    type: 'free_shipping',
-    value: 0,
-    appliedAmountCents: 0,
-    description: 'Free standard shipping',
-    isValid: true,
-  },
-  'FIRST20': {
-    code: 'FIRST20',
-    type: 'fixed',
-    value: 2000,
-    appliedAmountCents: 2000,
-    description: '$20 off your first order',
-    isValid: true,
-  },
-};
-
 export async function applyDiscount(
   code: string,
   subtotalCents: number,
@@ -679,28 +700,22 @@ export async function applyDiscount(
   if (!trimmedCode) {
     return { code: '', type: 'percentage' as any, value: 0, description: '', isValid: false, appliedAmountCents: 0, errorMessage: 'Please enter a code.' };
   }
-  // Get current checkout session to find the seller
+  // Get current checkout session to find the seller and line items (for
+  // product-scoped codes — an entire_store code ignores these anyway).
   const sess = await getCheckoutSession();
-  const sellerId = (sess as any)?.items?.[0]?.sellerId ?? (sess as any)?.deliveryGroups?.[0]?.sellerId ?? '';
+  const group = (sess as any)?.deliveryGroups?.[0];
+  const sellerId = group?.sellerId ?? '';
   if (!sellerId) {
-    // Fall back to demo codes if no seller context
-    const upper = trimmedCode;
-    if (existingDiscounts.some(d => d.code === upper)) {
-      return { code: upper, type: 'percentage' as any, value: 0, appliedAmountCents: 0, description: '', isValid: false, errorMessage: 'This code has already been applied.' };
-    }
-    const found = DEMO_DISCOUNT_CODES[upper];
-    if (!found) {
-      return { code: upper, type: 'percentage' as any, value: 0, appliedAmountCents: 0, description: '', isValid: false, errorMessage: 'Invalid discount code.' };
-    }
-    let appliedAmountCents = 0;
-    if (found.type === 'percentage') appliedAmountCents = centsAtPercent(subtotalCents, found.value);
-    else if (found.type === 'fixed') appliedAmountCents = Math.min(found.value, subtotalCents);
-    else if (found.type === 'free_shipping') appliedAmountCents = 1240;
-    return { ...found, appliedAmountCents };
+    // No seller context to validate a code against — fail closed rather than
+    // accepting an unvalidated code.
+    return { code: trimmedCode, type: 'percentage' as any, value: 0, appliedAmountCents: 0, description: '', isValid: false, errorMessage: 'Add items to your cart before applying a discount code.' };
   }
+  const items = Array.isArray(group?.items)
+    ? group.items.map((item: CartItem) => ({ productId: item.productId, priceCents: item.priceCents, quantity: item.quantity }))
+    : undefined;
   try {
     const { api } = await import('@/lib/api');
-    const result = await api.discountCodes.validate(trimmedCode, sellerId, subtotalCents);
+    const result = await api.discountCodes.validate(trimmedCode, sellerId, subtotalCents, items);
     return {
       code: result.code,
       type: result.type,
@@ -722,8 +737,12 @@ export async function applyDiscount(
       }
     } catch {}
     const msg = errCode === 'EXPIRED' ? 'This code has expired.' :
+                errCode === 'NOT_STARTED' ? "This code isn't active yet." :
                 errCode === 'MAX_USES_REACHED' ? 'This code has reached its usage limit.' :
+                errCode === 'ALREADY_USED_BY_CUSTOMER' ? "You've already used this code." :
                 errCode === 'MIN_ORDER_NOT_MET' ? 'Minimum order not met for this code.' :
+                errCode === 'NO_ELIGIBLE_ITEMS' ? 'No items in your cart qualify for this code.' :
+                errCode === 'INACTIVE' ? 'This code is paused.' :
                 'Invalid or expired discount code.';
     return { code: trimmedCode, type: 'percentage' as any, value: 0, description: '', isValid: false, appliedAmountCents: 0, errorMessage: msg };
   }
@@ -899,8 +918,8 @@ async function loadRefunds(k: CartKeys = keys()): Promise<BuyerRefundRequest[]> 
 // ─── Problem reports ──────────────────────────────────────────────────────────
 
 export async function createProblemReport(params: {
-  orderId: string;
-  orderNumber: string;
+  orderId?: string;
+  orderNumber?: string;
   type: BuyerProblemType;
   description: string;
   evidenceUris: string[];

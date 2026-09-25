@@ -4,10 +4,12 @@ import { dark } from '@clerk/themes';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/toaster';
+import { Toaster as SonnerToaster } from '@/components/ui/sonner';
 import { Route, Switch, Router as WouterRouter, Redirect, useLocation } from 'wouter';
 
 import Landing from '@/pages/landing';
 import Onboarding from '@/pages/onboarding';
+import Join from '@/pages/join';
 import Dashboard from '@/pages/dashboard';
 import Orders from '@/pages/orders';
 import Messages from '@/pages/messages';
@@ -19,6 +21,7 @@ import Reports from '@/pages/reports';
 import Sellers from '@/pages/sellers';
 import OrderTracker from '@/pages/order-tracker';
 import QuoteRequests from '@/pages/quote-requests';
+import Products from '@/pages/products';
 import NotFound from '@/pages/not-found';
 import { Layout } from '@/components/layout';
 import { useIsModerator } from '@/hooks/use-ip-cases';
@@ -220,6 +223,9 @@ function AppRouter() {
             <Route path="/sign-in/*?" component={SignInPage} />
             <Route path="/sign-up/*?" component={SignUpPage} />
 
+            {/* Shareable signup link (public listing or ?invite=<token>) */}
+            <Route path="/join" component={Join} />
+
             {/* Onboarding — requires auth */}
             <Route path="/onboard">
               <Protected><Onboarding /></Protected>
@@ -254,6 +260,9 @@ function AppRouter() {
             <Route path="/quote-requests">
               <Protected><Layout><QuoteRequests /></Layout></Protected>
             </Route>
+            <Route path="/products">
+              <Protected><Layout><Products /></Layout></Protected>
+            </Route>
             <Route path="/payment">
               <Protected><Layout><Payment /></Layout></Protected>
             </Route>
@@ -270,6 +279,7 @@ function AppRouter() {
             <Route component={NotFound} />
           </Switch>
           <Toaster />
+          <SonnerToaster theme="dark" position="bottom-right" />
         </TooltipProvider>
       </QueryClientProvider>
     </ClerkProvider>

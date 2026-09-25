@@ -16,6 +16,7 @@ describe('seller home analytics zero state', () => {
       visitorCount: 0,
       toFulfill: 0,
       toCapture: 0,
+      previous: { totalCents: 0, orderCount: 0, visitorCount: 0 },
       buckets: [],
     });
   });

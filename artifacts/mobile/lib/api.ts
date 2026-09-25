@@ -16,10 +16,80 @@ import {
   reportNetworkError,
 } from '@/lib/networkNotice';
 import type { FinanceSummary } from '@/lib/financeSummary';
+import type { ThreadCashCheckInResult, ThreadCashEntry, ThreadCashStatus } from '@/lib/threadCashTypes';
 
 const BASE =
   process.env.EXPO_PUBLIC_API_BASE_URL ??
   `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
+
+/**
+ * Every request gets a hard ceiling so a hung connection (dead server, black
+ * hole route, a device that fell asleep mid-request) always resolves into an
+ * error a screen can show instead of leaving loading state stuck forever.
+ */
+const REQUEST_TIMEOUT_MS = 15_000;
+
+/**
+ * AI generation endpoints (mockup/photography/logo/background-removal) can
+ * legitimately take much longer than an ordinary read/write — the server's
+ * own "expensive" rate-limit policy (see api-server/src/middlewares/
+ * rateLimit.ts) exists specifically for this class of request. Using the
+ * default 15s timeout here was cutting off in-progress generations that
+ * would have succeeded, surfacing a false "Request timed out" failure
+ * instead of the real result.
+ */
+const EXPENSIVE_REQUEST_TIMEOUT_MS = 90_000;
+
+/**
+ * fetch() with a hard timeout. Expo/RN's fetch never rejects or resolves on
+ * its own if the connection just hangs — AbortController is the only way to
+ * bound it. A timeout surfaces as ApiError(408) so it flows through the same
+ * classification/retry path as a real server timeout.
+ */
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number = REQUEST_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new ApiError(408, JSON.stringify({ error: { message: 'Request timed out. Please try again.', code: 'timeout' } }));
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Global 429 backoff gate. When the server rate-limits us, every request
+ * (not just the one that got the 429) waits out the server's Retry-After
+ * window before hitting the network again, instead of each screen's own
+ * retry/focus-refetch logic immediately re-triggering another 429. This is
+ * what actually stops the client from hammering the server during a rate
+ * limit — the previous behavior just surfaced the 429 as an error and let
+ * the next focus/retry fire right away.
+ */
+let rateLimitedUntil = 0;
+
+function noteRateLimited(retryAfterSeconds: number): void {
+  rateLimitedUntil = Math.max(rateLimitedUntil, Date.now() + retryAfterSeconds * 1000);
+}
+
+async function waitOutRateLimit(): Promise<void> {
+  const remaining = rateLimitedUntil - Date.now();
+  if (remaining <= 0) return;
+  await new Promise((resolve) => setTimeout(resolve, remaining));
+}
+
+function retryAfterSecondsFrom(res: Response): number {
+  const header = Number(res.headers.get('Retry-After'));
+  return Number.isFinite(header) && header > 0 ? header : 5;
+}
 
 type GetToken = () => Promise<string | null>;
 type GetCacheScope = () => string | Promise<string>;
@@ -246,15 +316,16 @@ function request<T = any>(
   asText = false,
   getCacheScope: GetCacheScope = () => 'anonymous',
   reportErrors = true,
+  timeoutMs: number = REQUEST_TIMEOUT_MS,
 ): Promise<T> {
   const isRead = (options.method ?? 'GET').toUpperCase() === 'GET';
   if (!isRead || options.cache === 'no-store') {
-    return doRequest<T>(path, options, getToken, asText, getCacheScope, reportErrors);
+    return doRequest<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs);
   }
   const dedupeKey = `${versionApiPath(path)}::${asText ? 'text' : 'json'}::${JSON.stringify(storeContextHeaders())}`;
   const existing = inFlightGetRequests.get(dedupeKey);
   if (existing) return existing;
-  const promise = doRequest<T>(path, options, getToken, asText, getCacheScope, reportErrors).finally(() => {
+  const promise = doRequest<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs).finally(() => {
     if (inFlightGetRequests.get(dedupeKey) === promise) inFlightGetRequests.delete(dedupeKey);
   });
   inFlightGetRequests.set(dedupeKey, promise);
@@ -268,7 +339,9 @@ async function doRequest<T = any>(
   asText = false,
   getCacheScope: GetCacheScope = () => 'anonymous',
   reportErrors = true,
+  timeoutMs: number = REQUEST_TIMEOUT_MS,
 ): Promise<T> {
+  await waitOutRateLimit();
   const resolvedPath = versionApiPath(path);
   const isRead = (options.method ?? 'GET').toUpperCase() === 'GET';
   const cacheKey = isRead && options.cache !== 'no-store' && !asText
@@ -291,10 +364,10 @@ async function doRequest<T = any>(
   };
   let res: Response;
   try {
-    res = await fetch(`${BASE}${resolvedPath}`, { ...options, headers });
+    res = await fetchWithTimeout(`${BASE}${resolvedPath}`, { ...options, headers }, timeoutMs);
   } catch (error) {
     const retry = isRead
-      ? () => request<T>(path, options, getToken, asText, getCacheScope, reportErrors)
+      ? () => request<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs)
       : undefined;
     const cached = cacheKey ? await readApiCache<T>(cacheKey) : null;
     if (reportErrors) reportNetworkError(error, retry, cached !== null);
@@ -302,12 +375,13 @@ async function doRequest<T = any>(
     throw error;
   }
   if (!res.ok) {
+    if (res.status === 429) noteRateLimited(retryAfterSecondsFrom(res));
     const body = await res.text();
     const error = new ApiError(res.status, body);
     const retry = isRead
-      ? () => request<T>(path, options, getToken, asText, getCacheScope, reportErrors)
+      ? () => request<T>(path, options, getToken, asText, getCacheScope, reportErrors, timeoutMs)
       : undefined;
-    const cached = cacheKey && res.status >= 500 ? await readApiCache<T>(cacheKey) : null;
+    const cached = cacheKey && (res.status >= 500 || res.status === 429) ? await readApiCache<T>(cacheKey) : null;
     if (reportErrors) reportNetworkError(error, retry, cached !== null);
     if (cached !== null) return cached;
     throw error;
@@ -576,6 +650,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
   const quietGet = <T>(path: string) => request<T>(path, { method: 'GET' }, getToken, false, getCacheScope, false);
   const getText  = (path: string)   => request<string>(path, { method: 'GET' }, getToken, true, getCacheScope);
   const post  = <T>(path: string, body: unknown) => request<T>(path, { method: 'POST',  body: JSON.stringify(body) }, getToken, false, getCacheScope);
+  const postExpensive = <T>(path: string, body: unknown) =>
+    request<T>(path, { method: 'POST', body: JSON.stringify(body) }, getToken, false, getCacheScope, true, EXPENSIVE_REQUEST_TIMEOUT_MS);
   const put   = <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT',   body: JSON.stringify(body) }, getToken, false, getCacheScope);
   const patch = <T>(path: string, body: unknown) => request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }, getToken, false, getCacheScope);
   const del   = <T>(path: string) => request<T>(path, { method: 'DELETE' }, getToken, false, getCacheScope);
@@ -622,7 +698,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         appThemeId?: string;
         appIconId?: string | null;
         expectedClerkId?: string;
+        category?:     string;
+        location?:     string;
+        contactEmail?: string;
+        tags?:         string[];
+        socialLinks?:  Record<string, string>;
       }) => patch<any>('/api/auth/profile', body),
+      /** Upload the current account's profile photo (buyer or seller). Cropped to a
+       *  square client-side and displayed as a circle. Shared with the seller avatar
+       *  endpoint — any authenticated user owns exactly one `profileImageUrl`. */
+      uploadAvatar: (image: { uri: string; mimeType?: string | null }) =>
+        uploadImage<{ profileImageUrl: string }>('/api/seller/profile/avatar/upload', image, getToken, getCacheScope),
       /** Permanently erase this account after the explicit DELETE confirmation. */
       deleteAccount: () => request<{ ok: true }>(
         '/api/auth/account',
@@ -666,6 +752,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Bulk-import products from a rows array. Returns { successCount, failCount, errors }. */
       import: (rows: Array<{ name: string; description?: string; category?: string; price?: string }>) =>
         post<{ successCount: number; failCount: number; errors?: string[] }>('/api/products/import', { rows }),
+      /** Upload one product photo and return the URL to store in `images`. */
+      uploadImage: (image: { uri: string; mimeType?: string | null }) =>
+        uploadImage<{ objectPath: string }>('/api/products/images', image, getToken, getCacheScope),
     },
     ipCases: {
       create: (body: { listingProductId: string; claimantName: string; claimantEmail: string; rightsType: string; description: string; evidenceReferences: string[] }) =>
@@ -684,6 +773,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         trackingStatus: 'label_created' | 'accepted' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'exception' | 'returned_to_sender';
         estimatedDelivery?: string | null;
       }) => patch(`/api/orders/${id}/tracking`, body),
+      /** Persist the seller's pick/pack checklist state for the fulfillment wizard. */
+      updateFulfillmentChecklist: (id: string, body: { isPicked?: boolean; isPacked?: boolean }) =>
+        patch(`/api/orders/${id}/fulfillment-checklist`, body),
+    },
+    packagePresets: {
+      list:   () => get<{ presets: any[] }>('/api/package-presets'),
+      create: (body: { name: string; weightOz: number; lengthIn: number; widthIn: number; heightIn: number }) =>
+        post<{ preset: any }>('/api/package-presets', body),
+      update: (id: string, body: Partial<{ name: string; weightOz: number; lengthIn: number; widthIn: number; heightIn: number }>) =>
+        patch<{ preset: any }>(`/api/package-presets/${encodeURIComponent(id)}`, body),
+      remove: (id: string) => del<{ ok: boolean }>(`/api/package-presets/${encodeURIComponent(id)}`),
     },
     customers: {
       list:    (search?: string) => get(`/api/customers${search ? `?search=${encodeURIComponent(search)}` : ''}`),
@@ -711,10 +811,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Schedule the follower broadcast for the drop's releaseAt. */
       scheduleBroadcast: (dropId: string, scheduledBroadcastAt: string) =>
         patch<any>(`/api/drops/${encodeURIComponent(dropId)}`, { scheduledBroadcastAt }),
+      /** Cancel a drop before/after launch. Pre-order drops with held funds require { confirm: true }. */
+      cancel: (dropId: string, confirm?: boolean) =>
+        post<any>(`/api/drops/${encodeURIComponent(dropId)}/cancel`, confirm ? { confirm } : {}),
     },
     analytics: {
       dashboard:  () => get('/api/analytics/dashboard'),
-      home: (range: 'live' | 'today' | 'yesterday' | 'week') =>
+      home: (range: 'live' | 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'all') =>
         get<{
           range: string;
           totalCents: number;
@@ -722,8 +825,14 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           visitorCount: number;
           toFulfill: number;
           toCapture: number;
-          buckets: Array<{ bucket: string; totalCents: number; orderCount: number }>;
-        }>(`/api/analytics/home?range=${range}`),
+          // The immediately preceding period of the same length (e.g. yesterday
+          // for "today"). No equivalent exists for balances — those are a
+          // point-in-time snapshot, not a period sum.
+          previous: { totalCents: number; orderCount: number; visitorCount: number };
+          buckets: Array<{ bucket: string; totalCents: number; orderCount: number; visitorCount: number }>;
+          // `tz` is minutes east of UTC (-Date#getTimezoneOffset()) so day/hour
+          // buckets land on the seller's local calendar day, not the server's.
+        }>(`/api/analytics/home?range=${range}&tz=${-new Date().getTimezoneOffset()}`),
       revenue:    (period: string) => get(`/api/analytics/revenue?period=${period}`),
       products:   () => get<any[]>('/api/analytics/products'),
       /** Top customers by spend + repeat-buyer stats — derived from real orders */
@@ -759,6 +868,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       },
       registerViaInvite: (token: string, body: any) =>
         post<any>(`/api/manufacturers/register-via-invite/${encodeURIComponent(token)}`, body),
+      /** Upload a factory/production photo for the signed-in manufacturer.
+       *  Requires an already-registered manufacturer profile (invite/claim
+       *  flow) — anonymous public applications cannot attach photos. */
+      uploadPhoto: (image: { uri: string; mimeType?: string | null }) =>
+        uploadImage<{ photo: string; photos: string[]; revision: number }>(
+          '/api/manufacturers/me/photos', image, getToken, getCacheScope,
+        ),
       favorites: {
         list: () => get<Array<{ manufacturerId: string; createdAt: string }>>('/api/manufacturers/favorites'),
         add: (manufacturerId: string) =>
@@ -886,19 +1002,28 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<{
           digest: 'realtime' | 'daily';
           role: 'buyer' | 'seller';
+          pushEnabled: boolean;
+          quietHours: { start: string | null; end: string | null; timezone: string };
           categories: Record<string, boolean>;
         }>('/api/notification-prefs'),
-      update: (body: { digest?: 'realtime' | 'daily'; categories?: Record<string, boolean> }) =>
+      update: (body: {
+        digest?: 'realtime' | 'daily';
+        categories?: Record<string, boolean>;
+        pushEnabled?: boolean;
+        quietHours?: { start: string; end: string; timezone?: string } | null;
+      }) =>
         put<{
           digest: 'realtime' | 'daily';
           role: 'buyer' | 'seller';
+          pushEnabled: boolean;
+          quietHours: { start: string | null; end: string | null; timezone: string };
           categories: Record<string, boolean>;
         }>('/api/notification-prefs', body),
     },
     logo: {
-      generate: (brandName: string, style: string) => post<any>('/api/logo/generate', { brandName, style }),
+      generate: (brandName: string, style: string) => postExpensive<any>('/api/logo/generate', { brandName, style }),
       onboardingSample: (brandName: string, style: string) =>
-        post<{ b64_json: string }>('/api/onboarding-sample/logo', { brandName, style }),
+        postExpensive<{ b64_json: string }>('/api/onboarding-sample/logo', { brandName, style }),
     },
     mockup: {
       generate: (
@@ -906,19 +1031,19 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         referenceImage?: string,
         mode: 'text_to_design' | 'sketch_to_design' | 'prompt_edit' = referenceImage ? 'prompt_edit' : 'text_to_design',
       ) =>
-        post<any>('/api/mockup/generate', { prompt, mode, ...(referenceImage ? { referenceImage } : {}) }),
+        postExpensive<any>('/api/mockup/generate', { prompt, mode, ...(referenceImage ? { referenceImage } : {}) }),
     },
     photography: {
       generate: (
         images: string[],
         prompt: string,
         mode: 'photoshoot' | 'mockup_to_model' = 'photoshoot',
-      ) => post<any>('/api/photography/generate', { images, prompt, mode }),
+      ) => postExpensive<any>('/api/photography/generate', { images, prompt, mode }),
       generateOutfitSwap: (
         heroImage: string,
         garmentImages: string[],
         prompt: string,
-      ) => post<{
+      ) => postExpensive<{
         results: { garmentIndex: number; b64_json: string }[];
         errors?: { garmentIndex: number }[];
       }>('/api/photography/outfit-swap', { heroImage, garmentImages, prompt }),
@@ -927,7 +1052,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         garmentImage: string,
         garmentIndex: number,
         prompt: string,
-      ) => post<{
+      ) => postExpensive<{
         garmentIndex: number;
         b64_json: string;
       }>('/api/photography/outfit-swap/retry', { heroImage, garmentImage, garmentIndex, prompt }),
@@ -937,7 +1062,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
        * Remove the background from a base64 data-URL image.
        * Returns: { b64_json, storageKey, size, mime, createdAt, id }
        */
-      remove: (image: string) => post<{
+      remove: (image: string) => postExpensive<{
         b64_json: string;
         storageKey: string | null;
         size: number;
@@ -947,11 +1072,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       }>('/api/bg-removal/remove', { image }),
       replace: (body: {
         image: string; backgroundImage?: string; prompt?: string; color?: string; bgType?: string;
-      }) => post<{ b64_json: string }>('/api/bg-removal/replace', body),
+      }) => postExpensive<{ b64_json: string }>('/api/bg-removal/replace', body),
     },
     lifestyle: {
       generate: (referenceImages: string[], productImages: string[], prompt: string) =>
-        post<any>('/api/lifestyle/generate', { referenceImages, productImages, prompt }),
+        postExpensive<any>('/api/lifestyle/generate', { referenceImages, productImages, prompt }),
     },
     techpack: {
       generate: (payload: {
@@ -967,7 +1092,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         careNotes: string;
         sizeChart: { sizes: string[]; rows: { point: string; values: Record<string, string> }[] };
         photos: string[];
-      }) => post<any>('/api/techpack/generate', payload),
+      }) => postExpensive<any>('/api/techpack/generate', payload),
     },
     integrations: {
       klaviyoStatus:      () => get<any>('/api/integrations/klaviyo'),
@@ -1013,6 +1138,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             clientIdempotencyKey?: string;
             /** One-time rewards token created by /api/loyalty/redeem. */
             loyaltyToken?: string;
+            /** THREAD CASH HOOK POINT: one-time token from /api/thread-cash/redeem.
+             *  The server currently rejects any request that includes this (see
+             *  routes/buyer.ts) until the checkout money flow can fund it without
+             *  changing seller payout — see docs/payments/thread-cash-checkout-todo.md. */
+            threadCashToken?: string;
+            /** Seller discount code, validated fresh server-side and applied to this charge. */
+            discountCode?: string;
           },
         ) =>
           post<{ sessionId: string; url: string }>('/api/buyer/checkout/session', {
@@ -1024,6 +1156,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             ...(opts.shippingAddress       ? { shippingAddress:       opts.shippingAddress       } : {}),
             ...(opts.clientIdempotencyKey  ? { clientIdempotencyKey:  opts.clientIdempotencyKey  } : {}),
             ...(opts.loyaltyToken          ? { loyaltyToken:          opts.loyaltyToken          } : {}),
+            ...(opts.threadCashToken       ? { threadCashToken:       opts.threadCashToken       } : {}),
+            ...(opts.discountCode          ? { discountCode:          opts.discountCode          } : {}),
           }),
         /** Verify payment status after Stripe redirect.
          *  Returns { status, paymentStatus, amountTotal, orderId?, orderNumber?, declineReason? }. */
@@ -1134,6 +1268,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Upload a base64-encoded image/video/audio file and get back a public URL. */
       uploadMedia: (body: { data: string; mimeType: string; extension: string }) =>
         post<{ url: string }>('/api/conversations/upload-media', body),
+      /** Set (or replace) my reaction on a message — one active reaction per user per message. */
+      addReaction: (conversationId: string, messageId: string, reactionType: string) =>
+        put<{ userId: string; userName: string; reactionType: string; createdAt: string }>(
+          `/api/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/reactions`,
+          { reactionType },
+        ),
+      /** Remove my reaction from a message. */
+      removeReaction: (conversationId: string, messageId: string) =>
+        del<{ ok: boolean }>(
+          `/api/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/reactions`,
+        ),
     },
     /** 1:1 voice / video call tokens (Agora RTC). */
     call: {
@@ -1184,16 +1329,42 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         get<any[]>(`/api/public/products/high-demand?limit=${encodeURIComponent(String(limit))}`),
     },
     public: {
-      search: (opts: { q: string; sort?: string; minPriceCents?: number; maxPriceCents?: number; category?: string; limit?: number }) => {
+      search: (opts: { q: string; sort?: string; minPriceCents?: number; maxPriceCents?: number; category?: string; size?: string; brand?: string; limit?: number; offset?: number }) => {
         const params = new URLSearchParams();
         if (opts.q) params.set('q', opts.q);
         if (opts.sort) params.set('sort', opts.sort);
         if (opts.minPriceCents !== undefined) params.set('minPriceCents', String(opts.minPriceCents));
         if (opts.maxPriceCents !== undefined) params.set('maxPriceCents', String(opts.maxPriceCents));
         if (opts.category) params.set('category', opts.category);
+        if (opts.size) params.set('size', opts.size);
+        if (opts.brand) params.set('brand', opts.brand);
         if (opts.limit) params.set('limit', String(opts.limit));
-        return get<{ results: any[] }>(`/api/public/search?${params.toString()}`);
-      }
+        if (opts.offset) params.set('offset', String(opts.offset));
+        return get<{ results: any[]; pagination: { limit: number; offset: number; returned: number; total?: number; hasMore: boolean } }>(`/api/public/search?${params.toString()}`);
+      },
+      /** Trending search terms (real logged queries once there's enough volume, else categories + brands) for the search empty state. */
+      trending: (limit = 8) =>
+        get<{ trending: Array<{ term: string; type: 'category' | 'brand' | 'query' }> }>(
+          `/api/public/search/trending?limit=${encodeURIComponent(String(limit))}`
+        ),
+      /** This signed-in buyer's own recent searches, most recent first. */
+      recent: (limit = 10) =>
+        get<{ recent: Array<{ query: string; normalized: string }> }>(
+          `/api/public/search/recent?limit=${encodeURIComponent(String(limit))}`
+        ),
+      clearRecent: () => del<{ ok: boolean }>('/api/public/search/recent'),
+      /** Suggested brands + products for the search empty state. */
+      suggested: (limit = 6) =>
+        get<{
+          brands: Array<{
+            id: string; sellerId: string; name: string; handle: string;
+            color: string; initials: string; followerCount: number;
+          }>;
+          products: Array<{
+            id: string; productId: string; name: string; brand: string;
+            category: string; imageUri: string | null; color: string; initials: string;
+          }>;
+        }>(`/api/public/search/suggested?limit=${encodeURIComponent(String(limit))}`),
     },
     reviews: {
       /** List reviews for a product (public). Returns { reviews, avgRating, totalCount }. */
@@ -1239,6 +1410,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           website:     string | null;
           username:    string | null;
           profileImageUrl: string | null;
+          logoUrl:     string | null;
+          bannerUrl:   string | null;
+          category:    string | null;
+          tags:        string[];
+          location:    string | null;
+          socialLinks: Record<string, string>;
+          contactEmail: string | null;
           verified:    boolean;
           returnPolicy:       string | null;
           cancellationPolicy: string | null;
@@ -1255,6 +1433,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Upload a seller-owned brand avatar after the server validates its bytes. */
       uploadAvatar: (image: { uri: string; mimeType?: string | null }) =>
         uploadImage<{ profileImageUrl: string }>('/api/seller/profile/avatar/upload', image, getToken, getCacheScope),
+      /** Upload the storefront logo (square, shown in the header preview). */
+      uploadLogo: (image: { uri: string; mimeType?: string | null }) =>
+        uploadImage<{ logoUrl: string }>('/api/seller/profile/logo/upload', image, getToken, getCacheScope),
+      /** Upload the storefront banner / cover image (wide aspect). */
+      uploadBanner: (image: { uri: string; mimeType?: string | null }) =>
+        uploadImage<{ bannerUrl: string }>('/api/seller/profile/banner/upload', image, getToken, getCacheScope),
       /** Update return / cancellation policy text. */
       updatePolicy: (body: { returnPolicy?: string; cancellationPolicy?: string }) =>
         patch<{ returnPolicy: string | null; cancellationPolicy: string | null }>(
@@ -1290,6 +1474,16 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           status: string;
           verified: boolean;
           bankLast4: string | null;
+          /** false when this environment has no Stripe key configured. */
+          providerConfigured?: boolean;
+          payoutSchedule?: {
+            interval: string | null;
+            delayDays: number | null;
+            weeklyAnchor: string | null;
+            monthlyAnchor: number | null;
+          } | null;
+          requirementsDue?: string[];
+          taxInfoStatus?: 'submitted' | 'needed' | 'unknown';
         }>('/api/seller/connect/status'),
       },
       /** Update the current user's public profile. username must be letters/numbers/underscores, 3-30 chars. */
@@ -1302,6 +1496,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         username?: string;
         appThemeId?: string;
         appIconId?: string | null;
+        category?:     string;
+        location?:     string;
+        contactEmail?: string;
+        tags?:         string[];
+        socialLinks?:  Record<string, string>;
       }) =>
         patch<any>('/api/auth/profile', body),
       /** Platform subscription — billed to the seller's own payment method (sellers only).
@@ -1476,6 +1675,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         duration: number;
         clipCount: number;
       }>('/api/posts/compose-video', body),
+      /** Re-extract the cover frame from an already-composed video at a chosen offset, without re-encoding. */
+      composeVideoThumbnail: (mediaPath: string, offset: number) => post<{
+        thumbnailUrl: string;
+        thumbnailPath: string;
+        offset: number;
+      }>('/api/posts/compose-video/thumbnail', { mediaPath, offset }),
       /** Compose ordered photo slides with per-slide text overlays into portrait rendered images */
       composeSlideshow: (body: {
         slides: Array<{
@@ -1498,7 +1703,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Owner-only verified performance. Untracked metrics return tracked=false and null values. */
       analytics: (id: string) =>
         get<PostAnalyticsResponse>(`/api/posts/${encodeURIComponent(id)}/analytics`),
-      interact: (id: string, body: { type: 'like' | 'repost' | 'view' | 'watch_time' | 'shop_click'; value?: string }) =>
+      interact: (id: string, body: { type: 'like' | 'repost' | 'view' | 'watch_time' | 'shop_click' | 'share' | 'not_interested'; value?: string }) =>
         post<{ action: string; count?: number }>(`/api/posts/${encodeURIComponent(id)}/interact`, body),
     },
     /** Content reporting (buyers and sellers can submit reports) */
@@ -1606,9 +1811,24 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       }) => post<any>('/api/social/stories', body),
       /** My active stories */
       myStories: () => get<any[]>('/api/social/stories/me'),
-      /** Another user's active stories — visible to all viewers */
+      /** Another user's active stories — visible to that author's followers only */
       storiesForUser: (userId: string) =>
         get<any[]>(`/api/social/stories/user/${encodeURIComponent(userId)}`),
+      /** Stories tray: one entry per followed author (+ me), grouped, with a seen flag */
+      storiesFollowing: () =>
+        get<Array<{
+          authorId: string; authorName: string; authorHandle: string;
+          authorInitials: string; authorColor: string; authorAccountType: string;
+          isMe: boolean; storyIds: string[]; seen: boolean; latestCreatedAt: number;
+        }>>('/api/social/stories/following'),
+      /** Who has viewed my story (author only) */
+      storyViewers: (storyId: string) =>
+        get<Array<{ userId: string; name: string; handle: string; initials: string; avatarUrl: string | null; viewedAt: string }>>(
+          `/api/social/stories/${encodeURIComponent(storyId)}/viewers`,
+        ),
+      /** Delete my own story before it expires */
+      deleteStory: (storyId: string) =>
+        del<{ id: string; deleted: boolean }>(`/api/social/stories/${encodeURIComponent(storyId)}`),
       /** Toggle like on a story */
       likeStory: (storyId: string) =>
         post<{ liked: boolean; likesCount: number }>(`/api/social/stories/${encodeURIComponent(storyId)}/like`, {}),
@@ -1661,7 +1881,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     /** Buyer-facing drops listing (active, with countdown releaseAt) */
     publicDrops: {
-      list: () => get<any[]>('/api/public/drops'),
+      list: (section?: 'upcoming' | 'live' | 'recent') =>
+        get<any[]>(`/api/public/drops${section ? `?section=${section}` : ''}`),
       get:  (id: string) => get<any>(`/api/public/drops/${encodeURIComponent(id)}`),
       notificationStatus: (id: string) =>
         get<{ subscribed: boolean }>(`/api/public/drops/${encodeURIComponent(id)}/notify`),
@@ -1673,13 +1894,34 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     /** Discount codes — seller-managed promo codes */
     discountCodes: {
       list:   () => get<any[]>('/api/discount-codes'),
-      create: (data: { code: string; type: string; value: number; minOrderCents?: number; maxUses?: number | null; expiresAt?: string | null }) =>
-        post<any>('/api/discount-codes', data),
-      update: (id: string, data: { active?: boolean; expiresAt?: string | null }) =>
-        patch<any>(`/api/discount-codes/${id}`, data),
+      create: (data: {
+        code?: string;
+        type: 'percentage' | 'fixed' | 'free_shipping' | 'free_item';
+        value?: number;
+        minOrderCents?: number;
+        appliesTo?: 'entire_store' | 'specific_products';
+        productIds?: string[];
+        maxUses?: number | null;
+        singleUse?: boolean;
+        oneUsePerCustomer?: boolean;
+        startsAt?: string | null;
+        expiresAt?: string | null;
+      }) => post<any>('/api/discount-codes', data),
+      update: (id: string, data: {
+        active?: boolean;
+        startsAt?: string | null;
+        expiresAt?: string | null;
+        minOrderCents?: number;
+        maxUses?: number | null;
+        oneUsePerCustomer?: boolean;
+        appliesTo?: 'entire_store' | 'specific_products';
+        productIds?: string[];
+        value?: number;
+      }) => patch<any>(`/api/discount-codes/${id}`, data),
       delete: (id: string) => del<any>(`/api/discount-codes/${id}`),
-      validate: (code: string, sellerId: string, subtotalCents: number) =>
-        get<any>(`/api/discount-codes/validate?code=${encodeURIComponent(code)}&sellerId=${encodeURIComponent(sellerId)}&subtotalCents=${subtotalCents}`),
+      uses:   (id: string) => get<any[]>(`/api/discount-codes/${id}/uses`),
+      validate: (code: string, sellerId: string, subtotalCents: number, items?: { productId: string; priceCents: number; quantity: number }[]) =>
+        get<any>(`/api/discount-codes/validate?code=${encodeURIComponent(code)}&sellerId=${encodeURIComponent(sellerId)}&subtotalCents=${subtotalCents}${items ? `&items=${encodeURIComponent(JSON.stringify(items))}` : ''}`),
     },
     /** Returns — buyer-initiated return requests */
     returns: {
@@ -1714,6 +1956,33 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       delete: (id: string) => del<any>(`/api/shipping-rates/${id}`),
       calculate: (sellerId: string, subtotalCents: number) =>
         get<any>(`/api/shipping-rates/calculate?sellerId=${encodeURIComponent(sellerId)}&subtotalCents=${subtotalCents}`),
+    },
+    /** Shipping zones — worldwide zone-based rates (domestic / country / rest-of-world), replacing the single flat rate above. */
+    shippingZones: {
+      list: () => get<any[]>('/api/shipping-zones'),
+      create: (data: {
+        name: string;
+        zoneType: 'domestic' | 'country' | 'rest_of_world';
+        countries?: string[];
+        pricingModel?: 'flat' | 'weight_tiered';
+        flatRateCents?: number;
+        freeAboveCents?: number | null;
+        processingDays?: number;
+        carrierLabel?: string | null;
+        shipsInternationally?: boolean;
+        dutiesHandling?: 'ddp' | 'dap';
+        sortOrder?: number;
+      }) => post<any>('/api/shipping-zones', data),
+      update: (id: string, data: Record<string, unknown>) =>
+        patch<any>(`/api/shipping-zones/${encodeURIComponent(id)}`, data),
+      delete: (id: string) => del<any>(`/api/shipping-zones/${encodeURIComponent(id)}`),
+      setWeightTiers: (id: string, tiers: Array<{ minWeightGrams: number; maxWeightGrams: number | null; rateCents: number }>) =>
+        put<any>(`/api/shipping-zones/${encodeURIComponent(id)}/weight-tiers`, { tiers }),
+      getSettings: () => get<{ shipFromCountry: string }>('/api/shipping-zones/settings'),
+      updateSettings: (shipFromCountry: string) =>
+        patch<{ shipFromCountry: string }>('/api/shipping-zones/settings', { shipFromCountry }),
+      resolve: (sellerId: string, country: string, subtotalCents: number, weightGrams = 0) =>
+        get<any>(`/api/shipping-zones/resolve?sellerId=${encodeURIComponent(sellerId)}&country=${encodeURIComponent(country)}&subtotalCents=${subtotalCents}&weightGrams=${weightGrams}`),
     },
     // (products key defined earlier in this object — no duplicate)
     /** Waitlist — out-of-stock variant demand tracking. */
@@ -1751,7 +2020,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     team: {
       members:   () => get<any[]>('/api/team/members'),
       member:    (id: string) => get<any>(`/api/team/members/${encodeURIComponent(id)}`),
-      invite:    (data: { email: string; name?: string; role?: string }) => post<any>('/api/team/invite', data),
+      invite:    (data: { email?: string; username?: string; name?: string; role?: string }) => post<any>('/api/team/invite', data),
       /** Public: resolve invite details for the accept screen (works signed-out) */
       resolveInvite: (token: string) => get<any>(`/api/team/invite/accept/${encodeURIComponent(token)}`),
       accept:    (token: string) => post<any>(`/api/team/invite/accept/${encodeURIComponent(token)}`, {}),
@@ -1761,7 +2030,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       roles:     () => get<any[]>('/api/team/roles'),
       roleMembers: (role: string) => get<any[]>(`/api/team/roles/${encodeURIComponent(role)}/members`),
       /** Resolves the caller's permission tier for the active store context. */
-      context: () => get<{ role: 'owner' | 'manager' | 'staff' }>('/api/team/context'),
+      context: () => get<{ role: 'owner' | 'admin' | 'manager' | 'finance' | 'orders' | 'marketing' | 'staff' | 'viewer' }>('/api/team/context'),
       /** Returns all of the caller's active memberships in other seller stores. */
       myMemberships: () =>
         get<{
@@ -1873,7 +2142,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         chargeVat: boolean;
       }>('/api/taxes/status'),
       enable:    () => post<any>('/api/taxes/enable', {}),
-      config:    (data: { collectDuties?: boolean; chargeShippingTax?: boolean; chargeVat?: boolean }) =>
+      config:    (data: { stripeTaxEnabled?: boolean; collectDuties?: boolean; chargeShippingTax?: boolean; chargeVat?: boolean; taxCalculationMode?: string }) =>
         patch<any>('/api/taxes/config', data),
       forms1099: (year?: number) => get<any>(`/api/taxes/1099${year ? `?year=${year}` : ''}`),
       calculate: (data: { lineItems: any[]; shippingAddress: any; currency?: string; shippingCents?: number }) =>
@@ -1897,9 +2166,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     /** AI — brand memory, proactive suggestions */
     ai: {
-      brandMemoryRebuild: () => post<{ fields: Record<string, string> }>('/api/ai/brand-memory/rebuild', {}),
+      brandMemoryRebuild: () => postExpensive<{ fields: Record<string, string> }>('/api/ai/brand-memory/rebuild', {}),
       suggestions:        () => get<{ suggestions: any[] }>('/api/ai/suggestions'),
       nextActions:        () => get<{ suggestions: any[] }>('/api/ai/suggestions'),
+      /** One-off assistant call — e.g. "rewrite this copy". */
+      chat: (body: { messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>; maxTokens?: number }) =>
+        postExpensive<{ content: string; actionCard?: Record<string, unknown>; tokensUsed?: number }>('/api/ai/chat', body),
     },
     /** Security — login sessions */
     security: {
@@ -2065,6 +2337,21 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       redeem: (body: { points: number }) =>
         post<{ ok: boolean; pointsUsed: number; discountCents: number; token: string }>('/api/loyalty/redeem', body),
     },
+    /** Thread Cash — platform-funded reward credit (daily check-in, streaks, wallet). */
+    threadCash: {
+      get: () =>
+        get<ThreadCashStatus>('/api/thread-cash'),
+      checkIn: (body: { timezone: string; deviceId?: string }) =>
+        post<ThreadCashCheckInResult>('/api/thread-cash/check-in', body),
+      history: (limit = 50) =>
+        get<{ history: ThreadCashEntry[] }>(`/api/thread-cash/history?limit=${limit}`),
+      redeem: (body: { amountCents: number }) =>
+        post<{ ok: boolean; discountCents: number; token: string }>('/api/thread-cash/redeem', body),
+      send: (body: { recipientId: string; conversationId?: string; amountCents: number }) =>
+        post<{ ok: boolean; transferId: string }>('/api/thread-cash/send', body),
+      claim: (body: { transferId: string }) =>
+        post<{ ok: boolean; amountCents: number }>('/api/thread-cash/claim', body),
+    },
     /** Public trending feed — no auth required. */
     publicTrending: {
       get: (limit = 20) =>
@@ -2076,6 +2363,60 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           likesCount: number; commentsCount: number; repostsCount: number; shopClicks: number;
           boosted: boolean; category: string; hype: string;
         }> }>(`/api/public/trending?limit=${limit}`),
+    },
+    /**
+     * For You ranking pipeline: batched behavioral-event ingestion + the
+     * buyer's personalized ranked Thread feed. Auth required for both.
+     */
+    feed: {
+      /** Batched, idempotent event ingestion (up to 50 events/request). Each
+       *  event needs a stable client-generated `clientEventId` so a retried
+       *  batch never double-counts a signal. */
+      events: (events: Array<{
+        postId: string;
+        type: 'view' | 'watch_time' | 'rewatch' | 'shop_click' | 'add_to_bag' | 'skip' | 'not_interested';
+        value?: string;
+        clientEventId: string;
+      }>) => post<{ accepted: number; deduped: number }>('/api/feed/events', { events }),
+      /** Cursor-paginated (`nextOffset`) personalized ranking. */
+      forYou: (opts: { limit?: number; offset?: number } = {}) => {
+        const params = new URLSearchParams();
+        params.set('limit', String(opts.limit ?? 20));
+        params.set('offset', String(opts.offset ?? 0));
+        return get<{ items: any[]; nextOffset: number | null }>(`/api/feed/for-you?${params.toString()}`);
+      },
+    },
+    /**
+     * Public "For You" ranked Discover feed — no auth required (an Authorization
+     * header is sent when available but the server does not require it).
+     * Contract (matched exactly against the backend ranking endpoint):
+     *   GET /api/public/discover/feed?limit=&offset=
+     *   -> { items: DiscoverFeedItem[]; computedAt: string; source: 'cache'|'computed'|'empty'; nextOffset: number | null }
+     */
+    discover: {
+      feed: (opts: { limit?: number; offset?: number } = {}) => {
+        const params = new URLSearchParams();
+        params.set('limit', String(opts.limit ?? 20));
+        params.set('offset', String(opts.offset ?? 0));
+        return get<{
+          items: Array<{
+            rank: number;
+            productId: string;
+            brandId: string;
+            brandName: string;
+            brandVerified: boolean;
+            productName: string;
+            priceCents: number;
+            compareAtPriceCents: number | null;
+            images: string[];
+            category: string;
+            sellerScore: number;
+          }>;
+          computedAt: string;
+          source: 'cache' | 'computed' | 'empty';
+          nextOffset: number | null;
+        }>(`/api/public/discover/feed?${params.toString()}`);
+      },
     },
     /** Stripe Connect Express onboarding for freelancer payouts. */
     freelancerConnect: {

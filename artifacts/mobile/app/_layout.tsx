@@ -24,8 +24,10 @@ import { flushPendingBuyerOnboardingSync } from '@/lib/buyerOnboardingSync';
 import { RoleProvider } from '@/contexts/RoleContext';
 import { ThreadPullProvider } from '@/contexts/ThreadPullTransitionContext';
 import { AppThemeProvider, useAppTheme } from '@/contexts/AppThemeContext';
+import { PrimaryButton } from '@/components/BrandthreadUI';
 import { AppIconProvider } from '@/contexts/AppIconContext';
 import BootScreen from '@/components/BootScreen';
+import AppIntroSplash from '@/components/splash/AppIntroSplash';
 import * as Notifications from 'expo-notifications';
 import { configureServices } from '@/lib/serviceConfig';
 import {
@@ -39,7 +41,13 @@ import {
 import { clearSocialCache, hydrateMyProfileFromAccount, initSocialService, socialKeysForUser } from '@/services/socialService';
 import { clearCartCache, initCartService } from '@/services/cartService';
 import { initDesignService } from '@/services/designService';
+import { initProductService } from '@/services/productService';
+import { initOrderService } from '@/services/orderService';
+import { initInventoryService } from '@/services/inventoryService';
+import { initAnalyticsService } from '@/services/analyticsService';
+import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { initBuyerProfile } from '@/lib/buyerProfile';
+import { WebAppShell } from '@/components/web/WebAppShell';
 import StoreContextBanner from '@/components/StoreContextBanner';
 import NetworkNoticeBanner from '@/components/NetworkNoticeBanner';
 import { dismissNetworkNotice } from '@/lib/networkNotice';
@@ -53,11 +61,16 @@ import { useCanUseMarketing } from '@/contexts/CookieConsentContext';
 import { setMarketingPixelConsent, trackMarketingPixelEvent } from '@/lib/marketingPixels';
 import { captureNotificationEvent, flushNotificationEvents } from '@/lib/notificationEventOutbox';
 import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
+import NotificationBanner from '@/components/notifications/NotificationBanner';
+import { showNotificationBanner } from '@/lib/notificationBannerBus';
+import { getNotifications as getFeedNotifications } from '@/services/socialService';
+import { syncNotificationBadge } from '@/lib/notificationBadge';
 import { SellerGlobalTabBar } from '@/components/SellerGlobalTabBar';
 import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 import AppLockGate from '@/components/security/AppLockGate';
 import LegalAcceptanceGate from '@/components/legal/LegalAcceptanceGate';
 import { SellerShellProvider, useSellerShell } from '@/contexts/SellerShellContext';
+import { FADE_MS, SCREEN_PUSH_MS } from '@/constants/motion';
 
 // Presentation routes must remain transparent so the active runtime shell is
 // visible behind cards, sheets, and full-screen modal content.
@@ -110,29 +123,36 @@ function RuntimeThemeShell({ children }: { children: React.ReactNode }) {
           barStyle={palette.statusBarStyle ?? 'light-content'}
           backgroundColor={background}
         />
-        {children}
+        <WebAppShell>{children}</WebAppShell>
       </View>
     </NavigationThemeProvider>
   );
 }
 
-// ─── Seller tab bar exclusion list ───────────────────────────────────────────
-// The bar shows on EVERY authenticated seller screen by default.
-// Only exclude routes where the seller identity/shell does not exist at all:
-//   • Boot/auth/onboarding (no session yet)
-//   • Legal public pages (reachable without auth)
-//   • The Expo Router root index (BootScreen redirect — no segment)
-//   • The navigation isolation test probe (CI only)
-//   • The buyer app group — buyer accounts never see the seller shell
-//     (role gating already prevents this; explicit exclusion avoids any flash)
+// ─── Seller tab bar full-screen deny-list ────────────────────────────────────
+// The bar is `position: absolute` (SellerGlobalTabBar.tsx) so it physically
+// overlays whatever is underneath it — it is NOT a harmless flex sibling.
+// It should show on every normal seller screen by default — the seller
+// `(tabs)` shell AND every pushed management screen (Settings, Billing, Team,
+// Customers, Payments, order/return/dispute detail, Manufacturer hub, and
+// dozens more) — and be hidden ONLY on the small, explicit set of genuine
+// full-screen creation/camera/checkout flows below, where the bar would
+// visually collide with the screen's own bottom-anchored controls (see
+// docs/polish/punch-list.md, "floating tab bar" / Top 20 item #16, and the
+// web-screenshot visual pass).
 //
-// Full-screen seller routes (create-post, camera-capture, seller-go-live,
-// seller-live, buyer-live, buyer-story-*, plans, team-invite, seller-profile,
-// buyer-product-detail, buyer-checkout, buyer-post-comments, buyer-report, etc.)
-// are intentionally NOT excluded — the bar is a normal flex sibling and does
-// not physically overlay these screens. Role gating prevents buyer accounts
-// from seeing it on buyer-facing screens.
-const SELLER_TAB_BAR_EXCLUDED_SEGMENTS = new Set([
+// This is a DENY-list (not an allow-list) on purpose: an allow-list defaults
+// new pushed routes to "hidden", which silently regresses every ordinary
+// seller screen (Settings, Billing, Customers, etc.) the moment it's added —
+// that was the regression this comment used to defend as intentional. A
+// short, curated deny-list of the few screens that are actually full-bleed
+// keeps the default correct (bar shows) for everything else, present and
+// future.
+//
+// This affects the SELLER tab bar only. The buyer tab bar is a separate
+// component/gate entirely (see the buyer `(buyer)` group layout) and is not
+// touched here.
+const SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS = new Set([
   // Boot: "/" renders BootScreen with no segment; AuthGate redirects immediately
   'index',
   // Auth flow — no seller session
@@ -151,6 +171,37 @@ const SELLER_TAB_BAR_EXCLUDED_SEGMENTS = new Set([
   'navigation-isolation-probe',
   // Buyer app group — buyer sessions only; seller role gating prevents cross-exposure
   '(buyer)',
+
+  // ── Genuine full-screen creation / camera / checkout flows ──
+  // Registered as a full-screen modal presentation below — real camera UI
+  // with its own shutter/mode controls anchored to the bottom of the screen.
+  'camera-capture',
+  'create-post',
+  // Full-page form with its own bottom "Publish"/"Uploading photos…" CTA.
+  'add-product',
+  // Paywall — screenshots showed the bar literally overlapping it.
+  'plans',
+  // Full-bleed canvas editor with its own bottom toolbar (layers, crop, etc.);
+  // the other design-studio screens (template/asset pickers, AI tool forms)
+  // are normal scrollable screens and keep the bar.
+  'design-canvas',
+  // Storefront-from-AI wizard and its full-screen generating/progress screen.
+  'store-generate',
+  'store-generating',
+  // Multi-step quote wizard with its own step header/footer.
+  'quote-request',
+  // Seller livestream — real full-screen camera/broadcast controls.
+  'seller-go-live',
+  'seller-live',
+  // Brandthread AI screen — immersive full-screen chat takeover with its own
+  // floating composer pinned to the safe-area bottom inset. The floating
+  // seller tab bar previously stayed mounted on top of it (this route wasn't
+  // deny-listed), which sat directly behind the AI composer since that
+  // screen's layout only accounted for the home indicator, not the tab bar's
+  // own height — the composer, suggestion chips, and message list were
+  // rendered underneath the bar. Deny-listing it here removes the overlap
+  // outright and matches the other full-bleed screens above.
+  'ai-brain',
 ]);
 
 // ─── SellerBarGate ────────────────────────────────────────────────────────────
@@ -162,9 +213,9 @@ const SELLER_TAB_BAR_EXCLUDED_SEGMENTS = new Set([
 // AuthGate is the single authority that reads AsyncStorage and the server
 // profile. SellerBarGate consumes SellerShellContext — no parallel read.
 //
-// The exclusion list is intentionally minimal (boot/auth/onboarding/legal/buyer
-// group only). Every normal seller screen — including full-screen modals that
-// are flex siblings of the bar — shows the tab bar.
+// It is gated by a DENY-list (SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS): the bar
+// shows by default on every seller route, and is hidden only on the small,
+// explicit set of genuine full-screen flows — see the deny-list comment above.
 
 function SellerBarGate() {
   const { isActiveSeller } = useSellerShell();
@@ -178,11 +229,13 @@ function SellerBarGate() {
 
   const showBar = isActiveSeller || isPreviewSeller;
 
-  // Check exclusion list: first segment determines the route
+  // Deny-list: first segment determines the route. The bar renders on every
+  // seller route except the curated full-screen set (see
+  // SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS).
   const firstSegment = (segments[0] as string | undefined) ?? '';
-  const isExcluded = SELLER_TAB_BAR_EXCLUDED_SEGMENTS.has(firstSegment);
+  const isFullScreenRoute = SELLER_TAB_BAR_FULL_SCREEN_SEGMENTS.has(firstSegment);
 
-  if (!showBar || isExcluded) return null;
+  if (!showBar || isFullScreenRoute) return null;
 
   return (
     <>
@@ -197,11 +250,15 @@ function SellerBarGate() {
 // API warnings and gives users the impression that browser push is enabled.
 if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
+    // The system alert is suppressed while the app is foregrounded — the
+    // themed in-app banner (components/notifications/NotificationBanner)
+    // takes over that job instead. Background/killed-app notifications are
+    // unaffected: the OS always shows those regardless of this handler.
     handleNotification: async () =>
-      ({ shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: true }) as any,
+      ({ shouldShowAlert: false, shouldPlaySound: true, shouldSetBadge: true }) as any,
   });
 
-  // ─── Android notification channel ───────────────────────────────────────────
+  // ─── Android notification channels ──────────────────────────────────────────
   if (Platform.OS === 'android') {
     Notifications.setNotificationChannelAsync('default', {
       name:       'Brandthread',
@@ -217,6 +274,38 @@ if (Platform.OS !== 'web') {
       sound: 'order_received.wav',
       lightColor: '#F7F7FA',
     });
+    Notifications.setNotificationChannelAsync('messages', {
+      name:       'Messages',
+      description: 'New chat messages.',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#F7F7FA',
+    });
+    Notifications.setNotificationChannelAsync('drops', {
+      name:       'Drops',
+      description: 'Drops going live from brands you follow.',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#F7F7FA',
+    });
+    Notifications.setNotificationChannelAsync('social', {
+      name:       'Social',
+      description: 'New followers and likes.',
+      importance: Notifications.AndroidImportance.DEFAULT,
+      lightColor: '#F7F7FA',
+    });
+    Notifications.setNotificationChannelAsync('stock', {
+      name:       'Stock & price alerts',
+      description: 'Back in stock and price drop alerts on items you saved.',
+      importance: Notifications.AndroidImportance.DEFAULT,
+      lightColor: '#F7F7FA',
+    });
+    Notifications.setNotificationChannelAsync('payout', {
+      name:       'Payouts',
+      description: 'Payout confirmations.',
+      importance: Notifications.AndroidImportance.DEFAULT,
+      lightColor: '#F7F7FA',
+    });
   }
 }
 
@@ -229,18 +318,17 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 }
 
 // ─── DEV design-preview bypass (web + dev builds only) ───────────────────────
-// The development web preview defaults to the buyer experience and skips the
-// Clerk/onboarding gates. ?bt_preview=seller remains available for seller review.
-// This is inert on native and in production builds.
-// ─── DEV: bypass all auth + onboarding on every platform ─────────────────────
-// Set to 'buyer' or 'seller' to jump straight to that dashboard on device.
-// Set back to null when you're ready to test real sign-in.
+// Explicitly opt in with ?bt_preview=buyer or ?bt_preview=seller in the URL to
+// skip the Clerk/onboarding gates and jump straight to that dashboard for
+// design review. Without the query param, web behaves like every other
+// platform: real splash -> sign-up -> onboarding. Inert in production builds.
 const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST === '1';
 
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
   if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web' || typeof window === 'undefined') return null;
   const v = new URLSearchParams(window.location.search).get('bt_preview');
-  return v === 'seller' ? 'seller' : 'buyer';
+  if (v !== 'buyer' && v !== 'seller') return null;
+  return v;
 })();
 
 // Seed storage so AuthGate doesn't loop waiting on onboarding data.
@@ -549,12 +637,20 @@ function ServiceConfigurer() {
       clearSocialCache(oldUserId).catch(() => {});
       clearCartCache(oldUserId).catch(() => {});
       clearApiCache(oldUserId).catch(() => {});
+      // The subscription-plan cache is keyed globally (not per-user), so it
+      // must be dropped explicitly or the previous account's plan tier would
+      // gate features for the next signed-in account.
+      invalidatePlanCache();
     }
     prevUserIdRef.current = newUserId;
     initSocialService(newUserId);
     initCartService(newUserId);
     initDesignService(newUserId);
     initBuyerProfile(newUserId);
+    initProductService(newUserId);
+    initOrderService(newUserId);
+    initInventoryService(newUserId);
+    initAnalyticsService(newUserId);
 
     if (!newUserId || !isSignedIn) return;
     // Defense in depth for people who sign in on another device or have an
@@ -704,6 +800,25 @@ function RootLayoutNav() {
     const receiptSubscription = Notifications.addNotificationReceivedListener(
       (notification) => {
         void trackNotificationEvent(notification, 'receipt').catch(() => {});
+
+        // The OS alert is suppressed while foregrounded (see the handler
+        // above) — this is the themed banner taking its place.
+        const content = notification.request.content;
+        const data = (content.data ?? {}) as Record<string, unknown>;
+        if (typeof content.title === 'string') {
+          showNotificationBanner({
+            id: notification.request.identifier,
+            title: content.title,
+            body: typeof content.body === 'string' ? content.body : '',
+            category: typeof data.category === 'string' ? data.category : undefined,
+            data,
+          });
+        }
+
+        // Refresh the in-app feed so the unread badge count picks up this
+        // notification immediately rather than waiting for the feed screen
+        // to be opened.
+        void getFeedNotifications().then(syncNotificationBadge).catch(() => {});
       },
     );
     void Notifications.getLastNotificationResponseAsync()
@@ -738,12 +853,18 @@ function RootLayoutNav() {
         <Text style={{ color: '#9898A6', fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 21, textAlign: 'center' }}>
           This feature is paused while we make improvements. Your existing work is still safe.
         </Text>
-        <Pressable
-          onPress={() => router.back()}
-          style={{ marginTop: 8, minHeight: 44, paddingHorizontal: 22, borderRadius: 10, backgroundColor: '#F5F5F7', alignItems: 'center', justifyContent: 'center' }}
-        >
-          <Text style={{ color: '#FFFFFF', fontFamily: 'Inter_600SemiBold', fontSize: 14 }}>Go back</Text>
-        </Pressable>
+        <PrimaryButton
+          label="Go back"
+          small
+          style={{ marginTop: 8 }}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/');
+            }
+          }}
+        />
       </View>
     );
   }
@@ -758,6 +879,7 @@ function RootLayoutNav() {
         style={{ position: 'absolute', width: 1, height: 1, opacity: 0.01 }}
       />
       <StoreContextBanner />
+      <NotificationBanner />
       <NetworkNoticeBanner />
       <Pressable onPress={Keyboard.dismiss} accessible={false} style={{ flex: 1 }}>
         <View style={{ flex: 1 }}>
@@ -767,20 +889,22 @@ function RootLayoutNav() {
         )}
         screenOptions={{
           headerShown: false,
-          animation: 'slide_from_right',
-          animationDuration: 220,
+          animation: 'ios_from_right',
+          // Design-system push duration (constants/motion.ts SCREEN_PUSH_MS) —
+          // Android honors this exactly; iOS uses its native, equivalent-feel push.
+          animationDuration: SCREEN_PUSH_MS,
           gestureEnabled: true,
           contentStyle: OPAQUE_SCREEN_CONTENT,
         }}
       >
         {/* Boot: "/" renders BootScreen until AuthGate redirects */}
-        <Stack.Screen name="index"          options={{ headerShown: false, animation: 'fade' }} />
+        <Stack.Screen name="index"          options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
         {/* Auth & onboarding */}
-        <Stack.Screen name="splash"         options={{ headerShown: false, animation: 'fade' }} />
+        <Stack.Screen name="splash"         options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
         <Stack.Screen name="sign-in"        options={{ headerShown: false }} />
-        <Stack.Screen name="forgot-password" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="forgot-password" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="onboarding"        options={{ headerShown: false, gestureEnabled: false }} />
-        <Stack.Screen name="thread-explainer"  options={{ headerShown: false, animation: 'fade', gestureEnabled: false }} />
+        <Stack.Screen name="thread-explainer"  options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS, gestureEnabled: false }} />
         {/* Main app */}
         <Stack.Screen name="(tabs)"         options={{ headerShown: false }} />
         <Stack.Screen name="(buyer)"        options={{ headerShown: false }} />
@@ -788,19 +912,18 @@ function RootLayoutNav() {
           <Stack.Screen name="navigation-isolation-probe" options={{ headerShown: false, animation: 'none', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         ) : null}
         {/* Feature screens */}
-        <Stack.Screen name="chat/[id]"        options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="camera-capture"    options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="brand"            options={{ headerShown: false }} />
-        <Stack.Screen name="seller-profile"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="seller-verification" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="seller-profile"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-verification" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="create-post"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="post-analytics"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="setup"            options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="post-analytics"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="setup"            options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="ai-studio"        options={{ headerShown: false }} />
-        <Stack.Screen name="product-editor"   options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="plans"            options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="settings"         options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="design-canvas"    options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="product-editor"   options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="plans"            options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="settings"         options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="design-canvas"    options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="manufacturer"     options={{ headerShown: false }} />
         <Stack.Screen name="finance"          options={{ headerShown: false }} />
         <Stack.Screen name="customers"        options={{ headerShown: false }} />
@@ -812,188 +935,194 @@ function RootLayoutNav() {
         <Stack.Screen name="automation"       options={{ headerShown: false }} />
         <Stack.Screen name="payments"         options={{ headerShown: false }} />
         <Stack.Screen name="website"          options={{ headerShown: false }} />
-        <Stack.Screen name="integrations/klaviyo" options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="edit-profile"     options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="integrations/klaviyo" options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="edit-profile"     options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         {/* Seller dashboard screens */}
-        <Stack.Screen name="order-detail"     options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="add-product"      options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="drafts"           options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="product-detail"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="product-store"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="product-import"   options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="order-detail"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="add-product"      options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="drafts"           options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="product-detail"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="product-store"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="product-import"   options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="inventory"        options={{ headerShown: false }} />
         <Stack.Screen name="store-builder"    options={{ headerShown: false }} />
         <Stack.Screen name="content"          options={{ headerShown: false }} />
-        <Stack.Screen name="notifications-settings" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="notifications-settings" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="help"             options={{ headerShown: false }} />
         <Stack.Screen name="bg-removal"       options={{ headerShown: false }} />
         <Stack.Screen name="tech-pack-generator" options={{ headerShown: false }} />
         {/* Manufacturer Hub screens */}
-        <Stack.Screen name="manufacturer-hub"      options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="manufacturer-profile"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="quote-request"         options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="quote-detail"          options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="quote-compare"         options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="sample-detail"         options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="production-detail"     options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="manufacturer-messages" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="invite-manufacturer"   options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="shipping-label"      options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="return-detail"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="refund-detail"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="dispute-detail"      options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-order-detail"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="inventory-detail"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="inventory-adjust"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="inventory-transfer" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="inventory-incoming" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="inventory-count"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="inventory-location" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-generate"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-generating"     options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="store-theme-picker"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-preview"        options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-editor"         options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-sections"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-collections"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-pages"          options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-nav"            options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-settings"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-policies"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-seo"            options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-domain"         options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-publish"        options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="store-versions"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-from-logo"      options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-from-moodboard" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-from-social"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="store-ai-improve"     options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="manufacturer-hub"      options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="manufacturer-profile"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="quote-request"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="quote-detail"          options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="quote-compare"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="sample-detail"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="production-detail"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="manufacturer-messages" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="invite-manufacturer"   options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="shipping-label"      options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="return-detail"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="refund-detail"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="dispute-detail"      options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-order-detail"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="inventory-detail"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="inventory-adjust"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="inventory-transfer" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="inventory-incoming" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="inventory-count"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="inventory-location" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-generate"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-generating"     options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="store-theme-picker"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-preview"        options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-editor"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-sections"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-collections"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-pages"          options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-nav"            options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-settings"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-policies"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-seo"            options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-domain"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-publish"        options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="store-versions"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-from-logo"      options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-from-moodboard" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-from-social"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="store-ai-improve"     options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         {/* Analytics screens */}
-        <Stack.Screen name="analytics-sales"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="analytics-products"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="analytics-customers"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="analytics-content"     options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="analytics-store"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="analytics-marketing"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="analytics-inventory"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="analytics-production"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="analytics-profit"      options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="analytics-sales"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-products"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-customers"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-content"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-store"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-marketing"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-inventory"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-production"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="analytics-profit"      options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Buyer commerce screens */}
-        <Stack.Screen name="buyer-product-detail"  options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="buyer-product-detail"  options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="thread-product-detail" options={{ headerShown: false, animation: 'none', gestureEnabled: false }} />
-        <Stack.Screen name="ip-report"             options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-checkout"        options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="ip-report"             options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-checkout"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="thread-checkout"       options={{ headerShown: false, animation: 'none', gestureEnabled: false }} />
-        <Stack.Screen name="buyer-return-request"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-refund-request"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-problem-report"  options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-return-request"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-refund-request"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-problem-report"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* return-request is an alias used by existing buyer-order-detail */}
-        <Stack.Screen name="return-request"        options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="return-request"        options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Buyer social screens */}
-        <Stack.Screen name="buyer-conversation"      options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="seller-inbox"            options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="seller-conversation"     options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-other-profile"     options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-friend-requests"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-story-viewer"      options={{ headerShown: false, animation: 'fade', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="buyer-conversation"      options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-inbox"            options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-conversation"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-other-profile"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-friend-requests"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-story-viewer"      options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS, presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-story-create"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="buyer-notifications"     options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-privacy-settings"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="privacy"                 options={{ headerShown: false, animation: 'fade' }} />
-        <Stack.Screen name="terms"                   options={{ headerShown: false, animation: 'fade' }} />
-        <Stack.Screen name="community-guidelines"    options={{ headerShown: false, animation: 'fade' }} />
-        <Stack.Screen name="buyer-saved"             options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-blocked"              options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-payment-methods"     options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-notifications"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="activity-center"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-privacy-settings"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="privacy"                 options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
+        <Stack.Screen name="terms"                   options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
+        <Stack.Screen name="community-guidelines"    options={{ headerShown: false, animation: 'fade', animationDuration: FADE_MS }} />
+        <Stack.Screen name="buyer-saved"             options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-collection"        options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-blocked"              options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-payment-methods"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Live Shopping */}
         <Stack.Screen name="seller-go-live"  options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="seller-live"     options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', gestureEnabled: false, contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-live"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="buyer-muted"               options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-restricted"          options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-settings"        options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-addresses"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="app-theme"             options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-settings-detail" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-account-center"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-personal-details" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-security"        options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-login-activity"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-account-control" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-download-data"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="seller-data-export"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-close-friends"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-your-activity"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-archive"         options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-qr-code"              options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-post-viewer"         options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-drop-detail"        options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-highlights-manager"  options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-muted"               options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-restricted"          options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-settings"        options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-addresses"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="app-theme"             options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-settings-detail" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-account-center"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-personal-details" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-security"        options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-login-activity"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-account-control" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-download-data"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-data-export"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-close-friends"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-your-activity"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-archive"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-qr-code"              options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-post-viewer"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-drop-detail"        options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-drops"              options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-drops"             options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-drop-create"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="seller-drop-preview"      options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="buyer-highlights-manager"  options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="buyer-report"            options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
         <Stack.Screen name="buyer-post-comments"     options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="ai-brain"         options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="ai-brand-memory"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="ai-settings"      options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="ai-brain"         options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="ai-brand-memory"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="ai-settings"      options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Design Studio screens */}
-        <Stack.Screen name="design"                   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-project"           options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-garment"           options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-templates"         options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-brand-assets"      options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-text-to-design"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-upload-sketch"     options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-mockup-to-model"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-ai-photoshoot"     options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-prompt-edit"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-bg-removal"        options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-bg-replace"        options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-campaign"          options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-mockup-preview"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="design-export"            options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="design-versions"          options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="design"                   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-project"           options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-garment"           options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-templates"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-brand-assets"      options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-text-to-design"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-upload-sketch"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-mockup-to-model"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-ai-photoshoot"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-prompt-edit"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-bg-removal"        options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-bg-replace"        options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-campaign"          options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-mockup-preview"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="design-export"            options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="design-versions"          options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Settings sub-screens */}
-        <Stack.Screen name="billing"            options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="users"              options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="roles"              options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="security"           options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="general-settings"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="push-notifications" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="biometric-unlock"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="app-icon"           options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="plan-details"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="payouts"            options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="subscription"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="share-store"        options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="product-size-chart" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="product-bundles"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="product-bundle-edit" options={{ headerShown: false, animation: 'slide_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
-        <Stack.Screen name="community-chat"     options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="freelancer-profile" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="billing"            options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="users"              options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="roles"              options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="security"           options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="general-settings"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="push-notifications" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="biometric-unlock"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="app-icon"           options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="plan-details"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="payouts"            options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="subscription"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="share-store"        options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="product-size-chart" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="product-bundles"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="product-bundle-edit" options={{ headerShown: false, animation: 'ios_from_right', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        <Stack.Screen name="community-chat"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="freelancer-profile" options={{ headerShown: false, animation: 'ios_from_right' }} />
         <Stack.Screen name="freelancer-apply"   options={{ headerShown: false, animation: 'slide_from_bottom' }} />
-        <Stack.Screen name="freelancer-jobs"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="manufacturer-onboard" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="request-sample"     options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="freelancer-jobs"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="manufacturer-onboard" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="request-sample"     options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* AI Studio sub-screens */}
-        <Stack.Screen name="ai-mockup-chat"     options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="ai-photography-chat" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="lifestyle-images"   options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="ai-mockup-chat"     options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="ai-photography-chat" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="lifestyle-images"   options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Store settings sub-screens */}
-        <Stack.Screen name="customer-accounts"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="customer-privacy"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="customer-events"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="taxes-duties"       options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="shipping-delivery"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="locations"          options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="languages"          options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="metafields"         options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="mobile-app-builder" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="orders"             options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="checkout"           options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="shopping-preferences"    options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="account-type-settings"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="login-methods"           options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="customer-accounts"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="customer-privacy"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="customer-events"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="taxes-duties"       options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="shipping-delivery"  options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="locations"          options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="languages"          options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="metafields"         options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="mobile-app-builder" options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="orders"             options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="checkout"           options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="shopping-preferences"    options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="account-type-settings"   options={{ headerShown: false, animation: 'ios_from_right' }} />
+        <Stack.Screen name="login-methods"           options={{ headerShown: false, animation: 'ios_from_right' }} />
         {/* Account management */}
-        <Stack.Screen name="account-switcher"       options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="account-switcher"       options={{ headerShown: false, animation: 'ios_from_right' }} />
       </Stack>
         </View>
       </Pressable>
@@ -1018,19 +1147,17 @@ export default function RootLayout() {
   const [fontGateExpired, setFontGateExpired] = useState(false);
 
   useEffect(() => {
-    // Web previews can occasionally leave expo-font pending forever after a
-    // hot reload or a stale font cache. Never keep the entire application on
-    // the boot screen for a cosmetic resource; React Native will fall back to
-    // the system font until the Inter faces become available.
-    const timeout = setTimeout(() => setFontGateExpired(true), 2500);
+    // Last-resort safety net only: expo-font can occasionally hang (a stale
+    // font cache after a hot reload, a broken preview). Everywhere else, the
+    // app waits for the real Inter faces so text never renders in a system
+    // fallback font — a swap that reads as "blurry" since the fallback's
+    // metrics and hinting don't match the app's type scale. This should
+    // essentially never fire in normal use.
+    const timeout = setTimeout(() => setFontGateExpired(true), 8000);
     return () => clearTimeout(timeout);
   }, []);
 
-  const appReady = Platform.OS === 'web' || fontsLoaded || !!fontError || fontGateExpired;
-
-  useEffect(() => {
-    if (appReady) SplashScreen.hideAsync();
-  }, [appReady]);
+  const appReady = fontsLoaded || !!fontError || fontGateExpired;
 
   const appTree = (
     <SafeAreaProvider>
@@ -1068,18 +1195,20 @@ export default function RootLayout() {
   );
 
   return (
-    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache} proxyUrl={proxyUrl}>
-      {PREVIEW_ROLE ? (
-        // DEV preview bypass: don't wait for clerk-js — render screens directly.
-        appTree
-      ) : (
-        <>
-          <ClerkLoading>
-            <BootScreen />
-          </ClerkLoading>
-          <ClerkLoaded>{appTree}</ClerkLoaded>
-        </>
-      )}
-    </ClerkProvider>
+    <AppIntroSplash ready={appReady}>
+      <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache} proxyUrl={proxyUrl}>
+        {PREVIEW_ROLE ? (
+          // DEV preview bypass: don't wait for clerk-js — render screens directly.
+          appTree
+        ) : (
+          <>
+            <ClerkLoading>
+              <BootScreen />
+            </ClerkLoading>
+            <ClerkLoaded>{appTree}</ClerkLoaded>
+          </>
+        )}
+      </ClerkProvider>
+    </AppIntroSplash>
   );
 }

@@ -7,36 +7,44 @@
  * - Inline unavailable/low-stock warnings backed by actual CartItem data
  * - Consistent monochrome Woven design-system tokens throughout
  */
-import React, { useState, useCallback, useMemo } from 'react';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import {
   View, Text, ScrollView, StyleSheet, Image,
-  ActivityIndicator, Alert, TextInput, RefreshControl,
+  ActivityIndicator, Alert, TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
+import { StickyFooter } from '@/components/layout';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
-  getCart, updateCartItemQuantity, removeCartItem, restoreCartSnapshot,
+  getCartForScreen, updateCartItemQuantity, removeCartItem, restoreCartSnapshot,
   saveForLater, moveToCart, removeSavedItem,
   groupCartBySeller, calculateCartSummary, createCheckoutSession, getCheckoutSession, validateCart,
 } from '@/services/cartService';
 import {
-  Cart, CartItem, SavedCartItem, CartSellerGroup, CheckoutLoyaltyRedemption,
+  Cart, CartItem, SavedCartItem, CartSellerGroup, CheckoutLoyaltyRedemption, CheckoutThreadCashRedemption,
 } from '@/services/cartTypes';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
+import { UseThreadCashCard } from '@/components/thread-cash/UseThreadCashCard';
 import { useApi } from '@/hooks/useApi';
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import {
-  FONT, FS, SP, RADIUS, COMP, ICON,
+  FONT, FS, SP, RADIUS, COMP, ICON, TYPE,
 } from '@/lib/theme';
 import type { AppThemePreset } from '@/contexts/AppThemeContext';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
-  BrandthreadScreen, BrandthreadHeader, StatusBadge, EmptyState, BrandedLoader, PressableScale, useUndoToast,
+  BrandthreadHeader, EmptyState, BrandedLoader, PressableScale, useUndoToast,
 } from '@/components/BrandthreadUI';
+import { InlineError } from '@/components/InlineFeedback';
+import {
+  Button, Card, QuantityStepper, StickyBottomCTA, ThemedRefreshControl,
+} from '@/components/ui';
+import { RADII } from '@/constants/radii';
+import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
 
 import { useAuth } from '@clerk/expo';
 import { formatCents } from '@/lib/money';
@@ -63,49 +71,32 @@ function QuantityControl({
   pendingInc?: boolean;
 }) {
   const { theme } = useAppTheme();
-  const qc = useMemo(() => makeQuantityStyles(theme), [theme]);
+  const busy = pendingDec || pendingInc;
   return (
-    <View style={qc.root}>
-      <PressableScale
-        style={qc.btn}
-        onPress={onDec}
-        disabled={pendingDec || pendingInc}
-        accessibilityLabel="Decrease quantity"
-        accessibilityState={{ disabled: pendingDec || pendingInc, busy: pendingDec }}
-      >
-        {pendingDec
-          ? <ActivityIndicator size="small" color={theme.text} style={{ transform: [{ scale: 0.7 }] }} />
-          : <Feather name="minus" size={13} color={theme.text} />}
-      </PressableScale>
-      <Text style={qc.val}>{value}</Text>
-      <PressableScale
-        style={[qc.btn, value >= max && qc.btnDisabled]}
-        onPress={onInc}
-        disabled={value >= max || pendingDec || pendingInc}
-        accessibilityLabel="Increase quantity"
-        accessibilityState={{ disabled: value >= max || pendingDec || pendingInc, busy: pendingInc }}
-      >
-        {pendingInc
-          ? <ActivityIndicator size="small" color={theme.text} style={{ transform: [{ scale: 0.7 }] }} />
-          : <Feather name="plus" size={13} color={value >= max ? theme.subtle : theme.text} />}
-      </PressableScale>
+    <View style={{ opacity: busy ? 0.5 : 1, flexDirection: 'row', alignItems: 'center', gap: SP.xs }}>
+      <QuantityStepper
+        value={value}
+        min={1}
+        max={Math.max(max, 1)}
+        disabled={busy}
+        onChange={next => (next > value ? onInc() : onDec())}
+      />
+      {busy && <ActivityIndicator size="small" color={theme.text} style={{ marginLeft: 2 }} />}
     </View>
   );
 }
-const makeQuantityStyles = (theme: AppThemePreset) => StyleSheet.create({
-  root: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  btn: { width: COMP.minTouchTarget, height: COMP.minTouchTarget, borderRadius: 8, backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
-  btnDisabled: { opacity: 0.4 },
-  val: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, minWidth: 20, textAlign: 'center' },
-});
 
 // ─── Cart Item Row ─────────────────────────────────────────────────────────────
 
 function CartItemRow({
-  item, pendingAction, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
+  item, pendingAction, selected, onToggleSelect, buyingNow, onBuyNow, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
 }: {
   item: CartItem;
   pendingAction?: RowPendingAction;
+  selected: boolean;
+  onToggleSelect: () => void;
+  buyingNow: boolean;
+  onBuyNow: () => void;
   onQtyDec: () => void;
   onQtyInc: () => void;
   onRemove: () => void;
@@ -116,7 +107,7 @@ function CartItemRow({
   const ir = useMemo(() => makeItemRowStyles(theme), [theme]);
   const lineTotal = item.priceCents * item.quantity;
   const hasDiscount = item.compareAtPriceCents && item.compareAtPriceCents > item.priceCents;
-  const isRowBusy = pendingAction === 'remove' || pendingAction === 'save';
+  const isRowBusy = pendingAction === 'remove' || pendingAction === 'save' || buyingNow;
 
   // Low stock: warn at ≤ 3 units
   const isLowStock = item.isAvailable && item.maxQuantity > 0 && item.maxQuantity <= 3;
@@ -131,6 +122,19 @@ function CartItemRow({
           <ActivityIndicator size="small" color={theme.muted} />
         </View>
       )}
+
+      <PressableScale
+        style={ir.checkbox}
+        onPress={onToggleSelect}
+        disabled={isRowBusy}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: selected, disabled: isRowBusy }}
+        accessibilityLabel={`${selected ? 'Deselect' : 'Select'} ${item.productName} for checkout`}
+      >
+        <View style={[ir.checkboxBox, selected && { backgroundColor: theme.accent, borderColor: theme.accent }]}>
+          {selected && <Feather name="check" size={12} color={theme.onAccent} />}
+        </View>
+      </PressableScale>
 
       <View style={ir.img}>
         {item.imageUri
@@ -196,7 +200,7 @@ function CartItemRow({
           </View>
         </View>
 
-        {/* Actions */}
+        {/* Actions — Remove and Save for later are optional, never required to buy */}
         <View style={ir.actions}>
           <PressableScale
             style={ir.actionBtn}
@@ -223,6 +227,20 @@ function CartItemRow({
                : <Feather name="trash-2" size={12} color={theme.error} />}
              <Text style={[ir.actionText, { color: theme.error }]}>Remove</Text>
           </PressableScale>
+          <View style={{ flex: 1 }} />
+          {/* Buys just this line — its own variant + qty — through the shared
+              Buy Now flow. It never touches, or requires touching, the rest
+              of the cart. */}
+          <Button
+            label="Buy"
+            size="small"
+            variant="primary"
+            onPress={onBuyNow}
+            loading={buyingNow}
+            disabled={isRowBusy || !item.isAvailable}
+            accessibilityHint={`Buy just ${item.productName} now, ${fmtPrice(lineTotal)}`}
+            style={ir.buyBtn}
+          />
         </View>
       </View>
     </View>
@@ -230,8 +248,10 @@ function CartItemRow({
 }
 
 const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
-  root: { flexDirection: 'row', gap: SP.sm, paddingVertical: SP.sm },
+  root: { flexDirection: 'row', gap: SP.sm, paddingVertical: SP.sm, alignItems: 'flex-start' },
   rowBusy: { opacity: 0.7 },
+  checkbox: { width: COMP.minTouchTarget, height: 100, alignItems: 'center', justifyContent: 'center', marginLeft: -8 },
+  checkboxBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
   busyOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     zIndex: 10, alignItems: 'center', justifyContent: 'center',
@@ -242,7 +262,7 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
   productImage: { width: '100%', height: '100%' },
-  name: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginBottom: 4, lineHeight: 18 },
+  name: { ...TYPE.bodyMedium, fontFamily: FONT.semibold, color: theme.text, marginBottom: 4 },
   variantRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
   variant: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
   preOrderBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
@@ -264,22 +284,27 @@ const makeItemRowStyles = (theme: AppThemePreset) => StyleSheet.create({
   stockWarnCriticalText: { color: theme.error },
   bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   priceBlock: { alignItems: 'flex-end' },
-  comparePrice: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, textDecorationLine: 'line-through' },
-  price: { fontSize: FS.base, fontFamily: FONT.bold, color: theme.text },
+  comparePrice: { fontSize: FS.xs, ...TABULAR_NUMS, fontFamily: FONT.regular, color: theme.subtle, textDecorationLine: 'line-through' },
+  price: { ...TYPE.bodyMedium, ...TABULAR_NUMS, fontFamily: FONT.bold, color: theme.text },
   priceDiscounted: { color: theme.success },
   actions: { flexDirection: 'row', alignItems: 'center', marginTop: SP.xs },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: COMP.minTouchTarget, paddingVertical: 4, paddingHorizontal: 8 },
   actionText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted },
   actionDivider: { width: 1, height: 14, backgroundColor: theme.border },
+  buyBtn: { minWidth: 72 },
 });
 
 // ─── Seller Group ─────────────────────────────────────────────────────────────
 
 function SellerGroup({
-  group, pendingByItemId, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
+  group, pendingByItemId, selectedIds, buyingItemId, onToggleSelect, onBuyNow, onQtyDec, onQtyInc, onRemove, onSaveForLater, onEditVariant,
 }: {
   group: CartSellerGroup;
   pendingByItemId: Record<string, RowPendingAction>;
+  selectedIds: Set<string>;
+  buyingItemId: string | null;
+  onToggleSelect: (itemId: string) => void;
+  onBuyNow: (item: CartItem) => void;
   onQtyDec: (itemId: string) => void;
   onQtyInc: (itemId: string) => void;
   onRemove: (itemId: string) => void;
@@ -290,7 +315,7 @@ function SellerGroup({
   const sg = useMemo(() => makeSellerGroupStyles(theme), [theme]);
   const router = useRouter();
   return (
-    <View style={sg.root}>
+    <Card style={sg.root}>
       {/* Seller header */}
       <View style={sg.sellerRow}>
         <View style={[sg.avatar, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
@@ -300,13 +325,13 @@ function SellerGroup({
           <Text style={sg.sellerName}>{group.sellerName}</Text>
           <Text style={sg.sellerHandle}>{group.sellerHandle}</Text>
         </View>
-        <PressableScale
+        <Button
+          label="Visit store"
+          size="small"
+          variant="secondary"
           onPress={() => router.push(('/seller-profile?id=' + group.sellerId) as never)}
-          style={[sg.visitBtn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}
-          accessibilityLabel={`Visit ${group.sellerName} store`}
-        >
-          <Text style={[sg.visitBtnText, { color: theme.accentLight }]}>Visit store</Text>
-        </PressableScale>
+          accessibilityHint={`Opens ${group.sellerName}'s store`}
+        />
       </View>
 
       {/* Items */}
@@ -316,6 +341,10 @@ function SellerGroup({
           <CartItemRow
             item={item}
             pendingAction={pendingByItemId[item.id]}
+            selected={selectedIds.has(item.id)}
+            onToggleSelect={() => onToggleSelect(item.id)}
+            buyingNow={buyingItemId === item.id}
+            onBuyNow={() => onBuyNow(item)}
             onQtyDec={() => onQtyDec(item.id)}
             onQtyInc={() => onQtyInc(item.id)}
             onRemove={() => onRemove(item.id)}
@@ -339,19 +368,17 @@ function SellerGroup({
         )}
         <Text style={sg.groupSubtotal}>Group subtotal: {fmtPrice(group.subtotalCents)}</Text>
       </View>
-    </View>
+    </Card>
   );
 }
 
 const makeSellerGroupStyles = (theme: AppThemePreset) => StyleSheet.create({
-  root: { backgroundColor: theme.cardGlass, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, padding: SP.md, marginBottom: SP.md },
+  root: { marginBottom: SP.md },
   sellerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
-  avatar: { width: 36, height: 36, borderRadius: RADIUS.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 36, height: 36, borderRadius: RADII.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: FS.sm, fontFamily: FONT.bold },
   sellerName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
   sellerHandle: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
-  visitBtn: { minHeight: COMP.minTouchTarget, paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADIUS.sm, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  visitBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   divider: { height: 1, backgroundColor: theme.border, marginVertical: SP.xs },
   footer: { borderTopWidth: 1, borderTopColor: theme.border, marginTop: SP.sm, paddingTop: SP.sm, gap: 4 },
   footerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -381,23 +408,21 @@ function SavedItemRow({ item, onMove, onRemove }: {
           <Text style={si.unavail}>No longer available</Text>
         )}
         <View style={si.actions}>
-          <PressableScale
-            style={[si.btn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}
+          <Button
+            label="Move to cart"
+            size="small"
+            variant="secondary"
             onPress={onMove}
-            accessibilityLabel={`Move ${item.productName} to cart`}
             disabled={!item.isAvailable}
-          >
-               <Text style={[si.btnText, { color: theme.accentLight }, !item.isAvailable && { color: theme.subtle }]}>
-              Move to cart
-            </Text>
-          </PressableScale>
-          <PressableScale
-            style={si.btnGhost}
+            accessibilityHint={`Moves ${item.productName} to cart`}
+          />
+          <Button
+            label="Remove"
+            size="small"
+            variant="tertiary"
             onPress={onRemove}
-            accessibilityLabel={`Remove ${item.productName} from saved items`}
-          >
-            <Text style={si.btnGhostText}>Remove</Text>
-          </PressableScale>
+            accessibilityHint={`Removes ${item.productName} from saved items`}
+          />
         </View>
       </View>
     </View>
@@ -412,10 +437,6 @@ const makeSavedItemStyles = (theme: AppThemePreset) => StyleSheet.create({
   price: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginBottom: 4 },
   unavail: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.error, marginBottom: 4 },
   actions: { flexDirection: 'row', gap: SP.sm },
-  btn: { minHeight: COMP.minTouchTarget, paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADIUS.sm, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  btnText: { fontSize: FS.xs, fontFamily: FONT.semibold },
-  btnGhost: { minHeight: COMP.minTouchTarget, paddingHorizontal: 10, paddingVertical: 5, justifyContent: 'center' },
-  btnGhostText: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted },
 });
 
 // ─── Summary Card ─────────────────────────────────────────────────────────────
@@ -434,7 +455,7 @@ function SummaryCard({ subtotal, discountTotal, shipping, tax, total, hasPreOrde
     );
   }
   return (
-    <View style={sum.root}>
+    <Card style={sum.root}>
       <Text style={sum.title}>Order summary</Text>
       <Row label="Subtotal" value={fmtPrice(subtotal)} />
       <Row label="Discounts" value={discountTotal > 0 ? `–${fmtPrice(discountTotal)}` : fmtPrice(0)} accent={discountTotal > 0 ? theme.success : undefined} />
@@ -452,22 +473,22 @@ function SummaryCard({ subtotal, discountTotal, shipping, tax, total, hasPreOrde
           <Text style={[sum.preOrderNoteText, { color: theme.secondary }]}>Pre-order items will ship after production. Items may ship separately.</Text>
         </View>
       )}
-    </View>
+    </Card>
   );
 }
 
 const makeSummaryStyles = (theme: AppThemePreset) => StyleSheet.create({
-  root: { backgroundColor: theme.cardGlass, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, padding: SP.md, marginBottom: SP.md },
+  root: { marginBottom: SP.md },
   title: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
-  label: { fontSize: FS.base, fontFamily: FONT.regular, color: theme.muted },
+  label: { ...TYPE.body, color: theme.muted },
   labelSm: { fontSize: FS.sm },
-  value: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text },
+  value: { ...TYPE.bodyMedium, ...TABULAR_NUMS, fontFamily: FONT.semibold, color: theme.text },
   valueSm: { fontSize: FS.sm },
   divider: { height: 1, backgroundColor: theme.border, marginVertical: SP.sm },
   totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: SP.xs },
-  totalLabel: { fontSize: FS.md, fontFamily: FONT.bold, color: theme.text },
-  totalValue: { fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text },
+  totalLabel: { ...TYPE.subheading, color: theme.text },
+  totalValue: { ...TYPE.subheading, ...TABULAR_NUMS, color: theme.text },
   note: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginTop: SP.sm },
   preOrderNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: SP.sm },
   preOrderNoteText: { fontSize: FS.xs, fontFamily: FONT.regular, flex: 1 },
@@ -488,12 +509,24 @@ export default function CartScreen() {
 
   const [cart, setCart] = useState<Cart>({ id: '', items: [], savedItems: [], updatedAt: '' });
   const [loading, setLoading] = useState(true);
+  /** True only when we couldn't confirm the cart is really empty (see getCartForScreen). */
+  const [loadError, setLoadError] = useState(false);
   const [validating, setValidating] = useState(false);
   const [loyaltyBalance, setLoyaltyBalance] = useState(0);
   const [pointsInput, setPointsInput] = useState('');
   const [redeemingPoints, setRedeemingPoints] = useState(false);
   const [loyaltyRedemption, setLoyaltyRedemption] = useState<CheckoutLoyaltyRedemption | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // THREAD CASH HOOK POINT — see components/thread-cash/UseThreadCashCard.tsx.
+  const threadCashCheckoutEnabled = useFeatureFlag('threadCashCheckoutDiscount');
+  const [threadCashRedemption, setThreadCashRedemption] = useState<CheckoutThreadCashRedemption | null>(null);
+
+  // Which lines are included in "Checkout selected" / a per-item Buy. New
+  // items default to selected — buyers opt OUT, they never have to opt in
+  // just to check out everything.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const knownItemIdsRef = useRef<Set<string>>(new Set());
+  const [buyingItemId, setBuyingItemId] = useState<string | null>(null);
 
   // Per-row pending actions: itemId → action
   const [pendingByItemId, setPendingByItemId] = useState<Record<string, RowPendingAction>>({});
@@ -505,8 +538,20 @@ export default function CartScreen() {
 
   const load = useCallback(async () => {
     try {
-      const nextCart = await getCart();
+      const { cart: nextCart, loadError: nextLoadError } = await getCartForScreen();
       setCart(nextCart);
+      setLoadError(nextLoadError);
+      setSelectedIds(prev => {
+        const next = new Set<string>();
+        for (const item of nextCart.items) {
+          // A brand-new line (never seen before) defaults to selected; a line
+          // the buyer already saw keeps whatever they chose, including "off".
+          const isNew = !knownItemIdsRef.current.has(item.id);
+          if (isNew || prev.has(item.id)) next.add(item.id);
+        }
+        knownItemIdsRef.current = new Set(nextCart.items.map(i => i.id));
+        return next;
+      });
       const pendingCheckout = await getCheckoutSession();
       if (
         pendingCheckout?.loyaltyRedemption &&
@@ -518,7 +563,9 @@ export default function CartScreen() {
       ) {
         setLoyaltyRedemption(pendingCheckout.loyaltyRedemption);
       }
-    } catch {}
+    } catch {
+      setLoadError(true);
+    }
     setLoading(false);
   }, []);
 
@@ -555,8 +602,27 @@ export default function CartScreen() {
   const loyaltyPreviewCents = Number.isFinite(requestedPoints) && requestedPoints >= 100
     ? Math.min(requestedPoints, maxRedeemablePoints)
     : 0;
-  const displayedDiscount = summary.discountTotalCents + (loyaltyRedemption?.discountCents ?? 0);
-  const displayedTotal = Math.max(0, summary.totalCents - (loyaltyRedemption?.discountCents ?? 0));
+  const rewardsAppliedCents = (loyaltyRedemption?.discountCents ?? 0) + (threadCashRedemption?.discountCents ?? 0);
+  const displayedDiscount = summary.discountTotalCents + rewardsAppliedCents;
+  const displayedTotal = Math.max(0, summary.totalCents - rewardsAppliedCents);
+
+  const selectedItems = cart.items.filter(i => selectedIds.has(i.id));
+  const allSelected = cart.items.length > 0 && selectedItems.length === cart.items.length;
+  const selectedSummary = calculateCartSummary(selectedItems);
+  const selectedDisplayedTotal = allSelected ? displayedTotal : selectedSummary.totalCents;
+
+  function toggleSelect(itemId: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId); else next.add(itemId);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    Haptics.selectionAsync();
+    setSelectedIds(allSelected ? new Set() : new Set(cart.items.map(i => i.id)));
+  }
 
   async function handleQtyDec(itemId: string) {
     if (pendingByItemId[itemId]) return;
@@ -687,25 +753,37 @@ export default function CartScreen() {
     }
   }
 
-  async function handleCheckout() {
-    if (cart.items.length === 0) return;
-    setValidating(true);
+  /**
+   * Shared checkout entry for the whole cart, a "checkout selected" subset,
+   * or a single item's own Buy button — always through the same existing
+   * order/payment APIs (isBuyNow=true just scopes which items build the
+   * session; it never changes how payment itself works).
+   */
+  async function startCheckout(items: CartItem[], opts: { onBusy?: (busy: boolean) => void } = {}) {
+    const setBusy = opts.onBusy ?? setValidating;
+    if (items.length === 0) return;
+    setBusy(true);
     try {
       if (isSignedIn) {
-        const validation = await validateCart(cart.items);
+        const validation = await validateCart(items);
         if (!validation.isValid) {
           const issues = validation.issues.map(i => `• ${i.message}`).join('\n');
           Alert.alert('Review your cart', `Some items need your attention:\n\n${issues}`, [{ text: 'OK' }]);
-          setValidating(false);
+          setBusy(false);
           return;
         }
       }
 
       // Check each seller's payment account before entering checkout
-      const currentGroups = groupCartBySeller(cart.items);
-      if (loyaltyRedemption && currentGroups.length !== 1) {
+      const currentGroups = groupCartBySeller(items);
+      // A rewards redemption was computed against the full cart's subtotal —
+      // only honor it when this checkout actually covers the whole cart.
+      const checkingOutFullCart = items.length === cart.items.length;
+      const loyaltyToApply = checkingOutFullCart ? (loyaltyRedemption ?? undefined) : undefined;
+      const threadCashToApply = checkingOutFullCart ? (threadCashRedemption ?? undefined) : undefined;
+      if ((loyaltyToApply || threadCashToApply) && currentGroups.length !== 1) {
         Alert.alert('Rewards need one store', 'Remove items from other sellers before continuing with this rewards discount.');
-        setValidating(false);
+        setBusy(false);
         return;
       }
 
@@ -720,28 +798,37 @@ export default function CartScreen() {
                 `${sellerLabel} can't accept payments right now.\n\n${status.reason ?? 'Please try again later or remove their items from your cart.'}`,
                 [{ text: 'OK' }],
               );
-              setValidating(false);
+              setBusy(false);
               return;
             }
           } catch {
             Alert.alert('Unable to verify payments', `We could not confirm ${group.sellerName} can accept payments. Check your connection and try again.`);
-            setValidating(false);
+            setBusy(false);
             return;
           }
         }
       }
 
-      await createCheckoutSession(
-        cart,
-        false,
-        undefined,
-        loyaltyRedemption ?? undefined,
-      );
+      // Items to check out are always passed explicitly — this is what keeps
+      // a single-item Buy, a "checkout selected" subset, and "checkout all"
+      // from ever forcing the buyer to purchase (or clear out) more than
+      // they chose; buyer-checkout.tsx removes only these items on success.
+      await createCheckoutSession(cart, true, items, loyaltyToApply, threadCashToApply);
       push(('/thread-checkout?source=cart') as never);
     } catch {
       Alert.alert('Error', 'Something went wrong. Please try again.');
     }
-    setValidating(false);
+    setBusy(false);
+  }
+
+  async function handleCheckoutSelected() {
+    await startCheckout(selectedItems);
+  }
+
+  async function handleBuyNow(item: CartItem) {
+    if (buyingItemId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await startCheckout([item], { onBusy: busy => setBuyingItemId(busy ? item.id : null) });
   }
 
   if (loading) {
@@ -757,17 +844,24 @@ export default function CartScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
-        <Text style={s.headerTitle}>Cart</Text>
-        {hasItems && (
-          <View style={[s.headerBadge, { backgroundColor: theme.accent }]}>
-            <Text style={[s.headerBadgeText, { color: theme.onAccent }]}>{cart.items.reduce((s, i) => s + i.quantity, 0)}</Text>
-          </View>
-        )}
+      {/* Header — full-cart totals stay visible at the top too, not just the footer.
+          Same BrandthreadHeader treatment used by Orders/Following so the tab-reachable
+          buyer screens read as one shell. */}
+      <View style={{ paddingTop: insets.top }}>
+        <BrandthreadHeader
+          title="Cart"
+          rightElement={hasItems ? (
+            <View style={s.headerRight}>
+              <View style={[s.headerBadge, { backgroundColor: theme.accent }]}>
+                <Text style={[s.headerBadgeText, { color: theme.onAccent }]}>{cart.items.reduce((s, i) => s + i.quantity, 0)}</Text>
+              </View>
+              <Text style={s.headerSubtotal}>{fmtPrice(summary.subtotalCents)}</Text>
+            </View>
+          ) : undefined}
+        />
       </View>
 
-      {!hasItems && !hasSaved ? (
+      {!hasItems && !hasSaved && !loadError ? (
         <EmptyState
           icon="shopping-bag"
           title="Your cart is ready for something great."
@@ -779,15 +873,36 @@ export default function CartScreen() {
           }}
           style={{ flex: 1 }}
         />
+      ) : !hasItems && !hasSaved && loadError ? (
+        <InlineError
+          message="Couldn’t load your cart. Check your connection and try again."
+          onRetry={() => { setLoading(true); void load(); }}
+          style={{ flex: 1, justifyContent: 'center' }}
+        />
       ) : (
         <>
+          {hasItems && (
+            <PressableScale
+              style={s.selectAllRow}
+              onPress={toggleSelectAll}
+              accessibilityRole="checkbox"
+              accessibilityLabel={allSelected ? 'All items selected' : `${selectedItems.length} of ${cart.items.length} selected`}
+              accessibilityState={{ checked: allSelected }}
+            >
+              <View style={[s.selectAllBox, allSelected && { backgroundColor: theme.accent, borderColor: theme.accent }]}>
+                {allSelected && <Feather name="check" size={12} color={theme.onAccent} />}
+              </View>
+              <Text style={s.selectAllText}>
+                {allSelected ? 'All items selected' : `${selectedItems.length} of ${cart.items.length} selected`}
+              </Text>
+            </PressableScale>
+          )}
           <ScrollView
             showsVerticalScrollIndicator={false}
             refreshControl={
-              <RefreshControl
+              <ThemedRefreshControl
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
-                tintColor={theme.accent}
               />
             }
             contentContainerStyle={{
@@ -803,6 +918,10 @@ export default function CartScreen() {
                 key={group.sellerId}
                 group={group}
                 pendingByItemId={pendingByItemId}
+                selectedIds={selectedIds}
+                buyingItemId={buyingItemId}
+                onToggleSelect={toggleSelect}
+                onBuyNow={handleBuyNow}
                 onQtyDec={handleQtyDec}
                 onQtyInc={handleQtyInc}
                 onRemove={handleRemove}
@@ -857,17 +976,15 @@ export default function CartScreen() {
                         style={s.pointsInput}
                         accessibilityLabel="Loyalty points to use"
                       />
-                      <PressableScale
-                        style={[s.pointsApply, { backgroundColor: theme.accentDim, borderColor: theme.accent }, (redeemingPoints || groups.length !== 1) && s.pointsApplyDisabled]}
+                      <Button
+                        label="Apply"
+                        size="small"
+                        variant="secondary"
                         onPress={handleApplyPoints}
-                        disabled={redeemingPoints || groups.length !== 1}
-                        accessibilityLabel="Apply loyalty points"
-                        accessibilityState={{ disabled: redeemingPoints || groups.length !== 1, busy: redeemingPoints }}
-                      >
-                        {redeemingPoints
-                          ? <ActivityIndicator color={theme.accentLight} size="small" />
-                          : <Text style={[s.pointsApplyText, { color: theme.accentLight }]}>Apply</Text>}
-                      </PressableScale>
+                        loading={redeemingPoints}
+                        disabled={groups.length !== 1}
+                        accessibilityHint="Applies loyalty points to this order"
+                      />
                     </View>
                     <Text style={s.pointsPreview}>
                       {groups.length !== 1
@@ -879,6 +996,18 @@ export default function CartScreen() {
                   </>
                 )}
               </View>
+              )}
+              {/* THREAD CASH HOOK POINT: self-contained card, only visible behind
+                  the 'threadCashCheckoutDiscount' flag (default OFF). See
+                  components/thread-cash/UseThreadCashCard.tsx and
+                  docs/payments/thread-cash-checkout-todo.md. */}
+              {isSignedIn && groups.length === 1 && threadCashCheckoutEnabled && (
+                <UseThreadCashCard
+                  maxDiscountCents={Math.max(0, summary.subtotalCents + summary.shippingTotalCents - 1)}
+                  redemption={threadCashRedemption}
+                  onApply={setThreadCashRedemption}
+                  onRemove={() => setThreadCashRedemption(null)}
+                />
               )}
               <SummaryCard
                 subtotal={summary.subtotalCents}
@@ -895,7 +1024,7 @@ export default function CartScreen() {
             {hasSaved && (
               <View style={s.savedSection}>
                 <Text style={s.savedTitle}>Saved for later ({cart.savedItems.length})</Text>
-                <View style={s.savedCard}>
+                <Card>
                   {cart.savedItems.map((item, idx) => (
                     <View key={item.id}>
                       {idx > 0 && <View style={s.divider} />}
@@ -906,7 +1035,7 @@ export default function CartScreen() {
                       />
                     </View>
                   ))}
-                </View>
+                </Card>
               </View>
             )}
 
@@ -915,39 +1044,28 @@ export default function CartScreen() {
             )}
           </ScrollView>
 
-          {/* Checkout button */}
+          {/* Checkout button — acts on whatever's checked (all by default), Nike-bag style sticky pill */}
           {hasItems && (
-          <View style={[s.checkoutBar, { paddingBottom: barInset + SP.xs }]}>
-              <PressableScale
-                style={[s.checkoutBtn, { shadowColor: theme.shadowColor }]}
-                onPress={handleCheckout}
-                disabled={validating}
-                accessibilityLabel={`Check out, ${fmtPrice(displayedTotal)}`}
+            <StickyFooter tabBarInset={barInset}>
+              <View style={s.checkoutSummaryRow}>
+                <Text style={s.checkoutSummaryLabel}>
+                  {allSelected ? 'Total' : `${selectedItems.length} selected`}
+                </Text>
+                <Text style={s.checkoutSummaryAmount}>{fmtPrice(selectedDisplayedTotal)}</Text>
+              </View>
+              <Button
+                label={allSelected ? 'Check out' : `Check out ${selectedItems.length} selected`}
+                icon="lock"
+                onPress={handleCheckoutSelected}
+                loading={validating}
+                disabled={selectedItems.length === 0}
+                fullWidth
                 accessibilityHint="Reviews shipping and opens secure payment"
-                accessibilityState={{ disabled: validating, busy: validating }}
-              >
-                <LinearGradient
-                  colors={[...theme.primaryGradient]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={s.checkoutGrad}
-                >
-                  {validating ? (
-                    <ActivityIndicator color={theme.onAccent} size="small" />
-                  ) : (
-                    <>
-                      <Feather name="lock" size={16} color={theme.onAccent} />
-                      <Text style={[s.checkoutText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Check out</Text>
-                      <View style={s.checkoutSpacer} />
-                      <Text style={[s.checkoutAmount, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>{fmtPrice(displayedTotal)}</Text>
-                    </>
-                  )}
-                </LinearGradient>
-              </PressableScale>
+              />
               <Text style={s.secureNote}>
                 <Feather name="shield" size={11} color={theme.subtle} /> Secured by Brandthread
               </Text>
-            </View>
+            </StickyFooter>
           )}
         </>
       )}
@@ -958,14 +1076,7 @@ export default function CartScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
-    gap: SP.sm,
-  },
-  headerTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: theme.text },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   headerBadge: {
     borderRadius: RADIUS.pill,
     paddingHorizontal: 8,
@@ -974,9 +1085,15 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
     alignItems: 'center',
   },
   headerBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold },
+  headerSubtotal: { ...TYPE_SCALE.headline, ...TABULAR_NUMS, color: theme.text },
+  selectAllRow: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
+    paddingHorizontal: SP.md, paddingBottom: SP.xs,
+  },
+  selectAllBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: theme.border, alignItems: 'center', justifyContent: 'center' },
+  selectAllText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.muted },
   savedSection: { marginBottom: SP.md },
   savedTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
-  savedCard: { backgroundColor: theme.cardGlass, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, padding: SP.md },
   divider: { height: 1, backgroundColor: theme.border, marginVertical: SP.xs },
   multiSellerNotice: { flexDirection: 'row', gap: SP.sm, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md },
   multiSellerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
@@ -987,37 +1104,13 @@ const makeScreenStyles = (theme: AppThemePreset) => StyleSheet.create({
   loyaltySub: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
   pointsRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'center' },
   pointsInput: { flex: 1, height: COMP.inputH, borderRadius: RADIUS.md, backgroundColor: theme.cardElevatedGlass, borderWidth: 1, borderColor: theme.border, color: theme.text, fontFamily: FONT.regular, paddingHorizontal: SP.md },
-  pointsApply: { minWidth: 76, height: COMP.inputH, borderRadius: RADIUS.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  pointsApplyDisabled: { opacity: 0.5 },
-  pointsApplyText: { fontSize: FS.sm, fontFamily: FONT.bold },
   pointsPreview: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: SP.xs, lineHeight: 17 },
   appliedPoints: { flexDirection: 'row', alignItems: 'center', backgroundColor: `${theme.success}26`, borderRadius: RADIUS.md, padding: SP.sm, gap: SP.sm },
   appliedPointsTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.success },
   appliedPointsSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
   savedHint: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, textAlign: 'center', marginBottom: SP.lg },
-  checkoutBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: SP.md,
-    paddingTop: SP.md,
-    backgroundColor: theme.background,
-    borderTopWidth: 1,
-    borderTopColor: theme.border,
-  },
-  checkoutBtn: { borderRadius: RADIUS.lg, overflow: 'hidden', shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
-  checkoutGrad: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: SP.sm,
-    height: COMP.buttonH,
-    borderRadius: RADIUS.lg,
-    paddingHorizontal: SP.md,
-  },
-  checkoutText: { fontSize: FS.base, fontFamily: FONT.bold },
-  checkoutSpacer: { flex: 1 },
-  checkoutAmount: { fontSize: FS.base, fontFamily: FONT.bold },
+  checkoutSummaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.xs },
+  checkoutSummaryLabel: { ...TYPE_SCALE.footnote, color: theme.muted },
+  checkoutSummaryAmount: { ...TYPE_SCALE.headline, ...TABULAR_NUMS, color: theme.text },
   secureNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, textAlign: 'center', marginTop: SP.xs },
 });

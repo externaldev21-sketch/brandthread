@@ -62,7 +62,7 @@ function randomChannelName(): string {
 
 // ─── POST /api/live/start ─────────────────────────────────────────────────────
 router.post("/start", requireAuth, async (req, res) => {
-  const sellerId = (req as any).userId as string;
+  const sellerId = (req as any).clerkUserId as string;
   const { title, description, thumbnailUrl, productTags = [] } = req.body;
 
   if (!title?.trim()) return res.status(400).json({ error: "title is required" });
@@ -155,7 +155,7 @@ router.get("/:id", async (req, res) => {
 
 // ─── POST /api/live/:id/join ──────────────────────────────────────────────────
 router.post("/:id/join", requireAuth, async (req, res) => {
-  const viewerId = (req as any).userId as string;
+  const viewerId = (req as any).clerkUserId as string;
   const { id } = req.params;
 
   try {
@@ -209,7 +209,7 @@ router.post("/:id/leave", requireAuth, async (req, res) => {
 
 // ─── POST /api/live/:id/end ───────────────────────────────────────────────────
 router.post("/:id/end", requireAuth, async (req, res) => {
-  const sellerId = (req as any).userId as string;
+  const sellerId = (req as any).clerkUserId as string;
 
   try {
     const rows = await db.execute(sql`
@@ -271,7 +271,7 @@ router.post("/:id/end", requireAuth, async (req, res) => {
 
 // ─── PATCH /api/live/:id/products ────────────────────────────────────────────
 router.patch("/:id/products", requireAuth, async (req, res) => {
-  const sellerId = (req as any).userId as string;
+  const sellerId = (req as any).clerkUserId as string;
   const { productTags } = req.body;
   if (!Array.isArray(productTags)) return res.status(400).json({ error: "productTags must be an array" });
 
@@ -292,12 +292,21 @@ router.patch("/:id/products", requireAuth, async (req, res) => {
 // ─── POST /api/live/:id/comment ───────────────────────────────────────────────
 router.post("/:id/comment", requireAuth, async (req, res) => {
   const userId = (req as any).clerkUserId as string;
-  const { message, displayName, avatarUrl } = req.body;
+  const { message } = req.body;
   if (typeof message !== "string" || !message.trim()) return res.status(400).json({ error: "message required" });
   if (message.length > 500) return res.status(400).json({ error: "message too long" });
 
   const restriction = await publishingRestriction(userId);
   if (restriction) return res.status(restriction.status).json(restriction.body);
+
+  // displayName/avatarUrl are resolved from the caller's own profile — never
+  // trust client-supplied identity fields here, or any authenticated viewer
+  // could post live chat that visually impersonates another user/seller.
+  const [viewer] = await db.execute(sql`
+    SELECT display_name, brand_name, profile_image_url FROM users WHERE clerk_id = ${userId} LIMIT 1
+  `).then((r) => r.rows as any[]);
+  const displayName = viewer?.brand_name || viewer?.display_name || "Viewer";
+  const avatarUrl = viewer?.profile_image_url ?? null;
 
   // Live chat is shown instantly, so it cannot wait in a review queue:
   // anything the public filter would hold is declined with an explanation.

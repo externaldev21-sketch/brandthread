@@ -13,6 +13,7 @@ import { Router } from "express";
 import { db, users, follows, stories, storyLikes, storyViews, blocks, posts, interactions } from "@workspace/db";
 import { eq, and, or, ilike, ne, inArray, sql, gt, desc, count, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { rateLimit } from "../middlewares/rateLimit";
 import { publishNotification } from "./notifications-feed";
 import { resolveToClerkId } from "./public";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
@@ -25,6 +26,8 @@ import {
   profilesById,
   publishingRestriction,
 } from "../lib/safety";
+import { actorFieldsFromProfile } from "../lib/activityEvents";
+import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 
 const router = Router();
 router.use(requireAuth);
@@ -80,7 +83,13 @@ function relationshipLockKey(firstUserId: string, secondUserId: string): string 
   return JSON.stringify([firstUserId, secondUserId].sort());
 }
 
-async function buildBuyerPosts(viewerId: string, authorIds: string[], limit: number, offset: number) {
+async function buildBuyerPosts(
+  viewerId: string,
+  authorIds: string[],
+  limit: number,
+  offset: number,
+  postId?: string,
+) {
   if (authorIds.length === 0) return [];
   const pageRows = await db.select({
     id: posts.id,
@@ -104,6 +113,7 @@ async function buildBuyerPosts(viewerId: string, authorIds: string[], limit: num
       eq(posts.moderationStatus, "visible"),
       authorInGoodStanding(posts.userId),
       notBlockedWith(viewerId, posts.userId),
+      ...(postId ? [eq(posts.id, postId)] : []),
     ))
     .orderBy(desc(posts.createdAt))
     .limit(limit)
@@ -174,7 +184,7 @@ async function buildBuyerPosts(viewerId: string, authorIds: string[], limit: num
 }
 
 // ─── POST /api/social/follow ──────────────────────────────────────────────────
-router.post("/follow", async (req, res) => {
+router.post("/follow", rateLimit("follow"), async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const { userId } = req.body as { userId?: string };
   if (!userId || typeof userId !== "string") {
@@ -218,24 +228,24 @@ router.post("/follow", async (req, res) => {
   if (result.inserted.length > 0) {
     (async () => {
       try {
-        const [follower] = await db
-          .select({ name: users.name, displayName: users.displayName, username: users.username })
-          .from(users).where(eq(users.clerkId, myId)).limit(1);
-        if (follower) {
-          const displayName = follower.displayName || follower.name || "Someone";
-          const handle = follower.username ? `@${follower.username}` : undefined;
-          const inits = displayName.split(" ").slice(0, 2).map((w: string) => w[0]?.toUpperCase() ?? "").join("") || "?";
+        const profile = (await profilesById([myId])).get(myId);
+        if (profile && !profile.deleted && !profile.suspended) {
+          const actor = actorFieldsFromProfile(profile);
+          // Offer "Follow back" only when the relationship is one-way.
+          const [alreadyFollowing] = await db
+            .select({ followerId: follows.followerId })
+            .from(follows)
+            .where(and(eq(follows.followerId, userId), eq(follows.followingId, myId)))
+            .limit(1);
           await publishNotification({
             userId:        userId,
             category:      "social",
             type:          "new_follower",
-            title:         `${displayName} started following you`,
-            actorName:     displayName,
-            actorHandle:   handle,
-            actorInitials: inits,
-            actorColor:    "#8B5CF6",
+            title:         `${actor.actorName} started following you`,
+            ...actor,
             targetId:      myId,
             targetType:    "user",
+            cta:           alreadyFollowing ? undefined : "Follow back",
           });
         }
       } catch { /* non-critical */ }
@@ -246,9 +256,9 @@ router.post("/follow", async (req, res) => {
 });
 
 // ─── DELETE /api/social/follow/:userId ───────────────────────────────────────
-router.delete("/follow/:userId", async (req, res) => {
+router.delete("/follow/:userId", rateLimit("follow"), async (req, res) => {
   const myId   = (req as any).clerkUserId as string;
-  const target = req.params.userId;
+  const target = req.params.userId as string;
   const followersCount = await db.transaction(async (tx) => {
     await tx.execute(sql`
       SELECT pg_advisory_xact_lock(
@@ -371,6 +381,45 @@ router.get("/profile/:userId", async (req, res) => {
   });
 });
 
+// ─── GET /api/social/posts/:postId ───────────────────────────────────────────
+// A single post by id, in the same normalized BuyerPost shape as
+// /profile/:userId/posts — for opening a specific post (e.g. from a saved
+// item or collection) without knowing the author in advance. Applies the
+// same visibility rule as the list route: viewable if it's the viewer's own
+// post, or the author is a mutual friend.
+router.get("/posts/:postId", async (req, res) => {
+  const myId = (req as any).clerkUserId as string;
+  const { postId } = req.params;
+
+  const [row] = await db.select({ userId: posts.userId }).from(posts)
+    .where(eq(posts.id, postId)).limit(1);
+  if (!row) { res.status(404).json({ error: "Post not found" }); return; }
+  const authorId = row.userId;
+
+  if (authorId !== myId) {
+    if ((await blockRelation(myId, authorId)) !== "none") {
+      res.status(404).json({ error: "Post not found" }); return;
+    }
+    const mutual = await db.execute(sql`
+      SELECT 1
+      FROM follows mine
+      JOIN follows theirs
+        ON theirs.follower_id = mine.following_id
+       AND theirs.following_id = ${myId}
+      WHERE mine.follower_id = ${myId}
+        AND mine.following_id = ${authorId}
+      LIMIT 1
+    `);
+    if ((((mutual as any).rows ?? []) as any[]).length === 0) {
+      res.status(403).json({ error: "Posts are available to friends only" }); return;
+    }
+  }
+
+  const [found] = await buildBuyerPosts(myId, [authorId], 1, 0, postId);
+  if (!found) { res.status(404).json({ error: "Post not found" }); return; }
+  res.json(found);
+});
+
 // Accepts users.clerkId or users.id (UUID) — resolves before block/friend checks.
 router.get("/profile/:userId/posts", async (req, res) => {
   const myId  = (req as any).clerkUserId as string;
@@ -423,11 +472,18 @@ router.get("/friends/activity", async (req, res) => {
 });
 
 // ─── GET /api/social/following ────────────────────────────────────────────────
+// Query params: ?limit=&offset= (default 100, capped at MAX_PAGE_LIMIT).
 router.get("/following", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
+  const page = parsePagination(req.query, { limit: 100 });
+  if (!page.success) { res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" }); return; }
+  const { limit, offset } = page.data;
   const rows = await db
     .select({ followingId: follows.followingId, createdAt: follows.createdAt })
-    .from(follows).where(eq(follows.followerId, myId));
+    .from(follows).where(eq(follows.followerId, myId))
+    .orderBy(desc(follows.createdAt))
+    .limit(limit).offset(offset);
+  setPaginationHeaders(res, page.data, rows.length);
   if (!rows.length) { res.json([]); return; }
 
   const ids      = rows.map(r => r.followingId);
@@ -445,11 +501,18 @@ router.get("/following", async (req, res) => {
 });
 
 // ─── GET /api/social/followers ────────────────────────────────────────────────
+// Query params: ?limit=&offset= (default 100, capped at MAX_PAGE_LIMIT).
 router.get("/followers", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
+  const page = parsePagination(req.query, { limit: 100 });
+  if (!page.success) { res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" }); return; }
+  const { limit, offset } = page.data;
   const rows = await db
     .select({ followerId: follows.followerId, createdAt: follows.createdAt })
-    .from(follows).where(eq(follows.followingId, myId));
+    .from(follows).where(eq(follows.followingId, myId))
+    .orderBy(desc(follows.createdAt))
+    .limit(limit).offset(offset);
+  setPaginationHeaders(res, page.data, rows.length);
   if (!rows.length) { res.json([]); return; }
 
   const ids      = rows.map(r => r.followerId);
@@ -545,27 +608,47 @@ function buildStoryView(row: typeof stories.$inferSelect, likedByMe: boolean) {
   };
 }
 
+async function isFollowing(followerId: string, followingId: string): Promise<boolean> {
+  const [row] = await db.select({ followerId: follows.followerId }).from(follows)
+    .where(and(eq(follows.followerId, followerId), eq(follows.followingId, followingId)))
+    .limit(1);
+  return !!row;
+}
+
+/** Loads {id, moderationStatus, expiresAt} for an active (non-expired, visible) story. */
+async function loadActiveStory(storyId: string) {
+  const [row] = await db.select().from(stories).where(eq(stories.id, storyId)).limit(1);
+  if (!row) return null;
+  if (row.moderationStatus === "removed") return null;
+  if (new Date(row.expiresAt).getTime() <= Date.now()) return null;
+  return row;
+}
+
 // ─── POST /api/social/stories — create a story ───────────────────────────────
 router.post("/stories", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
-  const { authorName, authorHandle, authorInitials, authorColor, authorAccountType,
-          media, repliesDisabled, privacy } = req.body as {
-    authorName:         string;
-    authorHandle?:      string;
-    authorInitials?:    string;
-    authorColor?:       string;
-    authorAccountType?: string;
+  const { media, repliesDisabled, privacy } = req.body as {
     media:              any[];
     repliesDisabled?:   boolean;
     privacy?: { visibility?: string; replyPermission?: string; };
   };
 
-  if (!authorName || !Array.isArray(media) || media.length === 0) {
-    res.status(400).json({ error: "authorName and media[] required" }); return;
+  if (!Array.isArray(media) || media.length === 0) {
+    res.status(400).json({ error: "media[] required" }); return;
   }
 
   const restriction = await publishingRestriction(myId);
   if (restriction) { res.status(restriction.status).json(restriction.body); return; }
+
+  // Author identity is derived server-side from the users table — the client
+  // cannot spoof its display name, handle, or (critically) account type by
+  // sending arbitrary authorName/authorAccountType fields.
+  const [me] = await db.select({
+    name: users.name, displayName: users.displayName, username: users.username,
+    accountType: users.accountType,
+  }).from(users).where(eq(users.clerkId, myId)).limit(1);
+  if (!me) { res.status(403).json({ error: "Account not found" }); return; }
+  const myName = me.displayName || me.name || "Brandthread member";
 
   // Slurs and threats are filtered everywhere, including story text.
   const storyText = media
@@ -578,17 +661,18 @@ router.post("/stories", async (req, res) => {
   }
 
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const visibility = privacy?.visibility === "friends" ? "friends" : "public";
 
   const [row] = await db.insert(stories).values({
     authorId:           myId,
-    authorName,
-    authorHandle:       authorHandle   ?? null,
-    authorInitials:     authorInitials ?? null,
-    authorColor:        authorColor    ?? null,
-    authorAccountType:  authorAccountType ?? "buyer",
+    authorName:         myName,
+    authorHandle:        me.username ? `@${me.username}` : `@${myName.toLowerCase().replace(/\s+/g, "")}`,
+    authorInitials:      initials(myName),
+    authorColor:         avatarColor(myId),
+    authorAccountType:   me.accountType ?? "buyer",
     media,
     repliesDisabled:    repliesDisabled ?? false,
-    privacyVisibility:  privacy?.visibility      ?? "public",
+    privacyVisibility:  visibility,
     privacyReplyPerm:   privacy?.replyPermission ?? "everyone",
     expiresAt,
   }).returning();
@@ -601,7 +685,7 @@ router.get("/stories/me", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
   const now  = new Date();
   const rows = await db.select().from(stories)
-    .where(and(eq(stories.authorId, myId), gt(stories.expiresAt, now)));
+    .where(and(eq(stories.authorId, myId), gt(stories.expiresAt, now), ne(stories.moderationStatus, "removed")));
 
   const likedSet = rows.length
     ? new Set(
@@ -616,35 +700,160 @@ router.get("/stories/me", async (req, res) => {
 });
 
 // ─── GET /api/social/stories/user/:userId — another user's active stories ────
-// Visible to ALL authenticated users regardless of follow status.
+// Stories are visible only to the author's followers (spec: "24h stories
+// visible to their followers"); a 'friends' privacy setting additionally
+// requires the relationship to be mutual.
 router.get("/stories/user/:userId", async (req, res) => {
   const myId    = (req as any).clerkUserId as string;
   const authorId = req.params.userId;
   const now     = new Date();
 
-  if (authorId !== myId && (await blockRelation(myId, authorId)) !== "none") {
-    res.json([]); return;
+  if (authorId !== myId) {
+    if ((await blockRelation(myId, authorId)) !== "none") { res.json([]); return; }
+    if (!(await isFollowing(myId, authorId))) { res.json([]); return; }
   }
 
   const rows = await db.select().from(stories)
-    .where(and(eq(stories.authorId, authorId), gt(stories.expiresAt, now)));
+    .where(and(eq(stories.authorId, authorId), gt(stories.expiresAt, now), ne(stories.moderationStatus, "removed")));
 
   if (!rows.length) { res.json([]); return; }
+
+  const visibleRows = authorId === myId
+    ? rows
+    : rows.filter((r) => r.privacyVisibility !== "friends");
+  const needsMutualCheck = authorId !== myId && rows.some((r) => r.privacyVisibility === "friends");
+  const finalRows = needsMutualCheck && await isFollowing(authorId, myId)
+    ? rows
+    : visibleRows;
+
+  if (!finalRows.length) { res.json([]); return; }
 
   const likedSet = new Set(
     (await db.select({ storyId: storyLikes.storyId }).from(storyLikes)
       .where(and(eq(storyLikes.userId, myId),
-                 inArray(storyLikes.storyId, rows.map(r => r.id)))))
+                 inArray(storyLikes.storyId, finalRows.map(r => r.id)))))
     .map(r => r.storyId)
   );
 
-  res.json(rows.map(r => buildStoryView(r, likedSet.has(r.id))));
+  res.json(finalRows.map(r => buildStoryView(r, likedSet.has(r.id))));
+});
+
+// ─── GET /api/social/stories/following — stories tray ────────────────────────
+// One entry per followed author (plus myself, if I have an active story),
+// each with `seen` = true only once every one of that author's active
+// stories has been viewed by me — this drives the ring color in the tray.
+router.get("/stories/following", async (req, res) => {
+  const myId = (req as any).clerkUserId as string;
+  const now  = new Date();
+
+  const followingRows = await db.select({ followingId: follows.followingId })
+    .from(follows).where(eq(follows.followerId, myId));
+  const authorIds = Array.from(new Set([myId, ...followingRows.map((r) => r.followingId)]));
+
+  const rows = await db.select().from(stories)
+    .where(and(inArray(stories.authorId, authorIds), gt(stories.expiresAt, now), ne(stories.moderationStatus, "removed")))
+    .orderBy(desc(stories.createdAt));
+  if (!rows.length) { res.json([]); return; }
+
+  const blockedIds = new Set(
+    (await db.select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId }).from(blocks)
+      .where(or(eq(blocks.blockerId, myId), eq(blocks.blockedId, myId))))
+      .flatMap((b) => [b.blockerId === myId ? b.blockedId : b.blockerId]),
+  );
+
+  const visibleRows = rows.filter((r) => {
+    if (r.authorId === myId) return true;
+    if (blockedIds.has(r.authorId)) return false;
+    if (r.privacyVisibility === "friends") return false; // mutual-only check omitted from the tray for simplicity; per-user fetch still enforces it
+    return true;
+  });
+  if (!visibleRows.length) { res.json([]); return; }
+
+  const viewedRows = await db.select({ storyId: storyViews.storyId }).from(storyViews)
+    .where(and(eq(storyViews.userId, myId), inArray(storyViews.storyId, visibleRows.map((r) => r.id))));
+  const viewedSet = new Set(viewedRows.map((r) => r.storyId));
+
+  const byAuthor = new Map<string, typeof visibleRows>();
+  for (const row of visibleRows) {
+    if (!byAuthor.has(row.authorId)) byAuthor.set(row.authorId, []);
+    byAuthor.get(row.authorId)!.push(row);
+  }
+
+  const result = Array.from(byAuthor.entries()).map(([authorId, authorStories]) => {
+    const latest = authorStories[0];
+    return {
+      authorId,
+      authorName:        latest.authorName,
+      authorHandle:      latest.authorHandle ?? "",
+      authorInitials:    latest.authorInitials ?? "",
+      authorColor:       latest.authorColor ?? "#8B5CF6",
+      authorAccountType: latest.authorAccountType,
+      isMe:              authorId === myId,
+      storyIds:          authorStories.map((s) => s.id),
+      seen:              authorStories.every((s) => viewedSet.has(s.id)),
+      latestCreatedAt:   new Date(latest.createdAt).getTime(),
+    };
+  });
+
+  result.sort((a, b) => {
+    if (a.isMe !== b.isMe) return a.isMe ? -1 : 1;
+    if (a.seen !== b.seen) return a.seen ? 1 : -1;
+    return b.latestCreatedAt - a.latestCreatedAt;
+  });
+
+  res.json(result);
+});
+
+// ─── GET /api/social/stories/:id/viewers — seen-by list (owner only) ─────────
+router.get("/stories/:id/viewers", async (req, res) => {
+  const myId    = (req as any).clerkUserId as string;
+  const storyId = req.params.id;
+
+  const [story] = await db.select({ authorId: stories.authorId }).from(stories)
+    .where(eq(stories.id, storyId)).limit(1);
+  if (!story) { res.status(404).json({ error: "Story not found" }); return; }
+  if (story.authorId !== myId) { res.status(403).json({ error: "Only the author can see who viewed this story" }); return; }
+
+  const viewRows = await db.select({ userId: storyViews.userId, viewedAt: storyViews.viewedAt })
+    .from(storyViews).where(eq(storyViews.storyId, storyId))
+    .orderBy(desc(storyViews.viewedAt));
+  if (!viewRows.length) { res.json([]); return; }
+
+  const profiles = await profilesById(viewRows.map((r) => r.userId));
+  res.json(viewRows.map((r) => {
+    const p = profiles.get(r.userId);
+    return {
+      userId:    r.userId,
+      name:      p?.deleted ? "Deleted account" : p?.name ?? "Brandthread member",
+      handle:    p?.handle ?? "",
+      initials:  p?.initials ?? "BM",
+      avatarUrl: p?.avatarUrl ?? null,
+      viewedAt:  r.viewedAt,
+    };
+  }));
+});
+
+// ─── DELETE /api/social/stories/:id — author removes their own story early ───
+router.delete("/stories/:id", async (req, res) => {
+  const myId    = (req as any).clerkUserId as string;
+  const storyId = req.params.id;
+  const [deleted] = await db.delete(stories)
+    .where(and(eq(stories.id, storyId), eq(stories.authorId, myId)))
+    .returning({ id: stories.id });
+  if (!deleted) { res.status(404).json({ error: "Story not found" }); return; }
+  res.json({ id: deleted.id, deleted: true });
 });
 
 // ─── POST /api/social/stories/:id/like — toggle like ─────────────────────────
 router.post("/stories/:id/like", async (req, res) => {
   const myId    = (req as any).clerkUserId as string;
   const storyId = req.params.id;
+
+  const story = await loadActiveStory(storyId);
+  if (!story) { res.status(404).json({ error: "Story not found" }); return; }
+  if (story.authorId !== myId && (await blockRelation(myId, story.authorId)) !== "none") {
+    res.status(404).json({ error: "Story not found" }); return;
+  }
 
   const [existing] = await db.select({ storyId: storyLikes.storyId })
     .from(storyLikes)
@@ -676,6 +885,12 @@ router.post("/stories/:id/like", async (req, res) => {
 router.post("/stories/:id/view", async (req, res) => {
   const myId    = (req as any).clerkUserId as string;
   const storyId = req.params.id;
+
+  const story = await loadActiveStory(storyId);
+  if (!story) { res.status(404).json({ error: "Story not found" }); return; }
+  if (story.authorId !== myId && (await blockRelation(myId, story.authorId)) !== "none") {
+    res.status(404).json({ error: "Story not found" }); return;
+  }
 
   const [existing] = await db.select({ storyId: storyViews.storyId })
     .from(storyViews)
@@ -741,10 +956,15 @@ router.delete("/block/:userId", async (req, res) => {
 // GET /api/social/blocks — list users I have blocked
 router.get("/blocks", async (req, res) => {
   const myId = (req as any).clerkUserId as string;
+  const page = parsePagination(req.query, { limit: 100 });
+  if (!page.success) { res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" }); return; }
+  const { limit, offset } = page.data;
   const rows = await db
     .select({ blockedId: blocks.blockedId, createdAt: blocks.createdAt })
     .from(blocks)
-    .where(eq(blocks.blockerId, myId));
+    .where(eq(blocks.blockerId, myId))
+    .orderBy(desc(blocks.createdAt)).limit(limit).offset(offset);
+  setPaginationHeaders(res, page.data, rows.length);
 
   if (rows.length === 0) { res.json([]); return; }
 

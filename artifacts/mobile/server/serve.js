@@ -10,6 +10,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const { renderSharePreviewHtml } = require('./sharePreview');
 
 const STATIC_ROOT = path.resolve(
   __dirname,
@@ -41,6 +42,19 @@ const MIME_TYPES = {
 function send(res, status, body, contentType = 'text/plain; charset=utf-8') {
   res.writeHead(status, { 'content-type': contentType });
   res.end(body);
+}
+
+function sendHtml(res, status, html, acceptEncoding = '') {
+  if (/\bgzip\b/.test(acceptEncoding)) {
+    res.writeHead(status, {
+      'content-type': 'text/html; charset=utf-8',
+      'content-encoding': 'gzip',
+      'vary': 'Accept-Encoding',
+    });
+    res.end(zlib.gzipSync(html));
+    return;
+  }
+  send(res, status, html, 'text/html; charset=utf-8');
 }
 
 function safeFilePath(urlPath) {
@@ -89,7 +103,7 @@ function canonicalRedirectLocation(req, requestUrl) {
   return `${CANONICAL_ORIGIN}${requestUrl.pathname}${requestUrl.search}`;
 }
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   let pathname;
   let requestUrl;
   try {
@@ -132,7 +146,15 @@ const server = http.createServer((req, res) => {
   // Only browser navigations get the SPA shell. Missing JS/image requests
   // should remain a real 404 instead of returning HTML with status 200.
   const acceptsHtml = String(req.headers.accept || '').includes('text/html');
-  if (acceptsHtml && serveFile(path.join(STATIC_ROOT, 'index.html'), res, acceptEncoding)) return;
+  if (acceptsHtml) {
+    const shellPath = path.join(STATIC_ROOT, 'index.html');
+    if (fs.existsSync(shellPath)) {
+      const shellHtml = fs.readFileSync(shellPath, 'utf8');
+      const preview = await renderSharePreviewHtml(requestedPath, shellHtml).catch(() => null);
+      sendHtml(res, 200, preview || shellHtml, acceptEncoding);
+      return;
+    }
+  }
 
   send(res, 404, 'Not Found');
 });

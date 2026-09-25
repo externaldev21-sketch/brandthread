@@ -9,20 +9,23 @@
  */
 import { Router } from "express";
 import {
-  db, posts, postTaggedProducts, products, users, interactions, follows, boosts, blocks,
+  db, posts, postTaggedProducts, products, productVariants, users, interactions, follows, boosts, blocks,
   savedItems, orders,
 } from "@workspace/db";
 import { eq, and, inArray, count, sql, desc, lte, lt, gte, or } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
+import { enqueueBatchedNotification } from "../lib/push";
 import postVideoRouter, {
   mediaUrl as composedMediaUrl,
   setComposedMediaVisibility,
 } from "./post-video";
 import postSlideRouter from "./post-slide";
 import { validateSlideOverlays, MAX_SLIDES } from "../lib/slideValidation";
+import { notifyPostLike } from "../lib/activityEvents";
 import { evaluateContent, matchesMutedWords } from "../lib/contentModerator";
 import { publicPostCondition, visibleCommentCounts } from "../lib/postVisibility";
+import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 import {
   enqueueAutoFilterReport,
   isBlockedEitherWay,
@@ -93,6 +96,22 @@ async function sellerExists(clerkId: string): Promise<boolean> {
     .where(eq(users.clerkId, clerkId))
     .limit(1);
   return seller?.accountType === "seller";
+}
+
+/**
+ * Lowest variant price per product — a product has no price of its own
+ * (that lives only on its variants), so this is what a tagged product's
+ * displayed price ("Shop · $X") must come from.
+ */
+async function productMinPrices(productIds: string[]): Promise<Record<string, number>> {
+  const ids = [...new Set(productIds)];
+  if (ids.length === 0) return {};
+  const rows = await db
+    .select({ productId: productVariants.productId, minPriceCents: sql<number>`min(${productVariants.priceCents})` })
+    .from(productVariants)
+    .where(inArray(productVariants.productId, ids))
+    .groupBy(productVariants.productId);
+  return Object.fromEntries(rows.map((r) => [r.productId, Number(r.minPriceCents)]));
 }
 
 router.use("/", postVideoRouter);
@@ -252,6 +271,7 @@ async function postDetails(postRows: typeof posts.$inferSelect[]) {
   const sellerById = new Map(sellerRows.map((seller) => [seller.clerkId, seller]));
   const tagsByPost: Record<string, typeof tagRows> = {};
   for (const tag of tagRows) (tagsByPost[tag.postId] ??= []).push(tag);
+  const minPriceByProduct = await productMinPrices(tagRows.map((tag) => tag.productId));
   const countByPost = (rows: Array<{ postId: string | null; cnt: number }>) =>
     Object.fromEntries(rows.filter((row) => row.postId).map((row) => [row.postId, Number(row.cnt)]));
   const likesByPost = countByPost(likeRows);
@@ -275,6 +295,7 @@ async function postDetails(postRows: typeof posts.$inferSelect[]) {
         position: tag.position,
         name: tag.name,
         images: tag.images,
+        priceCents: minPriceByProduct[tag.productId] ?? 0,
       })),
       likesCount: post.visibility?.showLikeCount === false ? null : likesByPost[post.id] ?? 0,
       repostsCount: repostsByPost[post.id] ?? 0,
@@ -389,6 +410,7 @@ router.get("/feed", requireAuth, async (req, res) => {
       if (!tagsByPost[t.postId]) tagsByPost[t.postId] = [];
       tagsByPost[t.postId].push(t);
     }
+    const minPriceByProduct = await productMinPrices(tagRows.map((t) => t.productId));
     const likesByPost: Record<string, number> = {};
     for (const r of likeRows) if (r.postId) likesByPost[r.postId] = Number(r.cnt);
     const repostsByPost: Record<string, number> = {};
@@ -443,6 +465,7 @@ router.get("/feed", requireAuth, async (req, res) => {
         position:  t.position,
         name:      t.name,
         images:    t.images,
+        priceCents: minPriceByProduct[t.productId] ?? 0,
       })),
       likesCount:    p.visibility?.showLikeCount === false ? null : likesByPost[p.id] ?? 0,
       repostsCount:  repostsByPost[p.id]  ?? 0,
@@ -463,25 +486,29 @@ router.get("/feed", requireAuth, async (req, res) => {
 });
 
 // ─── POST /api/posts ─────────────────────────────────────────────────────────
+// Sellers publish to the Thread feed (GET /feed already restricts the feed
+// join to accountType='seller', so this is the only writer that can reach
+// it). Buyers may post PHOTO posts (single photo or a photo carousel, with a
+// caption) to their own profile only — the accountType='seller' join on the
+// feed means a buyer post can never surface there no matter what fields are
+// set on it, but we additionally hard-block video/product-tagging for buyers
+// below so the write path itself can't be used to fake a Thread post.
 router.post("/", requireAuth, async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
 
-  // ── Seller-only gate ────────────────────────────────────────────────────────
-  // Only seller accounts may publish to the Thread feed. This is enforced
-  // server-side so a buyer cannot bypass it by calling the API directly.
   const [poster] = await db
     .select({ accountType: users.accountType })
     .from(users)
     .where(eq(users.clerkId, clerkId))
     .limit(1);
 
-  if (!poster || poster.accountType !== "seller") {
+  if (!poster || (poster.accountType !== "seller" && poster.accountType !== "buyer")) {
     return res.status(403).json({
-      error: "Only seller accounts can post to the Thread feed.",
-      code:  "SELLER_ONLY",
+      error: "Only buyer and seller accounts can post.",
+      code:  "ACCOUNT_TYPE_REQUIRED",
     });
   }
-  // ───────────────────────────────────────────────────────────────────────────
+  const isBuyer = poster.accountType === "buyer";
 
   const {
     mediaUrl: requestedMediaUrl, thumbnailUrl: requestedThumbnailUrl, mediaPath, thumbnailPath,
@@ -510,6 +537,31 @@ router.post("/", requireAuth, async (req, res) => {
 
   const restriction = await publishingRestriction(clerkId);
   if (restriction) return res.status(restriction.status).json(restriction.body);
+
+  // ── Buyer posting rules ─────────────────────────────────────────────────────
+  // Buyers may only post photos (single or carousel) to their own profile —
+  // no video, no product tagging (they don't own products), no scheduling.
+  if (isBuyer) {
+    const requestedType = (mediaType as string | undefined) ?? "photo";
+    if (requestedType !== "photo" && requestedType !== "slideshow") {
+      return res.status(403).json({
+        error: "Buyer accounts can only post photos (single or carousel).",
+        code:  "BUYER_PHOTO_ONLY",
+      });
+    }
+    if (taggedProductIds && taggedProductIds.length > 0) {
+      return res.status(403).json({
+        error: "Buyer accounts cannot tag products.",
+        code:  "BUYER_NO_PRODUCT_TAGS",
+      });
+    }
+    if (scheduledAt) {
+      return res.status(403).json({
+        error: "Buyer posts cannot be scheduled.",
+        code:  "BUYER_NO_SCHEDULING",
+      });
+    }
+  }
 
   if (caption !== undefined && caption !== null && typeof caption !== "string") {
     return res.status(400).json({ error: "caption must be a string" });
@@ -690,18 +742,26 @@ router.post("/", requireAuth, async (req, res) => {
 // ─── GET /api/posts/mine ─────────────────────────────────────────────────────
 // Authenticated seller library. Unlike /api/public/posts this includes only
 // the caller's own published, draft, and scheduled posts.
+// Query params: ?limit=&offset= (default 100, capped at MAX_PAGE_LIMIT) — a
+// long-lived seller's full post history was previously loaded unbounded.
 router.get("/mine", requireAuth, async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   if (!await sellerExists(clerkId)) {
     return res.status(403).json({ error: "Only seller accounts can manage posts.", code: "SELLER_ONLY" });
   }
+  const page = parsePagination(req.query, { limit: 100 });
+  if (!page.success) return res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" });
+  const { limit, offset } = page.data;
   try {
     const rows = await db.select().from(posts)
       .where(and(
         eq(posts.userId, clerkId),
         inArray(posts.postStatus, ["draft", "scheduled", "published", "archived"]),
       ))
-      .orderBy(desc(posts.createdAt));
+      .orderBy(desc(posts.createdAt))
+      .limit(limit)
+      .offset(offset);
+    setPaginationHeaders(res, page.data, rows.length);
     return res.json(await postDetails(rows));
   } catch (err) {
     req.log.error({ err, clerkId }, "Failed to fetch seller posts");
@@ -1129,10 +1189,11 @@ router.get("/:id", async (req, res) => {
       .where(and(eq(interactions.postId, id), eq(interactions.type, "repost"))),
   ]);
 
+  const minPriceByProduct = await productMinPrices(tags.map((t) => t.productId));
   return res.json({
     ...post,
     seller:       sellerRows[0] ?? null,
-    taggedProducts: tags,
+    taggedProducts: tags.map((t) => ({ ...t, priceCents: minPriceByProduct[t.productId] ?? 0 })),
     likeCount:    post.visibility?.showLikeCount === false ? null : likeRows[0]?.count ?? 0,
     repostCount:  repostRows[0]?.count ?? 0,
   });
@@ -1146,14 +1207,22 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
     return res.status(404).json({ error: "Post not found" });
   }
   const { type, value } = req.body as {
-    type: "like" | "repost" | "view" | "watch_time" | "shop_click";
+    type: "like" | "repost" | "view" | "watch_time" | "shop_click" | "share" | "not_interested";
     value?: string;
   };
 
-  if (!["like", "repost", "view", "watch_time", "shop_click"].includes(type)) {
-    return res.status(400).json({ error: "type must be like, repost, view, watch_time, or shop_click" });
+  // "share" is a new interaction type added for Discover's seller-ranking
+  // job (see jobs/computeSellerRanking.ts): it records a buyer sharing a
+  // post out of the app (share sheet, copy link, etc.), which previously had
+  // no tracking at all. Non-idempotent, like view/watch_time/shop_click —
+  // one row is recorded per share tap.
+  // "not_interested" records the feed's "Not interested" action so ranking
+  // can downweight similar posts for this buyer; also non-idempotent.
+  const RECORDED_ONLY_TYPES = ["view", "watch_time", "shop_click", "share", "not_interested"];
+  if (!["like", "repost", ...RECORDED_ONLY_TYPES].includes(type)) {
+    return res.status(400).json({ error: "type must be like, repost, view, watch_time, shop_click, share, or not_interested" });
   }
-  const [visiblePost] = await db.select({ id: posts.id, visibility: posts.visibility }).from(posts)
+  const [visiblePost] = await db.select({ id: posts.id, visibility: posts.visibility, ownerId: posts.userId }).from(posts)
     .where(and(eq(posts.id, id), visiblePostCondition()))
     .limit(1);
   if (!visiblePost) return res.status(404).json({ error: "Post not found" });
@@ -1161,7 +1230,7 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
     return res.status(403).json({ error: "Reposts are disabled for this post" });
   }
 
-  if (type === "view" || type === "watch_time" || type === "shop_click") {
+  if (RECORDED_ONLY_TYPES.includes(type)) {
     await db.insert(interactions).values({ userId: clerkId, postId: id, type, value: value ?? null });
     return res.json({ action: "recorded" });
   }
@@ -1179,19 +1248,39 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
         eq(interactions.type, type),
       ));
     } else {
-      await db
+      const inserted = await db
         .insert(interactions)
         .values({ userId: clerkId, postId: id, type, value: null })
         .onConflictDoNothing({
           target: [interactions.userId, interactions.postId],
           where: sql`type = 'like' AND post_id IS NOT NULL`,
-        });
+        })
+        .returning({ id: interactions.id });
+      // Only a genuinely new like notifies the owner; retries are silent.
+      if (inserted.length > 0) void notifyPostLike({ postId: id, likerId: clerkId });
     }
 
     const [{ count: newCount }] = await db
       .select({ count: count() })
       .from(interactions)
       .where(and(eq(interactions.postId, id), eq(interactions.type, type)));
+
+    if (!removing && visiblePost.ownerId && visiblePost.ownerId !== clerkId) {
+      const [liker] = await db.select({
+        name: sql<string>`COALESCE(${users.brandName}, ${users.displayName}, 'Someone')`,
+      }).from(users).where(eq(users.clerkId, clerkId)).limit(1);
+      // Likes are bursty and low-priority: collapse them into one notification
+      // instead of pushing on every tap (see jobs/notificationBatchFlush.ts).
+      void enqueueBatchedNotification({
+        userId: visiblePost.ownerId,
+        category: "social",
+        type: "post_liked",
+        targetId: id,
+        targetType: "post",
+        actorName: liker?.name ?? "Someone",
+        cta: "View post",
+      });
+    }
 
     return res.json({ action: removing ? "removed" : "added", count: newCount });
   }

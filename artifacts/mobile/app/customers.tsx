@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator } from 'react-native';
 import { useColors } from '@/hooks/useColors';
@@ -8,9 +8,9 @@ import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { FS } from '@/lib/theme';
-
-const SEGMENTS = ['All', 'VIP', 'Returning', 'At-Risk'] as const;
-type Segment = typeof SEGMENTS[number];
+import { formatCents } from '@/lib/money';
+import { EmptyState } from '@/components/BrandthreadUI';
+import { ErrorState } from '@/components/ui/ErrorState';
 
 type ApiCustomer = {
   id: string;
@@ -26,26 +26,28 @@ type ApiCustomer = {
   createdAt: string;
 };
 
-const AVATAR_COLORS = ['#0F766E', '#4A6FA5', '#22D3EE', '#B98A2E', '#EF4444', '#0EA5E9', '#F59E0B', '#1D4ED8'];
+
+type SortOption = 'recent' | 'spend' | 'name';
+
+const SORT_OPTIONS: { key: SortOption; label: string }[] = [
+  { key: 'recent', label: 'Recent' },
+  { key: 'spend', label: 'Top spender' },
+  { key: 'name', label: 'Name A-Z' },
+];
 
 function getInitials(name: string): string {
   return name.split(' ').map((p) => p[0] ?? '').join('').slice(0, 2).toUpperCase();
 }
 
-function getAvatarColor(id: string): string {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
-  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
-}
-
-
 export default function CustomersScreen() {
   const colors = useColors();
   const router = useRouter();
-  const [segment, setSegment] = useState<Segment>('All');
   const [search, setSearch] = useState('');
   const [customers, setCustomers] = useState<ApiCustomer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOption>('recent');
+  const hasDataRef = useRef(false);
 
   const fetchCustomers = useCallback(async (searchText: string) => {
     try {
@@ -53,9 +55,16 @@ export default function CustomersScreen() {
         ? `/api/customers?search=${encodeURIComponent(searchText.trim())}`
         : '/api/customers';
       const res = await serviceRequest<ApiCustomer[]>(url);
-      if (Array.isArray(res)) setCustomers(res);
+      if (Array.isArray(res)) {
+        setCustomers(res);
+        hasDataRef.current = res.length > 0;
+        setError(false);
+      }
     } catch {
-      // silently keep existing data on error
+      // Only surface a full ErrorState when there's nothing already on
+      // screen — a failed background refresh (e.g. while searching) keeps
+      // the last good list visible instead of replacing it with an error.
+      setError(!hasDataRef.current);
     } finally {
       setLoading(false);
     }
@@ -73,11 +82,29 @@ export default function CustomersScreen() {
     return () => clearTimeout(timer);
   }, [search, fetchCustomers]);
 
+  const totalCustomers = customers.length;
+  const avgSpendCents = totalCustomers > 0
+    ? Math.round(customers.reduce((sum, c) => sum + (c.totalSpentCents ?? 0), 0) / totalCustomers)
+    : 0;
+
+  const sortedCustomers = useMemo(() => {
+    const list = [...customers];
+    switch (sortBy) {
+      case 'spend':
+        return list.sort((a, b) => (b.totalSpentCents ?? 0) - (a.totalSpentCents ?? 0));
+      case 'name':
+        return list.sort((a, b) => a.name.localeCompare(b.name));
+      case 'recent':
+      default:
+        return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+  }, [customers, sortBy]);
+
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader
         title="Customers"
-        subtitle="CRM, loyalty & rewards"
+        subtitle="Your customer list"
         rightElement={
           <TouchableOpacity
             onPress={() => router.push('/(tabs)/analytics' as never)}
@@ -98,10 +125,8 @@ export default function CustomersScreen() {
       {/* Stats */}
       <View style={styles.statsRow}>
         {[
-          { label: 'Total', value: '1,240', icon: 'users' as const },
-          { label: 'VIP', value: '84', icon: 'star' as const },
-          { label: 'CLV', value: '$480', icon: 'heart' as const },
-          { label: 'Retention', value: '42%', icon: 'refresh-cw' as const },
+          { label: 'Total', value: totalCustomers.toLocaleString(), icon: 'users' as const },
+          { label: 'Avg. spend', value: formatCents(avgSpendCents), icon: 'heart' as const },
         ].map((s) => (
           <View key={s.label} style={[styles.stat, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name={s.icon} size={14} color={colors.primary} />
@@ -109,20 +134,6 @@ export default function CustomersScreen() {
             <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
           </View>
         ))}
-      </View>
-
-      {/* Loyalty Card */}
-      <View style={[styles.loyaltyCard, { backgroundColor: colors.card, borderColor: colors.primary }]}>
-        <View style={styles.loyaltyLeft}>
-          <Feather name="star" size={20} color={colors.primary} />
-          <View>
-            <Text style={[styles.loyaltyTitle, { color: colors.foreground }]}>Loyalty Program</Text>
-            <Text style={[styles.loyaltySub, { color: colors.mutedForeground }]}>840 customers enrolled · $3.2k rewards issued</Text>
-          </View>
-        </View>
-        <TouchableOpacity style={[styles.loyaltyBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8}>
-          <Text style={[styles.loyaltyBtnText, { color: colors.primaryForeground }]}>Manage</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Search */}
@@ -137,19 +148,30 @@ export default function CustomersScreen() {
         />
       </View>
 
-      {/* Segments */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.segments} contentContainerStyle={{ gap: 8 }}>
-        {SEGMENTS.map((s) => (
-          <TouchableOpacity
-            key={s}
-            onPress={() => setSegment(s)}
-            activeOpacity={0.7}
-            style={[styles.segChip, { backgroundColor: segment === s ? colors.primary : colors.card, borderColor: segment === s ? colors.primary : colors.border }]}
-          >
-            <Text style={[styles.segText, { color: segment === s ? colors.primaryForeground : colors.mutedForeground }]}>{s}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {/* Sort */}
+      <View style={styles.sortRow}>
+        {SORT_OPTIONS.map((opt) => {
+          const active = sortBy === opt.key;
+          return (
+            <TouchableOpacity
+              key={opt.key}
+              activeOpacity={0.7}
+              onPress={() => setSortBy(opt.key)}
+              style={[
+                styles.segChip,
+                {
+                  backgroundColor: active ? colors.primary : colors.card,
+                  borderColor: active ? colors.primary : colors.border,
+                },
+              ]}
+            >
+              <Text style={[styles.segText, { color: active ? colors.primaryForeground : colors.mutedForeground }]}>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       {/* Customer List */}
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -158,13 +180,32 @@ export default function CustomersScreen() {
             <ActivityIndicator size="small" color={colors.primary} />
             <Text style={[styles.custEmail, { color: colors.mutedForeground, marginLeft: 10 }]}>Loading customers...</Text>
           </View>
-        ) : customers.length === 0 ? (
-          <View style={styles.custRow}>
-            <Text style={[styles.custEmail, { color: colors.mutedForeground }]}>No customers found.</Text>
-          </View>
+        ) : error ? (
+          <ErrorState
+            message="Couldn't load your customers."
+            onRetry={() => { setLoading(true); fetchCustomers(search); }}
+          />
+        ) : sortedCustomers.length === 0 ? (
+          <EmptyState
+            icon="users"
+            title={search.trim() ? 'No matching customers' : 'No customers yet'}
+            description={
+              search.trim()
+                ? 'Try a different name, email or tag.'
+                : 'Once someone buys from your store, they will show up here.'
+            }
+            action={
+              search.trim()
+                ? undefined
+                : { label: 'View your store', onPress: () => router.push('/store-preview' as never), icon: 'external-link' }
+            }
+            compact
+          />
         ) : (
-          customers.map((c, i) => {
-            const color = getAvatarColor(c.id);
+          sortedCustomers.map((c, i) => {
+            // Monochrome avatar tint (theme foreground) — no saturated per-user hues,
+            // so it reads correctly across all 12 app themes.
+            const color = colors.foreground;
             const initials = getInitials(c.name);
             return (
               <TouchableOpacity
@@ -200,25 +241,6 @@ export default function CustomersScreen() {
           })
         )}
       </View>
-
-      {/* Wishlists & Gift Cards */}
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Rewards & Gifts</Text>
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {[
-          { label: 'Active Wishlists', value: '312', icon: 'heart' as const },
-          { label: 'Gift Cards Issued', value: '$4,800', icon: 'gift' as const },
-          { label: 'Points Redeemed', value: '18,400 pts', icon: 'award' as const },
-          { label: 'Referrals Active', value: '124', icon: 'share-2' as const },
-        ].map((r, i) => (
-          <View key={r.label} style={[styles.rewardRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-            <View style={[styles.rewardIcon, { backgroundColor: colors.secondary }]}>
-              <Feather name={r.icon} size={15} color={colors.primary} />
-            </View>
-            <Text style={[styles.rewardLabel, { color: colors.foreground }]}>{r.label}</Text>
-            <Text style={[styles.rewardVal, { color: colors.mutedForeground }]}>{r.value}</Text>
-          </View>
-        ))}
-      </View>
     </ScrollView>
       <AIBrainFAB context={{ screen: 'customers' as const }} bottomOffset={0} />
     </View>
@@ -245,6 +267,7 @@ const styles = StyleSheet.create({
   searchWrap: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 12, gap: 10, borderWidth: 1, marginBottom: 12 },
   searchInput: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
   segments: { marginBottom: 16 },
+  sortRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   segChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
   segText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },

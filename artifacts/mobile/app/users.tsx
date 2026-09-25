@@ -23,7 +23,11 @@ function fmtDate(iso: string | null) {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-const ROLE_LABEL: Record<string, string> = { owner: 'Owner', manager: 'Manager', staff: 'Staff' };
+const ROLE_LABEL: Record<string, string> = {
+  owner: 'Owner', admin: 'Admin', finance: 'Finance', orders: 'Orders', marketing: 'Marketing', viewer: 'Viewer',
+  manager: 'Manager', staff: 'Staff',
+};
+const INVITE_ROLES = ['admin', 'finance', 'orders', 'marketing', 'viewer'] as const;
 
 export default function UsersScreen() {
   const colors = useColors();
@@ -68,7 +72,7 @@ export default function UsersScreen() {
     const { member } = detail;
     Alert.alert('Change role', `Choose a new role for ${member.name ?? member.email}`, [
       { text: 'Cancel', style: 'cancel' },
-      ...(['staff', 'manager'] as const)
+      ...INVITE_ROLES
         .filter(r => r !== member.role)
         .map(r => ({
           text: ROLE_LABEL[r],
@@ -230,7 +234,13 @@ export default function UsersScreen() {
         rightElement={
           <View style={styles.headerActions}>
             <TouchableOpacity
-              onPress={haptic}
+              onPress={() => {
+                haptic();
+                Alert.alert(title, undefined, [
+                  { text: 'Invite someone', onPress: () => router.push('/team' as never) },
+                  { text: 'Cancel', style: 'cancel' },
+                ]);
+              }}
               activeOpacity={0.7}
               style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
             >
@@ -285,14 +295,7 @@ export default function UsersScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   headerActions: { flexDirection: 'row', gap: 8 },
-  headerBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
+  headerBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   userRow: {
     flexDirection: 'row',
     alignItems: 'center',

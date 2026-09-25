@@ -21,7 +21,7 @@ describe('seller orders read state', () => {
   it('uses the honest empty state without connection or API error banners', () => {
     expect(ordersSource).toContain('<EmptyState');
     expect(ordersSource).toContain('icon="shopping-bag"');
-    expect(ordersSource).toContain('title="Your orders will show up here."');
+    expect(ordersSource).toContain('message="Your orders will show up here."');
     expect(ordersSource).not.toContain('if (loading) return null');
     expect(ordersSource).not.toContain('<BrandedLoader');
     expect(ordersSource).not.toContain('name="scissors"');

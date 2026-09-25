@@ -82,7 +82,7 @@ export default function BillingScreen() {
         Alert.alert('Only the store owner can do this');
         return;
       }
-      router.push('/plan-details' as never);
+      Alert.alert("Couldn't open billing. Try again.");
     }
   }
 
@@ -138,8 +138,8 @@ export default function BillingScreen() {
       <ScreenHeader
         title="Billing"
         rightElement={!isReadOnly ? (
-          <TouchableOpacity testID="seller-billing-plan-menu" onPress={() => router.push('/plan-details' as never)} activeOpacity={0.7} style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="more-horizontal" size={17} color={colors.foreground} />
+          <TouchableOpacity testID="seller-billing-export" onPress={() => exportBills()} activeOpacity={0.7} style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]} accessibilityLabel="Export billing history">
+            <Feather name="share" size={17} color={colors.foreground} />
           </TouchableOpacity>
         ) : undefined}
       />
@@ -149,7 +149,7 @@ export default function BillingScreen() {
           <View style={styles.rowBetween}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Upcoming bill</Text>
             {!isReadOnly && (
-              <TouchableOpacity testID="seller-billing-view-bill" onPress={() => router.push('/plan-details' as never)} activeOpacity={0.7}>
+              <TouchableOpacity testID="seller-billing-view-bill" onPress={() => router.push('/subscription' as never)} activeOpacity={0.7}>
                 <Text style={[styles.linkText, { color: colors.foreground }]}>View bill</Text>
               </TouchableOpacity>
             )}
@@ -169,29 +169,17 @@ export default function BillingScreen() {
                 : 'No upcoming bill'}
           </Text>
 
-          <View style={[styles.infoBox, { backgroundColor: colors.primary + '12' }]}>
-            <Feather name="info" size={15} color={colors.primary} style={{ marginTop: 2 }} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.infoText, { color: colors.foreground }]}>$20.00 in discounts may apply to relevant charges on your next bill.</Text>
-              {!isReadOnly && (
-                <TouchableOpacity testID="seller-billing-view-breakdown" onPress={() => router.push('/plan-details' as never)} activeOpacity={0.7}>
-                  <Text style={[styles.infoLink, { color: colors.primary }]}>View breakdown</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-
           {isReadOnly ? (
             <View style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.cardBrand}>
-                <Feather name="credit-card" size={18} color="#FFFFFF" />
+              <View style={[styles.cardBrand, { backgroundColor: colors.secondary }]}>
+                <Feather name="credit-card" size={18} color={colors.foreground} />
               </View>
               <Text style={[styles.cardText, { color: colors.foreground }]}>{billingStatus.paymentMethodLabel ?? 'No payment method on file'}</Text>
             </View>
           ) : (
             <TouchableOpacity testID="seller-billing-payment-method" onPress={() => openBillingPortal()} activeOpacity={0.7} style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.cardBrand}>
-                <Feather name="credit-card" size={18} color="#FFFFFF" />
+              <View style={[styles.cardBrand, { backgroundColor: colors.secondary }]}>
+                <Feather name="credit-card" size={18} color={colors.foreground} />
               </View>
               <Text style={[styles.cardText, { color: colors.foreground }]}>{billingStatus.paymentMethodLabel ?? 'No payment method on file'}</Text>
                <Feather name={Platform.OS === 'web' ? 'edit-2' : 'external-link'} size={16} color={colors.mutedForeground} />
@@ -203,7 +191,7 @@ export default function BillingScreen() {
           <View style={[styles.noteBar, { backgroundColor: colors.secondary }]}>
             <Text style={[styles.noteText, { color: colors.mutedForeground }]}>
               To make changes to your plan,{' '}
-              <Text style={{ textDecorationLine: 'underline' }} onPress={() => router.push('/plan-details' as never)}>visit plan settings</Text>
+              <Text style={{ textDecorationLine: 'underline' }} onPress={() => router.push('/subscription' as never)}>visit plan settings</Text>
             </Text>
           </View>
         )}
@@ -220,8 +208,8 @@ export default function BillingScreen() {
         {Platform.OS === 'web' && <View style={styles.section}>
           <View style={styles.rowBetween}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Past bills</Text>
-            <TouchableOpacity onPress={() => exportBills()} activeOpacity={0.7}>
-              <Feather name="more-horizontal" size={18} color={colors.mutedForeground} />
+            <TouchableOpacity onPress={() => exportBills()} activeOpacity={0.7} accessibilityLabel="Export billing history">
+              <Feather name="share" size={18} color={colors.mutedForeground} />
             </TouchableOpacity>
           </View>
 
@@ -240,12 +228,6 @@ export default function BillingScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity onPress={() => () => {}} activeOpacity={0.7} style={[styles.iconBtn, { borderColor: colors.border }]}>
-              <Feather name="search" size={16} color={colors.mutedForeground} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => () => {}} activeOpacity={0.7} style={[styles.iconBtn, { borderColor: colors.border }]}>
-              <Feather name="sliders" size={16} color={colors.mutedForeground} />
-            </TouchableOpacity>
           </View>
 
           <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -257,7 +239,7 @@ export default function BillingScreen() {
               filteredBills.map((bill, i) => (
                 <TouchableOpacity
                   key={bill.id}
-                  onPress={() => router.push('/plan-details' as never)}
+                  onPress={() => router.push('/subscription' as never)}
                   disabled={isReadOnly}
                   activeOpacity={0.7}
                   style={[styles.billRow, i !== filteredBills.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
@@ -275,15 +257,6 @@ export default function BillingScreen() {
                 </TouchableOpacity>
               ))
             )}
-          </View>
-
-          <View style={styles.pagerRow}>
-            <TouchableOpacity onPress={() => () => {}} activeOpacity={0.7} style={[styles.pagerBtn, { borderColor: colors.border }]}>
-              <Feather name="chevron-left" size={16} color={colors.mutedForeground} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => () => {}} activeOpacity={0.7} style={[styles.pagerBtn, { borderColor: colors.border }]}>
-              <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
-            </TouchableOpacity>
           </View>
         </View>}
       </ScrollView>
@@ -307,7 +280,7 @@ const styles = StyleSheet.create({
   infoText: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17, marginBottom: 4 },
   infoLink: { fontSize: 12, fontFamily: 'Inter_600SemiBold', textDecorationLine: 'underline' },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14 },
-  cardBrand: { width: 34, height: 24, borderRadius: 4, backgroundColor: '#1F2937', alignItems: 'center', justifyContent: 'center' },
+  cardBrand: { width: 34, height: 24, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
   cardText: { flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium' },
   noteBar: { paddingHorizontal: 20, paddingVertical: 14 },
   noteText: { fontSize: 12, fontFamily: 'Inter_400Regular' },
@@ -324,6 +297,4 @@ const styles = StyleSheet.create({
   billAmount: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   statusPill: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
   statusText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-  pagerRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  pagerBtn: { width: 34, height: 34, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 });

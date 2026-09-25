@@ -46,10 +46,23 @@ vi.mock("@workspace/db", () => {
       }),
     }),
   };
+  // This actor is purely a joined team member with no store of their own
+  // (unlike the real store owner covered in own-store-context-default.test.ts),
+  // so the default-context lookup should keep resolving to the joined store.
+  const onboardingQuery = {
+    from: () => ({
+      where: () => ({
+        limit: async () => [{ onboardingComplete: false }],
+      }),
+    }),
+  };
 
   return {
     db: {
-      select: () => membershipQuery,
+      select: (fields: Record<string, unknown> | undefined) =>
+        fields && Object.prototype.hasOwnProperty.call(fields, "onboardingComplete")
+          ? onboardingQuery
+          : membershipQuery,
       update: () => ({
         set: () => ({
           where: () => Promise.resolve(),
@@ -110,7 +123,7 @@ afterAll(async () => {
 
 describe("joined-store billing isolation", () => {
   it.each(["staff", "manager"])(
-    "rejects a %s member from every billing surface after owner rewrite",
+    "rejects a %s member from every subscription/connect/money-moving surface after owner rewrite",
     async (role) => {
       testState.actorRole = role;
 
@@ -130,11 +143,6 @@ describe("joined-store billing isolation", () => {
         ["POST", "/api/seller/connect/onboard"],
         ["GET", "/api/seller/connect/onboard/return"],
         ["GET", "/api/seller/connect/onboard/refresh"],
-        ["GET", "/api/finance/balance"],
-        ["GET", "/api/finance/payouts"],
-        ["GET", "/api/finance/transactions"],
-        ["GET", "/api/finance/statement.csv"],
-        ["POST", "/api/finance/payout"],
       ]) {
         const result = await request(path, method);
         expect(result.status).toBe(403);
@@ -144,6 +152,57 @@ describe("joined-store billing isolation", () => {
           currentRole: role,
         });
       }
+
+      // The money-moving write gates on the "payouts" capability
+      // (requirePermission) alone — a "finance"/"admin" role passes this,
+      // but neither legacy staff nor manager (read-only) does. The GET
+      // finance reads below use requirePayoutsRead(), which additionally
+      // admits "manager" — covered by the two dedicated tests below instead
+      // of this shared staff/manager loop.
+      const payoutResult = await request("/api/finance/payout", "POST");
+      expect(payoutResult.status).toBe(403);
+      expect(payoutResult.body).toMatchObject({
+        code: "PERMISSION_REQUIRED",
+        requiredPermission: "payouts",
+        currentRole: role,
+      });
     },
   );
+
+  it("rejects staff (but not manager) from read-only finance data after owner rewrite", async () => {
+    testState.actorRole = "staff";
+
+    for (const path of [
+      "/api/finance/balance",
+      "/api/finance/payouts",
+      "/api/finance/transactions",
+      "/api/finance/statement.csv",
+    ]) {
+      const result = await request(path);
+      expect(result.status).toBe(403);
+      expect(result.body).toMatchObject({
+        code: "PERMISSION_REQUIRED",
+        requiredPermission: "payouts",
+        currentRole: "staff",
+      });
+    }
+  });
+
+  it("lets a manager team member read finance data for the store they joined (the legitimate finance-related role)", async () => {
+    testState.actorRole = "manager";
+
+    for (const path of [
+      "/api/finance/balance",
+      "/api/finance/payouts",
+      "/api/finance/transactions",
+      "/api/finance/statement.csv",
+    ]) {
+      const response = await fetch(`${base}${path}`);
+      // These fakes don't stub Stripe/DB deep enough to return 200s, but the
+      // point of this test is that the role gate itself lets a manager
+      // through (no 403/ROLE_REQUIRED) — same as any other manager-gated
+      // read elsewhere in the app.
+      expect(response.status, `${path} -> ${await response.clone().text()}`).not.toBe(403);
+    }
+  });
 });

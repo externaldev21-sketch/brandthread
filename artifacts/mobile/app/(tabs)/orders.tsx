@@ -4,7 +4,8 @@
  */
 
 import React, { useState, useCallback, useMemo, useRef } from 'react';
-import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, Share, SectionList } from 'react-native';
+import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, Share } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,14 +13,19 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, SP, RADIUS, COMP, ICON, ANIM } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
-import { IconButton, FilterChip, StatusBadge, SearchBar, EmptyState } from '@/components/BrandthreadUI';
+import { FilterChip, SearchBar } from '@/components/BrandthreadUI';
+import { SkeletonBlock, EmptyState, useCenteredContentPadding } from '@/components/layout';
+import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
+import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { filterOrders, sortOrders } from '@/services/orderService';
+import { dbStatusToOrderStatus, dbStatusToPaymentStatus } from '@/lib/orderStatusAdapter';
 import { Order, OrderFilterKey, OrderSortKey, OrderAddress, OrderCustomer, FulfillmentStatus, FulfillmentType, OrderStatus, PaymentStatus, CancellationReason, CANCELLATION_REASONS } from '@/services/orderTypes';
 import { useApi } from '@/hooks/useApi';
 import { useAuth } from '@clerk/expo';
 import { clearBadge } from '@/lib/orderBadgeStore';
 import { formatCents } from '@/lib/money';
 import SwipeActionRow from '@/components/SwipeActionRow';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -36,6 +42,33 @@ interface OrderSection {
   title: string;
   data: Order[];
 }
+
+/** One recyclable list row: a date header, an order, or the gap after a date group. */
+type OrderListItem =
+  | { type: 'header'; key: string; title: string; count: number }
+  | { type: 'order'; key: string; order: Order; isLast: boolean }
+  | { type: 'gap'; key: string };
+
+/** Flattens date sections into rows so FlashList can recycle them by type. */
+export function flattenOrderSections(sections: OrderSection[]): OrderListItem[] {
+  const rows: OrderListItem[] = [];
+  for (const section of sections) {
+    rows.push({ type: 'header', key: `header:${section.title}`, title: section.title, count: section.data.length });
+    section.data.forEach((order, index) => {
+      rows.push({ type: 'order', key: order.id, order, isLast: index === section.data.length - 1 });
+    });
+    rows.push({ type: 'gap', key: `gap:${section.title}` });
+  }
+  return rows;
+}
+
+type OrderRowActions = {
+  press: (order: Order) => void;
+  longPress: (orderId: string) => void;
+  markProcessing: (orderId: string) => void;
+  markReady: (orderId: string) => void;
+  ship: (orderId: string) => void;
+};
 
 type OrderListFilter = OrderFilterKey | 'unpaid' | 'open' | 'archived';
 type OrderListOrder = Order & {
@@ -147,15 +180,9 @@ function groupByDate(orders: Order[]): OrderSection[] {
 }
 
 // ─── API → Order adapter ──────────────────────────────────────────────────────
-
-const DB_STATUS_MAP: Record<string, OrderStatus> = {
-  pending:        'new',
-  processing:     'processing',
-  fulfilled:      'ready_to_ship',
-  shipped:        'shipped',
-  cancelled:      'cancelled',
-  refund_pending: 'refunded',
-};
+// Status and payment-status mapping is shared with order-detail.tsx via
+// lib/orderStatusAdapter.ts so this list can never disagree with the detail
+// screen about whether an order is new, delivered, refunded or disputed.
 
 const FULFILLMENT_MAP: Partial<Record<OrderStatus, FulfillmentStatus>> = {
   new:           'unfulfilled',
@@ -169,7 +196,8 @@ const FULFILLMENT_MAP: Partial<Record<OrderStatus, FulfillmentStatus>> = {
 };
 
 export function apiRowToOrder(row: any): OrderListOrder {
-  const ordStatus: OrderStatus = DB_STATUS_MAP[row.status as string] ?? 'new';
+  const ordStatus: OrderStatus = dbStatusToOrderStatus(row.status as string);
+  const rowPaymentStatus: PaymentStatus = dbStatusToPaymentStatus(row.status as string) as PaymentStatus;
   const fStatus: FulfillmentStatus = FULFILLMENT_MAP[ordStatus] ?? 'unfulfilled';
   const initials = ((row.customerName as string | undefined) ?? 'C')
     .split(/\s+/).map((w: string) => w[0] ?? '').slice(0, 2).join('').toUpperCase();
@@ -187,7 +215,7 @@ export function apiRowToOrder(row: any): OrderListOrder {
     id: row.id, orderNumber: row.orderNumber ?? '',
     sellerId: '', sellerName: '', sellerHandle: '',
     source: 'online', salesChannel: 'online',
-    status: ordStatus, paymentStatus: 'paid' as PaymentStatus,
+    status: ordStatus, paymentStatus: rowPaymentStatus,
     fulfillmentStatus: fStatus, fulfillmentType: 'seller' as FulfillmentType,
     riskLevel: 'low', riskFlags: [], customer,
     lineItems: [],
@@ -329,10 +357,10 @@ export function OrderRow({
   return (
     <>
       <TouchableOpacity
-        activeOpacity={0.82}
+        activeOpacity={0.86}
         onPress={onPress}
         onLongPress={onLongPress}
-        style={[s.orderRow, selected && s.orderRowSelected, isHighRisk && s.orderRowRisk, isArchived && s.orderRowArchived]}
+        style={[s.orderCard, selected && s.orderRowSelected, isHighRisk && s.orderRowRisk, isArchived && s.orderRowArchived]}
         accessibilityRole="button"
         accessibilityLabel={`Order ${order.orderNumber}, ${order.customer.name}, ${fmtMoney(order.payment.totalCents)}`}
       >
@@ -475,8 +503,12 @@ export function OrderRow({
             </View>
           )}
         </View>
+
+        {/* Live status tracker — compact stepper mirrors the buyer + detail screens */}
+        <View style={s.cardTimelineWrap}>
+          <OrderStatusTimeline status={order.status} compact />
+        </View>
       </TouchableOpacity>
-      {!isLast && <View style={s.rowDivider} />}
     </>
   );
 }
@@ -498,9 +530,9 @@ function SortModal({
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const PURPLE_LIGHT = theme.accentLight;
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close sort menu" />
-      <View style={s.modalSheet}>
+      <SheetRise style={s.modalSheet}>
         <View style={s.modalHandle} />
         <Text style={s.modalTitle}>Sort Orders</Text>
         {SORTS.map(({ key, label }) => (
@@ -521,7 +553,7 @@ function SortModal({
         <TouchableOpacity style={s.modalCloseBtn} onPress={onClose} accessibilityRole="button" accessibilityLabel="Cancel sorting">
           <Text style={s.modalCloseBtnText}>Cancel</Text>
         </TouchableOpacity>
-      </View>
+      </SheetRise>
     </Modal>
   );
 }
@@ -540,9 +572,9 @@ function FilterSheet({
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const PURPLE_LIGHT = theme.accentLight;
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close filter menu" />
-      <View style={s.modalSheet}>
+      <SheetRise style={s.modalSheet}>
         <View style={s.modalHandle} />
         <Text style={s.modalTitle}>Filter Orders</Text>
         <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }}>
@@ -565,12 +597,108 @@ function FilterSheet({
         <TouchableOpacity style={s.modalCloseBtn} onPress={onClose} accessibilityRole="button" accessibilityLabel="Cancel filtering">
           <Text style={s.modalCloseBtnText}>Cancel</Text>
         </TouchableOpacity>
-      </View>
+      </SheetRise>
     </Modal>
   );
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
+
+/**
+ * A memoized order row plus its swipe action. Handlers arrive as one stable
+ * object, so scrolling or polling does not re-render rows whose order and
+ * selection state are unchanged.
+ */
+const OrderListRow = React.memo(function OrderListRow({
+  order, isLast, selected, selectionMode, actions,
+}: {
+  order: Order;
+  isLast: boolean;
+  selected: boolean;
+  selectionMode: boolean;
+  actions: OrderRowActions;
+}) {
+  const { theme } = useAppTheme();
+  const swipeAction =
+    order.status === 'new'
+      ? { label: 'Accept', icon: 'check-circle' as const, color: theme.accent, run: () => actions.markProcessing(order.id) }
+      : order.status === 'processing'
+        ? { label: 'Ready', icon: 'package' as const, color: theme.accentLight, run: () => actions.markReady(order.id) }
+        : order.status === 'ready_to_ship'
+          ? { label: 'Ship', icon: 'send' as const, color: theme.success, run: () => actions.ship(order.id) }
+          : { label: 'Open', icon: 'arrow-right' as const, color: theme.accent, run: () => actions.press(order) };
+
+  return (
+    <SwipeActionRow
+      label={swipeAction.label}
+      icon={swipeAction.icon}
+      color={swipeAction.color}
+      onAction={swipeAction.run}
+      disabled={selectionMode}
+      accessibilityLabel={`${swipeAction.label} order ${order.orderNumber}`}
+    >
+      <OrderRow
+        order={order}
+        selected={selected}
+        selectionMode={selectionMode}
+        onPress={() => actions.press(order)}
+        onLongPress={() => actions.longPress(order.id)}
+        onMarkProcessing={() => actions.markProcessing(order.id)}
+        onMarkReady={() => actions.markReady(order.id)}
+        onShip={() => actions.ship(order.id)}
+        isLast={isLast}
+      />
+    </SwipeActionRow>
+  );
+});
+
+// ─── Order card skeleton — matches OrderRow's card shape: order # row,
+// customer + item lines, price/time, status pills, then the timeline strip ──
+function SellerOrderRowSkeleton() {
+  const { theme } = useAppTheme();
+  return (
+    <View
+      style={{
+        paddingHorizontal: SP.md,
+        paddingVertical: SP.md,
+        marginHorizontal: SP.md,
+        marginBottom: SP.sm,
+        borderRadius: RADIUS.lg,
+        borderWidth: 1,
+        borderColor: theme.border,
+        backgroundColor: theme.card,
+        gap: SP.xs,
+      }}
+    >
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        <View style={{ gap: SP.xs, flex: 1 }}>
+          <SkeletonBlock width={90} height={13} />
+          <SkeletonBlock width="45%" height={13} />
+          <SkeletonBlock width="65%" height={11} />
+        </View>
+        <View style={{ alignItems: 'flex-end', gap: SP.xs }}>
+          <SkeletonBlock width={56} height={13} />
+          <SkeletonBlock width={40} height={11} />
+        </View>
+      </View>
+      <View style={{ flexDirection: 'row', gap: SP.xs, marginTop: SP.xs }}>
+        <SkeletonBlock width={64} height={16} radius={RADIUS.pill} />
+        <SkeletonBlock width={72} height={16} radius={RADIUS.pill} />
+      </View>
+      <View style={{ flexDirection: 'row', gap: SP.sm, marginTop: SP.sm, paddingTop: SP.sm, borderTopWidth: 1, borderTopColor: theme.border }}>
+        {Array.from({ length: 5 }).map((_, i) => <SkeletonBlock key={i} width={10} height={10} radius={RADIUS.pill} />)}
+      </View>
+    </View>
+  );
+}
+
+function SellerOrdersListSkeleton() {
+  return (
+    <View style={{ paddingTop: SP.sm }}>
+      {Array.from({ length: 6 }).map((_, i) => <SellerOrderRowSkeleton key={i} />)}
+    </View>
+  );
+}
 
 export default function OrdersScreen() {
   const { theme } = useAppTheme();
@@ -580,6 +708,10 @@ export default function OrdersScreen() {
   const palette = theme as typeof theme & Record<string, string>;
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  // Extra centering padding beyond each row's own SP.md gutter — 0 on phone,
+  // grows on iPad so the list doesn't stretch edge to edge.
+  const listSidePad = Math.max(0, useCenteredContentPadding() - SP.md);
+  const tabBarMetrics = useTabBarMetrics();
 
   const api = useApi();
   const { userId, isLoaded: authLoaded, isSignedIn } = useAuth();
@@ -588,6 +720,7 @@ export default function OrdersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatesPaused, setUpdatesPaused] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<OrderListFilter>('all');
   const [sort, setSort] = useState<OrderSortKey>('newest');
@@ -616,13 +749,15 @@ export default function OrdersScreen() {
       setOrdersOwnerId(requestOwnerId);
       setStats(computeStats(all));
       setUpdatesPaused(false);
+      setLoadError(false);
       consecutiveFailuresRef.current = 0;
     } catch (e) {
       if (generationRef.current !== generation) return;
-      if (__DEV__) console.warn('[seller-orders] refresh unavailable; showing empty state', e);
-      setOrders([]);
+      if (__DEV__) console.warn('[seller-orders] refresh failed; keeping last known orders', e);
+      // Never clear the list or show a fake empty state on a fetch failure —
+      // keep whatever orders we already had and surface a retry banner.
       setOrdersOwnerId(requestOwnerId);
-      setStats(computeStats([]));
+      setLoadError(true);
       consecutiveFailuresRef.current += 1;
       if (consecutiveFailuresRef.current >= 3) {
         setUpdatesPaused(true);
@@ -699,8 +834,10 @@ export default function OrdersScreen() {
     return base;
   }, [orders, ordersOwnerId, userId, searchQuery, activeFilter, sort]);
 
-  // Date-grouped sections
+  // Date-grouped sections, flattened into recyclable rows
   const sections = useMemo(() => groupByDate(filtered), [filtered]);
+  const listRows = useMemo(() => flattenOrderSections(sections), [sections]);
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
   // Filter counts
   const filterCounts = useMemo(() => {
@@ -736,8 +873,13 @@ export default function OrdersScreen() {
   }, [api, loadData]);
 
   const handleShip = useCallback((orderId: string) => {
-    router.push(('/order-detail?id=' + orderId + '&tab=shipping') as never);
+    router.push(('/fulfill-order?orderId=' + orderId) as never);
   }, [router]);
+
+  const handleBulkFulfill = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push(('/fulfill-batch?orderIds=' + selectedIds.join(',')) as never);
+  }, [router, selectedIds]);
 
   const handleCardPress = useCallback((order: Order) => {
     if (selectedIds.length > 0) {
@@ -815,52 +957,70 @@ export default function OrdersScreen() {
   const hasActiveFilter = activeFilter !== 'all';
   const currentSortLabel = SORTS.find(s => s.key === sort)?.label ?? 'Sort';
 
-  const renderSectionHeader = useCallback(({ section }: { section: OrderSection }) => (
-    <View style={s.sectionHeader}>
-      <Text style={s.sectionTitle}>{section.title}</Text>
-      <Text style={s.sectionCount}>{section.data.length} {section.data.length === 1 ? 'order' : 'orders'}</Text>
-    </View>
-  ), []);
+  // Row handlers go through a ref so every row receives the same function
+  // identities; memoized rows then re-render only when their own order or
+  // selection state changes.
+  const actionsRef = useRef<OrderRowActions>({
+    press: handleCardPress,
+    longPress: handleLongPress,
+    markProcessing: handleMarkProcessing,
+    markReady: handleMarkReady,
+    ship: handleShip,
+  });
+  actionsRef.current = {
+    press: handleCardPress,
+    longPress: handleLongPress,
+    markProcessing: handleMarkProcessing,
+    markReady: handleMarkReady,
+    ship: handleShip,
+  };
+  const rowActions = useMemo<OrderRowActions>(() => ({
+    press: (order) => actionsRef.current.press(order),
+    longPress: (orderId) => actionsRef.current.longPress(orderId),
+    markProcessing: (orderId) => actionsRef.current.markProcessing(orderId),
+    markReady: (orderId) => actionsRef.current.markReady(orderId),
+    ship: (orderId) => actionsRef.current.ship(orderId),
+  }), []);
 
-  const renderItem = useCallback(({ item, index, section }: { item: Order; index: number; section: OrderSection }) => {
-    const isLast = index === section.data.length - 1;
-    const swipeAction =
-      item.status === 'new'
-        ? { label: 'Accept', icon: 'check-circle' as const, color: theme.accent, run: () => handleMarkProcessing(item.id) }
-        : item.status === 'processing'
-          ? { label: 'Ready', icon: 'package' as const, color: BLUE, run: () => handleMarkReady(item.id) }
-          : item.status === 'ready_to_ship'
-            ? { label: 'Ship', icon: 'send' as const, color: SUCCESS, run: () => handleShip(item.id) }
-            : { label: 'Open', icon: 'arrow-right' as const, color: theme.accent, run: () => handleCardPress(item) };
-
+  const selectionMode = selectedIds.length > 0;
+  const renderItem = useCallback(({ item }: { item: OrderListItem }) => {
+    if (item.type === 'header') {
+      return (
+        <View style={s.sectionHeader}>
+          <Text style={s.sectionTitle}>{item.title}</Text>
+          <Text style={s.sectionCount}>{item.count} {item.count === 1 ? 'order' : 'orders'}</Text>
+        </View>
+      );
+    }
+    if (item.type === 'gap') return <View style={{ height: SP.sm }} />;
     return (
-      <SwipeActionRow
-        label={swipeAction.label}
-        icon={swipeAction.icon}
-        color={swipeAction.color}
-        onAction={swipeAction.run}
-        disabled={selectedIds.length > 0}
-        accessibilityLabel={`${swipeAction.label} order ${item.orderNumber}`}
-      >
-        <OrderRow
-          order={item}
-          selected={selectedIds.includes(item.id)}
-          selectionMode={selectedIds.length > 0}
-          onPress={() => handleCardPress(item)}
-          onLongPress={() => handleLongPress(item.id)}
-          onMarkProcessing={() => handleMarkProcessing(item.id)}
-          onMarkReady={() => handleMarkReady(item.id)}
-          onShip={() => handleShip(item.id)}
-          isLast={isLast}
-        />
-      </SwipeActionRow>
+      <OrderListRow
+        order={item.order}
+        isLast={item.isLast}
+        selected={selectedIdSet.has(item.order.id)}
+        selectionMode={selectionMode}
+        actions={rowActions}
+      />
     );
-  }, [selectedIds, handleCardPress, handleLongPress, handleMarkProcessing, handleMarkReady, handleShip, theme.accent]);
+  }, [s, selectedIdSet, selectionMode, rowActions]);
 
-  const keyExtractor = useCallback((o: Order) => o.id, []);
+  const keyExtractor = useCallback((row: OrderListItem) => row.key, []);
+  const getItemType = useCallback((row: OrderListItem) => row.type, []);
 
   const ListHeaderComponent = useCallback(() => (
     <View style={s.listHeader}>
+      {(loadError || updatesPaused) && (
+        <TouchableOpacity
+          style={s.retryBanner}
+          onPress={onRefresh}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Couldn't refresh orders. Tap to try again."
+        >
+          <Feather name="alert-circle" size={14} color={theme.error} />
+          <Text style={s.retryBannerText}>Couldn{'’'}t refresh orders. Pull to try again.</Text>
+        </TouchableOpacity>
+      )}
       {/* Results count */}
       <View style={s.resultsRow}>
         <Text style={s.resultsText}>
@@ -876,17 +1036,24 @@ export default function OrdersScreen() {
         )}
       </View>
     </View>
-  ), [filtered.length, activeFilter, sort, currentSortLabel]);
+  ), [filtered.length, activeFilter, sort, currentSortLabel, loadError, updatesPaused, theme.error]);
 
   const ListEmptyComponent = useCallback(() => (
     <View style={s.emptyStateContainer}>
-      <EmptyState
-        icon="shopping-bag"
-        title="Your orders will show up here."
-        description="When a customer places an order, you can manage payment and fulfillment here."
-      />
+      {loadError ? (
+        <EmptyState
+          icon="alert-circle"
+          message="Couldn't load orders. Check your connection and pull to refresh."
+          variant="error"
+        />
+      ) : (
+        <EmptyState
+          icon="shopping-bag"
+          message="Your orders will show up here."
+        />
+      )}
     </View>
-  ), []);
+  ), [loadError]);
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -971,31 +1138,35 @@ export default function OrdersScreen() {
       </View>
 
       {/* ── Order list (section list for date groups) ── */}
-      <SectionList
-        sections={sections}
-        keyExtractor={keyExtractor}
-        renderItem={renderItem}
-        renderSectionHeader={renderSectionHeader}
-        renderSectionFooter={() => <View style={{ height: SP.sm }} />}
-        ListHeaderComponent={ListHeaderComponent}
-        ListEmptyComponent={ListEmptyComponent}
-        contentContainerStyle={[
-          s.listContent,
-          filtered.length === 0 && { flexGrow: 1 },
-          { paddingBottom: insets.bottom + COMP.tabBarH + (selectedIds.length > 0 ? 80 : SP.md) },
-        ]}
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-        stickySectionHeadersEnabled={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={PURPLE}
-            colors={[PURPLE]}
-          />
-        }
-      />
+      {loading && orders.length === 0 ? (
+        <View style={{ flex: 1, paddingHorizontal: listSidePad }}>
+          <SellerOrdersListSkeleton />
+        </View>
+      ) : (
+        <FlashList
+          data={listRows}
+          keyExtractor={keyExtractor}
+          getItemType={getItemType}
+          renderItem={renderItem}
+          extraData={selectedIdSet}
+          ListHeaderComponent={ListHeaderComponent}
+          ListEmptyComponent={ListEmptyComponent}
+          contentContainerStyle={[
+            s.listContent,
+            filtered.length === 0 && { flexGrow: 1 },
+            { paddingHorizontal: listSidePad, paddingBottom: tabBarMetrics.occupiedHeight + (selectedIds.length > 0 ? 80 : SP.md) },
+          ]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={PURPLE}
+              colors={[PURPLE]}
+            />
+          }
+        />
+      )}
 
       {/* Bulk action bar */}
       {selectedIds.length > 0 && (
@@ -1010,6 +1181,10 @@ export default function OrdersScreen() {
               <TouchableOpacity style={s.bulkBtn} onPress={handleBulkMarkReady} accessibilityRole="button" accessibilityLabel="Mark selected orders ready">
                 <Feather name="package" size={ICON.xs} color={SUCCESS} />
                 <Text style={[s.bulkBtnText, { color: SUCCESS }]}>Ready</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.bulkBtn} onPress={handleBulkFulfill} accessibilityRole="button" accessibilityLabel="Fulfill selected orders">
+                <Feather name="send" size={ICON.xs} color={BLUE} />
+                <Text style={[s.bulkBtnText, { color: BLUE }]}>Fulfill</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.bulkBtn} onPress={handleExportCsv} accessibilityRole="button" accessibilityLabel="Export selected orders">
                 <Feather name="download" size={ICON.xs} color={MUTED} />
@@ -1148,6 +1323,24 @@ const createStyles = (theme: any) => {
   listHeader: {
     paddingTop: SP.sm,
   },
+  retryBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
+    marginHorizontal: SP.md,
+    marginBottom: SP.sm,
+    padding: SP.sm,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: theme.error,
+    backgroundColor: theme.cardElevated ?? theme.card,
+  },
+  retryBannerText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: theme.error,
+    flex: 1,
+  },
   resultsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1197,22 +1390,34 @@ const createStyles = (theme: any) => {
     color: SUBTLE,
   },
 
-  // Order row
-  orderRow: {
+  // Order card
+  orderCard: {
     paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
+    paddingVertical: SP.md,
+    marginHorizontal: SP.md,
+    marginBottom: SP.sm,
     backgroundColor: CARD,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: BORDER,
     minHeight: 44,
   },
   orderRowSelected: {
     backgroundColor: CARD_ELEVATED_GLASS,
+    borderColor: BORDER_ACTIVE,
   },
   orderRowRisk: {
-    borderLeftWidth: 2,
-    borderLeftColor: RED + '66',
+    borderLeftWidth: 3,
+    borderLeftColor: RED + '88',
   },
   orderRowArchived: {
     opacity: 0.68,
+  },
+  cardTimelineWrap: {
+    marginTop: SP.sm,
+    paddingTop: SP.sm,
+    borderTopWidth: 1,
+    borderTopColor: BORDER,
   },
 
   // Selection

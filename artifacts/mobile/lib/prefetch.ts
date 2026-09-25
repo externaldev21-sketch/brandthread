@@ -6,7 +6,6 @@
  * instant instead of triggering a fresh network waterfall after the tap.
  */
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
-import { Image } from 'expo-image';
 
 /** Warm the query cache for a destination screen. Safe to call repeatedly —
  *  TanStack Query dedupes in-flight fetches for the same key and skips the
@@ -21,10 +20,12 @@ export function prefetchQuery<T>(
 }
 
 /** Warm expo-image's memory/disk cache for a URI so the destination screen's
- *  hero image is already decoded by the time it mounts. */
+ *  hero image is already decoded by the time it mounts. Imported lazily so
+ *  modules that only need the query-prefetch half of this file (e.g. in
+ *  tests) don't have to load the real expo-image native module. */
 export function prefetchImage(uri: string | null | undefined): void {
   if (!uri) return;
-  void Image.prefetch(uri, { cachePolicy: 'memory-disk' });
+  void import('expo-image').then(({ Image }) => Image.prefetch(uri, { cachePolicy: 'memory-disk' }));
 }
 
 /** Combine a query + image prefetch into one press-in handler. */

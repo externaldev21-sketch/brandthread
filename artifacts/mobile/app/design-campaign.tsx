@@ -1,15 +1,18 @@
 /**
- * Brandthread Create Ad — 5-step flow
+ * Brandthread Create Ad — single-page creator
  * Route: /design-campaign
  *
- * Step 1 — Media:          one video OR 1–5 ordered photos (never mixed)
- * Step 2 — Description:    headline + description fields only
- * Step 3 — Call to action: multiple-choice CTA chips; product selection lives here
- * Step 4 — Output format:  descriptive format cards with accurate aspect-ratio silhouettes; no output count
- * Step 5 — Budget & duration: slider-only budget + duration, live estimated reach, "Create ad · $X"
+ * Sections (compact, scrollable — not a step wizard):
+ *   1. Live ad preview — rendered the same way it appears in the buyer feed
+ *   2. Product & creative — one video OR 1–5 ordered photos
+ *   3. Headline & caption
+ *   4. Call to action (+ product selection when required)
+ *   5. Audience & reach — read-only estimated reach (no audience targeting exists server-side)
+ *   6. Budget & duration — sliders + live reach estimate
+ *   7. Sticky "Launch" button pinned to the bottom
  *
- * Payment flow (same pattern as sample-detail.tsx):
- *   1. User taps "Create ad · $X" → POST /pay → get checkout URL
+ * Payment flow (unchanged, same pattern as sample-detail.tsx):
+ *   1. User taps "Launch · $X" → PATCH campaign with final fields → POST /pay → get checkout URL
  *   2. Open Stripe Checkout in WebBrowser.openAuthSessionAsync
  *   3. Browser returns to brandthread://design-campaign/?id=&paymentReturn=1
  *   4. POST /pay/verify → server checks payment_status=paid → activates idempotently
@@ -20,31 +23,36 @@
  *   low  = floor(budgetCents/100 * 35)
  *   high = floor(budgetCents/100 * 65)
  * Labeled "estimate" — never reported as delivered impressions.
+ *
+ * Output format: the server requires a non-empty `formats` array before pay,
+ * but this UI no longer exposes a format picker — the ad is always delivered
+ * for the single placement that matches this exact preview (portrait feed,
+ * 4:5), so `DEFAULT_FORMATS` below is sent automatically.
+ *
+ * Audience targeting: `ad_campaigns` has no audience/targeting columns and the
+ * route never reads any — there is nothing real to select here, so this
+ * screen only surfaces the already-computed estimated reach, read-only.
  */
 import React, {
   useState, useCallback, useRef, useEffect, useMemo,
 } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, ActivityIndicator, LayoutChangeEvent, PanResponder,
-  Platform, TextInput,
+  Alert, ActivityIndicator, Platform, TextInput,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import * as WebBrowser from 'expo-web-browser';
+import { useUser } from '@clerk/expo';
 
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED,
-  BORDER, BORDER_ACTIVE, BORDER_SUBTLE,
-  FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM,
-  FONT, FS, SP, RADIUS, ICON, SHADOW_SM,
-} from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
+import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/hooks/useApi';
 import {
   estimateReach,
@@ -55,11 +63,9 @@ import {
   DURATION_MAX_DAYS,
   MAX_PHOTOS,
   CTA_OPTIONS,
-  AD_FORMAT_OPTIONS,
   validateMediaStage,
   validateDescriptionStage,
   validateCtaStage,
-  validateFormatStage,
   validateBudgetStage,
   buildAdCampaignReturnUrl,
   validateImageFile,
@@ -72,179 +78,33 @@ import type {
   AdMediaKind,
 } from '@/lib/api';
 import { isSellerDevPreview } from '@/lib/devPreview';
+import { Header } from '@/components/layout';
+import { InlineSlider } from '@/components/InlineSlider';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const TOTAL_STEPS = 5;
-const STEP_LABELS: readonly string[] = ['Media', 'Description', 'Call to action', 'Output format', 'Budget & duration'];
+// The server still requires a non-empty `formats` array (see route note above).
+// This design shows a single, true-to-life placement, so we always send this.
+const DEFAULT_FORMATS: AdFormatKind[] = ['portrait_4x5'];
 
 /** Return URL for Stripe Checkout redirect — matches server allowlist. */
 function makeReturnUrl(campaignId: string): string {
   return buildAdCampaignReturnUrl(campaignId);
 }
 
-// ─── Slider ───────────────────────────────────────────────────────────────────
-
-function SnapSlider({
-  value, min, max, step = 1, steps, onChange, accessibilityLabel,
-}: {
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  steps?: readonly number[];
-  onChange: (v: number) => void;
-  accessibilityLabel: string;
-}) {
-  const widthRef = useRef(1);
-
-  const snapValue = useCallback((raw: number): number => {
-    if (steps) {
-      let best = steps[0];
-      let bestDist = Math.abs(raw - best);
-      for (const s of steps) {
-        const d = Math.abs(raw - s);
-        if (d < bestDist) { best = s; bestDist = d; }
-      }
-      return best;
-    }
-    const clamped = Math.max(min, Math.min(max, raw));
-    return Math.round((clamped - min) / step) * step + min;
-  }, [min, max, step, steps]);
-
-  const fractionFromValue = useCallback((v: number): number => {
-    if (steps) {
-      const idx = steps.indexOf(v as any);
-      const safeIdx = idx === -1 ? 0 : idx;
-      return safeIdx / (steps.length - 1);
-    }
-    return (v - min) / (max - min);
-  }, [min, max, steps]);
-
-  const indexFromX = useCallback((x: number): number => {
-    if (!steps) return -1;
-    const fraction = Math.max(0, Math.min(1, x / widthRef.current));
-    return Math.min(steps.length - 1, Math.round(fraction * (steps.length - 1)));
-  }, [steps]);
-
-  const panResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder:  () => true,
-    onPanResponderGrant:          () => { Haptics.selectionAsync(); },
-    onPanResponderMove:           (_e, g) => {
-      if (steps) {
-        const currentIdx = steps.indexOf(value as any);
-        const startX = currentIdx === -1
-          ? widthRef.current / 2
-          : (currentIdx / (steps.length - 1)) * widthRef.current;
-        onChange(steps[indexFromX(startX + g.dx)]);
-      } else {
-        onChange(snapValue(value + (g.dx / widthRef.current) * (max - min)));
-      }
-    },
-  }), [steps, value, max, min, snapValue, indexFromX, onChange]);
-
-  const fraction = fractionFromValue(value);
-
-  return (
-    <View
-      style={ss.sliderTouch}
-      onLayout={(e: LayoutChangeEvent) => { widthRef.current = Math.max(1, e.nativeEvent.layout.width); }}
-      onTouchEnd={(e) => {
-        if (steps) {
-          onChange(steps[indexFromX(e.nativeEvent.locationX)]);
-        } else {
-          onChange(snapValue(min + (e.nativeEvent.locationX / widthRef.current) * (max - min)));
-        }
-        Haptics.selectionAsync();
-      }}
-      accessible
-      accessibilityRole="adjustable"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityValue={{ min, max, now: value }}
-      accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
-      onAccessibilityAction={(e) => {
-        if (steps) {
-          const idx = steps.indexOf(value as any);
-          const safeI = idx === -1 ? 0 : idx;
-          if (e.nativeEvent.actionName === 'increment') onChange(steps[Math.min(steps.length - 1, safeI + 1)]);
-          else onChange(steps[Math.max(0, safeI - 1)]);
-        } else {
-          onChange(snapValue(value + (e.nativeEvent.actionName === 'increment' ? step : -step)));
-        }
-      }}
-      {...panResponder.panHandlers}
-    >
-      <View style={ss.sliderTrack}>
-        <View style={[ss.sliderFill, { width: `${fraction * 100}%` as any }]} />
-      </View>
-      <View style={[ss.sliderThumb, { left: `${fraction * 100}%` as any }]} />
-    </View>
-  );
-}
-
-const ss = StyleSheet.create({
-  sliderTouch: { height: 44, justifyContent: 'center', position: 'relative' },
-  sliderTrack: { height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.10)', overflow: 'hidden' },
-  sliderFill:  { height: 5, borderRadius: 3, backgroundColor: PURPLE_LIGHT },
-  sliderThumb: {
-    position: 'absolute', top: 10, width: 24, height: 24, borderRadius: 12,
-    marginLeft: -12, backgroundColor: '#fff',
-    borderWidth: 3, borderColor: PURPLE_LIGHT,
-    shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
-  },
-});
-
-// ─── Step progress indicator ──────────────────────────────────────────────────
-
-function StepDots({ total, current }: { total: number; current: number }) {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, justifyContent: 'center', marginBottom: SP.sm }}>
-      {Array.from({ length: total }).map((_, i) => (
-        <View key={i} style={{
-          width: i === current ? 18 : 5,
-          height: 5, borderRadius: 3,
-          backgroundColor: i < current ? PURPLE_LIGHT : i === current ? PURPLE_LIGHT : 'rgba(255,255,255,0.15)',
-        }} />
-      ))}
-    </View>
-  );
-}
-
-// ─── Aspect-ratio silhouette ─────────────────────────────────────────────────
-
-function AspectSilhouette({ ratioW, ratioH, active }: { ratioW: number; ratioH: number; active: boolean }) {
-  const maxW = 52;
-  const maxH = 72;
-  let w = maxW;
-  let h = (ratioH / ratioW) * w;
-  if (h > maxH) { h = maxH; w = (ratioW / ratioH) * h; }
-  return (
-    <View style={{
-      width: w, height: h, borderRadius: 4,
-      backgroundColor: active ? PURPLE_DIM : 'rgba(255,255,255,0.06)',
-      borderWidth: 1.5,
-      borderColor: active ? PURPLE_LIGHT : 'rgba(255,255,255,0.12)',
-      alignItems: 'center', justifyContent: 'center',
-    }}>
-      {active && <Feather name="check" size={11} color={PURPLE_LIGHT} />}
-    </View>
-  );
-}
-
-// ─── Media thumbnail ─────────────────────────────────────────────────────────
+// ─── Media thumbnail (compact picker strip) ──────────────────────────────────
 
 function MediaThumb({
-  uri, mimeType, onRemove, onMoveLeft, onMoveRight, canMoveLeft, canMoveRight, index,
+  uri, mimeType, onRemove, onMoveLeft, onMoveRight, canMoveLeft, canMoveRight, index, colors,
 }: {
   uri: string; mimeType: string; onRemove: () => void;
   onMoveLeft: () => void; onMoveRight: () => void;
   canMoveLeft: boolean; canMoveRight: boolean; index: number;
+  colors: ReturnType<typeof useColors>;
 }) {
   const isVideo = mimeType.startsWith('video/');
   return (
-    <View style={mt.wrap} testID={`media-thumb-${index}`}>
+    <View style={[mt.wrap, { backgroundColor: colors.card, borderColor: colors.border }]} testID={`media-thumb-${index}`}>
       <Image source={{ uri }} style={mt.img} contentFit="cover" />
       {isVideo && (
         <View style={mt.videoBadge}><Feather name="play" size={10} color="#fff" /></View>
@@ -265,12 +125,113 @@ function MediaThumb({
 }
 
 const mt = StyleSheet.create({
-  wrap:       { width: 88, height: 88, borderRadius: RADIUS.sm, overflow: 'hidden', backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, position: 'relative' },
+  wrap:       { width: 76, height: 76, borderRadius: RADIUS.sm, overflow: 'hidden', borderWidth: 1, position: 'relative' },
   img:        { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   videoBadge: { position: 'absolute', top: 4, left: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, paddingHorizontal: 5, paddingVertical: 2, flexDirection: 'row', alignItems: 'center', gap: 2 },
-  removeBtn:  { position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center' },
+  removeBtn:  { position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center' },
   reorderRow: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 4, paddingVertical: 2 },
   reorderBtn: { padding: 2 },
+});
+
+// ─── Live ad preview — the same visual language as the buyer feed card ──────
+// Full-bleed media, bottom scrim, creator row + caption + a shop-style CTA
+// pill, mirroring the feed's bottom-left overlay (see app/(tabs)/feed.tsx).
+
+function AdPreviewCard({
+  mediaUri, isVideo, headline, ctaText, brandName,
+}: {
+  mediaUri: string | null;
+  isVideo: boolean;
+  headline: string;
+  ctaText: string | null;
+  brandName: string;
+}) {
+  const { theme } = useAppTheme();
+  const colors = useColors();
+  return (
+    <View style={[pv.card, { backgroundColor: colors.card, borderColor: colors.border }]} testID="ad-preview-card">
+      {mediaUri ? (
+        <Image source={{ uri: mediaUri }} style={pv.media} contentFit="cover" />
+      ) : (
+        <View style={[pv.media, pv.mediaEmpty, { backgroundColor: colors.elevated }]}>
+          <Feather name="image" size={ICON.lg} color={colors.mutedForeground} />
+          <Text style={[pv.emptyText, { color: colors.mutedForeground }]}>Add media to see your ad preview</Text>
+        </View>
+      )}
+
+      {isVideo && mediaUri && (
+        <View style={pv.videoBadge}>
+          <Feather name="play" size={12} color="#fff" />
+        </View>
+      )}
+
+      <View style={pv.sponsoredWrap}>
+        <View style={pv.sponsoredPill}>
+          <Feather name="zap" size={10} color="#fff" />
+          <Text style={pv.sponsoredText}>Sponsored</Text>
+        </View>
+      </View>
+
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.82)']}
+        style={pv.scrim}
+        pointerEvents="none"
+      />
+
+      <View style={pv.bottomInfo} pointerEvents="none">
+        <Text style={pv.brandName} numberOfLines={1}>{brandName}</Text>
+        <Text style={pv.headline} numberOfLines={2}>
+          {headline || 'Your headline appears here'}
+        </Text>
+        {ctaText && (
+          <View style={[pv.ctaPill, { backgroundColor: theme.accent }]}>
+            <Text style={[pv.ctaPillText, getOnAccentTextStyle(theme)]}>{ctaText}</Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
+const pv = StyleSheet.create({
+  card:          { width: '100%', aspectRatio: 4 / 5, borderRadius: RADIUS.lg, borderWidth: 1, overflow: 'hidden', position: 'relative' },
+  media:         { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  mediaEmpty:    { alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingHorizontal: SP.xl },
+  emptyText:     { fontSize: FS.sm, fontFamily: FONT.medium, textAlign: 'center' },
+  videoBadge:    { position: 'absolute', top: SP.sm, right: SP.sm, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.pill, padding: 6 },
+  sponsoredWrap: { position: 'absolute', top: SP.sm, left: SP.sm },
+  sponsoredPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 4 },
+  sponsoredText: { fontSize: FS.xs, fontFamily: FONT.bold, color: '#fff', letterSpacing: 0.3 },
+  scrim:         { position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%' },
+  bottomInfo:    { position: 'absolute', left: SP.md, right: SP.md, bottom: SP.md, gap: 6 },
+  brandName:     { fontSize: FS.sm, fontFamily: FONT.bold, color: '#fff' },
+  headline:      { fontSize: FS.base, fontFamily: FONT.semibold, color: '#fff', lineHeight: 20 },
+  ctaPill:       { alignSelf: 'flex-start', borderRadius: RADIUS.pill, paddingHorizontal: 14, paddingVertical: 8, marginTop: 2 },
+  ctaPillText:   { fontSize: FS.sm, fontFamily: FONT.bold },
+});
+
+// ─── Compact section wrapper ──────────────────────────────────────────────────
+
+function Section({
+  title, subtitle, children, colors,
+}: {
+  title: string; subtitle?: string; children: React.ReactNode; colors: ReturnType<typeof useColors>;
+}) {
+  return (
+    <View style={{ marginTop: SP.xl }}>
+      <Text style={[sec.title, { color: colors.foreground }]}>{title}</Text>
+      {subtitle && <Text style={[sec.subtitle, { color: colors.mutedForeground }]}>{subtitle}</Text>}
+      <View style={[sec.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {children}
+      </View>
+    </View>
+  );
+}
+
+const sec = StyleSheet.create({
+  title:    { fontSize: FS.base, fontFamily: FONT.bold, letterSpacing: -0.1 },
+  subtitle: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2, marginBottom: SP.sm, lineHeight: 16 },
+  card:     { borderRadius: RADIUS.md, borderWidth: 1, padding: SP.md, gap: SP.md },
 });
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
@@ -280,34 +241,32 @@ export default function CreateAdScreen() {
   const params    = useLocalSearchParams<{ id?: string; paymentReturn?: string }>();
   const insets    = useSafeAreaInsets();
   const api       = useApi();
+  const { theme } = useAppTheme();
+  const colors    = useColors();
+  const { user }  = useUser();
 
-  const topPad    = insets.top + (Platform.OS === 'web' ? 67 : 0);
-  const bottomPad = insets.bottom + (Platform.OS === 'web' ? 34 : 0) + 90;
+  const bottomPad = insets.bottom + (Platform.OS === 'web' ? 34 : 0) + 96;
 
   // ── Campaign state ────────────────────────────────────────────────────────
   const [campaign,  setCampaign]  = useState<AdCampaign | null>(null);
-  const [step,      setStep]      = useState(0);   // 0–4 for 5 steps
   const [loading,   setLoading]   = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
 
-  // Step 1 — Media
+  // Media
   const [localPaths, setLocalPaths] = useState<string[]>([]);
   const [localMimes, setLocalMimes] = useState<string[]>([]);
   const [localUris,  setLocalUris]  = useState<string[]>([]);
   const [mediaKind,  setMediaKind]  = useState<AdMediaKind>('photos');
 
-  // Step 2 — Description
+  // Headline & caption
   const [headline,    setHeadline]    = useState('');
   const [description, setDescription] = useState('');
 
-  // Step 3 — CTA
+  // CTA
   const [ctaKind,   setCtaKind]   = useState<AdCtaKind | null>(null);
   const [ctaDestId, setCtaDestId] = useState<string | null>(null);
 
-  // Step 4 — Formats
-  const [formats, setFormats] = useState<AdFormatKind[]>([]);
-
-  // Step 5 — Budget & duration
+  // Budget & duration
   const [budgetCents,  setBudgetCents]  = useState(2500);
   const [durationDays, setDurationDays] = useState(7);
 
@@ -316,7 +275,7 @@ export default function CreateAdScreen() {
   const [verifying, setVerifying] = useState(false);
   const [succeeded, setSucceeded] = useState(false);
 
-  // Products (loaded when entering step 3 — CTA)
+  // Products (loaded up-front since this is now a single page)
   const [products,        setProducts]        = useState<Array<{ id: string; name: string }>>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
 
@@ -327,6 +286,8 @@ export default function CreateAdScreen() {
 
   // Detect preview once at mount (stable across the component lifetime)
   const inSellerPreview = isSellerDevPreview();
+
+  const brandName = user?.fullName || (user as any)?.username || 'Your Store';
 
   // ── Create draft on mount ─────────────────────────────────────────────────
   useEffect(() => {
@@ -368,16 +329,16 @@ export default function CreateAdScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.paymentReturn, params.id]);
 
-  // ── Load products when entering step 3 (CTA) ────────────────────────────
+  // ── Load products up-front (needed by the CTA section) ──────────────────
   useEffect(() => {
-    if (step !== 2 || products.length > 0) return;
+    if (products.length > 0) return;
     setLoadingProducts(true);
     api.products.list()
       .then((rows: unknown) => setProducts((rows as any[]).map((p: any) => ({ id: p.id, name: p.name }))))
       .catch(() => {})
       .finally(() => setLoadingProducts(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step]);
+  }, []);
 
   // ── Verify payment (called after browser redirect) ────────────────────────
   const verifyPayment = useCallback(async (campaignId: string) => {
@@ -397,7 +358,7 @@ export default function CreateAdScreen() {
       } else if (res.campaign.status === 'failed') {
         Alert.alert(
           'Payment failed',
-          'Your payment could not be processed. Tap "Create ad" to try again.',
+          'Your payment could not be processed. Tap "Launch" to try again.',
           [{ text: 'OK' }],
         );
       }
@@ -462,7 +423,6 @@ export default function CreateAdScreen() {
 
       // Dev seller preview: keep media local; skip object-storage upload.
       if (inSellerPreview) {
-        // Use the local URI as the "path" — no server round-trip.
         setLocalPaths((prev) => [...prev, asset.uri]);
         setLocalMimes((prev) => [...prev, mimeType]);
         setLocalUris((prev)  => [...prev, asset.uri]);
@@ -537,76 +497,22 @@ export default function CreateAdScreen() {
     try { await api.adCampaigns.reorderMedia(campaign.id, order); } catch { /* revert not needed */ }
   }
 
-  // ── Step navigation ───────────────────────────────────────────────────────
+  // ── Launch: validate everything, save, then pay ──────────────────────────
 
-  function goBack() {
-    if (step === 0) { router.back(); return; }
-    setStep((s) => s - 1);
-    Haptics.selectionAsync();
-  }
-
-  async function goNext() {
+  async function handleLaunch() {
     if (!campaign) return;
 
-    // ── Step 1: Media ──
-    if (step === 0) {
-      const v = validateMediaStage({ mediaObjectPaths: localPaths, mediaKind });
-      if (!v.valid) { Alert.alert('Incomplete', v.errors.join('\n')); return; }
-    }
+    const mediaV = validateMediaStage({ mediaObjectPaths: localPaths, mediaKind });
+    if (!mediaV.valid) { Alert.alert('Incomplete', mediaV.errors.join('\n')); return; }
 
-    // ── Step 2: Description ──
-    if (step === 1) {
-      const v = validateDescriptionStage({ headline });
-      if (!v.valid) { Alert.alert('Incomplete', v.errors.join('\n')); return; }
-    }
+    const descV = validateDescriptionStage({ headline });
+    if (!descV.valid) { Alert.alert('Incomplete', descV.errors.join('\n')); return; }
 
-    // ── Step 3: CTA — persist headline + description + CTA in one update ──
-    if (step === 2) {
-      const v = validateCtaStage({ ctaKind: ctaKind ?? undefined, ctaDestinationId: ctaDestId ?? undefined });
-      if (!v.valid) { Alert.alert('Incomplete', v.errors.join('\n')); return; }
+    const ctaV = validateCtaStage({ ctaKind: ctaKind ?? undefined, ctaDestinationId: ctaDestId ?? undefined });
+    if (!ctaV.valid) { Alert.alert('Incomplete', ctaV.errors.join('\n')); return; }
 
-      // Dev seller preview: skip update API call — persist only in local state.
-      if (!inSellerPreview) {
-        setLoading(true);
-        try {
-          const selected = CTA_OPTIONS.find((c) => c.kind === ctaKind);
-          const updated = await api.adCampaigns.update(campaign.id, {
-            headline,
-            description: description || undefined,
-            ctaKind: ctaKind!,
-            ctaDestinationKind: selected?.destinationKind,
-            ...(ctaDestId ? { ctaDestinationId: ctaDestId } : {}),
-          });
-          setCampaign(updated.campaign);
-        } catch {
-          Alert.alert('Error', 'Could not save details. Please try again.');
-          setLoading(false);
-          return;
-        }
-        setLoading(false);
-      }
-    }
-
-    // ── Step 4: Format ──
-    if (step === 3) {
-      const v = validateFormatStage({ formats });
-      if (!v.valid) { Alert.alert('Incomplete', v.errors.join('\n')); return; }
-    }
-
-    // ── Step 5: Budget — trigger payment ──
-    if (step === 4) { handlePay(); return; }
-
-    setStep((s) => s + 1);
-    Haptics.selectionAsync();
-  }
-
-  // ── Payment — Stripe Checkout Session ─────────────────────────────────────
-
-  async function handlePay() {
-    if (!campaign) return;
-
-    const v = validateBudgetStage({ formats, budgetCents, durationDays });
-    if (!v.valid) { Alert.alert('Incomplete', v.errors.join('\n')); return; }
+    const budgetV = validateBudgetStage({ formats: DEFAULT_FORMATS, budgetCents, durationDays });
+    if (!budgetV.valid) { Alert.alert('Incomplete', budgetV.errors.join('\n')); return; }
 
     // Dev seller preview: never activate or charge. Show an honest sign-in alert.
     if (inSellerPreview) {
@@ -620,7 +526,17 @@ export default function CreateAdScreen() {
 
     setLoading(true);
     try {
-      const updated = await api.adCampaigns.update(campaign.id, { formats, budgetCents, durationDays });
+      const selected = CTA_OPTIONS.find((c) => c.kind === ctaKind);
+      const updated = await api.adCampaigns.update(campaign.id, {
+        headline,
+        description: description || undefined,
+        ctaKind: ctaKind!,
+        ctaDestinationKind: selected?.destinationKind,
+        ...(ctaDestId ? { ctaDestinationId: ctaDestId } : {}),
+        formats: DEFAULT_FORMATS,
+        budgetCents,
+        durationDays,
+      });
       setCampaign(updated.campaign);
     } catch {
       Alert.alert('Error', 'Could not save campaign settings. Please try again.');
@@ -663,7 +579,7 @@ export default function CreateAdScreen() {
       Alert.alert(
         'Payment failed',
         msg.includes('422') || msg.includes('media')
-          ? 'Make sure your campaign has media, a CTA, and at least one format before paying.'
+          ? 'Make sure your campaign has media, a CTA, and a budget before launching.'
           : 'Could not start checkout. Please try again.',
         [{ text: 'OK' }],
       );
@@ -676,329 +592,11 @@ export default function CreateAdScreen() {
 
   function renderHeader() {
     return (
-      <View style={[styles.header, { paddingTop: topPad + 8 }]}>
-        <TouchableOpacity onPress={goBack} style={styles.headerBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} accessibilityRole="button" accessibilityLabel="Go back">
-          <Feather name="arrow-left" size={20} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Create Ad</Text>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} accessibilityRole="button" accessibilityLabel="Close">
-          <Feather name="x" size={20} color={MUTED} />
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  // ── Step 1: Media ─────────────────────────────────────────────────────────
-
-  function renderMedia() {
-    return (
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: SP.md, paddingBottom: bottomPad }}>
-        <StepDots total={TOTAL_STEPS} current={0} />
-        <Text style={styles.stageHeading}>Add your media</Text>
-        <Text style={styles.stageSub}>Upload one video (up to 60 s) or 1–5 photos.{'\n'}You cannot mix video and photos.</Text>
-
-        {(!localPaths.length || mediaKind === 'photos') && (
-          <TouchableOpacity
-            style={[styles.pickerCard, mediaKind === 'video' && localPaths.length > 0 && { opacity: 0.35 }]}
-            onPress={() => pickMedia('photos')}
-            disabled={mediaKind === 'video' && localPaths.length > 0}
-            accessibilityRole="button"
-            accessibilityLabel="Add photos"
-            testID="pick-photos-btn"
-          >
-            <Feather name="image" size={ICON.md} color={PURPLE_LIGHT} />
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text style={styles.pickerCardTitle}>Add photos</Text>
-              <Text style={styles.pickerCardSub}>JPEG, PNG, WebP, HEIC · max 20 MB each · up to {MAX_PHOTOS}</Text>
-            </View>
-            <Feather name="plus" size={ICON.sm} color={MUTED} />
-          </TouchableOpacity>
-        )}
-
-        {(!localPaths.length || mediaKind === 'video') && (
-          <TouchableOpacity
-            style={[styles.pickerCard, { marginTop: SP.sm }, mediaKind === 'photos' && localPaths.length > 0 && { opacity: 0.35 }]}
-            onPress={() => pickMedia('video')}
-            disabled={mediaKind === 'photos' && localPaths.length > 0}
-            accessibilityRole="button"
-            accessibilityLabel="Add video"
-            testID="pick-video-btn"
-          >
-            <Feather name="video" size={ICON.md} color={PURPLE_LIGHT} />
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text style={styles.pickerCardTitle}>Add video</Text>
-              <Text style={styles.pickerCardSub}>MP4, MOV · max 500 MB · max 60 seconds</Text>
-            </View>
-            <Feather name="plus" size={ICON.sm} color={MUTED} />
-          </TouchableOpacity>
-        )}
-
-        {localPaths.length > 0 && (
-          <View style={{ marginTop: SP.lg }}>
-            <Text style={styles.sectionLabel}>{mediaKind === 'video' ? 'Video' : `Photos (${localPaths.length}/${MAX_PHOTOS})`}</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginTop: SP.sm }}>
-              {localUris.map((uri, i) => (
-                <MediaThumb
-                  key={`${uri}-${i}`}
-                  uri={uri}
-                  mimeType={localMimes[i] ?? 'image/jpeg'}
-                  index={i}
-                  onRemove={() => handleRemoveMedia(i)}
-                  onMoveLeft={() => handleReorder(i, 'left')}
-                  onMoveRight={() => handleReorder(i, 'right')}
-                  canMoveLeft={i > 0}
-                  canMoveRight={i < localPaths.length - 1}
-                />
-              ))}
-              {mediaKind === 'photos' && localPaths.length < MAX_PHOTOS && (
-                <TouchableOpacity style={[mt.wrap, { alignItems: 'center', justifyContent: 'center', borderStyle: 'dashed' }]} onPress={() => pickMedia('photos')} testID="add-more-photos-btn">
-                  <Feather name="plus" size={24} color={MUTED} />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        )}
-
-        {localPaths.length > 0 && (
-          <View style={[styles.infoBox, { marginTop: SP.lg }]}>
-            <Feather name="lock" size={13} color={MUTED} />
-            <Text style={styles.infoBoxText}>Media is kept private until your campaign is verified and activated.</Text>
-          </View>
-        )}
-      </ScrollView>
-    );
-  }
-
-  // ── Step 2: Description ───────────────────────────────────────────────────
-
-  function renderDescription() {
-    return (
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: SP.md, paddingBottom: bottomPad }} keyboardShouldPersistTaps="handled">
-        <StepDots total={TOTAL_STEPS} current={1} />
-        <Text style={styles.stageHeading}>Describe your ad</Text>
-        <Text style={styles.stageSub}>Write a headline and an optional description for your campaign.</Text>
-
-        <Text style={styles.sectionLabel}>Headline</Text>
-        <TextInput
-          value={headline}
-          onChangeText={setHeadline}
-          placeholder="Short, punchy headline…"
-          placeholderTextColor={SUBTLE}
-          style={styles.textInputField}
-          maxLength={80}
-          returnKeyType="done"
-          testID="headline-input"
-        />
-        <Text style={styles.charCount}>{headline.length}/80</Text>
-
-        <Text style={[styles.sectionLabel, { marginTop: SP.lg }]}>Description <Text style={{ fontFamily: FONT.regular, color: SUBTLE }}>(optional)</Text></Text>
-        <TextInput
-          value={description}
-          onChangeText={setDescription}
-          placeholder="Brief description of your product or offer…"
-          placeholderTextColor={SUBTLE}
-          style={styles.textArea}
-          multiline
-          maxLength={200}
-          returnKeyType="done"
-          testID="description-input"
-        />
-        <Text style={styles.charCount}>{description.length}/200</Text>
-      </ScrollView>
-    );
-  }
-
-  // ── Step 3: Call to action ────────────────────────────────────────────────
-
-  function renderCta() {
-    const selectedCta = CTA_OPTIONS.find((c) => c.kind === ctaKind);
-    return (
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: SP.md, paddingBottom: bottomPad }} keyboardShouldPersistTaps="handled">
-        <StepDots total={TOTAL_STEPS} current={2} />
-        <Text style={styles.stageHeading}>Call to action</Text>
-        <Text style={styles.stageSub}>Choose what happens when someone taps your ad.</Text>
-
-        <View style={{ gap: SP.sm, marginTop: SP.md }}>
-          {CTA_OPTIONS.map((opt) => {
-            const active = ctaKind === opt.kind;
-            return (
-              <TouchableOpacity
-                key={opt.kind}
-                style={[styles.ctaCard, active && styles.ctaCardActive]}
-                onPress={() => { Haptics.selectionAsync(); setCtaKind(opt.kind); setCtaDestId(null); }}
-                activeOpacity={0.8}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: active }}
-                accessibilityLabel={opt.label}
-                testID={`cta-${opt.kind}`}
-              >
-                <View style={[styles.ctaRadio, active && styles.ctaRadioActive]}>
-                  {active && <View style={styles.ctaRadioFill} />}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.ctaLabel, active && styles.ctaLabelActive]}>{opt.label}</Text>
-                  <Text style={styles.ctaDestKind}>
-                    {opt.requiresProductSelection ? 'Links to a product' : `Links to your ${opt.destinationKind}`}
-                  </Text>
-                </View>
-                {active && <Feather name="check" size={ICON.sm} color={PURPLE_LIGHT} />}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {selectedCta?.requiresProductSelection && (
-          <View style={{ marginTop: SP.lg }}>
-            <Text style={styles.sectionLabel}>Select product</Text>
-            <Text style={[styles.stageSub, { marginBottom: SP.sm }]}>Choose which product this ad promotes.</Text>
-            {loadingProducts ? (
-              <ActivityIndicator color={PURPLE_LIGHT} style={{ margin: SP.md }} />
-            ) : (
-              <View style={{ gap: SP.sm }}>
-                {products.map((p) => {
-                  const active = ctaDestId === p.id;
-                  return (
-                    <TouchableOpacity
-                      key={p.id}
-                      style={[styles.productRow, active && styles.productRowActive]}
-                      onPress={() => { Haptics.selectionAsync(); setCtaDestId(p.id); }}
-                      testID={`product-chip-${p.id}`}
-                      accessibilityRole="radio"
-                      accessibilityState={{ checked: active }}
-                    >
-                      <View style={[styles.ctaRadio, active && styles.ctaRadioActive]}>
-                        {active && <View style={styles.ctaRadioFill} />}
-                      </View>
-                      <Text style={[styles.productRowText, active && styles.productRowTextActive]}>{p.name}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-                {products.length === 0 && (
-                  <View style={styles.infoBox}>
-                    <Feather name="alert-circle" size={13} color={MUTED} />
-                    <Text style={styles.infoBoxText}>No products found. Add products to your store first.</Text>
-                  </View>
-                )}
-              </View>
-            )}
-          </View>
-        )}
-      </ScrollView>
-    );
-  }
-
-  // ── Step 4: Output format ─────────────────────────────────────────────────
-
-  function renderFormat() {
-    return (
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: SP.md, paddingBottom: bottomPad }}>
-        <StepDots total={TOTAL_STEPS} current={3} />
-        <Text style={styles.stageHeading}>Output format</Text>
-        <Text style={styles.stageSub}>Choose where your ad appears. Each card shows the exact aspect ratio for that placement.</Text>
-
-        <View style={{ gap: SP.sm, marginTop: SP.md }}>
-          {AD_FORMAT_OPTIONS.map((fmt) => {
-            const active = formats.includes(fmt.kind);
-            return (
-              <TouchableOpacity
-                key={fmt.kind}
-                style={[styles.formatRow, active && styles.formatRowActive]}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setFormats((prev) =>
-                    prev.includes(fmt.kind) ? prev.filter((f) => f !== fmt.kind) : [...prev, fmt.kind]
-                  );
-                }}
-                activeOpacity={0.8}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: active }}
-                testID={`format-${fmt.kind}`}
-              >
-                {/* Accurate aspect-ratio silhouette */}
-                <AspectSilhouette ratioW={fmt.ratioW} ratioH={fmt.ratioH} active={active} />
-                <View style={{ flex: 1, gap: 3 }}>
-                  <Text style={[styles.formatLabel, active && styles.formatLabelActive]}>{fmt.label}</Text>
-                  <Text style={styles.formatDesc}>{fmt.description}</Text>
-                  <Text style={styles.formatAr}>{fmt.aspectRatio} · {fmt.dims}</Text>
-                </View>
-                <Feather name={active ? 'check-square' : 'square'} size={ICON.sm} color={active ? PURPLE_LIGHT : MUTED} />
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {formats.length > 0 && (
-          <View style={[styles.infoBox, { marginTop: SP.lg }]}>
-            <Feather name="info" size={13} color={MUTED} />
-            <Text style={styles.infoBoxText}>
-              {formats.length} format{formats.length !== 1 ? 's' : ''} selected. Your ad will be delivered in each chosen placement.
-            </Text>
-          </View>
-        )}
-      </ScrollView>
-    );
-  }
-
-  // ── Step 5: Budget & duration ─────────────────────────────────────────────
-
-  function renderBudget() {
-    const budgetDollars = budgetCents / 100;
-    return (
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: SP.md, paddingBottom: bottomPad }}>
-        <StepDots total={TOTAL_STEPS} current={4} />
-        <Text style={styles.stageHeading}>Budget & duration</Text>
-        <Text style={styles.stageSub}>Slide to set your total spend and how long your ad runs.</Text>
-
-        {/* Budget slider */}
-        <Text style={[styles.sectionLabel, { marginTop: SP.md }]}>Budget</Text>
-        <View style={styles.sliderCard}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: SP.xs }}>
-            <Text style={styles.sliderMin}>${BUDGET_MIN_CENTS / 100}</Text>
-            <Text style={styles.sliderCurrent}>${budgetDollars}</Text>
-            <Text style={styles.sliderMax}>${BUDGET_MAX_CENTS / 100}</Text>
-          </View>
-          <SnapSlider
-            value={budgetCents}
-            min={BUDGET_MIN_CENTS}
-            max={BUDGET_MAX_CENTS}
-            steps={BUDGET_STEPS}
-            onChange={setBudgetCents}
-            accessibilityLabel="Campaign budget"
-          />
-          <Text style={styles.sliderHint}>Whole dollars only · $5 – $1,000</Text>
-        </View>
-
-        {/* Duration slider */}
-        <Text style={[styles.sectionLabel, { marginTop: SP.lg }]}>Duration</Text>
-        <View style={styles.sliderCard}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: SP.xs }}>
-            <Text style={styles.sliderMin}>{DURATION_MIN_DAYS} day</Text>
-            <Text style={styles.sliderCurrent}>{durationDays} day{durationDays !== 1 ? 's' : ''}</Text>
-            <Text style={styles.sliderMax}>{DURATION_MAX_DAYS} days</Text>
-          </View>
-          <SnapSlider
-            value={durationDays}
-            min={DURATION_MIN_DAYS}
-            max={DURATION_MAX_DAYS}
-            step={1}
-            onChange={setDurationDays}
-            accessibilityLabel="Campaign duration"
-          />
-          <Text style={styles.sliderHint}>1 to 30 days</Text>
-        </View>
-
-        {/* Live estimated reach */}
-        <View style={styles.reachCard} testID="estimated-reach">
-          <Feather name="users" size={16} color={SUCCESS} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.reachLabel}>Estimated reach</Text>
-            <Text style={styles.reachRange}>{reach.low.toLocaleString()}–{reach.high.toLocaleString()} people</Text>
-            <Text style={styles.reachDisclaimer}>
-              Estimate only — based on your budget. Not a guarantee of delivered impressions.
-            </Text>
-          </View>
-        </View>
-      </ScrollView>
+      <Header
+        title="Create Ad"
+        onBack={() => router.back()}
+        actions={[{ icon: 'x', onPress: () => router.back(), accessibilityLabel: 'Close' }]}
+      />
     );
   }
 
@@ -1006,10 +604,10 @@ export default function CreateAdScreen() {
 
   if (verifying) {
     return (
-      <View style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', gap: SP.md }}>
-        <ActivityIndicator color={PURPLE_LIGHT} size="large" />
-        <Text style={styles.stageSub}>Verifying your payment…</Text>
-        <Text style={[styles.stageSub, { fontSize: FS.xs, color: SUBTLE, textAlign: 'center', paddingHorizontal: SP.xl }]}>
+      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', gap: SP.md }}>
+        <ActivityIndicator color={theme.accentLight} size="large" />
+        <Text style={[styles.stageSub, { color: colors.mutedForeground }]}>Verifying your payment…</Text>
+        <Text style={[styles.stageSub, { fontSize: FS.xs, color: colors.subtle, textAlign: 'center', paddingHorizontal: SP.xl }]}>
           Never activates on redirect alone — confirming with Stripe now.
         </Text>
       </View>
@@ -1020,21 +618,21 @@ export default function CreateAdScreen() {
 
   if (succeeded) {
     return (
-      <View style={{ flex: 1, backgroundColor: BG }}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         {renderHeader()}
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl, gap: SP.md }}>
-          <View style={[styles.successIcon, { backgroundColor: SUCCESS_DIM }]}>
-            <Feather name="check" size={32} color={SUCCESS} />
+          <View style={[styles.successIcon, { backgroundColor: colors.success + '22' }]}>
+            <Feather name="check" size={32} color={colors.success} />
           </View>
-          <Text style={styles.stageHeading}>Ad activated!</Text>
-          <Text style={[styles.stageSub, { textAlign: 'center' }]}>
-            Payment confirmed and campaign is live. Activation was verified server-side — not from the browser redirect alone.
+          <Text style={[styles.stageHeading, { color: colors.foreground }]}>Your ad is live</Text>
+          <Text style={[styles.stageSub, { textAlign: 'center', color: colors.mutedForeground }]}>
+            Payment confirmed. We'll start showing it right away.
           </Text>
-          <Text style={[styles.stageSub, { textAlign: 'center', color: SUBTLE, fontSize: FS.xs }]}>
+          <Text style={[styles.stageSub, { textAlign: 'center', color: colors.subtle, fontSize: FS.xs }]}>
             Estimated reach: {reach.low.toLocaleString()}–{reach.high.toLocaleString()} people (estimate only — not a delivered-impression guarantee).
           </Text>
-          <TouchableOpacity style={styles.primaryBtn} onPress={() => router.back()}>
-            <Text style={styles.primaryBtnText}>Back to Design Studio</Text>
+          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.accent }]} onPress={() => router.back()}>
+            <Text style={[styles.primaryBtnText, getOnAccentTextStyle(theme)]}>Back to Design Studio</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -1046,14 +644,14 @@ export default function CreateAdScreen() {
   if (initError) {
     const isAuthError = initError.toLowerCase().includes('sign in') || initError.toLowerCase().includes('session');
     return (
-      <View style={{ flex: 1, backgroundColor: BG }}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         {renderHeader()}
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl, gap: SP.md }}>
-          <Feather name={isAuthError ? 'lock' : 'alert-circle'} size={36} color={RED} />
-          <Text style={styles.stageHeading}>{isAuthError ? 'Sign in required' : 'Something went wrong'}</Text>
-          <Text style={[styles.stageSub, { textAlign: 'center' }]}>{initError}</Text>
-          <TouchableOpacity style={styles.primaryBtn} onPress={() => { setInitError(null); router.back(); }}>
-            <Text style={styles.primaryBtnText}>Go back</Text>
+          <Feather name={isAuthError ? 'lock' : 'alert-circle'} size={36} color={colors.destructive} />
+          <Text style={[styles.stageHeading, { color: colors.foreground }]}>{isAuthError ? 'Sign in required' : 'Something went wrong'}</Text>
+          <Text style={[styles.stageSub, { textAlign: 'center', color: colors.mutedForeground }]}>{initError}</Text>
+          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.accent }]} onPress={() => { setInitError(null); router.back(); }}>
+            <Text style={[styles.primaryBtnText, getOnAccentTextStyle(theme)]}>Go back</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -1064,104 +662,326 @@ export default function CreateAdScreen() {
 
   if (!campaign && loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={PURPLE_LIGHT} size="large" />
-        <Text style={[styles.stageSub, { marginTop: SP.md }]}>Setting up your campaign…</Text>
+      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={theme.accentLight} size="large" />
+        <Text style={[styles.stageSub, { marginTop: SP.md, color: colors.mutedForeground }]}>Setting up your campaign…</Text>
       </View>
     );
   }
 
-  // Continue button label & disabled logic
-  const isLastStep = step === TOTAL_STEPS - 1;
-  const ctaButtonDisabled = (step === 0 && localPaths.length === 0) || loading || paying;
-  const continueLabel = isLastStep ? `Create ad · $${budgetCents / 100}` : 'Continue';
+  const selectedCta   = CTA_OPTIONS.find((c) => c.kind === ctaKind);
+  const launchDisabled = localPaths.length === 0 || !headline.trim() || !ctaKind || loading || paying;
+  const budgetDollars  = budgetCents / 100;
 
   return (
-    <View style={{ flex: 1, backgroundColor: BG }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       {renderHeader()}
 
-      {/* Step indicator text */}
-      <View style={{ paddingHorizontal: SP.md, paddingTop: SP.sm }}>
-        <Text style={styles.stageTitle}>Step {step + 1} of {TOTAL_STEPS} — {STEP_LABELS[step]}</Text>
-      </View>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ padding: SP.md, paddingBottom: bottomPad }}
+      >
+        {/* 1 — Live ad preview */}
+        <AdPreviewCard
+          mediaUri={localUris[0] ?? null}
+          isVideo={mediaKind === 'video'}
+          headline={headline}
+          ctaText={selectedCta?.label ?? null}
+          brandName={brandName}
+        />
 
-      <View style={{ flex: 1 }}>
-        {step === 0 && renderMedia()}
-        {step === 1 && renderDescription()}
-        {step === 2 && renderCta()}
-        {step === 3 && renderFormat()}
-        {step === 4 && renderBudget()}
-      </View>
+        {/* 2 — Product & creative */}
+        <Section
+          title="Product & creative"
+          subtitle={`One video (up to ${60}s) or 1–${MAX_PHOTOS} photos. You cannot mix video and photos.`}
+          colors={colors}
+        >
+          <View style={{ flexDirection: 'row', gap: SP.sm }}>
+            {(!localPaths.length || mediaKind === 'photos') && (
+              <TouchableOpacity
+                style={[styles.pickerCard, { backgroundColor: colors.elevated, borderColor: colors.border }, mediaKind === 'video' && localPaths.length > 0 && { opacity: 0.35 }]}
+                onPress={() => pickMedia('photos')}
+                disabled={mediaKind === 'video' && localPaths.length > 0}
+                accessibilityRole="button"
+                accessibilityLabel="Add photos"
+                testID="pick-photos-btn"
+              >
+                <Feather name="image" size={ICON.md} color={theme.accentLight} />
+                <Text style={[styles.pickerCardTitle, { color: colors.foreground }]}>Photos</Text>
+              </TouchableOpacity>
+            )}
+            {(!localPaths.length || mediaKind === 'video') && (
+              <TouchableOpacity
+                style={[styles.pickerCard, { backgroundColor: colors.elevated, borderColor: colors.border }, mediaKind === 'photos' && localPaths.length > 0 && { opacity: 0.35 }]}
+                onPress={() => pickMedia('video')}
+                disabled={mediaKind === 'photos' && localPaths.length > 0}
+                accessibilityRole="button"
+                accessibilityLabel="Add video"
+                testID="pick-video-btn"
+              >
+                <Feather name="video" size={ICON.md} color={theme.accentLight} />
+                <Text style={[styles.pickerCardTitle, { color: colors.foreground }]}>Video</Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
-      {/* Sticky bottom bar */}
-      <View style={[styles.stickyBottom, { paddingBottom: insets.bottom + (Platform.OS === 'web' ? 34 : 0) + SP.md }]}>
+          {localPaths.length > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm }}>
+              {localUris.map((uri, i) => (
+                <MediaThumb
+                  key={`${uri}-${i}`}
+                  uri={uri}
+                  mimeType={localMimes[i] ?? 'image/jpeg'}
+                  index={i}
+                  colors={colors}
+                  onRemove={() => handleRemoveMedia(i)}
+                  onMoveLeft={() => handleReorder(i, 'left')}
+                  onMoveRight={() => handleReorder(i, 'right')}
+                  canMoveLeft={i > 0}
+                  canMoveRight={i < localPaths.length - 1}
+                />
+              ))}
+              {mediaKind === 'photos' && localPaths.length < MAX_PHOTOS && (
+                <TouchableOpacity
+                  style={[mt.wrap, { alignItems: 'center', justifyContent: 'center', borderStyle: 'dashed', backgroundColor: colors.elevated, borderColor: colors.border }]}
+                  onPress={() => pickMedia('photos')}
+                  testID="add-more-photos-btn"
+                >
+                  <Feather name="plus" size={20} color={colors.mutedForeground} />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {localPaths.length > 0 && (
+            <View style={[styles.infoBox, { backgroundColor: colors.elevated, borderColor: colors.border }]}>
+              <Feather name="lock" size={13} color={colors.mutedForeground} />
+              <Text style={[styles.infoBoxText, { color: colors.mutedForeground }]}>Media is kept private until your campaign is verified and activated.</Text>
+            </View>
+          )}
+        </Section>
+
+        {/* 3 — Headline & caption */}
+        <Section title="Headline & caption" colors={colors}>
+          <View>
+            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Headline</Text>
+            <TextInput
+              value={headline}
+              onChangeText={setHeadline}
+              placeholder="Short, punchy headline…"
+              placeholderTextColor={colors.subtle}
+              style={[styles.textInputField, { backgroundColor: colors.elevated, borderColor: colors.border, color: colors.foreground }]}
+              maxLength={80}
+              returnKeyType="done"
+              testID="headline-input"
+            />
+            <Text style={[styles.charCount, { color: colors.subtle }]}>{headline.length}/80</Text>
+          </View>
+
+          <View>
+            <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>
+              Description <Text style={{ fontFamily: FONT.regular }}>(optional)</Text>
+            </Text>
+            <TextInput
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Brief description of your product or offer…"
+              placeholderTextColor={colors.subtle}
+              style={[styles.textArea, { backgroundColor: colors.elevated, borderColor: colors.border, color: colors.foreground }]}
+              multiline
+              maxLength={200}
+              returnKeyType="done"
+              testID="description-input"
+            />
+            <Text style={[styles.charCount, { color: colors.subtle }]}>{description.length}/200</Text>
+          </View>
+        </Section>
+
+        {/* 4 — Call to action */}
+        <Section title="Call to action" subtitle="Choose what happens when someone taps your ad." colors={colors}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm }}>
+            {CTA_OPTIONS.map((opt) => {
+              const active = ctaKind === opt.kind;
+              return (
+                <TouchableOpacity
+                  key={opt.kind}
+                  style={[
+                    styles.ctaChip,
+                    { backgroundColor: colors.elevated, borderColor: colors.border },
+                    active && { backgroundColor: theme.accentDim, borderColor: theme.accent },
+                  ]}
+                  onPress={() => { Haptics.selectionAsync(); setCtaKind(opt.kind); setCtaDestId(null); }}
+                  activeOpacity={0.8}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: active }}
+                  accessibilityLabel={opt.label}
+                  testID={`cta-${opt.kind}`}
+                >
+                  {active && <Feather name="check" size={13} color={theme.accentLight} />}
+                  <Text style={[styles.ctaChipText, { color: active ? colors.foreground : colors.mutedForeground }]}>{opt.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {selectedCta?.requiresProductSelection && (
+            <View style={{ gap: SP.sm }}>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Select product</Text>
+              {loadingProducts ? (
+                <ActivityIndicator color={theme.accentLight} style={{ margin: SP.md }} />
+              ) : (
+                <View style={{ gap: SP.sm }}>
+                  {products.map((p) => {
+                    const active = ctaDestId === p.id;
+                    return (
+                      <TouchableOpacity
+                        key={p.id}
+                        style={[styles.productRow, { backgroundColor: colors.elevated, borderColor: colors.border }, active && { backgroundColor: theme.accentDim, borderColor: theme.accent }]}
+                        onPress={() => { Haptics.selectionAsync(); setCtaDestId(p.id); }}
+                        testID={`product-chip-${p.id}`}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: active }}
+                      >
+                        <View style={[styles.ctaRadio, { borderColor: colors.mutedForeground }, active && { borderColor: theme.accentLight }]}>
+                          {active && <View style={[styles.ctaRadioFill, { backgroundColor: theme.accentLight }]} />}
+                        </View>
+                        <Text style={[styles.productRowText, { color: active ? colors.foreground : colors.mutedForeground }]}>{p.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                  {products.length === 0 && (
+                    <View style={[styles.infoBox, { backgroundColor: colors.elevated, borderColor: colors.border }]}>
+                      <Feather name="alert-circle" size={13} color={colors.mutedForeground} />
+                      <Text style={[styles.infoBoxText, { color: colors.mutedForeground }]}>No products found. Add products to your store first.</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+          )}
+        </Section>
+
+        {/* 5 — Audience & reach (read-only — no audience targeting exists server-side) */}
+        <Section title="Audience & reach" colors={colors}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm }}>
+            <Feather name="users" size={16} color={colors.success} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.reachRange, { color: colors.foreground }]}>{reach.low.toLocaleString()}–{reach.high.toLocaleString()} people</Text>
+              <Text style={[styles.reachDisclaimer, { color: colors.mutedForeground }]}>
+                Who this will reach, estimated from your budget. Brandthread doesn't yet support choosing an audience by
+                demographics or interests — every campaign reaches this general shopper pool.
+              </Text>
+            </View>
+          </View>
+        </Section>
+
+        {/* 6 — Budget & duration */}
+        <Section title="Budget & duration" subtitle="Slide to set your total spend and how long your ad runs." colors={colors}>
+          <View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: SP.xs }}>
+              <Text style={[styles.sliderMin, { color: colors.subtle }]}>${BUDGET_MIN_CENTS / 100}</Text>
+              <Text style={[styles.sliderCurrent, { color: colors.foreground }]}>${budgetDollars}</Text>
+              <Text style={[styles.sliderMax, { color: colors.subtle }]}>${BUDGET_MAX_CENTS / 100}</Text>
+            </View>
+            <InlineSlider
+              value={budgetCents}
+              min={BUDGET_MIN_CENTS}
+              max={BUDGET_MAX_CENTS}
+              steps={BUDGET_STEPS}
+              onChange={setBudgetCents}
+              accessibilityLabel="Campaign budget"
+              accentColor={theme.accentLight}
+              trackColor={colors.border}
+            />
+            <Text style={[styles.sliderHint, { color: colors.subtle }]}>Whole dollars only · $5 – $1,000</Text>
+          </View>
+
+          <View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: SP.xs }}>
+              <Text style={[styles.sliderMin, { color: colors.subtle }]}>{DURATION_MIN_DAYS} day</Text>
+              <Text style={[styles.sliderCurrent, { color: colors.foreground }]}>{durationDays} day{durationDays !== 1 ? 's' : ''}</Text>
+              <Text style={[styles.sliderMax, { color: colors.subtle }]}>{DURATION_MAX_DAYS} days</Text>
+            </View>
+            <InlineSlider
+              value={durationDays}
+              min={DURATION_MIN_DAYS}
+              max={DURATION_MAX_DAYS}
+              step={1}
+              onChange={setDurationDays}
+              accessibilityLabel="Campaign duration"
+              accentColor={theme.accentLight}
+              trackColor={colors.border}
+            />
+            <Text style={[styles.sliderHint, { color: colors.subtle }]}>1 to 30 days</Text>
+          </View>
+
+          <View style={[styles.reachCard, { backgroundColor: colors.success + '14', borderColor: colors.success }]} testID="estimated-reach">
+            <Feather name="trending-up" size={16} color={colors.success} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.reachLabel, { color: colors.success }]}>Estimated reach</Text>
+              <Text style={[styles.reachRange, { color: colors.foreground }]}>{reach.low.toLocaleString()}–{reach.high.toLocaleString()} people</Text>
+              <Text style={[styles.reachDisclaimer, { color: colors.mutedForeground }]}>
+                Estimate only — based on your budget. Not a guarantee of delivered impressions.
+              </Text>
+            </View>
+          </View>
+        </Section>
+      </ScrollView>
+
+      {/* 7 — Sticky Launch button */}
+      <View style={[styles.stickyBottom, { borderTopColor: colors.border, backgroundColor: colors.background, paddingBottom: insets.bottom + (Platform.OS === 'web' ? 34 : 0) + SP.md }]}>
         <TouchableOpacity
-          style={[styles.primaryBtn, { flex: 1 }, ctaButtonDisabled && { opacity: 0.5 }]}
-          onPress={isLastStep ? handlePay : goNext}
-          disabled={ctaButtonDisabled}
+          style={[styles.primaryBtn, { flex: 1, backgroundColor: theme.accent }, launchDisabled && { opacity: 0.5 }]}
+          onPress={handleLaunch}
+          disabled={launchDisabled}
           accessibilityRole="button"
-          accessibilityLabel={continueLabel}
+          accessibilityLabel={`Launch, ${budgetDollars} dollars`}
           testID="stage-continue-btn"
         >
           {(loading || paying) ? (
-            <ActivityIndicator color="#000" size="small" />
+            <ActivityIndicator color={theme.onAccent} size="small" />
           ) : (
-            <Text style={styles.primaryBtnText}>{continueLabel}</Text>
+            <>
+              <Feather name="zap" size={18} color={theme.onAccent} />
+              <Text style={[styles.primaryBtnText, getOnAccentTextStyle(theme)]}>Launch · ${budgetDollars}</Text>
+            </>
           )}
-          {!isLastStep && !loading && <Feather name="arrow-right" size={18} color="#000" />}
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── Styles (color-free — theme/palette colors are applied inline above) ────
 
 const styles = StyleSheet.create({
-  header:             { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingBottom: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
-  headerBtn:          { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:        { flex: 1, textAlign: 'center', fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  stageTitle:         { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: SP.xs },
-  stageHeading:       { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, marginBottom: SP.xs },
-  stageSub:           { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 20 },
-  sectionLabel:       { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, marginTop: SP.lg, marginBottom: SP.xs },
-  pickerCard:         { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: SP.md, marginTop: SP.sm },
-  pickerCardTitle:    { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  pickerCardSub:      { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, lineHeight: 16 },
-  infoBox:            { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, backgroundColor: CARD, borderRadius: RADIUS.md, padding: SP.md, borderWidth: 1, borderColor: BORDER_SUBTLE },
-  infoBoxText:        { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, lineHeight: 18 },
-  textInputField:     { backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, paddingHorizontal: SP.md, paddingVertical: SP.sm, fontSize: FS.base, fontFamily: FONT.regular, color: FG, marginTop: SP.xs },
-  charCount:          { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, alignSelf: 'flex-end', marginTop: 2 },
-  textArea:           { backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, paddingHorizontal: SP.md, paddingVertical: SP.sm, fontSize: FS.sm, fontFamily: FONT.regular, color: FG, minHeight: 80, marginTop: SP.xs },
-  ctaCard:            { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: SP.md },
-  ctaCardActive:      { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
-  ctaRadio:           { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: MUTED, alignItems: 'center', justifyContent: 'center' },
-  ctaRadioActive:     { borderColor: PURPLE_LIGHT },
-  ctaRadioFill:       { width: 10, height: 10, borderRadius: 5, backgroundColor: PURPLE_LIGHT },
-  ctaLabel:           { fontSize: FS.base, fontFamily: FONT.semibold, color: MUTED },
-  ctaLabelActive:     { color: FG },
-  ctaDestKind:        { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
-  productRow:         { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: SP.md },
-  productRowActive:   { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
-  productRowText:     { flex: 1, fontSize: FS.base, fontFamily: FONT.medium, color: MUTED },
-  productRowTextActive: { color: FG },
-  formatRow:          { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: SP.md },
-  formatRowActive:    { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
-  formatLabel:        { fontSize: FS.base, fontFamily: FONT.semibold, color: MUTED },
-  formatLabelActive:  { color: FG },
-  formatAr:           { fontSize: FS.xs, fontFamily: FONT.medium, color: SUBTLE },
-  formatDesc:         { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  sliderCard:         { backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: SP.md, marginTop: SP.sm },
-  sliderMin:          { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
-  sliderCurrent:      { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
-  sliderMax:          { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
-  sliderHint:         { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginTop: SP.xs, textAlign: 'center' },
-  reachCard:          { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, backgroundColor: SUCCESS_DIM, borderRadius: RADIUS.md, borderWidth: 1, borderColor: SUCCESS, padding: SP.md, marginTop: SP.lg },
-  reachLabel:         { fontSize: FS.sm, fontFamily: FONT.semibold, color: SUCCESS, marginBottom: 2 },
-  reachRange:         { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
-  reachDisclaimer:    { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 4, lineHeight: 16 },
-  stickyBottom:       { borderTopWidth: 1, borderTopColor: BORDER, backgroundColor: BG, paddingHorizontal: SP.md, paddingTop: SP.sm, flexDirection: 'row', gap: SP.sm },
-  primaryBtn:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, backgroundColor: PURPLE_LIGHT, borderRadius: RADIUS.md, paddingVertical: SP.md, paddingHorizontal: SP.lg, minHeight: 52 },
-  primaryBtnText:     { fontSize: FS.base, fontFamily: FONT.bold, color: '#0A0A0B' },
-  successIcon:        { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
+  stageHeading:    { fontSize: FS.xl, fontFamily: FONT.bold, marginBottom: SP.xs },
+  stageSub:        { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
+  fieldLabel:      { fontSize: FS.sm, fontFamily: FONT.semibold, marginBottom: SP.xs },
+  pickerCard:      { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, paddingVertical: SP.md },
+  pickerCardTitle: { fontSize: FS.sm, fontFamily: FONT.semibold },
+  infoBox:         { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, borderRadius: RADIUS.md, padding: SP.md, borderWidth: 1 },
+  infoBoxText:     { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, lineHeight: 18 },
+  textInputField:  { borderRadius: RADIUS.md, borderWidth: 1, paddingHorizontal: SP.md, paddingVertical: SP.sm, fontSize: FS.base, fontFamily: FONT.regular, marginTop: SP.xs },
+  charCount:       { fontSize: FS.xs, fontFamily: FONT.regular, alignSelf: 'flex-end', marginTop: 2 },
+  textArea:        { borderRadius: RADIUS.md, borderWidth: 1, paddingHorizontal: SP.md, paddingVertical: SP.sm, fontSize: FS.sm, fontFamily: FONT.regular, minHeight: 70, marginTop: SP.xs },
+  ctaChip:         { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: RADIUS.pill, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9 },
+  ctaChipText:     { fontSize: FS.sm, fontFamily: FONT.semibold },
+  ctaRadio:        { width: 18, height: 18, borderRadius: 9, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  ctaRadioFill:    { width: 9, height: 9, borderRadius: 5 },
+  productRow:      { flexDirection: 'row', alignItems: 'center', gap: SP.md, borderRadius: RADIUS.md, borderWidth: 1, padding: SP.md },
+  productRowText:  { flex: 1, fontSize: FS.base, fontFamily: FONT.medium },
+  sliderMin:       { fontSize: FS.xs, fontFamily: FONT.regular },
+  sliderCurrent:   { fontSize: FS.base, fontFamily: FONT.bold },
+  sliderMax:       { fontSize: FS.xs, fontFamily: FONT.regular },
+  sliderHint:      { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: SP.xs, textAlign: 'center' },
+  reachCard:       { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, padding: SP.md },
+  reachLabel:      { fontSize: FS.sm, fontFamily: FONT.semibold, marginBottom: 2 },
+  reachRange:      { fontSize: FS.lg, fontFamily: FONT.bold },
+  reachDisclaimer: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 4, lineHeight: 16 },
+  stickyBottom:    { borderTopWidth: 1, paddingHorizontal: SP.md, paddingTop: SP.sm, flexDirection: 'row', gap: SP.sm },
+  primaryBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, borderRadius: RADIUS.md, paddingVertical: SP.md, paddingHorizontal: SP.lg, minHeight: 52 },
+  primaryBtnText:  { fontSize: FS.base, fontFamily: FONT.bold },
+  successIcon:     { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
 });

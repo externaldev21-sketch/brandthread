@@ -4,18 +4,21 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, ScrollView, TextInput, StyleSheet, Alert, ActivityIndicator, Modal } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, StatusBadge, SectionHeader, EmptyState, PressableScale } from '@/components/BrandthreadUI';
+import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { RADII } from '@/constants/radii';
+import { hapticPrimaryAction, hapticToggle, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, ReturnStatus, RETURN_REASONS, OrderStatus, TrackingStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent, PaymentSummary } from '@/services/orderTypes';
+import { dbStatusToOrderStatus, dbStatusToPaymentStatus, type DbPaymentStatus } from '@/lib/orderStatusAdapter';
 
 function useThemeAliases() {
   const { theme } = useAppTheme();
@@ -69,34 +72,12 @@ export function adaptApiOrder(raw: any): Order {
   };
   const items: any[] = Array.isArray(raw.items) ? raw.items : [];
 
-  // DB status → UI order status
-  const statusMap: Record<string, OrderStatus> = {
-    pending:        'new',
-    processing:     'processing',
-    fulfilled:      'ready_to_ship',
-    shipped:        'shipped',
-    delivered:      'delivered',
-    cancelled:      'cancelled',
-    refunded:       'refunded',
-    refund_pending: 'cancelled',  // order was cancelled; refund may need manual resolution
-    disputed:       'disputed',
-  };
-  const uiStatus: OrderStatus = statusMap[raw.status] ?? 'cancelled';
+  // DB status → UI order status (shared with app/(tabs)/orders.tsx)
+  const uiStatus: OrderStatus = dbStatusToOrderStatus(raw.status);
 
-  // Derive payment status from DB order status
-  type PaymentStatus = 'pending' | 'authorized' | 'paid' | 'partially_refunded' | 'refunded' | 'voided' | 'failed';
-  const paymentStatusMap: Record<string, PaymentStatus> = {
-    pending:        'pending',
-    processing:     'paid',
-    fulfilled:      'paid',
-    shipped:        'paid',
-    delivered:      'paid',
-    cancelled:      'voided',
-    refunded:       'refunded',
-    refund_pending: 'authorized',  // payment received but refund not yet confirmed — shows WARNING
-    disputed:       'partially_refunded',
-  };
-  const uiPaymentStatus: PaymentStatus = paymentStatusMap[raw.status] ?? 'pending';
+  // Derive payment status from DB order status (shared with app/(tabs)/orders.tsx)
+  type PaymentStatus = DbPaymentStatus;
+  const uiPaymentStatus: PaymentStatus = dbStatusToPaymentStatus(raw.status);
   const isRefundPending = raw.status === 'refund_pending';
 
   // Parse shipping address (stored as JSON in DB)
@@ -321,7 +302,10 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'timeline',    label: 'Timeline' },
   { key: 'returns',     label: 'Returns' },
   { key: 'disputes',    label: 'Disputes' },
-  { key: 'notes',       label: 'Notes' },
+  // The Notes tab is hidden: notes aren't persisted by any API, and the
+  // 15-second order poll overwrites local edits, silently discarding
+  // anything a seller types. Bring this back once notes are backed by
+  // a real endpoint.
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -524,7 +508,7 @@ export default function OrderDetailScreen() {
   );
 
   const retryUpdates = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    hapticPrimaryAction();
     const generation = generationRef.current;
     consecutiveFailuresRef.current = 0;
     setUpdatesPaused(false);
@@ -537,26 +521,26 @@ export default function OrderDetailScreen() {
   // ── Actions ──────────────────────────────────────────────────────────────
 
   async function handleMarkProcessing() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try { await api.orders.updateStatus(id, 'processing'); } catch (e: any) { Alert.alert('Error', e.message); return; }
+    hapticSuccessAction();
+    try { await api.orders.updateStatus(id, 'processing'); } catch (e: any) { Alert.alert('Couldn’t update this order', 'Check your connection and try again.'); return; }
     load(generationRef.current);
   }
 
   async function handleMarkReadyToShip() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try { await api.orders.updateStatus(id, 'fulfilled'); } catch (e: any) { Alert.alert('Error', e.message); return; }
+    hapticSuccessAction();
+    try { await api.orders.updateStatus(id, 'fulfilled'); } catch (e: any) { Alert.alert('Couldn’t update this order', 'Check your connection and try again.'); return; }
     load(generationRef.current);
   }
 
   async function handleMarkShipped() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try { await api.orders.updateStatus(id, 'shipped'); } catch (e: any) { Alert.alert('Error', e.message); return; }
+    hapticSuccessAction();
+    try { await api.orders.updateStatus(id, 'shipped'); } catch (e: any) { Alert.alert('Couldn’t update this order', 'Check your connection and try again.'); return; }
     load(generationRef.current);
   }
 
   async function handleMarkDelivered() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try { await api.orders.updateStatus(id, 'delivered'); } catch (e: any) { Alert.alert('Error', e.message); return; }
+    hapticSuccessAction();
+    try { await api.orders.updateStatus(id, 'delivered'); } catch (e: any) { Alert.alert('Couldn’t update this order', 'Check your connection and try again.'); return; }
     load(generationRef.current);
   }
 
@@ -565,6 +549,7 @@ export default function OrderDetailScreen() {
       Alert.alert('Select a reason', 'Please choose a cancellation reason.');
       return;
     }
+    hapticDestructiveConfirm();
     setCancelling(true);
     try {
       await api.orders.updateStatus(id, 'cancelled', {
@@ -576,7 +561,7 @@ export default function OrderDetailScreen() {
       // Auto-dismiss the banner after 6 seconds
       setTimeout(() => setCancelConfirmed(false), 6000);
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      Alert.alert('Couldn’t cancel this order', 'Check your connection and try again.');
     } finally {
       setCancelling(false);
     }
@@ -616,7 +601,7 @@ export default function OrderDetailScreen() {
         carrier:        form.carrier.trim(),
       });
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      Alert.alert('Couldn’t add tracking', 'Check your connection and try again.');
       return;
     }
     setTrackingForms(prev => ({ ...prev, [groupId]: { ...prev[groupId], visible: false } }));
@@ -628,7 +613,7 @@ export default function OrderDetailScreen() {
       await api.orders.addTracking(id, { trackingNumber, carrier });
       load(generationRef.current);
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      Alert.alert('Couldn’t add tracking', 'Check your connection and try again.');
     }
   }
 
@@ -641,7 +626,7 @@ export default function OrderDetailScreen() {
       });
       await load(generationRef.current);
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      Alert.alert('Couldn’t update tracking', 'Check your connection and try again.');
       throw e;
     } finally {
       setUpdatingTracking(false);
@@ -658,7 +643,8 @@ export default function OrderDetailScreen() {
   }
 
   async function handleReturnAction(returnId: string, status: ReturnStatus, deniedReason?: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (status === 'denied') hapticDestructiveConfirm();
+    else hapticSuccessAction();
     // Returns not yet wired to API — update locally
     if (order) {
       setOrder({
@@ -682,10 +668,9 @@ export default function OrderDetailScreen() {
     return (
       <View style={[s.root, { paddingTop: insets.top }]}>
         {updatesPaused && (
-          <TouchableOpacity
+          <PressableScale
             style={s.pausedBanner}
             onPress={retryUpdates}
-            activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel="Live updates paused. Tap to retry."
             testID="order-detail-live-updates-retry"
@@ -694,7 +679,7 @@ export default function OrderDetailScreen() {
             <Text style={s.pausedBannerText}>Live updates paused</Text>
             <Text style={s.pausedBannerAction}>Tap to retry</Text>
             <Feather name="refresh-cw" size={12} color={ORANGE} />
-          </TouchableOpacity>
+          </PressableScale>
         )}
         <EmptyState
           icon="alert-circle"
@@ -709,18 +694,15 @@ export default function OrderDetailScreen() {
   const trackingModal = order.shipments.find(sh => sh.id === trackingModalShipmentId);
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <View style={s.root}>
       {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <View style={s.headerMid}>
-          <Text style={s.headerTitle}>{order.orderNumber}</Text>
-          <Text style={s.headerSub}>{order.customer.name}</Text>
-        </View>
-        <IconButton name="refresh-cw" onPress={retryUpdates} color={MUTED} />
-      </View>
+      <ScreenHeader
+        title={order.orderNumber}
+        subtitle={order.customer.name}
+        variant="push"
+        onBack={() => router.back()}
+        actions={[{ icon: 'refresh-cw', onPress: retryUpdates, accessibilityLabel: 'Refresh order' }]}
+      />
 
       {/* Tab bar */}
       <ScrollView
@@ -730,22 +712,24 @@ export default function OrderDetailScreen() {
         contentContainerStyle={s.tabBarContent}
       >
         {TABS.map(t => (
-          <TouchableOpacity
+          <PressableScale
             key={t.key}
-            onPress={() => { Haptics.selectionAsync(); setActiveTab(t.key); }}
+            onPress={() => { hapticToggle(); setActiveTab(t.key); }}
             style={[s.tabItem, activeTab === t.key && s.tabItemActive]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: activeTab === t.key }}
+            accessibilityLabel={t.label}
           >
             <Text style={[s.tabLabel, activeTab === t.key && s.tabLabelActive]}>{t.label}</Text>
-          </TouchableOpacity>
+          </PressableScale>
         ))}
       </ScrollView>
 
       {/* Cancellation confirmed banner */}
       {updatesPaused && (
-        <TouchableOpacity
+        <PressableScale
           style={s.pausedBanner}
           onPress={retryUpdates}
-          activeOpacity={0.8}
           accessibilityRole="button"
           accessibilityLabel="Live updates paused. Tap to retry."
           testID="order-detail-live-updates-retry"
@@ -754,16 +738,16 @@ export default function OrderDetailScreen() {
           <Text style={s.pausedBannerText}>Live updates paused</Text>
           <Text style={s.pausedBannerAction}>Tap to retry</Text>
           <Feather name="refresh-cw" size={12} color={ORANGE} />
-        </TouchableOpacity>
+        </PressableScale>
       )}
 
       {cancelConfirmed && (
         <View style={s.cancelBanner}>
           <Feather name="check-circle" size={ICON.sm} color={FG} />
           <Text style={s.cancelBannerText}>Order cancelled successfully.</Text>
-          <TouchableOpacity onPress={() => setCancelConfirmed(false)}>
+          <PressableScale onPress={() => { hapticPrimaryAction(); setCancelConfirmed(false); }} accessibilityRole="button" accessibilityLabel="Dismiss">
             <Feather name="x" size={ICON.sm} color={FG} />
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       )}
 
@@ -792,13 +776,16 @@ export default function OrderDetailScreen() {
             <Text style={s.modalSubtitle}>Select a reason</Text>
             <View style={s.chipRow}>
               {CANCELLATION_REASONS.map(r => (
-                <TouchableOpacity
+                <PressableScale
                   key={r.key}
-                  onPress={() => setCancelReason(r.key)}
+                  onPress={() => { hapticToggle(); setCancelReason(r.key); }}
                   style={[s.chip, cancelReason === r.key && s.chipActive]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: cancelReason === r.key }}
+                  accessibilityLabel={r.label}
                 >
                   <Text style={[s.chipText, cancelReason === r.key && s.chipTextActive]}>{r.label}</Text>
-                </TouchableOpacity>
+                </PressableScale>
               ))}
             </View>
             <TextInput
@@ -824,7 +811,7 @@ export default function OrderDetailScreen() {
                 label="Confirm Cancel"
                 onPress={handleCancelOrder}
                 loading={cancelling}
-                colors={[RED, '#C0392B']}
+                colors={[RED, RED]}
                 style={{ flex: 1 }}
               />
             </View>
@@ -922,6 +909,11 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
         )}
       </GradientCard>
 
+      {/* Live status tracker — the visual centerpiece: where this order stands right now */}
+      <BrandthreadCard style={s.timelineCard}>
+        <OrderStatusTimeline status={order.status} />
+      </BrandthreadCard>
+
       {/* Cancellation reason card */}
       {order.status === 'cancelled' && order.cancellation && (
         <View style={s.section}>
@@ -951,13 +943,13 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
         {order.status === 'processing' && (
           <View style={s.actionRow}>
             <PrimaryButton label="Mark Ready to Ship" onPress={onMarkReadyToShip} icon="package" style={{ flex: 1 }} />
-            <SecondaryButton label="Buy Shipping Label" onPress={() => router.push(`/shipping-label?orderId=${order.id}`)} icon="tag" style={{ flex: 1 }} />
+            <SecondaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" style={{ flex: 1 }} />
           </View>
         )}
         {order.status === 'ready_to_ship' && (
           <View style={s.actionCol}>
             <View style={s.actionRow}>
-              <PrimaryButton label="Buy Label" onPress={() => router.push(`/shipping-label?orderId=${order.id}`)} icon="tag" style={{ flex: 1 }} />
+              <PrimaryButton label="Fulfill Order" onPress={() => router.push(`/fulfill-order?orderId=${order.id}`)} icon="tag" style={{ flex: 1 }} />
               <SecondaryButton label="Add Tracking" onPress={() => setAddingTracking(!addingTracking)} icon="map-pin" style={{ flex: 1 }} />
             </View>
             {addingTracking && (
@@ -1047,6 +1039,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
 function CustomerTab({ order }: { order: Order }) {
   const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
+  const router = useRouter();
   const c = order.customer;
   return (
     <View style={s.tabContent}>
@@ -1082,10 +1075,16 @@ function CustomerTab({ order }: { order: Order }) {
         <AddressCard title="Billing Address" addr={c.billingAddress} />
       </View>
 
-      <View style={[s.actionRow, { marginHorizontal: SP.md }]}>
-        <SecondaryButton label="Message Customer" onPress={() => Alert.alert('Message Customer', 'Open the inbox to message this customer directly.')} icon="message-circle" style={{ flex: 1 }} />
-        <SecondaryButton label="View Profile" onPress={() => Alert.alert('Customer Profile', 'Customer profile details will appear here.')} icon="user" style={{ flex: 1 }} />
-      </View>
+      {!!c.id && (
+        <View style={[s.actionRow, { marginHorizontal: SP.md }]}>
+          <SecondaryButton
+            label="View customer"
+            onPress={() => router.push(`/customer-orders?customerId=${encodeURIComponent(c.id)}` as never)}
+            icon="user"
+            style={{ flex: 1 }}
+          />
+        </View>
+      )}
     </View>
   );
 }
@@ -1229,10 +1228,10 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
             {TRACKING_STATUS_OPTIONS.map(option => {
               const selected = trackingStatus === option.key;
               return (
-                <TouchableOpacity
+                <PressableScale
                   key={option.key}
                   onPress={() => {
-                    Haptics.selectionAsync();
+                    hapticToggle();
                     setTrackingStatus(option.key);
                     setTrackingFormDirty(true);
                   }}
@@ -1245,7 +1244,7 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
                   <Text style={[s.trackingStatusOptionText, selected && s.trackingStatusOptionTextSelected]}>
                     {option.label}
                   </Text>
-                </TouchableOpacity>
+                </PressableScale>
               );
             })}
           </View>
@@ -1325,7 +1324,7 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
                 )}
 
                 <View style={s.actionRow}>
-                  <SecondaryButton label="Buy Label" onPress={() => router.push(`/shipping-label?orderId=${order.id}&groupId=${group.id}`)} icon="tag" small style={{ flex: 1 }} />
+                  <SecondaryButton label="Buy Label" onPress={() => router.push(`/fulfill-order?orderId=${order.id}&step=3`)} icon="tag" small style={{ flex: 1 }} />
                   <SecondaryButton label="Add Tracking" onPress={() => toggleForm(group.id)} icon="map-pin" small style={{ flex: 1 }} />
                 </View>
               </BrandthreadCard>
@@ -1361,10 +1360,15 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
                     {sh.trackingEvents.length > 0 && (
                       <Text style={s.latestEvent}>{sh.trackingEvents[sh.trackingEvents.length - 1].description}</Text>
                     )}
-                    <TouchableOpacity onPress={() => onShowTracking(sh.id)} style={s.viewTrackingBtn}>
+                    <PressableScale
+                      onPress={() => { hapticPrimaryAction(); onShowTracking(sh.id); }}
+                      style={s.viewTrackingBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel="View tracking"
+                    >
                       <Feather name="map-pin" size={ICON.xs} color={CYAN} />
                       <Text style={s.viewTrackingText}>View tracking</Text>
-                    </TouchableOpacity>
+                    </PressableScale>
                   </BrandthreadCard>
                 ))}
               </View>
@@ -1445,6 +1449,8 @@ function ReturnsTab({ order, onAction, router }: {
 }) {
   const { theme, BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } = useThemeAliases();
   const s = React.useMemo(() => makeStyles(theme), [theme]);
+  const [denyingReturnId, setDenyingReturnId] = useState<string | null>(null);
+  const [denyReason, setDenyReason] = useState('');
   if (order.returns.length === 0) {
     return (
       <View style={s.tabContent}>
@@ -1475,15 +1481,48 @@ function ReturnsTab({ order, onAction, router }: {
 
           {/* Actions */}
           <View style={s.returnActions}>
-            {ret.status === 'requested' && (
+            {ret.status === 'requested' && denyingReturnId !== ret.id && (
               <>
                 <SecondaryButton label="Approve" onPress={() => onAction(ret.id, 'approved')} icon="check" small accent={SUCCESS} style={{ flex: 1 }} />
-                <SecondaryButton label="Deny" onPress={() => Alert.prompt('Deny Reason', 'Reason for denial:', (text) => { if (text) onAction(ret.id, 'denied', text); })} icon="x" small accent={RED} style={{ flex: 1 }} />
+                <SecondaryButton label="Deny" onPress={() => { setDenyReason(''); setDenyingReturnId(ret.id); }} icon="x" small accent={RED} style={{ flex: 1 }} />
               </>
             )}
-            {(ret.status === 'approved') && (
-              <SecondaryButton label="Issue Label" onPress={() => Alert.alert('Label', 'Return label issuance available in production build.')} icon="tag" small style={{ flex: 1 }} />
-            )}
+          </View>
+          {ret.status === 'requested' && denyingReturnId === ret.id && (
+            <View style={s.denyForm}>
+              <Text style={s.denyLabel}>Denial reason (required)</Text>
+              <TextInput
+                style={s.denyInput}
+                value={denyReason}
+                onChangeText={setDenyReason}
+                placeholder="Explain why the return is denied…"
+                placeholderTextColor={SUBTLE}
+                multiline
+                autoFocus
+              />
+              <View style={s.returnActions}>
+                <SecondaryButton
+                  label="Cancel"
+                  onPress={() => { setDenyingReturnId(null); setDenyReason(''); }}
+                  small
+                  style={{ flex: 1 }}
+                />
+                <PrimaryButton
+                  label="Submit denial"
+                  onPress={() => {
+                    if (!denyReason.trim()) return;
+                    onAction(ret.id, 'denied', denyReason.trim());
+                    setDenyingReturnId(null);
+                    setDenyReason('');
+                  }}
+                  disabled={!denyReason.trim()}
+                  small
+                  style={{ flex: 1 }}
+                />
+              </View>
+            </View>
+          )}
+          <View style={s.returnActions}>
             {(ret.status === 'label_issued' || ret.status === 'in_transit') && (
               <SecondaryButton label="Mark Received" onPress={() => onAction(ret.id, 'received')} icon="inbox" small style={{ flex: 1 }} />
             )}
@@ -1545,8 +1584,9 @@ function DisputesTab({ order, router }: { order: Order; router: ReturnType<typeo
             <Text style={s.disputeEvCount}>Evidence: {d.evidence.length} item{d.evidence.length !== 1 ? 's' : ''}</Text>
 
             <View style={s.disputeActions}>
-              <SecondaryButton label="Add Evidence" onPress={() => router.push(`/dispute-detail?orderId=${order.id}&disputeId=${d.id}`)} icon="plus" small style={{ flex: 1 }} />
-              <SecondaryButton label="Accept Dispute" onPress={() => Alert.alert('Accept Dispute', 'Are you sure? This will refund the customer.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Accept', style: 'destructive', onPress: () => Alert.alert('Dispute Accepted', 'The dispute has been accepted and the customer will be refunded.') }])} icon="check" small accent={RED} style={{ flex: 1 }} />
+              {/* "Accept Dispute" is hidden here until it calls a real disputes API —
+                  see dispute-detail.tsx, which owns evidence and concede actions. */}
+              <SecondaryButton label="Review Dispute" onPress={() => router.push(`/dispute-detail?orderId=${order.id}&disputeId=${d.id}`)} icon="plus" small style={{ flex: 1 }} />
             </View>
             {d.status === 'evidence_needed' && (
               <PrimaryButton label="Submit Evidence" onPress={() => router.push(`/dispute-detail?orderId=${order.id}&disputeId=${d.id}`)} icon="upload" small style={{ marginTop: SP.sm }} />
@@ -1607,9 +1647,15 @@ function NotesTab({ order, noteText, setNoteText, noteType, setNoteType, onAddNo
           <View style={s.noteHeader}>
             <StatusBadge label={note.type.toUpperCase()} variant={noteTypeVariant(note.type)} />
             {note.isPinned && <Feather name="bookmark" size={ICON.xs} color={GOLD} />}
-            <TouchableOpacity onPress={() => onPinNote(note.id, note.isPinned)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginLeft: 'auto' }}>
+            <PressableScale
+              onPress={() => { hapticToggle(); onPinNote(note.id, note.isPinned); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={{ marginLeft: 'auto' }}
+              accessibilityRole="button"
+              accessibilityLabel={note.isPinned ? 'Unpin note' : 'Pin note'}
+            >
               <Text style={[s.pinToggle, { color: note.isPinned ? ORANGE : MUTED }]}>{note.isPinned ? 'Unpin' : 'Pin'}</Text>
-            </TouchableOpacity>
+            </PressableScale>
           </View>
           <Text style={s.noteContent}>{note.content}</Text>
           <Text style={s.noteMeta}>{note.authorName} · {fmtTime(note.createdAt)}</Text>
@@ -1622,13 +1668,16 @@ function NotesTab({ order, noteText, setNoteText, noteType, setNoteType, onAddNo
       {/* Type selector */}
       <View style={s.noteTypeRow}>
         {(['internal', 'customer', 'manufacturer'] as const).map(t => (
-          <TouchableOpacity
+          <PressableScale
             key={t}
-            onPress={() => setNoteType(t)}
+            onPress={() => { hapticToggle(); setNoteType(t); }}
             style={[s.noteTypeChip, noteType === t && { borderColor: noteTypeColor(t), backgroundColor: noteTypeColor(t) + '22' }]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: noteType === t }}
+            accessibilityLabel={t}
           >
             <Text style={[s.noteTypeText, noteType === t && { color: noteTypeColor(t) }]}>{t}</Text>
-          </TouchableOpacity>
+          </PressableScale>
         ))}
       </View>
 
@@ -1669,18 +1718,11 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   root:             { flex: 1, backgroundColor: 'transparent' },
   centered:         { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
 
-  // Header
-  header:           { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, gap: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
-  backBtn:          { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  headerMid:        { flex: 1 },
-  headerTitle:      { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
-  headerSub:        { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-
   // Tab bar
-  tabBar:           { borderBottomWidth: 1, borderBottomColor: BORDER, maxHeight: 44, backgroundColor: SURFACE },
-  tabBarContent:    { paddingHorizontal: SP.md, gap: SP.xs },
-  tabItem:          { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabItemActive:    { borderBottomColor: PURPLE },
+  tabBar:           { borderBottomWidth: 1, borderBottomColor: BORDER, maxHeight: 52, backgroundColor: SURFACE },
+  tabBarContent:    { paddingHorizontal: SP.md, paddingVertical: SP.xs, gap: SP.xs, alignItems: 'center' },
+  tabItem:          { paddingHorizontal: SP.md, paddingVertical: SP.xs + 2, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: 'transparent', backgroundColor: 'transparent' },
+  tabItemActive:    { borderColor: PURPLE_DIM, backgroundColor: PURPLE_DIM },
   tabLabel:         { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   tabLabelActive:   { color: FG, fontFamily: FONT.semibold },
 
@@ -1692,6 +1734,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   // Hero / Overview
   heroCard:         { marginBottom: SP.sm },
   heroRow:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  timelineCard:     { marginBottom: SP.md, paddingVertical: SP.md },
   heroOrderNum:     { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
   badgeRow:         { flexDirection: 'row', gap: SP.sm, flexWrap: 'wrap' },
   heroDate:         { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: SP.xs },
@@ -1731,7 +1774,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   // Customer
   customerHero:     { alignItems: 'center', gap: SP.sm },
-  avatarCircle:     { width: 64, height: 64, borderRadius: 32, backgroundColor: PURPLE_DIM, borderWidth: 2, borderColor: BORDER_ACTIVE, alignItems: 'center', justifyContent: 'center' },
+  avatarCircle:     { width: 64, height: 64, borderRadius: RADII.pill, backgroundColor: PURPLE_DIM, borderWidth: 2, borderColor: BORDER_ACTIVE, alignItems: 'center', justifyContent: 'center' },
   avatarInitials:   { fontSize: FS.xl, fontFamily: FONT.bold, color: PURPLE },
   customerName:     { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
   customerEmail:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
@@ -1803,7 +1846,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   // Timeline
   timelineRow:      { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
-  timelineDot:      { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
+  timelineDot:      { width: 10, height: 10, borderRadius: RADII.pill, marginTop: 4 },
   timelineBody:     { flex: 1 },
   timelineMessage:  { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
   timelineMeta:     { flexDirection: 'row', gap: SP.sm, alignItems: 'center', marginTop: 2 },
@@ -1834,6 +1877,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   returnItemText:   { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, flex: 1 },
   returnItemReason: { fontSize: FS.xs, fontFamily: FONT.regular, color: ORANGE },
   returnActions:    { flexDirection: 'row', gap: SP.sm, flexWrap: 'wrap', marginTop: SP.xs },
+  denyForm:         { gap: SP.sm, marginTop: SP.xs },
+  denyLabel:        { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
+  denyInput:        { minHeight: 72, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, color: FG, padding: SP.sm, fontSize: FS.sm, fontFamily: FONT.regular, textAlignVertical: 'top' },
 
   // Disputes
   disputeCard:      { gap: SP.sm, marginBottom: SP.sm },
@@ -1862,12 +1908,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   pausedBanner:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: ORANGE_DIM, borderBottomWidth: 1, borderBottomColor: ORANGE + '55', paddingHorizontal: SP.md, paddingVertical: SP.sm },
   pausedBannerText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.medium, color: FG },
   pausedBannerAction: { fontSize: FS.xs, fontFamily: FONT.semibold, color: ORANGE },
-  cancelBanner:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: '#1A3A2A', borderBottomWidth: 1, borderBottomColor: SUCCESS + '55', paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  cancelBanner:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: SUCCESS_DIM, borderBottomWidth: 1, borderBottomColor: SUCCESS + '55', paddingHorizontal: SP.md, paddingVertical: SP.sm },
   cancelBannerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
 
   // Tracking modal
   trackingEventRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
-  trackingDot:      { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
+  trackingDot:      { width: 10, height: 10, borderRadius: RADII.pill, marginTop: 4 },
   trackingEvDesc:   { fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
   trackingEvLoc:    { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   trackingEvTime:   { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },

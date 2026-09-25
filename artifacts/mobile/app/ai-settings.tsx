@@ -7,77 +7,80 @@ import {
   View,
   Text,
   ScrollView,
-  Switch,
-  TouchableOpacity,
   Pressable,
   Alert,
   StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE,
-  FONT, FS, SP, RADIUS,
-} from '../lib/theme';
+import { FONT, FS, SP } from '../lib/theme';
 import { AISettings } from '../services/aiTypes';
 import { getAISettings, saveAISettings, clearSession } from '../services/aiService';
 import { clearAuditLog } from '../services/aiAuditLog';
 import { useColors } from '@/hooks/useColors';
+import { HapticSwitch } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
 
-const BORDER_COLOR = 'rgba(255,255,255,0.07)';
-const TRACK_FALSE  = 'rgba(255,255,255,0.07)';
+type Colors = ReturnType<typeof useColors>;
 
 // ─── Local Helpers ─────────────────────────────────────────────────────────────
 
 function SettingSection({
   title,
   subtitle,
+  colors,
   children,
 }: {
   title: string;
   subtitle?: string;
+  colors: Colors;
   children: React.ReactNode;
 }) {
+  const s = React.useMemo(() => makeSectionStyles(colors), [colors]);
   return (
-    <View style={sectionStyles.wrapper}>
-      <Text style={sectionStyles.title}>{title}</Text>
-      {subtitle ? <Text style={sectionStyles.subtitle}>{subtitle}</Text> : null}
-      <View style={sectionStyles.card}>{children}</View>
+    <View style={s.wrapper}>
+      <Text style={s.title}>{title}</Text>
+      {subtitle ? <Text style={s.subtitle}>{subtitle}</Text> : null}
+      <View style={s.card}>{children}</View>
     </View>
   );
 }
 
-const sectionStyles = StyleSheet.create({
-  wrapper: {
-    marginBottom: SP.lg,
-  },
-  title: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.xs,
-    color: MUTED,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 4,
-    paddingHorizontal: 2,
-  },
-  subtitle: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    color: SUBTLE,
-    marginBottom: SP.sm,
-    paddingHorizontal: 2,
-  },
-  card: {
-    backgroundColor: CARD,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: BORDER_COLOR,
-    overflow: 'hidden',
-  },
-});
+function makeSectionStyles(colors: Colors) {
+  return StyleSheet.create({
+    wrapper: {
+      marginBottom: SP.lg,
+    },
+    title: {
+      fontFamily: FONT.semibold,
+      fontSize: FS.xs,
+      lineHeight: 14,
+      color: colors.mutedForeground,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      marginBottom: 4,
+      paddingHorizontal: 2,
+    },
+    subtitle: {
+      fontFamily: FONT.regular,
+      fontSize: FS.xs,
+      lineHeight: 15,
+      color: colors.mutedForeground,
+      marginBottom: SP.sm,
+      paddingHorizontal: 2,
+    },
+    card: {
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+    },
+  });
+}
 
-function RowDivider() {
-  return <View style={{ height: 1, backgroundColor: BORDER_COLOR, marginHorizontal: SP.md }} />;
+function RowDivider({ colors }: { colors: Colors }) {
+  return <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginHorizontal: SP.md }} />;
 }
 
 function ToggleRow({
@@ -85,24 +88,26 @@ function ToggleRow({
   subtitle,
   value,
   onValueChange,
+  colors,
 }: {
   label: string;
   subtitle?: string;
   value: boolean;
   onValueChange: (v: boolean) => void;
+  colors: Colors;
 }) {
-  const colors = useColors();
+  const s = React.useMemo(() => makeRowStyles(colors), [colors]);
   return (
-    <View style={rowStyles.row}>
-      <View style={rowStyles.labelWrap}>
-        <Text style={rowStyles.label}>{label}</Text>
-        {subtitle ? <Text style={rowStyles.subtitle}>{subtitle}</Text> : null}
+    <View style={s.row}>
+      <View style={s.labelWrap}>
+        <Text style={s.label}>{label}</Text>
+        {subtitle ? <Text style={s.subtitle}>{subtitle}</Text> : null}
       </View>
-      <Switch
+      <HapticSwitch
         value={value}
         onValueChange={onValueChange}
-        trackColor={{ false: TRACK_FALSE, true: colors.primary }}
-        thumbColor={FG}
+        trackColor={{ false: colors.border, true: colors.primary }}
+        thumbColor={colors.background}
       />
     </View>
   );
@@ -111,14 +116,17 @@ function ToggleRow({
 function NavRow({
   label,
   onPress,
+  colors,
 }: {
   label: string;
   onPress: () => void;
+  colors: Colors;
 }) {
+  const s = React.useMemo(() => makeRowStyles(colors), [colors]);
   return (
-    <Pressable style={rowStyles.row} onPress={onPress}>
-      <Text style={rowStyles.label}>{label}</Text>
-      <Feather name="chevron-right" size={18} color={MUTED} />
+    <Pressable style={s.row} onPress={onPress}>
+      <Text style={s.label}>{label}</Text>
+      <Feather name="chevron-right" size={17} color={colors.mutedForeground} />
     </Pressable>
   );
 }
@@ -126,74 +134,70 @@ function NavRow({
 function ActionRow({
   label,
   onPress,
+  colors,
 }: {
   label: string;
   onPress: () => void;
+  colors: Colors;
 }) {
+  const s = React.useMemo(() => makeRowStyles(colors), [colors]);
   return (
-    <Pressable style={rowStyles.row} onPress={onPress}>
-      <Text style={rowStyles.actionLabel}>{label}</Text>
+    <Pressable style={s.row} onPress={onPress}>
+      <Text style={s.actionLabel}>{label}</Text>
     </Pressable>
   );
 }
 
-function InfoRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <View style={rowStyles.row}>
-      <Text style={rowStyles.label}>{label}</Text>
-      <Text style={rowStyles.infoValue}>{value}</Text>
-    </View>
-  );
+function makeRowStyles(colors: Colors) {
+  return StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: SP.md,
+      paddingVertical: 13,
+      minHeight: 52,
+    },
+    labelWrap: {
+      flex: 1,
+      paddingRight: SP.sm,
+    },
+    label: {
+      fontFamily: FONT.regular,
+      fontSize: FS.base,
+      lineHeight: 19,
+      color: colors.foreground,
+    },
+    subtitle: {
+      fontFamily: FONT.regular,
+      fontSize: FS.xs,
+      lineHeight: 15,
+      color: colors.mutedForeground,
+      marginTop: 2,
+    },
+    actionLabel: {
+      fontFamily: FONT.regular,
+      fontSize: FS.base,
+      lineHeight: 19,
+      color: colors.mutedForeground,
+    },
+    infoValue: {
+      fontFamily: FONT.regular,
+      fontSize: FS.sm,
+      lineHeight: 17,
+      color: colors.mutedForeground,
+      flex: 1,
+      textAlign: 'right',
+    },
+  });
 }
-
-const rowStyles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SP.md,
-    paddingVertical: 13,
-    minHeight: 52,
-  },
-  labelWrap: {
-    flex: 1,
-    paddingRight: SP.sm,
-  },
-  label: {
-    fontFamily: FONT.regular,
-    fontSize: FS.base,
-    color: FG,
-  },
-  subtitle: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    color: SUBTLE,
-    marginTop: 2,
-  },
-  actionLabel: {
-    fontFamily: FONT.regular,
-    fontSize: FS.base,
-    color: MUTED,
-  },
-  infoValue: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: SUBTLE,
-    flex: 1,
-    textAlign: 'right',
-  },
-});
 
 // ─── Main Screen ───────────────────────────────────────────────────────────────
 
 export default function AiSettingsScreen() {
   const router = useRouter();
+  const colors = useColors();
+  const styles = React.useMemo(() => makeStyles(colors), [colors]);
   const [settings, setSettings] = useState<AISettings | null>(null);
 
   useEffect(() => {
@@ -247,14 +251,7 @@ export default function AiSettingsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBack}>
-          <Feather name="chevron-left" size={24} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>AI Settings</Text>
-        <View style={styles.headerPlaceholder} />
-      </View>
+      <ScreenHeader title="AI Settings" />
 
       <ScrollView
         style={styles.scroll}
@@ -262,37 +259,42 @@ export default function AiSettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Section: Assistant */}
-        <SettingSection title="Assistant">
+        <SettingSection title="Assistant" colors={colors}>
           <ToggleRow
             label="Enable AI assistant"
             value={settings.enabled}
             onValueChange={v => update(s => ({ ...s, enabled: v }))}
+            colors={colors}
           />
-          <RowDivider />
+          <RowDivider colors={colors} />
           <ToggleRow
             label="Dashboard suggestions"
             subtitle="Smart cards on your dashboard"
             value={settings.suggestionsEnabled}
             onValueChange={v => update(s => ({ ...s, suggestionsEnabled: v }))}
+            colors={colors}
           />
-          <RowDivider />
+          <RowDivider colors={colors} />
           <ToggleRow
             label="Session memory"
             subtitle="Remembers your current conversation"
             value={settings.sessionMemoryEnabled}
             onValueChange={v => update(s => ({ ...s, sessionMemoryEnabled: v }))}
+            colors={colors}
           />
-          <RowDivider />
+          <RowDivider colors={colors} />
           <ToggleRow
             label="Brand Memory"
             subtitle="Your brand voice, audience, and style"
             value={settings.brandMemoryEnabled}
             onValueChange={v => update(s => ({ ...s, brandMemoryEnabled: v }))}
+            colors={colors}
           />
-          <RowDivider />
+          <RowDivider colors={colors} />
           <NavRow
             label="Manage Brand Memory"
             onPress={() => router.push('/ai-brand-memory')}
+            colors={colors}
           />
         </SettingSection>
 
@@ -300,117 +302,115 @@ export default function AiSettingsScreen() {
         <SettingSection
           title="Data Sources"
           subtitle="AI may reference data from these areas"
+          colors={colors}
         >
           <ToggleRow
             label="Products"
             value={ds.products}
             onValueChange={v => update(s => ({ ...s, dataSources: { ...s.dataSources, products: v } }))}
+            colors={colors}
           />
-          <RowDivider />
+          <RowDivider colors={colors} />
           <ToggleRow
             label="Orders"
             value={ds.orders}
             onValueChange={v => update(s => ({ ...s, dataSources: { ...s.dataSources, orders: v } }))}
+            colors={colors}
           />
-          <RowDivider />
+          <RowDivider colors={colors} />
           <ToggleRow
             label="Inventory"
             value={ds.inventory}
             onValueChange={v => update(s => ({ ...s, dataSources: { ...s.dataSources, inventory: v } }))}
+            colors={colors}
           />
-          <RowDivider />
+          <RowDivider colors={colors} />
           <ToggleRow
             label="Analytics"
             value={ds.analytics}
             onValueChange={v => update(s => ({ ...s, dataSources: { ...s.dataSources, analytics: v } }))}
+            colors={colors}
           />
-          <RowDivider />
+          <RowDivider colors={colors} />
           <ToggleRow
             label="Customers"
             value={ds.customers}
             onValueChange={v => update(s => ({ ...s, dataSources: { ...s.dataSources, customers: v } }))}
+            colors={colors}
           />
-          <RowDivider />
+          <RowDivider colors={colors} />
           <ToggleRow
             label="Content"
             value={ds.content}
             onValueChange={v => update(s => ({ ...s, dataSources: { ...s.dataSources, content: v } }))}
+            colors={colors}
           />
-          <RowDivider />
+          <RowDivider colors={colors} />
           <ToggleRow
             label="Manufacturers"
             value={ds.manufacturers}
             onValueChange={v => update(s => ({ ...s, dataSources: { ...s.dataSources, manufacturers: v } }))}
+            colors={colors}
           />
-          <RowDivider />
+          <RowDivider colors={colors} />
           <ToggleRow
             label="Store"
             value={ds.store}
             onValueChange={v => update(s => ({ ...s, dataSources: { ...s.dataSources, store: v } }))}
+            colors={colors}
           />
-          <RowDivider />
+          <RowDivider colors={colors} />
           <ToggleRow
             label="Marketing"
             value={ds.marketing}
             onValueChange={v => update(s => ({ ...s, dataSources: { ...s.dataSources, marketing: v } }))}
+            colors={colors}
           />
         </SettingSection>
 
         {/* Section: Confirmations */}
-        <SettingSection title="Confirmations">
+        <SettingSection title="Confirmations" colors={colors}>
           <ToggleRow
             label="Confirm sensitive actions"
             value={settings.confirmSensitiveActions}
             onValueChange={v => update(s => ({ ...s, confirmSensitiveActions: v }))}
+            colors={colors}
           />
-          <RowDivider />
+          <RowDivider colors={colors} />
           <ToggleRow
             label="Confirm destructive actions"
             value={settings.confirmDestructiveActions}
             onValueChange={v => update(s => ({ ...s, confirmDestructiveActions: v }))}
+            colors={colors}
           />
-          <RowDivider />
+          <RowDivider colors={colors} />
           <ToggleRow
             label="Confirm before publishing"
             value={settings.confirmPublishing}
             onValueChange={v => update(s => ({ ...s, confirmPublishing: v }))}
+            colors={colors}
           />
-          <RowDivider />
+          <RowDivider colors={colors} />
           <ToggleRow
             label="Confirm before sending"
             value={settings.confirmSending}
             onValueChange={v => update(s => ({ ...s, confirmSending: v }))}
+            colors={colors}
           />
         </SettingSection>
 
         {/* Section: History */}
-        <SettingSection title="History">
+        <SettingSection title="History" colors={colors}>
           <ActionRow
             label="Clear conversation history"
             onPress={handleClearHistory}
+            colors={colors}
           />
-          <RowDivider />
+          <RowDivider colors={colors} />
           <ActionRow
             label="Clear audit log"
             onPress={handleClearAudit}
-          />
-        </SettingSection>
-
-        {/* Section: Status */}
-        <SettingSection title="Status">
-          <InfoRow
-            label="AI Provider"
-            value="Brandthread OpenAI · Secure server"
-          />
-          <RowDivider />
-          <InfoRow
-            label="Mode"
-            value="Live — connected to your store"
-          />
-          <RowDivider />
-          <InfoRow
-            label="Version"
-            value="AI Brain 1.0"
+            colors={colors}
           />
         </SettingSection>
 
@@ -426,57 +426,34 @@ export default function AiSettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SP.md,
-    paddingTop: 56,
-    paddingBottom: SP.md,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER_COLOR,
-    backgroundColor: BG,
-  },
-  headerBack: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.md,
-    color: FG,
-  },
-  headerPlaceholder: {
-    width: 40,
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: SP.md,
-    paddingTop: SP.lg,
-    paddingBottom: 48,
-  },
-  privacyCard: {
-    backgroundColor: CARD,
-    borderRadius: 12,
-    padding: 14,
-    marginTop: 8,
-    marginBottom: SP.lg,
-    borderWidth: 1,
-    borderColor: BORDER_COLOR,
-  },
-  privacyText: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    color: SUBTLE,
-    lineHeight: 18,
-  },
-});
+function makeStyles(colors: Colors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: 'transparent',
+    },
+    scroll: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingHorizontal: SP.md,
+      paddingTop: SP.lg,
+      paddingBottom: 48,
+    },
+    privacyCard: {
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      padding: 14,
+      marginTop: 8,
+      marginBottom: SP.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    privacyText: {
+      fontFamily: FONT.regular,
+      fontSize: FS.xs,
+      color: colors.mutedForeground,
+      lineHeight: 18,
+    },
+  });
+}

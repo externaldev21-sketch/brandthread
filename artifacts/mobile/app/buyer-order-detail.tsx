@@ -20,35 +20,29 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet,
   ActivityIndicator, Modal, TextInput, RefreshControl, Image,
-  Animated, Platform,
+  Linking,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
-import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { Feather } from '@expo/vector-icons';
 import { BuyerOrderView, cancellationReasonLabel, OrderStatus, TrackingStatus } from '@/services/orderTypes';
 import { useApi } from '@/hooks/useApi';
-import {
-  BG, CARD, CARD_ELEVATED, BORDER,
-  FG, MUTED, SUBTLE, ON_DARK,
-  SUCCESS, SUCCESS_DIM,
-  BLUE, BLUE_DIM,
-  ORANGE, ORANGE_DIM,
-  RED, RED_DIM,
-  GOLD,
-  ACCENT, ACCENT_LIGHT,
-  FONT, FS, SP, RADIUS, COMP, ICON,
-} from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import {
   BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
   GradientCard, StatusBadge, PrimaryButton, SecondaryButton,
 } from '@/components/BrandthreadUI';
+import { ResponsiveContainer } from '@/components/layout';
+import { OrderProgressTimeline } from '@/components/orders/OrderProgressTimeline';
 import { formatCents } from '@/lib/money';
 import { visibleOrderForBuyer } from '@/lib/buyerOrdersVisibility';
 import { canBuyerCancel } from '@/services/orderPolicy';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -56,6 +50,18 @@ const GRAD_CARD_GLOW = ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.01)'] as c
 
 function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// Builds a real carrier tracking URL from the carrier name + tracking number.
+// Falls back to a tracking-number web search when the carrier isn't recognized.
+function carrierTrackingUrl(carrier: string | undefined, trackingNumber: string): string {
+  const key = (carrier ?? '').toLowerCase();
+  const encoded = encodeURIComponent(trackingNumber);
+  if (key.includes('usps')) return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${encoded}`;
+  if (key.includes('ups')) return `https://www.ups.com/track?tracknum=${encoded}`;
+  if (key.includes('fedex')) return `https://www.fedex.com/fedextrack/?trknbr=${encoded}`;
+  if (key.includes('dhl')) return `https://www.dhl.com/en/express/tracking.html?AWB=${encoded}`;
+  return `https://www.google.com/search?q=${encoded}+tracking`;
 }
 
 function formatRelativeUpdate(timestamp: number): string {
@@ -145,93 +151,20 @@ function isRealOrderId(id: string | undefined): boolean {
   return false;
 }
 
-// ─── Order timeline ───────────────────────────────────────────────────────────
-
-const ORDER_STEPS: Array<{ key: OrderStatus; title: string; description: string }> = [
-  { key: 'new',           title: 'Order Placed',  description: 'Your order has been received.' },
-  { key: 'processing',    title: 'Processing',    description: 'The seller is preparing your order.' },
-  { key: 'ready_to_ship', title: 'Ready to Ship', description: 'Packed and waiting for pickup.' },
-  { key: 'shipped',       title: 'Shipped',        description: 'On its way to you.' },
-  { key: 'delivered',     title: 'Delivered',      description: 'Your order has been delivered.' },
-];
-
+// The order's progress is now rendered entirely by the shared
+// OrderStatusTimeline component (see components/orders/OrderStatusTimeline)
+// so the seller and buyer screens can never disagree on stage order or
+// terminal-state handling. Terminal (non-happy-path) statuses that get their
+// own exception treatment throughout this screen.
 const TERMINAL_STATUSES: OrderStatus[] = ['cancelled', 'refunded', 'disputed'];
-
-function getOrderStepIndex(status: OrderStatus): number {
-  const idx = ORDER_STEPS.findIndex(s => s.key === status);
-  return idx >= 0 ? idx : 0;
-}
-
-function OrderTimeline({ status }: { status: OrderStatus }) {
-  if (TERMINAL_STATUSES.includes(status)) return null;
-  const currentIdx = getOrderStepIndex(status);
-
-  return (
-    <View style={tl.container}>
-      {ORDER_STEPS.map((step, idx) => {
-        const isCompleted = idx < currentIdx;
-        const isActive    = idx === currentIdx;
-        const isFuture    = idx > currentIdx;
-        const isLast      = idx === ORDER_STEPS.length - 1;
-        return (
-          <View key={step.key} style={tl.row}>
-            <View style={tl.dotCol}>
-              {isCompleted && (
-                <View style={tl.dotCompleted}>
-                  <Feather name="check" size={9} color={ON_DARK} />
-                </View>
-              )}
-              {isActive && (
-                <View style={tl.dotActive}>
-                  <View style={tl.dotActiveInner} />
-                </View>
-              )}
-              {isFuture && <View style={tl.dotFuture} />}
-              {!isLast && (
-                <View style={[tl.line, isCompleted && tl.lineCompleted, isActive && tl.lineActive]} />
-              )}
-            </View>
-            <View style={tl.textCol}>
-              <Text style={[tl.stepTitle, isCompleted && tl.stepTitleCompleted, isActive && tl.stepTitleActive, isFuture && tl.stepTitleFuture]}>
-                {step.title}
-              </Text>
-              {(isCompleted || isActive) && (
-                <Text style={[tl.stepDesc, isActive && tl.stepDescActive]}>{step.description}</Text>
-              )}
-            </View>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
-const tl = StyleSheet.create({
-  container: { paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  row: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.md },
-  dotCol: { alignItems: 'center', width: 20 },
-  dotCompleted: { width: 20, height: 20, borderRadius: 10, backgroundColor: SUCCESS, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
-  dotActive: { width: 20, height: 20, borderRadius: 10, backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center', zIndex: 1, shadowColor: ACCENT, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.7, shadowRadius: 8, elevation: 6 },
-  dotActiveInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: ON_DARK },
-  dotFuture: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: BORDER, backgroundColor: 'transparent', zIndex: 1 },
-  line: { width: 2, flex: 1, minHeight: 20, backgroundColor: BORDER, marginVertical: 2 },
-  lineCompleted: { backgroundColor: SUCCESS + '88' },
-  lineActive: { backgroundColor: ACCENT + '44' },
-  textCol: { flex: 1, paddingBottom: SP.md, paddingTop: 1 },
-  stepTitle: { fontSize: FS.sm, fontFamily: FONT.bold, color: SUBTLE },
-  stepTitleCompleted: { color: MUTED },
-  stepTitleActive: { color: ON_DARK, fontSize: FS.base },
-  stepTitleFuture: { color: SUBTLE, fontFamily: FONT.regular },
-  stepDesc: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginTop: 2, lineHeight: 17 },
-  stepDescActive: { color: MUTED },
-});
 
 // ─── Section Card ─────────────────────────────────────────────────────────────
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+  const { theme } = useAppTheme();
   return (
     <View style={sc.root}>
-      <Text style={sc.title}>{title}</Text>
+      <Text style={[sc.title, { color: theme.muted }]}>{title}</Text>
       <BrandthreadCard>{children}</BrandthreadCard>
     </View>
   );
@@ -239,32 +172,37 @@ function SectionCard({ title, children }: { title: string; children: React.React
 
 const sc = StyleSheet.create({
   root:  { marginBottom: SP.md },
-  title: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: SP.sm, paddingHorizontal: SP.md },
+  title: { fontSize: FS.sm, fontFamily: FONT.semibold, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: SP.sm, paddingHorizontal: SP.md },
 });
 
 // ─── Row ──────────────────────────────────────────────────────────────────────
 
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  const { theme } = useAppTheme();
   return (
     <View style={row.root}>
-      <Text style={row.label}>{label}</Text>
-      <Text style={[row.value, mono && row.mono]}>{value}</Text>
+      <Text style={[row.label, { color: theme.muted }]}>{label}</Text>
+      <Text style={[row.value, { color: theme.text }, mono && row.mono]}>{value}</Text>
     </View>
   );
 }
 
 const row = StyleSheet.create({
   root:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SP.xs },
-  label: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, flex: 1 },
-  value: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, flex: 1, textAlign: 'right' },
+  label: { fontSize: FS.sm, fontFamily: FONT.regular, flex: 1 },
+  value: { fontSize: FS.sm, fontFamily: FONT.semibold, flex: 1, textAlign: 'right' },
   mono:  { fontFamily: 'Inter_400Regular', letterSpacing: 0.5, fontSize: FS.xs },
 });
 
 // ─── Star Rating component ────────────────────────────────────────────────────
+// Filled stars use theme.warning (the same themed amber token seller-reviews.tsx
+// uses for its Stars component) instead of a fixed hex, so ratings stay legible
+// but still react to all 12 themes.
 
 function StarRating({ rating, size = 36, interactive = true, onRate }: {
   rating: number; size?: number; interactive?: boolean; onRate?: (r: number) => void;
 }) {
+  const { theme } = useAppTheme();
   return (
     <View style={{ flexDirection: 'row', gap: 6 }}>
       {[1, 2, 3, 4, 5].map(n => (
@@ -280,7 +218,7 @@ function StarRating({ rating, size = 36, interactive = true, onRate }: {
           accessibilityLabel={`${n} star${n > 1 ? 's' : ''}`}
           accessibilityState={interactive ? { selected: n <= rating } : undefined}
         >
-          <Text style={{ fontSize: size, color: n <= rating ? GOLD : MUTED }}>★</Text>
+          <Text style={{ fontSize: size, color: n <= rating ? theme.warning : theme.muted }}>★</Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -297,6 +235,7 @@ function ReviewSheet({
   submitting: boolean;
 }) {
   const insets = useSafeAreaInsets();
+  const { theme } = useAppTheme();
   const [rating, setRating] = useState(0);
   const [body, setBody] = useState('');
 
@@ -315,39 +254,39 @@ function ReviewSheet({
   if (!visible) return null;
 
   return (
-    <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
       <TouchableOpacity
         style={{ ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.62)' } as any}
         activeOpacity={1}
         onPress={onClose}
         accessibilityLabel="Close review"
       />
-      <View style={[rvs.sheet, { paddingBottom: Math.max(insets.bottom, SP.lg) }]}>
+      <SheetRise style={[rvs.sheet, { backgroundColor: theme.card, borderTopColor: theme.border, paddingBottom: Math.max(insets.bottom, SP.lg) }]}>
         {/* Handle */}
-        <View style={rvs.handle} />
+        <View style={[rvs.handle, { backgroundColor: theme.border }]} />
 
         {/* Header */}
         <View style={rvs.header}>
           <View style={{ flex: 1 }}>
-            <Text style={rvs.eyebrow}>LEAVE FEEDBACK</Text>
-            <Text style={rvs.title}>Rate {sellerName}</Text>
+            <Text style={[rvs.eyebrow, { color: theme.muted }]}>LEAVE FEEDBACK</Text>
+            <Text style={[rvs.title, { color: theme.text }]}>Rate {sellerName}</Text>
           </View>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityLabel="Close">
-            <Feather name="x" size={22} color={FG} />
+            <Feather name="x" size={22} color={theme.text} />
           </TouchableOpacity>
         </View>
 
         {/* Stars */}
         <View style={rvs.starsRow}>
           <StarRating rating={rating} size={42} interactive onRate={setRating} />
-          <Text style={rvs.ratingLabel}>{ratingLabel}</Text>
+          <Text style={[rvs.ratingLabel, { color: theme.muted }]}>{ratingLabel}</Text>
         </View>
 
         {/* Review text */}
         <TextInput
-          style={rvs.input}
+          style={[rvs.input, { backgroundColor: theme.cardElevated, borderColor: theme.border, color: theme.text }]}
           placeholder="Share your experience (optional)"
-          placeholderTextColor={SUBTLE}
+          placeholderTextColor={theme.subtle}
           value={body}
           onChangeText={setBody}
           multiline
@@ -355,20 +294,20 @@ function ReviewSheet({
           textAlignVertical="top"
           accessibilityLabel="Review text"
         />
-        <Text style={rvs.charCount}>{body.length}/500</Text>
+        <Text style={[rvs.charCount, { color: theme.subtle }]}>{body.length}/500</Text>
 
         {/* Actions */}
         <View style={rvs.actions}>
           <TouchableOpacity
-            style={rvs.cancelBtn}
+            style={[rvs.cancelBtn, { borderColor: theme.border }]}
             onPress={onClose}
             accessibilityRole="button"
             accessibilityLabel="Cancel"
           >
-            <Text style={rvs.cancelBtnText}>Not now</Text>
+            <Text style={[rvs.cancelBtnText, { color: theme.muted }]}>Not now</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[rvs.submitBtn, !canSubmit && rvs.submitBtnDisabled]}
+            style={[rvs.submitBtn, { backgroundColor: theme.accent }, !canSubmit && rvs.submitBtnDisabled]}
             onPress={canSubmit ? () => onSubmit(rating, body) : undefined}
             disabled={!canSubmit}
             activeOpacity={0.8}
@@ -377,12 +316,12 @@ function ReviewSheet({
             accessibilityState={{ disabled: !canSubmit, busy: submitting }}
           >
             {submitting
-              ? <ActivityIndicator color={ON_DARK} size="small" />
-              : <Text style={rvs.submitBtnText}>Submit review</Text>
+              ? <ActivityIndicator color={theme.onAccent} size="small" />
+              : <Text style={[rvs.submitBtnText, { color: theme.onAccent }]}>Submit review</Text>
             }
           </TouchableOpacity>
         </View>
-      </View>
+      </SheetRise>
     </Modal>
   );
 }
@@ -390,29 +329,29 @@ function ReviewSheet({
 const rvs = StyleSheet.create({
   sheet: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
-    backgroundColor: CARD, borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    borderTopWidth: 1, borderTopColor: BORDER,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    borderTopWidth: 1,
     padding: SP.lg,
   },
-  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: SP.md },
+  handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: SP.md },
   header: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: SP.lg },
-  eyebrow: { color: MUTED, fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1.6, marginBottom: 4 },
-  title: { color: FG, fontFamily: FONT.bold, fontSize: FS.lg, letterSpacing: -0.3 },
+  eyebrow: { fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1.6, marginBottom: 4 },
+  title: { fontFamily: FONT.bold, fontSize: FS.lg, letterSpacing: -0.3 },
   starsRow: { alignItems: 'center', marginBottom: SP.lg, gap: SP.sm },
-  ratingLabel: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.sm, textAlign: 'center' },
+  ratingLabel: { fontFamily: FONT.medium, fontSize: FS.sm, textAlign: 'center' },
   input: {
-    minHeight: 88, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md,
-    borderWidth: 1, borderColor: BORDER, padding: SP.md,
-    color: FG, fontFamily: FONT.regular, fontSize: FS.sm,
+    minHeight: 88, borderRadius: RADIUS.md,
+    borderWidth: 1, padding: SP.md,
+    fontFamily: FONT.regular, fontSize: FS.sm,
     marginBottom: 4,
   },
-  charCount: { color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'right', marginBottom: SP.md },
+  charCount: { fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'right', marginBottom: SP.md },
   actions: { flexDirection: 'row', gap: SP.sm },
-  cancelBtn: { flex: 1, height: COMP.buttonH, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  cancelBtnText: { color: MUTED, fontFamily: FONT.semibold, fontSize: FS.sm },
-  submitBtn: { flex: 2, height: COMP.buttonH, borderRadius: RADIUS.md, backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center' },
+  cancelBtn: { flex: 1, height: COMP.buttonH, borderRadius: RADIUS.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  cancelBtnText: { fontFamily: FONT.semibold, fontSize: FS.sm },
+  submitBtn: { flex: 2, height: COMP.buttonH, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
   submitBtnDisabled: { opacity: 0.42 },
-  submitBtnText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.base },
+  submitBtnText: { fontFamily: FONT.bold, fontSize: FS.base },
 });
 
 // ─── API adapter ──────────────────────────────────────────────────────────────
@@ -451,6 +390,7 @@ function adaptOrderDetail(row: any): BuyerOrderView {
     trackingCarrier:   row.carrier           ?? undefined,
     trackingStatus:    row.trackingStatus    ?? undefined,
     estimatedDelivery: row.estimatedDelivery ?? undefined,
+    shippedAt:         row.shippedAt         ?? undefined,
     isPreOrder:        false,
     hasReturnRequest:  false,
     cancellationReason: row.cancellationReason ?? null,
@@ -465,19 +405,20 @@ function adaptOrderDetail(row: any): BuyerOrderView {
 export function BuyerCancellationDetailsCard({ order }: {
   order: Pick<BuyerOrderView, 'status' | 'isCustomerVisible' | 'cancellationReason' | 'cancellationNotes'>;
 }) {
+  const { theme } = useAppTheme();
   if (order.status !== 'cancelled' || !order.isCustomerVisible || !order.cancellationReason) return null;
   return (
     <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
-      <GradientCard colors={['rgba(239,68,68,0.14)', 'rgba(239,68,68,0.05)']} style={{ borderColor: 'rgba(239,68,68,0.35)' }}>
+      <GradientCard colors={[`${theme.error}24`, `${theme.error}0D`]} style={{ borderColor: `${theme.error}59` }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs }}>
-          <Feather name="x-circle" size={ICON.sm} color={RED} />
-          <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: RED }}>Order Cancelled</Text>
+          <Feather name="x-circle" size={ICON.sm} color={theme.error} />
+          <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: theme.error }}>Order Cancelled</Text>
         </View>
-        <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginBottom: 2 }}>
+        <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text, marginBottom: 2 }}>
           {cancellationReasonLabel(order.cancellationReason)}
         </Text>
         {!!order.cancellationNotes && (
-          <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: SP.xs, lineHeight: 18 }}>
+          <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, marginTop: SP.xs, lineHeight: 18 }}>
             {order.cancellationNotes}
           </Text>
         )}
@@ -487,6 +428,7 @@ export function BuyerCancellationDetailsCard({ order }: {
 }
 
 export function BuyerTrackingAlertCard({ trackingStatus }: { trackingStatus?: TrackingStatus }) {
+  const { theme } = useAppTheme();
   const isOutForDelivery  = trackingStatus === 'out_for_delivery';
   const isDeliveryProblem = trackingStatus === 'exception' || trackingStatus === 'returned_to_sender';
   if (!isOutForDelivery && !isDeliveryProblem) return null;
@@ -496,16 +438,15 @@ export function BuyerTrackingAlertCard({ trackingStatus }: { trackingStatus?: Tr
     : trackingStatus === 'returned_to_sender'
       ? 'The carrier is returning this package to the sender. Contact the seller for help.'
       : 'The carrier reported a problem with this delivery. Check the tracking details or contact the seller.';
-  const color = isOutForDelivery ? ORANGE : RED;
-  const background = isOutForDelivery ? ORANGE_DIM : RED_DIM;
+  const color = isOutForDelivery ? theme.warning : theme.error;
   return (
     <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
-      <GradientCard colors={[`${color}24`, `${background}88`]} style={{ borderColor: `${color}66` }}>
+      <GradientCard colors={[`${color}24`, `${color}0D`]} style={{ borderColor: `${color}66` }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs }}>
           <Feather name={isOutForDelivery ? 'truck' : 'alert-triangle'} size={ICON.sm} color={color} />
           <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color }}>{title}</Text>
         </View>
-        <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 }}>{message}</Text>
+        <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text, lineHeight: 20 }}>{message}</Text>
       </GradientCard>
     </View>
   );
@@ -514,14 +455,12 @@ export function BuyerTrackingAlertCard({ trackingStatus }: { trackingStatus?: Tr
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function BuyerOrderDetailScreen() {
-  const colors = useColors();
   const { theme } = useAppTheme();
-  const PURPLE = colors.primary;
+  const PURPLE = theme.accent;
   const PURPLE_LIGHT = theme.accentLight;
-  const PURPLE_DIM = colors.accent;
+  const PURPLE_DIM = theme.accentDim;
   const CYAN = theme.secondary;
-  const BORDER_ACTIVE = `${theme.accent}73`;
-  const styles = makeStyles(theme);
+  const styles = React.useMemo(() => makeStyles(theme), [theme]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -540,6 +479,7 @@ export default function BuyerOrderDetailScreen() {
   const [submittingReview, setSubmittingReview] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [trackingCopied, setTrackingCopied] = useState(false);
   const [returnRequest, setReturnRequest] = useState<any | null>(null);
 
   const consecutiveFailuresRef = useRef(0);
@@ -647,8 +587,19 @@ export default function BuyerOrderDetailScreen() {
 
   function handleCopyTracking() {
     if (!order?.trackingNumber) return;
+    Clipboard.setStringAsync(order.trackingNumber);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert('Tracking Number', order.trackingNumber);
+    setTrackingCopied(true);
+    setTimeout(() => setTrackingCopied(false), 2000);
+  }
+
+  function handleTrackOnCarrier() {
+    if (!order?.trackingNumber) return;
+    const url = carrierTrackingUrl(order.trackingCarrier, order.trackingNumber);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Linking.openURL(url).catch(() => {
+      Alert.alert("Couldn't open tracking", 'Try again in a moment.');
+    });
   }
 
   function handleContactSeller() {
@@ -694,7 +645,7 @@ export default function BuyerOrderDetailScreen() {
       setShowReviewSheet(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: any) {
-      Alert.alert('Error', err?.message ?? 'Could not submit review');
+      Alert.alert('Error', "Couldn't post your review. Try again.");
     } finally {
       setSubmittingReview(false);
     }
@@ -729,7 +680,7 @@ export default function BuyerOrderDetailScreen() {
       }
     } catch (err: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Cannot Cancel', err?.message ?? 'Could not cancel this order. Please contact the seller.');
+      Alert.alert('Cannot Cancel', "This order can't be cancelled now. Message the seller for help.");
     } finally {
       setCancelling(false);
     }
@@ -755,7 +706,7 @@ export default function BuyerOrderDetailScreen() {
   if (visibleLoading) {
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={ACCENT} size="large" />
+        <ActivityIndicator color={theme.accent} size="large" />
       </View>
     );
   }
@@ -765,17 +716,17 @@ export default function BuyerOrderDetailScreen() {
       <BrandthreadScreen>
         <BrandthreadHeader title="Order Details" onBack={() => router.back()} />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.lg }}>
-          <Feather name="wifi-off" size={40} color={MUTED} />
-          <Text style={{ color: MUTED, fontFamily: FONT.medium, fontSize: FS.base, marginTop: SP.md, textAlign: 'center' }}>
+          <Feather name="wifi-off" size={40} color={theme.muted} />
+          <Text style={{ color: theme.muted, fontFamily: FONT.medium, fontSize: FS.base, marginTop: SP.md, textAlign: 'center' }}>
             Could not load order details
           </Text>
           <TouchableOpacity
-            style={{ marginTop: SP.md, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, paddingHorizontal: SP.lg, paddingVertical: SP.sm }}
+            style={{ marginTop: SP.md, borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.md, paddingHorizontal: SP.lg, paddingVertical: SP.sm }}
             onPress={handlePullRefresh}
             accessibilityRole="button"
             accessibilityLabel="Retry"
           >
-            <Text style={{ color: FG, fontFamily: FONT.semibold, fontSize: FS.sm }}>Retry</Text>
+            <Text style={{ color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm }}>Retry</Text>
           </TouchableOpacity>
         </View>
       </BrandthreadScreen>
@@ -808,12 +759,12 @@ export default function BuyerOrderDetailScreen() {
       <View style={styles.refreshStatus} accessibilityLiveRegion="polite">
         {isFetching ? (
           <>
-            <ActivityIndicator color={ACCENT} size="small" />
+            <ActivityIndicator color={theme.accent} size="small" />
             <Text style={styles.refreshStatusText}>Updating order status…</Text>
           </>
         ) : lastUpdatedAt !== null ? (
           <>
-            <Feather name="check-circle" size={ICON.xs} color={SUBTLE} />
+            <Feather name="check-circle" size={ICON.xs} color={theme.subtle} />
             <Text style={styles.refreshStatusText}>Last updated {formatRelativeUpdate(lastUpdatedAt)}</Text>
           </>
         ) : null}
@@ -823,9 +774,12 @@ export default function BuyerOrderDetailScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: SP.md, paddingBottom: Math.max(insets.bottom, SP.md) + COMP.buttonH + SP.xl }}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handlePullRefresh} tintColor={ACCENT} colors={[ACCENT]} />
+          <RefreshControl refreshing={refreshing} onRefresh={handlePullRefresh} tintColor={theme.accent} colors={[theme.accent]} />
         }
       >
+      {/* Centers content in a max-width column on iPad/landscape; each section
+          below keeps its own SP.md gutter so phones render unchanged. */}
+      <ResponsiveContainer style={{ paddingHorizontal: 0 }}>
         {/* ── 1. Status + Progress ─────────────────────────────────────────── */}
         <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
           <GradientCard colors={GRAD_CARD_GLOW} glow>
@@ -855,14 +809,27 @@ export default function BuyerOrderDetailScreen() {
           </GradientCard>
         </View>
 
-        {!isTerminal && (
-          <View style={{ marginBottom: SP.md }}>
-            <Text style={[sc.title, { paddingHorizontal: SP.md }]}>Order Progress</Text>
-            <BrandthreadCard style={{ marginHorizontal: SP.md }}>
-              <OrderTimeline status={order.status} />
-            </BrandthreadCard>
-          </View>
-        )}
+        {/* Live, timestamped progress tracker — the visual centerpiece of this
+            screen: Order placed → Processing → Shipped (carrier + tracking,
+            tap to track) → Out for delivery → Delivered, current step
+            highlighted and animated, future steps dimmed. Cancel/return/
+            refund states are handled by the cards below (BuyerCancellation-
+            DetailsCard / return request card / BuyerTrackingAlertCard) — this
+            tracker itself collapses to a single exception pill for those. */}
+        <View style={{ marginBottom: SP.md }}>
+          <Text style={[sc.title, { color: theme.muted, paddingHorizontal: SP.md }]}>Order Progress</Text>
+          <BrandthreadCard style={{ marginHorizontal: SP.md }} glow={!isTerminal}>
+            <OrderProgressTimeline
+              status={order.status}
+              createdAt={order.createdAt}
+              shippedAt={order.shippedAt}
+              trackingStatus={order.trackingStatus}
+              trackingCarrier={order.trackingCarrier}
+              trackingNumber={order.trackingNumber}
+              onTrackPress={handleTrackOnCarrier}
+            />
+          </BrandthreadCard>
+        </View>
 
         {/* Return request */}
         {returnRequest && (
@@ -907,7 +874,7 @@ export default function BuyerOrderDetailScreen() {
               key={idx}
               style={[
                 styles.lineItemRow,
-                idx < order.lineItems.length - 1 && { borderBottomWidth: 1, borderBottomColor: BORDER, paddingBottom: SP.sm, marginBottom: SP.sm },
+                idx < order.lineItems.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border, paddingBottom: SP.sm, marginBottom: SP.sm },
               ]}
             >
               {/* Thumbnail */}
@@ -920,7 +887,7 @@ export default function BuyerOrderDetailScreen() {
                 />
               ) : (
                 <View style={[styles.itemThumb, styles.itemThumbFallback]}>
-                  <Feather name="image" size={18} color={SUBTLE} />
+                  <Feather name="image" size={18} color={theme.subtle} />
                 </View>
               )}
               {/* Info */}
@@ -949,7 +916,11 @@ export default function BuyerOrderDetailScreen() {
         <SectionCard title="Payment Summary">
           <Row label="Subtotal" value={formatCents(order.payment.subtotalCents)} />
           <Row label="Shipping" value={formatCents(order.payment.shippingTotalCents)} />
-          <Row label="Tax"      value={formatCents(order.payment.taxTotalCents)} />
+          {/* Tax is hidden rather than shown as "$0.00" when it isn't known/charged —
+              display-only guard; the underlying total is unchanged. */}
+          {!!order.payment.taxTotalCents && (
+            <Row label="Tax" value={formatCents(order.payment.taxTotalCents)} />
+          )}
           <View style={styles.divider} />
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total</Text>
@@ -965,7 +936,7 @@ export default function BuyerOrderDetailScreen() {
             <View style={{ flexDirection: 'row', gap: SP.sm, marginTop: SP.sm, flexWrap: 'wrap' }}>
               {order.trackingCarrier && (
                 <View style={styles.carrierChip}>
-                  <Text style={styles.carrierChipText}>{order.trackingCarrier}</Text>
+                  <Text style={styles.carrierChipText} numberOfLines={1}>{order.trackingCarrier}</Text>
                 </View>
               )}
               {order.trackingStatus && (
@@ -974,16 +945,21 @@ export default function BuyerOrderDetailScreen() {
             </View>
             {order.estimatedDelivery && (
               <View style={styles.estDeliveryRow}>
-                <Feather name="calendar" size={ICON.xs} color={SUCCESS} />
+                <Feather name="calendar" size={ICON.xs} color={theme.success} />
                 <Text style={styles.estDeliveryText}>Est. delivery {fmtDate(order.estimatedDelivery)}</Text>
               </View>
             )}
             <View style={{ flexDirection: 'row', gap: SP.sm, marginTop: SP.md }}>
-              <SecondaryButton label="Copy tracking" icon="copy" onPress={handleCopyTracking} small style={{ flex: 1 }} />
+              <SecondaryButton
+                label={trackingCopied ? 'Copied' : 'Copy tracking'}
+                icon={trackingCopied ? 'check' : 'copy'}
+                onPress={handleCopyTracking}
+                small style={{ flex: 1 }}
+              />
               <SecondaryButton
                 label="Track on carrier"
                 icon="external-link"
-                onPress={() => Alert.alert('Track Shipment', `Track ${order.trackingNumber} on the carrier's website.`)}
+                onPress={handleTrackOnCarrier}
                 small style={{ flex: 1 }}
               />
             </View>
@@ -1016,18 +992,18 @@ export default function BuyerOrderDetailScreen() {
               label={cancelling ? 'Cancelling…' : 'Cancel Order'}
               icon="x-circle"
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowCancelModal(true); }}
-              accent={RED}
+              accent={theme.error}
               disabled={cancelling}
             />
           )}
           <SecondaryButton
             label={returnRequest ? 'Return Request Submitted' : 'Request Return'}
             icon="refresh-ccw"
-            onPress={handleRequestReturn}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleRequestReturn(); }}
             disabled={!!returnRequest}
           />
-          <SecondaryButton label="Report a Problem" icon="alert-circle" onPress={handleReportProblem} accent={RED} />
-          <SecondaryButton label="Report Seller" icon="flag" onPress={handleReportSeller} accent={RED} />
+          <SecondaryButton label="Report a Problem" icon="alert-circle" onPress={handleReportProblem} accent={theme.error} />
+          <SecondaryButton label="Report Seller" icon="flag" onPress={handleReportSeller} accent={theme.error} />
           {order.status === 'delivered' && (
             <SecondaryButton label="Buy Again" icon="repeat" onPress={handleBuyAgain} />
           )}
@@ -1039,6 +1015,7 @@ export default function BuyerOrderDetailScreen() {
             This order view shows your purchase details only. Internal seller information is not visible here.
           </Text>
         </View>
+      </ResponsiveContainer>
       </ScrollView>
 
       {/* ── Bottom Action Bar ────────────────────────────────────────────── */}
@@ -1046,7 +1023,7 @@ export default function BuyerOrderDetailScreen() {
         {/* Review CTA or submitted state */}
         {order.status === 'delivered' && reviewSubmitted && (
           <View style={styles.reviewDoneRow}>
-            <Feather name="check-circle" size={ICON.sm} color={SUCCESS} />
+            <Feather name="check-circle" size={ICON.sm} color={theme.success} />
             <Text style={styles.reviewDoneText}>Review submitted — thank you!</Text>
           </View>
         )}
@@ -1061,40 +1038,40 @@ export default function BuyerOrderDetailScreen() {
             accessibilityRole="button"
             accessibilityLabel="Leave a review"
           >
-            <Feather name="star" size={ICON.sm} color={GOLD} />
+            <Feather name="star" size={ICON.sm} color={theme.warning} />
             <View style={{ flex: 1 }}>
               <Text style={styles.reviewCTATitle}>Leave a Review</Text>
               <Text style={styles.reviewCTASub}>Share your experience with {order.sellerName}</Text>
             </View>
-            <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
+            <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
           </TouchableOpacity>
         )}
 
-        <SecondaryButton label="Help Center" icon="help-circle" onPress={() => Alert.alert('Help Center', 'Visit help.brandthread.com for support with your order.')} small />
+        <SecondaryButton label="Help Center" icon="help-circle" onPress={() => router.push('/help' as never)} small />
         <PrimaryButton label="Contact Seller" icon="message-circle" onPress={handleContactSeller} />
       </View>
 
       {/* ── Cancel Confirmation Modal ─────────────────────────────────────── */}
       <Modal visible={showCancelModal} transparent animationType="slide" onRequestClose={() => setShowCancelModal(false)}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: CARD, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: SP.lg, paddingBottom: SP.xl + 20 }}>
+          <View style={{ backgroundColor: theme.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: SP.lg, paddingBottom: SP.xl + 20 }}>
             <View style={{ alignItems: 'center', marginBottom: SP.md }}>
-              <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: RED_DIM, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm }}>
-                <Feather name="x-circle" size={24} color={RED} />
+              <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: `${theme.error}24`, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm }}>
+                <Feather name="x-circle" size={24} color={theme.error} />
               </View>
-              <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG }}>Cancel this order?</Text>
+              <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text }}>Cancel this order?</Text>
             </View>
-            <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20, marginBottom: SP.lg }}>
+            <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 20, marginBottom: SP.lg }}>
               Your payment will be fully refunded. Refunds typically appear within 5–10 business days depending on your bank.
             </Text>
             <View style={{ flexDirection: 'row', gap: SP.sm }}>
               <SecondaryButton label="Keep Order" onPress={() => setShowCancelModal(false)} style={{ flex: 1 }} />
               <TouchableOpacity
-                style={{ flex: 1, height: COMP.buttonH, borderRadius: RADIUS.md, backgroundColor: RED_DIM, borderWidth: 1, borderColor: RED + '60', alignItems: 'center', justifyContent: 'center' }}
+                style={{ flex: 1, height: COMP.buttonH, borderRadius: RADIUS.md, backgroundColor: `${theme.error}24`, borderWidth: 1, borderColor: `${theme.error}60`, alignItems: 'center', justifyContent: 'center' }}
                 onPress={handleCancelOrder}
                 activeOpacity={0.8}
               >
-                <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: RED }}>Yes, Cancel</Text>
+                <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: theme.error }}>Yes, Cancel</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1115,16 +1092,11 @@ export default function BuyerOrderDetailScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const PURPLE = theme.accent;
-  const PURPLE_LIGHT = theme.accentLight;
-  const PURPLE_DIM = theme.accentDim;
-  const CYAN = theme.secondary;
-  const BORDER_ACTIVE = `${theme.accent}73`;
+const makeStyles = (theme: AppThemePreset) => {
   return StyleSheet.create({
-    fulfillmentStatus: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
+    fulfillmentStatus: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
     refreshStatus: { minHeight: 28, paddingHorizontal: SP.md, flexDirection: 'row', alignItems: 'center', gap: SP.xs },
-    refreshStatusText: { fontSize: FS.xs, fontFamily: FONT.medium, color: SUBTLE },
+    refreshStatusText: { fontSize: FS.xs, fontFamily: FONT.medium, color: theme.subtle },
     preOrderInfoRow: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: SP.sm },
     preOrderInfoText: { fontSize: FS.sm, fontFamily: FONT.medium },
     trackingInfoRow: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: SP.sm, flexWrap: 'wrap' },
@@ -1132,60 +1104,60 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     trackingChip: { borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 3, maxWidth: 180 },
     trackingChipText: { fontSize: FS.xs, fontFamily: FONT.medium },
     returnHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
-    returnEyebrow: { color: MUTED, fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 0.7 },
-    returnTitle: { color: FG, fontFamily: FONT.bold, fontSize: FS.md, marginTop: 2 },
-    returnDetail: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 4, textTransform: 'capitalize' },
-    sellerResponse: { backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, padding: SP.sm, marginTop: SP.sm },
+    returnEyebrow: { color: theme.muted, fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 0.7 },
+    returnTitle: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.md, marginTop: 2 },
+    returnDetail: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 4, textTransform: 'capitalize' },
+    sellerResponse: { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.md, padding: SP.sm, marginTop: SP.sm },
     sellerResponseLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, marginBottom: 4 },
-    sellerResponseText: { color: FG, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
-    returnPendingText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: SP.sm },
-    returnUpdated: { color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: SP.sm },
+    sellerResponseText: { color: theme.text, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
+    returnPendingText: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: SP.sm },
+    returnUpdated: { color: theme.subtle, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: SP.sm },
 
     // Item rows with thumbnail
     lineItemRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-    itemThumb: { width: 56, height: 70, borderRadius: RADIUS.sm, overflow: 'hidden', borderWidth: 1, borderColor: BORDER },
-    itemThumbFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: CARD_ELEVATED },
-    lineItemName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-    lineItemVariant: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
-    lineItemPrice: { fontSize: FS.sm, fontFamily: FONT.bold, color: FG },
+    itemThumb: { width: 56, height: 70, borderRadius: RADIUS.sm, overflow: 'hidden', borderWidth: 1, borderColor: theme.border },
+    itemThumbFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: theme.cardElevated },
+    lineItemName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
+    lineItemVariant: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
+    lineItemPrice: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.text },
 
     // Address
-    addressLine: { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 22 },
+    addressLine: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.text, lineHeight: 22 },
 
     // Payment summary
-    divider: { height: 1, backgroundColor: BORDER, marginVertical: SP.sm },
+    divider: { height: 1, backgroundColor: theme.border, marginVertical: SP.sm },
     totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    totalLabel: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
-    totalAmount: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
-    paymentNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginTop: SP.sm, textAlign: 'center' },
+    totalLabel: { fontSize: FS.base, fontFamily: FONT.bold, color: theme.text },
+    totalAmount: { fontSize: FS.base, fontFamily: FONT.bold, color: theme.text },
+    paymentNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, marginTop: SP.sm, textAlign: 'center' },
 
     // Tracking
-    trackingNumberDisplay: { fontSize: FS.base, fontFamily: 'Inter_400Regular', color: FG, letterSpacing: 1 },
-    carrierChip: { backgroundColor: BLUE_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
-    carrierChipText: { fontSize: FS.xs, fontFamily: FONT.bold, color: BLUE },
+    trackingNumberDisplay: { fontSize: FS.base, fontFamily: 'Inter_400Regular', color: theme.text, letterSpacing: 1 },
+    carrierChip: { backgroundColor: theme.secondaryDim, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
+    carrierChipText: { fontSize: FS.xs, fontFamily: FONT.bold, color: theme.secondary },
     estDeliveryRow: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: SP.sm },
-    estDeliveryText: { fontSize: FS.sm, fontFamily: FONT.medium, color: SUCCESS },
+    estDeliveryText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.success },
 
     // Pre-order
     preOrderTitle: { fontSize: FS.base, fontFamily: FONT.semibold },
-    preOrderDetail: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+    preOrderDetail: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted },
 
     // Disclaimer
-    disclaimer: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', lineHeight: 18 },
+    disclaimer: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.subtle, textAlign: 'center', lineHeight: 18 },
 
     // Bottom action bar
-    actionBar: { borderTopWidth: 1, borderTopColor: BORDER, backgroundColor: BG, paddingHorizontal: SP.md, paddingTop: SP.sm, gap: SP.sm },
+    actionBar: { borderTopWidth: 1, borderTopColor: theme.border, backgroundColor: theme.background, paddingHorizontal: SP.md, paddingTop: SP.sm, gap: SP.sm },
     reviewCTA: {
-      backgroundColor: CARD, borderRadius: RADIUS.md, padding: SP.md,
-      borderWidth: 1, borderColor: BORDER, flexDirection: 'row', alignItems: 'center', gap: SP.sm,
+      backgroundColor: theme.card, borderRadius: RADIUS.md, padding: SP.md,
+      borderWidth: 1, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', gap: SP.sm,
     },
-    reviewCTATitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-    reviewCTASub: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+    reviewCTATitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
+    reviewCTASub: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
     reviewDoneRow: {
       flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-      backgroundColor: SUCCESS_DIM, borderRadius: RADIUS.md, padding: SP.sm,
-      borderWidth: 1, borderColor: SUCCESS + '40',
+      backgroundColor: `${theme.success}1F`, borderRadius: RADIUS.md, padding: SP.sm,
+      borderWidth: 1, borderColor: `${theme.success}40`,
     },
-    reviewDoneText: { fontSize: FS.sm, fontFamily: FONT.medium, color: SUCCESS },
+    reviewDoneText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.success },
   });
 };

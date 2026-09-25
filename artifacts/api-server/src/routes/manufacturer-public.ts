@@ -2,18 +2,23 @@
  * Public manufacturer directory — no auth required for reads.
  * Mounted at /api/manufacturers/public
  *
- * GET  /              list active public manufacturers (with optional filters)
- * POST /apply         public application — goes live immediately, no Clerk account needed
+ * GET  /              list active public manufacturers (search, country, specialty,
+ *                     minYears, maxMoq, verified, hasPhotos, sort)
+ * GET  /facets        countries and specialties in the live directory, with counts
+ * POST /apply         legacy anonymous application — stays private and pending; the
+ *                     portal's authenticated signup (POST /manufacturers/register) goes live instantly
  * GET  /:id           get a single public manufacturer profile
  */
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
-import { db, manufacturers, manufacturerReviews, sampleOrders, users } from "@workspace/db";
-import { eq, and, ilike, sql, or, inArray, desc } from "drizzle-orm";
+import { db, manufacturers, manufacturerReviews, sampleOrders, users, manufacturerProducts, manufacturerProductPriceTiers } from "@workspace/db";
+import { eq, and, ilike, sql, or, inArray, desc, gte, lte, isNotNull, type SQL } from "drizzle-orm";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { ApplyAsManufacturerBody } from "@workspace/api-zod";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { requireAuth } from "../middlewares/requireAuth";
+import { setPublicCacheHeaders } from "../lib/httpCache";
+import { parsePagination, setPaginationHeaders } from "../lib/pagination";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -29,6 +34,7 @@ const publicManufacturerFields = {
   moq:             manufacturers.moq,
   photos:          manufacturers.photos,
   website:         manufacturers.website,
+  timeZone:        manufacturers.timeZone,
   priceRange:      manufacturers.priceRange,
   sampleTurnaround: manufacturers.sampleTurnaround,
   bulkTurnaround:  manufacturers.bulkTurnaround,
@@ -128,17 +134,63 @@ async function serializePublicManufacturer(
 
 // ── GET /api/manufacturers/public ─────────────────────────────────────────────
 
+const DIRECTORY_SORTS: Record<string, SQL> = {
+  recommended: sql`${manufacturers.verifiedAt} DESC NULLS LAST, jsonb_array_length(COALESCE(${manufacturers.photos}::jsonb, '[]'::jsonb)) > 0 DESC, ${manufacturers.ratingBasisPoints} DESC, ${manufacturers.createdAt} DESC`,
+  newest: sql`${manufacturers.createdAt} DESC`,
+  experience: sql`${manufacturers.yearsInBusiness} DESC, ${manufacturers.createdAt} DESC`,
+  rating: sql`${manufacturers.ratingBasisPoints} DESC, ${manufacturers.createdAt} DESC`,
+  moq: sql`${manufacturers.moq} ASC, ${manufacturers.createdAt} DESC`,
+};
+
+function intParam(value: unknown, min: number, max: number): number | null {
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return null;
+  const parsed = Number(value);
+  return parsed >= min && parsed <= max ? parsed : null;
+}
+
+const HAS_PHOTOS = sql`jsonb_array_length(COALESCE(${manufacturers.photos}::jsonb, '[]'::jsonb)) > 0`;
+
+// ── GET /api/manufacturers/public/facets ──────────────────────────────────────
+
+router.get("/facets", async (req, res) => {
+  try {
+    const live = and(eq(manufacturers.isPublicDirectory, true), eq(manufacturers.status, "active"));
+    const [countries, specialties, [total]] = await Promise.all([
+      db.select({ name: manufacturers.country, count: sql<number>`count(*)::integer` })
+        .from(manufacturers).where(live).groupBy(manufacturers.country).orderBy(sql`count(*) DESC`, manufacturers.country),
+      db.select({ name: manufacturers.specialty, count: sql<number>`count(*)::integer` })
+        .from(manufacturers).where(live).groupBy(manufacturers.specialty).orderBy(sql`count(*) DESC`, manufacturers.specialty),
+      db.select({ count: sql<number>`count(*)::integer` }).from(manufacturers).where(live),
+    ]);
+    res.json({
+      total: total?.count ?? 0,
+      countries: countries.filter((row) => row.name?.trim()),
+      specialties: specialties.filter((row) => row.name?.trim()),
+    });
+  } catch (err) {
+    req.log.error({ err }, "Failed to load manufacturer directory facets");
+    res.status(500).json({ error: "Failed to load filters" });
+  }
+});
+
 router.get("/", async (req, res) => {
   try {
-    const { q, country, specialty } = req.query as Record<string, string>;
+    setPublicCacheHeaders(res);
+    const { q, country, specialty, verified, hasPhotos, sort } = req.query as Record<string, string>;
     const searchTerm = normalizeSearchTerm(q);
     const countryTerm = normalizeSearchTerm(country, 80);
     const specialtyTerm = normalizeSearchTerm(specialty, 100);
+    const minYears = intParam(req.query.minYears, 0, 200);
+    const maxMoq = intParam(req.query.maxMoq, 1, 10_000_000);
 
-    const conditions = [
+    const conditions: SQL[] = [
       eq(manufacturers.isPublicDirectory, true),
       eq(manufacturers.status, "active"),
     ];
+    if (minYears != null) conditions.push(gte(manufacturers.yearsInBusiness, minYears));
+    if (maxMoq != null) conditions.push(lte(manufacturers.moq, maxMoq));
+    if (verified === "true") conditions.push(isNotNull(manufacturers.verifiedAt));
+    if (hasPhotos === "true") conditions.push(HAS_PHOTOS);
 
     if (countryTerm) {
       conditions.push(eq(manufacturers.country, countryTerm));
@@ -160,11 +212,18 @@ router.get("/", async (req, res) => {
       conditions.push(ilike(manufacturers.specialty, containsSearchPattern(specialtyTerm)));
     }
 
+    const page = parsePagination(req.query, { limit: 100 });
+    if (!page.success) return void res.status(400).json({ error: "Invalid pagination", code: "VALIDATION_ERROR" });
+    const { limit, offset } = page.data;
+
     const rows = await db
       .select(publicManufacturerFields)
       .from(manufacturers)
       .where(and(...conditions))
-      .orderBy(sql`${manufacturers.verifiedAt} DESC NULLS LAST, ${manufacturers.createdAt} DESC`);
+      .orderBy(DIRECTORY_SORTS[sort] ?? DIRECTORY_SORTS.recommended)
+      .limit(limit)
+      .offset(offset);
+    setPaginationHeaders(res, page.data, rows.length);
 
     const summaries = await getReviewSummaries(rows.map((row) => row.id));
     const serialized = await Promise.all(rows.map((row) =>
@@ -183,6 +242,7 @@ router.get("/:id/reviews", async (req, res) => {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(manufacturerId)) {
     res.status(400).json({ error: "A canonical manufacturer UUID is required" }); return;
   }
+  setPublicCacheHeaders(res);
   const [manufacturer] = await db.select({ id: manufacturers.id }).from(manufacturers).where(and(
     eq(manufacturers.id, manufacturerId),
     eq(manufacturers.status, "active"),
@@ -324,6 +384,74 @@ router.post("/apply", async (req, res) => {
   }
 });
 
+// ── GET /api/manufacturers/public/:id/products ────────────────────────────────
+// Browsable catalog for an active, publicly-listed manufacturer, with
+// quantity price tiers (Alibaba/Faire style).
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function serializeTier(row: typeof manufacturerProductPriceTiers.$inferSelect) {
+  return { id: row.id, minQuantity: row.minQuantity, maxQuantity: row.maxQuantity, unitPriceCents: row.unitPriceCents };
+}
+
+async function assertActivePublicManufacturer(manufacturerId: string) {
+  if (!UUID_RE.test(manufacturerId)) return null;
+  const [mfr] = await db.select({ id: manufacturers.id }).from(manufacturers).where(and(
+    eq(manufacturers.id, manufacturerId),
+    eq(manufacturers.isPublicDirectory, true),
+    eq(manufacturers.status, "active"),
+  )).limit(1);
+  return mfr ?? null;
+}
+
+router.get("/:id/products", async (req, res) => {
+  const mfr = await assertActivePublicManufacturer(req.params.id);
+  if (!mfr) { res.status(404).json({ error: "Not found" }); return; }
+  setPublicCacheHeaders(res);
+  const products = await db.select().from(manufacturerProducts).where(and(
+    eq(manufacturerProducts.manufacturerId, mfr.id),
+    eq(manufacturerProducts.status, "active"),
+  )).orderBy(desc(manufacturerProducts.createdAt));
+  const productIds = products.map((p) => p.id);
+  const tiers = productIds.length === 0 ? [] : await db.select().from(manufacturerProductPriceTiers)
+    .where(inArray(manufacturerProductPriceTiers.productId, productIds))
+    .orderBy(manufacturerProductPriceTiers.sortOrder);
+  const tiersByProduct = new Map<string, ReturnType<typeof serializeTier>[]>();
+  for (const tier of tiers) {
+    const list = tiersByProduct.get(tier.productId) ?? [];
+    list.push(serializeTier(tier));
+    tiersByProduct.set(tier.productId, list);
+  }
+  res.json(products.map((p) => ({
+    ...p,
+    priceTiers: tiersByProduct.get(p.id) ?? [],
+    createdAt: p.createdAt.toISOString(),
+    updatedAt: p.updatedAt.toISOString(),
+  })));
+});
+
+router.get("/:id/products/:productId", async (req, res) => {
+  const mfr = await assertActivePublicManufacturer(req.params.id);
+  if (!mfr) { res.status(404).json({ error: "Not found" }); return; }
+  if (!UUID_RE.test(req.params.productId)) { res.status(400).json({ error: "Invalid product id" }); return; }
+  setPublicCacheHeaders(res);
+  const [product] = await db.select().from(manufacturerProducts).where(and(
+    eq(manufacturerProducts.id, req.params.productId),
+    eq(manufacturerProducts.manufacturerId, mfr.id),
+    eq(manufacturerProducts.status, "active"),
+  )).limit(1);
+  if (!product) { res.status(404).json({ error: "Not found" }); return; }
+  const tiers = await db.select().from(manufacturerProductPriceTiers)
+    .where(eq(manufacturerProductPriceTiers.productId, product.id))
+    .orderBy(manufacturerProductPriceTiers.sortOrder);
+  res.json({
+    ...product,
+    priceTiers: tiers.map(serializeTier),
+    createdAt: product.createdAt.toISOString(),
+    updatedAt: product.updatedAt.toISOString(),
+  });
+});
+
 // ── GET /api/manufacturers/public/:id ─────────────────────────────────────────
 
 router.get("/:id", async (req, res) => {
@@ -331,6 +459,7 @@ router.get("/:id", async (req, res) => {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.params.id)) {
       res.status(400).json({ error: "A canonical manufacturer UUID is required" }); return;
     }
+    setPublicCacheHeaders(res);
     const [mfr] = await db
       .select(publicManufacturerFields)
       .from(manufacturers)

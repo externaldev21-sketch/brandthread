@@ -10,6 +10,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Header } from '@/components/layout';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -24,6 +25,7 @@ import {
 } from '@/components/BrandthreadUI';
 import { getMenus, updateMenu } from '@/services/storeService';
 import { StoreMenu, StoreMenuItem, MenuType, MenuItemTarget } from '@/services/storeTypes';
+import { SheetRise } from '@/components/motion/SheetRise';
 
 const MENU_TABS: { type: MenuType; label: string }[] = [
   { type: 'main', label: 'Main Menu' },
@@ -313,18 +315,11 @@ export default function StoreNavScreen() {
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
-          style={styles.backBtn}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Navigation</Text>
-      </View>
+    <View style={styles.root}>
+      <Header
+        title="Navigation"
+        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
+      />
       <Text style={styles.headerSubtitle}>Set up your store's navigation menus.</Text>
 
       {/* Menu Tab Selector */}
@@ -387,12 +382,12 @@ export default function StoreNavScreen() {
       {/* Item Editor Modal */}
       <Modal
         visible={modalVisible}
-        animationType="slide"
+        animationType="fade"
         transparent
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + SP.md }]}>
+          <SheetRise style={[styles.modalSheet, { paddingBottom: insets.bottom + SP.md }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Menu Item</Text>
               <TouchableOpacity
@@ -501,7 +496,7 @@ export default function StoreNavScreen() {
                 style={{ marginTop: SP.md }}
               />
             </ScrollView>
-          </View>
+          </SheetRise>
         </View>
       </Modal>
     </View>
@@ -513,34 +508,28 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE_LIGHT = theme.accentLight;
   const PURPLE_DIM = theme.accentDim;
   const BORDER_ACTIVE = theme.accentLight;
+  const BG = theme.background;
+  const SURFACE = theme.surface;
+  const CARD = theme.card;
+  const CARD_ELEVATED = theme.cardElevated;
+  const BORDER = theme.border;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const SUBTLE = theme.subtle;
+  const SUCCESS = theme.success;
+  const SUCCESS_DIM = `${theme.success}20`;
+  const ORANGE = theme.warning;
+  const ORANGE_DIM = `${theme.warning}20`;
+  const RED = theme.error;
+  const RED_DIM = `${theme.error}20`;
+  const BLUE = theme.accent;
+  const BLUE_DIM = theme.accentDim;
+  const CYAN = theme.secondary;
+  const CYAN_DIM = theme.secondaryDim;
   return StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: 'transparent',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-    minHeight: 56,
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: RADIUS.sm,
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: FS.xl,
-    fontFamily: FONT.bold,
-    color: FG,
-    letterSpacing: -0.3,
   },
   headerSubtitle: {
     fontSize: FS.sm,

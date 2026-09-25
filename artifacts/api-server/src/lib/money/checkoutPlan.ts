@@ -10,9 +10,10 @@
  * so a buyer cannot route a preorder around the hold (or an in-stock order
  * into it) by editing a request.
  */
-import { eq, inArray } from "drizzle-orm";
-import { db, drops, products } from "@workspace/db";
+import { and, eq, inArray } from "drizzle-orm";
+import { db, drops, follows, products } from "@workspace/db";
 import { destinationApplicationFeeCents } from "./fees";
+import { isDropLive } from "./dropLaunch";
 import type { DbExecutor } from "./ledger";
 
 export class CheckoutPlanError extends Error {
@@ -29,6 +30,7 @@ export type ChargePlan =
 export async function resolveChargePlan(input: {
   productIds: string[];
   sellerId: string;
+  buyerId?: string | null;
   clientDropId?: string | null;
   now?: Date;
   executor?: DbExecutor;
@@ -42,12 +44,41 @@ export async function resolveChargePlan(input: {
     productId: products.id,
     dropId: products.dropId,
     dropType: drops.type,
+    dropStatus: drops.status,
     dropOwnerId: drops.ownerId,
     escrowState: drops.escrowState,
     deadline: drops.fulfillmentDeadlineAt,
+    releaseAt: drops.releaseAt,
+    earlyAccessMinutes: drops.earlyAccessMinutes,
   }).from(products)
     .leftJoin(drops, eq(drops.id, products.dropId))
     .where(inArray(products.id, ids));
+
+  // ── Launch-time enforcement (server clock, never the client) ─────────────
+  // Applies to every drop-linked product, pre-order or pre-made: buyers
+  // cannot check out before the drop is 'active' and its releaseAt has
+  // passed, unless they get the seller's configured early-access window.
+  const dropsById = new Map<string, (typeof rows)[number]>();
+  for (const row of rows) {
+    if (row.dropId) dropsById.set(row.dropId, row);
+  }
+  for (const drop of dropsById.values()) {
+    if (drop.dropStatus && drop.dropStatus !== "active") {
+      throw new CheckoutPlanError("This drop is not currently available.", 409, "DROP_NOT_ACTIVE");
+    }
+    if (!drop.releaseAt) continue;
+    const earlyAccessMinutes = drop.earlyAccessMinutes ?? 0;
+    let hasEarlyAccess = false;
+    if (earlyAccessMinutes > 0 && input.buyerId) {
+      const [isFollower] = await executor.select({ followerId: follows.followerId }).from(follows)
+        .where(and(eq(follows.followerId, input.buyerId), eq(follows.followingId, drop.dropOwnerId!)))
+        .limit(1);
+      hasEarlyAccess = !!isFollower;
+    }
+    if (!isDropLive(drop.releaseAt, earlyAccessMinutes, hasEarlyAccess, now)) {
+      throw new CheckoutPlanError("This drop hasn't launched yet.", 409, "DROP_NOT_LIVE");
+    }
+  }
 
   const preorderDrops = new Set<string>();
   let inStock = 0;

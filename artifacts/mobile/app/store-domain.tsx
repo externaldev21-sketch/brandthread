@@ -7,9 +7,9 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { Header } from '@/components/layout';
 import {
-  BG, CARD, SURFACE, BORDER,
+  SURFACE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM,
   FONT, FS, SP, RADIUS, ICON,
@@ -29,7 +29,6 @@ export default function StoreDomainScreen() {
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const params = useLocalSearchParams<{ from?: string }>();
-  const headerTopInset = useHeaderTopInset();
   const api = useApi();
   const [domains, setDomains] = useState<MergedDomain[]>([]);
   const [adding, setAdding] = useState(false);
@@ -148,16 +147,7 @@ export default function StoreDomainScreen() {
 
   return (
     <View style={dm.root}>
-      <View style={[dm.header, { paddingTop: headerTopInset + SP.sm }]}>
-        <TouchableOpacity
-          onPress={leaveSetupDestination}
-          style={dm.backBtn}
-          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-        >
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={dm.headerTitle}>Domains</Text>
-      </View>
+      <Header title="Domains" onBack={leaveSetupDestination} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={dm.scroll}>
 
@@ -290,19 +280,11 @@ export default function StoreDomainScreen() {
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE_LIGHT = theme.accentLight;
   const CYAN = theme.secondary;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const SURFACE = theme.surface;
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    paddingHorizontal: SP.md, paddingVertical: SP.sm,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)',
-  },
-  backBtn: {
-    width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  headerTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
   scroll: { paddingBottom: 60, paddingTop: SP.md },
   sh: { marginTop: SP.lg, marginBottom: SP.sm },
   card: { marginHorizontal: SP.md, marginBottom: SP.sm, gap: SP.md },

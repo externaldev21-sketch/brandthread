@@ -8,7 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
-import { COMP } from '@/lib/theme';
+import { COMP, FONT, ICON } from '@/lib/theme';
 import {
   getManufacturer, saveQuoteRequestDraft, submitQuoteRequest,
 } from '@/services/manufacturerService';
@@ -93,18 +93,18 @@ export default function RequestSampleScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
           accessibilityRole="button"
           accessibilityLabel="Back"
           accessibilityHint={`Returns without sending a sample request to ${manufacturer.name}`}
         >
-          <Feather name="arrow-left" size={22} color={colors.text} />
+          <Feather name="arrow-left" size={ICON.md} color={colors.text} />
         </TouchableOpacity>
         <View>
           <Text style={styles.headerTitle}>Request Sample</Text>
           <Text style={styles.headerSub}>{manufacturer.name}</Text>
         </View>
-        <View style={{ width: 22 }} />
+        <View style={{ width: ICON.md }} />
       </View>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Field label="Product type">
@@ -117,10 +117,10 @@ export default function RequestSampleScreen() {
             {QUANTITIES.map((item) => <Chip key={item} label={`${item}`} active={item === quantity} onPress={() => setQuantity(item)} color={colors.primary} />)}
           </View>
         </Field>
-        <Field label="Colorway"><TextInput accessibilityLabel="Colorway" accessibilityHint="Enter the requested sample color" value={colorway} onChangeText={setColorway} placeholder="e.g. Washed black" placeholderTextColor={colors.muted} style={styles.input} /></Field>
-        <Field label="Size"><TextInput accessibilityLabel="Size" accessibilityHint="Enter the requested sample size" value={size} onChangeText={setSize} placeholderTextColor={colors.muted} style={styles.input} /></Field>
-        <Field label="Reply contact"><TextInput accessibilityLabel="Reply contact" accessibilityHint="Enter an email address or WhatsApp number" value={contact} onChangeText={setContact} placeholder="Email or WhatsApp" placeholderTextColor={colors.muted} style={styles.input} autoCapitalize="none" /></Field>
-        <Field label="Notes"><TextInput accessibilityLabel="Sample notes" accessibilityHint="Enter optional materials, construction, or deadline details" value={notes} onChangeText={setNotes} placeholder="Materials, construction, or deadlines" placeholderTextColor={colors.muted} style={[styles.input, styles.notes]} multiline /></Field>
+        <Field label="Colorway"><TextInput accessibilityLabel="Colorway" accessibilityHint="Enter the requested sample color" value={colorway} onChangeText={setColorway} placeholder="e.g. Washed black" placeholderTextColor={colors.mutedForeground} style={styles.input} /></Field>
+        <Field label="Size"><TextInput accessibilityLabel="Size" accessibilityHint="Enter the requested sample size" value={size} onChangeText={setSize} placeholderTextColor={colors.mutedForeground} style={styles.input} /></Field>
+        <Field label="Reply contact"><TextInput accessibilityLabel="Reply contact" accessibilityHint="Enter an email address or WhatsApp number" value={contact} onChangeText={setContact} placeholder="Email or WhatsApp" placeholderTextColor={colors.mutedForeground} style={styles.input} autoCapitalize="none" /></Field>
+        <Field label="Notes"><TextInput accessibilityLabel="Sample notes" accessibilityHint="Enter optional materials, construction, or deadline details" value={notes} onChangeText={setNotes} placeholder="Materials, construction, or deadlines" placeholderTextColor={colors.mutedForeground} style={[styles.input, styles.notes]} multiline /></Field>
       </ScrollView>
       <View style={[styles.bottom, { paddingBottom: insets.bottom + 12 }]}>
         <TouchableOpacity
@@ -167,17 +167,17 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   center: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', gap: 14 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
   backButton: { width: COMP.minTouchTarget, minHeight: COMP.minTouchTarget, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { color: colors.text, fontSize: 16, fontFamily: 'Inter_700Bold', textAlign: 'center' },
-  headerSub: { color: colors.muted, fontSize: 12, fontFamily: 'Inter_400Regular', textAlign: 'center' },
+  headerTitle: { color: colors.text, fontSize: 16, fontFamily: FONT.bold, textAlign: 'center' },
+  headerSub: { color: colors.mutedForeground, fontSize: 12, fontFamily: FONT.regular, textAlign: 'center' },
   content: { padding: 16, paddingBottom: 120, gap: 20 },
   field: { gap: 8 },
-  label: { color: colors.muted, fontSize: 12, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.5 },
+  label: { color: colors.mutedForeground, fontSize: 12, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.5 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { minHeight: COMP.minTouchTarget, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 8, justifyContent: 'center' },
-  chipText: { color: colors.muted, fontSize: 13, fontFamily: 'Inter_500Medium' },
-  input: { minHeight: COMP.minTouchTarget, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 12, color: colors.text, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  chipText: { color: colors.mutedForeground, fontSize: 13, fontFamily: FONT.medium },
+  input: { minHeight: COMP.minTouchTarget, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 12, color: colors.text, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, fontFamily: FONT.regular },
   notes: { minHeight: 100, textAlignVertical: 'top' },
   bottom: { paddingHorizontal: 16, paddingTop: 12, backgroundColor: colors.background, borderTopWidth: 1, borderTopColor: colors.border },
   button: { minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, paddingHorizontal: 20 },
-  buttonText: { fontSize: 15, fontFamily: 'Inter_700Bold' },
+  buttonText: { fontSize: 15, fontFamily: FONT.bold },
 });

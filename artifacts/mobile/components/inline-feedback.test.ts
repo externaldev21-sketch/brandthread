@@ -59,12 +59,14 @@ describe('InlineFeedback primitives — source structure', () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const src = readFileSync(resolve(__dirname, './InlineFeedback.tsx'), 'utf8');
-    // Token imports are present
+    // Static spacing/type tokens still come from lib/theme
     expect(src).toContain("from '@/lib/theme'");
-    // The rgba for RED border is constructed from RED constant, not hardcoded
-    expect(src).toContain('RED');
-    expect(src).toContain('MUTED');
-    expect(src).toContain('SUBTLE');
+    // Colors are read live from the active theme (re-skins across all 12
+    // themes) rather than the static, theme-independent hex constants.
+    expect(src).toContain("from '@/hooks/useColors'");
+    expect(src).toContain('colors.destructive');
+    expect(src).toContain('colors.mutedForeground');
+    expect(src).toContain('colors.subtle');
   });
 });
 
@@ -241,7 +243,9 @@ describe('buyer-post-comments — continuous video preview', () => {
     expect(comments).toContain("if (mediaUri && postType === 'video') mediaPlayer.play()");
     expect(comments).toContain('return () => mediaPlayer.pause()');
     expect(comments).toContain('testID="comments-video-preview"');
-    expect(comments).toMatch(/<VideoView[\s\S]*?contentFit="contain"[\s\S]*?testID="comments-video-preview"/);
+    // Full-size, edge-to-edge — matching its normal position in the feed —
+    // not shrunk/letterboxed into a corner behind the comments sheet.
+    expect(comments).toMatch(/<VideoView[\s\S]*?contentFit="cover"[\s\S]*?testID="comments-video-preview"/);
   });
 });
 
@@ -322,14 +326,14 @@ describe('discover.tsx — per-section error states', () => {
   });
 });
 
-// ─── search screen: existing SearchResultsSkeleton + EmptyState used ─────────
+// ─── search screen: skeleton and empty states already in place ──────────────
 
 describe('search screen — skeleton and empty already in place', () => {
-  it('uses SearchResultsSkeleton while searching', async () => {
+  it('uses GridSkeleton while searching', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const src = readFileSync(resolve(__dirname, '../app/(buyer)/search.tsx'), 'utf8');
-    expect(src).toContain('SearchResultsSkeleton');
+    expect(src).toContain('GridSkeleton');
     expect(src).toContain('searching');
   });
 
@@ -338,6 +342,6 @@ describe('search screen — skeleton and empty already in place', () => {
     const { resolve } = await import('node:path');
     const src = readFileSync(resolve(__dirname, '../app/(buyer)/search.tsx'), 'utf8');
     expect(src).toContain('EmptyState');
-    expect(src).toMatch(/No exact match/);
+    expect(src).toMatch(/No results/);
   });
 });

@@ -13,7 +13,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
-import { SUCCESS, SUCCESS_DIM, FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 interface Location {
   id: string;
@@ -202,9 +202,9 @@ export default function LocationsScreen() {
                       <TouchableOpacity
                         onPress={() => toggleActive(loc)}
                         activeOpacity={0.7}
-                        style={[s.statusPill, { backgroundColor: loc.is_active ? SUCCESS_DIM : `${colors.border}80` }]}
+                        style={[s.statusPill, { backgroundColor: loc.is_active ? `${colors.success}20` : `${colors.border}80` }]}
                       >
-                        <Text style={[s.statusPillText, { color: loc.is_active ? SUCCESS : colors.mutedForeground }]}>
+                        <Text style={[s.statusPillText, { color: loc.is_active ? colors.success : colors.mutedForeground }]}>
                           {loc.is_active ? 'Active' : 'Inactive'}
                         </Text>
                       </TouchableOpacity>
@@ -238,7 +238,7 @@ export default function LocationsScreen() {
               disabled={saving}
               style={[s.modalSaveBtn, { backgroundColor: colors.primary, opacity: saving ? 0.6 : 1 }]}
             >
-              {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.modalSaveBtnText}>Save</Text>}
+              {saving ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Text style={[s.modalSaveBtnText, { color: colors.primaryForeground }]}>Save</Text>}
             </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={s.modalBody}>
@@ -303,7 +303,7 @@ const s = StyleSheet.create({
   modalCloseBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   modalTitle: { fontSize: FS.base, fontFamily: FONT.bold },
   modalSaveBtn: { borderRadius: RADIUS.sm, paddingHorizontal: 16, paddingVertical: 8 },
-  modalSaveBtnText: { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.sm },
+  modalSaveBtnText: { fontFamily: FONT.semibold, fontSize: FS.sm },
   modalBody: { padding: 20, gap: 16, paddingBottom: 60 },
   formField: { gap: 6 },
   formLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.6 },
