@@ -4,12 +4,10 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, ScrollView, TextInput, StyleSheet, Alert, ActivityIndicator, Modal } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, StatusBadge, SectionHeader, EmptyState, PressableScale } from '@/components/BrandthreadUI';
@@ -813,7 +811,7 @@ export default function OrderDetailScreen() {
                 label="Confirm Cancel"
                 onPress={handleCancelOrder}
                 loading={cancelling}
-                colors={[RED, '#C0392B']}
+                colors={[RED, RED]}
                 style={{ flex: 1 }}
               />
             </View>
@@ -1670,13 +1668,16 @@ function NotesTab({ order, noteText, setNoteText, noteType, setNoteType, onAddNo
       {/* Type selector */}
       <View style={s.noteTypeRow}>
         {(['internal', 'customer', 'manufacturer'] as const).map(t => (
-          <TouchableOpacity
+          <PressableScale
             key={t}
-            onPress={() => setNoteType(t)}
+            onPress={() => { hapticToggle(); setNoteType(t); }}
             style={[s.noteTypeChip, noteType === t && { borderColor: noteTypeColor(t), backgroundColor: noteTypeColor(t) + '22' }]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: noteType === t }}
+            accessibilityLabel={t}
           >
             <Text style={[s.noteTypeText, noteType === t && { color: noteTypeColor(t) }]}>{t}</Text>
-          </TouchableOpacity>
+          </PressableScale>
         ))}
       </View>
 
@@ -1716,13 +1717,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   return StyleSheet.create({
   root:             { flex: 1, backgroundColor: 'transparent' },
   centered:         { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
-
-  // Header
-  header:           { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, gap: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
-  backBtn:          { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  headerMid:        { flex: 1 },
-  headerTitle:      { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
-  headerSub:        { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
 
   // Tab bar
   tabBar:           { borderBottomWidth: 1, borderBottomColor: BORDER, maxHeight: 52, backgroundColor: SURFACE },
@@ -1780,7 +1774,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   // Customer
   customerHero:     { alignItems: 'center', gap: SP.sm },
-  avatarCircle:     { width: 64, height: 64, borderRadius: 32, backgroundColor: PURPLE_DIM, borderWidth: 2, borderColor: BORDER_ACTIVE, alignItems: 'center', justifyContent: 'center' },
+  avatarCircle:     { width: 64, height: 64, borderRadius: RADII.pill, backgroundColor: PURPLE_DIM, borderWidth: 2, borderColor: BORDER_ACTIVE, alignItems: 'center', justifyContent: 'center' },
   avatarInitials:   { fontSize: FS.xl, fontFamily: FONT.bold, color: PURPLE },
   customerName:     { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
   customerEmail:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
@@ -1852,7 +1846,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
 
   // Timeline
   timelineRow:      { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
-  timelineDot:      { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
+  timelineDot:      { width: 10, height: 10, borderRadius: RADII.pill, marginTop: 4 },
   timelineBody:     { flex: 1 },
   timelineMessage:  { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
   timelineMeta:     { flexDirection: 'row', gap: SP.sm, alignItems: 'center', marginTop: 2 },
@@ -1914,12 +1908,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   pausedBanner:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: ORANGE_DIM, borderBottomWidth: 1, borderBottomColor: ORANGE + '55', paddingHorizontal: SP.md, paddingVertical: SP.sm },
   pausedBannerText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.medium, color: FG },
   pausedBannerAction: { fontSize: FS.xs, fontFamily: FONT.semibold, color: ORANGE },
-  cancelBanner:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: '#1A3A2A', borderBottomWidth: 1, borderBottomColor: SUCCESS + '55', paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  cancelBanner:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: SUCCESS_DIM, borderBottomWidth: 1, borderBottomColor: SUCCESS + '55', paddingHorizontal: SP.md, paddingVertical: SP.sm },
   cancelBannerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
 
   // Tracking modal
   trackingEventRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
-  trackingDot:      { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
+  trackingDot:      { width: 10, height: 10, borderRadius: RADII.pill, marginTop: 4 },
   trackingEvDesc:   { fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
   trackingEvLoc:    { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   trackingEvTime:   { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
