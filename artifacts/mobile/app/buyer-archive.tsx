@@ -20,6 +20,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getMyPosts, unarchivePost, deletePost } from '@/services/socialService';
 import type { BuyerPost } from '@/services/socialTypes';
 import { Header } from '@/components/layout';
+import { EmptyState } from '@/components/BrandthreadUI';
 
 const { width } = Dimensions.get('window');
 const GAP = SP.xs;
@@ -134,13 +135,11 @@ export default function BuyerArchive() {
 
       {tab === 'posts' ? (
         archivedPosts.length === 0 ? (
-          <View style={styles.empty}>
-            <Feather name="archive" size={40} color={MUTED} />
-            <Text style={styles.emptyTitle}>No archived posts</Text>
-            <Text style={styles.emptyDesc}>
-              Posts you archive from your profile will appear here. Only you can see them.
-            </Text>
-          </View>
+          <EmptyState
+            icon="archive"
+            title="No archived posts"
+            description="Posts you archive from your profile will appear here. Only you can see them."
+          />
         ) : (
           <FlatList
             data={archivedPosts}
@@ -153,13 +152,11 @@ export default function BuyerArchive() {
           />
         )
       ) : (
-        <View style={styles.empty}>
-          <Feather name="clock" size={40} color={MUTED} />
-          <Text style={styles.emptyTitle}>No archived stories</Text>
-          <Text style={styles.emptyDesc}>
-            Stories are automatically saved here after they expire. Only you can see them.
-          </Text>
-        </View>
+        <EmptyState
+          icon="clock"
+          title="No archived stories"
+          description="Stories are automatically saved here after they expire. Only you can see them."
+        />
       )}
 
       {/* Restore / Delete bottom sheet */}

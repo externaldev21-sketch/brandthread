@@ -8,6 +8,8 @@ import {
   activityLabel, buildMoneyTiles, deadlineText, dropOrdersText, dropStateLabel, isEmptySummary, signedCents,
   type FinanceSummary, type Tone,
 } from '@/lib/financeSummary';
+import { TABULAR_NUMS } from '@/constants/typography';
+import { hapticPrimaryAction } from '@/lib/haptics';
 
 type Props = {
   summary: FinanceSummary | null;
@@ -60,7 +62,7 @@ export function FinanceMoneyFlow({ summary, loading, error, onRetry }: Props) {
           Your money is safe — this is only a display problem.
         </Text>
         <TouchableOpacity
-          onPress={onRetry}
+          onPress={() => { hapticPrimaryAction(); onRetry(); }}
           style={[styles.retry, { borderColor: colors.border }]}
           accessibilityRole="button"
           accessibilityLabel="Retry loading balances"
@@ -90,7 +92,7 @@ export function FinanceMoneyFlow({ summary, loading, error, onRetry }: Props) {
               <Feather name={tile.icon} size={13} color={colors.mutedForeground} />
               <Text style={[styles.tileLabel, { color: colors.mutedForeground }]}>{tile.label}</Text>
             </View>
-            <Text style={[styles.tileValue, { color: toneColor(tile.tone) }]} numberOfLines={1} adjustsFontSizeToFit>
+            <Text style={[styles.tileValue, TABULAR_NUMS, { color: toneColor(tile.tone) }]} numberOfLines={1} adjustsFontSizeToFit>
               {tile.value}
             </Text>
             <Text style={[styles.tileCaption, { color: colors.mutedForeground }]} numberOfLines={2}>{tile.caption}</Text>
@@ -140,7 +142,7 @@ export function FinanceMoneyFlow({ summary, loading, error, onRetry }: Props) {
                     {deadline && <Text style={[styles.dropMeta, { color: colors.mutedForeground }]}>{deadline}</Text>}
                   </View>
                   <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                    <Text style={[styles.dropAmount, { color: drop.shortfallCents > 0 ? colors.destructive : colors.foreground }]}>
+                    <Text style={[styles.dropAmount, TABULAR_NUMS, { color: drop.shortfallCents > 0 ? colors.destructive : colors.foreground }]}>
                       {drop.shortfallCents > 0 ? `−${formatCents(drop.shortfallCents)}` : formatCents(drop.heldCents)}
                     </Text>
                     <View style={[styles.pill, { borderColor: colors.border }]}>
@@ -176,7 +178,7 @@ export function FinanceMoneyFlow({ summary, loading, error, onRetry }: Props) {
                   {new Date(row.occurredAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                 </Text>
               </View>
-              <Text style={[styles.activityAmount, { color: row.sellerEffectCents > 0 ? colors.success : colors.foreground }]}>
+              <Text style={[styles.activityAmount, TABULAR_NUMS, { color: row.sellerEffectCents > 0 ? colors.success : colors.foreground }]}>
                 {signedCents(row.sellerEffectCents)}
               </Text>
             </View>

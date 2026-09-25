@@ -41,7 +41,9 @@ vi.mock('@/lib/theme', () => ({
   SCREEN_BG: 'transparent',
   SURFACE: '#0D0D17',
   CARD: '#12121F',
+  CARD_GLASS: 'rgba(18, 18, 31, 0.58)',
   CARD_ELEVATED: '#18182E',
+  ACCENT: '#F4F4FF',
   BORDER: '#303044',
   BORDER_ACTIVE: '#C7CDD5',
   FG: '#F4F4FF',
@@ -67,6 +69,7 @@ vi.mock('@/lib/theme', () => ({
   PURPLE_DIM: '#2E1065',
   CYAN: '#22D3EE',
   CYAN_DIM: '#083344',
+  COMP: { buttonH: 52, buttonHSm: 44, inputH: 52, tabBarH: 72, headerH: 56, cardRadius: 18, iconBtn: 44, minTouchTarget: 44 },
 }));
 
 import { adaptApiOrder } from '@/app/order-detail';

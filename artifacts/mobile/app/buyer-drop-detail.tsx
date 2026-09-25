@@ -22,6 +22,7 @@ import {
   URGENCY_UNITS_THRESHOLD,
 } from '@/components/CommerceSignal';
 import { ShopProductSheet } from '@/components/ShopProductSheet';
+import { EmptyState } from '@/components/BrandthreadUI';
 import type { ShopSheetSelection } from '@/components/ShopProductSheet';
 import { buildCanonicalDropUrl } from '@/lib/shareDrop';
 import { computeCountdownParts, type CountdownParts } from '@/lib/dropCountdown';
@@ -642,11 +643,12 @@ export default function BuyerDropDetail() {
               ))}
             </View>
           ) : (
-            <View style={styles.emptyProducts}>
-              <Feather name="package" size={32} color={MUTED} />
-              <Text style={styles.emptyTitle}>The reveal is coming</Text>
-              <Text style={styles.emptyText}>Products will appear here as the brand unveils this drop.</Text>
-            </View>
+            <EmptyState
+              icon="package"
+              title="The reveal is coming"
+              description="Products will appear here as the brand unveils this drop."
+              compact
+            />
           )}
         </View>
       </ScrollView>

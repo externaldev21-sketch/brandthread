@@ -4,23 +4,24 @@
  */
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  View, Text, ScrollView, StyleSheet,
   ActivityIndicator, Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useApi } from '@/lib/api';
-import * as Haptics from 'expo-haptics';
-import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  SUCCESS, SUCCESS_DIM, RED,
-  FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
+import { FONT } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@clerk/expo';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { Button, Card, IconButton } from '@/components/ui';
+import { EmptyState } from '@/components/BrandthreadUI';
+import { hapticDestructiveConfirm, hapticLight, hapticWarning } from '@/lib/haptics';
+import { TYPE_SCALE } from '@/constants/typography';
+import { SPACING } from '@/constants/spacing';
+import { RADII } from '@/constants/radii';
 
 interface PaymentMethod {
   id: string;
@@ -33,15 +34,6 @@ interface PaymentMethod {
   isDefault: boolean;
 }
 
-const BRAND_ICONS: Record<string, string> = {
-  visa: '💳',
-  mastercard: '💳',
-  amex: '💳',
-  discover: '💳',
-  unionpay: '💳',
-  jcb: '💳',
-};
-
 function CardBrand({ brand }: { brand: string }) {
   const { theme } = useAppTheme();
   const upper = brand.charAt(0).toUpperCase() + brand.slice(1);
@@ -52,13 +44,14 @@ function CardBrand({ brand }: { brand: string }) {
   );
 }
 const cb = StyleSheet.create({
-  wrap: { borderRadius: RADIUS.xs, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1 },
+  wrap: { borderRadius: RADII.chip, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1 },
   text: { fontSize: 11, fontFamily: FONT.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
 });
 
 export default function BuyerPaymentMethodsScreen() {
   const { theme } = useAppTheme();
-  const router = useRouter();
+  const palette = useColors();
+  const s = React.useMemo(() => makeStyles(theme, palette), [theme, palette]);
   const insets = useSafeAreaInsets();
   const api = useApi();
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -88,7 +81,7 @@ export default function BuyerPaymentMethodsScreen() {
 
   async function setDefault(pm: PaymentMethod) {
     if (pm.isDefault || settingDefault) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticLight();
     setSettingDefault(pm.id);
     try {
       await api.reviews.setDefaultPaymentMethod(pm.id);
@@ -101,7 +94,7 @@ export default function BuyerPaymentMethodsScreen() {
   }
 
   function confirmRemove(pm: PaymentMethod) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    hapticWarning();
     Alert.alert(
       'Remove card',
       `Remove your ${pm.brand.charAt(0).toUpperCase() + pm.brand.slice(1)} ending in ${pm.last4}?`,
@@ -110,6 +103,7 @@ export default function BuyerPaymentMethodsScreen() {
         {
           text: 'Remove', style: 'destructive',
           onPress: async () => {
+            hapticDestructiveConfirm();
             setRemoving(pm.id);
             try {
               await api.reviews.removePaymentMethod(pm.id) as any;
@@ -127,7 +121,7 @@ export default function BuyerPaymentMethodsScreen() {
 
   return (
     <View style={s.root}>
-      <Header title="Payment methods" />
+      <ScreenHeader title="Payment methods" />
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color={theme.accent} /></View>
@@ -141,14 +135,13 @@ export default function BuyerPaymentMethodsScreen() {
           </Text>
 
           {paymentMethods.length === 0 ? (
-            <View style={s.emptyCard}>
-              <Feather name="credit-card" size={32} color={MUTED} style={{ marginBottom: 12 }} />
-              <Text style={s.emptyTitle}>No saved payment methods</Text>
-              <Text style={s.emptyDesc}>
-                Payment methods are saved automatically when you complete a purchase. 
-                Your card details are stored securely by Stripe — Brandthread never sees your full card number.
-              </Text>
-            </View>
+            <EmptyState
+              icon="credit-card"
+              title="No saved payment methods"
+              description="Payment methods are saved automatically when you complete a purchase. Your card details are stored securely by Stripe — Brandthread never sees your full card number."
+              compact
+              style={{ marginBottom: SPACING.xl }}
+            />
           ) : (
             <View style={s.card}>
               {paymentMethods.map((pm, i) => (
@@ -170,29 +163,26 @@ export default function BuyerPaymentMethodsScreen() {
                         {pm.expMonth && pm.expYear ? ` · Exp ${String(pm.expMonth).padStart(2, '0')}/${String(pm.expYear).slice(-2)}` : ''}
                       </Text>
                       {!pm.isDefault && (
-                        <TouchableOpacity
+                        <Button
+                          label="Make default"
                           onPress={() => setDefault(pm)}
-                          activeOpacity={0.7}
+                          variant="tertiary"
+                          size="small"
+                          loading={settingDefault === pm.id}
                           disabled={settingDefault !== null}
                           style={s.setDefaultBtn}
-                        >
-                          {settingDefault === pm.id ? (
-                            <ActivityIndicator size="small" color={theme.accent} />
-                          ) : (
-                            <Text style={[s.setDefaultText, { color: theme.accent }]}>Make default</Text>
-                          )}
-                        </TouchableOpacity>
+                        />
                       )}
                     </View>
-                    {removing === pm.id ? <ActivityIndicator size="small" color={MUTED} /> : (
-                      <TouchableOpacity
+                    {removing === pm.id ? <ActivityIndicator size="small" color={palette.mutedForeground} /> : (
+                      <IconButton
+                        name="trash-2"
+                        accessibilityLabel={`Remove card ending in ${pm.last4}`}
                         onPress={() => confirmRemove(pm)}
-                        activeOpacity={0.7}
-                        style={s.removeBtn}
+                        variant="plain"
+                        color={palette.mutedForeground}
                         disabled={settingDefault !== null}
-                      >
-                        <Feather name="trash-2" size={16} color={MUTED} />
-                      </TouchableOpacity>
+                      />
                     )}
                   </View>
                 </View>
@@ -201,7 +191,7 @@ export default function BuyerPaymentMethodsScreen() {
           )}
 
           <View style={s.securityNote}>
-            <Feather name="lock" size={14} color={MUTED} style={{ marginTop: 1 }} />
+            <Feather name="lock" size={14} color={palette.mutedForeground} style={{ marginTop: 1 }} />
             <Text style={s.securityNoteText}>
               Your payment information is encrypted and stored securely by Stripe. Brandthread cannot access your full card details.
             </Text>
@@ -212,28 +202,20 @@ export default function BuyerPaymentMethodsScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme'], palette: ReturnType<typeof useColors>) => StyleSheet.create({
   root:    { flex: 1, backgroundColor: 'transparent' },
   center:  { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 },
-  errorText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20, marginBottom: 16 },
-  retryBtn: { borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 20, paddingVertical: 10 },
-  retryBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  body:    { paddingHorizontal: SP.md, paddingTop: SP.lg },
-  desc:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 20, marginBottom: SP.lg },
-  emptyCard: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, alignItems: 'center', paddingVertical: 40, paddingHorizontal: 30, marginBottom: SP.lg },
-  emptyTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, marginBottom: 8 },
-  emptyDesc:  { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20 },
-  card:  { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden', marginBottom: SP.lg },
-  rowDivider: { height: 1, backgroundColor: BORDER, marginHorizontal: SP.md },
-  pmRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: SP.md, paddingVertical: 14 },
+  body:    { paddingHorizontal: SPACING.md, paddingTop: SPACING.lg },
+  desc:    { ...TYPE_SCALE.callout, color: palette.mutedForeground, lineHeight: 20, marginBottom: SPACING.lg },
+  card:  { backgroundColor: palette.card, borderRadius: RADII.card, borderWidth: 1, borderColor: palette.border, overflow: 'hidden', marginBottom: SPACING.lg },
+  rowDivider: { height: StyleSheet.hairlineWidth, backgroundColor: palette.border, marginHorizontal: SPACING.md },
+  pmRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: SPACING.md, paddingVertical: 14 },
   pmNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  pmName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  defaultBadge: { backgroundColor: SUCCESS_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 3 },
-  defaultBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: SUCCESS },
-  pmMeta: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
-  setDefaultBtn: { alignSelf: 'flex-start', marginTop: 7, minHeight: 24, justifyContent: 'center' },
-  setDefaultText: { fontSize: FS.xs, fontFamily: FONT.semibold },
-  removeBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  securityNote: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', paddingHorizontal: SP.sm },
-  securityNoteText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, lineHeight: 18 },
+  pmName: { ...TYPE_SCALE.callout, fontFamily: FONT.semibold, color: palette.foreground },
+  defaultBadge: { backgroundColor: `${theme.success}26`, borderRadius: RADII.pill, paddingHorizontal: 8, paddingVertical: 3 },
+  defaultBadgeText: { ...TYPE_SCALE.caption, fontFamily: FONT.semibold, color: theme.success },
+  pmMeta: { ...TYPE_SCALE.caption, color: palette.mutedForeground, marginTop: 2 },
+  setDefaultBtn: { alignSelf: 'flex-start', marginTop: 6, minWidth: 0, paddingHorizontal: 0, height: 24 },
+  securityNote: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', paddingHorizontal: SPACING.sm },
+  securityNoteText: { flex: 1, ...TYPE_SCALE.caption, color: palette.mutedForeground, lineHeight: 18 },
 });

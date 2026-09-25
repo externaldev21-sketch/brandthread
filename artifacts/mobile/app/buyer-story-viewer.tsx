@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, TextInput, Animated, Easing,
+  View, Text, Pressable, TextInput, Animated, Easing,
   Dimensions, PanResponder, StyleSheet, Alert, Modal, FlatList,
-  Image, Linking,
+  Image, Linking, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +17,10 @@ import {
   FG, MUTED, SUBTLE, ON_DARK,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { RADII } from '@/constants/radii';
+import { hapticLight, hapticSuccessAction } from '@/lib/haptics';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { IconButton } from '@/components/ui';
 import {
   getStories, trackStoryView, subscribeSocial, muteUser, createOrGetConversation, sendMessage,
 } from '@/services/socialService';
@@ -85,6 +88,7 @@ export default function BuyerStoryViewer() {
   const [showGestureGuide, setShowGestureGuide] = useState(false);
   const [serverViewers, setServerViewers] = useState<Array<{ userId: string; name: string; handle: string; viewedAt: string }>>([]);
   const [viewersLoading, setViewersLoading] = useState(false);
+  const [trackWidth, setTrackWidth] = useState(0);
   const loadGeneration = useRef(0);
 
   const progress = useRef(new Animated.Value(0)).current;
@@ -183,7 +187,7 @@ export default function BuyerStoryViewer() {
       });
       await sendMessage(conv.id, text);
       setInputText('');
-      Haptics.notificationAsync?.(Haptics.NotificationFeedbackType.Success);
+      hapticSuccessAction();
     } catch {
       Alert.alert('Couldn’t send reply', 'Try again.');
     } finally {
@@ -225,7 +229,7 @@ export default function BuyerStoryViewer() {
     const anim = Animated.timing(progress, {
       toValue: 1,
       duration: dur,
-      useNativeDriver: false,
+      useNativeDriver: true,
       easing: Easing.linear,
     });
     anim.start(({ finished }) => { if (finished) advanceSlide(); });
@@ -256,9 +260,24 @@ export default function BuyerStoryViewer() {
   ).current;
 
   if (!currentStory || !currentSlide) {
-    return <View style={[styles.container, styles.loadState]}>
-      {loading ? <Text style={styles.loadText}>Loading story…</Text> : null}
-    </View>;
+    return (
+      <View style={[styles.container, styles.loadState, { paddingTop: insets.top }]}>
+        <StatusBar style="light" />
+        {loading ? (
+          // A thin progress-bar-shaped skeleton instead of a bare "Loading…" line,
+          // so the shape doesn't jump once the story arrives.
+          <View style={styles.loadSkeletonTrack} />
+        ) : (
+          <>
+            <Feather name="camera-off" size={40} color="rgba(255,255,255,0.3)" />
+            <Text style={styles.loadText}>This story's no longer available.</Text>
+          </>
+        )}
+        <View style={[styles.closeBtnWrap, { top: insets.top + SP.sm }]}>
+          <IconButton name="x" onPress={() => router.back()} accessibilityLabel="Close" color={ON_DARK} variant="plain" />
+        </View>
+      </View>
+    );
   }
 
   const isMyStory = !!myUserId && currentStory.authorId === myUserId;
@@ -312,20 +331,25 @@ export default function BuyerStoryViewer() {
         {(currentSlide.overlays ?? []).map(overlay => {
           if (overlay.type === 'link') {
             return (
-              <TouchableOpacity
+              <Pressable
                 key={overlay.id}
-                style={[styles.linkOverlay, { left: overlay.x, top: overlay.y }]}
+                style={({ pressed }) => [
+                  styles.linkOverlay,
+                  { left: overlay.x, top: overlay.y, opacity: pressed ? 0.82 : 1 },
+                ]}
                 onPress={() => {
+                  hapticLight();
                   const url = overlay.linkUrl ?? '';
                   if (url) Linking.openURL(url).catch(() => {});
                 }}
-                activeOpacity={0.82}
+                accessibilityRole="link"
+                accessibilityLabel={overlay.linkText || overlay.linkUrl || 'Open link'}
               >
                 <Feather name="link-2" size={12} color={theme.onAccent} />
                 <Text style={[styles.linkOverlayText, getOnAccentTextStyle(theme)]} numberOfLines={1}>
                   {overlay.linkText || overlay.linkUrl}
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
             );
           }
           if (overlay.type === 'gif' && overlay.gifUrl) {
@@ -359,17 +383,19 @@ export default function BuyerStoryViewer() {
 
       {/* TAP ZONES */}
       <View style={[StyleSheet.absoluteFill, { zIndex: 5 }]} pointerEvents="box-none">
+        {/* Plain Pressable, not PressableScale: these are invisible full-height
+            advance/retreat/pause zones with intentionally no visual feedback
+            (matching the old activeOpacity=1), so the hold-to-pause timing is
+            never touched. */}
         <View style={styles.tapZoneRow}>
-          <TouchableOpacity
+          <Pressable
             style={styles.tapLeft}
-            activeOpacity={1}
             onPress={retreatSlide}
             onLongPress={() => { setIsLongPressing(true); setIsPaused(true); }}
             onPressOut={() => { if (isLongPressing) { setIsPaused(false); setIsLongPressing(false); } }}
           />
-          <TouchableOpacity
+          <Pressable
             style={styles.tapRight}
-            activeOpacity={1}
             onPress={advanceSlide}
             onLongPress={() => { setIsLongPressing(true); setIsPaused(true); }}
             onPressOut={() => { if (isLongPressing) { setIsPaused(false); setIsLongPressing(false); } }}
@@ -380,18 +406,26 @@ export default function BuyerStoryViewer() {
       {/* PROGRESS BAR */}
       <View style={[styles.progressContainer, { top: insets.top + SP.sm }]}>
         {currentStory.media.map((_, i) => (
-          <View key={i} style={styles.progressTrack}>
+          <View
+            key={i}
+            style={styles.progressTrack}
+            onLayout={trackWidth === 0 ? (e) => setTrackWidth(e.nativeEvent.layout.width) : undefined}
+          >
             {slideIdx > i ? (
               <View style={styles.progressFull} />
-            ) : slideIdx === i ? (
+            ) : slideIdx === i && trackWidth > 0 ? (
+              // Animate `transform` (scaleX pinned to the left edge via a matching
+              // translateX) instead of `width`, so this runs on the native driver
+              // and never drops frames — the timer/advance logic above is untouched.
               <Animated.View
                 style={[
-                  styles.progressFill,
+                  styles.progressFillNative,
                   {
-                    width: progress.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['0%', '100%'],
-                    }),
+                    width: trackWidth,
+                    transform: [
+                      { translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [-trackWidth / 2, 0] }) },
+                      { scaleX: progress },
+                    ],
                   },
                 ]}
               />
@@ -411,9 +445,10 @@ export default function BuyerStoryViewer() {
         </View>
         <View style={{ flex: 1 }} />
         {currentSlide.productTagId && (
-          <TouchableOpacity
-            style={styles.productTag}
-            onPress={() =>
+          <Pressable
+            style={({ pressed }) => [styles.productTag, { opacity: pressed ? 0.8 : 1 }]}
+            onPress={() => {
+              hapticLight();
               Alert.alert(currentSlide.productTagName ?? 'Product', undefined, [
                 {
                   text: 'Shop',
@@ -422,17 +457,20 @@ export default function BuyerStoryViewer() {
                   ),
                 },
                 { text: 'Cancel', style: 'cancel' },
-              ])
-            }
+              ]);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`Shop ${currentSlide.productTagName ?? 'this product'}`}
           >
             <Feather name="shopping-bag" size={ICON.sm} color={PURPLE} />
             <Text style={styles.productTagText}>{currentSlide.productTagName}</Text>
-          </TouchableOpacity>
+          </Pressable>
         )}
         {currentStory.authorId !== myUserId && currentStory.authorId !== 'me' ? (
-          <TouchableOpacity
-            style={{ marginLeft: SP.sm, padding: SP.xs }}
-            accessibilityRole="button"
+          <IconButton
+            name="more-horizontal"
+            variant="plain"
+            color={ON_DARK}
             accessibilityLabel="Story options"
             onPress={() => {
               setIsPaused(true);
@@ -472,73 +510,84 @@ export default function BuyerStoryViewer() {
                 { text: 'Cancel', style: 'cancel', onPress: () => setIsPaused(false) },
               ]);
             }}
-          >
-            <Feather name="more-horizontal" size={ICON.md} color={ON_DARK} />
-          </TouchableOpacity>
+          />
         ) : null}
+        <IconButton
+          name="x"
+          variant="plain"
+          color={ON_DARK}
+          accessibilityLabel="Close"
+          onPress={() => router.back()}
+        />
       </View>
 
       {/* BOTTOM BAR */}
-      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SP.md }]}>
-        {!currentStory.repliesDisabled ? (
-          <>
-            <TextInput
-              style={styles.replyInput}
-              value={inputText}
-              onChangeText={setInputText}
-              placeholder={`Reply to ${currentStory.authorName}…`}
-              placeholderTextColor="rgba(255,255,255,0.4)"
-              onFocus={() => setIsPaused(true)}
-              onBlur={() => setIsPaused(false)}
-              onSubmitEditing={handleSendReply}
-              returnKeyType="send"
-              editable={!sendingReply}
-            />
-            {inputText.trim().length > 0 && (
-              <TouchableOpacity
-                onPress={handleSendReply}
-                style={styles.likeBtn}
-                activeOpacity={0.7}
-                disabled={sendingReply}
-                accessibilityRole="button"
-                accessibilityLabel="Send reply"
-              >
-                <Feather name="send" size={ICON.md} color={sendingReply ? 'rgba(255,255,255,0.4)' : ON_DARK} />
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              onPress={handleLike}
-              style={styles.likeBtn}
-              activeOpacity={0.7}
-            >
-              <Feather
-                name="heart"
-                size={ICON.lg}
-                color={likedSet.has(currentStory.id) ? '#EF4444' : ON_DARK}
-                style={likedSet.has(currentStory.id) ? styles.heartFilled : undefined}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.bottomBarWrap}
+        keyboardVerticalOffset={0}
+      >
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SP.md }]}>
+          {!currentStory.repliesDisabled ? (
+            <>
+              <TextInput
+                style={styles.replyInput}
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder={`Reply to ${currentStory.authorName}…`}
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                onFocus={() => setIsPaused(true)}
+                onBlur={() => setIsPaused(false)}
+                onSubmitEditing={handleSendReply}
+                returnKeyType="send"
+                editable={!sendingReply}
               />
-              {(likesCounts[currentStory.id] ?? 0) > 0 && (
-                <Text style={styles.likesCountText}>
-                  {likesCounts[currentStory.id]}
-                </Text>
+              {inputText.trim().length > 0 && (
+                <PressableScale
+                  onPress={handleSendReply}
+                  style={styles.likeBtn}
+                  disabled={sendingReply}
+                  accessibilityRole="button"
+                  accessibilityLabel="Send reply"
+                >
+                  <Feather name="send" size={ICON.md} color={sendingReply ? 'rgba(255,255,255,0.4)' : ON_DARK} />
+                </PressableScale>
               )}
-            </TouchableOpacity>
-            {isMyStory && (
-              <TouchableOpacity
-                style={styles.viewerBtn}
-                onPress={openViewersModal}
+              <PressableScale
+                onPress={() => { hapticLight(); handleLike(); }}
+                style={styles.likeBtn}
                 accessibilityRole="button"
-                accessibilityLabel="See who viewed this story"
+                accessibilityLabel={likedSet.has(currentStory.id) ? 'Unlike this story' : 'Like this story'}
               >
-                <Feather name="eye" size={ICON.lg} color={ON_DARK} />
-                <Text style={styles.viewerCount}>{(currentStory as any).viewsCount ?? currentStory.viewers.length}</Text>
-              </TouchableOpacity>
-            )}
-          </>
-        ) : (
-          <Text style={styles.repliesDisabled}>Replies disabled</Text>
-        )}
-      </View>
+                <Feather
+                  name="heart"
+                  size={ICON.lg}
+                  color={likedSet.has(currentStory.id) ? '#EF4444' : ON_DARK}
+                  style={likedSet.has(currentStory.id) ? styles.heartFilled : undefined}
+                />
+                {(likesCounts[currentStory.id] ?? 0) > 0 && (
+                  <Text style={styles.likesCountText}>
+                    {likesCounts[currentStory.id]}
+                  </Text>
+                )}
+              </PressableScale>
+              {isMyStory && (
+                <PressableScale
+                  style={styles.viewerBtn}
+                  onPress={() => { hapticLight(); openViewersModal(); }}
+                  accessibilityRole="button"
+                  accessibilityLabel="See who viewed this story"
+                >
+                  <Feather name="eye" size={ICON.lg} color={ON_DARK} />
+                  <Text style={styles.viewerCount}>{(currentStory as any).viewsCount ?? currentStory.viewers.length}</Text>
+                </PressableScale>
+              )}
+            </>
+          ) : (
+            <Text style={styles.repliesDisabled}>Replies disabled</Text>
+          )}
+        </View>
+      </KeyboardAvoidingView>
 
       {/* VIEWER MODAL */}
       <Modal
@@ -547,19 +596,18 @@ export default function BuyerStoryViewer() {
         animationType="slide"
         onRequestClose={() => setViewerModalVisible(false)}
       >
-        <TouchableOpacity
+        <Pressable
           style={styles.modalOverlay}
-          activeOpacity={1}
           onPress={() => setViewerModalVisible(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
         />
         <View style={[styles.viewerModal, { paddingBottom: insets.bottom + SP.md }]}>
           <View style={styles.viewerModalHeader}>
             <Text style={styles.viewerModalTitle}>
               {serverViewers.length} {serverViewers.length === 1 ? 'viewer' : 'viewers'}
             </Text>
-            <TouchableOpacity onPress={() => setViewerModalVisible(false)}>
-              <Feather name="x" size={ICON.lg} color={FG} />
-            </TouchableOpacity>
+            <IconButton name="x" variant="plain" size={ICON.lg} color={FG} accessibilityLabel="Close" onPress={() => setViewerModalVisible(false)} />
           </View>
           <FlatList
             data={serverViewers}
@@ -639,6 +687,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     height: '100%',
     backgroundColor: ON_DARK,
   },
+  progressFillNative: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: ON_DARK,
+  },
   authorRow: {
     position: 'absolute',
     left: 0,
@@ -703,17 +758,19 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     width: '78%',
     height: '100%',
   },
-  bottomBar: {
+  bottomBarWrap: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
+    zIndex: 10,
+  },
+  bottomBar: {
     paddingHorizontal: SP.md,
     paddingTop: SP.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.sm,
-    zIndex: 10,
   },
   replyInput: {
     flex: 1,
@@ -855,7 +912,15 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontFamily: FONT.medium,
     minWidth: 16,
   },
-  loadState: { alignItems: 'center', justifyContent: 'center', gap: SP.sm },
-  loadText: { color: ON_DARK, fontFamily: FONT.regular, fontSize: FS.sm },
+  loadState: { alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingHorizontal: SP.xl },
+  loadText: { color: ON_DARK, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center' },
+  loadSkeletonTrack: {
+    width: '60%',
+    height: 3,
+    borderRadius: RADII.pill,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    overflow: 'hidden',
+  },
+  closeBtnWrap: { position: 'absolute', right: SP.sm },
   });
 };

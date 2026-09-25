@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator } from 'react-native';
 import { useColors } from '@/hooks/useColors';
@@ -26,6 +26,14 @@ type ApiCustomer = {
 
 const AVATAR_COLORS = ['#0F766E', '#4A6FA5', '#22D3EE', '#B98A2E', '#EF4444', '#0EA5E9', '#F59E0B', '#1D4ED8'];
 
+type SortOption = 'recent' | 'spend' | 'name';
+
+const SORT_OPTIONS: { key: SortOption; label: string }[] = [
+  { key: 'recent', label: 'Recent' },
+  { key: 'spend', label: 'Top spender' },
+  { key: 'name', label: 'Name A-Z' },
+];
+
 function getInitials(name: string): string {
   return name.split(' ').map((p) => p[0] ?? '').join('').slice(0, 2).toUpperCase();
 }
@@ -43,6 +51,7 @@ export default function CustomersScreen() {
   const [search, setSearch] = useState('');
   const [customers, setCustomers] = useState<ApiCustomer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sortBy, setSortBy] = useState<SortOption>('recent');
 
   const fetchCustomers = useCallback(async (searchText: string) => {
     try {
@@ -74,6 +83,19 @@ export default function CustomersScreen() {
   const avgSpendCents = totalCustomers > 0
     ? Math.round(customers.reduce((sum, c) => sum + (c.totalSpentCents ?? 0), 0) / totalCustomers)
     : 0;
+
+  const sortedCustomers = useMemo(() => {
+    const list = [...customers];
+    switch (sortBy) {
+      case 'spend':
+        return list.sort((a, b) => (b.totalSpentCents ?? 0) - (a.totalSpentCents ?? 0));
+      case 'name':
+        return list.sort((a, b) => a.name.localeCompare(b.name));
+      case 'recent':
+      default:
+        return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+  }, [customers, sortBy]);
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
@@ -123,6 +145,31 @@ export default function CustomersScreen() {
         />
       </View>
 
+      {/* Sort */}
+      <View style={styles.sortRow}>
+        {SORT_OPTIONS.map((opt) => {
+          const active = sortBy === opt.key;
+          return (
+            <TouchableOpacity
+              key={opt.key}
+              activeOpacity={0.7}
+              onPress={() => setSortBy(opt.key)}
+              style={[
+                styles.segChip,
+                {
+                  backgroundColor: active ? colors.primary : colors.card,
+                  borderColor: active ? colors.primary : colors.border,
+                },
+              ]}
+            >
+              <Text style={[styles.segText, { color: active ? colors.primaryForeground : colors.mutedForeground }]}>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       {/* Customer List */}
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {loading ? (
@@ -130,12 +177,12 @@ export default function CustomersScreen() {
             <ActivityIndicator size="small" color={colors.primary} />
             <Text style={[styles.custEmail, { color: colors.mutedForeground, marginLeft: 10 }]}>Loading customers...</Text>
           </View>
-        ) : customers.length === 0 ? (
+        ) : sortedCustomers.length === 0 ? (
           <View style={styles.custRow}>
             <Text style={[styles.custEmail, { color: colors.mutedForeground }]}>No customers found.</Text>
           </View>
         ) : (
-          customers.map((c, i) => {
+          sortedCustomers.map((c, i) => {
             const color = getAvatarColor(c.id);
             const initials = getInitials(c.name);
             return (
@@ -198,6 +245,7 @@ const styles = StyleSheet.create({
   searchWrap: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 12, gap: 10, borderWidth: 1, marginBottom: 12 },
   searchInput: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
   segments: { marginBottom: 16 },
+  sortRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   segChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
   segText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },

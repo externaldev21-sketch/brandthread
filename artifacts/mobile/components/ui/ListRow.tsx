@@ -13,6 +13,7 @@ import { useColors } from '@/hooks/useColors';
 import { hapticLight } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { HapticSwitch } from '@/components/BrandthreadUI';
+import { Avatar } from '@/components/ui/Avatar';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
@@ -21,11 +22,15 @@ import { PRESS_DURATION_MS, PRESS_SCALE } from '@/constants/motion';
 export interface ListRowProps {
   icon?: keyof typeof Feather.glyphMap;
   iconColor?: string;
+  /** Renders a round Avatar (photo or initials) in place of `icon`, for people rows. */
+  avatar?: { uri?: string | null; name?: string };
   title: string;
   subtitle?: string;
   value?: string;
   chevron?: boolean;
   toggle?: { value: boolean; onChange: (next: boolean) => void };
+  /** Arbitrary trailing content (e.g. an "Unblock" button) in place of value/chevron/toggle. */
+  right?: React.ReactNode;
   onPress?: () => void;
   disabled?: boolean;
   destructive?: boolean;
@@ -34,7 +39,7 @@ export interface ListRowProps {
 }
 
 export function ListRow({
-  icon, iconColor, title, subtitle, value, chevron, toggle, onPress, disabled, destructive, style, testID,
+  icon, iconColor, avatar, title, subtitle, value, chevron, toggle, right, onPress, disabled, destructive, style, testID,
 }: ListRowProps) {
   const palette = useColors();
   const scale = React.useRef(new Animated.Value(1)).current;
@@ -44,7 +49,8 @@ export function ListRow({
 
   const content = (
     <>
-      {icon && (
+      {avatar && <Avatar uri={avatar.uri} name={avatar.name} size={40} />}
+      {icon && !avatar && (
         <View style={[styles.iconWrap, { backgroundColor: palette.card, borderRadius: RADII.chip }]}>
           <Feather name={icon} size={18} color={iconColor ?? (destructive ? palette.destructive : palette.mutedForeground)} />
         </View>
@@ -53,9 +59,10 @@ export function ListRow({
         <Text style={[TYPE_SCALE.body, { fontFamily: FONT.medium, color: titleColor }]} numberOfLines={1}>{title}</Text>
         {subtitle && <Text style={[TYPE_SCALE.footnote, { color: palette.mutedForeground, marginTop: 2 }]} numberOfLines={1}>{subtitle}</Text>}
       </View>
-      {value && <Text style={[TYPE_SCALE.body, { color: palette.mutedForeground, marginRight: SPACING.xs }]} numberOfLines={1}>{value}</Text>}
-      {toggle && <HapticSwitch value={toggle.value} onValueChange={toggle.onChange} disabled={disabled} />}
-      {chevron && !toggle && <Feather name="chevron-right" size={18} color={palette.mutedForeground} />}
+      {right}
+      {!right && value && <Text style={[TYPE_SCALE.body, { color: palette.mutedForeground, marginRight: SPACING.xs }]} numberOfLines={1}>{value}</Text>}
+      {!right && toggle && <HapticSwitch value={toggle.value} onValueChange={toggle.onChange} disabled={disabled} />}
+      {!right && chevron && !toggle && <Feather name="chevron-right" size={18} color={palette.mutedForeground} />}
     </>
   );
 

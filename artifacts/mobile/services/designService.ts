@@ -51,6 +51,7 @@ function K(userId = _designUserId, storeContext = _designStoreContext) {
     syncState: `bt:design:${scope}:sync-state:v2`,
     uploadQueue: `bt:design:${scope}:verified-upload-queue:v1`,
     legacyRecovery: `bt:design:${scope}:legacy-recovery:v1`,
+    colorPicker: `bt:design:${scope}:color-picker-state:v1`,
   };
 }
 
@@ -1234,6 +1235,34 @@ export async function updateBrandAsset(id: string, partial: Partial<BrandAsset>)
 export async function deleteBrandAsset(id: string): Promise<void> {
   const assets = await loadAssets();
   await saveAssets(assets.filter(a => a.id !== id));
+}
+
+// ─── Color picker state (recents + brand palettes) ────────────────────────────
+// Persisted the same way as brand assets: one JSON blob per user/store scope.
+
+export interface ColorPickerState {
+  recentColors: string[];
+  palettes: import('../lib/colorModel').BrandPalette[];
+}
+
+const DEFAULT_COLOR_PICKER_STATE: ColorPickerState = { recentColors: [], palettes: [] };
+
+export async function getColorPickerState(): Promise<ColorPickerState> {
+  try {
+    const raw = await AsyncStorage.getItem(K().colorPicker);
+    if (!raw) return { ...DEFAULT_COLOR_PICKER_STATE };
+    const parsed = JSON.parse(raw) as Partial<ColorPickerState>;
+    return {
+      recentColors: Array.isArray(parsed.recentColors) ? parsed.recentColors : [],
+      palettes: Array.isArray(parsed.palettes) ? parsed.palettes : [],
+    };
+  } catch {
+    return { ...DEFAULT_COLOR_PICKER_STATE };
+  }
+}
+
+export async function saveColorPickerState(state: ColorPickerState): Promise<void> {
+  await AsyncStorage.setItem(K().colorPicker, JSON.stringify(state));
 }
 
 // ─── Export ───────────────────────────────────────────────────────────────────

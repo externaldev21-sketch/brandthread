@@ -40,7 +40,12 @@ import { getVerifiedPlanAccess, sendPlanLimitReached, sendPlanLookupUnavailable 
 
 const router = Router();
 
-// ─── Role definitions (the three tiers ARE the permission model) ──────────────
+// ─── Role definitions ─────────────────────────────────────────────────────────
+// `owner` plus the five roles offered on invite. Permissions here mirror
+// ROLE_PERMISSIONS in middlewares/requireRole.ts — that file is the source of
+// truth enforced server-side; this list is for the UI (roles screen, invite
+// picker). `manager`/`staff` are legacy roles kept alive for members invited
+// before this rollout; they're no longer offered on new invites.
 const ROLE_DEFINITIONS = [
   {
     key: "owner",
@@ -50,20 +55,45 @@ const ROLE_DEFINITIONS = [
     permissions: ["*"],
   },
   {
-    key: "manager",
-    name: "Manager",
-    group: "Store",
-    description: "Manage products, orders, inventory, and analytics",
-    permissions: ["products", "orders", "inventory", "analytics", "customers"],
+    key: "admin",
+    name: "Admin",
+    group: "Organization",
+    description: "Manage products, orders, inventory, analytics, customers, marketing, payouts and the team",
+    permissions: ["products", "orders", "inventory", "analytics", "customers", "marketing", "payouts", "team"],
   },
   {
-    key: "staff",
-    name: "Staff",
+    key: "finance",
+    name: "Finance",
     group: "Store",
-    description: "Fulfillment and shipping only — can view and fulfill orders",
-    permissions: ["orders:read", "orders:fulfill"],
+    description: "View balance, payouts, transactions and statements",
+    permissions: ["payouts", "analytics"],
+  },
+  {
+    key: "orders",
+    name: "Orders",
+    group: "Store",
+    description: "Manage orders, fulfillment and inventory",
+    permissions: ["orders", "inventory"],
+  },
+  {
+    key: "marketing",
+    name: "Marketing",
+    group: "Store",
+    description: "Manage ads, boosts and discount codes",
+    permissions: ["marketing", "analytics"],
+  },
+  {
+    key: "viewer",
+    name: "Viewer",
+    group: "Store",
+    description: "Read-only access to analytics and store data",
+    permissions: ["analytics"],
   },
 ] as const;
+
+const INVITE_ROLES = ["admin", "finance", "orders", "marketing", "viewer"] as const;
+type InviteRole = (typeof INVITE_ROLES)[number];
+const isInviteRole = (role: unknown): role is InviteRole => INVITE_ROLES.includes(role as InviteRole);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -504,18 +534,35 @@ router.get("/members/:id", async (req, res) => {
 });
 
 // POST /api/team/invite — owner creates (or refreshes) an invite
+// Body: { email?, username?, name?, role }. Either `email` or `username` must
+// be given; a `username` is resolved to that user's account email.
 router.post("/invite", requireRole("owner"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const { email, name, role = "staff" } = req.body ?? {};
-  if (!email || typeof email !== "string" || !email.includes("@")) {
-    res.status(400).json({ error: "Valid email required" });
+  const { email, username, name, role = "viewer" } = req.body ?? {};
+  if (!isInviteRole(role)) {
+    res.status(400).json({ error: `Invalid role — must be one of ${INVITE_ROLES.join(", ")}` });
     return;
   }
-  if (!["manager", "staff"].includes(role)) {
-    res.status(400).json({ error: "Invalid role — must be manager or staff" });
+
+  let resolvedEmail: string | null =
+    typeof email === "string" && email.includes("@") ? email : null;
+  if (!resolvedEmail && typeof username === "string" && username.trim()) {
+    const [byUsername] = await db
+      .select({ email: users.email })
+      .from(users)
+      .where(eq(users.username, username.trim().replace(/^@/, "")))
+      .limit(1);
+    if (!byUsername) {
+      res.status(404).json({ error: `No user found with username ${username}` });
+      return;
+    }
+    resolvedEmail = byUsername.email;
+  }
+  if (!resolvedEmail) {
+    res.status(400).json({ error: "A valid email or username is required" });
     return;
   }
-  const normEmail = email.trim().toLowerCase();
+  const normEmail = resolvedEmail.trim().toLowerCase();
 
   const [ownerUser] = await db
     .select({ email: users.email, name: users.name, displayName: users.displayName, brandName: users.brandName })
@@ -667,8 +714,8 @@ async function handleRoleChange(req: any, res: any) {
     res.status(400).json({ error: "The owner's role can't be changed" });
     return;
   }
-  if (!["manager", "staff"].includes(role)) {
-    res.status(400).json({ error: "Invalid role — must be manager or staff" });
+  if (!isInviteRole(role)) {
+    res.status(400).json({ error: `Invalid role — must be one of ${INVITE_ROLES.join(", ")}` });
     return;
   }
   if (!isUuid(id)) {
@@ -772,7 +819,7 @@ router.get("/roles/:role/members", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const viewerIsOwner = (((req as any).actorRole as string) ?? "owner") === "owner";
   const role = String(req.params.role).toLowerCase();
-  if (!["owner", "manager", "staff"].includes(role)) {
+  if (!["owner", "admin", "manager", "finance", "orders", "marketing", "staff", "viewer"].includes(role)) {
     res.status(400).json({ error: "Unknown role" });
     return;
   }

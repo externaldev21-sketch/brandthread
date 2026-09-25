@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
   Modal,
   Animated,
@@ -15,7 +14,6 @@ import {
   Linking,
   RefreshControl,
 } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -35,6 +33,10 @@ import { ShareProfileSheet } from '@/components/ShareProfileSheet';
 import { confirmBlock, reportHref } from '@/lib/safety';
 import { GridSkeleton, ResponsiveContainer, useGridColumns, useBreakpoint } from '@/components/layout';
 import { BrandHero, useBrandHeroScrollY, type BrandHeroStat } from '@/components/profile/BrandHero';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { FollowMorphButton } from '@/components/ui/MotionPrimitives';
+import { Snackbar } from '@/components/ui/Snackbar';
+import { hapticLight, hapticMedium, hapticSelection, hapticSuccessAction } from '@/lib/haptics';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TILE_SIZE = Math.floor((SCREEN_WIDTH - 2) / 3);
@@ -163,7 +165,7 @@ function PostTile({ post, index, isOwner, onPress, size = TILE_SIZE }: PostTileP
   const badgeColor = statusBadgeColor(post.status, theme);
 
   return (
-    <TouchableOpacity
+    <PressableScale
       style={[tileStyles.postTile, { width: size, height: size }]}
       onPress={() => onPress(post)}
       activeOpacity={0.85}
@@ -194,7 +196,7 @@ function PostTile({ post, index, isOwner, onPress, size = TILE_SIZE }: PostTileP
           </Text>
         </View>
       )}
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -213,14 +215,14 @@ const tileStyles = StyleSheet.create({
 function CreatePostTile({ onPress, size = TILE_SIZE }: { onPress: () => void; size?: number }) {
   const { theme } = useAppTheme();
   return (
-    <TouchableOpacity
+    <PressableScale
       style={[tileStyles.postTile, createStyles.createTile, { width: size, height: size, backgroundColor: theme.card, borderColor: theme.border }]}
       onPress={onPress}
       activeOpacity={0.8}
     >
       <Feather name="plus" size={24} color={theme.accent} />
       <Text style={[createStyles.createTileLabel, { color: theme.muted }]}>New post</Text>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -256,7 +258,7 @@ function ProductCard({ product, index, onPress, cardWidth }: ProductCardProps) {
   const isDraftOrArchived = product.status === 'draft' || product.status === 'archived';
 
   return (
-    <TouchableOpacity
+    <PressableScale
       style={[productStyles.productCard, { backgroundColor: theme.background }, cardWidth != null && { width: cardWidth }]}
       onPress={() => onPress(product.id)}
       activeOpacity={0.85}
@@ -296,7 +298,7 @@ function ProductCard({ product, index, onPress, cardWidth }: ProductCardProps) {
         </View>
         <Text style={[productStyles.productStock, { color: stockColor }]}>{stockLabel}</Text>
       </View>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -335,13 +337,13 @@ function EmptyState({
       <Text style={[emptyStyles.emptyTitle, { color: theme.text }]}>{title}</Text>
       {subtitle && <Text style={[emptyStyles.emptySubtitle, { color: theme.muted }]}>{subtitle}</Text>}
       {actionLabel && onAction && (
-        <TouchableOpacity
+        <PressableScale
           accessibilityRole="button"
           onPress={onAction}
           style={[emptyStyles.actionBtn, { backgroundColor: theme.accent }]}
         >
           <Text style={[emptyStyles.actionLabel, { color: theme.onAccent }]}>{actionLabel}</Text>
-        </TouchableOpacity>
+        </PressableScale>
       )}
     </View>
   );
@@ -368,11 +370,11 @@ function ActionRow({ icon, label, color, onPress }: ActionRowProps) {
   const { theme } = useAppTheme();
   const tint = color ?? theme.text;
   return (
-    <TouchableOpacity style={sheetStyles.actionRow} onPress={onPress} activeOpacity={0.7}>
+    <PressableScale style={sheetStyles.actionRow} onPress={onPress} activeOpacity={0.7}>
       <Feather name={icon} size={18} color={tint} />
       <Text style={[sheetStyles.actionRowLabel, { color: tint }]}>{label}</Text>
       <Feather name="chevron-right" size={16} color={theme.muted} />
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -413,6 +415,7 @@ export default function SellerProfileScreen() {
   // This is what follow/message/review/posts actions must use, not the raw route param
   // (which may be a DB UUID alias when navigating from /u/[username]).
   const [canonicalSellerId, setCanonicalSellerId] = useState<string | null>(null);
+  const [snackbar, setSnackbar] = useState('');
 
   const tabs = ['Posts', 'Products'];
   // ScrollView children: 0 = BrandHero, 1 = Shop button (non-owner only), then the sticky tab bar.
@@ -435,6 +438,12 @@ export default function SellerProfileScreen() {
     setRefreshing(true);
     setRefreshTick(t => t + 1);
   }, []);
+
+  useEffect(() => {
+    if (!snackbar) return;
+    const t = setTimeout(() => setSnackbar(''), 2200);
+    return () => clearTimeout(t);
+  }, [snackbar]);
 
   // Load seller data
   useEffect(() => {
@@ -546,7 +555,7 @@ export default function SellerProfileScreen() {
     // Always use canonical clerkId for follow actions — never the route alias.
     const sellerId = canonicalSellerId;
     if (!sellerId) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // FollowMorphButton already fires its own toggle haptic on press.
     const previousFollowing = isFollowing;
     const previousFollowers = followers;
     const next = !previousFollowing;
@@ -569,7 +578,7 @@ export default function SellerProfileScreen() {
   const handleShare = useCallback(() => {
     if (isOwner) {
       // Owner always gets the profile share sheet with card, QR + canonical URL.
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      hapticLight();
       setShareSheetVisible(true);
     } else {
       // Non-owner (visitor) viewing a seller: share via native sheet using the canonical URL.
@@ -590,7 +599,7 @@ export default function SellerProfileScreen() {
       );
       return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    hapticMedium();
     // Use canonical clerkId for messaging — never a DB UUID alias.
     const sellerId = canonicalSellerId ?? profile.sellerId;
     router.push((
@@ -604,7 +613,7 @@ export default function SellerProfileScreen() {
   }, [router, profile, canonicalSellerId]);
 
   const handleOpenInbox = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticLight();
     router.push((isOwner ? '/seller-inbox' : '/(buyer)/inbox') as never);
   }, [isOwner, router]);
 
@@ -661,7 +670,8 @@ export default function SellerProfileScreen() {
       return;
     }
     await Clipboard.setStringAsync(url);
-    Alert.alert('Link copied');
+    hapticSuccessAction();
+    setSnackbar('Link copied');
   }, [profile.username]);
 
   const truncatedBio = profile.bio.length > 120 && !bioExpanded
@@ -708,16 +718,16 @@ export default function SellerProfileScreen() {
           stats={heroStats}
           testID="seller-profile-hero"
           topBarLeft={
-            <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()}>
+            <PressableScale style={styles.headerBtn} onPress={() => router.back()}>
               <Feather name="arrow-left" size={20} color={theme.text} />
-            </TouchableOpacity>
+            </PressableScale>
           }
           topBarRight={
             <View style={styles.headerActions}>
-              <TouchableOpacity style={styles.headerBtn} onPress={handleOpenInbox} accessibilityRole="button" accessibilityLabel={isOwner ? 'Inbox' : 'Message seller'}>
+              <PressableScale style={styles.headerBtn} onPress={handleOpenInbox} accessibilityRole="button" accessibilityLabel={isOwner ? 'Inbox' : 'Message seller'}>
                 <Feather name="message-circle" size={20} color={theme.text} />
-              </TouchableOpacity>
-              <TouchableOpacity
+              </PressableScale>
+              <PressableScale
                 style={styles.headerBtn}
                 onPress={handleShare}
                 accessibilityRole="button"
@@ -726,42 +736,39 @@ export default function SellerProfileScreen() {
                 testID={isOwner ? 'seller-profile-share-btn' : undefined}
               >
                 <Feather name="share-2" size={20} color={theme.text} />
-              </TouchableOpacity>
+              </PressableScale>
             </View>
           }
           actions={
             isOwner ? (
               <>
-                <TouchableOpacity style={[styles.outlineBtn, styles.outlineBtnPrimary]} onPress={() => router.push('/edit-profile' as never)}>
-                  <Text style={[styles.outlineBtnText, { color: theme.accent }]}>Edit Profile</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.outlineBtn} onPress={handleOpenInbox}>
+                <PressableScale style={[styles.outlineBtn, styles.outlineBtnPrimary]} onPress={() => router.push('/edit-profile' as never)}>
+                  <Text style={[styles.outlineBtnText, { color: theme.accent }]}>Edit profile</Text>
+                </PressableScale>
+                <PressableScale style={styles.outlineBtn} onPress={handleOpenInbox}>
                   <Text style={styles.outlineBtnText}>Messages</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.outlineBtn} onPress={() => router.push('/create-post' as never)}>
-                  <Text style={styles.outlineBtnText}>Create Post</Text>
-                </TouchableOpacity>
+                </PressableScale>
+                <PressableScale style={styles.outlineBtn} onPress={() => router.push('/create-post' as never)}>
+                  <Text style={styles.outlineBtnText}>Create post</Text>
+                </PressableScale>
               </>
             ) : (
               <>
-                <TouchableOpacity
-                  style={[styles.outlineBtn, isFollowing && styles.outlineBtnPrimary]}
-                  onPress={handleFollow}
-                  disabled={followPending}
-                  accessibilityState={{ disabled: followPending, selected: isFollowing }}
-                  testID="seller-profile-follow-btn"
-                >
-                  <Text style={[styles.outlineBtnText, isFollowing && { color: theme.accent }]}>
-                    {followPending ? 'Updating…' : isFollowing ? 'Following' : 'Follow'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.outlineBtn} onPress={handleMessageSeller}>
+                <View style={{ flex: 1 }} testID="seller-profile-follow-btn">
+                  <FollowMorphButton
+                    following={isFollowing}
+                    onChange={handleFollow}
+                    disabled={followPending}
+                    style={styles.followMorphBtn}
+                  />
+                </View>
+                <PressableScale style={styles.outlineBtn} onPress={handleMessageSeller} accessibilityRole="button" accessibilityLabel="Message">
                   <Feather name="message-circle" size={14} color={theme.text} style={{ marginRight: 4 }} />
                   <Text style={styles.outlineBtnText}>Message</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconBtn} onPress={handleMoreOptions}>
+                </PressableScale>
+                <PressableScale style={styles.iconBtn} onPress={handleMoreOptions}>
                   <Feather name="more-horizontal" size={16} color={theme.text} />
-                </TouchableOpacity>
+                </PressableScale>
               </>
             )
           }
@@ -791,7 +798,7 @@ export default function SellerProfileScreen() {
 
           {/* Website */}
           {profile.website && (
-            <TouchableOpacity
+            <PressableScale
               style={styles.metaRow}
               onPress={() => {
                 const url = profile.website!.startsWith('http')
@@ -803,7 +810,7 @@ export default function SellerProfileScreen() {
             >
               <Feather name="link" size={12} color={theme.accent} />
               <Text style={[styles.metaText, { color: theme.accent }]}>{profile.website}</Text>
-            </TouchableOpacity>
+            </PressableScale>
           )}
 
           {/* Location */}
@@ -828,14 +835,14 @@ export default function SellerProfileScreen() {
         {/* Shop button (buyer only) */}
         {!isOwner && (
           <View style={styles.shopBtnWrapper}>
-            <TouchableOpacity
+            <PressableScale
               style={[styles.shopBtn, { borderColor: theme.accent }]}
               activeOpacity={0.85}
               onPress={() => setActiveTab(1)}
             >
               <Feather name="shopping-bag" size={16} color={theme.accent} />
               <Text style={[styles.shopBtnText, { color: theme.accent }]}>Shop {profile.brandName}</Text>
-            </TouchableOpacity>
+            </PressableScale>
           </View>
         )}
 
@@ -847,10 +854,10 @@ export default function SellerProfileScreen() {
             contentContainerStyle={styles.tabBarContent}
           >
             {tabs.map((tab, i) => (
-              <TouchableOpacity
+              <PressableScale
                 key={tab}
                 style={[styles.tabItem, activeTab === i && styles.tabItemActive]}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setActiveTab(i); }}
+                onPress={() => { hapticLight(); setActiveTab(i); }}
                 testID={`seller-profile-tab-${tab.toLowerCase()}`}
               >
                 <Feather
@@ -862,7 +869,7 @@ export default function SellerProfileScreen() {
                   {tab}
                 </Text>
                 {activeTab === i && <View style={[styles.tabUnderline, { backgroundColor: theme.accent }]} />}
-              </TouchableOpacity>
+              </PressableScale>
             ))}
           </ScrollView>
         </View>
@@ -950,7 +957,7 @@ export default function SellerProfileScreen() {
         animationType="slide"
         onRequestClose={handleActionSheetClose}
       >
-        <TouchableOpacity
+        <PressableScale
           style={styles.modalOverlay}
           activeOpacity={1}
           onPress={handleActionSheetClose}
@@ -977,12 +984,12 @@ export default function SellerProfileScreen() {
                 (especially a "Delete post" that doesn't delete) would be
                 actively misleading. "Edit post", "View analytics" and "Copy
                 link" below are all real. */}
-            <ActionRow icon="edit-2" label="Edit post" onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); handleActionSheetClose(); router.push(('/create-post?editId=' + selectedPost.id) as never); }} />
-            <ActionRow icon="bar-chart-2" label="View analytics" onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); handleActionSheetClose(); router.push(('/post-analytics?id=' + selectedPost.id) as never); }} />
-            <ActionRow icon="copy" label="Copy link" onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); const post = selectedPost; handleActionSheetClose(); void handleCopyPostLink(post); }} />
-            <TouchableOpacity style={styles.sheetCancel} onPress={handleActionSheetClose}>
+            <ActionRow icon="edit-2" label="Edit post" onPress={() => { hapticMedium(); handleActionSheetClose(); router.push(('/create-post?editId=' + selectedPost.id) as never); }} />
+            <ActionRow icon="bar-chart-2" label="View analytics" onPress={() => { hapticMedium(); handleActionSheetClose(); router.push(('/post-analytics?id=' + selectedPost.id) as never); }} />
+            <ActionRow icon="copy" label="Copy link" onPress={() => { hapticMedium(); const post = selectedPost; handleActionSheetClose(); void handleCopyPostLink(post); }} />
+            <PressableScale style={styles.sheetCancel} onPress={handleActionSheetClose}>
               <Text style={styles.sheetCancelText}>Cancel</Text>
-            </TouchableOpacity>
+            </PressableScale>
           </View>
         )}
       </Modal>
@@ -998,6 +1005,8 @@ export default function SellerProfileScreen() {
           }}
         />
       ) : null}
+
+      <Snackbar visible={!!snackbar} message={snackbar} onDismiss={() => setSnackbar('')} />
     </View>
   );
 }
@@ -1037,16 +1046,18 @@ function makeStyles(theme: AppThemePreset) {
     },
     categoryBadgeText: { color: theme.text, fontSize: FS.xs, fontFamily: FONT.semibold, letterSpacing: 0.5, textTransform: 'uppercase' },
 
-    // Action buttons
+    // Action buttons — equal-width, per the Instagram profile action-row
+    // layout idea (same actions, restyled to fill the row like Follow/Message do there).
     outlineBtn: {
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+      flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
       borderWidth: 1, borderColor: theme.border, borderRadius: RADIUS.md,
-      paddingHorizontal: SP.md, paddingVertical: 9, minWidth: 88,
+      paddingHorizontal: SP.md, height: 44,
     },
     outlineBtnPrimary: { borderColor: theme.accent },
     outlineBtnText: { color: theme.text, fontSize: FS.sm, fontFamily: FONT.semibold },
+    followMorphBtn: { flex: 1, height: 44 },
     iconBtn: {
-      width: 38, height: 38, borderRadius: RADIUS.md,
+      width: 44, height: 44, borderRadius: RADIUS.md,
       borderWidth: 1, borderColor: theme.border,
       alignItems: 'center', justifyContent: 'center',
     },

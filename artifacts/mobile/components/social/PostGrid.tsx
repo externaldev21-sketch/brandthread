@@ -4,7 +4,7 @@ import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
-import { EmptyState } from '@/components/layout';
+import { EmptyState } from '@/components/BrandthreadUI';
 
 export type GridPost = {
   id: string;
@@ -35,7 +35,8 @@ export default function PostGrid({ posts, onPressPost, columns = 3, gap = 1, emp
     return (
       <EmptyState
         icon="grid"
-        message={emptyMessage ?? 'No posts yet.'}
+        title="No posts yet"
+        description={emptyMessage ?? 'Posts will appear here.'}
       />
     );
   }

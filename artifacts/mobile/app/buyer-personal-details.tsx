@@ -1,19 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useUser } from '@clerk/expo';
-import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useColors } from '@/hooks/useColors';
 import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields } from '@/lib/buyerProfile';
 import { updateMyProfile, getMyProfile } from '@/services/socialService';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { Card, StickyBottomCTA } from '@/components/ui';
+import { hapticSuccess } from '@/lib/haptics';
+import { TYPE_SCALE } from '@/constants/typography';
+import { SPACING } from '@/constants/spacing';
+import { RADII } from '@/constants/radii';
+import { FONT } from '@/lib/theme';
 
 /** Fields stored in BuyerProfileFields — everything editable is persisted. */
 type PersistedKey = keyof Omit<BuyerProfileFields, 'aiCreator' | 'avatarUri'>;
@@ -37,10 +38,6 @@ const FIELDS: FieldDef[] = [
   { key: 'pronouns', label: 'Pronouns',  placeholder: 'e.g. they/them',     icon: 'smile' },
 ];
 
-function Divider() {
-  return <View style={{ height: 1, backgroundColor: BORDER, marginLeft: 16 }} />;
-}
-
 /** Masks a real email address, e.g. "jordan@example.com" -> "••••@example.com". */
 function maskEmail(email: string | null | undefined): string {
   if (!email || !email.includes('@')) return '';
@@ -50,8 +47,8 @@ function maskEmail(email: string | null | undefined): string {
 
 export default function BuyerPersonalDetails() {
   const { theme } = useAppTheme();
-  const PURPLE = theme.accent;
-  const s = makeStyles();
+  const palette = useColors();
+  const s = makeStyles(palette, theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useUser();
@@ -85,7 +82,7 @@ export default function BuyerPersonalDetails() {
   }
 
   async function handleSave() {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    hapticSuccess();
     // Persist locally; only sync non-empty shared identity fields to the social
     // profile so saving an unrelated field (e.g. phone) never overwrites an
     // already-set name or username with an empty string.
@@ -104,43 +101,43 @@ export default function BuyerPersonalDetails() {
 
   return (
     <View style={s.page}>
-      <Header title="Personal Details" />
+      <ScreenHeader title="Personal Details" />
 
-      <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 100 }}>
+      <ScrollView contentContainerStyle={{ padding: SPACING.md, paddingBottom: insets.bottom + (hasChanges ? 120 : 40) }}>
         <Text style={s.sectionDesc}>
           Keep your details up to date. Email and birthday are managed by your sign-in provider.
         </Text>
 
-        <View style={s.card}>
+        <Card style={s.card}>
           {FIELDS.map((field, i) => {
             const isEditable = field.editable !== false;
             return (
               <React.Fragment key={field.key}>
                 <View style={s.row}>
-                  <Feather name={field.icon} size={17} color={PURPLE} style={{ width: 24 }} />
+                  <Feather name={field.icon} size={17} color={theme.accent} style={{ width: 24 }} />
                   <Text style={s.rowLabel}>{field.label}</Text>
                   <TextInput
                     style={[s.input, !isEditable && s.inputDisabled]}
                     value={getValue(field.key)}
                     onChangeText={v => isEditable && set(field.key, v)}
                     placeholder={field.placeholder}
-                    placeholderTextColor={SUBTLE}
+                    placeholderTextColor={palette.mutedForeground}
                     editable={isEditable}
                     keyboardType={field.keyboardType ?? 'default'}
                     autoCorrect={false}
                     returnKeyType="done"
                   />
-                  {!isEditable && <Feather name="lock" size={14} color={SUBTLE} />}
+                  {!isEditable && <Feather name="lock" size={14} color={palette.mutedForeground} />}
                 </View>
-                {i < FIELDS.length - 1 && <Divider />}
+                {i < FIELDS.length - 1 && <View style={s.divider} />}
               </React.Fragment>
             );
           })}
-        </View>
+        </Card>
 
         {/* Note about locked fields */}
         <View style={s.note}>
-          <Feather name="info" size={14} color={MUTED} />
+          <Feather name="info" size={14} color={palette.mutedForeground} />
           <Text style={s.noteText}>
             Change your email in Login methods.
           </Text>
@@ -148,29 +145,21 @@ export default function BuyerPersonalDetails() {
       </ScrollView>
 
       {hasChanges && (
-        <View style={[s.saveBar, { paddingBottom: insets.bottom + SP.md }]}>
-          <TouchableOpacity onPress={handleSave} activeOpacity={0.85} style={{ flex: 1 }}>
-            <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.saveBtn}>
-              <Text style={[s.saveBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Save Changes</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
+        <StickyBottomCTA label="Save Changes" onPress={() => { void handleSave(); }} />
       )}
     </View>
   );
 }
 
-const makeStyles = () => StyleSheet.create({
+const makeStyles = (palette: ReturnType<typeof useColors>, theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
-  sectionDesc: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 18, marginBottom: SP.md },
-  card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
-  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: 14, gap: 10 },
-  rowLabel: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED, width: 72 },
-  input: { flex: 1, fontFamily: FONT.regular, fontSize: FS.base, color: FG, textAlign: 'right', padding: 0 },
-  inputDisabled: { color: MUTED },
-  note: { flexDirection: 'row', gap: 8, marginTop: SP.md, padding: SP.sm, backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, alignItems: 'flex-start' },
-  noteText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, lineHeight: 17 },
-  saveBar: { paddingHorizontal: SP.md, paddingTop: SP.sm, backgroundColor: BG, borderTopWidth: 1, borderTopColor: BORDER },
-  saveBtn: { height: 50, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
-  saveBtnText: { fontFamily: FONT.bold, fontSize: FS.base },
+  sectionDesc: { ...TYPE_SCALE.footnote, color: palette.mutedForeground, lineHeight: 18, marginBottom: SPACING.md },
+  card: { padding: 0, overflow: 'hidden' },
+  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingVertical: 14, gap: 10 },
+  rowLabel: { ...TYPE_SCALE.footnote, fontFamily: FONT.medium, color: palette.mutedForeground, width: 72 },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: palette.border, marginLeft: SPACING.md },
+  input: { flex: 1, ...TYPE_SCALE.body, color: palette.foreground, textAlign: 'right', padding: 0 },
+  inputDisabled: { color: palette.mutedForeground },
+  note: { flexDirection: 'row', gap: 8, marginTop: SPACING.md, padding: SPACING.sm, backgroundColor: palette.card, borderRadius: RADII.card, borderWidth: 1, borderColor: palette.border, alignItems: 'flex-start' },
+  noteText: { flex: 1, ...TYPE_SCALE.footnote, color: palette.mutedForeground, lineHeight: 17 },
 });

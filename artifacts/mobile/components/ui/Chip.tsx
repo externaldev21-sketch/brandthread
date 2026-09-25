@@ -9,9 +9,10 @@
  */
 import React from 'react';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useColors } from '@/hooks/useColors';
-import { hapticToggle } from '@/lib/haptics';
+import { hapticToggle, hapticSelection } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
@@ -25,13 +26,20 @@ export interface ChipProps {
   count?: number;
   disabled?: boolean;
   testID?: string;
+  /** Optional leading glyph, e.g. a trending/history icon ahead of the label. */
+  icon?: keyof typeof Feather.glyphMap;
+  iconColor?: string;
+  /** Optional trailing remove control (e.g. clearing a single recent search). */
+  onRemove?: () => void;
+  removeAccessibilityLabel?: string;
 }
 
-export function Chip({ label, selected, onPress, count, disabled, testID }: ChipProps) {
+export function Chip({ label, selected, onPress, count, disabled, testID, icon, iconColor, onRemove, removeAccessibilityLabel }: ChipProps) {
   const { theme } = useAppTheme();
   const palette = useColors();
   const scale = React.useRef(new Animated.Value(1)).current;
   const nativeDriver = Platform.OS !== 'web';
+  const contentColor = selected ? theme.accentLight : palette.mutedForeground;
 
   return (
     <Pressable
@@ -56,13 +64,24 @@ export function Chip({ label, selected, onPress, count, disabled, testID }: Chip
           },
         ]}
       >
-        <Text style={[TYPE_SCALE.footnote, { fontFamily: selected ? FONT.semibold : FONT.medium, color: selected ? theme.accentLight : palette.mutedForeground }]}>
+        {icon && <Feather name={icon} size={12} color={iconColor ?? contentColor} />}
+        <Text style={[TYPE_SCALE.footnote, { fontFamily: selected ? FONT.semibold : FONT.medium, color: contentColor }]}>
           {label}
         </Text>
         {count !== undefined && (
           <View style={[styles.count, { backgroundColor: selected ? theme.accentDim : 'rgba(255,255,255,0.08)' }]}>
-            <Text style={[TYPE_SCALE.caption, { color: selected ? theme.accentLight : palette.mutedForeground }]}>{count}</Text>
+            <Text style={[TYPE_SCALE.caption, { color: contentColor }]}>{count}</Text>
           </View>
+        )}
+        {onRemove && (
+          <Pressable
+            onPress={() => { hapticSelection(); onRemove(); }}
+            hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel={removeAccessibilityLabel ?? `Remove ${label}`}
+          >
+            <Feather name="x" size={13} color={contentColor} />
+          </Pressable>
         )}
       </Animated.View>
     </Pressable>

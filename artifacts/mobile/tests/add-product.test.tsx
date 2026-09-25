@@ -44,6 +44,16 @@ vi.mock('react-native', () => {
   };
 });
 
+vi.mock('@/components/ui/Button', () => {
+  const React = require('react') as typeof import('react');
+  return {
+    Button: ({ label, onPress, testID }: { label: string; onPress: () => void; testID?: string }) =>
+      React.createElement('Button', { testID, onPress, accessibilityLabel: label }, label),
+    StickyBottomCTA: ({ header }: { header?: React.ReactNode }) =>
+      React.createElement('View', null, header),
+  };
+});
+
 vi.mock('expo-linear-gradient', () => ({
   LinearGradient: ({ children, ...props }: { children?: React.ReactNode }) =>
     React.createElement('LinearGradient', props, children),
@@ -54,9 +64,11 @@ vi.mock('@expo/vector-icons', () => ({
 }));
 
 vi.mock('expo-haptics', () => ({
-  impactAsync: vi.fn(),
-  selectionAsync: vi.fn(),
-  ImpactFeedbackStyle: { Light: 'light' },
+  impactAsync: vi.fn().mockResolvedValue(undefined),
+  selectionAsync: vi.fn().mockResolvedValue(undefined),
+  notificationAsync: vi.fn().mockResolvedValue(undefined),
+  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium', Heavy: 'heavy' },
+  NotificationFeedbackType: { Success: 'success', Error: 'error', Warning: 'warning' },
 }));
 
 vi.mock('expo-image-picker', () => ({
@@ -141,6 +153,7 @@ vi.mock('@/components/BrandthreadUI', () => {
     ProgressCard: native('ProgressCard'),
     EmptyState: native('EmptyState'),
     GuidedTip: native('GuidedTip'),
+    PressableScale: native('PressableScale'),
     FormInput: ({
       label,
       value,

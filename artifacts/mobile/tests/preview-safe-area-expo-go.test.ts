@@ -19,7 +19,8 @@ describe('browser preview safe areas and Expo Go startup', () => {
     expect(sellerBar).toContain('bottom: metrics.bottomOffset');
     expect(tabBarParts).toContain('minWidth: 44');
     expect(sellerTabs).not.toContain("if (Platform.OS === 'web') return null");
-    expect(cookieConsent).toContain('bottom:72+SP.md');
+    expect(cookieConsent).toContain('const BANNER_BOTTOM = 72 + SP.md;');
+    expect(cookieConsent).toContain('bottom:BANNER_BOTTOM');
   });
 
   it('does not statically load the unavailable keyboard-controller native module', () => {

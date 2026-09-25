@@ -71,9 +71,30 @@ vi.mock('react-native', () => {
     return MockNativeComponent;
   };
 
+  // A minimal Animated stand-in: values with a plain numeric handle and
+  // timing/spring calls that resolve their `start` callback synchronously,
+  // matching how the real API is used by Chip/ListRow/Button-style press
+  // feedback (no native driver needed in this jsdom-free renderer).
+  class MockAnimatedValue {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    constructor(_value: number) {}
+    setValue() {}
+  }
+  const animatedTransition = () => ({ start: (cb?: () => void) => cb?.() });
+  const MockAnimated = {
+    Value: MockAnimatedValue,
+    timing: animatedTransition,
+    spring: animatedTransition,
+    loop: () => ({ start: () => {}, stop: () => {} }),
+    sequence: () => ({ start: () => {} }),
+    View: nativeComponent('Animated.View'),
+  };
+
   return {
     ActivityIndicator: nativeComponent('ActivityIndicator'),
+    Animated: MockAnimated,
     Platform: { OS: 'ios', select: (obj: any) => obj.ios },
+    Pressable: nativeComponent('Pressable'),
     RefreshControl: nativeComponent('RefreshControl'),
     ScrollView: nativeComponent('ScrollView'),
     StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1, absoluteFill: {} },

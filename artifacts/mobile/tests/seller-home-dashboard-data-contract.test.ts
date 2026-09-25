@@ -10,7 +10,7 @@ const source = fs.readFileSync(
 describe('seller home dashboard data contract', () => {
   it('waits for the authenticated seller and reloads analytics when the range changes', () => {
     expect(source).toContain('if (!analyticsUserId)');
-    expect(source).toContain('[analyticsUserId, api, range, retryTick, sellerPreview]');
+    expect(source).toContain('[analyticsUserId, api, range, retryTick, sellerPreview, storeContextTick]');
     expect(source).toContain('sellerHomeAnalyticsKey(analyticsUserId, range)');
     expect(source).toContain("const analyticsUserId = sellerPreview ? userId ?? 'demo-seller' : userId");
     expect(source).toContain('setSnapshot({ key: requestKey');
@@ -70,6 +70,19 @@ describe('seller home dashboard data contract', () => {
     expect(source).toContain('AsyncStorage.setItem(storageKey');
     expect(source).toContain('subscribeStoreContext');
     expect(source).toContain('accessibilityLabel="Withdraw available balance"');
+  });
+
+  it('refetches analytics/orders/products — not just the finance balance — when the seller switches stores', () => {
+    // Regression test: switching between a seller's own store and a joined
+    // store (same signed-in account) used to leave the dashboard showing the
+    // previously active store's numbers, because only loadFinanceBalance
+    // reacted to subscribeStoreContext.
+    expect(source).toContain('[analyticsUserId, api, range, retryTick, sellerPreview, storeContextTick]');
+    expect(source).toContain('[loadSecondaryData, retryTick, storeContextTick]');
+    // The stale snapshot/top-products/recent-orders must be dropped
+    // immediately on a store switch, not left on screen until the refetch
+    // resolves.
+    expect(source).toMatch(/setSnapshot\(null\);[\s\S]{0,80}setTopProducts\(null\);[\s\S]{0,80}setRecentOrders\(null\);[\s\S]{0,80}setStoreContextTick/);
   });
 
   it('supports pull-to-refresh instead of only an initial load', () => {

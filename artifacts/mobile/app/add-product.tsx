@@ -13,13 +13,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { File, Paths } from 'expo-file-system';
 
 import { FONT, FS, SP, RADIUS, COMP, ICON, ANIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { RADII } from '@/constants/radii';
+import { TYPE_SCALE } from '@/constants/typography';
+import { hapticPrimaryAction, hapticToggle, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { Button } from '@/components/ui/Button';
 
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, FilterChip, StatusBadge, SectionHeader, FormInput, ProgressCard, EmptyState } from '@/components/BrandthreadUI';
 
@@ -236,7 +240,7 @@ export default function AddProductScreen() {
   }
 
   function toggleSection(key: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticToggle();
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
   }
@@ -499,7 +503,7 @@ export default function AddProductScreen() {
       sku: '', price: '', qty: '',
     }));
     updateUnsavedState(setLocalVariants, variants);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    hapticSuccessAction();
   }
 
   // ── Publish ──
@@ -722,19 +726,19 @@ export default function AddProductScreen() {
     const next = [...media];
     [next[idx], next[target]] = [next[target], next[idx]];
     const resequenced = next.map((m, i) => ({ ...m, sortOrder: i }));
-    Haptics.selectionAsync();
+    hapticToggle();
     patchDraft({ media: resequenced });
   }
 
   function setCoverImage(id: string) {
     const media = draftData.media ?? [];
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticToggle();
     patchDraft({ media: media.map(m => ({ ...m, isCover: m.id === id })) });
   }
 
   function toggleCutoutUse(id: string) {
     const media = draftData.media ?? [];
-    Haptics.selectionAsync();
+    hapticToggle();
     patchDraft({ media: media.map(m => m.id === id ? { ...m, useCutout: !m.useCutout } : m) });
   }
 
@@ -754,7 +758,7 @@ export default function AddProductScreen() {
       patchDraft({ media: media.map(m => m.id === item.id ? { ...m, uri: cropped.uri } : m) });
       setMediaUpload(prev => ({ ...prev, [item.id]: { status: 'uploading' } }));
       void uploadMediaAsset({ ...item, uri: cropped.uri });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      hapticSuccessAction();
     } catch {
       Alert.alert('Crop failed', 'Could not crop this photo. Please try again.');
     }
@@ -783,7 +787,7 @@ export default function AddProductScreen() {
       const media = draftData.media ?? [];
       patchDraft({ media: media.map(m => m.id === item.id ? { ...m, cutoutUri: localFile.uri, useCutout: true } : m) });
       setBgRemovalState(prev => ({ ...prev, [item.id]: 'done' }));
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      hapticSuccessAction();
 
       // Upload the cutout in the background so it has a remote URL by publish time.
       try {
@@ -1349,7 +1353,7 @@ export default function AddProductScreen() {
               <Text style={s.variantCount}>{localVariants.length} variant{localVariants.length !== 1 ? 's' : ''}</Text>
               <TouchableOpacity
                 onPress={() => {
-                  Haptics.selectionAsync();
+                  hapticToggle();
                   setBulkEditMode(v => !v);
                   setSelectedVariantIds(new Set());
                 }}
@@ -1405,7 +1409,7 @@ export default function AddProductScreen() {
                         return next;
                       });
                     }
-                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    hapticSuccessAction();
                     setBulkPrice(''); setBulkQty('');
                   }}
                 />
@@ -1485,7 +1489,7 @@ export default function AddProductScreen() {
       <>
         <SectionHeader title="How will you sell this product?" style={s.sectionHdr} />
         {models.map(m => (
-          <TouchableOpacity key={m.key} onPress={() => { Haptics.selectionAsync(); patchDraft({ salesModel: m.key }); }} activeOpacity={0.8}>
+          <TouchableOpacity key={m.key} onPress={() => { hapticToggle(); patchDraft({ salesModel: m.key }); }} activeOpacity={0.8}>
             <BrandthreadCard style={[s.modelCard, sm === m.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}>
               <View style={s.modelCardHeader}>
                 <Text style={s.modelTitle}>{m.title}</Text>
@@ -1549,7 +1553,7 @@ export default function AddProductScreen() {
       <>
         <SectionHeader title="Manufacturer" style={s.sectionHdr} />
         {modes.map(m => (
-          <TouchableOpacity key={m.key} onPress={() => { Haptics.selectionAsync(); updateUnsavedState(setMfgMode, m.key); }} activeOpacity={0.8}>
+          <TouchableOpacity key={m.key} onPress={() => { hapticToggle(); updateUnsavedState(setMfgMode, m.key); }} activeOpacity={0.8}>
             <BrandthreadCard style={[s.modelCard, mfgMode === m.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}>
               <View style={s.modelCardHeader}>
                 <Text style={s.modelTitle}>{m.label}</Text>
@@ -1589,7 +1593,7 @@ export default function AddProductScreen() {
       <>
         <SectionHeader title="Store visibility" style={s.sectionHdr} />
         {statuses.map(st => (
-          <TouchableOpacity key={st.key} onPress={() => { Haptics.selectionAsync(); patchDraft({ storeSettings: { ...ss, status: st.key }, status: st.key }); }} activeOpacity={0.8}>
+          <TouchableOpacity key={st.key} onPress={() => { hapticToggle(); patchDraft({ storeSettings: { ...ss, status: st.key }, status: st.key }); }} activeOpacity={0.8}>
             <BrandthreadCard style={[s.modelCard, ss.status === st.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}>
               <View style={s.modelCardHeader}>
                 <Text style={s.modelTitle}>{st.label}</Text>
@@ -1634,7 +1638,7 @@ export default function AddProductScreen() {
           <Switch
             value={isPreOrder}
             onValueChange={v => {
-              Haptics.selectionAsync();
+              hapticToggle();
               setIsPreOrder(v);
               patchDraft({ salesModel: v ? 'pre-order' : 'pre-made' });
             }}
@@ -1735,18 +1739,24 @@ export default function AddProductScreen() {
   // ─── Render ─────────────────────────────────────────────────────
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <View style={s.root}>
 
       {/* ── Header ── */}
-      <View style={s.header}>
-        <TouchableOpacity testID="add-product-exit" onPress={handleExit} style={s.headerBack} accessibilityRole="button" accessibilityLabel="Close product form">
-          <Feather name="x" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>{isEditMode ? 'Edit Product' : 'Add Product'}</Text>
-        <TouchableOpacity onPress={handleSaveDraftInPlace} style={s.headerSave} testID="add-product-save-draft" accessibilityRole="button" accessibilityLabel="Save product draft">
-          <Text style={[s.headerSaveText, { color: theme.accentLight }]}>Save draft</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title={isEditMode ? 'Edit Product' : 'Add Product'}
+        variant="push"
+        onBack={handleExit}
+        backTestID="add-product-exit"
+        rightElement={
+          <Button
+            variant="tertiary"
+            size="small"
+            label="Save draft"
+            onPress={handleSaveDraftInPlace}
+            testID="add-product-save-draft"
+          />
+        }
+      />
 
        {/* ── One continuous product form ── */}
       <KeyboardAvoidingView
@@ -1856,39 +1866,9 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     backgroundColor: 'transparent',
   },
 
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-    minHeight: COMP.headerH,
-  },
-  headerBack: {
-    width: 36,
-    height: 36,
-    borderRadius: RADIUS.sm,
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: FS.base,
-    fontFamily: FONT.bold,
-    color: FG,
-    textAlign: 'center',
-  },
-  headerSave: {
-    paddingHorizontal: SP.sm,
-    paddingVertical: SP.xs,
-  },
+  // Footer "Save as draft & exit" link (header itself is now ScreenHeader)
   headerSaveText: {
-    fontSize: FS.sm,
+    ...TYPE_SCALE.footnote,
     fontFamily: FONT.semibold,
   },
 
@@ -1992,7 +1972,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   mediaThumbImg: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   mediaDeleteBtn: {
     position: 'absolute', top: 4, right: 4,
-    width: 20, height: 20, borderRadius: 10,
+    width: 20, height: 20, borderRadius: RADII.pill,
     backgroundColor: 'rgba(0,0,0,0.7)',
     alignItems: 'center', justifyContent: 'center',
   },
@@ -2007,12 +1987,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     position: 'absolute', bottom: 4, left: 4,
     backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: RADIUS.xs, paddingHorizontal: 6, paddingVertical: 2,
   },
-  mediaCoverBadgeText: { fontSize: 9, fontFamily: FONT.bold, color: ON_DARK },
+  mediaCoverBadgeText: { ...TYPE_SCALE.caption, fontFamily: FONT.bold, color: ON_DARK },
   mediaReorderRow: {
     position: 'absolute', top: 4, left: 4, flexDirection: 'row', gap: 2,
   },
   mediaReorderBtn: {
-    width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(0,0,0,0.6)',
+    width: 18, height: 18, borderRadius: RADII.pill, backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems: 'center', justifyContent: 'center',
   },
   mediaActionsList: { gap: SP.sm, marginTop: SP.xs },
@@ -2024,7 +2004,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingHorizontal: 8, paddingVertical: 4,
   },
   mediaActionChipActive: { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED },
-  mediaActionChipText: { fontSize: 10, fontFamily: FONT.medium, color: MUTED },
+  mediaActionChipText: { ...TYPE_SCALE.caption, fontFamily: FONT.medium, color: MUTED },
 
   // Pricing
   pricingCard: { gap: SP.sm },
@@ -2064,7 +2044,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingHorizontal: 10, paddingVertical: 4,
     borderWidth: 1, borderColor: BORDER_ACTIVE,
   },
-  valueDot: { width: 10, height: 10, borderRadius: 5, borderWidth: 1, borderColor: BORDER },
+  valueDot: { width: 10, height: 10, borderRadius: RADII.pill, borderWidth: 1, borderColor: BORDER },
   valueChipText: { fontSize: FS.xs, fontFamily: FONT.medium },
   customValueRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,

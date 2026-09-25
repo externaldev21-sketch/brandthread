@@ -30,6 +30,7 @@ vi.mock('react-native', () => {
     Alert: { alert: alertMock },
     Modal: nativeComponent('Modal'),
     Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
+    Pressable: nativeComponent('Pressable'),
     ScrollView: nativeComponent('ScrollView'),
     StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
     Text: nativeComponent('Text'),
@@ -39,12 +40,59 @@ vi.mock('react-native', () => {
     Animated: {
       Value: class { constructor(_v?: number) {} },
       View: nativeComponent('Animated.View'),
+      Text: nativeComponent('Animated.Text'),
       event: () => () => {},
       timing: () => ({ start: (cb?: () => void) => cb?.() }),
+      spring: () => ({ start: (cb?: () => void) => cb?.() }),
       sequence: () => ({ start: (cb?: () => void) => cb?.() }),
+      parallel: () => ({ start: (cb?: () => void) => cb?.() }),
       loop: () => ({ start: () => {}, stop: () => {} }),
     },
     useWindowDimensions: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
+  };
+});
+
+// The Phase 2 design-system components (Button/IconButton/PressableScale)
+// pull in expo-haptics (native bridge) and BrandthreadUI's other native-only
+// dependencies at module load time — none of which are available in this
+// unit-test environment, so they're stubbed the same way the rest of the
+// native surface above is.
+vi.mock('expo-haptics', () => ({
+  impactAsync: vi.fn(),
+  notificationAsync: vi.fn(),
+  selectionAsync: vi.fn(),
+  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium', Heavy: 'heavy' },
+  NotificationFeedbackType: { Success: 'success', Warning: 'warning', Error: 'error' },
+}));
+
+vi.mock('@/lib/haptics', () => ({
+  hapticLight: vi.fn(),
+  hapticMedium: vi.fn(),
+  hapticSelection: vi.fn(),
+  hapticSuccess: vi.fn(),
+  hapticError: vi.fn(),
+  hapticWarning: vi.fn(),
+  hapticPrimaryAction: vi.fn(),
+  hapticToggle: vi.fn(),
+  hapticSuccessAction: vi.fn(),
+  hapticDestructiveConfirm: vi.fn(),
+}));
+
+vi.mock('expo-linear-gradient', () => {
+  const React = require('react');
+  return {
+    LinearGradient: (props: Record<string, unknown>) =>
+      React.createElement('LinearGradient', props, props.children as React.ReactNode),
+  };
+});
+
+vi.mock('react-native-svg', () => {
+  const React = require('react');
+  const svgComponent = (name: string) => (props: Record<string, unknown>) =>
+    React.createElement(name, props, props.children as React.ReactNode);
+  return {
+    default: svgComponent('Svg'),
+    Line: svgComponent('SvgLine'),
   };
 });
 
@@ -79,6 +127,16 @@ vi.mock('@/hooks/useColors', () => ({
     primary: '#ffffff',
     primaryForeground: '#000000',
     accent: '#222222',
+    text: '#ffffff',
+    foreground: '#ffffff',
+    background: '#000000',
+    card: '#111111',
+    elevated: '#1a1a1a',
+    border: '#222222',
+    mutedForeground: '#999999',
+    subtle: '#777777',
+    success: '#10b981',
+    destructive: '#f87171',
   }),
 }));
 

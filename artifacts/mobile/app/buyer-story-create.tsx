@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import {
-  Animated, View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Dimensions, Alert, Switch, Image, FlatList, Modal, PanResponder,
+  Animated, View, Text, ScrollView, Pressable, TextInput,
+  StyleSheet, Dimensions, Alert, Image, FlatList, Modal, PanResponder,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,6 +9,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useUser } from '@clerk/expo';
 import {
   BG, SURFACE, CARD, BORDER,
@@ -22,6 +23,9 @@ import { useColors } from '@/hooks/useColors';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { getTaggableProducts } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
+import { PressableScale, HapticSwitch } from '@/components/BrandthreadUI';
+import { IconButton, Button } from '@/components/ui';
+import { hapticLight, hapticToggle, hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
 
 const STICKER_EMOJI = ['🔥', '✨', '❤️', '😂', '🎉', '👀', '💯', '⭐️'];
 
@@ -64,11 +68,16 @@ function DraggableOverlay({ overlay, canvasSize, onMove, onRemove }: {
       testID={`story-overlay-${overlay.id}`}
       style={[storyOverlayStyles.chip, { transform: pan.getTranslateTransform() }]}
     >
-      <TouchableOpacity onLongPress={() => onRemove(overlay.id)} activeOpacity={0.85}>
+      <Pressable
+        onLongPress={() => { hapticLight(); onRemove(overlay.id); }}
+        style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
+        accessibilityRole="button"
+        accessibilityLabel={`${overlay.text}, long-press to remove`}
+      >
         <Text style={{ color: overlay.color ?? '#FFF', fontSize: overlay.size ?? 28, fontFamily: FONT.bold }}>
           {overlay.text}
         </Text>
-      </TouchableOpacity>
+      </Pressable>
     </Animated.View>
   );
 }
@@ -76,6 +85,19 @@ function DraggableOverlay({ overlay, canvasSize, onMove, onRemove }: {
 const storyOverlayStyles = StyleSheet.create({
   chip: { position: 'absolute', top: 0, left: 0 },
 });
+
+/** A muted, looping preview frame for the selected video clip, instead of a bare play icon. */
+function VideoPreview({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = true; p.play(); });
+  return (
+    <VideoView
+      player={player}
+      style={StyleSheet.absoluteFill}
+      contentFit="cover"
+      nativeControls={false}
+    />
+  );
+}
 
 const { width: W } = Dimensions.get('window');
 const CANVAS_H = Math.min(W * 1.4, 400);
@@ -300,7 +322,7 @@ export default function BuyerStoryCreate() {
 
       router.back();
     } catch {
-      Alert.alert('Error', 'Failed to post story. Please try again.');
+      Alert.alert("Couldn't share your story", 'Try again.');
     } finally {
       setIsPosting(false);
     }
@@ -315,14 +337,14 @@ export default function BuyerStoryCreate() {
 
       {/* HEADER */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
-          <Text style={styles.closeText}>×</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Story</Text>
-        <TouchableOpacity
-          onPress={doShare}
+        <IconButton name="x" variant="plain" color={ON_DARK} accessibilityLabel="Close" onPress={() => router.back()} />
+        <Text style={styles.headerTitle}>New story</Text>
+        <PressableScale
+          onPress={() => { hapticPrimaryAction(); doShare(); }}
           disabled={isShareDisabled}
           style={{ opacity: isShareDisabled ? 0.4 : 1 }}
+          accessibilityRole="button"
+          accessibilityLabel={isPosting ? 'Posting story' : 'Share story'}
         >
           <LinearGradient
             colors={theme.primaryGradient}
@@ -332,7 +354,7 @@ export default function BuyerStoryCreate() {
           >
             <Text style={[styles.shareBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>{isPosting ? 'Posting…' : 'Share'}</Text>
           </LinearGradient>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
 
       {/* TYPE TABS */}
@@ -340,7 +362,7 @@ export default function BuyerStoryCreate() {
         {TYPE_TABS.map(tab => {
           const active = tab.value === type;
           return (
-            <TouchableOpacity
+            <PressableScale
               key={tab.value}
               style={[
                 styles.typeTab,
@@ -348,13 +370,16 @@ export default function BuyerStoryCreate() {
                   ? { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE }
                   : { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.15)' },
               ]}
-              onPress={() => setType(tab.value)}
+              onPress={() => { hapticToggle(); setType(tab.value); }}
+              accessibilityRole="button"
+              accessibilityLabel={`${tab.label} story`}
+              accessibilityState={{ selected: active }}
             >
               <Feather name={tab.icon as any} size={ICON.sm} color={active ? PURPLE : 'rgba(255,255,255,0.6)'} />
               <Text style={[styles.typeTabLabel, { color: active ? PURPLE : 'rgba(255,255,255,0.6)' }]}>
                 {tab.label}
               </Text>
-            </TouchableOpacity>
+            </PressableScale>
           );
         })}
       </View>
@@ -374,7 +399,7 @@ export default function BuyerStoryCreate() {
                   style={[styles.textInput, { color: textColor }]}
                   value={textContent}
                   onChangeText={setTextContent}
-                  placeholder="Tap to type..."
+                  placeholder="Type something…"
                   placeholderTextColor="rgba(255,255,255,0.3)"
                   multiline
                   textAlign="center"
@@ -393,18 +418,24 @@ export default function BuyerStoryCreate() {
                       <Text style={styles.multiSlideText}>{photoUris.length} slides</Text>
                     </View>
                   )}
-                  <TouchableOpacity style={styles.changeBtn} onPress={pickPhotos}>
+                  <Pressable
+                    style={({ pressed }) => [styles.changeBtn, { opacity: pressed ? 0.8 : 1 }]}
+                    onPress={() => { hapticLight(); pickPhotos(); }}
+                  >
                     <Text style={styles.changeBtnText}>Change</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 </View>
               ) : (
-                <TouchableOpacity style={styles.canvasFill} activeOpacity={0.8} onPress={pickPhotos}>
+                <Pressable
+                  style={({ pressed }) => [styles.canvasFill, { opacity: pressed ? 0.85 : 1 }]}
+                  onPress={() => { hapticLight(); pickPhotos(); }}
+                >
                   <View style={styles.placeholder}>
                     <Feather name="image" size={48} color="rgba(255,255,255,0.35)" />
                     <Text style={styles.placeholderTitle}>Tap to choose photos</Text>
                     <Text style={styles.placeholderSub}>Select up to 10 — each becomes a slide</Text>
                   </View>
-                </TouchableOpacity>
+                </Pressable>
               )
             )}
 
@@ -412,24 +443,31 @@ export default function BuyerStoryCreate() {
             {type === 'video' && (
               videoUri ? (
                 <View style={styles.canvasFill}>
-                  <View style={styles.videoReadyBg}>
-                    <Feather name="play-circle" size={56} color="rgba(255,255,255,0.8)" />
-                    <Text style={styles.videoDurText}>
-                      {videoDuration > 0 ? `${Math.round(videoDuration)}s` : 'Video'} · ready to post
+                  <VideoPreview uri={videoUri} />
+                  <View style={styles.videoDurChip}>
+                    <Feather name="video" size={11} color="#FFF" />
+                    <Text style={styles.videoDurChipText}>
+                      {videoDuration > 0 ? `${Math.round(videoDuration)}s` : 'Video'}
                     </Text>
                   </View>
-                  <TouchableOpacity style={styles.changeBtn} onPress={pickVideo}>
+                  <Pressable
+                    style={({ pressed }) => [styles.changeBtn, { opacity: pressed ? 0.8 : 1 }]}
+                    onPress={() => { hapticLight(); pickVideo(); }}
+                  >
                     <Text style={styles.changeBtnText}>Change</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 </View>
               ) : (
-                <TouchableOpacity style={styles.canvasFill} activeOpacity={0.8} onPress={pickVideo}>
+                <Pressable
+                  style={({ pressed }) => [styles.canvasFill, { opacity: pressed ? 0.85 : 1 }]}
+                  onPress={() => { hapticLight(); pickVideo(); }}
+                >
                   <View style={styles.placeholder}>
                     <Feather name="video" size={48} color="rgba(255,255,255,0.35)" />
                     <Text style={styles.placeholderTitle}>Tap to choose a video</Text>
                     <Text style={styles.placeholderSub}>Clips are capped at 15 seconds</Text>
                   </View>
-                </TouchableOpacity>
+                </Pressable>
               )
             )}
 
@@ -448,37 +486,62 @@ export default function BuyerStoryCreate() {
 
         {/* OVERLAY TOOLBAR — text, stickers, product tag (sellers) */}
         <View style={styles.overlayToolbar}>
-          <TouchableOpacity style={styles.toolbarBtn} onPress={addTextOverlay} testID="story-add-text">
+          <Pressable
+            style={({ pressed }) => [styles.toolbarBtn, { opacity: pressed ? 0.8 : 1 }]}
+            onPress={() => { hapticLight(); addTextOverlay(); }}
+            testID="story-add-text"
+            accessibilityRole="button"
+            accessibilityLabel="Add text"
+          >
             <Feather name="type" size={ICON.sm} color={ON_DARK} />
             <Text style={styles.toolbarBtnText}>Text</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.toolbarBtn}
-            onPress={() => setStickerPickerOpen(v => !v)}
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.toolbarBtn, { opacity: pressed ? 0.8 : 1 }]}
+            onPress={() => { hapticLight(); setStickerPickerOpen(v => !v); }}
             testID="story-add-sticker"
+            accessibilityRole="button"
+            accessibilityLabel="Add sticker"
           >
             <Feather name="smile" size={ICON.sm} color={ON_DARK} />
             <Text style={styles.toolbarBtnText}>Sticker</Text>
-          </TouchableOpacity>
+          </Pressable>
           {isSeller && (
-            <TouchableOpacity style={styles.toolbarBtn} onPress={openProductPicker} testID="story-tag-product">
+            <Pressable
+              style={({ pressed }) => [styles.toolbarBtn, { opacity: pressed ? 0.8 : 1 }]}
+              onPress={() => { hapticLight(); openProductPicker(); }}
+              testID="story-tag-product"
+              accessibilityRole="button"
+              accessibilityLabel={taggedProduct ? `Tagged product: ${taggedProduct.name}` : 'Tag a product'}
+            >
               <Feather name="shopping-bag" size={ICON.sm} color={ON_DARK} />
               <Text style={styles.toolbarBtnText}>{taggedProduct ? taggedProduct.name : 'Tag product'}</Text>
               {taggedProduct && (
-                <TouchableOpacity onPress={() => setTaggedProduct(null)} hitSlop={8}>
+                <Pressable
+                  onPress={() => { hapticLight(); setTaggedProduct(null); }}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Remove tagged product"
+                >
                   <Feather name="x" size={ICON.xs} color={ON_DARK} />
-                </TouchableOpacity>
+                </Pressable>
               )}
-            </TouchableOpacity>
+            </Pressable>
           )}
         </View>
 
         {stickerPickerOpen && (
           <View style={styles.stickerRow}>
             {STICKER_EMOJI.map(emoji => (
-              <TouchableOpacity key={emoji} style={styles.stickerBtn} onPress={() => addSticker(emoji)}>
+              <PressableScale
+                key={emoji}
+                style={styles.stickerBtn}
+                onPress={() => { hapticToggle(); addSticker(emoji); }}
+                accessibilityRole="button"
+                accessibilityLabel={`Add ${emoji} sticker`}
+              >
                 <Text style={styles.stickerEmoji}>{emoji}</Text>
-              </TouchableOpacity>
+              </PressableScale>
             ))}
           </View>
         )}
@@ -506,18 +569,20 @@ export default function BuyerStoryCreate() {
 
         {/* ADVANCED EDITOR LINK — when photo/video is ready */}
         {type !== 'text' && hasMedia && (
-          <TouchableOpacity
-            style={styles.advancedBtn}
-            onPress={() =>
+          <Pressable
+            style={({ pressed }) => [styles.advancedBtn, { opacity: pressed ? 0.8 : 1 }]}
+            onPress={() => {
+              hapticLight();
               router.push({
                 pathname: '/create-post',
                 params: { accountType: params.accountType ?? 'buyer' },
-              } as any)
-            }
+              } as any);
+            }}
+            accessibilityRole="button"
           >
             <Feather name="sliders" size={ICON.sm} color={PURPLE} />
             <Text style={styles.advancedBtnText}>Open advanced editor — add text, links, GIFs</Text>
-          </TouchableOpacity>
+          </Pressable>
         )}
 
         {/* TEXT CONTROLS */}
@@ -526,17 +591,20 @@ export default function BuyerStoryCreate() {
             <Text style={styles.controlLabel}>Background</Text>
             <View style={styles.colorRow}>
               {BG_COLORS.map(c => (
-                <TouchableOpacity
+                <PressableScale
                   key={c}
                   style={[styles.colorCircle, { backgroundColor: c }, bgColor === c && styles.colorCircleActive]}
-                  onPress={() => setBgColor(c)}
+                  onPress={() => { hapticToggle(); setBgColor(c); }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Background color"
+                  accessibilityState={{ selected: bgColor === c }}
                 />
               ))}
             </View>
             <Text style={[styles.controlLabel, { marginTop: SP.md }]}>Text color</Text>
             <View style={styles.colorRow}>
               {TEXT_COLORS.map(c => (
-                <TouchableOpacity
+                <PressableScale
                   key={c}
                   style={[
                     styles.colorCircle,
@@ -544,7 +612,10 @@ export default function BuyerStoryCreate() {
                     textColor === c && styles.colorCircleActive,
                     c === '#000000' && { borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
                   ]}
-                  onPress={() => setTextColor(c)}
+                  onPress={() => { hapticToggle(); setTextColor(c); }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Text color"
+                  accessibilityState={{ selected: textColor === c }}
                 />
               ))}
             </View>
@@ -554,28 +625,31 @@ export default function BuyerStoryCreate() {
         {/* PRIVACY */}
         <View style={styles.privacySection}>
           <View style={styles.privacyCard}>
-            <TouchableOpacity
+            <PressableScale
               style={styles.privacyRow}
-              onPress={() =>
+              onPress={() => {
+                hapticLight();
                 Alert.alert('Audience', '', [
                   { text: 'Everyone',      onPress: () => setPrivacyVis('public')  },
                   { text: 'Friends only',  onPress: () => setPrivacyVis('friends') },
                   { text: 'Cancel', style: 'cancel' },
-                ])
-              }
+                ]);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Who can see this story"
             >
               <Feather name={privacyVis === 'public' ? 'globe' : 'users'} size={ICON.md} color={PURPLE} />
               <Text style={styles.privacyLabel}>Who can see</Text>
               <Text style={styles.privacyValue}>{privacyVis === 'public' ? 'Everyone' : 'Friends only'}</Text>
               <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
-            </TouchableOpacity>
+            </PressableScale>
 
             <View style={styles.privacyDivider} />
 
             <View style={styles.privacyRow}>
               <Feather name="message-circle" size={ICON.md} color={PURPLE} />
               <Text style={[styles.privacyLabel, { flex: 1 }]}>Replies</Text>
-              <Switch
+              <HapticSwitch
                 value={allowReplies}
                 onValueChange={setAllowReplies}
                 trackColor={{ false: BORDER, true: PURPLE }}
@@ -601,7 +675,7 @@ export default function BuyerStoryCreate() {
             />
             <View style={[styles.colorRow, { marginTop: SP.sm }]}>
               {TEXT_COLORS.map(c => (
-                <TouchableOpacity
+                <PressableScale
                   key={c}
                   style={[
                     styles.colorCircle,
@@ -609,17 +683,16 @@ export default function BuyerStoryCreate() {
                     textDraftColor === c && styles.colorCircleActive,
                     c === '#000000' && { borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
                   ]}
-                  onPress={() => setTextDraftColor(c)}
+                  onPress={() => { hapticToggle(); setTextDraftColor(c); }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Text color"
+                  accessibilityState={{ selected: textDraftColor === c }}
                 />
               ))}
             </View>
             <View style={styles.overlayModalActions}>
-              <TouchableOpacity onPress={() => setTextModalVisible(false)} style={styles.overlayModalCancel}>
-                <Text style={styles.overlayModalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={commitTextOverlay} style={[styles.overlayModalDone, { backgroundColor: PURPLE }]}>
-                <Text style={styles.overlayModalDoneText}>Add</Text>
-              </TouchableOpacity>
+              <Button label="Cancel" variant="secondary" size="small" onPress={() => setTextModalVisible(false)} style={{ flex: 1 }} />
+              <Button label="Add" variant="primary" size="small" onPress={() => { hapticPrimaryAction(); commitTextOverlay(); }} style={{ flex: 1 }} />
             </View>
           </View>
         </View>
@@ -627,7 +700,12 @@ export default function BuyerStoryCreate() {
 
       {/* PRODUCT TAG PICKER (sellers) */}
       <Modal visible={productPickerOpen} transparent animationType="slide" onRequestClose={() => setProductPickerOpen(false)}>
-        <TouchableOpacity style={styles.overlayModalBackdrop} activeOpacity={1} onPress={() => setProductPickerOpen(false)} />
+        <Pressable
+          style={styles.overlayModalBackdrop}
+          onPress={() => setProductPickerOpen(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+        />
         <View style={[styles.productSheet, { paddingBottom: insets.bottom + SP.md }]}>
           <Text style={styles.controlLabel}>Tag a product</Text>
           <FlatList
@@ -635,13 +713,15 @@ export default function BuyerStoryCreate() {
             keyExtractor={p => p.id}
             ListEmptyComponent={<Text style={styles.placeholderSub}>No products to tag yet.</Text>}
             renderItem={({ item }) => (
-              <TouchableOpacity
+              <PressableScale
                 style={styles.productRow}
-                onPress={() => { setTaggedProduct({ id: item.id, name: item.name }); setProductPickerOpen(false); }}
+                onPress={() => { hapticLight(); setTaggedProduct({ id: item.id, name: item.name }); setProductPickerOpen(false); }}
+                accessibilityRole="button"
+                accessibilityLabel={`Tag ${item.name}`}
               >
                 <Text style={styles.privacyLabel}>{item.name}</Text>
                 <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
-              </TouchableOpacity>
+              </PressableScale>
             )}
           />
         </View>
@@ -665,16 +745,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingHorizontal: SP.md,
     paddingTop: SP.sm,
     paddingBottom: SP.sm,
-  },
-  closeBtn: {
-    width: 36, height: 36,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  closeText: {
-    color: ON_DARK,
-    fontSize: FS.xxl,
-    fontFamily: FONT.bold,
-    lineHeight: FS.xxl + 4,
   },
   headerTitle: {
     flex: 1,
@@ -787,16 +857,21 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: FS.xs,
     fontFamily: FONT.medium,
   },
-  videoReadyBg: {
-    flex: 1,
-    backgroundColor: '#0a0a0a',
-    justifyContent: 'center',
+  videoDurChip: {
+    position: 'absolute',
+    top: SP.sm,
+    right: SP.sm,
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: SP.sm,
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.62)',
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.sm,
+    paddingVertical: 4,
   },
-  videoDurText: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: FS.sm,
+  videoDurChipText: {
+    color: '#FFF',
+    fontSize: FS.xs,
     fontFamily: FONT.medium,
   },
   photoStrip: {
@@ -971,25 +1046,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     justifyContent: 'flex-end',
     gap: SP.sm,
     marginTop: SP.md,
-  },
-  overlayModalCancel: {
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-  },
-  overlayModalCancelText: {
-    color: MUTED,
-    fontFamily: FONT.medium,
-    fontSize: FS.sm,
-  },
-  overlayModalDone: {
-    borderRadius: RADIUS.pill,
-    paddingHorizontal: SP.lg,
-    paddingVertical: SP.sm,
-  },
-  overlayModalDoneText: {
-    color: ON_DARK,
-    fontFamily: FONT.semibold,
-    fontSize: FS.sm,
   },
   productSheet: {
     position: 'absolute',

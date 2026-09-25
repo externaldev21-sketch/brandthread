@@ -54,6 +54,15 @@ vi.mock('react-native', () => {
     UIManager: { setLayoutAnimationEnabledExperimental: vi.fn() },
     Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
     useWindowDimensions: () => ({ width: 393, height: 852, scale: 3, fontScale: 1 }),
+    Animated: {
+      Value: class {
+        constructor(public _value: number) {}
+        setValue() {}
+      },
+      View: nativeComponent('Animated.View'),
+      timing: () => ({ start: (cb?: () => void) => cb?.() }),
+      spring: () => ({ start: (cb?: () => void) => cb?.() }),
+    },
   };
 });
 
@@ -84,9 +93,9 @@ vi.mock('@expo/vector-icons', () => ({
 }));
 
 vi.mock('expo-haptics', () => ({
-  impactAsync: vi.fn(),
-  notificationAsync: vi.fn(),
-  selectionAsync: vi.fn(),
+  impactAsync: vi.fn().mockResolvedValue(undefined),
+  notificationAsync: vi.fn().mockResolvedValue(undefined),
+  selectionAsync: vi.fn().mockResolvedValue(undefined),
   ImpactFeedbackStyle: { Light: 'light', Medium: 'medium' },
   NotificationFeedbackType: { Warning: 'warning' },
 }));
@@ -120,6 +129,18 @@ vi.mock('@/lib/money', () => ({
 }));
 
 vi.mock('@/lib/theme', () => ({
+  BG: '#0A0A0B',
+  CARD: '#18181B',
+  CARD_GLASS: 'rgba(24, 24, 27, 0.58)',
+  FG: '#F7F7FA',
+  ACCENT: '#F7F7FA',
+  MUTED: 'rgba(247,247,250,0.58)',
+  SUBTLE: 'rgba(247,247,250,0.50)',
+  BORDER: 'rgba(255,255,255,0.07)',
+  RED: '#F87171',
+  SUCCESS: '#10B981',
+  ORANGE: '#F97316',
+  GOLD: '#F59E0B',
   FONT: { regular: 'System', medium: 'System', semibold: 'System', bold: 'System' },
   FS: { xs: 11, sm: 13, base: 15, md: 17, lg: 19, xl: 22, xxl: 26 },
   SP: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 },

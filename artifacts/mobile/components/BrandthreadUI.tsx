@@ -90,7 +90,8 @@ export function useUndoToast(): UndoToastContextValue {
 // ─── Reusable Motion Primitives ───────────────────────────────────────────────
 
 interface PressableScaleProps extends Omit<PressableProps, 'style'> {
-  children: React.ReactNode | ((state: { pressed: boolean }) => React.ReactNode);
+  /** Optional so a purely-tappable overlay (e.g. a full-screen dismiss backdrop) doesn't need a dummy child. */
+  children?: React.ReactNode | ((state: { pressed: boolean }) => React.ReactNode);
   style?: StyleProp<ViewStyle> | ((state: { pressed: boolean }) => StyleProp<ViewStyle>);
   activeScale?: number;
   activeOpacity?: number;
@@ -661,7 +662,7 @@ const stS = StyleSheet.create({
 interface EmptyStateProps {
   icon: keyof typeof Feather.glyphMap;
   title: string;
-  description: string;
+  description?: string;
   action?: { label: string; onPress: () => void; icon?: keyof typeof Feather.glyphMap };
   secondaryAction?: { label: string; onPress: () => void };
   style?: StyleProp<ViewStyle>;
@@ -695,7 +696,9 @@ export function EmptyState({ icon, title, description, action, secondaryAction, 
         </LinearGradient>
       </View>}
       <Text style={[esS.title, { color: colors.foreground }]}>{title}</Text>
-      <Text style={[esS.desc, { color: colors.mutedForeground }]}>{description}</Text>
+      {!!description && (
+        <Text style={[esS.desc, { color: colors.mutedForeground }]}>{description}</Text>
+      )}
       {action && (
         <View style={esS.actions}>
           <PrimaryButton label={action.label} onPress={action.onPress} icon={action.icon} style={esS.btn} />

@@ -2,9 +2,9 @@
  * Brandthread — Login Methods
  * Shows all connected sign-in methods for the current account.
  */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, TextInput, Modal, Platform,
+  View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput, Modal, Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -14,12 +14,15 @@ import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import QRCode from 'react-native-qrcode-svg';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
-import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  FONT, FS, SP, RADIUS, SUCCESS, SUCCESS_DIM, CARD_ELEVATED, RED, RED_DIM,
-} from '@/lib/theme';
+import { FONT } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { TYPE_SCALE } from '@/constants/typography';
+import { SPACING } from '@/constants/spacing';
+import { RADII } from '@/constants/radii';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -35,6 +38,7 @@ type OAuthProvider = 'google' | 'apple';
 
 export default function LoginMethods() {
   const colors = useColors();
+  const s = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, isLoaded } = useUser();
@@ -66,14 +70,14 @@ export default function LoginMethods() {
       id: 'email',
       label: 'Email address',
       sublabel: email || 'No email set',
-      icon: <Feather name="mail" size={20} color={email ? FG : SUBTLE} />,
+      icon: <Feather name="mail" size={20} color={email ? colors.foreground : colors.subtle} />,
       connected: !!email,
     },
     {
       id: 'password',
       label: 'Password',
       sublabel: hasPassword ? 'Enabled — you can sign in with your password' : 'Not set',
-      icon: <Feather name="lock" size={20} color={hasPassword ? FG : SUBTLE} />,
+      icon: <Feather name="lock" size={20} color={hasPassword ? colors.foreground : colors.subtle} />,
       connected: hasPassword,
     },
     {
@@ -82,7 +86,7 @@ export default function LoginMethods() {
       sublabel: hasGoogle
         ? (googleAccount?.emailAddress ?? 'Connected')
         : 'Not connected',
-      icon: <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: 'Inter_700Bold', fontSize: 12, color: '#FFFFFF', lineHeight: 14 }}>G</Text></View>,
+      icon: <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: FONT.bold, fontSize: 12, color: '#FFFFFF', lineHeight: 14 }}>G</Text></View>,
       connected: hasGoogle,
     },
     {
@@ -274,7 +278,7 @@ export default function LoginMethods() {
 
   return (
     <View style={s.root}>
-      <Header title="Login Methods" />
+      <ScreenHeader title="Login Methods" />
 
       {!isLoaded ? (
         <View style={s.loading}>
@@ -315,23 +319,19 @@ export default function LoginMethods() {
                   {method.connected ? (
                     <View style={s.connectedActions}>
                       <View style={s.activeBadge}>
-                        <Feather name="check" size={11} color={SUCCESS} />
+                        <Feather name="check" size={11} color={colors.success} />
                         <Text style={s.activeBadgeText}>Active</Text>
                       </View>
                       {isOAuth && externalAccount && (
-                        <TouchableOpacity
+                        <Button
                           testID={`remove-${method.id}-login-method`}
-                          activeOpacity={0.7}
+                          label="Remove"
+                          variant="destructive"
+                          size="small"
                           disabled={!!linkingProvider || !!removingProvider}
+                          loading={isRemoving}
                           onPress={() => removeOAuth(method.id as OAuthProvider, externalAccount)}
-                          style={[s.removeBtn, isRemoving && s.removeBtnLoading]}
-                        >
-                          {isRemoving ? (
-                            <ActivityIndicator size="small" color={RED} />
-                          ) : (
-                            <Text style={s.removeBtnText}>Remove</Text>
-                          )}
-                        </TouchableOpacity>
+                        />
                       )}
                     </View>
                   ) : isOAuth || isPassword ? (
@@ -356,9 +356,10 @@ export default function LoginMethods() {
                 <View key={method.id}>
                   {idx > 0 && <View style={s.divider} />}
                   {tappable ? (
-                    <TouchableOpacity
+                    <PressableScale
                       testID={isPassword ? 'setup-password-login-method' : `connect-${method.id}-login-method`}
-                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityLabel={isPassword ? 'Set up password' : `Connect ${method.label}`}
                       disabled={!!linkingProvider || !!removingProvider || passwordSetupSaving}
                       onPress={() => {
                         if (isPassword) {
@@ -369,7 +370,7 @@ export default function LoginMethods() {
                       }}
                     >
                       {rowContent}
-                    </TouchableOpacity>
+                    </PressableScale>
                   ) : (
                     rowContent
                   )}
@@ -386,7 +387,7 @@ export default function LoginMethods() {
                 s.iconWrap,
                 twoFactorEnabled && [s.iconWrapActive, { backgroundColor: colors.accent, borderColor: colors.primary }],
               ]}>
-                <Feather name="shield" size={20} color={twoFactorEnabled ? colors.primary : SUBTLE} />
+                <Feather name="shield" size={20} color={twoFactorEnabled ? colors.primary : colors.subtle} />
               </View>
               <View style={{ flex: 1, gap: 2 }}>
                 <Text style={s.methodLabel}>Authenticator app (TOTP)</Text>
@@ -397,25 +398,18 @@ export default function LoginMethods() {
               {twoFaLoading ? (
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : twoFactorEnabled ? (
-                <TouchableOpacity onPress={handleDisable2FA} style={s.disableBtn}>
-                  <Text style={s.disableBtnText}>Disable</Text>
-                </TouchableOpacity>
+                <Button label="Disable" variant="destructive" size="small" onPress={handleDisable2FA} />
               ) : (
-                <TouchableOpacity
-                  onPress={handleEnable2FA}
-                  style={[s.enableBtn, { backgroundColor: colors.accent, borderColor: colors.primary }]}
-                >
-                  <Text style={[s.enableBtnText, { color: colors.primary }]}>Enable</Text>
-                </TouchableOpacity>
+                <Button label="Enable" variant="secondary" size="small" onPress={handleEnable2FA} />
               )}
             </View>
           </View>
 
           {/* Info note */}
           <View style={s.note}>
-            <Feather name="info" size={14} color={MUTED} style={{ marginTop: 1 }} />
+            <Feather name="info" size={14} color={colors.mutedForeground} style={{ marginTop: 1 }} />
             <Text style={s.noteText}>
-              Tap <Text style={{ color: FG }}>Connect</Text> on Google or Apple to link
+              Tap <Text style={{ color: colors.foreground }}>Connect</Text> on Google or Apple to link
               that account for faster future sign-ins. Your primary email is used for
               account recovery.
             </Text>
@@ -433,14 +427,16 @@ export default function LoginMethods() {
         <View style={s.modal}>
           <View style={s.modalHeader}>
             <Text style={s.modalTitle}>Add a password</Text>
-            <TouchableOpacity
+            <IconButton
+              name="x"
+              variant="plain"
+              size={20}
+              color={colors.foreground}
               onPress={closePasswordSetup}
-              style={s.modalClose}
               disabled={passwordSetupSaving}
               testID="close-password-setup"
-            >
-              <Feather name="x" size={20} color={FG} />
-            </TouchableOpacity>
+              accessibilityLabel="Close"
+            />
           </View>
 
           <KeyboardAwareScrollViewCompat
@@ -464,19 +460,22 @@ export default function LoginMethods() {
                   setPasswordSetupError('');
                 }}
                 placeholder="Minimum 8 characters"
-                placeholderTextColor={SUBTLE}
+                placeholderTextColor={colors.subtle}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoCorrect={false}
                 autoComplete="new-password"
               />
-              <TouchableOpacity
-                onPress={() => setShowPassword((visible) => !visible)}
+              <IconButton
+                name={showPassword ? 'eye-off' : 'eye'}
+                variant="plain"
+                size={18}
+                color={colors.mutedForeground}
                 style={s.passwordVisibilityButton}
+                onPress={() => setShowPassword((visible) => !visible)}
                 testID="toggle-password-visibility"
-              >
-                <Feather name={showPassword ? 'eye-off' : 'eye'} size={18} color={MUTED} />
-              </TouchableOpacity>
+                accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+              />
             </View>
 
             <Text style={s.passwordSetupLabel}>Confirm password</Text>
@@ -489,7 +488,7 @@ export default function LoginMethods() {
                 setPasswordSetupError('');
               }}
               placeholder="Enter it again"
-              placeholderTextColor={SUBTLE}
+              placeholderTextColor={colors.subtle}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
               autoCorrect={false}
@@ -500,31 +499,21 @@ export default function LoginMethods() {
 
             {passwordSetupError ? (
               <View style={s.passwordErrorBox}>
-                <Feather name="alert-circle" size={14} color={RED} />
+                <Feather name="alert-circle" size={14} color={colors.destructive} />
                 <Text testID="password-setup-error" style={s.passwordErrorText}>
                   {passwordSetupError}
                 </Text>
               </View>
             ) : null}
 
-            <TouchableOpacity
+            <Button
               testID="save-password-button"
-              style={[
-                s.verifyBtn,
-                { backgroundColor: colors.primary, opacity: passwordSetupSaving ? 0.6 : 1 },
-              ]}
+              label="Add password"
               onPress={savePassword}
-              disabled={passwordSetupSaving}
-              activeOpacity={0.85}
-            >
-              {passwordSetupSaving ? (
-                <ActivityIndicator color={colors.primaryForeground} />
-              ) : (
-                <Text style={[s.verifyBtnText, { color: colors.primaryForeground }]}>
-                  Add password
-                </Text>
-              )}
-            </TouchableOpacity>
+              loading={passwordSetupSaving}
+              fullWidth
+              style={s.verifyBtn}
+            />
           </KeyboardAwareScrollViewCompat>
         </View>
       </Modal>
@@ -534,9 +523,14 @@ export default function LoginMethods() {
         <View style={s.modal}>
           <View style={s.modalHeader}>
             <Text style={s.modalTitle}>Set up authenticator app</Text>
-            <TouchableOpacity onPress={() => { setTotpModal(null); setVerifyCode(''); }} style={s.modalClose}>
-              <Feather name="x" size={20} color={FG} />
-            </TouchableOpacity>
+            <IconButton
+              name="x"
+              variant="plain"
+              size={20}
+              color={colors.foreground}
+              onPress={() => { setTotpModal(null); setVerifyCode(''); }}
+              accessibilityLabel="Close"
+            />
           </View>
 
           <ScrollView contentContainerStyle={s.modalBody}>
@@ -561,7 +555,7 @@ export default function LoginMethods() {
               value={verifyCode}
               onChangeText={setVerifyCode}
               placeholder="000000"
-              placeholderTextColor={SUBTLE}
+              placeholderTextColor={colors.subtle}
               keyboardType="number-pad"
               maxLength={6}
               textAlign="center"
@@ -578,20 +572,14 @@ export default function LoginMethods() {
               </>
             )}
 
-            <TouchableOpacity
-              style={[
-                s.verifyBtn,
-                { backgroundColor: colors.primary, opacity: verifyCode.length < 6 ? 0.5 : 1 },
-              ]}
+            <Button
+              label="Verify & enable 2FA"
               onPress={handleVerifyTOTP}
-              disabled={verifyCode.length < 6 || verifying}
-            >
-              {verifying ? (
-                <ActivityIndicator color={colors.primaryForeground} />
-              ) : (
-                <Text style={[s.verifyBtnText, { color: colors.primaryForeground }]}>Verify &amp; enable 2FA</Text>
-              )}
-            </TouchableOpacity>
+              disabled={verifyCode.length < 6}
+              loading={verifying}
+              fullWidth
+              style={s.verifyBtn}
+            />
           </ScrollView>
         </View>
       </Modal>
@@ -599,185 +587,153 @@ export default function LoginMethods() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   root:    { flex: 1, backgroundColor: 'transparent' },
-  header:  {
-    height: 56, flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', paddingHorizontal: SP.md,
-    borderBottomWidth: 1, borderBottomColor: BORDER,
-  },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title:   { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  body: { paddingHorizontal: SP.md, paddingTop: SP.lg },
+  body: { paddingHorizontal: SPACING.md, paddingTop: SPACING.lg },
   desc: {
-    fontSize: FS.sm, fontFamily: FONT.regular,
-    color: MUTED, lineHeight: 20, marginBottom: SP.lg,
+    ...TYPE_SCALE.callout,
+    color: colors.mutedForeground, marginBottom: SPACING.lg,
   },
 
   sectionLabel: {
-    fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED,
+    fontSize: 11, fontFamily: FONT.semibold, color: colors.mutedForeground,
     textTransform: 'uppercase', letterSpacing: 0.8,
-    marginBottom: SP.sm, marginTop: SP.lg, paddingHorizontal: 2,
+    marginBottom: SPACING.sm, marginTop: SPACING.lg, paddingHorizontal: 2,
   },
 
   card: {
-    backgroundColor: CARD, borderRadius: RADIUS.lg,
-    borderWidth: 1, borderColor: BORDER, overflow: 'hidden',
-    marginBottom: SP.lg,
+    backgroundColor: colors.card, borderRadius: RADII.card,
+    borderWidth: 1, borderColor: colors.border, overflow: 'hidden',
+    marginBottom: SPACING.lg,
   },
   row: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: SP.md, paddingVertical: 14, gap: 12,
+    paddingHorizontal: SPACING.md, paddingVertical: 14, gap: SPACING.sm,
   },
-  divider: { height: 1, backgroundColor: BORDER, marginHorizontal: SP.md },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginHorizontal: SPACING.md },
 
   iconWrap: {
-    width: 40, height: 40, borderRadius: RADIUS.sm,
-    backgroundColor: CARD_ELEVATED, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: BORDER,
+    width: 40, height: 40, borderRadius: RADII.chip,
+    backgroundColor: colors.elevated, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: colors.border,
   },
   iconWrapActive: {
   },
 
-  methodLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  methodSub:   { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  methodLabel: { ...TYPE_SCALE.callout, fontFamily: FONT.semibold, color: colors.foreground },
+  methodSub:   { fontSize: 11, fontFamily: FONT.regular, color: colors.mutedForeground },
 
   activeBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: SUCCESS_DIM, borderRadius: RADIUS.pill,
-    paddingHorizontal: 8, paddingVertical: 4,
+    backgroundColor: colors.success + '26', borderRadius: RADII.pill,
+    paddingHorizontal: SPACING.xs, paddingVertical: 4,
   },
   activeBadgeText: {
-    fontSize: FS.xs, fontFamily: FONT.semibold, color: SUCCESS,
+    fontSize: 11, fontFamily: FONT.semibold, color: colors.success,
   },
   connectedActions: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.xs,
   },
   inactiveBadge: {
-    fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE,
+    fontSize: 11, fontFamily: FONT.regular, color: colors.subtle,
   },
 
   enableBtn: {
-    borderRadius: RADIUS.sm,
-    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: RADII.chip,
+    paddingHorizontal: SPACING.sm, paddingVertical: 6,
     borderWidth: 1,
   },
-  enableBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold },
-
-  removeBtn: {
-    minWidth: 56, minHeight: 30, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: RED_DIM, borderRadius: RADIUS.sm,
-    paddingHorizontal: 8, paddingVertical: 5,
-    borderWidth: 1, borderColor: 'rgba(248,113,113,0.3)',
-  },
-  removeBtnLoading: { opacity: 0.7 },
-  removeBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: RED },
-
-  disableBtn: {
-    backgroundColor: 'rgba(239,68,68,0.12)', borderRadius: RADIUS.sm,
-    paddingHorizontal: 12, paddingVertical: 6,
-    borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)',
-  },
-  disableBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: '#EF4444' },
+  enableBtnText: { fontSize: 11, fontFamily: FONT.semibold },
 
   note: {
-    flexDirection: 'row', gap: 8, alignItems: 'flex-start',
-    paddingHorizontal: SP.sm,
+    flexDirection: 'row', gap: SPACING.xs, alignItems: 'flex-start',
+    paddingHorizontal: SPACING.sm,
   },
   noteText: {
-    flex: 1, fontSize: FS.xs, fontFamily: FONT.regular,
-    color: MUTED, lineHeight: 18,
+    flex: 1, fontSize: 11, fontFamily: FONT.regular,
+    color: colors.mutedForeground, lineHeight: 18,
   },
 
   // TOTP modal
-  modal: { flex: 1, backgroundColor: BG },
+  modal: { flex: 1, backgroundColor: colors.background },
   modalHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SP.md, paddingTop: SP.xl, paddingBottom: SP.md,
-    borderBottomWidth: 1, borderBottomColor: BORDER,
+    paddingHorizontal: SPACING.md, paddingTop: SPACING.xl, paddingBottom: SPACING.md,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
   },
-  modalClose: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  modalTitle: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
-  modalBody: { paddingHorizontal: SP.md, paddingTop: SP.lg, paddingBottom: 40 },
+  modalTitle: { ...TYPE_SCALE.headline, color: colors.foreground },
+  modalBody: { paddingHorizontal: SPACING.md, paddingTop: SPACING.lg, paddingBottom: 40 },
   modalStep: {
-    fontSize: FS.sm, fontFamily: FONT.regular, color: FG,
-    lineHeight: 22, marginBottom: SP.md,
-  },
-  modalNote: {
-    fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED,
-    lineHeight: 18, marginBottom: SP.lg,
+    ...TYPE_SCALE.callout, color: colors.foreground,
+    lineHeight: 22, marginBottom: SPACING.md,
   },
   qrWrap: {
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#FFFFFF', borderRadius: RADIUS.sm,
-    padding: SP.md, marginBottom: SP.md, alignSelf: 'center',
+    backgroundColor: '#FFFFFF', borderRadius: RADII.chip,
+    padding: SPACING.md, marginBottom: SPACING.md, alignSelf: 'center',
   },
   secretBox: {
-    backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER,
-    paddingHorizontal: SP.md, paddingVertical: SP.sm, marginBottom: SP.md,
+    backgroundColor: colors.card, borderRadius: RADII.chip, borderWidth: 1, borderColor: colors.border,
+    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, marginBottom: SPACING.md,
     alignItems: 'center',
   },
   secretText: {
-    fontSize: FS.base, fontFamily: FONT.semibold,
+    fontSize: 15, fontFamily: FONT.semibold,
     letterSpacing: 2,
   },
   codeInput: {
-    backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER,
-    paddingHorizontal: SP.md, paddingVertical: 14,
-    fontSize: 28, fontFamily: FONT.bold, color: FG,
-    letterSpacing: 8, marginBottom: SP.lg,
+    backgroundColor: colors.card, borderRadius: RADII.chip, borderWidth: 1, borderColor: colors.border,
+    paddingHorizontal: SPACING.md, paddingVertical: 14,
+    fontSize: 28, fontFamily: FONT.bold, color: colors.foreground,
+    letterSpacing: 8, marginBottom: SPACING.lg,
   },
   backupCodesBox: {
-    backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER,
-    paddingHorizontal: SP.md, paddingVertical: SP.sm, marginBottom: SP.lg,
-    flexDirection: 'row', flexWrap: 'wrap', gap: 8,
+    backgroundColor: colors.card, borderRadius: RADII.chip, borderWidth: 1, borderColor: colors.border,
+    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, marginBottom: SPACING.lg,
+    flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs,
   },
   backupCode: {
-    fontFamily: FONT.regular, fontSize: FS.sm, color: FG,
-    backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 4,
-    paddingHorizontal: 6, paddingVertical: 3,
+    fontFamily: FONT.regular, fontSize: 13, color: colors.foreground,
+    backgroundColor: colors.elevated, borderRadius: 4,
+    paddingHorizontal: SPACING.xxs + 2, paddingVertical: 3,
   },
-  verifyBtn: {
-    borderRadius: RADIUS.md,
-    paddingVertical: 16, alignItems: 'center',
-  },
-  verifyBtnText: { fontSize: FS.base, fontFamily: FONT.semibold },
+  verifyBtn: { marginTop: SPACING.xs },
 
-  passwordSetupBody: { paddingHorizontal: SP.md, paddingTop: SP.lg, paddingBottom: 40 },
+  passwordSetupBody: { paddingHorizontal: SPACING.md, paddingTop: SPACING.lg, paddingBottom: 40 },
   passwordSetupIntro: {
-    fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED,
-    lineHeight: 21, marginBottom: SP.lg,
+    ...TYPE_SCALE.callout, color: colors.mutedForeground,
+    lineHeight: 21, marginBottom: SPACING.lg,
   },
   passwordSetupLabel: {
-    fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED,
-    marginBottom: 6, marginTop: SP.sm,
+    fontSize: 11, fontFamily: FONT.semibold, color: colors.mutedForeground,
+    marginBottom: 6, marginTop: SPACING.sm,
   },
   passwordInputRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: CARD, borderRadius: RADIUS.sm,
-    borderWidth: 1, borderColor: BORDER,
+    backgroundColor: colors.card, borderRadius: RADII.chip,
+    borderWidth: 1, borderColor: colors.border,
   },
   passwordInput: {
-    flex: 1, paddingHorizontal: SP.md, paddingVertical: 14,
-    fontSize: FS.sm, fontFamily: FONT.regular, color: FG,
+    flex: 1, paddingHorizontal: SPACING.md, paddingVertical: 14,
+    ...TYPE_SCALE.callout, color: colors.foreground,
   },
   passwordInputStandalone: {
-    backgroundColor: CARD, borderRadius: RADIUS.sm,
-    borderWidth: 1, borderColor: BORDER,
-    paddingHorizontal: SP.md, paddingVertical: 14,
-    fontSize: FS.sm, fontFamily: FONT.regular, color: FG,
+    backgroundColor: colors.card, borderRadius: RADII.chip,
+    borderWidth: 1, borderColor: colors.border,
+    paddingHorizontal: SPACING.md, paddingVertical: 14,
+    ...TYPE_SCALE.callout, color: colors.foreground,
   },
-  passwordVisibilityButton: { paddingHorizontal: SP.md, paddingVertical: 12 },
+  passwordVisibilityButton: {},
   passwordErrorBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: RED_DIM, borderRadius: RADIUS.sm,
-    borderWidth: 1, borderColor: 'rgba(248,113,113,0.3)',
-    paddingHorizontal: SP.sm, paddingVertical: 10, marginTop: SP.md,
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.xs,
+    backgroundColor: colors.destructive + '26', borderRadius: RADII.chip,
+    borderWidth: 1, borderColor: colors.destructive + '4d',
+    paddingHorizontal: SPACING.sm, paddingVertical: 10, marginTop: SPACING.md,
   },
   passwordErrorText: {
-    flex: 1, fontSize: FS.xs, fontFamily: FONT.regular,
-    color: RED, lineHeight: 18,
+    flex: 1, fontSize: 11, fontFamily: FONT.regular,
+    color: colors.destructive, lineHeight: 18,
   },
 });

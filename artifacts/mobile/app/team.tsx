@@ -44,6 +44,29 @@ function initials(name: string) {
 
 const AVATAR_COLORS = ['#0F766E', '#4A6FA5', '#22D3EE', '#B98A2E', '#EC4899', '#10B981'];
 
+type InviteRole = 'admin' | 'finance' | 'orders' | 'marketing' | 'viewer';
+const INVITE_ROLES: { key: InviteRole; title: string; sub: string }[] = [
+  { key: 'admin', title: 'Admin', sub: 'Everything but billing' },
+  { key: 'finance', title: 'Finance', sub: 'Balance & payouts' },
+  { key: 'orders', title: 'Orders', sub: 'Orders & fulfillment' },
+  { key: 'marketing', title: 'Marketing', sub: 'Ads, boosts & discounts' },
+  { key: 'viewer', title: 'Viewer', sub: 'Read-only analytics' },
+];
+const ROLE_LABEL: Record<string, string> = {
+  owner: 'Owner', admin: 'Admin', finance: 'Finance', orders: 'Orders', marketing: 'Marketing', viewer: 'Viewer',
+  manager: 'Manager', staff: 'Staff',
+};
+const ROLE_ACCESS: Record<string, string> = {
+  owner: 'Full Access',
+  admin: 'Products, orders, payouts, marketing & team',
+  finance: 'Balance, payouts & transactions',
+  orders: 'Orders, fulfillment & inventory',
+  marketing: 'Ads, boosts & discount codes',
+  viewer: 'Read-only analytics',
+  manager: 'Orders, Products, Inventory',
+  staff: 'Fulfillment only',
+};
+
 function avatarColor(idx: number) { return AVATAR_COLORS[idx % AVATAR_COLORS.length]; }
 
 const ACTIVITY_PAGE = 10;
@@ -63,7 +86,7 @@ export default function TeamScreen() {
   // Invite modal state
   const [inviteVisible, setInviteVisible] = useState(false);
   const [inviteEmail, setInviteEmail]     = useState('');
-  const [inviteRole, setInviteRole]       = useState<'staff' | 'manager'>('staff');
+  const [inviteRole, setInviteRole]       = useState<InviteRole>('viewer');
   const [inviting, setInviting]           = useState(false);
   const [inviteResult, setInviteResult]   = useState<{ inviteUrl: string; emailSent: boolean; email: string } | null>(null);
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
@@ -105,18 +128,20 @@ export default function TeamScreen() {
   const openInvite = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setInviteEmail('');
-    setInviteRole('staff');
+    setInviteRole('viewer');
     setInviteResult(null);
     setInviteVisible(true);
   };
 
   const handleInvite = async () => {
-    const email = inviteEmail.trim();
-    if (!email) return;
+    const value = inviteEmail.trim();
+    if (!value) return;
     setInviting(true);
     try {
-      const res = await api.team.invite({ email, role: inviteRole });
-      setInviteResult({ inviteUrl: res.inviteUrl, emailSent: !!res.emailSent, email });
+      const isEmail = value.includes('@') && value.includes('.');
+      const payload = isEmail ? { email: value, role: inviteRole } : { username: value.replace(/^@/, ''), role: inviteRole };
+      const res = await api.team.invite(payload);
+      setInviteResult({ inviteUrl: res.inviteUrl, emailSent: !!res.emailSent, email: res.member?.email ?? value });
       await load();
     } catch (err: any) {
       const rejection = getEntitlementRejection(err);
@@ -205,11 +230,11 @@ export default function TeamScreen() {
     const ini   = initials(m.name ?? m.email ?? '?');
     const isPending = m.status === 'pending';
     const isExpired = isExpiredInvite(m);
-    const roleLabel = m.role === 'owner' ? 'Owner' : m.role === 'manager' ? 'Manager' : 'Staff';
+    const roleLabel = ROLE_LABEL[m.role] ?? m.role;
     const expLabel  = isPending ? expiryLabel(m.expiresAt) : null;
     const accessLabel = isPending
       ? `Invited ${m.invitedAt ? relTime(m.invitedAt) : ''}${expLabel ? ` · ${expLabel}` : ' · awaiting acceptance'}`
-      : m.role === 'owner' ? 'Full Access' : m.role === 'manager' ? 'Orders, Products, Inventory' : 'Fulfillment only';
+      : ROLE_ACCESS[m.role] ?? '';
     const isRegenerating = regeneratingId === m.id;
     const isDismissing = dismissingId === m.id;
     return (
@@ -384,31 +409,29 @@ export default function TeamScreen() {
               <TextInput
                 value={inviteEmail}
                 onChangeText={setInviteEmail}
-                placeholder="Email address"
+                placeholder="Email address or @username"
                 placeholderTextColor={colors.mutedForeground}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoFocus
                 style={[styles.inviteInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
               />
-              <View style={styles.roleRow}>
-                {(['staff', 'manager'] as const).map(r => (
+              <View style={styles.roleGrid}>
+                {INVITE_ROLES.map(r => (
                   <TouchableOpacity
-                    key={r}
-                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setInviteRole(r); }}
+                    key={r.key}
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setInviteRole(r.key); }}
                     activeOpacity={0.8}
                     style={[
-                      styles.rolePill,
-                      { borderColor: inviteRole === r ? colors.primary : colors.border,
-                        backgroundColor: inviteRole === r ? colors.primary + '22' : 'transparent' },
+                      styles.rolePillWrap,
+                      { borderColor: inviteRole === r.key ? colors.primary : colors.border,
+                        backgroundColor: inviteRole === r.key ? colors.primary + '22' : 'transparent' },
                     ]}
                   >
-                    <Text style={[styles.rolePillTitle, { color: inviteRole === r ? colors.primary : colors.foreground }]}>
-                      {r === 'staff' ? 'Staff' : 'Manager'}
+                    <Text style={[styles.rolePillTitle, { color: inviteRole === r.key ? colors.primary : colors.foreground }]}>
+                      {r.title}
                     </Text>
-                    <Text style={[styles.rolePillSub, { color: colors.mutedForeground }]}>
-                      {r === 'staff' ? 'Fulfillment only' : 'Products, orders & inventory'}
-                    </Text>
+                    <Text style={[styles.rolePillSub, { color: colors.mutedForeground }]}>{r.sub}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -519,6 +542,8 @@ const styles = StyleSheet.create({
   modalSub: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 6, lineHeight: 18 },
   roleRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
   rolePill: { flex: 1, borderWidth: 1.5, borderRadius: 12, padding: 12 },
+  roleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 14 },
+  rolePillWrap: { width: '47%', borderWidth: 1.5, borderRadius: 12, padding: 12 },
   rolePillTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   rolePillSub: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
   modalActions: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18 },

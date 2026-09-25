@@ -8,16 +8,17 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet, Alert, Share, Modal, Pressable, TouchableOpacity, LayoutAnimation, UIManager, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert, Share, Modal, Pressable, LayoutAnimation, UIManager, Platform } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { PrimaryButton, SearchBar, FilterChip, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { EmptyState, GridSkeleton, useGridColumns, useBreakpoint, useCenteredGridPadding } from '@/components/layout';
+import { IconButton } from '@/components/ui/IconButton';
+import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ProductCard } from '@/components/products/ProductCard';
 import { getProducts, getProductStats, archiveProduct, unarchiveProduct, deleteProduct, restoreProduct, duplicateProduct } from '@/services/productService';
@@ -237,17 +238,18 @@ function SortModal({
         <View style={sh.handle} />
         <Text style={sh.sheetTitle}>Sort Products</Text>
         {SORT_OPTIONS.map(({ key, label }) => (
-          <TouchableOpacity
+          <PressableScale
             key={key}
             style={[sh.sortOption, current === key && sh.sortOptionActive]}
-            onPress={() => { Haptics.selectionAsync(); onSelect(key); onClose(); }}
-            activeOpacity={0.8}
+            onPress={() => { hapticToggle(); onSelect(key); onClose(); }}
+            accessibilityLabel={label}
+            accessibilityState={{ selected: current === key }}
           >
             <Text style={[sh.sortOptionText, current === key && sh.sortOptionTextActive]}>
               {label}
             </Text>
             {current === key && <Feather name="check" size={ICON.sm} color={PURPLE_LIGHT} />}
-          </TouchableOpacity>
+          </PressableScale>
         ))}
       </SheetRise>
     </Modal>
@@ -432,7 +434,7 @@ export default function ProductsScreen() {
   }, [router]);
 
   const openActionSheet = useCallback((product: Product) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    hapticPrimaryAction();
     setActionProduct(product);
     setActionSheetVisible(true);
   }, []);
@@ -491,37 +493,42 @@ export default function ProductsScreen() {
       <View style={[s.header, { paddingTop: insets.top + SP.sm, backgroundColor: palette.surface ?? BG, borderBottomColor: palette.border ?? BORDER }]}>
         {/* Title row */}
         <View style={s.titleRow}>
-          <TouchableOpacity
+          <PressableScale
             style={s.titleBtn}
-            onPress={() => Alert.alert('Product view', 'Choose a view', [
-              { text: 'All products', onPress: () => setFilter('all') },
-              { text: 'Collections', onPress: () => router.push('/store-collections' as never) },
-              { text: 'Cancel', style: 'cancel' },
-            ])}
-            activeOpacity={0.7}
+            onPress={() => {
+              hapticPrimaryAction();
+              Alert.alert('Product view', 'Choose a view', [
+                { text: 'All products', onPress: () => setFilter('all') },
+                { text: 'Collections', onPress: () => router.push('/store-collections' as never) },
+                { text: 'Cancel', style: 'cancel' },
+              ]);
+            }}
+            accessibilityLabel="Products, choose a view"
           >
             <Text style={[s.titleText, { color: palette.foreground ?? FG }]}>Products</Text>
-            <Feather name="chevron-down" size={18} color={MUTED} />
-          </TouchableOpacity>
+            <Feather name="chevron-down" size={ICON.sm} color={MUTED} />
+          </PressableScale>
           <View style={s.titleActions}>
-            <TouchableOpacity
-              style={s.headerIconBtn}
+            <IconButton
+              name="plus"
+              variant="plain"
+              size={ICON.md}
+              color={FG}
               onPress={() => router.push('/add-product' as never)}
               accessibilityLabel="Add product"
-            >
-              <Feather name="plus" size={ICON.md} color={FG} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={s.headerIconBtn}
+            />
+            <IconButton
+              name="more-horizontal"
+              variant="plain"
+              size={ICON.md}
+              color={FG}
               onPress={() => Alert.alert('Products', 'Choose an action', [
                 { text: 'Import products', onPress: () => router.push('/product-import' as never) },
                 { text: 'Export products', onPress: () => { void handleExportProducts(); } },
                 { text: 'Cancel', style: 'cancel' },
               ])}
               accessibilityLabel="More product actions"
-            >
-              <Feather name="more-horizontal" size={ICON.md} color={FG} />
-            </TouchableOpacity>
+            />
           </View>
         </View>
 
@@ -535,20 +542,22 @@ export default function ProductsScreen() {
               style={s.searchInput}
             />
           </View>
-          <TouchableOpacity
+          <PressableScale
             style={[s.controlBtn, hasActiveFilter && s.controlBtnActive]}
-            onPress={() => setFilterModalVisible(true)}
+            onPress={() => { hapticPrimaryAction(); setFilterModalVisible(true); }}
+            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
             accessibilityLabel={hasActiveFilter ? `Filter: ${filter}` : 'Filter products'}
           >
-            <Feather name="sliders" size={14} color={hasActiveFilter ? PURPLE_LIGHT : MUTED} />
-          </TouchableOpacity>
-          <TouchableOpacity
+            <Feather name="sliders" size={ICON.xs} color={hasActiveFilter ? PURPLE_LIGHT : MUTED} />
+          </PressableScale>
+          <PressableScale
             style={s.controlBtn}
-            onPress={() => setSortModalVisible(true)}
+            onPress={() => { hapticPrimaryAction(); setSortModalVisible(true); }}
+            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
             accessibilityLabel={`Sort: ${currentSortLabel}`}
           >
-            <Feather name="chevrons-down" size={14} color={MUTED} />
-          </TouchableOpacity>
+            <Feather name="chevrons-down" size={ICON.xs} color={MUTED} />
+          </PressableScale>
         </View>
 
         {/* Status pills */}
@@ -657,7 +666,7 @@ const createStyles = (theme: any) => {
     justifyContent: 'space-between',
     paddingHorizontal: SP.md,
     paddingBottom: SP.sm,
-    minHeight: 44,
+    minHeight: COMP.minTouchTarget,
   },
   titleBtn: {
     flexDirection: 'row',
@@ -674,12 +683,6 @@ const createStyles = (theme: any) => {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.xs,
-  },
-  headerIconBtn: {
-    width: COMP.iconBtn,
-    height: COMP.iconBtn,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 
   // Search row

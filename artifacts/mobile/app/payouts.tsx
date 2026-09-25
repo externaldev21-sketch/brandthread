@@ -12,7 +12,7 @@ import {
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { Header } from '@/components/layout';
 import { useApi } from '@/lib/api';
-import { isManagerRole } from '@/lib/roleError';
+import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import StripeConnectWarning, { ConnectStatus, normalizeConnectStatus } from '@/components/StripeConnectWarning';
 import { useTeamRole } from '@/hooks/useTeamRole';
@@ -179,7 +179,7 @@ export default function PayoutsScreen() {
     );
   }
 
-  if (currentRole !== 'owner' && !isReadOnly) {
+  if (!hasPayoutsAccess(currentRole) && !isReadOnly) {
     return (
       <View style={styles.root}>
         <Header title="Payouts" onBack={() => { haptic(); leaveSetupDestination(); }} />

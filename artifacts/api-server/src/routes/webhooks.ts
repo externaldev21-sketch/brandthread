@@ -50,6 +50,7 @@ import {
   type StripeWebhookClaim,
 } from "../lib/stripeWebhookLedger";
 import { sellerPlanFromStripeLookupKey } from "../lib/stripePlanMapping";
+import { recordDiscountCodeUse } from "../lib/discounts";
 import { splitOrder } from "../lib/money/fees";
 import { fetchChargeDetails, type ChargeDetails } from "../lib/money/stripeMoney";
 import {
@@ -822,6 +823,18 @@ export async function handleCheckoutPaid(
           csRecord.id,
         );
       }
+    }
+
+    // A discount code is consumed only once a paid session has produced a
+    // valid order — same idempotency boundary as the loyalty redemption above.
+    if (csRecord.discountCodeId && oversoldItems.length === 0) {
+      await recordDiscountCodeUse(tx, {
+        discountCodeId: csRecord.discountCodeId,
+        sellerId: ownerId,
+        customerKey: buyerId ?? `guest:${guestEmail}`,
+        orderId: order.id,
+        appliedAmountCents: csRecord.discountCodeAmountCents ?? 0,
+      });
     }
 
     // Record the purchase reward in the same transaction as the confirmed

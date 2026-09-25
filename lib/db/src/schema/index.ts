@@ -506,6 +506,10 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   // The paid-order webhook consumes it atomically with order creation.
   loyaltyToken: text('loyalty_token'),
   loyaltyDiscountCents: integer('loyalty_discount_cents').notNull().default(0),
+  // Seller discount code reserved for this session; consumed atomically with
+  // order creation by the paid-order webhook (see lib/discounts.ts).
+  discountCodeId: text('discount_code_id'),
+  discountCodeAmountCents: integer('discount_code_amount_cents').notNull().default(0),
   // Money decisions fixed when the Stripe session was created.
   chargeModel: text('charge_model'),        // 'destination' | 'held'
   dropId: uuid('drop_id'),                  // server-derived from the products
@@ -1028,19 +1032,40 @@ export const discountCodes = pgTable('discount_codes', {
   id:             text('id').primaryKey().default(''),
   sellerId:       text('seller_id').notNull(),
   code:           text('code').notNull(),
-  /** 'percentage' | 'fixed' | 'free_shipping' */
+  /** 'percentage' | 'fixed' | 'free_shipping' | 'free_item' */
   type:           text('type').notNull().default('percentage'),
-  /** Percentage 0-100, or fixed amount in cents */
+  /** Percentage 0-100, or fixed amount in dollars. Unused for free_shipping/free_item. */
   value:          numeric('value', { precision: 10, scale: 2 }).notNull().default('0'),
   minOrderCents:  integer('min_order_cents').notNull().default(0),
   maxUses:        integer('max_uses'),
   usesCount:      integer('uses_count').notNull().default(0),
   expiresAt:      timestamp('expires_at'),
+  /** 'entire_store' | 'specific_products' */
+  appliesTo:      text('applies_to').notNull().default('entire_store'),
+  /** Product ids the code applies to when appliesTo === 'specific_products' */
+  productIds:     jsonb('product_ids').$type<string[]>().notNull().default([]),
+  oneUsePerCustomer: boolean('one_use_per_customer').notNull().default(false),
+  startsAt:       timestamp('starts_at'),
   active:         boolean('active').notNull().default(true),
   createdAt:      timestamp('created_at').defaultNow().notNull(),
 }, (t) => ({
   sellerIdx: index('discount_codes_seller_idx').on(t.sellerId),
   codeIdx:   index('discount_codes_code_idx').on(t.code),
+}));
+
+/** One real redemption of a discount code — enforces one-use-per-customer and audits usage. */
+export const discountCodeUses = pgTable('discount_code_uses', {
+  id:               uuid('id').primaryKey().defaultRandom(),
+  discountCodeId:   text('discount_code_id').notNull(),
+  sellerId:         text('seller_id').notNull(),
+  /** Buyer clerk id, or "guest:<email>" for guest checkout */
+  customerKey:      text('customer_key').notNull(),
+  orderId:          uuid('order_id'),
+  appliedAmountCents: integer('applied_amount_cents').notNull().default(0),
+  usedAt:           timestamp('used_at').defaultNow().notNull(),
+}, (t) => ({
+  codeIdx: index('discount_code_uses_code_idx').on(t.discountCodeId),
+  customerIdx: index('discount_code_uses_customer_idx').on(t.discountCodeId, t.customerKey),
 }));
 
 // ─── Returns ──────────────────────────────────────────────────────────────────

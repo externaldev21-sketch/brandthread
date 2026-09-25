@@ -31,6 +31,14 @@ vi.mock('react-native', () => {
 
   return {
     ActivityIndicator: nativeComponent('ActivityIndicator'),
+    Animated: {
+      Value: class { _value: number; constructor(v?: number) { this._value = v ?? 0; } setValue(v: number) { this._value = v; } interpolate() { return this._value; } },
+      View: nativeComponent('Animated.View'),
+      timing: () => ({ start: (cb?: (r: { finished: boolean }) => void) => cb?.({ finished: true }) }),
+      spring: () => ({ start: (cb?: (r: { finished: boolean }) => void) => cb?.({ finished: true }) }),
+      loop: () => ({ start: () => {}, stop: () => {} }),
+      sequence: () => ({ start: (cb?: (r: { finished: boolean }) => void) => cb?.({ finished: true }) }),
+    },
     FlatList: (props: {
       data: unknown[];
       renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
@@ -39,11 +47,48 @@ vi.mock('react-native', () => {
       props,
       props.data.map((item, index) => props.renderItem({ item, index })),
     ),
+    Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios },
+    Pressable: (props: Record<string, unknown> & { children?: unknown }) => {
+      const { children, ...rest } = props;
+      return React.createElement(
+        'Pressable',
+        rest,
+        typeof children === 'function' ? (children as (state: { pressed: boolean }) => React.ReactNode)({ pressed: false }) : (children as React.ReactNode),
+      );
+    },
     RefreshControl: nativeComponent('RefreshControl'),
-    StyleSheet: { create: (styles: unknown) => styles },
+    StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1, absoluteFill: {}, flatten: (s: unknown) => s },
+    Switch: nativeComponent('Switch'),
     Text: nativeComponent('Text'),
+    TextInput: nativeComponent('TextInput'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),
     View: nativeComponent('View'),
+    useWindowDimensions: () => ({ width: 375, height: 800 }),
+  };
+});
+
+vi.mock('expo-haptics', () => ({
+  impactAsync: vi.fn().mockResolvedValue(undefined),
+  selectionAsync: vi.fn().mockResolvedValue(undefined),
+  notificationAsync: vi.fn().mockResolvedValue(undefined),
+  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium' },
+  NotificationFeedbackType: { Success: 'success', Error: 'error', Warning: 'warning' },
+}));
+
+vi.mock('expo-linear-gradient', () => ({
+  LinearGradient: (props: Record<string, unknown>) => React.createElement('LinearGradient', props, props.children as React.ReactNode),
+}));
+
+vi.mock('react-native-svg', () => {
+  const nativeComponent = (name: string) => {
+    function MockNativeComponent(props: Record<string, unknown>) {
+      return React.createElement(name, props, props.children as React.ReactNode);
+    }
+    return MockNativeComponent;
+  };
+  return {
+    default: nativeComponent('Svg'),
+    Line: nativeComponent('Line'),
   };
 });
 
@@ -98,25 +143,17 @@ vi.mock('@/lib/networkNotice', () => ({
   reportNetworkError: vi.fn(),
 }));
 
-vi.mock('@/lib/theme', () => ({
-  BG: '#09090b',
-  SCREEN_BG: 'transparent',
-  CARD: '#18181b',
-  CARD_GLASS: 'rgba(18, 18, 31, 0.45)',
-  CARD_ELEVATED_GLASS: 'rgba(24, 24, 46, 0.65)',
-  SURFACE_GLASS: 'rgba(12, 12, 23, 0.65)',
-  SKELETON_GLASS: 'rgba(255,255,255,0.05)',
-  BORDER: '#3f3f46',
-  FG: '#fafafa',
-  MUTED: '#a1a1aa',
-  SUBTLE: '#71717a',
-  ON_DARK: '#ffffff',
-  FONT: { regular: 'System', semibold: 'System', bold: 'System', medium: 'System' },
-  FS: { xs: 12, sm: 14, base: 16, md: 18 },
-  SP: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 },
-  RADIUS: { sm: 8, lg: 16 },
-  ICON: { lg: 24, sm: 16 },
-}));
+vi.mock('@/lib/theme', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/theme')>();
+  return {
+    ...actual,
+    FONT: { regular: 'System', semibold: 'System', bold: 'System', medium: 'System' },
+    FS: { xs: 12, sm: 14, base: 16, md: 18 },
+    SP: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 },
+    RADIUS: { xs: 6, sm: 8, md: 14, lg: 16, xl: 24, pill: 999 },
+    ICON: { xs: 14, sm: 16, md: 20, lg: 24, xl: 28 },
+  };
+});
 
 import SellerInboxScreen from '@/app/seller-inbox';
 import { notifyConversationReadFailure } from '@/lib/conversationReadEvents';

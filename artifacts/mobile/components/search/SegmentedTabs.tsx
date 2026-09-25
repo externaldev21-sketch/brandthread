@@ -1,8 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { FONT, FS } from '@/lib/theme';
+import { hapticToggle } from '@/lib/haptics';
+import { FONT } from '@/lib/theme';
+import { TYPE_SCALE } from '@/constants/typography';
+import { SPACING, SCREEN_GUTTER } from '@/constants/spacing';
+import { RADII } from '@/constants/radii';
 
 export type SearchTabKey = 'top' | 'brands' | 'products' | 'people';
 
@@ -13,7 +16,13 @@ export const SEARCH_TABS: Array<{ key: SearchTabKey; label: string }> = [
   { key: 'people', label: 'People' },
 ];
 
-/** Clean, theme-aware segmented control switching between search result tabs. */
+/**
+ * Segmented control switching between search result tabs. Visually and
+ * motion-aligned to `components/ui/SegmentedControl` (same track/pill radii,
+ * type scale, spacing and selection haptic) — kept as its own lightweight
+ * component rather than the animated-indicator version since these four tabs
+ * are keyed by a fixed string union, not a generic option list.
+ */
 export function SegmentedTabs({
   active,
   onChange,
@@ -31,10 +40,10 @@ export function SegmentedTabs({
         return (
           <TouchableOpacity
             key={tab.key}
-            style={[styles.segment, isActive && { backgroundColor: theme.card }]}
+            style={[styles.segment, isActive && { backgroundColor: theme.accent }]}
             onPress={() => {
               if (isActive) return;
-              Haptics.selectionAsync().catch(() => {});
+              hapticToggle();
               onChange(tab.key);
             }}
             activeOpacity={0.8}
@@ -43,7 +52,15 @@ export function SegmentedTabs({
             accessibilityLabel={`${tab.label} search results`}
             testID={`search-tab-${tab.key}`}
           >
-            <Text style={[styles.label, { color: isActive ? theme.text : theme.muted }]}>{tab.label}</Text>
+            <Text
+              style={[
+                TYPE_SCALE.footnote,
+                { fontFamily: isActive ? FONT.semibold : FONT.medium, color: isActive ? theme.onAccent : theme.muted },
+              ]}
+              numberOfLines={1}
+            >
+              {tab.label}
+            </Text>
           </TouchableOpacity>
         );
       })}
@@ -53,11 +70,12 @@ export function SegmentedTabs({
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   track: {
-    flexDirection: 'row', gap: 4, padding: 4, borderRadius: 14,
-    backgroundColor: theme.surface, marginHorizontal: 16, marginTop: 12, marginBottom: 4,
+    flexDirection: 'row', gap: SPACING.xxs, padding: 3, borderRadius: RADII.pill,
+    backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border,
+    marginHorizontal: SCREEN_GUTTER, marginTop: SPACING.sm, marginBottom: SPACING.xxs,
   },
   segment: {
-    flex: 1, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+    flex: 1, height: 34, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: SPACING.xs,
   },
-  label: { fontSize: FS.sm, fontFamily: FONT.semibold },
 });

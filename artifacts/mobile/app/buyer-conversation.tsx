@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, TextInput,
+  View, Text, FlatList, TextInput,
   KeyboardAvoidingView, Alert, Platform, StyleSheet, Dimensions,
-  ListRenderItemInfo, Modal, ScrollView, ActivityIndicator, Image, Animated,
+  ListRenderItemInfo, Modal, ScrollView, ActivityIndicator, Animated,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { CachedImage } from '@/components/CachedImage';
+import { Snackbar } from '@/components/ui/Snackbar';
+import { hapticPrimaryAction, hapticSuccessAction, hapticSelection, hapticDestructiveConfirm } from '@/lib/haptics';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import {
@@ -474,7 +477,7 @@ export default function BuyerConversationScreen() {
     if (result.canceled || !result.assets.length) return;
     const asset = result.assets[0];
     if ((asset.duration ?? 0) > 60000) { Alert.alert('Video too long', 'Choose a video under 1 minute.'); return; }
-    if (!asset.base64) { Alert.alert('Error', 'Could not read video file.'); return; }
+    if (!asset.base64) { Alert.alert('Couldn’t read that video', 'Please try a different file.'); return; }
     setShowMediaSheet(false);
     setIsUploading(true);
     try {
@@ -556,7 +559,7 @@ export default function BuyerConversationScreen() {
 
   async function handleReact(msg: Message, type: ReactionType) {
     if (!conv) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    hapticSelection();
     try {
       await addReaction(conv.id, msg.id, type);
       const msgs = await getMessages(conv.id);
@@ -567,7 +570,7 @@ export default function BuyerConversationScreen() {
   }
 
   function triggerDoubleTapLike(msg: Message, pageX: number, pageY: number) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    hapticSuccessAction();
     setLikeBurst({ key: Date.now(), x: pageX, y: pageY });
     void handleReact(msg, 'like');
   }
@@ -593,17 +596,17 @@ export default function BuyerConversationScreen() {
       return (
         <View style={s.photoGrid}>
           {uris.slice(0, 4).map((uri, idx) => (
-            <TouchableOpacity
+            <PressableScale
               key={idx}
               style={[s.photoCell, uris.length === 1 && s.photoCellSingle]}
               activeOpacity={0.9}
               onPress={() => setViewerUri(uri)}
             >
-              <Image source={{ uri }} style={s.photoImg} resizeMode="cover" />
+              <CachedImage source={{ uri }} style={s.photoImg} recyclingKey={uri} />
               {idx === 3 && uris.length > 4 && (
                 <View style={s.photoMore}><Text style={s.photoMoreText}>+{uris.length - 4}</Text></View>
               )}
-            </TouchableOpacity>
+            </PressableScale>
           ))}
         </View>
       );
@@ -611,7 +614,7 @@ export default function BuyerConversationScreen() {
     if (att.type === 'video') {
       return (
         <View style={s.videoThumb}>
-          {att.uri ? <Image source={{ uri: att.uri }} style={s.videoThumbImg} resizeMode="cover" /> : null}
+          {att.uri ? <CachedImage source={{ uri: att.uri }} style={s.videoThumbImg} recyclingKey={att.uri} /> : null}
           <View style={s.videoPlayOverlay}><Feather name="play-circle" size={36} color="#fff" /></View>
           {att.meta?.duration ? <View style={s.videoDurBadge}><Text style={s.videoDurText}>{att.meta.duration}s</Text></View> : null}
         </View>
@@ -619,7 +622,7 @@ export default function BuyerConversationScreen() {
     }
     if (att.type === 'voice') {
       return (
-        <TouchableOpacity style={s.voiceRow} activeOpacity={0.8}
+        <PressableScale style={s.voiceRow} activeOpacity={0.8}
           onPress={() => att.uri && handlePlayVoice(att.uri)}>
           <View style={[s.voicePlayBtn, playingVoiceUri === att.uri && s.voicePlayBtnActive]}>
             <Feather name={playingVoiceUri === att.uri ? 'square' : 'play'} size={14} color="#fff" />
@@ -630,12 +633,12 @@ export default function BuyerConversationScreen() {
             ))}
           </View>
           <Text style={s.voiceDur}>{att.meta?.duration ? `${att.meta.duration}s` : '…'}</Text>
-        </TouchableOpacity>
+        </PressableScale>
       );
     }
     // Default: product / order / post / profile card
     return (
-      <TouchableOpacity
+      <PressableScale
         style={s.attachCard}
         activeOpacity={att.type === 'product' || att.type === 'order' || att.type === 'post' ? 0.7 : 1}
         onPress={() => {
@@ -672,7 +675,7 @@ export default function BuyerConversationScreen() {
         {(att.type === 'product' || att.type === 'order' || att.type === 'post') && (
           <Feather name="chevron-right" size={ICON.xs} color={theme.muted} />
         )}
-      </TouchableOpacity>
+      </PressableScale>
     );
   }
 
@@ -797,8 +800,9 @@ export default function BuyerConversationScreen() {
   function sheetCopy() {
     if (activeSheetMsg) {
       Clipboard.setStringAsync(activeSheetMsg.text);
+      hapticPrimaryAction();
       setCopiedToast(true);
-      setTimeout(() => setCopiedToast(false), 1600);
+      setTimeout(() => setCopiedToast(false), 2000);
     }
     closeMessageSheet();
   }
@@ -806,6 +810,7 @@ export default function BuyerConversationScreen() {
   function sheetDelete() {
     const msg = activeSheetMsg;
     closeMessageSheet();
+    hapticDestructiveConfirm();
     if (conv && msg) deleteMessageForMe(conv.id, msg.id).then(() => getMessages(conv.id).then(setMessages));
   }
 
@@ -874,12 +879,15 @@ export default function BuyerConversationScreen() {
 
         <View style={{ maxWidth: BUBBLE_MAX }}>
           {/* Bubble */}
-          <TouchableOpacity
+          <PressableScale
             testID={`conversation-bubble-${msg.id}`}
             activeOpacity={0.88}
             onPress={(e) => handleBubblePress(msg, e)}
-            onLongPress={() => setActiveSheetMsg(msg)}
+            onLongPress={() => { hapticSelection(); setActiveSheetMsg(msg); }}
             delayLongPress={280}
+            accessibilityRole="button"
+            accessibilityLabel={isOwn ? 'Your message' : `Message from ${msg.fromName}`}
+            accessibilityHint="Double tap to like, or touch and hold for more actions"
             style={[
               s.bubble,
               {
@@ -930,22 +938,22 @@ export default function BuyerConversationScreen() {
 
             {/* Failed / retry */}
             {isOwn && msg.status === 'failed' && (
-              <TouchableOpacity
+              <PressableScale
                 onPress={() => conv && retryMessage(conv.id, msg.id)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={s.retryRow}
               >
                 <Feather name="alert-circle" size={11} color={theme.error} />
                 <Text style={[s.retryText, { color: theme.error }]}>Tap to retry</Text>
-              </TouchableOpacity>
+              </PressableScale>
             )}
-          </TouchableOpacity>
+          </PressableScale>
 
           {/* Reaction chip summary */}
           {reactionEntries.length > 0 && (
             <View style={[s.reactionsRow, isOwn ? { alignSelf: 'flex-end' } : { alignSelf: 'flex-start' }]}>
               {reactionEntries.map(([kind, count]) => (
-                <TouchableOpacity
+                <PressableScale
                   key={kind}
                   style={[
                     s.reactionChip,
@@ -959,7 +967,7 @@ export default function BuyerConversationScreen() {
                   <Text style={[s.reactionCount, { color: mine === kind ? theme.accent : theme.muted }]}>
                     {count > 1 ? count : reactionAuthorName(topReactor ?? { fromName: '' }).split(' ')[0]}
                   </Text>
-                </TouchableOpacity>
+                </PressableScale>
               ))}
             </View>
           )}
@@ -1007,66 +1015,81 @@ export default function BuyerConversationScreen() {
       {/* Floating glass header */}
       <View style={[s.headerWrap, { paddingTop: insets.top + SP.sm }]}>
         <View style={s.headerPill}>
-          <TouchableOpacity
-            onPress={() => router.back()}
+          <PressableScale
+            onPress={() => { hapticPrimaryAction(); router.back(); }}
             style={s.roundBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             testID="conversation-back"
+            accessibilityRole="button"
+            accessibilityLabel="Back"
           >
             <Feather name="arrow-left" size={ICON.md} color={theme.text} />
-          </TouchableOpacity>
+          </PressableScale>
 
-          <TouchableOpacity
+          <PressableScale
             style={s.headerCenter}
             activeOpacity={participant ? 0.7 : 1}
             disabled={!participant}
-            onPress={openParticipantProfile}
+            onPress={() => { hapticPrimaryAction(); openParticipantProfile(); }}
+            accessibilityRole="button"
+            accessibilityLabel={`View ${displayName}'s profile`}
           >
             <Text style={s.headerName} numberOfLines={1}>{displayName}</Text>
             {statusLine ? <Text style={s.headerStatusLine} numberOfLines={1}>{statusLine}</Text> : null}
-          </TouchableOpacity>
+          </PressableScale>
 
           {participant && (
-            <TouchableOpacity onPress={openParticipantProfile} testID="conversation-avatar">
+            <PressableScale
+              onPress={() => { hapticPrimaryAction(); openParticipantProfile(); }}
+              testID="conversation-avatar"
+              accessibilityRole="button"
+              accessibilityLabel={`View ${displayName}'s profile`}
+            >
               <View style={[s.headerAvatarCircle, { backgroundColor: participant.color }]}>
                 <Text style={s.headerAvatarInitials}>{participant.initials}</Text>
               </View>
-            </TouchableOpacity>
+            </PressableScale>
           )}
 
           {conv && (
             <>
-              <TouchableOpacity
+              <PressableScale
                 style={s.roundBtn}
-                onPress={() => handleStartCall('voice')}
+                onPress={() => { hapticPrimaryAction(); handleStartCall('voice'); }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 testID="conversation-call-voice"
+                accessibilityRole="button"
+                accessibilityLabel="Voice call"
               >
                 <Feather name="phone" size={ICON.sm} color={theme.muted} />
-              </TouchableOpacity>
-              <TouchableOpacity
+              </PressableScale>
+              <PressableScale
                 style={s.roundBtn}
-                onPress={() => handleStartCall('video')}
+                onPress={() => { hapticPrimaryAction(); handleStartCall('video'); }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 testID="conversation-call-video"
+                accessibilityRole="button"
+                accessibilityLabel="Video call"
               >
                 <Feather name="video" size={ICON.sm} color={theme.muted} />
-              </TouchableOpacity>
+              </PressableScale>
             </>
           )}
-          <TouchableOpacity
+          <PressableScale
             style={s.roundBtn}
-            onPress={openOptions}
+            onPress={() => { hapticPrimaryAction(); openOptions(); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="More options"
           >
             <Feather name="more-horizontal" size={ICON.sm} color={theme.muted} />
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       </View>
 
       {/* Order context card */}
       {conv?.type === 'buyer_to_seller_order' && (
-        <TouchableOpacity
+        <PressableScale
           style={s.orderCard}
           onPress={() => router.push('/(buyer)/orders' as never)}
           activeOpacity={0.8}
@@ -1083,12 +1106,12 @@ export default function BuyerConversationScreen() {
               <Text style={s.orderStatusText}>{conv.contextOrderStatus}</Text>
             </View>
           ) : null}
-        </TouchableOpacity>
+        </PressableScale>
       )}
 
       {/* Product context card — shown for seller product conversations */}
       {conv?.type === 'buyer_to_seller_product' && conv.contextProductName && (
-        <TouchableOpacity
+        <PressableScale
           style={s.orderCard}
           onPress={() => {
             if (participant) {
@@ -1107,7 +1130,7 @@ export default function BuyerConversationScreen() {
           <View style={s.orderStatusBadge}>
             <Text style={s.orderStatusText}>View store</Text>
           </View>
-        </TouchableOpacity>
+        </PressableScale>
       )}
 
       {/* Friendship inactive banner */}
@@ -1156,12 +1179,12 @@ export default function BuyerConversationScreen() {
             <Text style={s.replyFromName}>{replyTo.fromName}</Text>
             <Text style={s.replyPreviewText} numberOfLines={1}>{replyTo.text}</Text>
           </View>
-          <TouchableOpacity
+          <PressableScale
             onPress={() => setReplyTo(null)}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Text style={s.replyClose}>×</Text>
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       )}
 
@@ -1208,28 +1231,32 @@ export default function BuyerConversationScreen() {
                   {selectedAttachment.title}
                 </Text>
               </View>
-              <TouchableOpacity
+              <PressableScale
                 onPress={() => setSelectedAttachment(null)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Remove attachment"
               >
                 <Feather name="x" size={ICON.sm} color={theme.muted} />
-              </TouchableOpacity>
+              </PressableScale>
             </View>
           )}
           <View style={[s.inputRow, { paddingBottom: insets.bottom + SP.sm }]}>
             {/* Attach — photos, video, and (for seller chats) products/posts */}
-            <TouchableOpacity
-              onPress={() => setShowMediaSheet(true)}
+            <PressableScale
+              onPress={() => { hapticPrimaryAction(); setShowMediaSheet(true); }}
               style={s.roundInputBtn}
               disabled={isUploading || isSending}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               testID="conversation-attach"
+              accessibilityRole="button"
+              accessibilityLabel="Attach"
             >
               {isUploading
                 ? <UploadRing size={24} color={theme.accent} />
                 : <Feather name="plus" size={ICON.md} color={theme.muted} />
               }
-            </TouchableOpacity>
+            </PressableScale>
 
             {/* THREAD CASH HOOK POINT: minimal attach entry, OFF by default
                 behind the 'threadCashSend' flag. Rendering a sent Thread Cash
@@ -1248,7 +1275,7 @@ export default function BuyerConversationScreen() {
               style={s.textInput}
               value={text}
               onChangeText={setText}
-              placeholder="Message..."
+              placeholder="Message…"
               placeholderTextColor={theme.muted}
               multiline
               returnKeyType="default"
@@ -1260,15 +1287,17 @@ export default function BuyerConversationScreen() {
                 pointerEvents={showSendButton ? 'none' : 'auto'}
                 style={[StyleSheet.absoluteFill, s.morphFace, { opacity: micOpacity, transform: [{ scale: micScale }] }]}
               >
-                <TouchableOpacity
+                <PressableScale
                   onPressIn={startRecording}
                   onPressOut={stopRecording}
                   disabled={isUploading || isSending}
                   style={s.morphFaceInner}
                   testID="conversation-mic"
+                  accessibilityRole="button"
+                  accessibilityLabel="Record voice message"
                 >
                   <Feather name={isRecording ? 'stop-circle' : 'mic'} size={ICON.md} color={isRecording ? theme.error : theme.muted} />
-                </TouchableOpacity>
+                </PressableScale>
               </Animated.View>
               <Animated.View
                 pointerEvents={showSendButton ? 'auto' : 'none'}
@@ -1277,15 +1306,17 @@ export default function BuyerConversationScreen() {
                   { opacity: sendOpacity, transform: [{ scale: sendScale }], backgroundColor: canSend ? theme.accent : theme.cardElevated },
                 ]}
               >
-                <TouchableOpacity
-                  onPress={handleSend}
+                <PressableScale
+                  onPress={() => { hapticPrimaryAction(); handleSend(); }}
                   disabled={!canSend}
                   style={s.morphFaceInner}
                   activeOpacity={0.8}
                   testID="conversation-send"
+                  accessibilityRole="button"
+                  accessibilityLabel="Send message"
                 >
                   <Feather name="send" size={ICON.sm} color={canSend ? theme.onAccent : theme.muted} />
-                </TouchableOpacity>
+                </PressableScale>
               </Animated.View>
             </View>
           </View>
@@ -1303,32 +1334,32 @@ export default function BuyerConversationScreen() {
         animationType="fade"
         onRequestClose={() => setShowMediaSheet(false)}
       >
-        <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowMediaSheet(false)} />
+        <PressableScale style={s.modalBackdrop} activeOpacity={1} onPress={() => setShowMediaSheet(false)} />
         <SheetRise style={s.mediaSheet}>
           <View style={s.mediaSheetHandle} />
           <Text style={s.mediaSheetTitle}>Add to message</Text>
-          <TouchableOpacity style={s.mediaSheetOption} onPress={handlePickPhoto}>
+          <PressableScale style={s.mediaSheetOption} onPress={handlePickPhoto}>
             <View style={s.mediaSheetIcon}><Feather name="image" size={ICON.md} color={theme.accent} /></View>
             <View>
               <Text style={s.mediaSheetLabel}>Photos</Text>
               <Text style={s.mediaSheetDesc}>Up to 15 at once</Text>
             </View>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.mediaSheetOption} onPress={handlePickVideo}>
+          </PressableScale>
+          <PressableScale style={s.mediaSheetOption} onPress={handlePickVideo}>
             <View style={s.mediaSheetIcon}><Feather name="video" size={ICON.md} color={theme.accent} /></View>
             <View>
               <Text style={s.mediaSheetLabel}>Video clip</Text>
               <Text style={s.mediaSheetDesc}>Under 1 minute</Text>
             </View>
-          </TouchableOpacity>
+          </PressableScale>
           {isSellerConv && (
-            <TouchableOpacity style={s.mediaSheetOption} onPress={openAttachmentPicker}>
+            <PressableScale style={s.mediaSheetOption} onPress={openAttachmentPicker}>
               <View style={s.mediaSheetIcon}><Feather name="shopping-bag" size={ICON.md} color={theme.accent} /></View>
               <View>
                 <Text style={s.mediaSheetLabel}>Product or post</Text>
                 <Text style={s.mediaSheetDesc}>Share from {displayName}'s store</Text>
               </View>
-            </TouchableOpacity>
+            </PressableScale>
           )}
           <View style={{ height: 20 }} />
         </SheetRise>
@@ -1347,15 +1378,15 @@ export default function BuyerConversationScreen() {
                 <Text style={s.pickerTitle}>Attach to message</Text>
                 <Text style={s.pickerSubtitle}>Choose from {displayName}'s store</Text>
               </View>
-              <TouchableOpacity
+              <PressableScale
                 onPress={() => setShowAttachmentPicker(false)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Feather name="x" size={ICON.md} color={theme.muted} />
-              </TouchableOpacity>
+              </PressableScale>
             </View>
             <View style={s.attachmentTabs}>
-              <TouchableOpacity
+              <PressableScale
                 style={[s.attachmentTab, attachmentTab === 'product' && s.attachmentTabActive]}
                 onPress={() => setAttachmentTab('product')}
               >
@@ -1363,8 +1394,8 @@ export default function BuyerConversationScreen() {
                 <Text style={[s.attachmentTabText, attachmentTab === 'product' && s.attachmentTabTextActive]}>
                   Products
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </PressableScale>
+              <PressableScale
                 style={[s.attachmentTab, attachmentTab === 'post' && s.attachmentTabActive]}
                 onPress={() => setAttachmentTab('post')}
               >
@@ -1372,7 +1403,7 @@ export default function BuyerConversationScreen() {
                 <Text style={[s.attachmentTabText, attachmentTab === 'post' && s.attachmentTabTextActive]}>
                   Posts
                 </Text>
-              </TouchableOpacity>
+              </PressableScale>
             </View>
             {attachmentTab === 'product' ? (
               productsLoading ? (
@@ -1397,14 +1428,14 @@ export default function BuyerConversationScreen() {
                       .filter((price) => price > 0);
                     const lowestPriceCents = prices.length > 0 ? Math.min(...prices) : null;
                     return (
-                      <TouchableOpacity
+                      <PressableScale
                         key={product.id}
                         style={s.productOption}
                         onPress={() => pickProduct(product)}
                         activeOpacity={0.75}
                       >
                         {product.images?.[0] ? (
-                          <Image source={{ uri: product.images[0] }} style={s.productThumb} />
+                          <CachedImage source={{ uri: product.images[0] }} style={s.productThumb} recyclingKey={product.id} />
                         ) : (
                           <View style={s.productThumbPlaceholder}>
                             <Feather name="shopping-bag" size={ICON.md} color={theme.accent} />
@@ -1418,7 +1449,7 @@ export default function BuyerConversationScreen() {
                           </Text>
                         </View>
                         <Feather name="plus-circle" size={ICON.md} color={theme.accent} />
-                      </TouchableOpacity>
+                      </PressableScale>
                     );
                   })}
                 </ScrollView>
@@ -1441,14 +1472,14 @@ export default function BuyerConversationScreen() {
                   keyboardShouldPersistTaps="handled"
                 >
                   {sellerPosts.map((post) => (
-                    <TouchableOpacity
+                    <PressableScale
                       key={post.id}
                       style={s.productOption}
                       onPress={() => pickPost(post)}
                       activeOpacity={0.75}
                     >
                       {post.mediaUrl ? (
-                        <Image source={{ uri: post.mediaUrl }} style={s.productThumb} />
+                        <CachedImage source={{ uri: post.mediaUrl }} style={s.productThumb} recyclingKey={post.id} />
                       ) : (
                         <View style={s.productThumbPlaceholder}>
                           <Feather name="image" size={ICON.md} color={theme.accent} />
@@ -1463,7 +1494,7 @@ export default function BuyerConversationScreen() {
                         </Text>
                       </View>
                       <Feather name="plus-circle" size={ICON.md} color={theme.accent} />
-                    </TouchableOpacity>
+                    </PressableScale>
                   ))}
                 </ScrollView>
               )
@@ -1479,7 +1510,7 @@ export default function BuyerConversationScreen() {
         animationType="fade"
         onRequestClose={closeMessageSheet}
       >
-        <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={closeMessageSheet} />
+        <PressableScale style={s.modalBackdrop} activeOpacity={1} onPress={closeMessageSheet} />
         <SheetRise style={s.reactionSheet}>
           <View style={s.mediaSheetHandle} />
           <ReactionChipsRow
@@ -1491,24 +1522,24 @@ export default function BuyerConversationScreen() {
             }}
           />
           <View style={s.sheetDivider} />
-          <TouchableOpacity style={s.sheetAction} onPress={sheetReply}>
+          <PressableScale style={s.sheetAction} onPress={sheetReply}>
             <Feather name="corner-up-left" size={ICON.sm} color={theme.text} />
             <Text style={s.sheetActionText}>Reply</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.sheetAction} onPress={sheetCopy}>
+          </PressableScale>
+          <PressableScale style={s.sheetAction} onPress={sheetCopy}>
             <Feather name="copy" size={ICON.sm} color={theme.text} />
             <Text style={s.sheetActionText}>Copy</Text>
-          </TouchableOpacity>
+          </PressableScale>
           {isOwnSheetMsg ? (
-            <TouchableOpacity style={s.sheetAction} onPress={sheetDelete}>
+            <PressableScale style={s.sheetAction} onPress={sheetDelete}>
               <Feather name="trash-2" size={ICON.sm} color={theme.error} />
               <Text style={[s.sheetActionText, { color: theme.error }]}>Delete for me</Text>
-            </TouchableOpacity>
+            </PressableScale>
           ) : (
-            <TouchableOpacity style={s.sheetAction} onPress={sheetReport}>
+            <PressableScale style={s.sheetAction} onPress={sheetReport}>
               <Feather name="flag" size={ICON.sm} color={theme.error} />
               <Text style={[s.sheetActionText, { color: theme.error }]}>Report message</Text>
-            </TouchableOpacity>
+            </PressableScale>
           )}
           <View style={{ height: 12 }} />
         </SheetRise>
@@ -1516,11 +1547,11 @@ export default function BuyerConversationScreen() {
 
       <MediaViewer visible={viewerUri != null} uri={viewerUri} onClose={() => setViewerUri(null)} />
 
-      {copiedToast && (
-        <View pointerEvents="none" style={s.copiedToast} accessibilityLiveRegion="polite">
-          <Text style={s.copiedToastText}>Copied</Text>
-        </View>
-      )}
+      <Snackbar
+        visible={copiedToast}
+        message="Copied"
+        onDismiss={() => setCopiedToast(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -1824,23 +1855,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   msgText: {
     fontSize: FS.base,
     fontFamily: FONT.regular,
-  },
-
-  copiedToast: {
-    position: 'absolute',
-    alignSelf: 'center',
-    bottom: 96,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-    borderRadius: RADIUS.pill,
-    backgroundColor: theme.cardElevated,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  copiedToastText: {
-    fontSize: FS.sm,
-    fontFamily: FONT.semibold,
-    color: theme.text,
   },
 
   // Quoted reply snippet

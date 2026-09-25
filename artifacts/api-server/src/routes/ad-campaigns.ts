@@ -27,6 +27,7 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db, adCampaigns, products } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
+import { requirePermission } from "../middlewares/requireRole";
 import { requireStripe } from "../lib/stripe";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { isAllowedBrandthreadCallbackUrl } from "../lib/brandthreadCallbackUrls";
@@ -124,7 +125,7 @@ async function findOwnedCampaign(id: string, owner: string) {
 
 // ─── POST /api/ad-campaigns — create draft ────────────────────────────────────
 
-router.post("/", express.json({ limit: "32kb" }), async (req, res) => {
+router.post("/", requirePermission("marketing"), express.json({ limit: "32kb" }), async (req, res) => {
   const owner = sellerId(req);
   const draft = await db
     .insert(adCampaigns)
@@ -158,7 +159,7 @@ router.get("/:id", async (req, res) => {
 
 // ─── PATCH /api/ad-campaigns/:id — update draft ───────────────────────────────
 
-router.patch("/:id", express.json({ limit: "32kb" }), async (req, res) => {
+router.patch("/:id", requirePermission("marketing"), express.json({ limit: "32kb" }), async (req, res) => {
   const owner = sellerId(req);
   const campaign = await findOwnedCampaign(req.params.id, owner);
   if (!campaign) return res.status(404).json({ error: "Campaign not found" });
@@ -261,7 +262,7 @@ router.patch("/:id", express.json({ limit: "32kb" }), async (req, res) => {
 
 // ─── DELETE /api/ad-campaigns/:id — cancel ────────────────────────────────────
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requirePermission("marketing"), async (req, res) => {
   const owner = sellerId(req);
   const campaign = await findOwnedCampaign(req.params.id, owner);
   if (!campaign) return res.status(404).json({ error: "Campaign not found" });
@@ -282,7 +283,7 @@ router.delete("/:id", async (req, res) => {
 
 // ─── POST /api/ad-campaigns/:id/media — upload one file ───────────────────────
 
-router.post("/:id/media", async (req, res) => {
+router.post("/:id/media", requirePermission("marketing"), async (req, res) => {
   const owner = sellerId(req);
   const campaign = await findOwnedCampaign(req.params.id, owner);
   if (!campaign) return res.status(404).json({ error: "Campaign not found" });
@@ -381,7 +382,7 @@ router.post("/:id/media", async (req, res) => {
 
 // ─── DELETE /api/ad-campaigns/:id/media/:index ───────────────────────────────
 
-router.delete("/:id/media/:index", async (req, res) => {
+router.delete("/:id/media/:index", requirePermission("marketing"), async (req, res) => {
   const owner = sellerId(req);
   const campaign = await findOwnedCampaign(req.params.id, owner);
   if (!campaign) return res.status(404).json({ error: "Campaign not found" });
@@ -415,7 +416,7 @@ router.delete("/:id/media/:index", async (req, res) => {
 
 // ─── POST /api/ad-campaigns/:id/reorder-media ────────────────────────────────
 
-router.post("/:id/reorder-media", express.json({ limit: "4kb" }), async (req, res) => {
+router.post("/:id/reorder-media", requirePermission("marketing"), express.json({ limit: "4kb" }), async (req, res) => {
   const owner = sellerId(req);
   const campaign = await findOwnedCampaign(req.params.id, owner);
   if (!campaign) return res.status(404).json({ error: "Campaign not found" });
@@ -451,7 +452,7 @@ router.post("/:id/reorder-media", express.json({ limit: "4kb" }), async (req, re
 //   A still-open session is reused so retries never create duplicate charges.
 //   Campaign stays pending_payment until /pay/verify or webhook confirms paid.
 
-router.post("/:id/pay", express.json({ limit: "4kb" }), async (req, res) => {
+router.post("/:id/pay", requirePermission("marketing"), express.json({ limit: "4kb" }), async (req, res) => {
   try {
     const owner = sellerId(req);
     const campaign = await findOwnedCampaign(req.params.id, owner);

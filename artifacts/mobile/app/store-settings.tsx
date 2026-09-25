@@ -2,18 +2,19 @@ import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, TextInput,
-  StyleSheet, Alert, TouchableOpacity,
+  StyleSheet, Alert,
 } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
-import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
+import { useFocusEffect } from 'expo-router';
 import {
   SUCCESS, BLUE, ORANGE, RED,
-  FONT, FS, SP, RADIUS, ICON,
+  FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import {
-  BrandthreadCard, PrimaryButton, SectionHeader, FilterChip, HapticSwitch,
+  BrandthreadCard, PrimaryButton, SectionHeader, FilterChip, PressableScale,
 } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { ListRow } from '@/components/ui/ListRow';
+import { hapticToggle } from '@/lib/haptics';
 import { getStorefront, updateSettings } from '@/services/storeService';
 import { Storefront, StoreSettings, StorePublishStatus } from '@/services/storeTypes';
 
@@ -60,8 +61,6 @@ function langLabel(code: string): string {
 export default function StoreSettingsScreen() {
   const colors = useColors();
   const ss = React.useMemo(() => makeStyles(colors), [colors]);
-  const router = useRouter();
-  const headerTopInset = useHeaderTopInset();
   const [form, setForm] = useState<StoreSettings>({
     storeName: '',
     storeUrl: '',
@@ -103,20 +102,19 @@ export default function StoreSettingsScreen() {
 
   return (
     <View style={ss.root}>
-      {/* Header */}
-      <View style={[ss.header, { paddingTop: headerTopInset + SP.sm }]}>
-        <TouchableOpacity onPress={() => router.back()} style={ss.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Feather name="arrow-left" size={ICON.md} color={colors.foreground} />
-        </TouchableOpacity>
-        <Text style={ss.headerTitle}>Store Settings</Text>
-        <PrimaryButton
-          label={saving ? 'Saving...' : 'Save'}
-          onPress={handleSave}
-          loading={saving}
-          small
-          style={{ minWidth: 72 }}
-        />
-      </View>
+      <ScreenHeader
+        title="Store Settings"
+        variant="push"
+        rightElement={(
+          <PrimaryButton
+            label={saving ? 'Saving...' : 'Save'}
+            onPress={handleSave}
+            loading={saving}
+            small
+            style={{ minWidth: 72 }}
+          />
+        )}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={ss.scroll}>
 
@@ -224,13 +222,19 @@ export default function StoreSettingsScreen() {
               const isActive = form.storeStatus === opt.value;
               const chipColor = statusColor(opt.value, colors.mutedForeground);
               return (
-                <TouchableOpacity
+                <PressableScale
                   key={opt.value}
-                  onPress={() => patch({ storeStatus: opt.value, passwordProtected: opt.value === 'password_protected' })}
+                  onPress={() => {
+                    hapticToggle();
+                    patch({ storeStatus: opt.value, passwordProtected: opt.value === 'password_protected' });
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={opt.label}
+                  accessibilityState={{ selected: isActive }}
                   style={[ss.statusChip, isActive && { borderColor: chipColor, backgroundColor: chipColor + '20' }]}
                 >
                   <Text style={[ss.statusChipLabel, { color: isActive ? chipColor : colors.mutedForeground }]}>{opt.label}</Text>
-                </TouchableOpacity>
+                </PressableScale>
               );
             })}
           </View>
@@ -255,8 +259,6 @@ export default function StoreSettingsScreen() {
         <SectionHeader title="CHECKOUT & ACCOUNTS" style={ss.sectionHeader} />
         <BrandthreadCard style={ss.card}>
           <SwitchRow
-            ss={ss}
-            colors={colors}
             label="Require Account"
             description="Buyers must create an account to check out"
             value={form.checkoutRequireAccount}
@@ -264,8 +266,6 @@ export default function StoreSettingsScreen() {
           />
           <View style={ss.divider} />
           <SwitchRow
-            ss={ss}
-            colors={colors}
             label="Guest Checkout"
             description="Allow guest checkout"
             value={form.checkoutGuestAllowed}
@@ -273,8 +273,6 @@ export default function StoreSettingsScreen() {
           />
           <View style={ss.divider} />
           <SwitchRow
-            ss={ss}
-            colors={colors}
             label="Order Notifications"
             description="Email seller on new orders"
             value={form.orderNotifications}
@@ -282,8 +280,6 @@ export default function StoreSettingsScreen() {
           />
           <View style={ss.divider} />
           <SwitchRow
-            ss={ss}
-            colors={colors}
             label="Analytics"
             description="Enable analytics tracking"
             value={form.analyticsEnabled}
@@ -306,40 +302,22 @@ function FieldRow({ ss, label, children }: { ss: ReturnType<typeof makeStyles>; 
   );
 }
 
-function SwitchRow({ ss, colors, label, description, value, onValueChange }: {
-  ss: ReturnType<typeof makeStyles>; colors: Colors;
+function SwitchRow({ label, description, value, onValueChange }: {
   label: string; description: string; value: boolean; onValueChange: (v: boolean) => void;
 }) {
   return (
-    <View style={ss.switchRow}>
-      <View style={{ flex: 1 }}>
-        <Text style={ss.switchLabel}>{label}</Text>
-        <Text style={ss.switchDesc}>{description}</Text>
-      </View>
-      <HapticSwitch
-        value={value}
-        onValueChange={onValueChange}
-        trackColor={{ false: colors.border, true: colors.primary }}
-        thumbColor={colors.background}
-      />
-    </View>
+    <ListRow
+      title={label}
+      subtitle={description}
+      toggle={{ value, onChange: onValueChange }}
+      style={{ minHeight: 48 }}
+    />
   );
 }
 
 function makeStyles(colors: Colors) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: 'transparent' },
-    header: {
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-      paddingHorizontal: SP.md, paddingVertical: SP.sm,
-      borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
-    },
-    backBtn: {
-      width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: colors.card,
-      borderWidth: 1, borderColor: colors.border,
-      alignItems: 'center', justifyContent: 'center',
-    },
-    headerTitle: { fontSize: FS.xl, lineHeight: 27, fontFamily: FONT.bold, color: colors.foreground, flex: 1, marginLeft: SP.sm },
     scroll: { paddingBottom: 60 },
     sectionHeader: { marginTop: SP.lg, marginBottom: SP.sm },
     card: { marginHorizontal: SP.md, gap: SP.md },
@@ -362,9 +340,6 @@ function makeStyles(colors: Colors) {
       minHeight: 30, justifyContent: 'center',
     },
     statusChipLabel: { fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.medium },
-    switchRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, minHeight: 48 },
-    switchLabel: { fontSize: FS.base, lineHeight: 19, fontFamily: FONT.semibold, color: colors.foreground },
-    switchDesc: { fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
     saveBtn: { marginHorizontal: SP.md, marginTop: SP.lg },
   });
 }

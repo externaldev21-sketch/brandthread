@@ -1,19 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import {
-  BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM,
-  ON_DARK, FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useColors } from '@/hooks/useColors';
 import { useApi } from '@/lib/api';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { Button, Card, ListRow, StickyBottomCTA } from '@/components/ui';
+import { hapticError, hapticSuccess, hapticToggle } from '@/lib/haptics';
+import { TYPE_SCALE } from '@/constants/typography';
+import { SPACING } from '@/constants/spacing';
 
 type DataCategory = { key: string; label: string; sub: string; icon: keyof typeof Feather.glyphMap; selected: boolean };
 
@@ -25,10 +23,9 @@ const DEFAULT_CATEGORIES: DataCategory[] = [
 
 export default function BuyerDownloadData() {
   const { theme } = useAppTheme();
-  const PURPLE = theme.accent;
-  const s = makeStyles();
+  const palette = useColors();
+  const s = makeStyles(palette);
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const api = useApi();
   const [requested, setRequested] = useState(false);
   const [requestedAt, setRequestedAt] = useState<string | null>(null);
@@ -36,7 +33,7 @@ export default function BuyerDownloadData() {
   const [loading, setLoading] = useState(false);
 
   function toggleCat(key: string) {
-    Haptics.selectionAsync();
+    hapticToggle();
     setCategories(prev => prev.map(c => c.key === key ? { ...c, selected: !c.selected } : c));
   }
 
@@ -56,11 +53,11 @@ export default function BuyerDownloadData() {
       } else {
         Alert.alert('Export ready', 'Your data is ready. Save it or send it anywhere.');
       }
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      hapticSuccess();
       setRequestedAt(data.exportedAt);
       setRequested(true);
     } catch (err: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      hapticError();
       Alert.alert('Export failed', "Couldn't prepare your data. Try again.");
     } finally {
       setLoading(false);
@@ -75,20 +72,18 @@ export default function BuyerDownloadData() {
 
   return (
     <View style={s.page}>
-      <Header title="Download your data" />
+      <ScreenHeader title="Download your data" />
 
-      <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 100 }}>
+      <ScrollView contentContainerStyle={{ padding: SPACING.md, paddingBottom: insets.bottom + (requested ? 40 : 120) }}>
         {requested ? (
           <View style={s.successCard}>
-            <Feather name="check-circle" size={40} color={SUCCESS} />
+            <Feather name="check-circle" size={40} color={theme.success} />
             <Text style={s.successTitle}>Export ready</Text>
             {formattedDate && <Text style={s.successDate}>Generated {formattedDate}</Text>}
             <Text style={s.successDesc}>
               Your data is ready. Save it or send it anywhere.
             </Text>
-            <TouchableOpacity onPress={() => setRequested(false)} style={s.againBtn}>
-              <Text style={[s.againText, { color: PURPLE }]}>Generate another export</Text>
-            </TouchableOpacity>
+            <Button label="Generate another export" onPress={() => setRequested(false)} variant="tertiary" size="small" style={s.againBtn} />
           </View>
         ) : (
           <>
@@ -97,29 +92,23 @@ export default function BuyerDownloadData() {
             </Text>
 
             <Text style={s.groupLabel}>Select what to include</Text>
-            <View style={s.card}>
+            <Card style={s.card}>
               {categories.map((cat, i) => (
                 <React.Fragment key={cat.key}>
-                  <TouchableOpacity style={s.row} onPress={() => toggleCat(cat.key)} activeOpacity={0.7}>
-                    <Feather name={cat.icon} size={19} color={PURPLE} style={{ width: 28 }} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.label}>{cat.label}</Text>
-                      <Text style={s.sub}>{cat.sub}</Text>
-                    </View>
-                    <Switch
-                      value={cat.selected}
-                      onValueChange={() => toggleCat(cat.key)}
-                      trackColor={{ false: CARD_ELEVATED, true: PURPLE }}
-                      thumbColor={theme.onAccent}
-                    />
-                  </TouchableOpacity>
+                  <ListRow
+                    icon={cat.icon}
+                    title={cat.label}
+                    subtitle={cat.sub}
+                    toggle={{ value: cat.selected, onChange: () => toggleCat(cat.key) }}
+                    onPress={() => toggleCat(cat.key)}
+                  />
                   {i < categories.length - 1 && <View style={s.divider} />}
                 </React.Fragment>
               ))}
-            </View>
+            </Card>
 
             <View style={s.note}>
-              <Feather name="info" size={14} color={MUTED} />
+              <Feather name="info" size={14} color={palette.mutedForeground} />
               <Text style={s.noteText}>
                 Only records your account owns are included.
               </Text>
@@ -129,46 +118,31 @@ export default function BuyerDownloadData() {
       </ScrollView>
 
       {!requested && (
-        <View style={[s.footer, { paddingBottom: insets.bottom + SP.md }]}>
-          <Text style={s.footerCount}>{selectedCount} of {categories.length} categories selected</Text>
-          <TouchableOpacity
-            onPress={handleRequest}
-            disabled={loading || selectedCount === 0}
-            activeOpacity={selectedCount > 0 && !loading ? 0.85 : 1}
-            style={{ opacity: selectedCount > 0 ? 1 : 0.4 }}
-          >
-            <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.requestBtn}>
-              {loading ? <ActivityIndicator color={theme.onAccent} size="small" /> : <Feather name="download" size={18} color={theme.onAccent} />}
-              <Text style={[s.requestBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
-                {loading ? 'Generating…' : 'Download'}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
+        <StickyBottomCTA
+          label={loading ? 'Generating…' : 'Download'}
+          icon={loading ? undefined : 'download'}
+          onPress={() => { void handleRequest(); }}
+          loading={loading}
+          disabled={selectedCount === 0}
+          header={<Text style={s.footerCount}>{selectedCount} of {categories.length} categories selected</Text>}
+        />
       )}
     </View>
   );
 }
 
-const makeStyles = () => StyleSheet.create({
+const makeStyles = (palette: ReturnType<typeof useColors>) => StyleSheet.create({
   page: { flex: 1, backgroundColor: 'transparent' },
-  intro: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 18, marginBottom: SP.md },
-  groupLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SP.sm },
-  card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden', marginBottom: SP.md },
-  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: 14, gap: 12 },
-  divider: { height: 1, backgroundColor: BORDER, marginLeft: SP.md },
-  label: { fontFamily: FONT.medium, fontSize: FS.base, color: FG },
-  sub: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
-  note: { flexDirection: 'row', gap: 8, padding: SP.sm, backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, alignItems: 'flex-start' },
-  noteText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, lineHeight: 17 },
-  footer: { paddingHorizontal: SP.md, paddingTop: SP.sm, borderTopWidth: 1, borderTopColor: BORDER, gap: SP.sm },
-  footerCount: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, textAlign: 'center' },
-  requestBtn: { height: 50, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: SP.sm },
-  requestBtnText: { fontFamily: FONT.bold, fontSize: FS.base, color: ON_DARK },
-  successCard: { alignItems: 'center', paddingVertical: SP.xxl, gap: SP.md },
-  successTitle: { fontFamily: FONT.bold, fontSize: FS.lg, color: FG },
-  successDate: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
-  successDesc: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', lineHeight: 20, maxWidth: 300 },
-  againBtn: { paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  againText: { fontFamily: FONT.semibold, fontSize: FS.sm },
+  intro: { ...TYPE_SCALE.footnote, color: palette.mutedForeground, lineHeight: 18, marginBottom: SPACING.md },
+  groupLabel: { ...TYPE_SCALE.caption, color: palette.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SPACING.xs },
+  card: { padding: 0, overflow: 'hidden', marginBottom: SPACING.md },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: palette.border, marginLeft: SPACING.md + 32 + SPACING.sm },
+  note: { flexDirection: 'row', gap: 8, padding: SPACING.sm, backgroundColor: palette.card, borderRadius: 12, borderWidth: 1, borderColor: palette.border, alignItems: 'flex-start' },
+  noteText: { flex: 1, ...TYPE_SCALE.footnote, color: palette.mutedForeground, lineHeight: 17 },
+  footerCount: { ...TYPE_SCALE.caption, color: palette.mutedForeground, textAlign: 'center' },
+  successCard: { alignItems: 'center', paddingVertical: SPACING.xxl, gap: SPACING.md },
+  successTitle: { ...TYPE_SCALE.title2, color: palette.foreground },
+  successDate: { ...TYPE_SCALE.footnote, color: palette.mutedForeground },
+  successDesc: { ...TYPE_SCALE.callout, color: palette.mutedForeground, textAlign: 'center', lineHeight: 20, maxWidth: 300 },
+  againBtn: { marginTop: SPACING.xs },
 });

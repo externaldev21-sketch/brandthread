@@ -19,12 +19,36 @@ import {
   ShippingRate, DEMO_CARRIER_RATES, PAYOUT_MILESTONES,
 } from './orderTypes';
 
-// ─── Storage keys ─────────────────────────────────────────────────────────────
+// ─── Storage keys (scoped by user ID so two accounts never share storage) ─────
 
-const KEYS = {
-  orders:  'orders:v1',
-  buyer:   'buyer_orders:v1',
-};
+/** Legacy, unscoped keys from before per-account scoping. Migrated once into
+ *  the first user to initialize the service on a given device, then removed
+ *  so they can never leak into a different account afterward. */
+const LEGACY_ORDERS_KEY = 'orders:v1';
+const LEGACY_BUYER_ORDERS_KEY = 'buyer_orders:v1';
+
+/** Set by initOrderService() after sign-in. Falls back to 'anon' so the
+ *  service is safe to call before the user ID is available. */
+let _orderUserId = 'anon';
+
+/** Call once after Clerk resolves the current user ID (and again on sign-out
+ *  with null, or when the signed-in user changes) so a different account
+ *  never reads/writes the previous account's cached orders. */
+export function initOrderService(userId: string | null): void {
+  const newUserId = userId ?? 'anon';
+  if (newUserId === _orderUserId) return;
+  _orderUserId = newUserId;
+  _initialized = false;
+  _orders = [];
+  _buyerOrders = [];
+}
+
+function orderKeys(uid = _orderUserId) {
+  return {
+    orders:   `orders:${uid}:v1`,
+    migrated: `orders:migration_v2_scoped:${uid}`,
+  };
+}
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
@@ -107,23 +131,52 @@ let _initialized = false;
 let _orders: Order[] = [];
 let _buyerOrders: BuyerOrderView[] = [];
 
+/** Move data written before per-account scoping existed into the first
+ *  account that initializes on this device, then delete the legacy keys so
+ *  they can never be picked up by a second account later. */
+async function migrateLegacyOrders(uid: string, k: ReturnType<typeof orderKeys>): Promise<void> {
+  const already = await AsyncStorage.getItem(k.migrated).catch(() => null);
+  if (already) return;
+  try {
+    const [existingScoped, legacyOrders, legacyBuyerOrders] = await Promise.all([
+      AsyncStorage.getItem(k.orders),
+      AsyncStorage.getItem(LEGACY_ORDERS_KEY),
+      AsyncStorage.getItem(LEGACY_BUYER_ORDERS_KEY),
+    ]);
+    if (!existingScoped && legacyOrders) {
+      await AsyncStorage.setItem(k.orders, legacyOrders);
+    }
+    if (legacyBuyerOrders) {
+      const existingScopedBuyer = await AsyncStorage.getItem(buyerOrdersCacheKey(uid));
+      if (!existingScopedBuyer) await AsyncStorage.setItem(buyerOrdersCacheKey(uid), legacyBuyerOrders);
+    }
+    await AsyncStorage.multiRemove([LEGACY_ORDERS_KEY, LEGACY_BUYER_ORDERS_KEY]);
+  } catch { /* non-fatal — worst case the legacy data is left in place */ }
+  await AsyncStorage.setItem(k.migrated, '1').catch(() => {});
+}
+
 async function ensureInitialized() {
   if (_initialized) return;
-  _initialized = true;
+  const uid = _orderUserId;
+  const k = orderKeys(uid);
+  await migrateLegacyOrders(uid, k);
+  // An init() call (account switch) may have landed while the migration was
+  // in flight. Never hydrate a different account's data into the active one.
+  if (_orderUserId !== uid) return;
   try {
-    const [[, raw], [, rawBuyer]] = await AsyncStorage.multiGet([KEYS.orders, KEYS.buyer]);
+    const [[, raw], [, rawBuyer]] = await AsyncStorage.multiGet([k.orders, buyerOrdersCacheKey(uid)]);
     _orders = raw ? JSON.parse(raw) : [];
     _buyerOrders = rawBuyer ? JSON.parse(rawBuyer) : [];
-    if (!raw) await AsyncStorage.setItem(KEYS.orders, JSON.stringify([]));
-    if (!rawBuyer) await AsyncStorage.setItem(KEYS.buyer, JSON.stringify(_buyerOrders));
+    if (!raw) await AsyncStorage.setItem(k.orders, JSON.stringify([]));
   } catch {
     _orders = [];
     _buyerOrders = [];
   }
+  if (_orderUserId === uid) _initialized = true;
 }
 
 async function persistOrders() {
-  await AsyncStorage.setItem(KEYS.orders, JSON.stringify(_orders));
+  await AsyncStorage.setItem(orderKeys().orders, JSON.stringify(_orders));
 }
 
 function addTimeline(order: Order, type: OrderTimelineEvent['type'], message: string, customerVisible = false) {
