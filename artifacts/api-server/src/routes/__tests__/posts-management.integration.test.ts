@@ -330,6 +330,20 @@ describe("seller post management", () => {
     })).status).toBe(403);
     expect((await request(`/api/posts/${repostRestricted.body.id}`)).body.likeCount).toBeNull();
 
+    // "Not interested" (feed's non-idempotent recording types) succeeds on a
+    // visible post and is rejected the same way as any other interaction on
+    // a draft/private one.
+    const notInterested = await request(`/api/posts/${published.body.id}/interact`, {
+      method: "POST",
+      body: JSON.stringify({ type: "not_interested" }),
+    });
+    expect(notInterested.status).toBe(200);
+    expect(notInterested.body.action).toBe("recorded");
+    expect((await request(`/api/posts/${draft.body.id}/interact`, {
+      method: "POST",
+      body: JSON.stringify({ type: "not_interested" }),
+    })).status).toBe(404);
+
     const publicSeller = await request(`/api/public/sellers/${sellerA}`);
     expect(publicSeller.status).toBe(200);
     expect(publicSeller.body.posts.map((post: any) => post.id)).toEqual([
