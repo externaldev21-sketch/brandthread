@@ -32,14 +32,16 @@ const VIEWPORTS = [
 
 const SCREENS = [
   { id: 'buyer-feed', role: 'buyer', path: '/(buyer)', ready: 'Drop 04 is live' },
-  { id: 'seller-dashboard', role: 'seller', path: '/(tabs)', ready: '$1,842.50' },
+  { id: 'payouts', role: 'seller', path: '/payouts', ready: '$1,842.50' },
   { id: 'manufacturer-hub', role: 'seller', path: '/manufacturer-hub', ready: 'Porto Knit Collective' },
   { id: 'seller-settings', role: 'seller', path: '/seller-settings', ready: 'Settings' },
 ];
 
 async function main() {
-  console.log('Building preview web export...');
-  buildPreviewWeb();
+  if (!process.argv.includes('--skip-build')) {
+    console.log('Building preview web export...');
+    buildPreviewWeb();
+  }
   const { origin, close } = await serveBuild(DEFAULT_BUILD_DIR);
   const browser = await launchBrowser();
   const images = await ensureDemoImages(browser, path.join(WORK_DIR, 'demo-images'));
