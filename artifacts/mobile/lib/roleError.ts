@@ -8,22 +8,29 @@
 
 import { ApiError } from '@/lib/networkNotice';
 
-export type TeamRole = 'owner' | 'manager' | 'staff';
+export type TeamRole = 'owner' | 'admin' | 'manager' | 'finance' | 'orders' | 'marketing' | 'staff' | 'viewer';
 
 export interface RoleError {
-  code: 'ROLE_REQUIRED';
+  code: 'ROLE_REQUIRED' | 'PERMISSION_REQUIRED';
   requiredRole: string;
   currentRole: string;
   message: string;
 }
 
+const TEAM_ROLES: readonly TeamRole[] = ['owner', 'admin', 'manager', 'finance', 'orders', 'marketing', 'staff', 'viewer'];
+
 export function isTeamRole(role: unknown): role is TeamRole {
-  return role === 'owner' || role === 'manager' || role === 'staff';
+  return typeof role === 'string' && (TEAM_ROLES as readonly string[]).includes(role);
 }
 
 /** Managers can inspect billing data but cannot change owner-only settings. */
 export function isManagerRole(role?: string | null): boolean {
   return role === 'manager';
+}
+
+/** Owner, admin and finance roles all satisfy the server's "payouts" permission (requirePermission("payouts")). */
+export function hasPayoutsAccess(role?: string | null): boolean {
+  return role === 'owner' || role === 'admin' || role === 'finance';
 }
 
 function toRoleError(value: unknown): RoleError | null {
@@ -32,18 +39,20 @@ function toRoleError(value: unknown): RoleError | null {
   const body = payload.error && typeof payload.error === 'object'
     ? payload.error as Record<string, unknown>
     : payload;
-  if (body.code !== 'ROLE_REQUIRED') return null;
+  if (body.code !== 'ROLE_REQUIRED' && body.code !== 'PERMISSION_REQUIRED') return null;
 
   const details = body.details && typeof body.details === 'object'
     ? body.details as Record<string, unknown>
     : {};
   return {
-    code: 'ROLE_REQUIRED',
+    code: body.code as 'ROLE_REQUIRED' | 'PERMISSION_REQUIRED',
     requiredRole: typeof body.requiredRole === 'string'
       ? body.requiredRole
-      : typeof details.requiredRole === 'string'
-        ? details.requiredRole
-        : 'owner',
+      : typeof body.requiredPermission === 'string'
+        ? body.requiredPermission
+        : typeof details.requiredRole === 'string'
+          ? details.requiredRole
+          : 'owner',
     currentRole: typeof body.currentRole === 'string'
       ? body.currentRole
       : typeof details.currentRole === 'string'
@@ -63,7 +72,7 @@ export function parseRoleError(err: unknown): RoleError | null {
   if (!(err instanceof Error)) return null;
 
   if (err instanceof ApiError) {
-    if (err.status !== 403 || err.code !== 'ROLE_REQUIRED') return null;
+    if (err.status !== 403 || (err.code !== 'ROLE_REQUIRED' && err.code !== 'PERMISSION_REQUIRED')) return null;
     try {
       return toRoleError(JSON.parse(err.body));
     } catch {
