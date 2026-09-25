@@ -158,8 +158,10 @@ export function ProfileStatsRow({ stats, loading }: { stats: ProfileStat[]; load
         return (
           <React.Fragment key={stat.key}>
             {index > 0 ? <View style={[styles.statDivider, { backgroundColor: theme.border }]} /> : null}
+            {/* Every cell has the same wrapper + inner box so values and labels
+                sit on one baseline whether or not the stat is tappable. */}
             {stat.onPress ? (
-              <View style={styles.flexCell}>
+              <View style={styles.statSlot}>
                 <PressableScale
                   style={styles.statCell}
                   onPress={() => { hapticSelection(); stat.onPress?.(); }}
@@ -176,13 +178,15 @@ export function ProfileStatsRow({ stats, loading }: { stats: ProfileStat[]; load
                 </PressableScale>
               </View>
             ) : (
-              <View
-                style={[styles.flexCell, styles.statCell]}
-                accessible
-                accessibilityLabel={stat.accessibilityLabel ?? `${stat.value} ${stat.label}`}
-                testID={`profile-stat-${stat.key}`}
-              >
-                {content}
+              <View style={styles.statSlot}>
+                <View
+                  style={styles.statCell}
+                  accessible
+                  accessibilityLabel={stat.accessibilityLabel ?? `${stat.value} ${stat.label}`}
+                  testID={`profile-stat-${stat.key}`}
+                >
+                  {content}
+                </View>
               </View>
             )}
           </React.Fragment>
@@ -354,7 +358,8 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth,
     marginHorizontal: SP.md, paddingVertical: SP.xs,
   },
-  statCell: { minHeight: 52, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xs, gap: 2 },
+  statSlot: { flex: 1, justifyContent: 'center' },
+  statCell: { height: 52, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xs, gap: 2 },
   statValue: { fontFamily: FONT.bold, fontSize: FS.lg, lineHeight: 24, letterSpacing: -0.3 },
   statLabel: { fontFamily: FONT.medium, fontSize: FS.xs, lineHeight: 14 },
   statDivider: { width: StyleSheet.hairlineWidth, marginVertical: SP.sm },
