@@ -107,7 +107,7 @@ export interface CheckoutDeliveryGroup {
 
 export interface CheckoutDiscount {
   code: string;
-  type: 'percentage' | 'fixed' | 'free_shipping' | 'store_credit';
+  type: 'percentage' | 'fixed' | 'free_shipping' | 'free_item' | 'store_credit';
   /** Percentage points for percentage discounts; cents for fixed discounts. */
   value: number;
   appliedAmountCents: number;

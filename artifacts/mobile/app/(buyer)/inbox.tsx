@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity,
+  View, Text, FlatList, SectionList, TouchableOpacity,
   Alert, StyleSheet, ScrollView, RefreshControl,
   Modal, TextInput, ActivityIndicator,
 } from 'react-native';
@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { ListSkeleton } from '@/components/layout';
-import { EmptyState } from '@/components/BrandthreadUI';
+import { EmptyState, SearchBar, SheetHandle } from '@/components/BrandthreadUI';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
@@ -23,11 +23,46 @@ import {
   getConversations, markConversationRead, archiveConversation,
   subscribeSocial, getNotifications, markNotificationRead,
   searchProfiles, createOrGetConversation, muteUser, MY_USER_ID,
+  getFriendSuggestions,
 } from '@/services/socialService';
-import type { Conversation, Notification, ProfileSearchResult } from '@/services/socialTypes';
+import type { Conversation, Notification, ProfileSearchResult, AccountType } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 import InboxSwipeRow, { type InboxSwipeAction } from '@/components/inbox/InboxSwipeRow';
 import { ConversationPreview } from '@/components/inbox/ConversationPreview';
+
+// ─── Compose sheet: unified "person" shape ────────────────────────────────────
+// Friends/followers/following come from the follow-graph endpoints in
+// lib/api.ts's `social` namespace; suggested people reuse the existing (today
+// stubbed-empty) getFriendSuggestions() extension point from socialService
+// rather than inventing a new backend endpoint. All are buyer accounts, since
+// this sheet only starts buyer_to_buyer conversations.
+type ComposePerson = {
+  userId: string;
+  name: string;
+  handle: string;
+  initials: string;
+  color: string;
+  accountType: AccountType;
+};
+
+type ComposeSection = { key: string; title: string; data: ComposePerson[] };
+
+function matchesQuery(p: ComposePerson, q: string): boolean {
+  return p.name.toLowerCase().includes(q) || p.handle.toLowerCase().includes(q);
+}
+
+function dedupePeople(groups: ComposePerson[][]): ComposePerson[] {
+  const seen = new Set<string>();
+  const out: ComposePerson[] = [];
+  for (const group of groups) {
+    for (const p of group) {
+      if (seen.has(p.userId)) continue;
+      seen.add(p.userId);
+      out.push(p);
+    }
+  }
+  return out;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -90,6 +125,13 @@ export default function InboxScreen() {
   const [composeLoading, setComposeLoading] = useState(false);
   const [composeStartingId, setComposeStartingId] = useState<string | null>(null);
   const composeSearchSeq = useRef(0);
+  // Default directory shown before the person types anything: friends
+  // (mutual follows) → followers → following → suggested, deduplicated.
+  const [composeDirLoading, setComposeDirLoading] = useState(false);
+  const [composeFriends, setComposeFriends] = useState<ComposePerson[]>([]);
+  const [composeFollowers, setComposeFollowers] = useState<ComposePerson[]>([]);
+  const [composeFollowing, setComposeFollowing] = useState<ComposePerson[]>([]);
+  const [composeSuggested, setComposeSuggested] = useState<ComposePerson[]>([]);
   const [messagesSearchQuery, setMessagesSearchQuery] = useState('');
 
   const loadData = useCallback(async () => {
@@ -279,6 +321,46 @@ export default function InboxScreen() {
     setComposeResults([]);
   }
 
+  // Load the default directory (friends/followers/following/suggested) once
+  // per sheet open, from the same follow-graph endpoints friends.tsx uses.
+  useEffect(() => {
+    if (!composeVisible) return;
+    let cancelled = false;
+    setComposeDirLoading(true);
+    Promise.all([
+      api.social.following().catch(() => []),
+      api.social.followers().catch(() => []),
+      getFriendSuggestions().catch(() => []),
+    ]).then(([followingRows, followerRows, suggestionRows]) => {
+      if (cancelled) return;
+      const followingList = Array.isArray(followingRows) ? followingRows : [];
+      const followerList = Array.isArray(followerRows) ? followerRows : [];
+      const suggestionList = Array.isArray(suggestionRows) ? suggestionRows : [];
+      // isFollowingBack on a follower row means the relationship is mutual
+      // (I follow them and they follow me) — that's what this app's UI
+      // treats as a "friend" (there is no separate friend-request table).
+      const mutualIds = new Set(followerList.filter(f => f.isFollowingBack).map(f => f.userId));
+      const toPerson = (u: { userId: string; name: string; handle: string; initials: string; color: string }): ComposePerson => ({
+        userId: u.userId, name: u.name, handle: u.handle, initials: u.initials, color: u.color, accountType: 'buyer',
+      });
+      const friendsList = followerList.filter(f => mutualIds.has(f.userId)).map(toPerson);
+      const followersOnly = followerList.filter(f => !mutualIds.has(f.userId)).map(toPerson);
+      const followingOnly = followingList.filter(f => !mutualIds.has(f.userId)).map(toPerson);
+      const alreadyShownIds = new Set([...friendsList, ...followersOnly, ...followingOnly].map(p => p.userId));
+      const suggested = suggestionList.filter(s => !alreadyShownIds.has(s.userId)).map(toPerson);
+      setComposeFriends(friendsList);
+      setComposeFollowers(followersOnly);
+      setComposeFollowing(followingOnly);
+      setComposeSuggested(suggested);
+    }).finally(() => {
+      if (!cancelled) setComposeDirLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [composeVisible, api]);
+
+  // Network-wide search (people outside the loaded directory) once the
+  // person types — the directory above already covers friends/followers/
+  // following/suggested, so this only needs to surface everyone else.
   useEffect(() => {
     if (!composeVisible) return;
     const q = composeQuery.trim();
@@ -307,7 +389,34 @@ export default function InboxScreen() {
     return () => clearTimeout(timer);
   }, [composeQuery, composeVisible]);
 
-  async function startConversationWith(person: ProfileSearchResult) {
+  const composeDirectory = useMemo(
+    () => dedupePeople([composeFriends, composeFollowers, composeFollowing, composeSuggested]),
+    [composeFriends, composeFollowers, composeFollowing, composeSuggested]
+  );
+
+  const composeQueryLower = composeQuery.trim().toLowerCase();
+
+  const composeSections: ComposeSection[] = useMemo(() => {
+    if (!composeQueryLower) {
+      return [
+        { key: 'friends', title: 'Friends', data: composeFriends },
+        { key: 'followers', title: 'Followers', data: composeFollowers },
+        { key: 'following', title: 'Following', data: composeFollowing },
+        { key: 'suggested', title: 'Suggested', data: composeSuggested },
+      ].filter(sec => sec.data.length > 0);
+    }
+    const inDirectory = composeDirectory.filter(p => matchesQuery(p, composeQueryLower));
+    const directoryIds = new Set(composeDirectory.map(p => p.userId));
+    const morePeople: ComposePerson[] = composeResults
+      .filter(r => !directoryIds.has(r.userId))
+      .map(r => ({ userId: r.userId, name: r.name, handle: r.handle, initials: r.initials, color: r.color, accountType: r.accountType }));
+    return [
+      { key: 'in-network', title: 'In your network', data: inDirectory },
+      { key: 'more-people', title: 'More people', data: morePeople },
+    ].filter(sec => sec.data.length > 0);
+  }, [composeQueryLower, composeDirectory, composeFriends, composeFollowers, composeFollowing, composeSuggested, composeResults]);
+
+  async function startConversationWith(person: ComposePerson) {
     if (composeStartingId) return;
     setComposeStartingId(person.userId);
     try {
@@ -564,9 +673,10 @@ export default function InboxScreen() {
           onPress={openCompose}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel="New conversation"
+          accessibilityLabel="New message"
+          testID="inbox-header-compose"
         >
-          <Feather name="edit-3" size={21} color={FG} />
+          <Feather name="plus" size={23} color={FG} />
           {unreadNotifCount > 0 && <View style={[s.headerUnreadDot, { backgroundColor: theme.accent }]} />}
         </TouchableOpacity>
       </View>
@@ -695,9 +805,9 @@ export default function InboxScreen() {
       >
         <View style={s.composeBackdrop}>
           <View style={[s.composeSheet, { paddingBottom: insets.bottom + SP.md, backgroundColor: theme.card }]}>
-            <View style={s.composeHandle} />
+            <SheetHandle />
             <View style={s.composeHeader}>
-              <Text style={s.composeTitle}>New message</Text>
+              <Text style={[s.composeTitle, { color: theme.text }]}>New message</Text>
               <TouchableOpacity
                 onPress={closeCompose}
                 accessibilityRole="button"
@@ -707,27 +817,38 @@ export default function InboxScreen() {
                 <Feather name="x" size={22} color={theme.text} />
               </TouchableOpacity>
             </View>
-            <View style={[s.composeSearchRow, { borderColor: theme.border }]}>
-              <Feather name="search" size={16} color={theme.muted} />
-              <TextInput
-                style={[s.composeSearchInput, { color: theme.text }]}
-                value={composeQuery}
-                onChangeText={setComposeQuery}
-                placeholder="Search people"
-                placeholderTextColor={theme.muted}
-                autoFocus
-                autoCorrect={false}
-              />
-            </View>
-            {composeLoading ? (
+            <SearchBar
+              value={composeQuery}
+              onChange={setComposeQuery}
+              placeholder="Search people"
+              style={s.composeSearchBar}
+            />
+            {composeDirLoading && !composeQueryLower ? (
               <View style={s.composeCenter}><ActivityIndicator color={theme.accent} /></View>
-            ) : composeQuery.trim() && composeResults.length === 0 ? (
-              <View style={s.composeCenter}><Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm }}>No one found</Text></View>
+            ) : composeSections.length === 0 ? (
+              composeLoading ? (
+                <View style={s.composeCenter}><ActivityIndicator color={theme.accent} /></View>
+              ) : (
+                <View style={s.composeCenter}>
+                  <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm }}>
+                    {composeQueryLower ? 'No one found' : 'No one to show yet'}
+                  </Text>
+                </View>
+              )
             ) : (
-              <FlatList
-                data={composeResults}
+              <SectionList
+                sections={composeSections}
                 keyExtractor={item => item.userId}
                 keyboardShouldPersistTaps="handled"
+                stickySectionHeadersEnabled={false}
+                ListFooterComponent={
+                  composeQueryLower && composeLoading
+                    ? <View style={s.composeCenter}><ActivityIndicator color={theme.accent} size="small" /></View>
+                    : null
+                }
+                renderSectionHeader={({ section }) => (
+                  <Text style={[s.composeSectionTitle, { color: theme.muted, backgroundColor: theme.card }]}>{section.title}</Text>
+                )}
                 renderItem={({ item }) => (
                   <TouchableOpacity
                     style={s.composeResultRow}
@@ -781,6 +902,15 @@ const s = StyleSheet.create({
     marginBottom: SP.sm,
   },
   composeSearchInput: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, height: 44 },
+  composeSearchBar: { marginBottom: SP.sm },
+  composeSectionTitle: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingTop: SP.sm,
+    paddingBottom: SP.xs,
+  },
   composeCenter: { paddingVertical: SP.xl, alignItems: 'center' },
   composeResultRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,

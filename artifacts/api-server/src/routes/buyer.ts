@@ -4,7 +4,7 @@
  */
 import { Router } from "express";
 import {
-  db, checkoutSessions, orders, orderItems, productVariants, products, users, shippingRates, discountCodes, buyerAddresses,
+  db, checkoutSessions, orders, orderItems, productVariants, products, users, shippingRates, buyerAddresses,
   drops, shippingZones, shippingZoneWeightTiers,
 } from "@workspace/db";
 import { eq, and, desc, sql, isNull, inArray } from "drizzle-orm";
@@ -25,6 +25,7 @@ import {
   reversePurchasePointsOnce,
 } from "./loyalty";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
+import { validateDiscountCode, DiscountValidationError } from "../lib/discounts";
 import { logger } from "../lib/logger";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
@@ -65,6 +66,7 @@ const checkoutBodySchema = z.object({
   dropId: requestPrimitives.uuid.nullable().optional(),
   loyaltyToken: z.string().trim().min(1).max(512).optional(),
   threadCashToken: z.string().trim().min(1).max(512).optional(),
+  discountCode: z.string().trim().min(1).max(64).optional(),
 }).passthrough();
 const addressSuggestionQuerySchema = z.object({
   q: z.string().trim().min(3).max(160),
@@ -341,6 +343,7 @@ router.delete("/addresses/:id", validateRequest({ params: uuidParamsSchema }), a
  * before the buyer reaches Stripe.
  */
 router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }), async (req, res) => {
+  const buyerId = (req as any).clerkUserId as string;
   const items = req.body?.items;
   const discountCodeValues = Array.isArray(req.body?.discountCodes) ? req.body.discountCodes : [];
   if (!Array.isArray(items) || items.length === 0) {
@@ -355,6 +358,7 @@ router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }
   }> = [];
   const sellerIds = new Set<string>();
   let subtotalCents = 0;
+  const lines: Array<{ productId: string; priceCents: number; quantity: number }> = [];
 
   for (const item of items) {
     const [row] = await db
@@ -400,6 +404,7 @@ router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }
       });
     }
     subtotalCents += row.priceCents * quantity;
+    lines.push({ productId: item.productId, priceCents: row.priceCents, quantity });
   }
   for (const sellerId of sellerIds) {
     const vacation = await getSellerVacationStatus(sellerId);
@@ -416,21 +421,19 @@ router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }
   if (issues.length === 0 && sellerIds.size === 1) {
     const sellerId = [...sellerIds][0];
     for (const codeValue of discountCodeValues) {
-      const code = String(codeValue ?? "").trim().toUpperCase();
+      const code = String(codeValue ?? "").trim();
       if (!code) continue;
-      const [discount] = await db
-        .select()
-        .from(discountCodes)
-        .where(and(eq(discountCodes.sellerId, sellerId), eq(discountCodes.code, code), eq(discountCodes.active, true)))
-        .limit(1);
-      const expired = !!discount?.expiresAt && discount.expiresAt.getTime() <= Date.now();
-      const exhausted = discount?.maxUses != null && discount.usesCount >= discount.maxUses;
-      const belowMinimum = !!discount && subtotalCents < discount.minOrderCents;
-      if (!discount || expired || exhausted || belowMinimum) {
+      try {
+        await validateDiscountCode({
+          sellerId, code, customerKey: buyerId, cartSubtotalCents: subtotalCents, lines,
+        });
+      } catch (err) {
+        const message = err instanceof DiscountValidationError
+          ? err.message
+          : `${code} is no longer valid for this order. Remove it to continue.`;
         issues.push({
           itemId: "discount", productName: "Discount code", type: "unavailable",
-          message: `${code} is no longer valid for this order. Remove it to continue.`,
-          canContinue: false,
+          message, canContinue: false,
         });
       }
     }
@@ -463,7 +466,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     const buyerId = (req as any).clerkUserId as string;
     const {
       items, successUrl, cancelUrl, contactEmail, contactPhone, shippingAddress,
-      clientIdempotencyKey, dropId, loyaltyToken, threadCashToken,
+      clientIdempotencyKey, dropId, loyaltyToken, threadCashToken, discountCode,
     } = req.body;
 
     // ── THREAD CASH HOOK POINT ────────────────────────────────────────────
@@ -532,6 +535,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       priceCents: number;
     }> = [];
     const sellerIds = new Set<string>();
+    const discountLines: Array<{ productId: string; priceCents: number; quantity: number }> = [];
     // Tracked separately (not persisted on the checkout-session row) so it
     // can feed weight-tiered shipping zones without changing the shape of
     // the stored cart item snapshot.
@@ -615,6 +619,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         quantity: qty,
         priceCents: row.priceCents,
       });
+      discountLines.push({ productId: item.productId, priceCents: row.priceCents, quantity: qty });
       cartWeightGrams += (row.weightGrams ?? 0) * qty;
     }
 
@@ -872,6 +877,31 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         quantity: 1,
       });
     }
+    // ── Discount code (validated fresh at charge time — never trusts the
+    // client's earlier /cart/validate check) ──────────────────────────────
+    let discountApplication: Awaited<ReturnType<typeof validateDiscountCode>> | null = null;
+    if (typeof discountCode === "string" && discountCode.trim()) {
+      try {
+        discountApplication = await validateDiscountCode({
+          sellerId,
+          code: discountCode,
+          customerKey: buyerId,
+          cartSubtotalCents: subtotalCents,
+          lines: discountLines,
+        });
+      } catch (err) {
+        if (err instanceof DiscountValidationError) {
+          res.status(400).json({ error: err.message, code: err.code, ...err.details });
+          return;
+        }
+        throw err;
+      }
+    }
+    const discountShippingCents = discountApplication?.freeShipping ? 0 : shippingCents;
+    const discountCodeAmountCents = discountApplication
+      ? Math.min(discountApplication.appliedAmountCents + (shippingCents - discountShippingCents), subtotalCents + shippingCents)
+      : 0;
+
     const totalBeforeLoyaltyDiscountCents = subtotalCents + shippingCents;
     const normalizedLoyaltyToken =
       typeof loyaltyToken === "string" && loyaltyToken.trim()
@@ -897,11 +927,12 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
     // Persist the checkout before Stripe is contacted. Its ID is included in
     // the initial Stripe metadata, so a paid session is always reconstructable
     // by the webhook even if the later session-ID write is interrupted.
+    const combinedDiscountCents = (loyaltyRedemption?.discountCents ?? 0) + discountCodeAmountCents;
     const money = paymentIntentMoney({
       plan: chargePlan,
       sellerStripeAccountId: seller.stripeAccountId,
-      merchandiseCents: Math.max(0, subtotalCents - (loyaltyRedemption?.discountCents ?? 0)),
-      preTaxTotalCents: Math.max(0, totalBeforeLoyaltyDiscountCents - (loyaltyRedemption?.discountCents ?? 0)),
+      merchandiseCents: Math.max(0, subtotalCents - combinedDiscountCents),
+      preTaxTotalCents: Math.max(0, totalBeforeLoyaltyDiscountCents - combinedDiscountCents),
     });
     const insertValues = {
       buyerId,
@@ -914,6 +945,10 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       ...(loyaltyRedemption ? {
         loyaltyToken: loyaltyRedemption.token,
         loyaltyDiscountCents: loyaltyRedemption.discountCents,
+      } : {}),
+      ...(discountApplication ? {
+        discountCodeId: discountApplication.discount.id,
+        discountCodeAmountCents: discountCodeAmountCents,
       } : {}),
       ...(validatedShipping ? { shippingAddress: validatedShipping } : {}),
       ...(hasKey ? { clientIdempotencyKey } : {}),
@@ -969,19 +1004,25 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       loyaltyReservation.reservationId = csId;
     }
 
-    // Loyalty points are represented as a Stripe once-off coupon. This keeps
-    // tax and the buyer-facing Stripe total authoritative, unlike attempting to
-    // rewrite individual line-item prices or accepting a client-provided total.
-    let loyaltyCouponId: string | undefined;
-    if (loyaltyRedemption) {
+    // Loyalty points and a seller discount code are both represented as ONE
+    // combined Stripe once-off coupon — Checkout Sessions only accept a single
+    // `discounts` entry in payment mode. This keeps tax and the buyer-facing
+    // Stripe total authoritative, unlike rewriting individual line-item prices.
+    let combinedCouponId: string | undefined;
+    if (combinedDiscountCents > 0) {
+      const couponName = loyaltyRedemption && discountApplication
+        ? `Brandthread rewards + ${discountApplication.discount.code}`
+        : loyaltyRedemption
+          ? "Brandthread rewards"
+          : discountApplication!.discount.code;
       const coupon = await stripe.coupons.create({
-        amount_off: loyaltyRedemption.discountCents,
+        amount_off: combinedDiscountCents,
         currency: "usd",
         duration: "once",
         max_redemptions: 1,
-        name: "Brandthread rewards",
+        name: couponName,
       });
-      loyaltyCouponId = coupon.id;
+      combinedCouponId = coupon.id;
     }
 
     const validDropId = chargePlan.dropId;
@@ -1006,7 +1047,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
           allowed_countries: [validatedShipping?.country ?? "US"],
         },
         customer_update: { shipping: "auto" },
-        ...(loyaltyCouponId ? { discounts: [{ coupon: loyaltyCouponId }] } : {}),
+        ...(combinedCouponId ? { discounts: [{ coupon: combinedCouponId }] } : {}),
         success_url: successUrl,
         cancel_url: cancelUrl,
         customer: stripeCustomerId,

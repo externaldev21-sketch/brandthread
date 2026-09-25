@@ -5,16 +5,12 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
-  ActivityIndicator,
+  ActivityIndicator, TouchableOpacity,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
-import {
-  BG, CARD, SURFACE, BORDER, FG, MUTED, SUBTLE,
-  SUCCESS,
-  FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
+import { FS } from '@/lib/theme';
 import { useApi } from '@/lib/api';
 import { StatusBadge } from '@/components/BrandthreadUI';
 import { useColors } from '@/hooks/useColors';
@@ -116,6 +112,20 @@ export default function CustomerOrdersScreen() {
         <View style={s.center}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
+      ) : error ? (
+        <View style={s.center}>
+          <Feather name="alert-circle" size={28} color={colors.mutedForeground} />
+          <Text style={[s.errorText, { color: colors.mutedForeground }]}>
+            Couldn't load this customer. Check your connection and try again.
+          </Text>
+          <TouchableOpacity
+            style={[s.retryBtn, { borderColor: colors.border }]}
+            onPress={() => { setLoading(true); load(); }}
+            activeOpacity={0.7}
+          >
+            <Text style={[s.retryText, { color: colors.foreground }]}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <ScrollView
           contentContainerStyle={s.scroll}
@@ -123,7 +133,7 @@ export default function CustomerOrdersScreen() {
         >
           {/* Customer summary */}
           {customer && (
-            <View style={s.custCard}>
+            <View style={[s.custCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={s.custAvatarRow}>
                 <View style={[s.avatar, { backgroundColor: colors.accent }]}>
                   <Text style={[s.avatarText, { color: colors.accentForeground }]}>
@@ -131,31 +141,31 @@ export default function CustomerOrdersScreen() {
                   </Text>
                 </View>
                 <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={s.custName}>{customer.name}</Text>
-                  <Text style={s.custEmail}>{customer.email}</Text>
-                  {customer.phone ? <Text style={s.custEmail}>{customer.phone}</Text> : null}
+                  <Text style={[s.custName, { color: colors.foreground }]}>{customer.name}</Text>
+                  <Text style={[s.custEmail, { color: colors.mutedForeground }]}>{customer.email}</Text>
+                  {customer.phone ? <Text style={[s.custEmail, { color: colors.mutedForeground }]}>{customer.phone}</Text> : null}
                 </View>
               </View>
 
               {/* Stats */}
-              <View style={s.statsRow}>
+              <View style={[s.statsRow, { backgroundColor: colors.surface }]}>
                 <View style={s.stat}>
-                  <Text style={s.statVal}>{orders.length}</Text>
-                  <Text style={s.statLabel}>Orders</Text>
+                  <Text style={[s.statVal, { color: colors.foreground }]}>{orders.length}</Text>
+                  <Text style={[s.statLabel, { color: colors.mutedForeground }]}>Orders</Text>
                 </View>
-                <View style={s.statDiv} />
+                <View style={[s.statDiv, { backgroundColor: colors.border }]} />
                 <View style={s.stat}>
-                  <Text style={s.statVal}>{cents(customer.totalSpentCents)}</Text>
-                  <Text style={s.statLabel}>Total spent</Text>
+                  <Text style={[s.statVal, { color: colors.foreground }]}>{cents(customer.totalSpentCents)}</Text>
+                  <Text style={[s.statLabel, { color: colors.mutedForeground }]}>Total spent</Text>
                 </View>
-                <View style={s.statDiv} />
+                <View style={[s.statDiv, { backgroundColor: colors.border }]} />
                 <View style={s.stat}>
-                  <Text style={s.statVal}>
+                  <Text style={[s.statVal, { color: colors.foreground }]}>
                     {customer.totalSpentCents > 0 && orders.length > 0
                       ? cents(Math.round(customer.totalSpentCents / orders.length))
                       : '—'}
                   </Text>
-                  <Text style={s.statLabel}>Avg order</Text>
+                  <Text style={[s.statLabel, { color: colors.mutedForeground }]}>Avg order</Text>
                 </View>
               </View>
 
@@ -172,41 +182,41 @@ export default function CustomerOrdersScreen() {
 
               {/* Notes */}
               {customer.notes ? (
-                <Text style={s.notes}>{customer.notes}</Text>
+                <Text style={[s.notes, { color: colors.mutedForeground }]}>{customer.notes}</Text>
               ) : null}
             </View>
           )}
 
           {/* Orders list */}
-          <Text style={s.sectionTitle}>Order History</Text>
+          <Text style={[s.sectionTitle, { color: colors.mutedForeground }]}>Order History</Text>
           {orders.length === 0 ? (
-            <View style={s.emptyCard}>
-              <Feather name="inbox" size={28} color={MUTED} />
-              <Text style={s.emptyText}>No orders yet</Text>
+            <View style={[s.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Feather name="inbox" size={28} color={colors.mutedForeground} />
+              <Text style={[s.emptyText, { color: colors.mutedForeground }]}>No orders yet</Text>
             </View>
           ) : (
-            <View style={s.orderList}>
+            <View style={[s.orderList, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {orders.map((order, i) => (
                 <View
                   key={order.id}
-                  style={[s.orderRow, i > 0 && { borderTopWidth: 1, borderTopColor: BORDER }]}
+                  style={[s.orderRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
                 >
                   <View style={s.orderLeft}>
-                    <Text style={s.orderNum}>#{order.orderNumber}</Text>
-                    <Text style={s.orderDate}>
+                    <Text style={[s.orderNum, { color: colors.foreground }]}>#{order.orderNumber}</Text>
+                    <Text style={[s.orderDate, { color: colors.mutedForeground }]}>
                       {new Date(order.createdAt).toLocaleDateString('en-US', {
                         month: 'short', day: 'numeric', year: 'numeric',
                       })}
                     </Text>
                     {order.trackingNumber ? (
-                      <Text style={s.trackingText}>
+                      <Text style={[s.trackingText, { color: colors.mutedForeground }]}>
                         {order.carrier ? `${order.carrier}: ` : ''}
                         {order.trackingNumber}
                       </Text>
                     ) : null}
                   </View>
                   <View style={s.orderRight}>
-                    <Text style={s.orderTotal}>{cents(order.totalCents)}</Text>
+                    <Text style={[s.orderTotal, { color: colors.foreground }]}>{cents(order.totalCents)}</Text>
                     <StatusBadge
                       label={order.status}
                       variant={STATUS_VARIANT[order.status] ?? 'neutral'}
@@ -226,35 +236,35 @@ const s = StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
   scroll:       { padding: 16, paddingBottom: 100, gap: 16 },
   center:       { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  errorText:    { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center' },
-  retryBtn:     { paddingVertical: 8, paddingHorizontal: 20, borderRadius: 8, borderWidth: 1, borderColor: BORDER },
-  retryText:    { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
+  errorText:    { fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingHorizontal: 24 },
+  retryBtn:     { paddingVertical: 8, paddingHorizontal: 20, borderRadius: 8, borderWidth: 1 },
+  retryText:    { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
 
-  custCard:     { backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, padding: 16, gap: 14 },
+  custCard:     { borderRadius: 16, borderWidth: 1, padding: 16, gap: 14 },
   custAvatarRow:{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   avatar:       { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   avatarText:   { fontSize: 16, fontFamily: 'Inter_700Bold' },
-  custName:     { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
-  custEmail:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
-  statsRow:     { flexDirection: 'row', backgroundColor: SURFACE, borderRadius: 10, padding: 12 },
+  custName:     { fontSize: 16, fontFamily: 'Inter_700Bold' },
+  custEmail:    { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  statsRow:     { flexDirection: 'row', borderRadius: 10, padding: 12 },
   stat:         { flex: 1, alignItems: 'center', gap: 2 },
-  statVal:      { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
-  statLabel:    { fontSize: FS.xs, fontFamily: 'Inter_400Regular', color: MUTED },
-  statDiv:      { width: 1, backgroundColor: BORDER, marginVertical: 4 },
+  statVal:      { fontSize: 15, fontFamily: 'Inter_700Bold' },
+  statLabel:    { fontSize: FS.xs, fontFamily: 'Inter_400Regular' },
+  statDiv:      { width: 1, marginVertical: 4 },
   tagsRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   tag:          { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   tagText:      { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-  notes:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 18 },
+  notes:        { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 18 },
 
-  sectionTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.5 },
-  emptyCard:    { backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, padding: 32, alignItems: 'center', gap: 8 },
-  emptyText:    { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED },
-  orderList:    { backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER },
+  sectionTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.5 },
+  emptyCard:    { borderRadius: 14, borderWidth: 1, padding: 32, alignItems: 'center', gap: 8 },
+  emptyText:    { fontSize: 14, fontFamily: 'Inter_400Regular' },
+  orderList:    { borderRadius: 14, borderWidth: 1 },
   orderRow:     { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', padding: 14, gap: 12 },
   orderLeft:    { flex: 1, gap: 3 },
-  orderNum:     { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
-  orderDate:    { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
-  trackingText: { fontSize: FS.xs, fontFamily: 'Inter_400Regular', color: MUTED, fontStyle: 'italic' },
+  orderNum:     { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  orderDate:    { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  trackingText: { fontSize: FS.xs, fontFamily: 'Inter_400Regular', fontStyle: 'italic' },
   orderRight:   { alignItems: 'flex-end', gap: 6 },
-  orderTotal:   { fontSize: 14, fontFamily: 'Inter_700Bold', color: FG },
+  orderTotal:   { fontSize: 14, fontFamily: 'Inter_700Bold' },
 });

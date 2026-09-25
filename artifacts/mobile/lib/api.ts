@@ -747,14 +747,6 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       adjust: (variantId: string, body: { delta?: number; newStock?: number }) =>
         patch<any>(`/api/inventory/${variantId}/adjust`, body),
     },
-    discounts: {
-      list:   () => get<any[]>('/api/discount-codes'),
-      create: (body: { code: string; type: 'percentage' | 'fixed' | 'free_shipping'; value: number; minOrderCents?: number; maxUses?: number | null; expiresAt?: string | null }) =>
-        post<any>('/api/discount-codes', body),
-      update: (id: string, body: { active?: boolean; expiresAt?: string | null }) =>
-        patch<any>(`/api/discount-codes/${encodeURIComponent(id)}`, body),
-      remove: (id: string) => del<any>(`/api/discount-codes/${encodeURIComponent(id)}`),
-    },
     /** Manufacturer hub — public directory, invite tokens, threads, sample orders, drop wallets. */
     manufacturers: {
       public: {
@@ -1048,6 +1040,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
              *  routes/buyer.ts) until the checkout money flow can fund it without
              *  changing seller payout — see docs/payments/thread-cash-checkout-todo.md. */
             threadCashToken?: string;
+            /** Seller discount code, validated fresh server-side and applied to this charge. */
+            discountCode?: string;
           },
         ) =>
           post<{ sessionId: string; url: string }>('/api/buyer/checkout/session', {
@@ -1060,6 +1054,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             ...(opts.clientIdempotencyKey  ? { clientIdempotencyKey:  opts.clientIdempotencyKey  } : {}),
             ...(opts.loyaltyToken          ? { loyaltyToken:          opts.loyaltyToken          } : {}),
             ...(opts.threadCashToken       ? { threadCashToken:       opts.threadCashToken       } : {}),
+            ...(opts.discountCode          ? { discountCode:          opts.discountCode          } : {}),
           }),
         /** Verify payment status after Stripe redirect.
          *  Returns { status, paymentStatus, amountTotal, orderId?, orderNumber?, declineReason? }. */
@@ -1781,13 +1776,34 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     /** Discount codes — seller-managed promo codes */
     discountCodes: {
       list:   () => get<any[]>('/api/discount-codes'),
-      create: (data: { code: string; type: string; value: number; minOrderCents?: number; maxUses?: number | null; expiresAt?: string | null }) =>
-        post<any>('/api/discount-codes', data),
-      update: (id: string, data: { active?: boolean; expiresAt?: string | null }) =>
-        patch<any>(`/api/discount-codes/${id}`, data),
+      create: (data: {
+        code?: string;
+        type: 'percentage' | 'fixed' | 'free_shipping' | 'free_item';
+        value?: number;
+        minOrderCents?: number;
+        appliesTo?: 'entire_store' | 'specific_products';
+        productIds?: string[];
+        maxUses?: number | null;
+        singleUse?: boolean;
+        oneUsePerCustomer?: boolean;
+        startsAt?: string | null;
+        expiresAt?: string | null;
+      }) => post<any>('/api/discount-codes', data),
+      update: (id: string, data: {
+        active?: boolean;
+        startsAt?: string | null;
+        expiresAt?: string | null;
+        minOrderCents?: number;
+        maxUses?: number | null;
+        oneUsePerCustomer?: boolean;
+        appliesTo?: 'entire_store' | 'specific_products';
+        productIds?: string[];
+        value?: number;
+      }) => patch<any>(`/api/discount-codes/${id}`, data),
       delete: (id: string) => del<any>(`/api/discount-codes/${id}`),
-      validate: (code: string, sellerId: string, subtotalCents: number) =>
-        get<any>(`/api/discount-codes/validate?code=${encodeURIComponent(code)}&sellerId=${encodeURIComponent(sellerId)}&subtotalCents=${subtotalCents}`),
+      uses:   (id: string) => get<any[]>(`/api/discount-codes/${id}/uses`),
+      validate: (code: string, sellerId: string, subtotalCents: number, items?: { productId: string; priceCents: number; quantity: number }[]) =>
+        get<any>(`/api/discount-codes/validate?code=${encodeURIComponent(code)}&sellerId=${encodeURIComponent(sellerId)}&subtotalCents=${subtotalCents}${items ? `&items=${encodeURIComponent(JSON.stringify(items))}` : ''}`),
     },
     /** Returns — buyer-initiated return requests */
     returns: {
@@ -1886,7 +1902,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     team: {
       members:   () => get<any[]>('/api/team/members'),
       member:    (id: string) => get<any>(`/api/team/members/${encodeURIComponent(id)}`),
-      invite:    (data: { email: string; name?: string; role?: string }) => post<any>('/api/team/invite', data),
+      invite:    (data: { email?: string; username?: string; name?: string; role?: string }) => post<any>('/api/team/invite', data),
       /** Public: resolve invite details for the accept screen (works signed-out) */
       resolveInvite: (token: string) => get<any>(`/api/team/invite/accept/${encodeURIComponent(token)}`),
       accept:    (token: string) => post<any>(`/api/team/invite/accept/${encodeURIComponent(token)}`, {}),
@@ -1896,7 +1912,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       roles:     () => get<any[]>('/api/team/roles'),
       roleMembers: (role: string) => get<any[]>(`/api/team/roles/${encodeURIComponent(role)}/members`),
       /** Resolves the caller's permission tier for the active store context. */
-      context: () => get<{ role: 'owner' | 'manager' | 'staff' }>('/api/team/context'),
+      context: () => get<{ role: 'owner' | 'admin' | 'manager' | 'finance' | 'orders' | 'marketing' | 'staff' | 'viewer' }>('/api/team/context'),
       /** Returns all of the caller's active memberships in other seller stores. */
       myMemberships: () =>
         get<{
