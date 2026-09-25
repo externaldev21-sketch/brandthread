@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { Feather } from '@expo/vector-icons';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
 import { EmptyState } from '@/components/BrandthreadUI';
+import { setPendingTileTransition } from '@/lib/tileTransition';
 
 export type GridPost = {
   id: string;
@@ -48,29 +49,55 @@ export default function PostGrid({ posts, onPressPost, columns = 3, gap = 1, emp
       numColumns={columns}
       keyExtractor={(item) => item.id}
       renderItem={({ item, index }) => (
-        <Pressable
-          testID={`post-grid-cell-${item.id}`}
-          onPress={() => onPressPost(item, index)}
-          style={({ pressed }) => [styles.cell, pressed && styles.cellPressed]}
-        >
-          {item.mediaUrl ? (
-            <CachedImage
-              source={{ uri: item.mediaUrl }}
-              style={styles.image}
-              recyclingKey={item.id}
-            />
-          ) : (
-            <View style={[styles.image, { backgroundColor: item.mediaColors?.[0] ?? theme.cardElevated }]} />
-          )}
-          {item.type === 'slideshow' && (
-            <Feather name="copy" size={14} color="#FFFFFF" style={styles.badge} />
-          )}
-          {item.type === 'video' && (
-            <Feather name="play" size={14} color="#FFFFFF" style={styles.badge} />
-          )}
-        </Pressable>
+        <GridCell item={item} index={index} onPressPost={onPressPost} theme={theme} styles={styles} />
       )}
     />
+  );
+}
+
+function GridCell({
+  item, index, onPressPost, theme, styles,
+}: {
+  item: GridPost;
+  index: number;
+  onPressPost: (post: GridPost, index: number) => void;
+  theme: AppThemePreset;
+  styles: ReturnType<typeof makeStyles>;
+}) {
+  const cellRef = useRef<View>(null);
+
+  function handlePress() {
+    cellRef.current?.measureInWindow((x, y, width, height) => {
+      if (width > 0 && height > 0) {
+        setPendingTileTransition({ postId: item.id, uri: item.mediaUrl ?? null, rect: { x, y, width, height } });
+      }
+      onPressPost(item, index);
+    });
+  }
+
+  return (
+    <Pressable
+      ref={cellRef}
+      testID={`post-grid-cell-${item.id}`}
+      onPress={handlePress}
+      style={({ pressed }) => [styles.cell, pressed && styles.cellPressed]}
+    >
+      {item.mediaUrl ? (
+        <CachedImage
+          source={{ uri: item.mediaUrl }}
+          style={styles.image}
+          recyclingKey={item.id}
+        />
+      ) : (
+        <View style={[styles.image, { backgroundColor: item.mediaColors?.[0] ?? theme.cardElevated }]} />
+      )}
+      {item.type === 'slideshow' && (
+        <Feather name="copy" size={14} color="#FFFFFF" style={styles.badge} />
+      )}
+      {item.type === 'video' && (
+        <Feather name="play" size={14} color="#FFFFFF" style={styles.badge} />
+      )}
+    </Pressable>
   );
 }
 

@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  TextInput, Modal, Share,
+  TextInput, Modal, Share, Animated, useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -19,8 +19,9 @@ import { useAppTheme, getOnAccentTextStyle } from '@/contexts/AppThemeContext';
 import { CachedImage } from '@/components/CachedImage';
 import {
   BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK,
-  FONT, FS, SP, RADIUS, ICON, OVERLAY, RED,
+  FONT, FS, SP, RADIUS, ICON, OVERLAY, RED, COMP,
 } from '@/lib/theme';
+import { useExpandFromTileOverlay } from '@/components/ExpandFromTileOverlay';
 import {
   getComments, likePost, repostPost, saveItem, getMyPosts, getPostById, updatePost, deletePost,
   MY_USER_ID, MY_COLOR, MY_INITIALS, MY_NAME, MY_HANDLE,
@@ -87,6 +88,7 @@ export default function BuyerPostViewer() {
   const SHADOW_PURPLE = { shadowColor: theme.shadowColor, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 };
   const s = makeStyles(theme);
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const router = useRouter();
   const params = useLocalSearchParams<{
     postId: string;
@@ -176,14 +178,29 @@ export default function BuyerPostViewer() {
   const typeIcon: keyof typeof Feather.glyphMap =
     postType === 'photo' ? 'image' : postType === 'slideshow' ? 'layers' : 'video';
 
+  // Media is a full-width square right under the header — a stable enough
+  // target rect to grow the tapped grid tile into without needing to
+  // measure the real content (see components/ExpandFromTileOverlay).
+  const { overlay: tileExpandOverlay, contentOpacity } = useExpandFromTileOverlay(params.postId, {
+    x: 0,
+    y: insets.top + COMP.headerH,
+    width: windowWidth,
+    height: windowWidth,
+  });
+
   return (
     <View style={s.page}>
       <Header
         title={authorName}
         actions={[{ icon: 'send', onPress: handleShare, accessibilityLabel: 'Share' }]}
       />
+      {tileExpandOverlay}
 
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
+      <Animated.ScrollView
+        contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+        showsVerticalScrollIndicator={false}
+        style={contentOpacity ? { opacity: contentOpacity } : undefined}
+      >
         {/* Media display */}
         <View style={s.media}>
           <PostMedia
@@ -325,7 +342,7 @@ export default function BuyerPostViewer() {
             </TouchableOpacity>
           </View>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* Edit caption modal */}
       <Modal visible={editOpen} transparent animationType="fade" onRequestClose={() => setEditOpen(false)}>
