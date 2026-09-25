@@ -39,6 +39,11 @@ import {
 import { clearSocialCache, hydrateMyProfileFromAccount, initSocialService, socialKeysForUser } from '@/services/socialService';
 import { clearCartCache, initCartService } from '@/services/cartService';
 import { initDesignService } from '@/services/designService';
+import { initProductService } from '@/services/productService';
+import { initOrderService } from '@/services/orderService';
+import { initInventoryService } from '@/services/inventoryService';
+import { initAnalyticsService } from '@/services/analyticsService';
+import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { initBuyerProfile } from '@/lib/buyerProfile';
 import StoreContextBanner from '@/components/StoreContextBanner';
 import NetworkNoticeBanner from '@/components/NetworkNoticeBanner';
@@ -632,12 +637,20 @@ function ServiceConfigurer() {
       clearSocialCache(oldUserId).catch(() => {});
       clearCartCache(oldUserId).catch(() => {});
       clearApiCache(oldUserId).catch(() => {});
+      // The subscription-plan cache is keyed globally (not per-user), so it
+      // must be dropped explicitly or the previous account's plan tier would
+      // gate features for the next signed-in account.
+      invalidatePlanCache();
     }
     prevUserIdRef.current = newUserId;
     initSocialService(newUserId);
     initCartService(newUserId);
     initDesignService(newUserId);
     initBuyerProfile(newUserId);
+    initProductService(newUserId);
+    initOrderService(newUserId);
+    initInventoryService(newUserId);
+    initAnalyticsService(newUserId);
 
     if (!newUserId || !isSignedIn) return;
     // Defense in depth for people who sign in on another device or have an

@@ -158,6 +158,11 @@ export default function SellerHomeCommerceDashboard({
   const [analyticsError, setAnalyticsError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [retryTick, setRetryTick] = useState(0);
+  // Bumped whenever the seller switches between their own store and a joined
+  // store so the analytics/orders/products sections refetch instead of
+  // continuing to show the previous store's numbers (only the finance
+  // balance below used to react to this).
+  const [storeContextTick, setStoreContextTick] = useState(0);
 
   const [financeBalance, setFinanceBalance] = useState<FinanceBalance | null>(null);
   const [financeLoading, setFinanceLoading] = useState(true);
@@ -170,6 +175,15 @@ export default function SellerHomeCommerceDashboard({
   const [everSoldCount, setEverSoldCount] = useState<number | null>(null);
   const [actionInputs, setActionInputs] = useState<{ unreadMessages: number; lowStockCount: number; returns: number } | null>(null);
   const [secondaryError, setSecondaryError] = useState(false);
+
+  useEffect(() => subscribeStoreContext(() => {
+    // Drop the previous store's numbers immediately rather than leaving them
+    // on screen until the refetch (triggered by storeContextTick below) resolves.
+    setSnapshot(null);
+    setTopProducts(null);
+    setRecentOrders(null);
+    setStoreContextTick((t) => t + 1);
+  }), []);
 
   const data = selectSellerHomeAnalytics(snapshot, userId, range);
 
@@ -234,7 +248,7 @@ export default function SellerHomeCommerceDashboard({
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [api, range, userId, retryTick]);
+  }, [api, range, userId, retryTick, storeContextTick]);
 
   // ── Range-independent data (orders, inventory, hub, products) — fetched
   // once per seller/refresh, not re-fetched on every chart range switch. ────
@@ -294,7 +308,7 @@ export default function SellerHomeCommerceDashboard({
     }
   }, [api, userId]);
 
-  useEffect(() => { void loadSecondaryData(); }, [loadSecondaryData, retryTick]);
+  useEffect(() => { void loadSecondaryData(); }, [loadSecondaryData, retryTick, storeContextTick]);
 
   const loadFinanceBalance = useCallback(async () => {
     const generation = ++balanceGenerationRef.current;
