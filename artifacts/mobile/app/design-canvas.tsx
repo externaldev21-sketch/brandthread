@@ -3181,7 +3181,9 @@ export default function DesignCanvasScreen() {
               pointerEvents="none"
             >
               <Rect x={0} y={0} width={logicalW} height={logicalH} fill={bgHex} />
-              {sortedLayers.map(layer =>
+              {/* Garment guide/template layers (layer.isTemplate) are a non-exportable
+                  placement aid and are always excluded from the flattened export. */}
+              {sortedLayers.filter(layer => !layer.isTemplate).map(layer =>
                 renderLayerInSvg(layer, 1, 1, bgHex, true)
               )}
             </Svg>

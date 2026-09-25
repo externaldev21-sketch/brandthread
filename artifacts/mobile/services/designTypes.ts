@@ -537,4 +537,40 @@ export const SELLER_CANVAS_PRESETS: SellerCanvasPreset[] = [
     description: '1024 x 1024 px — transparent',
     width: 1024, height: 1024, dpi: 72, colorProfile: 'sRGB', transparentBg: true,
   },
+  {
+    id: 'a4_print',
+    label: 'A4 Print',
+    description: '2480 x 3508 px — 300 dpi',
+    width: 2480, height: 3508, dpi: 300, colorProfile: 'sRGB',
+  },
+  {
+    id: 'tee_front',
+    label: 'Tee — Front',
+    description: '4000 x 4000 px — 300 dpi',
+    width: 4000, height: 4000, dpi: 300, colorProfile: 'sRGB', transparentBg: true,
+  },
+  {
+    id: 'tee_back',
+    label: 'Tee — Back',
+    description: '4000 x 4000 px — 300 dpi',
+    width: 4000, height: 4000, dpi: 300, colorProfile: 'sRGB', transparentBg: true,
+  },
+  {
+    id: 'hoodie_front',
+    label: 'Hoodie — Front',
+    description: '3600 x 4000 px — 300 dpi',
+    width: 3600, height: 4000, dpi: 300, colorProfile: 'sRGB', transparentBg: true,
+  },
+  {
+    id: 'hoodie_back',
+    label: 'Hoodie — Back',
+    description: '3600 x 4000 px — 300 dpi',
+    width: 3600, height: 4000, dpi: 300, colorProfile: 'sRGB', transparentBg: true,
+  },
+  {
+    id: 'label',
+    label: 'Label',
+    description: '1200 x 600 px — 300 dpi',
+    width: 1200, height: 600, dpi: 300, colorProfile: 'sRGB', transparentBg: true,
+  },
 ];
