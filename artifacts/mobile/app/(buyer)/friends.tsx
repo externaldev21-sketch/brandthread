@@ -475,7 +475,7 @@ export default function FriendsScreen() {
       {/* Section header */}
       <View style={s.sectionHeader}>
         <Text style={[TYPE_SCALE.headline, s.sectionTitle, { color: palette.foreground }]}>Friend activity</Text>
-        <PressableScale onPress={() => { hapticPrimaryAction(); router.push('/(tabs)/discover' as never); }}>
+        <PressableScale onPress={() => { hapticPrimaryAction(); router.push('/(buyer)/discover' as never); }}>
           <Text style={[TYPE_SCALE.callout, s.seeAll, { color: theme.accent }]}>See all</Text>
         </PressableScale>
       </View>

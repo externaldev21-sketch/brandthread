@@ -57,12 +57,6 @@ const OUTPUT_FORMATS = [
 type OutputFormat = typeof OUTPUT_FORMATS[number]['value'];
 type ProductOption = { id: string; name: string; images?: string[]; status?: string };
 
-const GRAD_PALETTES: Record<number, readonly [string, string]> = {
-  0: ['#0F766E', '#22D3EE'],
-  1: ['#F97316', '#0EA5E9'],
-  2: ['#22D3EE', '#3B82F6'],
-  3: ['#F59E0B', '#F97316'],
-};
 
 export default function AIPhotoshootScreen() {
   const { theme } = useAppTheme();
@@ -364,18 +358,18 @@ export default function AIPhotoshootScreen() {
                     <Image source={{ uri }} style={s.resultGradient} resizeMode="cover" />
                   ) : (
                     <LinearGradient
-                      colors={GRAD_PALETTES[idx % 4]}
+                      colors={[theme.cardElevated, theme.card]}
                       style={s.resultGradient}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                     >
-                      <Feather name="user" size={32} color="rgba(255,255,255,0.5)" />
+                      <Feather name="user" size={32} color={MUTED} />
                       <Text style={s.resultLabel}>Photo {idx + 1}</Text>
                     </LinearGradient>
                   )}
                   {/* Checkbox */}
                   <View style={[s.checkbox, isSelected && s.checkboxActive]}>
-                    {isSelected && <Feather name="check" size={ICON.xs} color="#fff" />}
+                    {isSelected && <Feather name="check" size={ICON.xs} color={theme.onAccent} />}
                   </View>
                 </TouchableOpacity>
               );
@@ -594,12 +588,12 @@ export default function AIPhotoshootScreen() {
                   onPress={() => setSceneStyle(sc.value)}
                 >
                   <LinearGradient
-                    colors={sceneStyle === sc.value ? theme.primaryGradient : ['#18182E', '#12121F']}
+                    colors={sceneStyle === sc.value ? theme.primaryGradient : [theme.cardElevated, theme.card]}
                     style={s.sceneCardGrad}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                   >
-                    <Feather name="image" size={ICON.md} color={sceneStyle === sc.value ? '#fff' : MUTED} />
+                    <Feather name="image" size={ICON.md} color={sceneStyle === sc.value ? theme.onAccent : MUTED} />
                   </LinearGradient>
                   <Text style={[s.sceneCardText, sceneStyle === sc.value && { color: PURPLE_LIGHT }]}>
                     {sc.label}

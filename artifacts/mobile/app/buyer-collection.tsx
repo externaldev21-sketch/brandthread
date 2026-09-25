@@ -7,7 +7,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Alert, StyleSheet, Dimensions,
-  Modal, TextInput, ActivityIndicator, Switch, Share,
+  Modal, TextInput, ActivityIndicator, Share,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -24,7 +24,7 @@ import { reportNetworkError } from '@/lib/networkNotice';
 import { Header } from '@/components/layout';
 import { CachedImage } from '@/components/CachedImage';
 import { GridSkeleton } from '@/components/layout/Skeleton';
-import { EmptyState } from '@/components/BrandthreadUI';
+import { EmptyState, HapticSwitch } from '@/components/BrandthreadUI';
 import { formatCents } from '@/lib/money';
 import { buildCanonicalCollectionUrl } from '@/lib/shareCollection';
 
@@ -192,11 +192,11 @@ export default function BuyerCollection() {
             <Text style={styles.publicLabel}>Public</Text>
             <Text style={styles.publicDesc}>Anyone with the link can view this board</Text>
           </View>
-          <Switch
+          <HapticSwitch
             value={collection.isPublic}
             onValueChange={togglePublic}
             trackColor={{ false: BORDER, true: theme.accent }}
-            thumbColor="#fff"
+            thumbColor={theme.onAccent}
           />
         </View>
       )}

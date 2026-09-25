@@ -29,15 +29,7 @@ import * as Haptics from 'expo-haptics';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { ONBOARDING_OWNER_KEY } from './_layout';
-import {
-  BG,
-  BORDER,
-  CARD,
-  FG,
-  GRAD_DARK_FADE,
-  GRAD_HERO,
-  MUTED,
-} from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 const EXPLAINER_SEEN_PREFIX = 'thread_explainer_seen:';
 const { width: SW } = Dimensions.get('window');
@@ -135,16 +127,16 @@ export default function ThreadExplainerScreen() {
 
   if (!checked) {
     // Blank while checking AsyncStorage — avoids flash
-    return <View style={{ flex: 1, backgroundColor: BG }} />;
+    return <View style={{ flex: 1, backgroundColor: theme.background }} />;
   }
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: theme.background, paddingTop: insets.top }]}>
       <StatusBar barStyle="light-content" />
 
       {/* Background gradient */}
       <LinearGradient
-        colors={GRAD_HERO}
+        colors={theme.heroGradient}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
         style={StyleSheet.absoluteFill}
@@ -162,21 +154,21 @@ export default function ThreadExplainerScreen() {
           </View>
 
           {/* Hero headline */}
-          <Text style={styles.headline}>Welcome to{'\n'}the Thread.</Text>
-          <Text style={styles.sub}>
+          <Text style={[styles.headline, { color: theme.text }]}>Welcome to{'\n'}the Thread.</Text>
+          <Text style={[styles.sub, { color: theme.muted }]}>
             Brandthread's feed is where independent brands post, drop, and sell — and where you discover them first.
           </Text>
 
           {/* Feature cards */}
           <View style={styles.features}>
             {THREAD_FEATURES.map((feature, i) => (
-              <View key={feature.title} style={styles.featureCard}>
+              <View key={feature.title} style={[styles.featureCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
                 <View style={[styles.featureIconWrap, { backgroundColor: theme.accentDim, borderColor: theme.accentDim }]}>
                   <Feather name={feature.icon} size={22} color={theme.accentLight} />
                 </View>
                 <View style={styles.featureContent}>
-                  <Text style={styles.featureTitle}>{feature.title}</Text>
-                  <Text style={styles.featureBody}>{feature.body}</Text>
+                  <Text style={[styles.featureTitle, { color: theme.text }]}>{feature.title}</Text>
+                  <Text style={[styles.featureBody, { color: theme.muted }]}>{feature.body}</Text>
                 </View>
               </View>
             ))}
@@ -193,7 +185,7 @@ export default function ThreadExplainerScreen() {
         ]}
       >
         <LinearGradient
-            colors={GRAD_DARK_FADE}
+          colors={['transparent', theme.background]}
           style={StyleSheet.absoluteFill}
           pointerEvents="none"
         />
@@ -220,48 +212,43 @@ export default function ThreadExplainerScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: BG,
   },
   scroll: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingHorizontal: SP.lg,
+    paddingTop: SP.md,
   },
   logoWrap: {
-    marginBottom: 28,
+    marginBottom: SP.xl - SP.xs,
   },
   headline: {
-    fontSize: 40,
-    fontFamily: 'Inter_700Bold',
-    color: FG,
+    fontSize: FS.h1 + 4,
+    fontFamily: FONT.bold,
     letterSpacing: -1.5,
     lineHeight: 46,
-    marginBottom: 12,
+    marginBottom: SP.sm,
   },
   sub: {
-    fontSize: 16,
-    fontFamily: 'Inter_400Regular',
-    color: MUTED,
+    fontSize: FS.md,
+    fontFamily: FONT.regular,
     lineHeight: 24,
-    marginBottom: 32,
+    marginBottom: SP.xl,
   },
   features: {
-    gap: 12,
-    marginBottom: 24,
+    gap: SP.sm,
+    marginBottom: SP.lg,
   },
   featureCard: {
     flexDirection: 'row',
     gap: 14,
-    backgroundColor: CARD,
-    borderRadius: 16,
+    borderRadius: RADIUS.lg,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: BORDER,
-    padding: 16,
+    padding: SP.md,
     alignItems: 'flex-start',
   },
   featureIconWrap: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: RADIUS.md,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -272,16 +259,14 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   featureTitle: {
-    fontSize: 16,
-    fontFamily: 'Inter_700Bold',
-    color: FG,
-    marginBottom: 4,
+    fontSize: FS.md,
+    fontFamily: FONT.bold,
+    marginBottom: SP.xs,
     letterSpacing: -0.2,
   },
   featureBody: {
-    fontSize: 13,
-    fontFamily: 'Inter_400Regular',
-    color: MUTED,
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
     lineHeight: 19,
   },
   ctaWrap: {
@@ -289,11 +274,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: 24,
+    paddingHorizontal: SP.lg,
     paddingTop: 28,
   },
   ctaBtn: {
-    borderRadius: 16,
+    borderRadius: RADIUS.lg,
     overflow: 'hidden',
   },
   ctaBtnInner: {
@@ -302,11 +287,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     paddingVertical: 18,
-    borderRadius: 16,
+    borderRadius: RADIUS.lg,
   },
   ctaBtnText: {
-    fontSize: 17,
-    fontFamily: 'Inter_700Bold',
-    color: FG,
+    fontSize: FS.lg,
+    fontFamily: FONT.bold,
   },
 });

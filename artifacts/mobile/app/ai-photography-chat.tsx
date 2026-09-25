@@ -500,7 +500,7 @@ export default function AIPhotographyChatScreen() {
                 testID={`ai-photography-remove-${p.id}`}
                 accessibilityLabel="Remove photo"
               >
-                <Feather name="x" size={11} color="#FFF" />
+                <Feather name="x" size={11} color={colors.destructiveForeground} />
               </TouchableOpacity>
             </View>
           ))}

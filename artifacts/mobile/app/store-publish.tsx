@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
@@ -11,9 +11,6 @@ import * as Clipboard from 'expo-clipboard';
 import { Header } from '@/components/layout';
 import { useApi } from '@/lib/api';
 import {
-  SURFACE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, StatusBadge } from '@/components/BrandthreadUI';
@@ -31,7 +28,14 @@ const ERROR_ROUTES: Record<string, string> = {
 
 export default function StorePublishScreen() {
   const { theme } = useAppTheme();
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const {
+    primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN,
+    foreground: FG, mutedForeground: MUTED, subtle: SUBTLE,
+    success: SUCCESS, destructive: RED, warning: ORANGE, info: BLUE,
+  } = useColors();
+  const SUCCESS_DIM = `${SUCCESS}20`;
+  const RED_DIM = `${RED}20`;
+  const pub = useMemo(() => makePubStyles({ FG, MUTED, SUCCESS, RED }), [FG, MUTED, SUCCESS, RED]);
   const router = useRouter();
   const api = useApi();
   const params = useLocalSearchParams<{ from?: string }>();
@@ -286,8 +290,8 @@ export default function StorePublishScreen() {
         ) : validation?.canPublish ? (
           <GradientCard colors={theme.primaryGradient} style={pub.card} glow>
             <Text style={[pub.publishReadyTitle, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Ready to go live.</Text>
-            <Text style={pub.publishStoreName}>{store?.settings.storeName || 'Your Store'}</Text>
-              <Text style={pub.publishUrl}>https://{storeUrl}.brandthread.app</Text>
+            <Text style={[pub.publishStoreName, { color: `${theme.onAccent}CC` }]}>{store?.settings.storeName || 'Your Store'}</Text>
+              <Text style={[pub.publishUrl, { color: `${theme.onAccent}B3` }]}>https://{storeUrl}.brandthread.app</Text>
             <PrimaryButton
               label={publishing ? 'Publishing...' : 'Publish Store →'}
               onPress={handlePublish}
@@ -302,7 +306,7 @@ export default function StorePublishScreen() {
         {/* Unpublish danger zone */}
         {published && (
           <>
-            <View style={pub.divider} />
+            <View style={[pub.divider, { backgroundColor: theme.border }]} />
             <BrandthreadCard style={pub.card}>
               <Text style={pub.dangerTitle}>Unpublish Store</Text>
               <Text style={pub.dangerDesc}>Your store will no longer be visible to buyers.</Text>
@@ -315,37 +319,39 @@ export default function StorePublishScreen() {
   );
 }
 
-const pub = StyleSheet.create({
-  root: { flex: 1, backgroundColor: 'transparent' },
-  scroll: { paddingBottom: 60, paddingTop: SP.md },
-  card: { marginHorizontal: SP.md, marginBottom: SP.sm, gap: SP.sm },
-  loadingRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, justifyContent: 'center', padding: SP.md },
-  loadingText: { fontSize: FS.base, fontFamily: FONT.medium, color: MUTED },
-  validHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    borderWidth: 1, borderRadius: RADIUS.sm, padding: SP.md,
-  },
-  validHeaderText: { fontSize: FS.base, fontFamily: FONT.semibold, flex: 1 },
-  issueSection: { gap: SP.sm, marginTop: SP.sm },
-  issueTitle: { fontSize: FS.sm, fontFamily: FONT.bold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.5 },
-  issueRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
-  issueText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
-  revalidateBtn: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, justifyContent: 'center', paddingVertical: SP.sm },
-  revalidateText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-  successBlock: { alignItems: 'center', gap: SP.md, padding: SP.md },
-  successIcon: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
-  successTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
-  successUrl: { fontSize: FS.sm, fontFamily: FONT.medium, color: SUCCESS },
-  successActions: { flexDirection: 'row', gap: SP.sm, width: '100%' },
-  publishReadyTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: '#fff' },
-  publishStoreName: { fontSize: FS.base, fontFamily: FONT.semibold, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
-  publishUrl: { fontSize: FS.sm, fontFamily: FONT.regular, color: 'rgba(255,255,255,0.7)' },
-  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.07)', marginVertical: SP.md, marginHorizontal: SP.md },
-  dangerTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: RED },
-  dangerDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  shareTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
-  shareDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 19 },
-  shareActions: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.xs },
-  revokeBtn: { paddingHorizontal: SP.sm, paddingVertical: SP.sm },
-  revokeText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: RED },
-});
+function makePubStyles(c: { FG: string; MUTED: string; SUCCESS: string; RED: string }) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: 'transparent' },
+    scroll: { paddingBottom: 60, paddingTop: SP.md },
+    card: { marginHorizontal: SP.md, marginBottom: SP.sm, gap: SP.sm },
+    loadingRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, justifyContent: 'center', padding: SP.md },
+    loadingText: { fontSize: FS.base, fontFamily: FONT.medium, color: c.MUTED },
+    validHeader: {
+      flexDirection: 'row', alignItems: 'center', gap: SP.sm,
+      borderWidth: 1, borderRadius: RADIUS.sm, padding: SP.md,
+    },
+    validHeaderText: { fontSize: FS.base, fontFamily: FONT.semibold, flex: 1 },
+    issueSection: { gap: SP.sm, marginTop: SP.sm },
+    issueTitle: { fontSize: FS.sm, fontFamily: FONT.bold, color: c.MUTED, textTransform: 'uppercase', letterSpacing: 0.5 },
+    issueRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
+    issueText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
+    revalidateBtn: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, justifyContent: 'center', paddingVertical: SP.sm },
+    revalidateText: { fontSize: FS.sm, fontFamily: FONT.medium, color: c.MUTED },
+    successBlock: { alignItems: 'center', gap: SP.md, padding: SP.md },
+    successIcon: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
+    successTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: c.FG },
+    successUrl: { fontSize: FS.sm, fontFamily: FONT.medium, color: c.SUCCESS },
+    successActions: { flexDirection: 'row', gap: SP.sm, width: '100%' },
+    publishReadyTitle: { fontSize: FS.xl, fontFamily: FONT.bold },
+    publishStoreName: { fontSize: FS.base, fontFamily: FONT.semibold, marginTop: 4 },
+    publishUrl: { fontSize: FS.sm, fontFamily: FONT.regular },
+    divider: { height: 1, marginVertical: SP.md, marginHorizontal: SP.md },
+    dangerTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: c.RED },
+    dangerDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: c.MUTED },
+    shareTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: c.FG },
+    shareDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: c.MUTED, lineHeight: 19 },
+    shareActions: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.xs },
+    revokeBtn: { paddingHorizontal: SP.sm, paddingVertical: SP.sm },
+    revokeText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: c.RED },
+  });
+}

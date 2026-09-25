@@ -2,14 +2,11 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useFocusEffect } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
-import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, SUCCESS, RED, ORANGE, FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { useAppTheme, AppThemePreset } from '@/contexts/AppThemeContext';
 import { Header } from '@/components/layout';
 import { useApi } from '@/lib/api';
 import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
@@ -44,12 +41,12 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function statusConfig(status: PayoutStatus, theme: { secondary: string; secondaryDim: string }) {
+function statusConfig(status: PayoutStatus, theme: AppThemePreset) {
   return {
-    paid:       { label: 'Paid',       color: SUCCESS,        bg: `${SUCCESS}20` },
-    pending:    { label: 'Pending',    color: ORANGE,         bg: `${ORANGE}20` },
+    paid:       { label: 'Paid',       color: theme.success,   bg: `${theme.success}20` },
+    pending:    { label: 'Pending',    color: theme.warning,   bg: `${theme.warning}20` },
     in_transit: { label: 'In transit', color: theme.secondary, bg: theme.secondaryDim },
-    failed:     { label: 'Failed',     color: RED,            bg: `${RED}20` },
+    failed:     { label: 'Failed',     color: theme.error,     bg: `${theme.error}20` },
   }[status];
 }
 
@@ -209,7 +206,7 @@ export default function PayoutsScreen() {
         </View>
         <View style={[styles.balanceCard, { flex: 1 }]}>
           <Text style={styles.balanceLabel}>Pending</Text>
-          <Text style={[styles.balanceAmount, { color: MUTED }]}>{pendFmt}</Text>
+          <Text style={[styles.balanceAmount, { color: theme.muted }]}>{pendFmt}</Text>
         </View>
       </View>
 
@@ -241,8 +238,8 @@ export default function PayoutsScreen() {
             <ActivityIndicator color={theme.accent} style={{ marginTop: 40 }} />
           ) : payouts.length === 0 ? (
             <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-              <Feather name="inbox" size={28} color={MUTED} />
-              <Text style={{ color: MUTED, fontSize: FS.sm, fontFamily: FONT.regular, marginTop: 10 }}>
+              <Feather name="inbox" size={28} color={theme.muted} />
+              <Text style={{ color: theme.muted, fontSize: FS.sm, fontFamily: FONT.regular, marginTop: 10 }}>
                 {balance?.connected === false ? 'Connect Stripe to receive payouts' : 'No payouts yet'}
               </Text>
             </View>
@@ -288,10 +285,10 @@ export default function PayoutsScreen() {
             </View>
              {!connectLoading && connectStatus && (
                <View style={[styles.statusPill, {
-                 backgroundColor: connectStatus.verified ? `${SUCCESS}20` : `${ORANGE}20`,
+                 backgroundColor: connectStatus.verified ? `${theme.success}20` : `${theme.warning}20`,
                }]}>
                  <Text style={[styles.statusText, {
-                   color: connectStatus.verified ? SUCCESS : ORANGE,
+                   color: connectStatus.verified ? theme.success : theme.warning,
                  }]}>
                    {connectStatus.verified
                      ? 'Verified'
@@ -333,7 +330,7 @@ export default function PayoutsScreen() {
                  connectStatus.requirementsDue.map((field) => (
                    <View key={field} style={styles.settingsRow}>
                      <Text style={styles.settingsLabel}>{requirementLabel(field)}</Text>
-                     <Feather name="alert-circle" size={14} color={ORANGE} />
+                     <Feather name="alert-circle" size={14} color={theme.warning} />
                    </View>
                  ))
                )}
@@ -395,46 +392,46 @@ export default function PayoutsScreen() {
   );
 }
 
-const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
-  const { accent } = theme;
+const createStyles = (theme: AppThemePreset) => {
+  const { accent, text, muted, subtle, card, border, warning } = theme;
   return StyleSheet.create({
   root:         { flex: 1, backgroundColor: 'transparent' },
   accessLoading:{ flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
+  header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: border },
   backBtn:      { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:  { flex: 1, textAlign: 'center', color: FG, fontSize: FS.lg, fontFamily: FONT.semibold },
-  devBanner:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: `${ORANGE}15`, paddingHorizontal: SP.md, paddingVertical: 8 },
-  devBannerText:{ color: ORANGE, fontSize: FS.xs, fontFamily: FONT.medium },
+  headerTitle:  { flex: 1, textAlign: 'center', color: text, fontSize: FS.lg, fontFamily: FONT.semibold },
+  devBanner:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: `${warning}15`, paddingHorizontal: SP.md, paddingVertical: 8 },
+  devBannerText:{ color: warning, fontSize: FS.xs, fontFamily: FONT.medium },
   balanceRow:   { flexDirection: 'row', padding: SP.md },
-  balanceCard:  { backgroundColor: CARD, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: BORDER },
-  balanceLabel: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: 4 },
-  balanceAmount:{ color: FG, fontSize: FS.xl, fontFamily: FONT.semibold, marginBottom: 2 },
-  balanceSub:   { color: SUBTLE, fontSize: FS.xs, fontFamily: FONT.regular },
-  tabRow:       { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, marginHorizontal: SP.md },
+  balanceCard:  { backgroundColor: card, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: border },
+  balanceLabel: { color: muted, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: 4 },
+  balanceAmount:{ color: text, fontSize: FS.xl, fontFamily: FONT.semibold, marginBottom: 2 },
+  balanceSub:   { color: subtle, fontSize: FS.xs, fontFamily: FONT.regular },
+  tabRow:       { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: border, marginHorizontal: SP.md },
   tab:          { flex: 1, paddingVertical: SP.sm, alignItems: 'center' },
    tabActive:    { borderBottomWidth: 2, borderBottomColor: accent },
-  tabText:      { color: MUTED, fontSize: FS.sm, fontFamily: FONT.medium },
+  tabText:      { color: muted, fontSize: FS.sm, fontFamily: FONT.medium },
    tabTextActive:{ color: accent },
   list:         { padding: SP.md },
-  payoutRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
+  payoutRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SP.md, borderBottomWidth: 1, borderBottomColor: border },
   payoutLeft:   {},
   payoutRight:  { alignItems: 'flex-end', gap: 4 },
-  payoutDate:   { color: FG, fontSize: FS.base, fontFamily: FONT.medium },
-  payoutSub:    { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-  payoutAmount: { color: FG, fontSize: FS.base, fontFamily: FONT.semibold },
+  payoutDate:   { color: text, fontSize: FS.base, fontFamily: FONT.medium },
+  payoutSub:    { color: muted, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
+  payoutAmount: { color: text, fontSize: FS.base, fontFamily: FONT.semibold },
   statusPill:   { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2 },
   statusText:   { fontSize: FS.xs, fontFamily: FONT.medium },
-  totalRow:     { flexDirection: 'row', justifyContent: 'space-between', marginTop: SP.lg, paddingTop: SP.md, borderTopWidth: 1, borderTopColor: BORDER },
-  totalLabel:   { color: MUTED, fontSize: FS.sm, fontFamily: FONT.medium },
-  totalAmount:  { color: FG, fontSize: FS.base, fontFamily: FONT.semibold },
-  bankCard:     { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: BORDER, marginBottom: SP.md },
-  bankLabel:    { color: FG, fontSize: FS.base, fontFamily: FONT.medium },
-  bankSub:      { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-  settingsSection:{ backgroundColor: CARD, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: BORDER, marginBottom: SP.md },
-  sectionTitle: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: SP.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
-  settingsRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: SP.sm, borderTopWidth: 1, borderTopColor: BORDER },
-  settingsLabel:{ color: MUTED, fontSize: FS.sm, fontFamily: FONT.regular },
-  settingsValue:{ color: FG, fontSize: FS.sm, fontFamily: FONT.medium },
+  totalRow:     { flexDirection: 'row', justifyContent: 'space-between', marginTop: SP.lg, paddingTop: SP.md, borderTopWidth: 1, borderTopColor: border },
+  totalLabel:   { color: muted, fontSize: FS.sm, fontFamily: FONT.medium },
+  totalAmount:  { color: text, fontSize: FS.base, fontFamily: FONT.semibold },
+  bankCard:     { flexDirection: 'row', alignItems: 'center', backgroundColor: card, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: border, marginBottom: SP.md },
+  bankLabel:    { color: text, fontSize: FS.base, fontFamily: FONT.medium },
+  bankSub:      { color: muted, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
+  settingsSection:{ backgroundColor: card, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: border, marginBottom: SP.md },
+  sectionTitle: { color: muted, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: SP.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
+  settingsRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: SP.sm, borderTopWidth: 1, borderTopColor: border },
+  settingsLabel:{ color: muted, fontSize: FS.sm, fontFamily: FONT.regular },
+  settingsValue:{ color: text, fontSize: FS.sm, fontFamily: FONT.medium },
    addBankBtn:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm, justifyContent: 'center', padding: SP.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: accent, borderStyle: 'dashed' },
    addBankText:  { color: accent, fontSize: FS.sm, fontFamily: FONT.medium },
   });

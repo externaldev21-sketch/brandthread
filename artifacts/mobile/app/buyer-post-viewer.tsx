@@ -229,8 +229,8 @@ export default function BuyerPostViewer() {
         {/* Engagement bar */}
         <View style={s.engagementBar}>
           <TouchableOpacity style={s.engageBtn} onPress={handleLike}>
-            <Feather name="heart" size={22} color={liked ? '#F472B6' : FG} />
-            <Text style={[s.engageCount, liked && { color: '#F472B6' }]}>{likeCount}</Text>
+            <Feather name="heart" size={22} color={liked ? RED : FG} />
+            <Text style={[s.engageCount, liked && { color: RED }]}>{likeCount}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={s.engageBtn}

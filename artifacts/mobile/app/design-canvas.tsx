@@ -5318,7 +5318,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.md, paddingVertical: SP.xs, borderRadius: RADIUS.pill,
     backgroundColor: 'rgba(0,0,0,0.7)',
   },
-  eyedropperHintText: { fontFamily: FONT.medium, fontSize: FS.xs, color: '#FFFFFF', includeFontPadding: false },
+  eyedropperHintText: { fontFamily: FONT.medium, fontSize: FS.xs, color: '#FFFFFF', includeFontPadding: false }, // theme-exempt: text on a fixed black scrim over the canvas
 
   topBar: {
     flexDirection: 'row', alignItems: 'center',

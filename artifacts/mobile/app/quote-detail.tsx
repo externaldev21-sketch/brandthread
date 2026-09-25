@@ -454,7 +454,7 @@ export default function QuoteDetailScreen() {
                   onPress={handleStartSample}
                   loading={actionLoading}
                   icon="package"
-                  colors={['#10B981', '#34D399']}
+                  colors={GRAD_SUCCESS_G}
                 />
                 <SecondaryButton
                   label="Message Manufacturer"
@@ -485,7 +485,7 @@ export default function QuoteDetailScreen() {
                 onPress={handleAccept}
                 loading={actionLoading}
                 icon="check"
-                colors={['#10B981', '#34D399']}
+                colors={GRAD_SUCCESS_G}
               />
               <SecondaryButton
                 label="Send Counteroffer"

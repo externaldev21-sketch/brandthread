@@ -8,7 +8,7 @@ import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
 import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
-import { SUCCESS, ORANGE, FS } from '@/lib/theme';
+import { FS } from '@/lib/theme';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { formatCents } from '@/lib/money';
 import { FinanceMoneyFlow } from '@/components/FinanceMoneyFlow';
@@ -166,14 +166,14 @@ export default function FinanceScreen() {
             <View style={[
               styles.subStatusPill,
               { backgroundColor: subStatus.status === 'trialing' ? colors.infoDim
-                  : subStatus.status === 'active' ? `${SUCCESS}22`
-                  : `${ORANGE}22` },
+                  : subStatus.status === 'active' ? `${colors.success}22`
+                  : `${colors.warning}22` },
             ]}>
               <Text style={[
                 styles.subStatusText,
                 { color: subStatus.status === 'trialing' ? colors.info
-                    : subStatus.status === 'active' ? SUCCESS
-                    : ORANGE },
+                    : subStatus.status === 'active' ? colors.success
+                    : colors.warning },
               ]}>
                 {subStatus.status === 'trialing' ? 'Trial'
                   : subStatus.status === 'active' ? 'Active'

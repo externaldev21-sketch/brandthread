@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
-  ActivityIndicator, Alert, Switch, Image,
+  ActivityIndicator, Alert, Image,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -25,7 +25,8 @@ import {
   RED, RED_DIM,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+import { HapticSwitch, PrimaryButton } from '@/components/BrandthreadUI';
 
 export default function BuyerProblemReportScreen() {
   const { theme } = useAppTheme();
@@ -102,11 +103,7 @@ export default function BuyerProblemReportScreen() {
         <View style={s.successIcon}><Feather name="check" size={32} color={ON_DARK} /></View>
         <Text style={s.successTitle}>Report submitted</Text>
         <Text style={s.successSub}>Your problem report has been received. Our team will review it and reach out if needed.</Text>
-        <TouchableOpacity style={s.doneBtn} onPress={() => router.back()} activeOpacity={0.85}>
-          <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.doneBtnGrad}>
-            <Text style={[s.doneBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Back to Order</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+        <PrimaryButton label="Back to Order" onPress={() => router.back()} style={s.doneBtn} />
       </View>
     );
   }
@@ -195,7 +192,7 @@ export default function BuyerProblemReportScreen() {
                 <Text style={s.switchLabel}>Contacted the seller</Text>
                 <Text style={s.switchSub}>Have you already reached out to the seller about this issue?</Text>
               </View>
-              <Switch
+              <HapticSwitch
                 value={contactedSeller}
                 onValueChange={setContactedSeller}
                 trackColor={{ true: PURPLE, false: BORDER }}
@@ -229,11 +226,7 @@ export default function BuyerProblemReportScreen() {
       </ScrollView>
 
       <View style={[s.bottomBar, { paddingBottom: insets.bottom + SP.sm }]}>
-        <TouchableOpacity style={s.submitBtn} onPress={handleSubmit} activeOpacity={0.88} disabled={submitting}>
-          <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.submitGrad}>
-            {submitting ? <ActivityIndicator color={theme.onAccent} size="small" /> : <Text style={[s.submitText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Send report</Text>}
-          </LinearGradient>
-        </TouchableOpacity>
+        <PrimaryButton label="Send report" onPress={handleSubmit} loading={submitting} disabled={submitting} />
       </View>
     </View>
   );

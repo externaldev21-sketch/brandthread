@@ -393,7 +393,7 @@ function SellerLiveNativeScreen() {
                        <Text style={[s.pickerRowPrice, { color: MUTED }]}>{formatCents(p.priceCents ?? 0)}</Text>
                     </View>
                     <View style={[s.checkbox, tagged && { backgroundColor: PURPLE, borderColor: PURPLE }]}>
-                      {tagged && <Feather name="check" size={13} color="#fff" />}
+                      {tagged && <Feather name="check" size={13} color={theme.onAccent} />}
                     </View>
                   </TouchableOpacity>
                 );

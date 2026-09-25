@@ -988,17 +988,19 @@ function Review({
 
 // ─── Confirmation screen ──────────────────────────────────────────────────────
 
+// Colors are theme keywords resolved at render time (never literal hex) so
+// confetti stays monochrome-brand and reacts to all 12 themes.
 const CONFETTI = [
-  { left: '5%', color: SUCCESS, delay: 0, x: -14 },
+  { left: '5%', color: 'success', delay: 0, x: -14 },
   { left: '13%', color: 'accent', delay: 90, x: 18 },
   { left: '22%', color: 'secondary', delay: 180, x: -8 },
   { left: '31%', color: 'secondary', delay: 50, x: 14 },
-  { left: '42%', color: '#F87171', delay: 230, x: -18 },
-  { left: '53%', color: SUCCESS, delay: 110, x: 10 },
+  { left: '42%', color: 'foreground', delay: 230, x: -18 },
+  { left: '53%', color: 'success', delay: 110, x: 10 },
   { left: '64%', color: 'accent', delay: 20, x: -12 },
   { left: '73%', color: 'secondary', delay: 260, x: 17 },
   { left: '82%', color: 'secondary', delay: 140, x: -10 },
-  { left: '92%', color: '#F87171', delay: 70, x: 13 },
+  { left: '92%', color: 'foreground', delay: 70, x: 13 },
 ] as const;
 
 function Confirmation({
@@ -1087,7 +1089,8 @@ function Confirmation({
                   backgroundColor:
                     particle.color === 'accent' ? theme.accent
                     : particle.color === 'secondary' ? theme.secondary
-                    : particle.color,
+                    : particle.color === 'success' ? theme.success
+                    : theme.text,
                   opacity: confettiProgress.interpolate({ inputRange: [0, 0.82, 1], outputRange: [1, 1, 0] }),
                   transform: [
                     { translateX: confettiProgress.interpolate({ inputRange: [0, 1], outputRange: [0, particle.x] }) },

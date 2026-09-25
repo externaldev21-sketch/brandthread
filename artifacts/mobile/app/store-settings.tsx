@@ -6,7 +6,6 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import {
-  SUCCESS, BLUE, ORANGE, RED,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import {
@@ -29,13 +28,13 @@ const STATUS_OPTIONS: { value: StorePublishStatus; label: string }[] = [
   { value: 'unpublished', label: 'Unpublished' },
 ];
 
-function statusColor(st: StorePublishStatus, mutedColor: string): string {
-  if (st === 'published') return SUCCESS;
-  if (st === 'draft') return BLUE;
-  if (st === 'password_protected') return ORANGE;
-  if (st === 'maintenance') return ORANGE;
-  if (st === 'unpublished') return RED;
-  return mutedColor;
+function statusColor(st: StorePublishStatus, colors: Colors): string {
+  if (st === 'published') return colors.success;
+  if (st === 'draft') return colors.info;
+  if (st === 'password_protected') return colors.warning;
+  if (st === 'maintenance') return colors.warning;
+  if (st === 'unpublished') return colors.destructive;
+  return colors.mutedForeground;
 }
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD'];
@@ -220,7 +219,7 @@ export default function StoreSettingsScreen() {
           <View style={ss.chipRow}>
             {STATUS_OPTIONS.map(opt => {
               const isActive = form.storeStatus === opt.value;
-              const chipColor = statusColor(opt.value, colors.mutedForeground);
+              const chipColor = statusColor(opt.value, colors);
               return (
                 <PressableScale
                   key={opt.value}

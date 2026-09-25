@@ -119,12 +119,12 @@ export function SellerDashboardListItem({
       </View>
       <View style={styles.listBody}>
         <View style={styles.listTitleRow}>
-           <Text style={[styles.listTitle, { color: palette.foreground }, subtitle && styles.listTitleWithSubtitle]} numberOfLines={2} maxFontSizeMultiplier={2}>
+           <Text style={[styles.listTitle, { color: palette.text }, subtitle && styles.listTitleWithSubtitle]} numberOfLines={2} maxFontSizeMultiplier={2}>
             {title}
           </Text>
           {badge !== undefined && badge > 0 ? (
-             <View style={[styles.badge, { backgroundColor: palette.statusError ?? RED }]}>
-               <Text style={[styles.badgeText, { color: palette.onStatus ?? '#FFF' }]} maxFontSizeMultiplier={2}>{badge > 9 ? '9+' : badge}</Text>
+             <View style={[styles.badge, { backgroundColor: theme.error }]}>
+               <Text style={styles.badgeText} maxFontSizeMultiplier={2}>{badge > 9 ? '9+' : badge}</Text>
             </View>
           ) : null}
         </View>
@@ -134,7 +134,7 @@ export function SellerDashboardListItem({
       </View>
       <View style={styles.listRight}>
         {value ? (
-             <Text style={[styles.listValue, { color: palette.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} maxFontSizeMultiplier={2}>
+             <Text style={[styles.listValue, { color: palette.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} maxFontSizeMultiplier={2}>
             {value}
           </Text>
         ) : null}

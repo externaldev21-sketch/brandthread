@@ -2,28 +2,23 @@
  * Brandthread AI Brain — Brand Memory Settings Screen
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useColors } from '@/hooks/useColors';
 import {
   View,
   Text,
   ScrollView,
   TextInput,
-  Switch,
-  TouchableOpacity,
-  Pressable,
   Alert,
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
-import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, CYAN, RED,
-  FONT, FS, SP, RADIUS,
-} from '../lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { PressableScale, HapticSwitch, TertiaryButton } from '@/components/BrandthreadUI';
 import { BrandMemory, DEFAULT_BRAND_MEMORY } from '../services/aiTypes';
 import {
   getBrandMemory,
@@ -33,12 +28,10 @@ import {
   rebuildBrandMemory,
 } from '../services/aiBrandMemory';
 
-const BORDER_COLOR = 'rgba(255,255,255,0.07)';
-
 export default function AiBrandMemoryScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { getToken } = useAuth();
   const [localMemory, setLocalMemory] = useState<BrandMemory | null>(null);
   const [saving, setSaving] = useState(false);
@@ -104,19 +97,23 @@ export default function AiBrandMemoryScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBack}>
-          <Feather name="chevron-left" size={24} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Brand Memory</Text>
-        <TouchableOpacity onPress={handleSave} style={styles.headerSave} disabled={saving}>
-          {saving
-            ? <ActivityIndicator size="small" color={PURPLE} />
-            : <Text style={styles.headerSaveText}>Save</Text>
-          }
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title="Brand Memory"
+        rightElement={
+          <PressableScale
+            onPress={handleSave}
+            disabled={saving}
+            style={styles.headerSave}
+            accessibilityRole="button"
+            accessibilityLabel="Save brand memory"
+          >
+            {saving
+              ? <ActivityIndicator size="small" color={colors.primary} />
+              : <Text style={styles.headerSaveText}>Save</Text>
+            }
+          </PressableScale>
+        }
+      />
 
       <ScrollView
         style={styles.scroll}
@@ -132,10 +129,13 @@ export default function AiBrandMemoryScreen() {
         </View>
 
         {/* Rebuild row */}
-        <Pressable style={styles.rebuildRow} onPress={handleRebuild}>
-          <Feather name="refresh-cw" size={16} color={CYAN} />
+        <PressableScale style={styles.rebuildRow} onPress={handleRebuild} disabled={rebuilding}>
+          {rebuilding
+            ? <ActivityIndicator size="small" color={colors.info} />
+            : <Feather name="refresh-cw" size={16} color={colors.info} />
+          }
           <Text style={styles.rebuildText}>Rebuild from data</Text>
-        </Pressable>
+        </PressableScale>
 
         {/* Memory fields */}
         {localMemory && memoryKeys.map((key, index) => {
@@ -146,11 +146,11 @@ export default function AiBrandMemoryScreen() {
                 {/* Row header */}
                 <View style={styles.fieldHeader}>
                   <Text style={styles.fieldLabel}>{field.label}</Text>
-                  <Switch
+                  <HapticSwitch
                     value={field.enabled}
                     onValueChange={() => handleToggle(key)}
-                    trackColor={{ false: BORDER_COLOR, true: PURPLE }}
-                    thumbColor={FG}
+                    trackColor={{ false: colors.border, true: colors.primary }}
+                    thumbColor={colors.foreground}
                   />
                 </View>
 
@@ -163,7 +163,7 @@ export default function AiBrandMemoryScreen() {
                     multiline
                     numberOfLines={3}
                     placeholder={`Enter ${field.label.toLowerCase()}…`}
-                    placeholderTextColor={SUBTLE}
+                    placeholderTextColor={colors.subtle}
                   />
                 ) : (
                   <Text style={styles.fieldDisabled}>
@@ -180,55 +180,32 @@ export default function AiBrandMemoryScreen() {
 
         {!localMemory && (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator color={PURPLE} />
+            <ActivityIndicator color={colors.primary} />
           </View>
         )}
 
         {/* Clear all */}
-        <TouchableOpacity style={styles.clearButton} onPress={handleClearAll}>
-          <Text style={styles.clearText}>Clear all memory</Text>
-        </TouchableOpacity>
+        <TertiaryButton label="Clear all memory" onPress={handleClearAll} accent={colors.destructive} style={styles.clearButton} />
       </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'transparent',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.md,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER_COLOR,
-    backgroundColor: BG,
-  },
-  headerBack: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.md,
-    color: FG,
-  },
   headerSave: {
-    width: 60,
-    height: 40,
+    minHeight: 40,
+    paddingHorizontal: SP.sm,
     alignItems: 'flex-end',
     justifyContent: 'center',
   },
   headerSaveText: {
     fontFamily: FONT.semibold,
     fontSize: FS.base,
-    color: PURPLE,
+    color: colors.primary,
   },
   scroll: {
     flex: 1,
@@ -236,20 +213,20 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: SP.md,
     paddingTop: SP.md,
-    paddingBottom: 48,
+    paddingBottom: SP.xxl,
   },
   infoCard: {
-    backgroundColor: CARD,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
+    backgroundColor: colors.card,
+    borderRadius: RADIUS.md,
+    padding: SP.md,
+    marginBottom: SP.md,
     borderWidth: 1,
-    borderColor: BORDER_COLOR,
+    borderColor: colors.border,
   },
   infoText: {
     fontFamily: FONT.regular,
     fontSize: FS.sm,
-    color: MUTED,
+    color: colors.mutedForeground,
     lineHeight: 20,
   },
   rebuildRow: {
@@ -262,14 +239,14 @@ const styles = StyleSheet.create({
   rebuildText: {
     fontFamily: FONT.medium,
     fontSize: FS.sm,
-    color: CYAN,
+    color: colors.info,
   },
   fieldCard: {
-    backgroundColor: CARD,
-    borderRadius: 12,
+    backgroundColor: colors.card,
+    borderRadius: RADIUS.md,
     padding: SP.md,
     borderWidth: 1,
-    borderColor: BORDER_COLOR,
+    borderColor: colors.border,
   },
   fieldHeader: {
     flexDirection: 'row',
@@ -280,43 +257,36 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontFamily: FONT.medium,
     fontSize: FS.sm,
-    color: FG,
+    color: colors.foreground,
     flex: 1,
     paddingRight: SP.sm,
   },
   fieldInput: {
-    color: FG,
-    backgroundColor: BG,
-    borderColor: BORDER_COLOR,
+    color: colors.foreground,
+    backgroundColor: colors.background,
+    borderColor: colors.border,
     borderWidth: 1,
     fontFamily: FONT.regular,
     fontSize: FS.sm,
-    borderRadius: 10,
-    padding: 10,
+    borderRadius: RADIUS.sm,
+    padding: SP.sm,
     minHeight: 72,
     textAlignVertical: 'top',
   },
   fieldDisabled: {
     fontFamily: FONT.regular,
     fontSize: FS.xs,
-    color: SUBTLE,
-    padding: 8,
+    color: colors.subtle,
+    padding: SP.sm,
   },
   divider: {
-    height: 8,
+    height: SP.sm,
   },
   loadingContainer: {
     paddingVertical: SP.xl,
     alignItems: 'center',
   },
   clearButton: {
-    alignItems: 'center',
-    paddingVertical: SP.md,
     marginTop: SP.md,
-  },
-  clearText: {
-    fontFamily: FONT.medium,
-    fontSize: FS.sm,
-    color: RED,
   },
 });

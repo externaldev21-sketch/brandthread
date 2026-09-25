@@ -15,9 +15,6 @@ import { Feather } from '@expo/vector-icons';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import { Header } from '@/components/layout';
 import {
-  BG, CARD, SURFACE, BORDER,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, SUCCESS, ORANGE, ORANGE_DIM,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, StatusBadge } from '@/components/BrandthreadUI';
@@ -39,7 +36,10 @@ const POLICY_TYPES: { type: PolicyType; label: string; icon: keyof typeof Feathe
 
 export default function StorePoliciesScreen() {
   const { theme } = useAppTheme();
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const {
+    primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN,
+    card: CARD, border: BORDER, foreground: FG, mutedForeground: MUTED, subtle: SUBTLE, success: SUCCESS,
+  } = useColors();
   const router = useRouter();
   const headerTopInset = useHeaderTopInset();
   const api = useApi();

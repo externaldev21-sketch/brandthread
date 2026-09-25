@@ -98,7 +98,7 @@ export default function SellerDropPreview() {
           {heroUri ? (
             <Image source={{ uri: heroUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           ) : (
-            <LinearGradient colors={['#23202A', '#050506']} style={StyleSheet.absoluteFill} />
+            <LinearGradient colors={[theme.cardElevated, theme.background]} style={StyleSheet.absoluteFill} />
           )}
           <LinearGradient colors={['rgba(0,0,0,0.15)', 'rgba(0,0,0,0.92)']} style={StyleSheet.absoluteFill} />
 

@@ -360,6 +360,12 @@ export default function StoreFromSocialScreen() {
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE_DIM = theme.accentDim;
   const PURPLE_LIGHT = theme.accentLight;
+  const PURPLE = theme.accent;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const SUBTLE = theme.subtle;
+  const CARD = theme.card;
+  const SURFACE = theme.surface;
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
   scroll: { paddingBottom: 80, paddingTop: SP.md },

@@ -12,11 +12,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Header } from '@/components/layout';
 import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
-  ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
+  FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
@@ -155,7 +151,7 @@ export default function StoreThemePicker() {
               disabled={isCurrent || isApplying}
             >
               {isApplying ? (
-                <ActivityIndicator size="small" color={FG} />
+                <ActivityIndicator size="small" color={theme.text} />
               ) : (
                 <Text style={styles.useBtnText}>{isCurrent ? 'Active' : 'Use Theme'}</Text>
               )}
@@ -199,7 +195,7 @@ export default function StoreThemePicker() {
               </Text>
               <Text style={styles.detailDesc}>{previewingTheme.description}</Text>
               <Text style={styles.detailBestFor}>
-                <Text style={{ color: MUTED }}>Best for: </Text>
+                <Text style={{ color: theme.muted }}>Best for: </Text>
                 {previewingTheme.bestFor}
               </Text>
             </View>
@@ -208,7 +204,7 @@ export default function StoreThemePicker() {
               style={styles.closeBtn}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Feather name="x" size={ICON.md} color={MUTED} />
+              <Feather name="x" size={ICON.md} color={theme.muted} />
             </TouchableOpacity>
           </View>
 
@@ -292,6 +288,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE_DIM = theme.accentDim;
   const CYAN = theme.secondary;
   const BORDER_ACTIVE = theme.accentLight;
+  const CARD = theme.card;
+  const CARD_ELEVATED = theme.cardElevated;
+  const BORDER = theme.border;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const SUBTLE = theme.subtle;
+  const SUCCESS = theme.success;
   return StyleSheet.create({
   root: {
     flex: 1,
@@ -344,7 +347,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     position: 'absolute',
     top: SP.sm,
     left: SP.sm,
-    backgroundColor: SUCCESS,
+    backgroundColor: `${SUCCESS}26`,
     borderRadius: RADIUS.pill,
     paddingHorizontal: 7,
     paddingVertical: 3,
@@ -352,14 +355,14 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   currentBadgeText: {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: '#fff',
+    color: SUCCESS,
     letterSpacing: 0.5,
   },
   previewingBadge: {
     position: 'absolute',
     top: SP.sm,
     left: SP.sm,
-    backgroundColor: CYAN,
+    backgroundColor: `${CYAN}26`,
     borderRadius: RADIUS.pill,
     paddingHorizontal: 7,
     paddingVertical: 3,
@@ -367,7 +370,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   previewingBadgeText: {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: '#000',
+    color: CYAN,
     letterSpacing: 0.5,
   },
   themeInfo: {

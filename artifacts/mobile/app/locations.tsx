@@ -13,7 +13,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
-import { SUCCESS, SUCCESS_DIM, FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 interface Location {
   id: string;
@@ -202,9 +202,9 @@ export default function LocationsScreen() {
                       <TouchableOpacity
                         onPress={() => toggleActive(loc)}
                         activeOpacity={0.7}
-                        style={[s.statusPill, { backgroundColor: loc.is_active ? SUCCESS_DIM : `${colors.border}80` }]}
+                        style={[s.statusPill, { backgroundColor: loc.is_active ? `${colors.success}20` : `${colors.border}80` }]}
                       >
-                        <Text style={[s.statusPillText, { color: loc.is_active ? SUCCESS : colors.mutedForeground }]}>
+                        <Text style={[s.statusPillText, { color: loc.is_active ? colors.success : colors.mutedForeground }]}>
                           {loc.is_active ? 'Active' : 'Inactive'}
                         </Text>
                       </TouchableOpacity>
