@@ -55,6 +55,7 @@ import {
 import { ShopProductSheet } from '@/components/ShopProductSheet';
 import type { ShopSheetSelection } from '@/components/ShopProductSheet';
 import { FeedGestureGuide } from '@/components/FeedGestureGuide';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { hasSeenFeedGestureGuide, markFeedGestureGuideSeen } from '@/lib/feedGestureGuideStorage';
 import type { BuyerProduct } from '@/services/cartTypes';
 import { getCart } from '@/services/cartService';
@@ -1205,6 +1206,7 @@ function SpotlightPage({
   /** 2x while holding the right side of the video. */
   const [speedActive, setSpeedActive] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [captionExpanded, setCaptionExpanded] = useState(false);
   const { showToast } = useFeedToast();
   const heartBurst = useRef(new Animated.Value(0)).current;
   const heartScale = useRef(new Animated.Value(1)).current;
@@ -1426,7 +1428,7 @@ function SpotlightPage({
         <EngagementButton
           icon="heart"
           solidIcon="heart"
-          iconSize={22}
+          iconSize={25}
           count={formatCount(engagement?.likes ?? 0)}
           active={engagement?.liked ?? false}
           activeColor="#EF4444"
@@ -1453,7 +1455,7 @@ function SpotlightPage({
           accessibilityRole="button"
           accessibilityLabel={`Comments, ${formatCount(item.commentsCount ?? (engagement?.comments ?? []).length)}`}
         >
-          <FontAwesome name="commenting" size={21} color={ON_DARK} />
+          <FontAwesome name="commenting" size={24} color={ON_DARK} />
           <Text style={styles.railCount}>{formatCount(item.commentsCount ?? (engagement?.comments ?? []).length)}</Text>
         </TouchableOpacity>
 
@@ -1461,7 +1463,7 @@ function SpotlightPage({
         <EngagementButton
           icon="repeat"
           solidIcon="retweet"
-          iconSize={22}
+          iconSize={25}
           count={formatCount(engagement?.reposts ?? 0)}
           active={engagement?.reposted ?? false}
           activeColor={theme.accent}
@@ -1484,7 +1486,7 @@ function SpotlightPage({
         <EngagementButton
           icon="bookmark"
           solidIcon="bookmark"
-          iconSize={21}
+          iconSize={24}
           count={formatCount(engagement?.saves ?? item.saves)}
           active={engagement?.saved ?? false}
           activeColor={GOLD}
@@ -1515,7 +1517,7 @@ function SpotlightPage({
             setShareOpen(true);
           }}
         >
-          <FontAwesome name="share" size={21} color={ON_DARK} />
+          <FontAwesome name="share" size={24} color={ON_DARK} />
           <Text style={styles.railCount}>{formatCount(item.shares)}</Text>
         </TouchableOpacity>
 
@@ -1588,10 +1590,19 @@ function SpotlightPage({
           </View>
         </TouchableOpacity>
 
-         <Text style={styles.caption} numberOfLines={2}>
-           {item.caption}
-            {item.caption.length > 86 && <Text style={styles.moreText}> more</Text>}
-         </Text>
+        <Pressable
+          onPress={() => item.caption.length > 86 && setCaptionExpanded(v => !v)}
+          accessibilityRole={item.caption.length > 86 ? 'button' : 'text'}
+          accessibilityLabel={item.caption.length > 86 ? (captionExpanded ? 'Collapse caption' : 'Expand caption') : undefined}
+          hitSlop={{ top: 4, bottom: 4 }}
+        >
+          <Text style={styles.caption} numberOfLines={captionExpanded ? undefined : 2}>
+            {item.caption}
+            {item.caption.length > 86 && (
+              <Text style={styles.moreText}>{captionExpanded ? '  less' : '  more'}</Text>
+            )}
+          </Text>
+        </Pressable>
 
         <Pressable
           style={styles.soundRow}
@@ -1753,6 +1764,9 @@ export default function FeedScreen({
   const pageHeight = viewportSize.height || windowHeight;
   const viewportReady = viewportSize.width > 0 && viewportSize.height > 0;
   const [showSearch, setShowSearch] = useState(false);
+  /** Buyer Threads Home's own search toggle — the glass top bar swaps to a
+   * search row in place, same searchQuery state as the legacy top bar. */
+  const [buyerSearchOpen, setBuyerSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifs, setShowNotifs] = useState(false);
   const [showRepostEducation, setShowRepostEducation] = useState(false);
@@ -1776,6 +1790,7 @@ export default function FeedScreen({
   const repostPendingRef = useRef(new Set<string>());
   const cartPulse = useRef(new Animated.Value(1)).current;
   const cartTargetRef = useRef<View>(null);
+  const feedListRef = useRef<FlatList<FeedItem>>(null);
 
   useEffect(() => {
     let active = true;
@@ -2273,6 +2288,19 @@ export default function FeedScreen({
     return () => { cancelled = true; };
   }, [sellerFeedPosts]);
 
+  /** Top-bar LIVE button: jumps the feed to the nearest active live stream
+   * card already mixed into displayItems, ahead of the current position
+   * when one exists downstream, otherwise the closest one behind it. */
+  function jumpToNearestLive() {
+    const indices: number[] = [];
+    displayItems.forEach((it, i) => { if ((it as any)._isLive) indices.push(i); });
+    if (!indices.length) return;
+    const ahead = indices.find(i => i > activeIndex);
+    const target = ahead ?? indices[indices.length - 1];
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    feedListRef.current?.scrollToIndex({ index: target, animated: true });
+  }
+
   function handleOpenComments(id: string) {
     const item = allItems.find(i => i.id === id);
     if (!item || isLiveStreamItem(item) || isJustDroppedItem(item)) return;
@@ -2365,6 +2393,7 @@ export default function FeedScreen({
         />
       )}
       {viewportReady && <FlatList
+        ref={feedListRef}
         key={`thread-${pageWidth}x${pageHeight}`}
         data={displayItems}
         keyExtractor={item => item.id}
@@ -2509,78 +2538,141 @@ export default function FeedScreen({
       {/* ─ Top bar overlay ─ */}
       {isBuyerSurface ? (
         <View style={[styles.topBar, { paddingTop: Math.max(0, previewTopInset - 4) }]} pointerEvents="box-none">
-          {/* Buyer Home: Friends · Following | For You · Cart. Search lives in the tab bar. */}
-          <View style={styles.buyerTopRow}>
-            <TouchableOpacity
-              style={styles.buyerTopBtn}
-              activeOpacity={0.7}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                router.navigate('/(buyer)/friends' as never);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Friends"
-              testID="buyer-home-friends"
-            >
-              <BuyerNavIcon name="friends" color={ON_DARK} size={24} strokeWidth={1.9} />
-            </TouchableOpacity>
-            {/* Drops entry point — small, additive */}
-            <TouchableOpacity
-              style={styles.buyerTopBtn}
-              activeOpacity={0.7}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                router.push('/buyer-drops' as never);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Drops"
-              testID="buyer-home-drops"
-            >
-              <Feather name="zap" size={22} color={ON_DARK} />
-            </TouchableOpacity>
-            <View style={styles.buyerFeedTabs}>
-                {([
-                  ['following', 'Following'],
-                  ['for-you', 'Threads'],
-                ] as const).map(([key, label]) => (
-                  <TouchableOpacity
-                    key={key}
-                    style={[styles.feedTab, styles.buyerFeedTab]}
-                    onPress={() => {
-                      setActiveIndex(0);
-                      setFeedTab(key);
-                    }}
-                    accessibilityRole="tab"
-                    accessibilityState={{ selected: feedTab === key }}
-                  >
-                    <Text style={[styles.feedTabText, styles.buyerFeedTabText, feedTab === key && styles.feedTabTextActive]}>{label}</Text>
-                    {feedTab === key && <View style={[styles.feedTabUnderline, styles.buyerFeedTabUnderline, { backgroundColor: theme.accent }]} />}
-                  </TouchableOpacity>
-                ))}
+          {/* Buyer Threads Home: For You feed chrome — Friends + Drops entry
+              points, a centered "Following | Threads" glass pill switcher
+              (real SegmentedControl from the shared design system, extended
+              with a translucent `variant="glass"` for use over video — see
+              components/ui/SegmentedControl.tsx), a LIVE jump-to button that
+              only appears while a live stream is actually mixed into the
+              feed, search, activity and cart. */}
+          {buyerSearchOpen ? (
+            <View style={styles.buyerSearchRow}>
+              <BlurView intensity={34} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
+              <Feather name="search" size={16} color="rgba(255,255,255,0.75)" style={{ marginLeft: 14 }} />
+              <TextInput
+                style={styles.buyerSearchInput}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search creators, products…"
+                placeholderTextColor="rgba(255,255,255,0.5)"
+                autoFocus
+                returnKeyType="search"
+                onSubmitEditing={() => setBuyerSearchOpen(false)}
+              />
+              <TouchableOpacity
+                style={styles.buyerTopBtnCompact}
+                activeOpacity={0.7}
+                onPress={() => { setBuyerSearchOpen(false); setSearchQuery(''); }}
+                accessibilityRole="button"
+                accessibilityLabel="Close search"
+              >
+                <Feather name="x" size={18} color={ON_DARK} />
+              </TouchableOpacity>
             </View>
-            <ActivityBellButton color={ON_DARK} size={22} style={styles.buyerTopBtn} badgeBorderColor={BG} />
-            <Animated.View ref={cartTargetRef} style={[styles.buyerTopBtn, { transform: [{ scale: cartPulse }] }]}>
-            <TouchableOpacity
-              style={styles.buyerTopBtn}
-              activeOpacity={0.7}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push('/(buyer)/cart' as never);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
-            >
-              <Feather name="shopping-cart" size={22} color={ON_DARK} />
-              {cartCount > 0 && (
-                <View style={[styles.cartCountBadge, styles.buyerCartBadge, { backgroundColor: theme.accent }]}>
-                  <Text style={[styles.cartCountText, { color: theme.onAccent }]}>
-                    {cartCount > 99 ? '99+' : cartCount}
-                  </Text>
-                </View>
+          ) : (
+          <View style={styles.buyerTopRow}>
+            <View style={styles.buyerTopCluster}>
+              <TouchableOpacity
+                style={styles.buyerTopBtnCompact}
+                activeOpacity={0.7}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  router.navigate('/(buyer)/friends' as never);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Friends"
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                testID="buyer-home-friends"
+              >
+                <BuyerNavIcon name="friends" color={ON_DARK} size={22} strokeWidth={1.9} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.buyerTopBtnCompact}
+                activeOpacity={0.7}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  router.push('/buyer-drops' as never);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Drops"
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                testID="buyer-home-drops"
+              >
+                <Feather name="zap" size={20} color={ON_DARK} />
+              </TouchableOpacity>
+              {activeLiveStreams.length > 0 && (
+                <TouchableOpacity
+                  style={styles.liveJumpBtn}
+                  activeOpacity={0.78}
+                  onPress={jumpToNearestLive}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Jump to live, ${activeLiveStreams.length} streaming now`}
+                  hitSlop={{ top: 5, bottom: 5, left: 4, right: 5 }}
+                >
+                  <View style={styles.liveJumpDot} />
+                  <Text style={styles.liveJumpText}>LIVE</Text>
+                </TouchableOpacity>
               )}
-            </TouchableOpacity>
-            </Animated.View>
+            </View>
+
+            <View style={styles.buyerTabSwitcherWrap} pointerEvents="box-none">
+              <SegmentedControl
+                variant="glass"
+                size="compact"
+                style={{ minWidth: 176, maxWidth: 220, width: '100%' }}
+                testID="buyer-home-tabs"
+                options={[
+                  { id: 'following', label: 'Following' },
+                  { id: 'for-you', label: 'Threads' },
+                ]}
+                selectedId={feedTab}
+                onChange={(id) => {
+                  setActiveIndex(0);
+                  setFeedTab(id as 'following' | 'for-you');
+                }}
+              />
+            </View>
+
+            <View style={styles.buyerTopCluster}>
+              <TouchableOpacity
+                style={styles.buyerTopBtnCompact}
+                activeOpacity={0.7}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  setBuyerSearchOpen(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Search"
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                testID="buyer-home-search"
+              >
+                <Feather name="search" size={20} color={ON_DARK} />
+              </TouchableOpacity>
+              <ActivityBellButton color={ON_DARK} size={20} style={styles.buyerTopBtnCompact} badgeBorderColor={BG} />
+              <Animated.View ref={cartTargetRef} style={[styles.buyerTopBtnCompact, { transform: [{ scale: cartPulse }] }]}>
+              <TouchableOpacity
+                style={styles.buyerTopBtnCompact}
+                activeOpacity={0.7}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push('/(buyer)/cart' as never);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
+              >
+                <Feather name="shopping-cart" size={20} color={ON_DARK} />
+                {cartCount > 0 && (
+                  <View style={[styles.cartCountBadge, styles.buyerCartBadge, { backgroundColor: theme.accent }]}>
+                    <Text style={[styles.cartCountText, { color: theme.onAccent }]}>
+                      {cartCount > 99 ? '99+' : cartCount}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              </Animated.View>
+            </View>
           </View>
+          )}
         </View>
       ) : (
       <View style={[styles.topBar, { paddingTop: previewTopInset + 2 }]} pointerEvents="box-none">
@@ -2816,24 +2908,32 @@ const styles = StyleSheet.create({
   shopPillShimmer: { position: 'absolute', top: 0, bottom: 0, width: 40 },
 
   rail: {
-    position: 'absolute', right: 8, width: 48, bottom: 116, alignItems: 'center', gap: 15,
+    position: 'absolute', right: 10, width: 52, bottom: 116, alignItems: 'center', gap: 19,
   },
-  railAvatarWrap: { alignItems: 'center', marginBottom: 2 },
-  railAvatar: { width: 40, height: 40, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: ON_DARK },
+  railAvatarWrap: { alignItems: 'center', marginBottom: 3 },
+  railAvatar: {
+    width: 44, height: 44, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: ON_DARK,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 4,
+  },
   railAvatarText: { fontSize: FS.sm, fontFamily: FONT.bold, color: ON_DARK },
   railFollowBadge: {
-    position: 'absolute', bottom: -8, width: 19, height: 19, borderRadius: RADII.pill,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000',
+    position: 'absolute', bottom: -8, width: 20, height: 20, borderRadius: RADII.pill,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.35, shadowRadius: 3, elevation: 3,
   },
-  railBtn: { width: 48, alignItems: 'center', gap: 2 },
-  railActionContent: { width: 48, alignItems: 'center', gap: 2 },
-  railCount: { fontSize: 11, lineHeight: 13, fontFamily: FONT.bold, color: ON_DARK, ...TABULAR_NUMS },
+  railBtn: { width: 48, alignItems: 'center', gap: 3 },
+  railActionContent: { width: 48, alignItems: 'center', gap: 3 },
+  railCount: {
+    fontSize: 11, lineHeight: 13, fontFamily: FONT.bold, color: ON_DARK, ...TABULAR_NUMS,
+    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
 
   bottomInfo: {
-    position: 'absolute', left: 16, right: 84, bottom: 26, height: 104,
-    justifyContent: 'flex-end', gap: 8,
+    position: 'absolute', left: 16, right: 84, bottom: 26, minHeight: 104,
+    justifyContent: 'flex-end', gap: 9,
   },
-  bottomInfoWithRepost: { height: 140 },
+  bottomInfoWithRepost: { minHeight: 140 },
   repostIdentity: {
     alignSelf: 'flex-start', maxWidth: '100%', minHeight: 32,
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -2850,24 +2950,44 @@ const styles = StyleSheet.create({
   repostAvatarInitials: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs },
   repostIdentityText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 12, flexShrink: 1 },
   caption: {
-    height: 38, fontSize: 14, fontFamily: FONT.regular, color: ON_DARK,
-    lineHeight: 19,
+    fontSize: 14.5, fontFamily: FONT.regular, color: ON_DARK,
+    lineHeight: 20,
+    textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
-  moreText: { fontFamily: FONT.semibold, color: ON_DARK },
-  creatorRow: { height: 28, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  creatorName: { fontSize: FS.base, fontFamily: FONT.bold, color: ON_DARK, flexShrink: 1 },
+  moreText: { fontFamily: FONT.bold, color: ON_DARK },
+  creatorRow: { minHeight: 28, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  creatorName: {
+    fontSize: FS.base + 1, fontFamily: FONT.bold, color: ON_DARK, flexShrink: 1,
+    textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
   soundRow: { height: 16, flexDirection: 'row', alignItems: 'center', gap: 6 },
   soundText: { fontSize: FS.xs, fontFamily: FONT.regular, color: `${ON_DARK}CC`, flexShrink: 1 },
 
-  topBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 12, paddingBottom: 4 },
+  topBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 10, paddingBottom: 4 },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  buyerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 },
-  buyerTopBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  buyerFeedTabs: { flex: 1, flexDirection: 'row', justifyContent: 'center', gap: 18 },
-  buyerCartBadge: { top: 5, right: 3 },
-  buyerFeedTabUnderline: { position: 'absolute', bottom: 6, alignSelf: 'center' },
-  buyerFeedTab: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 6 },
-  buyerFeedTabText: { fontSize: FS.base, textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 1 },
+  buyerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, gap: 2 },
+  // Compact 36×36 visual footprint with 5pt hitSlop on every button above =
+  // a real 44×44+ touch target while leaving the centered pill enough room
+  // to breathe at 375pt width (5 icon buttons + LIVE badge otherwise crowd
+  // "Following"/"Threads" onto two lines).
+  buyerTopBtnCompact: { width: 33, height: 36, alignItems: 'center', justifyContent: 'center' },
+  buyerTopCluster: { flexDirection: 'row', alignItems: 'center', gap: 0 },
+  buyerTabSwitcherWrap: { flex: 1, alignItems: 'center', paddingHorizontal: 4 },
+  buyerCartBadge: { top: 3, right: 1 },
+  liveJumpBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36,
+    paddingHorizontal: 8, borderRadius: RADII.pill,
+    backgroundColor: 'rgba(0,0,0,0.32)', borderWidth: 1, borderColor: 'rgba(255,59,48,0.55)',
+  },
+  liveJumpDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FF3B30' },
+  liveJumpText: { fontSize: 10, letterSpacing: 0.6, fontFamily: FONT.bold, color: ON_DARK },
+  buyerSearchRow: {
+    flexDirection: 'row', alignItems: 'center', minHeight: 44, borderRadius: RADII.pill,
+    overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.32)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
+  },
+  buyerSearchInput: {
+    flex: 1, height: 44, paddingHorizontal: 10, fontSize: FS.sm, fontFamily: FONT.regular, color: ON_DARK,
+  },
   topAvatarBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   topAvatar: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   unreadDot: { position: 'absolute', top: 4, right: 4, width: 9, height: 9, borderRadius: 4.5, backgroundColor: RED, borderWidth: 1.5, borderColor: BG },
