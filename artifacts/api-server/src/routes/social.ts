@@ -10,6 +10,7 @@
  * GET    /api/social/search?q=&limit=    — search buyers by name / username
  */
 import { Router } from "express";
+import { publicCoverFields } from "../lib/profileCover";
 import { db, users, follows, stories, storyLikes, storyViews, blocks, posts, interactions } from "@workspace/db";
 import { eq, and, or, ilike, ne, inArray, sql, gt, desc, count, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -68,6 +69,8 @@ function formatUser(u: UserRow) {
     initials:    initials(nm),
     color:       avatarColor(u.clerkId),
     handle:      u.username ? `@${u.username}` : `@${nm.toLowerCase().replace(/\s+/g, "")}`,
+    // Profile cover video (null while unset or moderated away).
+    ...publicCoverFields(u),
   };
 }
 

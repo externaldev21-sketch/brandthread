@@ -3,6 +3,7 @@
  * Mounted at /api/public — no requireAuth middleware.
  */
 import { Router } from "express";
+import { publicCoverFields } from "../lib/profileCover";
 import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, sellerRankingCache, boosts, orders, orderItems, follows, savedCollections, savedItems, searchLog } from "@workspace/db";
 import { getAuth } from "@clerk/express";
 import { effectiveDropLaunchAt } from "../lib/money/dropLaunch";
@@ -990,6 +991,9 @@ router.get("/sellers/:sellerId", async (req, res) => {
       vacationMode:    users.vacationMode,
       vacationMessage: users.vacationMessage,
       username:        users.username,
+      coverVideoUrl:   users.coverVideoUrl,
+      coverPosterUrl:  users.coverPosterUrl,
+      coverVideoModerationStatus: users.coverVideoModerationStatus,
     })
     .from(users)
     .where(eq(users.clerkId, canonicalClerkId))
@@ -1080,6 +1084,9 @@ router.get("/sellers/:sellerId", async (req, res) => {
       profileImageUrl,
       productsCount: Number(activeProductsCount),
       videosCount: Number(publicPostsCount),
+      // Cover video (null while unset or moderated away); never the raw status.
+      ...publicCoverFields(seller),
+      coverVideoModerationStatus: undefined,
     },
     products: sellerProducts,
     posts: sellerPosts.map((p) => ({
@@ -1557,6 +1564,9 @@ router.get("/profiles/:username", async (req, res) => {
         profileImageUrl: users.profileImageUrl,
         verified:    users.verified,
         deletedAt:   users.deletedAt,
+        coverVideoUrl:  users.coverVideoUrl,
+        coverPosterUrl: users.coverPosterUrl,
+        coverVideoModerationStatus: users.coverVideoModerationStatus,
       })
       .from(users)
       // Case-insensitive lookup using the normalized form.
@@ -1607,6 +1617,7 @@ router.get("/profiles/:username", async (req, res) => {
       bio:         user.bio ?? null,
       avatarUrl,
       verified,
+      ...publicCoverFields(user),
     });
   } catch (err) {
     req.log.error({ err }, "Failed to resolve public profile by username");

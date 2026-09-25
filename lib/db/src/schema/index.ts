@@ -83,6 +83,18 @@ export const users = pgTable('users', {
   // by a later Clerk sync.
   logoUrl:   text('logo_url'),
   bannerUrl: text('banner_url'),
+  // Profile cover video (all account types) — a short, always-muted looping
+  // clip shown in the profile hero. Separate from the avatar. Server-rendered
+  // compressed rendition + poster frame, both public object paths served via
+  // /api/profile/cover-media. `coverVideoUpdatedAt` drives the once-per-24h
+  // change limit (setting AND removing both count as a change).
+  coverVideoUrl:              text('cover_video_url'),
+  coverPosterUrl:             text('cover_poster_url'),
+  coverVideoUpdatedAt:        timestamp('cover_video_updated_at', { withTimezone: true }),
+  coverVideoModerationStatus: text('cover_video_moderation_status').notNull().default('visible'),
+  // First-visit coach mark ("add a cover video") — shown exactly once per
+  // account, server-side so it survives reinstalls and other devices.
+  coverCoachmarkSeenAt:       timestamp('cover_coachmark_seen_at', { withTimezone: true }),
   // Unique @handle (letters, numbers, underscores; 3–30 chars). Nullable so
   // existing rows are unaffected; the DB-level unique index enforces platform-wide uniqueness.
   username: text('username').unique(),
