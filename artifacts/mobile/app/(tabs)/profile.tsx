@@ -438,10 +438,21 @@ export default function ProfileScreen() {
           </>
         )}
         extras={(
-          <View style={s.quickRow}>
-            {QUICK_ACTIONS.map((qa) => (
-              <ProfileButton key={qa.label} label={qa.label} icon={qa.icon} onPress={() => nav(qa.route)} accessibilityLabel={qa.label} />
-            ))}
+          <View style={s.extrasStack}>
+            {/* In-flow here: a floating pill above the seller tab bar would sit
+                on top of the action rows at 375pt. */}
+            {userId ? (
+              <ShopPill
+                label={productsCount && productsCount > 0 ? `Shop ${productsCount} product${productsCount === 1 ? '' : 's'}` : 'Set up your shop'}
+                sublabel={productsCount && productsCount > 0 ? 'Your live listings' : 'Add a product'}
+                onPress={() => nav(profileProductsHref({ sellerId: userId, sellerName: brandTitle, isOwner: true }))}
+              />
+            ) : null}
+            <View style={s.quickRow}>
+              {QUICK_ACTIONS.map((qa) => (
+                <ProfileButton key={qa.label} label={qa.label} icon={qa.icon} onPress={() => nav(qa.route)} accessibilityLabel={qa.label} />
+              ))}
+            </View>
           </View>
         )}
         tabs={{
@@ -471,14 +482,6 @@ export default function ProfileScreen() {
         refreshing={refreshing}
         onRefresh={handleRefresh}
         bottomInset={sellerBarInset}
-        renderFloating={userId ? (bottom) => (
-          <ShopPill
-            bottom={bottom}
-            label={productsCount && productsCount > 0 ? `Shop ${productsCount} product${productsCount === 1 ? '' : 's'}` : 'Set up your shop'}
-            sublabel={productsCount && productsCount > 0 ? 'Your live listings' : 'Add a product'}
-            onPress={() => nav(profileProductsHref({ sellerId: userId, sellerName: brandTitle, isOwner: true }))}
-          />
-        ) : undefined}
       />
 
       {/* ── Profile Editor Modal ── */}
@@ -592,6 +595,7 @@ const s = StyleSheet.create({
   },
   brandNameTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG, flexShrink: 1 },
   actionRow: { flexDirection: 'row', gap: SP.sm },
+  extrasStack: { gap: SP.md },
   quickRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md },
 
   // Profile editor sheet

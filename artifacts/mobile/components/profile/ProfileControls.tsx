@@ -282,12 +282,13 @@ export function ShopPill({
   label: string;
   sublabel?: string;
   onPress: () => void;
-  bottom: number;
+  /** Distance from the screen bottom when floating; omit to render in-flow. */
+  bottom?: number;
   testID?: string;
 }) {
   const { theme } = useAppTheme();
   return (
-    <View pointerEvents="box-none" style={[styles.pillWrap, { bottom }]}>
+    <View pointerEvents="box-none" style={bottom === undefined ? styles.pillInline : [styles.pillWrap, { bottom }]}>
       <PressableScale
         onPress={() => { hapticLight(); onPress(); }}
         accessibilityRole="button"
@@ -378,6 +379,7 @@ const styles = StyleSheet.create({
   sectionText: { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 1.6, textTransform: 'uppercase' },
 
   pillWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', paddingHorizontal: SP.md },
+  pillInline: { alignItems: 'center', paddingHorizontal: SP.md },
   pill: {
     height: SHOP_PILL_HEIGHT, minWidth: 220, maxWidth: 420, borderRadius: RADIUS.pill,
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,

@@ -162,7 +162,8 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
 
   const heroActive = focused && heroOnScreen && !reduceMotion;
   // The compact identity sits between the floating controls; when a wide
-  // control (e.g. the account switcher) leaves no room, only the bar shows.
+  // control (e.g. the account switcher) leaves no room for a readable name
+  // (avatar + ~7 characters), only the bar shows.
   const compactLeft = SP.md + (leftWidth ? leftWidth + SP.sm : 0);
   const compactRight = Math.max(SP.md, rightWidth + SP.md + SP.sm);
   const compactRoom = columnWidth - compactLeft - compactRight;
@@ -222,10 +223,22 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
           )}
           <View style={styles.identityCopy}>
             <View style={styles.nameRow}>
-              <Text style={styles.name} numberOfLines={2} accessibilityRole="header">{identity.name}</Text>
-              {identity.verified ? (
-                <Feather name="check-circle" size={18} color={theme.accent} accessibilityLabel="Verified" style={styles.verified} />
-              ) : null}
+              {/* The badge is nested in the name's text so it follows the last
+                  word when a long name wraps, instead of pinning to the edge. */}
+              <Text
+                style={styles.name}
+                numberOfLines={2}
+                accessibilityRole="header"
+                accessibilityLabel={identity.verified ? `${identity.name}, verified` : undefined}
+              >
+                {identity.name}
+                {identity.verified ? (
+                  <Text>
+                    {'\u00A0'}
+                    <Feather name="check-circle" size={18} color={theme.accent} accessibilityLabel="Verified" />
+                  </Text>
+                ) : null}
+              </Text>
             </View>
             <View style={styles.handleRow}>
               {identity.handle ? <Text style={styles.handle} numberOfLines={1}>{identity.handle}</Text> : null}
@@ -279,7 +292,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
           style={[styles.compact, { height: insets.top + 60, paddingTop: insets.top, opacity: compactOpacity }]}
         >
           <View style={[styles.compactInner, { paddingLeft: compactLeft, paddingRight: compactRight }]}>
-            {compactRoom >= 96 ? (
+            {compactRoom >= 140 ? (
               <>
                 <View style={styles.compactAvatar}>
                   {identity.avatarUrl ? (
@@ -350,7 +363,6 @@ function makeStyles(theme: AppThemePreset) {
       flexShrink: 1, fontFamily: FONT.bold, fontSize: FS.h2, lineHeight: 34, letterSpacing: -0.8, color: theme.text,
       textShadowColor: 'rgba(0,0,0,0.35)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6, // theme-exempt: legibility over media
     },
-    verified: { marginLeft: 6 },
     handleRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: SP.xs },
     handle: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.muted },
 
