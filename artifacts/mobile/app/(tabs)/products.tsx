@@ -4,7 +4,8 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, ScrollView, FlatList, StyleSheet, Alert, Share, Modal, Pressable, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert, Share, Modal, Pressable, TouchableOpacity } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -14,9 +15,12 @@ import { FONT, FS, SP, RADIUS, COMP, ICON } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { AnimatedEntrance, BrandthreadCard, PrimaryButton, IconButton, SearchBar, FilterChip, StatusBadge, EmptyState, ProductGridSkeleton, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
-import { getProducts, getProductStats, archiveProduct, unarchiveProduct, deleteProduct, restoreProduct, duplicateProduct } from '@/services/productService';
+import { getProducts, getProductStats, getProduct, archiveProduct, unarchiveProduct, deleteProduct, restoreProduct, duplicateProduct } from '@/services/productService';
 import { Product, ProductFilter } from '@/services/productTypes';
 import { formatCents, integerPercent } from '@/lib/money';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryClient';
+import { prefetchOnPressIn } from '@/lib/prefetch';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -56,11 +60,12 @@ interface Stats {
 interface ProductRowProps {
   product: Product;
   onPress: () => void;
+  onPressIn?: () => void;
   onMore: () => void;
   isLast: boolean;
 }
 
-function ProductRow({ product, onPress, onMore, isLast }: ProductRowProps) {
+function ProductRow({ product, onPress, onPressIn, onMore, isLast }: ProductRowProps) {
   const { theme } = useAppTheme();
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const { error: RED, warning: ORANGE, success: SUCCESS, card: CARD, border: BORDER, text: FG, muted: MUTED, subtle: SUBTLE } = theme;
@@ -84,6 +89,7 @@ function ProductRow({ product, onPress, onMore, isLast }: ProductRowProps) {
       <TouchableOpacity
         activeOpacity={0.82}
         onPress={onPress}
+        onPressIn={onPressIn}
         style={[s.productRow, { backgroundColor: palette.card ?? CARD, borderColor: palette.border ?? BORDER }]}
         accessibilityLabel={`${product.name}, ${statusLabel(product.status)}, ${formatCents(price)}`}
       >
@@ -494,14 +500,21 @@ export default function ProductsScreen() {
   const currentSortLabel = SORT_OPTIONS.find(o => o.key === sort)?.label ?? 'Sort';
   const hasActiveFilter = filter !== 'all';
 
+  const queryClient = useQueryClient();
   const renderProduct = useCallback(({ item, index }: { item: Product; index: number }) => (
     <ProductRow
       product={item}
       onPress={() => router.push(('/product-detail?id=' + item.id) as never)}
+      onPressIn={prefetchOnPressIn(
+        queryClient,
+        queryKeys.product(item.id),
+        () => getProduct(item.id),
+        item.media.find(m => m.isCover)?.uri ?? item.media[0]?.uri,
+      )}
       onMore={() => openActionSheet(item)}
       isLast={index === sortedProducts.length - 1}
     />
-  ), [router, sortedProducts.length]);
+  ), [router, sortedProducts.length, queryClient]);
 
   const keyExtractor = useCallback((item: Product) => item.id, []);
 
@@ -618,7 +631,7 @@ export default function ProductsScreen() {
       </View>
 
       {/* ── Product list ── */}
-      <FlatList
+      <FlashList
         data={sortedProducts}
         keyExtractor={keyExtractor}
         renderItem={renderProduct}
@@ -626,7 +639,6 @@ export default function ProductsScreen() {
         ListEmptyComponent={loading ? null : ListEmpty}
         contentContainerStyle={s.listContent}
         showsVerticalScrollIndicator={false}
-        ItemSeparatorComponent={null}
       />
 
       {/* Action sheet */}

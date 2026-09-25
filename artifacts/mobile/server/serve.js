@@ -9,6 +9,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 
 const STATIC_ROOT = path.resolve(
   __dirname,
@@ -51,16 +52,29 @@ function safeFilePath(urlPath) {
   return filePath;
 }
 
-function serveFile(filePath, res) {
+const COMPRESSIBLE_EXTS = new Set(['.html', '.js', '.css', '.json', '.svg', '.map']);
+
+function serveFile(filePath, res, acceptEncoding = '') {
   if (!filePath || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
     return false;
   }
   const ext = path.extname(filePath).toLowerCase();
-  res.writeHead(200, {
+  const headers = {
     'content-type': MIME_TYPES[ext] || 'application/octet-stream',
     'cache-control': ext === '.html' ? 'no-cache' : 'public, max-age=31536000, immutable',
-  });
-  res.end(fs.readFileSync(filePath));
+  };
+  const body = fs.readFileSync(filePath);
+  // Text assets compress well and dominate initial page weight (JS bundles,
+  // the HTML shell); images/fonts are already compressed formats.
+  if (COMPRESSIBLE_EXTS.has(ext) && /\bgzip\b/.test(acceptEncoding)) {
+    headers['content-encoding'] = 'gzip';
+    headers['vary'] = 'Accept-Encoding';
+    res.writeHead(200, headers);
+    res.end(zlib.gzipSync(body));
+    return true;
+  }
+  res.writeHead(200, headers);
+  res.end(body);
   return true;
 }
 
@@ -112,12 +126,13 @@ const server = http.createServer((req, res) => {
     send(res, 400, 'Bad Request');
     return;
   }
-  if (serveFile(safeFilePath(requestedPath), res)) return;
+  const acceptEncoding = String(req.headers['accept-encoding'] || '');
+  if (serveFile(safeFilePath(requestedPath), res, acceptEncoding)) return;
 
   // Only browser navigations get the SPA shell. Missing JS/image requests
   // should remain a real 404 instead of returning HTML with status 200.
   const acceptsHtml = String(req.headers.accept || '').includes('text/html');
-  if (acceptsHtml && serveFile(path.join(STATIC_ROOT, 'index.html'), res)) return;
+  if (acceptsHtml && serveFile(path.join(STATIC_ROOT, 'index.html'), res, acceptEncoding)) return;
 
   send(res, 404, 'Not Found');
 });
