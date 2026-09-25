@@ -862,6 +862,19 @@ export const savedItems = pgTable('saved_items', {
   userTargetUnique: unique('saved_items_user_id_target_id_key').on(table.userId, table.targetId),
 }));
 
+// ─── Recently viewed products ──────────────────────────────────────────────────
+// One row per (buyer, product); viewing again bumps viewedAt via upsert
+// rather than creating a duplicate.
+export const recentlyViewedProducts = pgTable('recently_viewed_products', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  userId:    text('user_id').notNull(),
+  productId: uuid('product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
+  viewedAt:  timestamp('viewed_at').defaultNow().notNull(),
+}, (table) => ({
+  userProductUnique: uniqueIndex('recently_viewed_products_user_product_unique').on(table.userId, table.productId),
+  userViewedIdx: index('recently_viewed_products_user_viewed_idx').on(table.userId, table.viewedAt),
+}));
+
 // ─── Server-side cart (full-replace sync model) ───────────────────────────────
 
 export const cartItems = pgTable('cart_items', {

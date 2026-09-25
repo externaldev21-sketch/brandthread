@@ -20,6 +20,7 @@ const {
     publicProducts: {
       get: vi.fn(),
       related: vi.fn(),
+      taggedVideos: vi.fn(),
     },
     buyer: {
       sellerPaymentStatus: vi.fn(),
@@ -341,6 +342,8 @@ describe('buyer product detail when seller payments are unavailable', () => {
     apiMock.publicProducts.get.mockResolvedValue(product);
     apiMock.publicProducts.related.mockReset();
     apiMock.publicProducts.related.mockResolvedValue([]);
+    apiMock.publicProducts.taggedVideos.mockReset();
+    apiMock.publicProducts.taggedVideos.mockResolvedValue([]);
     apiMock.buyer.sellerPaymentStatus.mockReset();
     apiMock.buyer.sellerPaymentStatus.mockResolvedValue({
       ready: false,
@@ -393,7 +396,7 @@ describe('buyer product detail when seller payments are unavailable', () => {
     });
 
     expect(addToCartMock).toHaveBeenCalledOnce();
-    expect(textContent(renderer.root)).toContain('View Cart');
+    expect(textContent(renderer.root)).toContain('View bag');
     expect(routerMock.push).not.toHaveBeenCalledWith('/buyer-checkout?source=buynow');
   });
 
@@ -415,7 +418,7 @@ describe('buyer product detail when seller payments are unavailable', () => {
     });
 
     expect(addToCartMock).toHaveBeenCalledOnce();
-    expect(textContent(renderer.root)).toContain('View Cart');
+    expect(textContent(renderer.root)).toContain('View bag');
 
     const buyNow = renderer.root.findByProps({ accessibilityLabel: 'Buy now' });
     expect(buyNow.props.disabled).toBe(false);
