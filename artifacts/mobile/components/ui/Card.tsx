@@ -19,9 +19,12 @@ export interface CardProps {
   elevated?: boolean;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+  /** Only used when `onPress` is set — labels the pressable surface for a11y. */
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 }
 
-export function Card({ children, onPress, elevated = false, style, testID }: CardProps) {
+export function Card({ children, onPress, elevated = false, style, testID, accessibilityLabel, accessibilityHint }: CardProps) {
   const palette = useColors();
   const scale = React.useRef(new Animated.Value(1)).current;
   const nativeDriver = Platform.OS !== 'web';
@@ -41,6 +44,8 @@ export function Card({ children, onPress, elevated = false, style, testID }: Car
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
       onPress={() => { hapticLight(); onPress(); }}
       onPressIn={() => Animated.timing(scale, { toValue: PRESS_SCALE, duration: PRESS_DURATION_MS, useNativeDriver: nativeDriver }).start()}
       onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: nativeDriver, speed: 18, bounciness: 6 }).start()}

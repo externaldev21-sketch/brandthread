@@ -65,6 +65,8 @@ import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { BuyerNavIcon } from '@/components/buyer-nav/BuyerNavIcon';
 import { SheetRise } from '@/components/motion/SheetRise';
 import ActivityBellButton from '@/components/ActivityBellButton';
+import { RADII } from '@/constants/radii';
+import { TABULAR_NUMS } from '@/constants/typography';
 
 const THREAD_PAGE_SIZE = 30;
 
@@ -944,7 +946,7 @@ function VideoVisual({
         />
         {paused && (
           <View style={styles.pauseOverlay}>
-            <Feather name="play" size={56} color="#FFFFFFCC" />
+            <Feather name="play" size={56} color={`${ON_DARK}CC`} />
           </View>
         )}
       </View>
@@ -1237,7 +1239,7 @@ function SpotlightPage({
               transform: [{ scale: heartBurst.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.5] }) }],
             }]}
           >
-            <Feather name="heart" size={110} color="#FFFFFF" />
+            <Feather name="heart" size={110} color={ON_DARK} />
           </Animated.View>
           {item.contentType === 'video' && (
             <Animated.View
@@ -1246,7 +1248,7 @@ function SpotlightPage({
               accessibilityElementsHidden
               importantForAccessibility="no"
             >
-              <Feather name="fast-forward" size={12} color="#FFFFFF" />
+              <Feather name="fast-forward" size={12} color={ON_DARK} />
               <Text style={styles.speedPillText}>2x</Text>
             </Animated.View>
           )}
@@ -1322,7 +1324,7 @@ function SpotlightPage({
           count={formatCount(engagement?.likes ?? 0)}
           active={engagement?.liked ?? false}
           activeColor="#EF4444"
-          inactiveColor="#FFFFFF"
+          inactiveColor={ON_DARK}
           accessibilityLabel={`${engagement?.liked ? 'Unlike' : 'Like'}, ${formatCount(engagement?.likes ?? 0)} likes`}
           accessibilityState={{ checked: engagement?.liked ?? false }}
           scaleAnim={heartScale}
@@ -1345,7 +1347,7 @@ function SpotlightPage({
           accessibilityRole="button"
           accessibilityLabel={`Comments, ${formatCount(item.commentsCount ?? (engagement?.comments ?? []).length)}`}
         >
-          <FontAwesome name="commenting" size={21} color="#FFFFFF" />
+          <FontAwesome name="commenting" size={21} color={ON_DARK} />
           <Text style={styles.railCount}>{formatCount(item.commentsCount ?? (engagement?.comments ?? []).length)}</Text>
         </TouchableOpacity>
 
@@ -1357,7 +1359,7 @@ function SpotlightPage({
           count={formatCount(engagement?.reposts ?? 0)}
           active={engagement?.reposted ?? false}
           activeColor={theme.accent}
-          inactiveColor="#FFFFFF"
+          inactiveColor={ON_DARK}
           accessibilityLabel={`${engagement?.reposted ? 'Undo repost' : 'Repost'}, ${formatCount(engagement?.reposts ?? 0)} reposts`}
           accessibilityState={{ checked: engagement?.reposted ?? false }}
           style={styles.railActionContent}
@@ -1379,7 +1381,7 @@ function SpotlightPage({
           count={formatCount(engagement?.saves ?? item.saves)}
           active={engagement?.saved ?? false}
           activeColor={theme.accent}
-          inactiveColor="#FFFFFF"
+          inactiveColor={ON_DARK}
           accessibilityLabel={`${engagement?.saved ? 'Unsave' : 'Save'}, ${formatCount(engagement?.saves ?? item.saves)} saves`}
           accessibilityState={{ checked: engagement?.saved ?? false }}
           style={styles.railActionContent}
@@ -1405,7 +1407,7 @@ function SpotlightPage({
             setShareOpen(true);
           }}
         >
-          <FontAwesome name="share" size={21} color="#FFFFFF" />
+          <FontAwesome name="share" size={21} color={ON_DARK} />
           <Text style={styles.railCount}>{formatCount(item.shares)}</Text>
         </TouchableOpacity>
 
@@ -1458,7 +1460,7 @@ function SpotlightPage({
               ))}
               {friendReposts.length === 0 && (
                 <View style={[styles.repostAvatar, styles.repostAvatarFallback]}>
-                  <Feather name="user" size={13} color="#FFFFFF" />
+                  <Feather name="user" size={13} color={ON_DARK} />
                 </View>
               )}
             </View>
@@ -1473,7 +1475,7 @@ function SpotlightPage({
           }}
         >
           <View style={styles.creatorRow}>
-            <Text style={styles.creatorName}>{item.creator}</Text>
+            <Text style={styles.creatorName} numberOfLines={1}>{item.creator}</Text>
             {item.verified && <Feather name="check-circle" size={13} color="#4FA8FF" style={{ marginLeft: 4 }} />}
           </View>
         </TouchableOpacity>
@@ -1484,7 +1486,7 @@ function SpotlightPage({
          </Text>
 
         <View style={styles.soundRow}>
-           <Feather name="music" size={12} color="#FFFFFFCC" />
+           <Feather name="music" size={12} color={`${ON_DARK}CC`} />
           <Text style={styles.soundText} numberOfLines={1}>{item.sound}</Text>
         </View>
       </View>
@@ -2494,44 +2496,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.sm,
     backgroundColor: 'rgba(0,0,0,0.78)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)',
   },
-  scrubBubbleText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 11 },
+  scrubBubbleText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 11, ...TABULAR_NUMS },
   speedPill: {
     position: 'absolute', top: '42%', alignSelf: 'center',
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 12, paddingVertical: 7, borderRadius: RADIUS.pill,
     backgroundColor: 'rgba(0,0,0,0.62)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
   },
-  speedPillText: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 13 },
-  mediaDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#FFFFFF80' },
-  mediaDotActive: { width: 18, backgroundColor: '#FFFFFF' },
+  speedPillText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 13 },
+  mediaDot: { width: 5, height: 5, borderRadius: RADII.pill, backgroundColor: `${ON_DARK}80` },
+  mediaDotActive: { width: 18, backgroundColor: ON_DARK },
   mediaTags: { position: 'absolute', left: 16, right: 86, alignItems: 'flex-start' },
   shopPill: {
     height: 34, flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderRadius: 17, paddingLeft: 4, paddingRight: 12, overflow: 'hidden',
+    borderRadius: RADII.pill, paddingLeft: 4, paddingRight: 12, overflow: 'hidden',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.24,
     shadowRadius: 6, elevation: 5,
   },
   shopPillThumb: {
-    width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#FFFFFF', overflow: 'hidden',
+    width: 26, height: 26, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: ON_DARK, overflow: 'hidden',
   },
-  shopPillPrice: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: 12.5 },
+  shopPillPrice: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 12.5, ...TABULAR_NUMS },
   shopPillShimmer: { position: 'absolute', top: 0, bottom: 0, width: 40 },
 
   rail: {
     position: 'absolute', right: 8, width: 48, bottom: 116, alignItems: 'center', gap: 15,
   },
   railAvatarWrap: { alignItems: 'center', marginBottom: 2 },
-  railAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#FFFFFF' },
-  railAvatarText: { fontSize: FS.sm, fontFamily: FONT.bold, color: '#FFFFFF' },
+  railAvatar: { width: 40, height: 40, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: ON_DARK },
+  railAvatarText: { fontSize: FS.sm, fontFamily: FONT.bold, color: ON_DARK },
   railFollowBadge: {
-    position: 'absolute', bottom: -8, width: 19, height: 19, borderRadius: 10,
+    position: 'absolute', bottom: -8, width: 19, height: 19, borderRadius: RADII.pill,
     alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000',
   },
   railBtn: { width: 48, alignItems: 'center', gap: 2 },
   railActionContent: { width: 48, alignItems: 'center', gap: 2 },
-  railCount: { fontSize: 11, lineHeight: 13, fontFamily: FONT.bold, color: '#FFFFFF' },
+  railCount: { fontSize: 11, lineHeight: 13, fontFamily: FONT.bold, color: ON_DARK, ...TABULAR_NUMS },
 
   bottomInfo: {
     position: 'absolute', left: 16, right: 84, bottom: 26, height: 104,
@@ -2547,21 +2549,21 @@ const styles = StyleSheet.create({
   },
   repostAvatarStack: { minWidth: 22, height: 22, flexDirection: 'row', alignItems: 'center' },
   repostAvatar: {
-    width: 22, height: 22, borderRadius: 11, overflow: 'hidden',
-    borderWidth: 1.5, borderColor: '#FFFFFF',
+    width: 22, height: 22, borderRadius: RADII.pill, overflow: 'hidden',
+    borderWidth: 1.5, borderColor: ON_DARK,
   },
   repostAvatarFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#35353A' },
-  repostAvatarInitials: { color: '#FFFFFF', fontFamily: FONT.bold, fontSize: FS.xs },
-  repostIdentityText: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: 12, flexShrink: 1 },
+  repostAvatarInitials: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.xs },
+  repostIdentityText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: 12, flexShrink: 1 },
   caption: {
-    height: 38, fontSize: 14, fontFamily: FONT.regular, color: '#FFFFFF',
+    height: 38, fontSize: 14, fontFamily: FONT.regular, color: ON_DARK,
     lineHeight: 19,
   },
   moreText: { fontFamily: FONT.semibold, color: ON_DARK },
   creatorRow: { height: 28, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  creatorName: { fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
+  creatorName: { fontSize: FS.base, fontFamily: FONT.bold, color: ON_DARK, flexShrink: 1 },
   soundRow: { height: 16, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  soundText: { fontSize: FS.xs, fontFamily: FONT.regular, color: '#FFFFFFCC', flexShrink: 1 },
+  soundText: { fontSize: FS.xs, fontFamily: FONT.regular, color: `${ON_DARK}CC`, flexShrink: 1 },
 
   topBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 12, paddingBottom: 4 },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -2579,10 +2581,10 @@ const styles = StyleSheet.create({
   cartHeaderBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   cartCountBadge: {
     position: 'absolute', top: 1, right: -1, minWidth: 17, height: 17,
-    borderRadius: 9, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center',
+    borderRadius: RADII.pill, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: BG,
   },
-  cartCountText: { fontSize: FS.xs, lineHeight: 12, fontFamily: FONT.bold },
+  cartCountText: { fontSize: FS.xs, lineHeight: 12, fontFamily: FONT.bold, ...TABULAR_NUMS },
   topTitle: { flex: 1, textAlign: 'center', fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
   feedTabs: { alignSelf: 'center', flexDirection: 'row', gap: 22, marginTop: 0, paddingBottom: 1 },
   feedTab: { paddingHorizontal: 4, paddingVertical: 3, alignItems: 'center' },

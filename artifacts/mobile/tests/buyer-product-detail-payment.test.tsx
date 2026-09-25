@@ -57,6 +57,17 @@ vi.mock('react-native', () => {
     setValue() {}
   }
 
+  // Real RN Pressable accepts a function-as-children render prop (passed a
+  // press/hover/focus state); PressableScale (components/BrandthreadUI.tsx,
+  // used by Snackbar/ListRow) relies on that to animate its wrapper.
+  function MockPressable(props: Record<string, unknown>) {
+    const { children, ...rest } = props;
+    const content = typeof children === 'function'
+      ? (children as (state: { pressed: boolean }) => React.ReactNode)({ pressed: false })
+      : (children as React.ReactNode);
+    return React.createElement('Pressable', rest, content);
+  }
+
   return {
     ActivityIndicator: nativeComponent('ActivityIndicator'),
     Alert: { alert: alertMock },
@@ -74,9 +85,11 @@ vi.mock('react-native', () => {
       get: () => ({ width: 390, height: 844 }),
     },
     Image: nativeComponent('Image'),
+    Modal: nativeComponent('Modal'),
     PanResponder: {
       create: () => ({ panHandlers: {} }),
     },
+    Pressable: MockPressable,
     RefreshControl: nativeComponent('RefreshControl'),
     ScrollView: nativeComponent('ScrollView'),
     StyleSheet: {
@@ -102,10 +115,10 @@ vi.mock('@expo/vector-icons', () => ({
 }));
 
 vi.mock('expo-haptics', () => ({
-  impactAsync: vi.fn(),
-  notificationAsync: vi.fn(),
-  selectionAsync: vi.fn(),
-  ImpactFeedbackStyle: { Medium: 'medium' },
+  impactAsync: vi.fn(async () => {}),
+  notificationAsync: vi.fn(async () => {}),
+  selectionAsync: vi.fn(async () => {}),
+  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium' },
   NotificationFeedbackType: { Success: 'success' },
 }));
 
@@ -114,11 +127,42 @@ vi.mock('expo-linear-gradient', () => ({
     React.createElement('LinearGradient', props, children),
 }));
 
+vi.mock('expo-image', () => ({
+  Image: Object.assign(
+    (props: Record<string, unknown>) => React.createElement('Image', props),
+    { prefetch: vi.fn(async () => {}) },
+  ),
+}));
+
+vi.mock('react-native-svg', () => ({
+  default: (props: Record<string, unknown>) => React.createElement('Svg', props, props.children as React.ReactNode),
+  Line: (props: Record<string, unknown>) => React.createElement('SvgLine', props),
+}));
+
 vi.mock('expo-router', () => ({
   useLocalSearchParams: useLocalSearchParamsMock,
   usePathname: () => '/buyer-product-detail',
   useRouter: () => routerMock,
 }));
+
+vi.mock('react-native-reanimated', () => {
+  const React = require('react') as typeof import('react');
+  const el = (name: string) => (props: Record<string, unknown>) =>
+    React.createElement(name, props, props.children as React.ReactNode);
+  const sharedValue = (initial: unknown) => {
+    const shared = { value: initial, set(next: unknown) { shared.value = next; } };
+    return shared;
+  };
+
+  return {
+    default: { View: el('AnimatedView') },
+    useSharedValue: sharedValue,
+    useAnimatedStyle: (fn: () => Record<string, unknown>) => fn(),
+    withSpring: (v: unknown) => v,
+    withTiming: (v: unknown) => v,
+    Easing: { out: (v: unknown) => v, cubic: () => {} },
+  };
+});
 
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -164,11 +208,24 @@ vi.mock('@/lib/money', () => ({
 vi.mock('@/lib/theme', () => ({
   BG: '#07070F',
   SCREEN_BG: 'transparent',
+  SURFACE: '#111113',
   CARD: '#12121F',
   CARD_ELEVATED: '#18182E',
+  SURFACE_GLASS: 'rgba(17, 17, 19, 0.72)',
+  CARD_GLASS: 'rgba(24, 24, 27, 0.58)',
+  CARD_ELEVATED_GLASS: 'rgba(34, 34, 38, 0.72)',
+  SKELETON_GLASS: 'rgba(255,255,255,0.05)',
   BORDER: '#303044',
+  BORDER_ACTIVE: '#F7F7FA',
+  BORDER_FOCUS: '#F7F7FA',
   FG: '#F4F4FF',
   MUTED: '#AAAABC',
+  GREEN_BRIGHT: '#39FF88',
+  BLUE: '#3B82F6',
+  BLUE_DIM: '#1E3A5F',
+  SHADOW: { shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 8 },
+  SHADOW_SM: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4 },
+  ANIM: { fast: 150, normal: 250, slow: 400, spring: { tension: 60, friction: 10 } },
   SUBTLE: '#77778A',
   ON_DARK: '#FFFFFF',
   SUCCESS: '#10B981',
@@ -242,10 +299,16 @@ function textContent(value: unknown): string {
 }
 
 function findTouchableByText(renderer: ReactTestRenderer, text: string): ReactTestInstance {
+  // The design-system migration moved some of these onto Chip/Button, which
+  // render a Pressable instead of a raw TouchableOpacity — same tap behavior,
+  // different host element type.
   const match = renderer.root.findAll(
-    (node: any) => node.type === 'TouchableOpacity' && textContent(node.props.children).includes(text),
+    (node: any) =>
+      (node.type === 'TouchableOpacity' || node.type === 'Pressable') &&
+      typeof node.props.onPress === 'function' &&
+      textContent(node.props.children).includes(text),
   )[0];
-  if (!match) throw new Error(`Could not find TouchableOpacity containing "${text}"`);
+  if (!match) throw new Error(`Could not find TouchableOpacity/Pressable containing "${text}"`);
   return match;
 }
 
@@ -318,7 +381,10 @@ describe('buyer product detail when seller payments are unavailable', () => {
     expect(buyNow.props.disabled).toBe(true);
     expect(textContent(buyNow)).toContain('Payments unavailable');
 
-    const addToCart = findTouchableByText(renderer, 'Add to Cart');
+    // The add-to-cart control is an icon-only IconButton (was previously a
+    // TouchableOpacity with a visually-hidden "Add to Cart" text node) —
+    // both expose the same action via accessibilityLabel.
+    const addToCart = renderer.root.findByProps({ accessibilityLabel: 'Add to cart' });
     expect(addToCart.props.disabled).toBe(false);
 
     await act(async () => {
@@ -340,7 +406,7 @@ describe('buyer product detail when seller payments are unavailable', () => {
       await flushPromises();
     });
 
-    const addToCart = findTouchableByText(renderer, 'Add to Cart');
+    const addToCart = renderer.root.findByProps({ accessibilityLabel: 'Add to cart' });
     expect(addToCart.props.disabled).toBe(false);
 
     await act(async () => {

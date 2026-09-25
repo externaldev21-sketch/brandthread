@@ -28,10 +28,12 @@ export interface HeartToggleProps {
   onChange: (next: boolean) => void;
   size?: number;
   accessibilityLabel?: string;
+  /** Optional secondary action (e.g. "save to a specific collection"). */
+  onLongPress?: () => void;
 }
 
 /** A heart icon that pops (scales past 1, then settles back to 1) when liked. */
-export function HeartToggle({ liked, onChange, size = 22, accessibilityLabel }: HeartToggleProps) {
+export function HeartToggle({ liked, onChange, size = 22, accessibilityLabel, onLongPress }: HeartToggleProps) {
   const palette = useColors();
   const scale = useSharedValue(1);
   const wasLiked = useRef(liked);
@@ -51,6 +53,7 @@ export function HeartToggle({ liked, onChange, size = 22, accessibilityLabel }: 
       accessibilityLabel={accessibilityLabel ?? (liked ? 'Unlike' : 'Like')}
       accessibilityState={{ selected: liked }}
       onPress={() => { hapticSuccessAction(); onChange(!liked); }}
+      onLongPress={onLongPress}
       hitSlop={8}
     >
       <Animated.View style={style}>

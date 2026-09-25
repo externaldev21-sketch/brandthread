@@ -17,12 +17,10 @@ import {
   Platform,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image as ExpoImage } from 'expo-image';
 import * as Haptics from 'expo-haptics';
@@ -43,9 +41,14 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
-import { FONT, FS, GRID_MAX_WIDTH, RADIUS, SP } from '@/lib/theme';
+import { FONT, GRID_MAX_WIDTH, SP } from '@/lib/theme';
+import { hapticPrimaryAction } from '@/lib/haptics';
+import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
+import { RADII } from '@/constants/radii';
 import { CachedImage } from '@/components/CachedImage';
 import { CardSkeleton, EmptyState } from '@/components/layout';
+import { IconButton } from '@/components/ui';
+import { PressableScale } from '@/components/BrandthreadUI';
 import {
   addToCart,
   getBuyerProduct,
@@ -288,22 +291,24 @@ export function DiscoverPager() {
 
           {/* ─ Top chrome: back, brand handled per-card, cart icon ─ */}
           <View style={[styles.topBar, { top: insets.top + 8 }]} pointerEvents="box-none">
-            <GlassIconButton
-              icon="chevron-left"
+            <IconButton
+              name="chevron-left"
+              variant="glass"
               accessibilityLabel="Back"
               onPress={back}
+              style={styles.glassBtn}
             />
             <View
               ref={cartIconRef}
               collapsable={false}
             >
-              <GlassIconButton
-                icon="shopping-cart"
+              <IconButton
+                name="shopping-cart"
+                variant="glass"
                 accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
                 onPress={() => push('/(buyer)/cart' as never)}
                 badge={cartCount}
-                accentColor={theme.accent}
-                onAccentColor={theme.onAccent}
+                style={styles.glassBtn}
               />
             </View>
           </View>
@@ -472,14 +477,17 @@ function DiscoverCard({
   return (
     <View style={{ width: cardWidth }}>
       <View style={styles.brandRow}>
-        <TouchableOpacity onPress={onBrandPress} accessibilityRole="button" accessibilityLabel={`View ${item.brandName}'s shop`}>
+        <PressableScale
+          onPress={() => { hapticPrimaryAction(); onBrandPress(); }}
+          accessibilityLabel={`View ${item.brandName}'s shop`}
+        >
           <View style={styles.brandInner}>
             <Text style={[styles.brandName, { color: theme.text }]} numberOfLines={1}>{item.brandName}</Text>
             {item.brandVerified && (
               <Feather name="check-circle" size={13} color={theme.accent} style={{ marginLeft: 4 }} />
             )}
           </View>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
 
       <View style={styles.heroWrap}>
@@ -510,74 +518,40 @@ function DiscoverCard({
       <Text style={styles.productName} numberOfLines={2}>{item.productName}</Text>
 
       <View style={styles.priceRow}>
-        <Text style={styles.price}>{formatCents(item.priceCents)}</Text>
+        <Text style={[styles.price, TABULAR_NUMS]}>{formatCents(item.priceCents)}</Text>
         {hasDiscount && (
-          <Text style={styles.comparePrice}>{formatCents(item.compareAtPriceCents!)}</Text>
+          <Text style={[styles.comparePrice, TABULAR_NUMS]}>{formatCents(item.compareAtPriceCents!)}</Text>
         )}
       </View>
 
       <View style={[styles.actionsRow, { marginBottom: insets.bottom + SP.lg }]}>
-        <TouchableOpacity
-          ref={priceRef}
-          style={[styles.secondaryBtn, { borderColor: '#FFFFFF55' }]}
-          activeOpacity={0.85}
-          accessibilityRole="button"
-          accessibilityLabel="Add to cart"
-          onPress={() => {
-            priceRef.current?.measureInWindow((x, y) => onAddToCart(x, y));
-          }}
-        >
-          <Feather name="shopping-cart" size={16} color="#FFFFFF" />
-          <Text style={styles.secondaryBtnText}>Add to Cart</Text>
-        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <PressableScale
+            style={[styles.secondaryBtn, { borderColor: '#FFFFFF55' }]}
+            accessibilityLabel="Add to cart"
+            onPress={() => {
+              hapticPrimaryAction();
+              priceRef.current?.measureInWindow((x, y) => onAddToCart(x, y));
+            }}
+          >
+            <View ref={priceRef} collapsable={false} style={styles.actionBtnInner}>
+              <Feather name="shopping-cart" size={16} color="#FFFFFF" />
+              <Text style={styles.secondaryBtnText}>Add to Cart</Text>
+            </View>
+          </PressableScale>
+        </View>
 
-        <TouchableOpacity
-          style={[styles.primaryBtn, { backgroundColor: theme.accent }]}
-          activeOpacity={0.85}
-          accessibilityRole="button"
-          accessibilityLabel="Buy now"
-          onPress={onBuyNow}
-        >
-          <Text style={[styles.primaryBtnText, { color: theme.onAccent }]}>Buy Now</Text>
-        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <PressableScale
+            style={[styles.primaryBtn, { backgroundColor: theme.accent }]}
+            accessibilityLabel="Buy now"
+            onPress={() => { hapticPrimaryAction(); onBuyNow(); }}
+          >
+            <Text style={[styles.primaryBtnText, { color: theme.onAccent }]}>Buy Now</Text>
+          </PressableScale>
+        </View>
       </View>
     </View>
-  );
-}
-
-// ─── Glass icon button (frosted chrome, monochrome regardless of theme) ──────
-
-function GlassIconButton({
-  icon, accessibilityLabel, onPress, badge, accentColor, onAccentColor,
-}: {
-  icon: React.ComponentProps<typeof Feather>['name'];
-  accessibilityLabel: string;
-  onPress: () => void;
-  badge?: number;
-  accentColor?: string;
-  onAccentColor?: string;
-}) {
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.75}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      style={styles.glassBtn}
-    >
-      {Platform.OS !== 'android' && (
-        <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
-      )}
-      <View style={[StyleSheet.absoluteFill, styles.glassTint]} />
-      <Feather name={icon} size={20} color="#FFFFFF" />
-      {typeof badge === 'number' && badge > 0 && (
-        <View style={[styles.badge, { backgroundColor: accentColor ?? '#F7F7FA' }]}>
-          <Text style={[styles.badgeText, { color: onAccentColor ?? '#0A0A0B' }]}>
-            {badge > 99 ? '99+' : badge}
-          </Text>
-        </View>
-      )}
-    </TouchableOpacity>
   );
 }
 
@@ -596,33 +570,14 @@ const styles = StyleSheet.create({
   glassBtn: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  glassTint: { backgroundColor: 'rgba(10,10,11,0.35)' },
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    paddingHorizontal: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#0A0A0B',
-  },
-  badgeText: { fontSize: 10, fontFamily: FONT.bold },
   brandRow: { alignItems: 'center', marginBottom: SP.md },
   brandInner: { flexDirection: 'row', alignItems: 'center' },
-  brandName: { fontSize: FS.base, fontFamily: FONT.semibold },
+  brandName: { ...TYPE_SCALE.body, fontFamily: FONT.semibold },
   heroWrap: { alignItems: 'center', justifyContent: 'center', marginBottom: SP.lg },
   heroFloat: { alignItems: 'center', justifyContent: 'center' },
   heroImage: {
-    borderRadius: RADIUS.xl,
+    borderRadius: RADII.sheet,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.45,
@@ -632,33 +587,29 @@ const styles = StyleSheet.create({
   heroFallback: { backgroundColor: '#FFFFFF14', alignItems: 'center', justifyContent: 'center' },
   productName: {
     color: '#FFFFFF',
-    fontSize: FS.lg,
-    fontFamily: FONT.bold,
+    ...TYPE_SCALE.title2,
     textAlign: 'center',
     paddingHorizontal: SP.lg,
   },
   priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 6 },
-  price: { color: '#FFFFFF', fontSize: FS.xl, fontFamily: FONT.bold },
-  comparePrice: { color: '#FFFFFF99', fontSize: FS.base, fontFamily: FONT.regular, textDecorationLine: 'line-through' },
+  price: { color: '#FFFFFF', ...TYPE_SCALE.title1 },
+  comparePrice: { color: '#FFFFFF99', ...TYPE_SCALE.body, textDecorationLine: 'line-through' },
   actionsRow: { flexDirection: 'row', gap: 10, paddingHorizontal: SP.lg, marginTop: SP.lg },
   secondaryBtn: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
     minHeight: 50,
-    borderRadius: RADIUS.md,
+    borderRadius: RADII.pill,
     borderWidth: 1,
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
-  secondaryBtnText: { color: '#FFFFFF', fontSize: FS.base, fontFamily: FONT.semibold },
+  actionBtnInner: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  secondaryBtnText: { color: '#FFFFFF', ...TYPE_SCALE.headline },
   primaryBtn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 50,
-    borderRadius: RADIUS.md,
+    borderRadius: RADII.pill,
   },
-  primaryBtnText: { fontSize: FS.base, fontFamily: FONT.bold },
+  primaryBtnText: { ...TYPE_SCALE.headline },
 });
