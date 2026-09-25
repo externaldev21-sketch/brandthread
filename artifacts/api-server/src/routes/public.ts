@@ -1173,6 +1173,23 @@ router.get("/sellers/:sellerId", async (req, res) => {
       .where(and(eq(posts.userId, canonicalClerkId), publicPostCondition())),
   ]);
 
+  // Attach variants to each product — mirrors the /products list enrichment so
+  // callers (e.g. the buyer Discover "From brands you follow" rail) can read a
+  // real current price instead of guessing from a bare product row.
+  const sellerProductIds = sellerProducts.map((p) => p.id);
+  const sellerVariants = sellerProductIds.length > 0
+    ? await db.select().from(productVariants).where(inArray(productVariants.productId, sellerProductIds))
+    : [];
+  const sellerVariantsByProduct: Record<string, typeof sellerVariants> = {};
+  for (const v of sellerVariants) {
+    if (!sellerVariantsByProduct[v.productId]) sellerVariantsByProduct[v.productId] = [];
+    sellerVariantsByProduct[v.productId].push(v);
+  }
+  const sellerProductsWithVariants = sellerProducts.map((p) => ({
+    ...p,
+    variants: sellerVariantsByProduct[p.id] ?? [],
+  }));
+
   // Attach tagged products per post
   const postIds = sellerPosts.map((p) => p.id);
   const tagsByPost = new Map<string, any[]>();
@@ -1220,7 +1237,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
       productsCount: Number(activeProductsCount),
       videosCount: Number(publicPostsCount),
     },
-    products: sellerProducts,
+    products: sellerProductsWithVariants,
     posts: sellerPosts.map((p) => ({
       ...p,
       taggedProducts: tagsByPost.get(p.id) ?? [],
