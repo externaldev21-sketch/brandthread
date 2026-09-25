@@ -12,15 +12,12 @@ describe('development app preview routing', () => {
       "if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web' || typeof window === 'undefined') return null;",
     );
     expect(layoutSource).toContain("return v === 'buyer' ? 'buyer' : 'seller';");
-    expect(indexSource).toContain(
-      "const effectivePreviewRole = Platform.OS === 'web'",
-    );
+    expect(indexSource).toContain('const effectivePreviewRole = getDevWebPreviewRole();');
+    expect(indexSource).toContain("effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/'");
     expect(indexSource).toContain(
       "previewRole === 'buyer' ? '/(buyer)' : '/(tabs)'",
     );
-    expect(indexSource).toContain(
-      "previewRole === 'buyer' ? 'buyer' : 'seller'",
-    );
+    expect(indexSource).toContain("if (Platform.OS !== 'web') return;");
   });
 
   it('uses populated seller analytics and balances instead of protected APIs in preview', () => {

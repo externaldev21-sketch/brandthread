@@ -83,3 +83,4 @@
 - [Install-triggered workflow collisions](install-workflow-collisions.md) — package sync can leave duplicate listeners on managed ports; clear stale process groups before one managed restart.
 - [Expo web chat focus](expo-web-chat-focus.md) — browser taps can focus a textarea then immediately blur it through an ancestor press handler.
 - [Git provider vs connector auth](git-provider-vs-connector-auth.md) — a healthy GitHub API integration does not repair expired Git push credentials.
+- [Expo screen layouts and route context](expo-screen-layout-route-context.md) — screenLayout wrappers render outside per-screen route context; pass the route argument explicitly.
