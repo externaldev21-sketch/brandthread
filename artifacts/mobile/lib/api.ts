@@ -54,6 +54,32 @@ async function fetchWithTimeout(
   }
 }
 
+/**
+ * Global 429 backoff gate. When the server rate-limits us, every request
+ * (not just the one that got the 429) waits out the server's Retry-After
+ * window before hitting the network again, instead of each screen's own
+ * retry/focus-refetch logic immediately re-triggering another 429. This is
+ * what actually stops the client from hammering the server during a rate
+ * limit — the previous behavior just surfaced the 429 as an error and let
+ * the next focus/retry fire right away.
+ */
+let rateLimitedUntil = 0;
+
+function noteRateLimited(retryAfterSeconds: number): void {
+  rateLimitedUntil = Math.max(rateLimitedUntil, Date.now() + retryAfterSeconds * 1000);
+}
+
+async function waitOutRateLimit(): Promise<void> {
+  const remaining = rateLimitedUntil - Date.now();
+  if (remaining <= 0) return;
+  await new Promise((resolve) => setTimeout(resolve, remaining));
+}
+
+function retryAfterSecondsFrom(res: Response): number {
+  const header = Number(res.headers.get('Retry-After'));
+  return Number.isFinite(header) && header > 0 ? header : 5;
+}
+
 type GetToken = () => Promise<string | null>;
 type GetCacheScope = () => string | Promise<string>;
 
@@ -242,6 +268,7 @@ async function request<T = any>(
   getCacheScope: GetCacheScope = () => 'anonymous',
   reportErrors = true,
 ): Promise<T> {
+  await waitOutRateLimit();
   const resolvedPath = versionApiPath(path);
   const isRead = (options.method ?? 'GET').toUpperCase() === 'GET';
   const cacheKey = isRead && options.cache !== 'no-store' && !asText
@@ -275,12 +302,13 @@ async function request<T = any>(
     throw error;
   }
   if (!res.ok) {
+    if (res.status === 429) noteRateLimited(retryAfterSecondsFrom(res));
     const body = await res.text();
     const error = new ApiError(res.status, body);
     const retry = isRead
       ? () => request<T>(path, options, getToken, asText, getCacheScope, reportErrors)
       : undefined;
-    const cached = cacheKey && res.status >= 500 ? await readApiCache<T>(cacheKey) : null;
+    const cached = cacheKey && (res.status >= 500 || res.status === 429) ? await readApiCache<T>(cacheKey) : null;
     if (reportErrors) reportNetworkError(error, retry, cached !== null);
     if (cached !== null) return cached;
     throw error;
