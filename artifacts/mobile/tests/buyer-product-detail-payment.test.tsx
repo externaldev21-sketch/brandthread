@@ -309,12 +309,15 @@ function findTouchableByText(renderer: ReactTestRenderer, text: string): ReactTe
   // The design-system migration moved some of these onto Chip/Button, which
   // render a Pressable instead of a raw TouchableOpacity — same tap behavior,
   // different host element type.
-  const match = renderer.root.findAll(
+  const touchables = renderer.root.findAll(
     (node: any) =>
       (node.type === 'TouchableOpacity' || node.type === 'Pressable') &&
       typeof node.props.onPress === 'function' &&
       textContent(node.props.children).includes(text),
-  )[0];
+  );
+  // Prefer an exact label match (a size chip "M") over any control whose
+  // label merely contains the text (e.g. "Message seller").
+  const match = touchables.find((node) => textContent(node.props.children).trim() === text) ?? touchables[0];
   if (!match) throw new Error(`Could not find TouchableOpacity/Pressable containing "${text}"`);
   return match;
 }

@@ -170,7 +170,10 @@ export default function BuyerConversationScreen() {
     contextOrderId?: string;
     contextOrderNumber?: string;
     contextOrderStatus?: string;
+    contextProductId?: string;
     contextProductName?: string;
+    contextProductPriceCents?: string;
+    contextProductImage?: string;
     contextSellerName?: string;
   }>();
 
@@ -213,6 +216,23 @@ export default function BuyerConversationScreen() {
 
   // Attachment state
   const [selectedAttachment, setSelectedAttachment] = useState<MessageAttachment | null>(null);
+  // "Message seller" from a product page stages that product's card in the
+  // composer once, so the first message carries the product as context.
+  const stagedProductRef = useRef<string | null>(null);
+  useEffect(() => {
+    const productId = params.contextProductId;
+    if (!productId || !params.contextProductName || stagedProductRef.current === productId) return;
+    stagedProductRef.current = productId;
+    const price = Number(params.contextProductPriceCents);
+    setSelectedAttachment({
+      type: 'product',
+      title: params.contextProductName,
+      subtitle: Number.isFinite(price) && price > 0 ? formatCents(price) : 'Product',
+      uri: params.contextProductImage || undefined,
+      accentColor: theme.accent,
+      meta: { productId },
+    });
+  }, [params.contextProductId, params.contextProductName, params.contextProductPriceCents, params.contextProductImage, theme.accent]);
   const [showAttachmentPicker, setShowAttachmentPicker] = useState(false);
   const [attachmentTab, setAttachmentTab] = useState<'product' | 'post'>('product');
   const [sellerProducts, setSellerProducts] = useState<SellerProduct[]>([]);
@@ -253,6 +273,7 @@ export default function BuyerConversationScreen() {
           contextOrderId:     params.contextOrderId,
           contextOrderNumber: params.contextOrderNumber,
           contextOrderStatus: params.contextOrderStatus,
+          contextProductId:   params.contextProductId,
           contextProductName: params.contextProductName,
           contextSellerName:  params.contextSellerName,
         });
@@ -1114,11 +1135,16 @@ export default function BuyerConversationScreen() {
         <PressableScale
           style={s.orderCard}
           onPress={() => {
-            if (participant) {
-              router.push(('/seller-profile?id=' + participant.userId) as never);
+            // The product card opens the product; without an id, the store.
+            if (conv.contextProductId) {
+              router.push(('/buyer-product-detail?productId=' + encodeURIComponent(conv.contextProductId)) as never);
+            } else if (participant) {
+              router.push(('/seller-profile?id=' + encodeURIComponent(participant.userId)) as never);
             }
           }}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={conv.contextProductId ? `View ${conv.contextProductName}` : 'View store'}
         >
           <Feather name="shopping-bag" size={ICON.md} color={theme.accent} />
           <View style={{ flex: 1, marginLeft: SP.sm }}>
@@ -1128,7 +1154,7 @@ export default function BuyerConversationScreen() {
             ) : null}
           </View>
           <View style={s.orderStatusBadge}>
-            <Text style={s.orderStatusText}>View store</Text>
+            <Text style={s.orderStatusText}>{conv.contextProductId ? 'View product' : 'View store'}</Text>
           </View>
         </PressableScale>
       )}

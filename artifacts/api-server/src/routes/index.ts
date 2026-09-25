@@ -26,6 +26,7 @@ import pushRouter from "./push";
 import aiRouter from "./ai";
 // New: buyer-facing, public browsing, Stripe Connect, webhooks
 import publicRouter from "./public";
+import profileMediaRouter from "./profile-media";
 import buyerRouter from "./buyer";
 import guestCheckoutRouter from "./guest-checkout";
 import connectRouter from "./connect";
@@ -100,6 +101,7 @@ const router = Router();
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/config/features", featureFlagsRouter);
 router.use("/public",          publicRouter);
+router.use("/public",          profileMediaRouter); // /users/:id/videos, /products/:id/feed-videos
 router.use("/guest/checkout",  guestCheckoutRouter);
 router.use("/webhooks",        webhooksRouter);
 router.use("/webhooks/shippo", webhooksShippoRouter);

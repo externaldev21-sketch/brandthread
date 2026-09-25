@@ -72,6 +72,21 @@ import { SheetRise } from '@/components/motion/SheetRise';
 import ActivityBellButton from '@/components/ActivityBellButton';
 import { RADII } from '@/constants/radii';
 import { TABULAR_NUMS } from '@/constants/typography';
+import { getVideoFeedPage, loadVideoFeedThrough } from '@/services/profileService';
+import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
+
+/**
+ * Scopes the feed player to one creator's videos (profile grid tap) or to the
+ * videos that feature one product (product detail "Featured in"), opened at
+ * `startPostId`. Same pages, rail, comments, share and shop sheet as the main
+ * feed — only the data source and the chrome differ.
+ */
+export interface CreatorFeedConfig {
+  source: VideoFeedSource;
+  id: string;
+  startPostId?: string;
+  title?: string;
+}
 
 const THREAD_PAGE_SIZE = 30;
 
@@ -278,6 +293,8 @@ interface SpotlightItem {
   // Optional fields present on real seller posts
   productId?: string;
   sellerId?: string;
+  /** Who posted it — decides which profile the avatar/name opens. Feed posts default to seller. */
+  authorAccountType?: 'seller' | 'buyer';
   productTags?: { productId: string; productName: string; priceCents: number; imageUri?: string }[];
   /** Authoritative comment count from the server (preferred over local comments array length) */
   commentsCount?: number;
@@ -1171,7 +1188,7 @@ function ShopPill({
 }
 
 function SpotlightPage({
-  item, isActive, pageWidth, pageHeight, bottomClearance, immersive = false, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onNotInterested, soundOn, onToggleSound,
+  item, isActive, pageWidth, pageHeight, bottomClearance, immersive: immersiveProp = false, hasTabBar = true, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShopTag, onOpenCreator, onNotInterested, soundOn, onToggleSound,
 }: {
   item: SpotlightItem;
   isActive: boolean;
@@ -1180,6 +1197,10 @@ function SpotlightPage({
   bottomClearance: number;
   /** Buyer Home behind the floating tab bar. */
   immersive?: boolean;
+  /** False for the full-screen creator player, which has no tab bar to blur under. */
+  hasTabBar?: boolean;
+  /** Opens the creator's profile (or returns to it from the creator player). */
+  onOpenCreator: (item: SpotlightItem) => void;
   engagement: EngagementState | undefined;
   onLike: (id: string) => Promise<void>;
   onDoubleTapLike: (id: string) => void;
@@ -1197,6 +1218,8 @@ function SpotlightPage({
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { push } = useThreadPull();
+  // The creator player (no tab bar) always plays edge to edge like Buyer Home.
+  const immersive = immersiveProp || !hasTabBar;
   const [paused, setPaused] = useState(false);
   /** Which page of a multi-photo post is currently visible, for the pager dots. */
   const [photoPageIndex, setPhotoPageIndex] = useState(0);
@@ -1340,7 +1363,7 @@ function SpotlightPage({
                 pageAspect={pageHeight > 0 ? pageWidth / pageHeight : undefined}
                 pageWidth={pageWidth}
                 pageHeight={pageHeight}
-                bottomStripHeight={immersive ? bottomClearance : 0}
+                bottomStripHeight={immersive && hasTabBar ? bottomClearance : 0}
               />
             )
             : <PhotoVisual uris={item.mediaUris} pageWidth={pageWidth} pageHeight={pageHeight} onPageChange={setPhotoPageIndex} />}
@@ -1397,7 +1420,7 @@ function SpotlightPage({
             activeOpacity={0.8}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push(('/seller-profile?id=' + encodeURIComponent(item.sellerId ?? item.id)) as never);
+              onOpenCreator(item);
             }}
             accessibilityRole="button"
             accessibilityLabel={`View ${item.creator}'s profile`}
@@ -1544,7 +1567,8 @@ function SpotlightPage({
             disabled={friendReposts.length === 0}
             onPress={() => {
               const friend = friendReposts[0];
-              if (friend) router.push(('/buyer-other-profile?id=' + encodeURIComponent(friend.userId)) as never);
+              // buyer-other-profile reads `userId` — the old `id` param opened a blank profile.
+              if (friend) router.push(profileHref({ userId: friend.userId, accountType: 'buyer', name: friend.displayName }) as never);
             }}
             accessibilityRole={friendReposts.length > 0 ? 'button' : 'text'}
             accessibilityLabel={repostLabel}
@@ -1579,8 +1603,10 @@ function SpotlightPage({
           activeOpacity={0.8}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push(('/seller-profile?id=' + encodeURIComponent(item.sellerId ?? item.id)) as never);
+            onOpenCreator(item);
           }}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${item.creator}'s profile`}
         >
           <View style={styles.creatorRow}>
             <Text style={styles.creatorName} numberOfLines={1}>{item.creator}</Text>
@@ -1655,6 +1681,7 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     location: (post as any).location ?? (post as any).locationName ?? undefined,
     productId: tag?.productId,
     sellerId: post.authorId,
+    authorAccountType: post.authorAccountType === 'buyer' ? 'buyer' : 'seller',
     productTags: post.productTags ?? [],
     commentsCount: post.commentsCount,
   };
@@ -1708,9 +1735,11 @@ function buildPreviewShopProduct(
 export default function FeedScreen({
   buyerMode = false,
   showFashionPreview = false,
+  creatorFeed,
 }: {
   buyerMode?: boolean;
   showFashionPreview?: boolean;
+  creatorFeed?: CreatorFeedConfig;
 }) {
   const { theme } = useAppTheme();
   const palette = theme as typeof theme & { background?: string; surface?: string; card?: string; border?: string; text?: string; muted?: string; subtle?: string; };
@@ -1720,6 +1749,10 @@ export default function FeedScreen({
   const previewTopInset = Platform.OS === 'web' ? 67 : insets.top;
   const previewBottomInset = insets.bottom;
   const isBuyerSurface = buyerMode || showFashionPreview;
+  const isCreatorFeed = !!creatorFeed;
+  const creatorSource = creatorFeed?.source;
+  const creatorId = creatorFeed?.id;
+  const creatorStartPostId = creatorFeed?.startPostId;
   // Height of the floating top overlay (Friends/Following/For You/Cart row):
   // topBar's own paddingTop + paddingBottom, plus the buyerTopRow's height.
   // Single source of truth so BuyerHighDemandPage's content never renders
@@ -1767,6 +1800,10 @@ export default function FeedScreen({
   const [feedLoadingMore, setFeedLoadingMore] = useState(false);
   const [feedHasMore, setFeedHasMore] = useState(true);
   const [activeLiveStreams, setActiveLiveStreams] = useState<LiveStreamFeedItem[]>([]);
+  const [feedError, setFeedError] = useState(false);
+  const [creatorStartIndex, setCreatorStartIndex] = useState(0);
+  const creatorOffsetRef = useRef(0);
+  const viewedPostIdsRef = useRef(new Set<string>());
   const api = useApi();
   const feedCursorRef = useRef(createThreadFeedCursor());
   const feedGenerationRef = useRef(0);
@@ -1806,6 +1843,35 @@ export default function FeedScreen({
 
   // Load published seller posts and subscribe to real-time changes
   const loadFeed = useCallback(async (initial = false) => {
+    if (creatorSource && creatorId) {
+      // Creator/product player: that creator's videos only, opened at the tapped one.
+      const generation = feedGenerationRef.current + 1;
+      feedGenerationRef.current = generation;
+      if (initial) setFeedLoading(true);
+      else setFeedRefreshing(true);
+      setFeedError(false);
+      try {
+        const result = await loadVideoFeedThrough(creatorSource, creatorId, initial ? creatorStartPostId : null);
+        if (feedGenerationRef.current !== generation) return;
+        setSellerFeedPosts(result.posts.map(mapSellerPost).filter((p): p is SpotlightItem => p !== null));
+        creatorOffsetRef.current = result.nextOffset;
+        feedHasMoreRef.current = result.hasMore;
+        setFeedHasMore(result.hasMore);
+        if (initial) {
+          setCreatorStartIndex(result.startIndex);
+          setActiveIndex(result.startIndex);
+        }
+      } catch {
+        if (feedGenerationRef.current !== generation) return;
+        if (initial) { setSellerFeedPosts([]); setFeedError(true); }
+      } finally {
+        if (feedGenerationRef.current === generation) {
+          if (initial) setFeedLoading(false);
+          else setFeedRefreshing(false);
+        }
+      }
+      return;
+    }
     const loadKey = feedTab;
     if (feedLoadKeyRef.current === loadKey) return;
     feedLoadKeyRef.current = loadKey;
@@ -1841,7 +1907,7 @@ export default function FeedScreen({
         else setFeedRefreshing(false);
       }
     }
-  }, [feedTab]);
+  }, [feedTab, creatorSource, creatorId, creatorStartPostId]);
 
   const loadMoreFeed = useCallback(async () => {
     if (feedLoadingMoreRef.current || !feedHasMoreRef.current || feedLoading || feedRefreshing) return;
@@ -1850,7 +1916,12 @@ export default function FeedScreen({
     const generation = feedGenerationRef.current;
     const cursor = feedCursorRef.current;
     try {
-      const page = await getThreadPostsPage(cursor, THREAD_PAGE_SIZE, feedTab);
+      const page = creatorSource && creatorId
+        ? await getVideoFeedPage(creatorSource, creatorId, creatorOffsetRef.current).then((result) => {
+            creatorOffsetRef.current = result.nextOffset;
+            return { posts: result.posts, cursor, hasMore: result.hasMore };
+          })
+        : await getThreadPostsPage(cursor, THREAD_PAGE_SIZE, feedTab);
       if (feedGenerationRef.current !== generation) return;
       const rows = page.posts;
       const mapped = (Array.isArray(rows) ? rows : [])
@@ -1875,7 +1946,7 @@ export default function FeedScreen({
       feedLoadingMoreRef.current = false;
       if (feedGenerationRef.current === generation) setFeedLoadingMore(false);
     }
-  }, [feedLoading, feedRefreshing, feedTab]);
+  }, [feedLoading, feedRefreshing, feedTab, creatorSource, creatorId]);
 
   useEffect(() => {
     void loadFeed(true);
@@ -1909,8 +1980,10 @@ export default function FeedScreen({
     void loadFeed();
   }, [feedRefreshing, loadFeed]);
 
-  // Poll active live streams every 30 seconds
+  // Poll active live streams every 30 seconds (main feed only — a creator's
+  // video player never weaves other sellers' streams in)
   useEffect(() => {
+    if (isCreatorFeed) return undefined;
     async function fetchLive() {
       try {
         const data = await (api as any).live.active() as { streams: any[] };
@@ -1933,7 +2006,7 @@ export default function FeedScreen({
     fetchLive();
     const id = setInterval(fetchLive, 30_000);
     return () => clearInterval(id);
-  }, []);
+  }, [isCreatorFeed]);
 
   // "Just dropped from brands you follow" — real drops only: fetch the
   // buyer's follow graph and the platform's currently-live drops, then
@@ -1980,11 +2053,13 @@ export default function FeedScreen({
   // Production and seller feeds remain real published seller posts only.
   // Live streams are woven in at roughly 1 per 10 regular posts (occasional, not dominant).
   const allItems = useMemo(() => {
-    const previewPosts = __DEV__ && (buyerMode || showFashionPreview) && feedTab === 'for-you'
+    const previewPosts = __DEV__ && !isCreatorFeed && (buyerMode || showFashionPreview) && feedTab === 'for-you'
       ? FASHION_PREVIEW_POSTS
       : [];
     const regular: (SpotlightItem | LiveStreamFeedItem | JustDroppedRailItem)[] = [...previewPosts, ...sellerFeedPosts];
-    if (feedTab === 'following') return regular;
+    // A creator/product-scoped player shows only those videos — no live
+    // streams or rails woven in.
+    if (isCreatorFeed || feedTab === 'following') return regular;
     // Weave the "Just dropped" rail in once, early (index 2) — a real,
     // non-video page in the same vertical pager the live-stream cards use.
     if (isBuyerSurface && justDroppedDrops.length > 0) {
@@ -1998,7 +2073,7 @@ export default function FeedScreen({
       result.splice(insertAt, 0, liveItem);
     });
     return result;
-  }, [sellerFeedPosts, activeLiveStreams, buyerMode, feedTab, showFashionPreview, isBuyerSurface, justDroppedDrops]);
+  }, [sellerFeedPosts, activeLiveStreams, buyerMode, feedTab, showFashionPreview, isBuyerSurface, justDroppedDrops, isCreatorFeed]);
 
   // Every on-screen post's real engagement snapshot (server-backed likes/
   // saves/reposts/liked-by-me/saved-by-me), keyed by id. `engagements` state
@@ -2080,6 +2155,36 @@ export default function FeedScreen({
   // buyerOffset: used to compute correct isActive for video playback when the
   // demand sentinel sits at index 0.
   const buyerOffset = buyerMode ? 1 : 0;
+
+  // Avatar / name tap: open the creator's profile — or, inside that creator's
+  // own video player, go back to the profile it was opened from.
+  const handleOpenCreator = useCallback((item: SpotlightItem) => {
+    if (!item.sellerId) return;
+    if (creatorSource === 'creator' && creatorId && item.sellerId === creatorId && router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.push(profileHref({
+      userId: item.sellerId,
+      accountType: item.authorAccountType ?? 'seller',
+      name: item.creator,
+      handle: item.handle,
+      initials: item.initials,
+    }) as never);
+  }, [creatorSource, creatorId, router]);
+
+  // Record one view per post per session when it becomes the active page —
+  // the view counts profile video tiles show.
+  useEffect(() => {
+    if (!userId) return;
+    const item = displayItems[activeIndex];
+    if (!item || isDemandPageItem(item) || (item as LiveStreamFeedItem)._isLive) return;
+    const id = item.id;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return;
+    if (viewedPostIdsRef.current.has(id)) return;
+    viewedPostIdsRef.current.add(id);
+    api.posts.interact(id, { type: 'view' }).catch(() => {});
+  }, [activeIndex, api, displayItems, userId]);
 
   function update(id: string, patch: Partial<EngagementState> | ((e: EngagementState) => Partial<EngagementState>)) {
     setEngagements(prev => {
@@ -2365,8 +2470,11 @@ export default function FeedScreen({
         />
       )}
       {viewportReady && <FlatList
-        key={`thread-${pageWidth}x${pageHeight}`}
+        // The creator player remounts once its videos load so it opens at the tapped one.
+        key={`thread-${pageWidth}x${pageHeight}${isCreatorFeed && feedLoading ? '-loading' : ''}`}
         data={displayItems}
+        // Creator player opens at the tapped video (uniform page height via getItemLayout).
+        initialScrollIndex={isCreatorFeed && creatorStartIndex > 0 && creatorStartIndex < displayItems.length ? creatorStartIndex : undefined}
         keyExtractor={item => item.id}
         pagingEnabled
         disableIntervalMomentum
@@ -2394,7 +2502,24 @@ export default function FeedScreen({
           />
         }
         ListEmptyComponent={
-          searchQuery.trim() ? (
+          isCreatorFeed && !feedLoading ? (
+            <View style={{ width: pageWidth, height: pageHeight, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 40 }}>
+              <Feather name={feedError ? 'wifi-off' : 'film'} size={40} color={MUTED} />
+              <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center' }}>
+                {feedError ? "Couldn't load these videos" : 'No videos yet'}
+              </Text>
+              {feedError ? (
+                <TouchableOpacity
+                  onPress={() => { void loadFeed(true); }}
+                  style={styles.creatorRetry}
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry"
+                >
+                  <Text style={styles.creatorRetryText}>Retry</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          ) : searchQuery.trim() ? (
             <View style={{ width: pageWidth, height: pageHeight, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
               <Feather name="search" size={32} color={theme.muted} />
               <Text style={{ fontSize: FS.base, fontFamily: FONT.medium, color: theme.muted }}>
@@ -2472,6 +2597,8 @@ export default function FeedScreen({
               pageHeight={pageHeight}
               bottomClearance={bottomClearance}
               immersive={isBuyerSurface}
+              hasTabBar={!isCreatorFeed}
+              onOpenCreator={handleOpenCreator}
               engagement={engagements[spotlight.id] ?? initialEngagement(spotlight)}
               onLike={handleLike}
               onDoubleTapLike={handleDoubleTapLike}
@@ -2507,7 +2634,50 @@ export default function FeedScreen({
       )}
 
       {/* ─ Top bar overlay ─ */}
-      {isBuyerSurface ? (
+      {isCreatorFeed ? (
+        <View style={[styles.topBar, { paddingTop: Math.max(0, previewTopInset - 4) }]} pointerEvents="box-none">
+          <View style={styles.buyerTopRow}>
+            <TouchableOpacity
+              style={styles.buyerTopBtn}
+              activeOpacity={0.7}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                if (router.canGoBack()) router.back();
+                else router.replace('/' as never);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+              testID="creator-feed-back"
+            >
+              <Feather name="arrow-left" size={24} color={ON_DARK} />
+            </TouchableOpacity>
+            <Text style={styles.creatorTitle} numberOfLines={1} accessibilityRole="header">
+              {creatorFeed?.title || (creatorFeed?.source === 'product' ? 'Featured in' : 'Videos')}
+            </Text>
+            <Animated.View ref={cartTargetRef} style={[styles.buyerTopBtn, { transform: [{ scale: cartPulse }] }]}>
+              <TouchableOpacity
+                style={styles.buyerTopBtn}
+                activeOpacity={0.7}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push('/(buyer)/cart' as never);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Open cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
+              >
+                <Feather name="shopping-cart" size={22} color={ON_DARK} />
+                {cartCount > 0 && (
+                  <View style={[styles.cartCountBadge, styles.buyerCartBadge, { backgroundColor: theme.accent }]}>
+                    <Text style={[styles.cartCountText, { color: theme.onAccent }]}>
+                      {cartCount > 99 ? '99+' : cartCount}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
+        </View>
+      ) : isBuyerSurface ? (
         <View style={[styles.topBar, { paddingTop: Math.max(0, previewTopInset - 4) }]} pointerEvents="box-none">
           {/* Buyer Home: Friends · Following | For You · Cart. Search lives in the tab bar. */}
           <View style={styles.buyerTopRow}>
@@ -2880,6 +3050,15 @@ const styles = StyleSheet.create({
   },
   cartCountText: { fontSize: FS.xs, lineHeight: 12, fontFamily: FONT.bold, ...TABULAR_NUMS },
   topTitle: { flex: 1, textAlign: 'center', fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
+  creatorTitle: {
+    flex: 1, textAlign: 'center', fontSize: FS.base, fontFamily: FONT.semibold, color: ON_DARK,
+    textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
+  creatorRetry: {
+    minHeight: 44, minWidth: 140, paddingHorizontal: SP.lg, borderRadius: RADIUS.pill,
+    borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center',
+  },
+  creatorRetryText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
   feedTabs: { alignSelf: 'center', flexDirection: 'row', gap: 22, marginTop: 0, paddingBottom: 1 },
   feedTab: { paddingHorizontal: 4, paddingVertical: 3, alignItems: 'center' },
   feedTabText: { color: ON_DARK, opacity: 0.6, fontFamily: FONT.semibold, fontSize: FS.xs },

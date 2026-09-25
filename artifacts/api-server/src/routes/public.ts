@@ -135,10 +135,20 @@ router.get("/products", async (req, res) => {
       return;
     }
     const { limit: lim, offset: off } = page.data;
+    // Profiles may only hold the users.id alias (e.g. from /u/:username) — the
+    // shop list resolves it to the seller's Clerk ID like every public read.
+    const resolvedOwnerId = ownerId && UUID_PATTERN.test(ownerId)
+      ? await resolveToClerkId(ownerId, "seller")
+      : ownerId;
+    if (ownerId && !resolvedOwnerId) {
+      setPaginationHeaders(res, page.data, 0, 0);
+      res.json([]);
+      return;
+    }
     const whereClause = and(
       eq(products.status, "active"),
       isNull(products.deletedAt),
-      ownerId ? eq(products.ownerId, ownerId) : undefined,
+      resolvedOwnerId ? eq(products.ownerId, resolvedOwnerId) : undefined,
       category ? eq(products.category, category) : undefined,
       tag
         ? or(
@@ -992,11 +1002,16 @@ router.get("/sellers/:sellerId", async (req, res) => {
   }
   const vacation = await getSellerVacationStatus(canonicalClerkId);
 
-  const [sellerProducts, sellerPosts] = await Promise.all([
+  const activeProductsWhere = and(
+    eq(products.ownerId, canonicalClerkId),
+    eq(products.status, "active"),
+    isNull(products.deletedAt),
+  );
+  const [sellerProducts, sellerPosts, [{ activeProductsCount }], [{ publicPostsCount }]] = await Promise.all([
     db
       .select()
       .from(products)
-      .where(and(eq(products.ownerId, canonicalClerkId), eq(products.status, "active"), isNull(products.deletedAt)))
+      .where(activeProductsWhere)
       .orderBy(desc(products.createdAt))
       .limit(50),
     db
@@ -1012,6 +1027,11 @@ router.get("/sellers/:sellerId", async (req, res) => {
       ))
       .orderBy(desc(posts.createdAt))
       .limit(30),
+    // True totals for the profile's "Shop N products" pill and video count —
+    // the two lists above are capped pages, not counts.
+    db.select({ activeProductsCount: count() }).from(products).where(activeProductsWhere),
+    db.select({ publicPostsCount: count() }).from(posts)
+      .where(and(eq(posts.userId, canonicalClerkId), publicPostCondition())),
   ]);
 
   // Attach tagged products per post
@@ -1058,6 +1078,8 @@ router.get("/sellers/:sellerId", async (req, res) => {
       vacationMessage: vacation.active ? vacation.message : null,
       vacationUntil: vacation.until?.toISOString() ?? null,
       profileImageUrl,
+      productsCount: Number(activeProductsCount),
+      videosCount: Number(publicPostsCount),
     },
     products: sellerProducts,
     posts: sellerPosts.map((p) => ({

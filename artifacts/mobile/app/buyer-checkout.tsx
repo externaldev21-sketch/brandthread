@@ -88,6 +88,7 @@ import { StickyFooter } from '@/components/layout';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { trackAndRelayConversionEvent } from '@/lib/marketingPixels';
 import { Button, IconButton } from '@/components/ui';
+import { BuyerProtectionNote } from '@/components/BuyerProtectionNote';
 import { RADII } from '@/constants/radii';
 import { TABULAR_NUMS, TYPE_SCALE } from '@/constants/typography';
 
@@ -1832,6 +1833,12 @@ export default function BuyerCheckoutScreen() {
                 }
               />
             </GuidedSection>
+
+            {/* Buyer protection — shown right before the buyer pays. */}
+            <BuyerProtectionNote
+              preorder={current.deliveryGroups.some(group => group.items.some(item => item.isPreOrder))}
+              style={{ marginTop: SP.md }}
+            />
           </>
         )}
 
