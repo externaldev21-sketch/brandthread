@@ -18,7 +18,6 @@
 import { Tabs } from 'expo-router';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { TabScreenErrorFallback } from '@/components/ErrorBoundary';
-import { SellerPreviewRouteGate } from '@/components/SellerPreviewRouteGate';
 
 // ─── Tab label constants (referenced by navigation contract tests) ─────────────
 // Keep these assignments even though the tab bar is hidden — they satisfy
@@ -40,9 +39,6 @@ export default function TabLayout() {
     <Tabs
       detachInactiveScreens
       tabBar={() => null}
-      screenLayout={({ route, children }) => (
-        <SellerPreviewRouteGate route={route.name} isTab>{children}</SellerPreviewRouteGate>
-      )}
       // A render crash in one tab shows a friendly per-tab fallback instead
       // of taking down the whole app; the root layout's ErrorBoundary is
       // still the last-resort catch-all above this.

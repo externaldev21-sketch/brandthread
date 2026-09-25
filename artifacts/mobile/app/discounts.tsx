@@ -16,7 +16,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
+import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import {
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
@@ -105,11 +107,13 @@ export default function DiscountsScreen() {
   const { text: FG, muted: MUTED, border: BORDER } = theme;
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
+  const { isLoaded: authLoaded, isSignedIn, userId } = useAuth();
+  const previewOnly = isSellerDevPreview() && (!authLoaded || !isSignedIn || !userId);
   const api = useApi();
 
   const [discounts, setDiscounts] = useState<DiscountCode[]>([]);
   const [products, setProducts] = useState<Array<{ id: string; name: string; images?: string[] }>>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!previewOnly);
   const [loadError, setLoadError] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -132,6 +136,13 @@ export default function DiscountsScreen() {
   const [endDate, setEndDate] = useState('');
 
   const loadDiscounts = useCallback(async () => {
+    if (previewOnly) {
+      setDiscounts([]);
+      setProducts([]);
+      setLoadError(false);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [data, prods] = await Promise.all([
@@ -147,7 +158,7 @@ export default function DiscountsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, previewOnly]);
 
   useFocusEffect(useCallback(() => { loadDiscounts(); }, [loadDiscounts]));
 
@@ -210,6 +221,10 @@ export default function DiscountsScreen() {
     : `${startDate ? `Starts ${startDate}` : 'Starts immediately'}${hasEnd && endDate ? ` · Ends ${endDate}` : hasEnd ? '' : ' · No end date'}`;
 
   async function handleSave() {
+    if (previewOnly) {
+      Alert.alert('Preview only', 'Discount codes can’t be created or edited in this signed-out preview.');
+      return;
+    }
     if (discType !== 'free_shipping' && discType !== 'free_item') {
       if (discType === 'percentage' && (percent < 1 || percent > 100)) {
         Alert.alert('Invalid percentage', 'Choose between 1% and 100%.');
@@ -269,6 +284,10 @@ export default function DiscountsScreen() {
   }
 
   async function togglePause(d: DiscountCode) {
+    if (previewOnly) {
+      Alert.alert('Preview only', 'Discount codes can’t be changed in this signed-out preview.');
+      return;
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const nextActive = !d.active;
     setDiscounts(prev => prev.map(x => x.id === d.id ? { ...x, active: nextActive, status: nextActive ? 'active' : 'paused' } : x));
@@ -280,6 +299,10 @@ export default function DiscountsScreen() {
   }
 
   async function handleDelete(d: DiscountCode) {
+    if (previewOnly) {
+      Alert.alert('Preview only', 'Discount codes can’t be deleted in this signed-out preview.');
+      return;
+    }
     Alert.alert('Delete discount?', `Remove code "${d.code}"?`, [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -321,7 +344,9 @@ export default function DiscountsScreen() {
             <EmptyState
               icon="tag"
               title="No discount codes yet"
-              description="Create a code to offer buyers a percentage off, a fixed amount, free shipping or a free item."
+              description={previewOnly
+                ? 'Preview only · Create a code to explore discount options. Changes won’t be saved.'
+                : 'Create a code to offer buyers a percentage off, a fixed amount, free shipping or a free item.'}
               action={{ label: 'Create code', onPress: openNewModal }}
             />
           )}
@@ -532,7 +557,7 @@ export default function DiscountsScreen() {
             </View>
 
             <PrimaryButton
-              label={saving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Code'}
+              label={previewOnly ? 'Preview only — not saved' : saving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Code'}
               onPress={handleSave}
               disabled={saving}
               style={{ marginTop: SP.sm }}

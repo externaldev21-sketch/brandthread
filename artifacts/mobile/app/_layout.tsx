@@ -63,7 +63,6 @@ import { showNotificationBanner } from '@/lib/notificationBannerBus';
 import { getNotifications as getFeedNotifications } from '@/services/socialService';
 import { syncNotificationBadge } from '@/lib/notificationBadge';
 import { SellerGlobalTabBar } from '@/components/SellerGlobalTabBar';
-import { SellerPreviewRouteGate } from '@/components/SellerPreviewRouteGate';
 import SellerStudioRadialMenu from '@/components/SellerStudioRadialMenu';
 import AppLockGate from '@/components/security/AppLockGate';
 import LegalAcceptanceGate from '@/components/legal/LegalAcceptanceGate';
@@ -74,12 +73,12 @@ import { FADE_MS, SCREEN_PUSH_MS } from '@/constants/motion';
 // visible behind cards, sheets, and full-screen modal content.
 const OPAQUE_SCREEN_CONTENT = { backgroundColor: 'transparent' } as const;
 
-function IsolatedStackScene({ children, routeName }: { children: React.ReactNode; routeName: string }) {
+function IsolatedStackScene({ children }: { children: React.ReactNode }) {
   const { theme } = useAppTheme();
   const palette = theme as typeof theme & Record<string, any>;
   return (
     <View style={{ flex: 1, backgroundColor: palette.background ?? '#0A0A0B' }}>
-      <SellerPreviewRouteGate route={routeName}>{children}</SellerPreviewRouteGate>
+      {children}
     </View>
   );
 }
@@ -886,8 +885,8 @@ function RootLayoutNav() {
       <Pressable onPress={Keyboard.dismiss} accessible={false} style={{ flex: 1 }}>
         <View style={{ flex: 1 }}>
       <Stack
-        screenLayout={({ route, children }) => (
-          <IsolatedStackScene routeName={route.name}>{children}</IsolatedStackScene>
+        screenLayout={({ children }) => (
+          <IsolatedStackScene>{children}</IsolatedStackScene>
         )}
         screenOptions={{
           headerShown: false,

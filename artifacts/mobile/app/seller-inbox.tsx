@@ -17,6 +17,7 @@ import { ListSkeleton } from '@/components/layout';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { hapticPrimaryAction } from '@/lib/haptics';
 import { useApi } from '@/lib/api';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import { subscribeConversationReadFailure } from '@/lib/conversationReadEvents';
 
@@ -56,9 +57,10 @@ export default function SellerInboxScreen() {
   const api = useApi();
   const { user, isLoaded: clerkLoaded = true } = useUser();
   const myId = user?.id ?? '';
+  const isDemoPreview = isSellerDevPreview();
 
   const [convs, setConvs] = useState<ConvView[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!clerkLoaded && !isDemoPreview);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -77,11 +79,11 @@ export default function SellerInboxScreen() {
     optimisticReadsRef.current.clear();
     setConvs([]);
     setLoadError(false);
-    setIsLoading(!clerkLoaded);
-  }, [clerkLoaded, myId]);
+    setIsLoading(!clerkLoaded && !isDemoPreview);
+  }, [clerkLoaded, isDemoPreview, myId]);
 
   const load = useCallback(async (generation: number, silent = false) => {
-    if (!clerkLoaded || !myId) return;
+    if (isDemoPreview || !clerkLoaded || !myId) return;
     // Keep one request in flight per focus cycle so a slow request cannot
     // overlap a later poll and corrupt the consecutive-failure count.
     if (requestGenerationRef.current === generation) return;
@@ -134,7 +136,7 @@ export default function SellerInboxScreen() {
         requestGenerationRef.current = null;
       }
     }
-  }, [api, clerkLoaded, myId]);
+  }, [api, clerkLoaded, isDemoPreview, myId]);
 
   useEffect(() => subscribeConversationReadFailure((conversationId) => {
     // A failed mark-as-read must not leave the inbox suppressing the server's
@@ -145,6 +147,12 @@ export default function SellerInboxScreen() {
   }), [load, clerkLoaded, myId]);
 
   useFocusEffect(useCallback(() => {
+    if (isDemoPreview) {
+      setConvs([]);
+      setLoadError(false);
+      setIsLoading(false);
+      return;
+    }
     const generation = ++generationRef.current;
     consecutiveFailuresRef.current = 0;
     load(generation);
@@ -155,9 +163,10 @@ export default function SellerInboxScreen() {
         pollRef.current = null;
       }
     };
-  }, [load, clerkLoaded, myId]));
+  }, [isDemoPreview, load, clerkLoaded, myId]));
 
   async function onRefresh() {
+    if (isDemoPreview) return;
     setIsRefreshing(true);
     consecutiveFailuresRef.current = 0;
     await load(generationRef.current, true);

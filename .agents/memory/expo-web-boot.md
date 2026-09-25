@@ -24,9 +24,13 @@ The dev-web account switcher's selected demo side must survive Expo Router remov
 **Why:** clicking Demo Buyer opened the buyer home, but the root redirect dropped the query; reloading silently returned to Demo Seller.
 **How to apply:** explicit preview URLs override the tab's selection, and seller/buyer preview detection, root redirects, and displayed account state must all resolve the same selected role.
 
-Authenticated seller tools cannot treat this navigation bypass as a real Clerk session. In dev web seller preview, initialize review-only UI state synchronously from the route role and skip protected API calls; keep uploads, writes, checkout, and activation behind real authentication.
+Opening the demo account chooser from the buyer profile should use a full preview-only navigation rather than a client-side push; keep real accounts on normal in-app navigation.
+**Why:** early preview navigation can be reset to buyer home while Clerk finishes loading, hiding the chooser before Demo Seller can be tapped. Direct chooser loads remain stable during that startup window.
+**How to apply:** preserve the buyer preview URL when entering the chooser, then let the selected demo row navigate to its chosen side; do not treat demo rows as real Clerk sessions.
 
-**Why:** paid promotion screens entered generic error states because the preview bypass opened them without a token, so every protected request returned 401. Async-only fallbacks also flashed or remained on loading states during direct web captures.
+Authenticated seller tools cannot treat this navigation bypass as a real Clerk session. In dev web seller preview, mount the actual seller screens, using their own zero/default states and skipping protected API calls. Do not replace routes with generic sign-in or “nothing here yet” screens; keep uploads, writes, checkout, and activation behind real authentication.
+
+**Why:** paid promotion screens entered generic error states because the preview bypass opened them without a token, so every protected request returned 401. Async-only fallbacks also flashed or remained on loading states during direct web captures. The owner explicitly rejected route-wide preview placeholders because they blocked navigation despite removing sign-in prompts.
 
 **How to apply:** derive preview role from route parameters so SSR and the first client frame agree. Use clearly labeled, non-financial preview fixtures only for reviewing UI; never fake successful writes, payments, entitlement, delivery, or activation.
 

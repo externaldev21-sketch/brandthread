@@ -26,6 +26,7 @@ import { clearBadge } from '@/lib/orderBadgeStore';
 import { formatCents } from '@/lib/money';
 import SwipeActionRow from '@/components/SwipeActionRow';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { isSellerDevPreview } from '@/lib/devPreview';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -715,9 +716,10 @@ export default function OrdersScreen() {
 
   const api = useApi();
   const { userId, isLoaded: authLoaded, isSignedIn } = useAuth();
+  const sellerPreview = isSellerDevPreview() && (!authLoaded || !isSignedIn || !userId);
 
   const [orders, setOrders] = useState<OrderListOrder[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!sellerPreview);
   const [refreshing, setRefreshing] = useState(false);
   const [updatesPaused, setUpdatesPaused] = useState(false);
   const [loadError, setLoadError] = useState(false);
@@ -737,6 +739,7 @@ export default function OrdersScreen() {
   const hasLoadedRef = useRef(false);
 
   const loadData = useCallback(async (generation: number) => {
+    if (sellerPreview) return;
     if (!authLoaded || !isSignedIn || !userId) return;
     if (requestGenerationRef.current === generation) return;
     const requestOwnerId = userId;
@@ -776,10 +779,28 @@ export default function OrdersScreen() {
         requestGenerationRef.current = null;
       }
     }
-  }, [api, authLoaded, isSignedIn, userId]);
+  }, [api, authLoaded, isSignedIn, userId, sellerPreview]);
 
   useFocusEffect(
     useCallback(() => {
+      if (sellerPreview) {
+        // The dev-web seller preview is review-only. Keep the real screen chrome
+        // and empty state, but never issue protected requests or retain account data.
+        generationRef.current += 1;
+        if (timerRef.current !== null) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        setOrders([]);
+        setOrdersOwnerId(null);
+        setStats(null);
+        setLoadError(false);
+        setLoading(false);
+        setRefreshing(false);
+        setSelectedIds([]);
+        hasLoadedRef.current = true;
+        return undefined;
+      }
       if (!authLoaded || !isSignedIn || !userId) {
         setLoading(true);
         return undefined;
@@ -797,10 +818,11 @@ export default function OrdersScreen() {
           timerRef.current = null;
         }
       };
-    }, [authLoaded, isSignedIn, loadData, userId])
+    }, [authLoaded, isSignedIn, loadData, sellerPreview, userId])
   );
 
   const retryUpdates = useCallback(() => {
+    if (sellerPreview) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const generation = generationRef.current;
     consecutiveFailuresRef.current = 0;
@@ -809,16 +831,17 @@ export default function OrdersScreen() {
       timerRef.current = setInterval(() => loadData(generation), 30_000);
     }
     loadData(generation);
-  }, [loadData]);
+  }, [loadData, sellerPreview]);
 
   const onRefresh = useCallback(() => {
+    if (sellerPreview) return;
     setRefreshing(true);
     retryUpdates();
-  }, [retryUpdates]);
+  }, [retryUpdates, sellerPreview]);
 
   // Filtered + sorted list
   const filtered = useMemo(() => {
-    const visibleOrders = ordersOwnerId === userId ? orders : [];
+    const visibleOrders = !sellerPreview && ordersOwnerId === userId ? orders : [];
     let base = visibleOrders;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
@@ -832,7 +855,7 @@ export default function OrdersScreen() {
     base = filterOrderList(base, activeFilter);
     base = sortOrders(base, sort);
     return base;
-  }, [orders, ordersOwnerId, userId, searchQuery, activeFilter, sort]);
+  }, [orders, ordersOwnerId, userId, searchQuery, activeFilter, sort, sellerPreview]);
 
   // Date-grouped sections, flattened into recyclable rows
   const sections = useMemo(() => groupByDate(filtered), [filtered]);
@@ -843,16 +866,17 @@ export default function OrdersScreen() {
   const filterCounts = useMemo(() => {
     const map: Partial<Record<OrderListFilter, number>> = {};
     FILTERS.forEach(({ key }) => {
-      const visibleOrders = ordersOwnerId === userId ? orders : [];
+      const visibleOrders = !sellerPreview && ordersOwnerId === userId ? orders : [];
       const count = filterOrderList(visibleOrders, key).length;
       if (key !== 'all') map[key] = count;
     });
     return map;
-  }, [orders, ordersOwnerId, userId]);
+  }, [orders, ordersOwnerId, userId, sellerPreview]);
 
   // ─── Actions ───────────────────────────────────────────────────────────────
 
   const handleMarkProcessing = useCallback(async (orderId: string) => {
+    if (sellerPreview) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await api.orders.updateStatus(orderId, 'processing');
@@ -860,9 +884,10 @@ export default function OrdersScreen() {
     } catch {
       Alert.alert('Error', 'Could not update order.');
     }
-  }, [api, loadData]);
+  }, [api, loadData, sellerPreview]);
 
   const handleMarkReady = useCallback(async (orderId: string) => {
+    if (sellerPreview) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await api.orders.updateStatus(orderId, 'fulfilled');
@@ -870,18 +895,21 @@ export default function OrdersScreen() {
     } catch {
       Alert.alert('Error', 'Could not update order.');
     }
-  }, [api, loadData]);
+  }, [api, loadData, sellerPreview]);
 
   const handleShip = useCallback((orderId: string) => {
+    if (sellerPreview) return;
     router.push(('/fulfill-order?orderId=' + orderId) as never);
-  }, [router]);
+  }, [router, sellerPreview]);
 
   const handleBulkFulfill = useCallback(() => {
+    if (sellerPreview) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push(('/fulfill-batch?orderIds=' + selectedIds.join(',')) as never);
-  }, [router, selectedIds]);
+  }, [router, selectedIds, sellerPreview]);
 
   const handleCardPress = useCallback((order: Order) => {
+    if (sellerPreview) return;
     if (selectedIds.length > 0) {
       setSelectedIds(prev =>
         prev.includes(order.id) ? prev.filter(id => id !== order.id) : [...prev, order.id]
@@ -889,16 +917,18 @@ export default function OrdersScreen() {
     } else {
       router.push(('/order-detail?id=' + order.id) as never);
     }
-  }, [selectedIds, router]);
+  }, [selectedIds, router, sellerPreview]);
 
   const handleLongPress = useCallback((orderId: string) => {
+    if (sellerPreview) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setSelectedIds(prev =>
       prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]
     );
-  }, []);
+  }, [sellerPreview]);
 
   const handleBulkMarkProcessing = useCallback(async () => {
+    if (sellerPreview) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await Promise.all(selectedIds.map(id => api.orders.updateStatus(id, 'processing')));
@@ -907,9 +937,10 @@ export default function OrdersScreen() {
     } catch {
       Alert.alert('Error', 'Could not bulk update orders.');
     }
-  }, [api, selectedIds, loadData]);
+  }, [api, selectedIds, loadData, sellerPreview]);
 
   const handleBulkMarkReady = useCallback(async () => {
+    if (sellerPreview) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await Promise.all(selectedIds.map(id => api.orders.updateStatus(id, 'fulfilled')));
@@ -918,9 +949,10 @@ export default function OrdersScreen() {
     } catch {
       Alert.alert('Error', 'Could not bulk update orders.');
     }
-  }, [api, selectedIds, loadData]);
+  }, [api, selectedIds, loadData, sellerPreview]);
 
   const handleExportCsv = useCallback(async () => {
+    if (sellerPreview) return;
     try {
       const visibleOrders = ordersOwnerId === userId ? orders : [];
       const rows = visibleOrders.map(o => {
@@ -941,16 +973,20 @@ export default function OrdersScreen() {
     } catch {
       Alert.alert('Export failed', 'Could not export orders. Please try again.');
     }
-  }, [orders, ordersOwnerId, userId]);
+  }, [orders, ordersOwnerId, userId, sellerPreview]);
 
   const handleMoreMenu = useCallback(() => {
+    if (sellerPreview) {
+      Alert.alert('Preview mode', 'Orders are read-only in the development seller preview.');
+      return;
+    }
     Alert.alert('Orders', 'Choose an action', [
       { text: 'Export CSV', onPress: handleExportCsv },
       { text: 'Bulk Actions', onPress: () => Alert.alert('Bulk', 'Long-press orders to select.') },
       { text: 'Refresh', onPress: onRefresh },
       { text: 'Cancel', style: 'cancel' },
     ]);
-  }, [onRefresh, handleExportCsv]);
+  }, [onRefresh, handleExportCsv, sellerPreview]);
 
   // ─── Render helpers ────────────────────────────────────────────────────────
 

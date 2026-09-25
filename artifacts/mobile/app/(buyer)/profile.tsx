@@ -24,6 +24,7 @@ import {
 import { useApi } from '@/lib/api';
 import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 import { formatCents } from '@/lib/money';
+import { isBuyerDevPreview } from '@/lib/devPreview';
 import { CachedImage } from '@/components/CachedImage';
 import { ShareProfileSheet } from '@/components/ShareProfileSheet';
 import { loadBuyerProfile } from '@/lib/buyerProfile';
@@ -755,6 +756,12 @@ export default function ProfileScreen() {
           style={styles.topBarLeft}
           onPress={() => {
             hapticLight();
+            // A full preview navigation keeps the account chooser stable while
+            // Clerk initializes; real accounts still use the in-app stack.
+            if (isBuyerDevPreview() && typeof window !== 'undefined') {
+              window.location.assign('/account-switcher?bt_preview=buyer');
+              return;
+            }
             router.push('/account-switcher' as never);
           }}
           activeOpacity={0.75}

@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { getSellerPosts, subscribeSocial, type SellerThreadPost } from '@/services/socialService';
 import { useApi } from '@/lib/api';
+import { isSellerDevPreview } from '@/lib/devPreview';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { reportNetworkError } from '@/lib/networkNotice';
 import {
@@ -60,6 +61,7 @@ export default function ProfileScreen() {
   const api = useApi();
   const { theme } = useAppTheme();
   const { isLoaded: authLoaded, userId } = useAuth();
+  const sellerPreview = isSellerDevPreview() && (!authLoaded || !userId);
   const [activeTab, setActiveTab] = useState(0);
   const [sellerPosts, setSellerPosts] = useState<SellerThreadPost[]>([]);
   const [myStoryIds, setMyStoryIds] = useState<string[]>([]);
@@ -75,16 +77,16 @@ export default function ProfileScreen() {
   const scrollY = useBrandHeroScrollY();
 
   const loadPosts = useCallback(async () => {
-    if (!authLoaded || !userId) return;
+    if (sellerPreview || !authLoaded || !userId) return;
     const requestUser = userId;
     try {
       const posts = await getSellerPosts();
       if (requestUserRef.current === requestUser) setSellerPosts(posts);
     } catch { /* keep the profile usable when posts are unavailable */ }
-  }, [authLoaded, userId]);
+  }, [authLoaded, sellerPreview, userId]);
 
   const loadMyStories = useCallback(async () => {
-    if (!authLoaded || !userId) return;
+    if (sellerPreview || !authLoaded || !userId) return;
     const requestUser = userId;
     try {
       const rows = await api.social.myStories();
@@ -94,10 +96,10 @@ export default function ProfileScreen() {
         .map((s: any) => s.id as string);
       if (requestUserRef.current === requestUser) setMyStoryIds(active);
     } catch { /* stories are optional profile content */ }
-  }, [api, authLoaded, userId]);
+  }, [api, authLoaded, sellerPreview, userId]);
 
   const loadProfile = useCallback(async () => {
-    if (!authLoaded || !userId) return;
+    if (sellerPreview || !authLoaded || !userId) return;
     const requestUser = userId;
     try {
       const data = await api.seller.getProfile();
@@ -120,10 +122,10 @@ export default function ProfileScreen() {
       });
       setSocialCounts((current) => ({ ...current, likes: data.totalLikes ?? 0 }));
     } catch { /* nullable profile fields already render safely */ }
-  }, [api, authLoaded, userId]);
+  }, [api, authLoaded, sellerPreview, userId]);
 
   const loadSocialCounts = useCallback(async () => {
-    if (!authLoaded || !userId) return;
+    if (sellerPreview || !authLoaded || !userId) return;
     const requestUser = userId;
     try {
       const [followersArr, followingArr] = await Promise.all([
@@ -137,15 +139,15 @@ export default function ProfileScreen() {
         following: Array.isArray(followingArr) ? followingArr.length : 0,
       }));
     } catch { /* zero counts remain visible */ }
-  }, [api, authLoaded, userId]);
+  }, [api, authLoaded, sellerPreview, userId]);
 
   const loadPage = useCallback(() => {
-    if (!authLoaded || !userId) return;
+    if (sellerPreview || !authLoaded || !userId) return;
     void loadPosts();
     void loadMyStories();
     void loadSocialCounts();
     void loadProfile();
-  }, [authLoaded, userId, loadPosts, loadMyStories, loadProfile, loadSocialCounts]);
+  }, [authLoaded, sellerPreview, userId, loadPosts, loadMyStories, loadProfile, loadSocialCounts]);
 
   useEffect(() => {
     requestUserRef.current = userId ?? null;
@@ -153,10 +155,11 @@ export default function ProfileScreen() {
     setMyStoryIds([]);
     setProfile(null);
     setSocialCounts({ followers: 0, following: 0, likes: 0 });
-    if (authLoaded && userId) void loadPage();
+    if (sellerPreview || !authLoaded) return;
+    if (userId) void loadPage();
     const unsub = subscribeSocial(() => { loadPosts(); loadMyStories(); });
     return unsub;
-  }, [authLoaded, userId, loadPage, loadPosts, loadMyStories]);
+  }, [authLoaded, sellerPreview, userId, loadPage, loadPosts, loadMyStories]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -166,6 +169,10 @@ export default function ProfileScreen() {
 
   function nav(route: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (sellerPreview && ['/edit-profile', '/seller-go-live'].includes(route)) {
+      Alert.alert('Sign in required', 'Seller actions are unavailable in the signed-out preview.');
+      return;
+    }
     router.push(route as never);
   }
 
@@ -188,6 +195,28 @@ export default function ProfileScreen() {
       return;
     }
     if (savingProfile) return;
+
+    if (sellerPreview) {
+      setProfile((current) => ({
+        brandName,
+        displayName: current?.displayName ?? null,
+        bio,
+        subscriptionStatus: current?.subscriptionStatus ?? null,
+        subscriptionPlanId: current?.subscriptionPlanId ?? null,
+        totalLikes: current?.totalLikes ?? 0,
+        profileImageUrl: current?.profileImageUrl ?? null,
+        verified: current?.verified ?? false,
+        metrics: current?.metrics ?? {
+          revenueCents: 0,
+          visitors: 0,
+          orders: 0,
+          conversionRate: 0,
+        },
+      }));
+      setProfileEditorVisible(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      return;
+    }
 
     setSavingProfile(true);
     try {
@@ -219,7 +248,8 @@ export default function ProfileScreen() {
     }
   }
 
-  const avatarInitials = (profile?.brandName || profile?.displayName || 'My Brand')
+  const identityName = profile?.brandName || profile?.displayName || (sellerPreview ? 'Your Brand' : 'My Brand');
+  const avatarInitials = identityName
     .split(/\s+/)
     .map((part) => part[0])
     .filter(Boolean)
@@ -258,7 +288,7 @@ export default function ProfileScreen() {
       {/* ── Brand hero — same visual language as seller-profile.tsx, owner action set ── */}
       <BrandHero
         scrollY={scrollY}
-        brandName={profile?.brandName || profile?.displayName || 'My Brand'}
+        brandName={profile?.brandName || profile?.displayName || (sellerPreview ? 'Your Brand' : 'My Brand')}
         username={
           profile?.brandName && profile?.displayName && profile.brandName !== profile.displayName
             ? profile.displayName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)
@@ -280,7 +310,11 @@ export default function ProfileScreen() {
             router.push('/create-post' as any);
           }
         }}
-        avatarAccessibilityLabel={myStoryIds.length > 0 ? 'View your active story' : 'Create your first story'}
+        avatarAccessibilityLabel={
+          myStoryIds.length > 0
+            ? 'View your active story'
+            : sellerPreview ? 'Seller preview avatar' : 'Create your first story'
+        }
         topBarLeft={
           <TouchableOpacity
             style={s.topBarTitle}
@@ -295,7 +329,7 @@ export default function ProfileScreen() {
           >
             <View style={s.accountSwitcherRow}>
               <Text style={[s.brandNameTitle, { color: theme.text }]} numberOfLines={1}>
-                {profile?.brandName || profile?.displayName || 'My Brand'}
+                {identityName}
               </Text>
               <Feather name="chevron-down" size={16} color={theme.text} style={s.chevron} />
             </View>
@@ -346,7 +380,9 @@ export default function ProfileScreen() {
       >
         {/* Plan pill */}
         <View style={s.planPill}>
-          <Text style={[s.planText, { color: hasPaidPlan ? theme.accentLight : theme.muted }]}>{planLabel}</Text>
+          <Text style={[s.planText, { color: sellerPreview ? theme.muted : hasPaidPlan ? theme.accentLight : theme.muted }]}>
+            {sellerPreview ? 'Seller preview' : planLabel}
+          </Text>
         </View>
 
         {/* Bio */}
@@ -443,7 +479,8 @@ export default function ProfileScreen() {
           <View style={s.emptyState}>
             <Feather name="inbox" size={24} color={MUTED} />
             <Text style={s.emptyText}>
-              {activeTab === 0 ? 'No posts yet. Create your first post!' :
+              {sellerPreview ? 'No posts to show in this preview.' :
+               activeTab === 0 ? 'No posts yet. Create your first post!' :
                activeTab === 1 ? 'No drafts saved.' :
                'No scheduled posts.'}
             </Text>
@@ -474,7 +511,11 @@ export default function ProfileScreen() {
             <View style={s.sheetHeader}>
               <View>
                 <Text style={s.sheetTitle}>Edit brand</Text>
-                <Text style={s.sheetSubtitle}>Keep your Profile details up to date.</Text>
+                <Text style={s.sheetSubtitle}>
+                  {sellerPreview
+                    ? 'Preview only · changes stay local to this session.'
+                    : 'Keep your Profile details up to date.'}
+                </Text>
               </View>
               <TouchableOpacity
                 style={s.sheetClose}
@@ -534,7 +575,9 @@ export default function ProfileScreen() {
                 activeOpacity={0.8}
                 testID="profile-edit-save"
               >
-                <Text style={[s.saveButtonText, { color: theme.accent }]}>{savingProfile ? 'Saving…' : 'Save changes'}</Text>
+                <Text style={[s.saveButtonText, { color: theme.accent }]}>
+                  {savingProfile ? 'Saving…' : sellerPreview ? 'Save locally' : 'Save changes'}
+                </Text>
               </TouchableOpacity>
             </View>
           </SheetRise>
