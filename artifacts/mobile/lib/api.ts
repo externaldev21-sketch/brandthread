@@ -1327,6 +1327,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
             category: string; imageUri: string | null; color: string; initials: string;
           }>;
         }>(`/api/public/search/suggested?limit=${encodeURIComponent(String(limit))}`),
+      /** "Search by category" tiles for the empty state — one representative image per top category. */
+      categories: (limit = 8) =>
+        get<{
+          categories: Array<{ category: string; productCount: number; imageUri: string | null; color: string }>;
+        }>(`/api/public/search/categories?limit=${encodeURIComponent(String(limit))}`),
     },
     reviews: {
       /** List reviews for a product (public). Returns { reviews, avgRating, totalCount }. */
