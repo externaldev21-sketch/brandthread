@@ -89,6 +89,7 @@ export default function TeamScreen() {
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
   const [dismissingId, setDismissingId] = useState<string | null>(null);
   const [showExpired, setShowExpired] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -99,7 +100,10 @@ export default function TeamScreen() {
       setMembers(m);
       setActivity(a.logs ?? []);
       setHasMoreActivity(!!a.hasMore);
-    } catch { /* no-op if not connected */ }
+      setLoadError(false);
+    } catch {
+      setLoadError(true);
+    }
     setLoading(false);
   }, []);
 
@@ -312,9 +316,36 @@ export default function TeamScreen() {
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{ margin: 16 }} />
+        ) : loadError ? (
+          <View style={{ padding: 24, alignItems: 'center', gap: 10 }}>
+            <View style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
+              <Feather name="alert-triangle" size={22} color={colors.mutedForeground} />
+            </View>
+            <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: '600', textAlign: 'center' }}>Couldn't load your team</Text>
+            <TouchableOpacity
+              onPress={() => { setLoading(true); load(); }}
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading team"
+              style={{ marginTop: 4, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999, backgroundColor: colors.primary }}
+            >
+              <Text style={{ color: colors.primaryForeground, fontSize: 13, fontWeight: '600' }}>Retry</Text>
+            </TouchableOpacity>
+          </View>
         ) : currentMembers.length === 0 ? (
-          <View style={{ padding: 20, alignItems: 'center' }}>
-            <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>No team members yet. Invite someone to get started.</Text>
+          <View style={{ padding: 24, alignItems: 'center', gap: 10 }}>
+            <View style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
+              <Feather name="user-plus" size={22} color={colors.mutedForeground} />
+            </View>
+            <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: '600', textAlign: 'center' }}>No team members yet</Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 13, textAlign: 'center' }}>Invite someone to help you run your store.</Text>
+            <TouchableOpacity
+              onPress={openInvite}
+              accessibilityRole="button"
+              accessibilityLabel="Invite teammate"
+              style={{ marginTop: 4, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999, backgroundColor: colors.primary }}
+            >
+              <Text style={{ color: colors.primaryForeground, fontSize: 13, fontWeight: '600' }}>Invite teammate</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           currentMembers.map(renderMemberRow)
