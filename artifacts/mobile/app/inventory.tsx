@@ -198,6 +198,8 @@ export default function InventoryScreen() {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<InventoryFilterKey>('all');
 
@@ -211,7 +213,9 @@ export default function InventoryScreen() {
       setIncoming([]);
       setCounts([]);
       setEvents([]);
+      setLoadError(false);
       setLoading(false);
+      setHasLoadedOnce(true);
       return;
     }
     try {
@@ -233,21 +237,25 @@ export default function InventoryScreen() {
       setIncoming(Array.isArray(inc) ? inc : []);
       setCounts(Array.isArray(cnts) ? cnts : []);
       setEvents(Array.isArray(evts) ? evts : []);
+      setLoadError(false);
     } catch (e) {
-      setItems([]);
-      setFiltered([]);
-      setAlerts([]);
-      setTransfers([]);
-      setIncoming([]);
-      setCounts([]);
-      setEvents([]);
+      // Keep whatever inventory we already loaded — never wipe good data or
+      // show a fake empty state just because a background refresh failed.
+      setLoadError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setHasLoadedOnce(true);
     }
   }, [activeFilter, userId]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
+
+  const handleRetryInitialLoad = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setLoading(true);
+    loadData();
+  }, [loadData]);
 
   const handleSearch = useCallback(async (q: string) => {
     setSearchQuery(q);
@@ -345,6 +353,24 @@ export default function InventoryScreen() {
 
   const renderOverview = () => {
     if (!overview) return <ActivityIndicator color={PURPLE} style={{ marginTop: SP.xl }} />;
+
+    if (items.length === 0 && alerts.length === 0 && incoming.length === 0) {
+      return (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[s.tabContent, { flexGrow: 1 }]}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={PURPLE} />}
+        >
+          <EmptyState
+            icon="package"
+            title="No products yet"
+            description="Add your first product to start tracking stock levels, locations and alerts."
+            action={{ label: 'Add product', onPress: () => router.push('/add-product' as never), icon: 'plus' }}
+          />
+        </ScrollView>
+      );
+    }
+
     const stats = [
       { label: 'On Hand',       value: String(overview.totalOnHand),                  color: FG,      filter: null },
       { label: 'Available',     value: String(overview.totalAvailable),                color: SUCCESS, filter: 'available' as InventoryFilterKey },
@@ -357,7 +383,11 @@ export default function InventoryScreen() {
     ];
 
     return (
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.tabContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={s.tabContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={PURPLE} />}
+      >
         {/* Stat grid */}
         <View style={s.statGrid}>
           {stats.map(stat => (
@@ -575,11 +605,20 @@ export default function InventoryScreen() {
         contentContainerStyle={s.listContent}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <EmptyState
-            icon="package"
-            title="No items found"
-            description="Try adjusting your search or filter."
-          />
+          items.length === 0 && !searchQuery && activeFilter === 'all' ? (
+            <EmptyState
+              icon="package"
+              title="No products yet"
+              description="Add your first product to start tracking stock levels, locations and alerts."
+              action={{ label: 'Add product', onPress: () => router.push('/add-product' as never), icon: 'plus' }}
+            />
+          ) : (
+            <EmptyState
+              icon="package"
+              title="No items found"
+              description="Try adjusting your search or filter."
+            />
+          )
         }
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={PURPLE} />}
       />
@@ -925,7 +964,7 @@ export default function InventoryScreen() {
 
   // ─── Render ─────────────────────────────────────────────────────────────────
 
-  if (loading) {
+  if (loading && !hasLoadedOnce) {
     return (
       <View style={s.loadingWrap}>
         <ActivityIndicator color={PURPLE} size="large" />
@@ -934,10 +973,31 @@ export default function InventoryScreen() {
     );
   }
 
+  // First load failed outright and we have nothing cached to show — a full
+  // error state with Retry, never an endless spinner.
+  if (loadError && items.length === 0 && !overview) {
+    return (
+      <View style={s.loadingWrap}>
+        <EmptyState
+          icon="alert-circle"
+          title="Couldn't load inventory"
+          description="Check your connection and try again."
+          action={{ label: 'Retry', onPress: handleRetryInitialLoad, icon: 'refresh-cw' }}
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={[s.root, { backgroundColor: 'transparent' }]}>
       {renderHeader()}
       {renderTabBar()}
+      {loadError && (
+        <TouchableOpacity style={s.retryBanner} onPress={handleRetryInitialLoad} activeOpacity={0.8}>
+          <Feather name="alert-circle" size={14} color={RED} />
+          <Text style={s.retryBannerText}>Couldn’t refresh inventory. Tap to try again.</Text>
+        </TouchableOpacity>
+      )}
       <View style={s.content}>
         {activeTab === 'overview'   && renderOverview()}
         {activeTab === 'products'   && renderProducts()}
@@ -960,6 +1020,11 @@ const s = StyleSheet.create({
   root:             { flex: 1 },
   loadingWrap:      { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: SP.md },
   loadingText:      { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
+
+  retryBanner:      { flexDirection: 'row', alignItems: 'center', gap: SP.xs,
+                      marginHorizontal: SP.md, marginTop: SP.sm, padding: SP.sm,
+                      borderRadius: RADIUS.md, borderWidth: 1, borderColor: RED, backgroundColor: CARD },
+  retryBannerText:  { fontSize: FS.xs, fontFamily: FONT.medium, color: RED, flex: 1 },
 
   // Header
   header:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

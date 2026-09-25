@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Search,
   Send,
+  Split,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -58,6 +59,7 @@ type QuoteRequest = {
   quoteValidUntil: string | null;
   counteroffer: Counteroffer | null;
   notes: string | null;
+  rfqId: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -140,6 +142,19 @@ function DetailValue({
       <dt className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{label}</dt>
       <dd className="mt-1 whitespace-pre-wrap break-words text-sm">{children || "—"}</dd>
     </div>
+  );
+}
+
+function RfqBadge({ className }: { className?: string }) {
+  return (
+    <Badge
+      variant="outline"
+      className={cn("gap-1 border-primary/40 text-primary", className)}
+      title="This seller sent the same request to several manufacturers at once."
+      data-testid="badge-rfq"
+    >
+      <Split className="h-3 w-3" /> Multi-supplier RFQ
+    </Badge>
   );
 }
 
@@ -410,6 +425,7 @@ export default function QuoteRequests() {
                       <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                     </div>
                     <p className="mt-1 truncate text-xs text-muted-foreground">{item.sellerId} · {item.quantity ?? "—"} units</p>
+                    {item.rfqId && <RfqBadge className="mt-2" />}
                     <div className="mt-3 flex items-center justify-between gap-2">
                       <Badge variant="outline" className="capitalize">{item.type}</Badge>
                       <span className="text-[11px] text-muted-foreground">{formatDate(item.createdAt)}</span>
@@ -435,6 +451,7 @@ export default function QuoteRequests() {
                   <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">Request detail</p>
                   <h2 className="mt-2 truncate text-2xl font-bold">{selected.productName}</h2>
                   <p className="mt-1 text-sm text-muted-foreground">From seller {selected.sellerId} · Received {formatDateTime(selected.createdAt)}</p>
+                  {selected.rfqId && <RfqBadge className="mt-3" />}
                 </div>
                 <StatusBadge status={selected.status} />
               </div>
@@ -444,6 +461,16 @@ export default function QuoteRequests() {
                   <div className="flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive" role="alert" aria-live="polite">
                     <X className="mt-0.5 h-4 w-4 shrink-0" />
                     <span>{mutationError}</span>
+                  </div>
+                )}
+
+                {selected.rfqId && (
+                  <div className="flex items-start gap-3 rounded-md border border-primary/30 bg-primary/5 p-4 text-sm">
+                    <Split className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <p>
+                      Part of a multi-supplier RFQ — this seller sent the same request to several manufacturers.
+                      Your quote is independent; there's no guarantee of exclusivity.
+                    </p>
                   </div>
                 )}
 

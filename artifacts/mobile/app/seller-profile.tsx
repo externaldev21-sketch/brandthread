@@ -31,6 +31,7 @@ import { getSellerFollowState, setSellerFollowing } from '@/services/socialServi
 import { FONT, FS, SP, RADIUS, GRID_MAX_WIDTH } from '@/lib/theme';
 import { buildCanonicalProfileUrl } from '@/lib/shareProfile';
 import { BrandDropsCard } from '@/components/BrandDropsCard';
+import { ShareProfileSheet } from '@/components/ShareProfileSheet';
 import { confirmBlock, reportHref } from '@/lib/safety';
 import { GridSkeleton, ResponsiveContainer, useGridColumns, useBreakpoint } from '@/components/layout';
 import { BrandHero, useBrandHeroScrollY, type BrandHeroStat } from '@/components/profile/BrandHero';
@@ -403,6 +404,7 @@ export default function SellerProfileScreen() {
   const [liveProducts, setLiveProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [apiRating, setApiRating] = useState<{ avgRating: number; totalCount: number } | null>(null);
+  const [shareSheetVisible, setShareSheetVisible] = useState(false);
   const [posts, setPosts] = useState<SellerPost[]>([]);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
@@ -566,9 +568,9 @@ export default function SellerProfileScreen() {
 
   const handleShare = useCallback(() => {
     if (isOwner) {
-      // Owner always gets the dedicated share-profile page with QR + canonical URL.
+      // Owner always gets the profile share sheet with card, QR + canonical URL.
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      router.push('/share-profile' as never);
+      setShareSheetVisible(true);
     } else {
       // Non-owner (visitor) viewing a seller: share via native sheet using the canonical URL.
       const url = buildCanonicalProfileUrl(profile.username);
@@ -578,7 +580,7 @@ export default function SellerProfileScreen() {
         Share.share({ message: `Check out @${profile.username} on Brandthread` });
       }
     }
-  }, [isOwner, profile.username, profile.brandName, router]);
+  }, [isOwner, profile.username, profile.brandName]);
 
   const handleMessageSeller = useCallback(() => {
     if ((profile as any).vacationMode) {
@@ -984,6 +986,18 @@ export default function SellerProfileScreen() {
           </View>
         )}
       </Modal>
+
+      {isOwner ? (
+        <ShareProfileSheet
+          visible={shareSheetVisible}
+          onClose={() => setShareSheetVisible(false)}
+          avatarUrl={profileImageUrl}
+          sellerExtra={{
+            rating: apiRating,
+            products: displayProducts.slice(0, 3).map(p => ({ id: p.id, uri: p.media[0]?.thumbnailUri || p.media[0]?.uri })),
+          }}
+        />
+      ) : null}
     </View>
   );
 }
