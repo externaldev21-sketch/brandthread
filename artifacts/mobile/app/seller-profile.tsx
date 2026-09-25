@@ -413,6 +413,7 @@ export default function SellerProfileScreen() {
             onChange={handleFollow}
             disabled={followPending || !canonicalSellerId || !userId}
             style={styles.followBtn}
+            labelStyle={{ fontFamily: FONT.bold, fontSize: FS.base }}
           />
         </View>
         <ProfileButton label="Message" icon="message-circle" onPress={handleMessageSeller} />
@@ -564,7 +565,7 @@ function makeStyles(theme: AppThemePreset) {
   return StyleSheet.create({
     flex: { flex: 1 },
     actionRow: { flexDirection: 'row', gap: SP.sm },
-    followBtn: { width: '100%', minHeight: 46, borderRadius: RADIUS.md },
+    followBtn: { width: '100%', minHeight: 48, borderRadius: RADIUS.md },
     vacation: {
       flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginTop: SP.xs,
       borderWidth: 1, borderColor: `${theme.warning}55`, borderRadius: RADIUS.md, padding: SP.sm,

@@ -279,6 +279,7 @@ export default function BuyerOtherProfileScreen() {
             followLabel={isFollowedBy ? 'Follow back' : 'Follow'}
             followingLabel={isMutual ? 'Friends' : 'Following'}
             style={styles.followMorphBtn}
+            labelStyle={{ fontFamily: FONT.bold, fontSize: FS.base }}
           />
         </View>
         <ProfileButton
@@ -414,7 +415,7 @@ function makeStyles(theme: AppThemePreset) {
   return StyleSheet.create({
     flex: { flex: 1 },
     actionRow: { flexDirection: 'row', gap: SP.sm },
-    followMorphBtn: { width: '100%', minHeight: 46, borderRadius: RADIUS.md },
+    followMorphBtn: { width: '100%', minHeight: 48, borderRadius: RADIUS.md },
     blockedBanner: {
       flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: SP.sm,
       padding: 12, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,

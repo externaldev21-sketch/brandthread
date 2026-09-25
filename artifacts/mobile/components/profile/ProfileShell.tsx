@@ -4,20 +4,21 @@
  * profile tab, and a seller's public brand profile. Each role fills the same
  * slots with its own existing components (actions, stats, extras, tabs).
  *
- *   ┌──────────────────────────────┐  full-bleed hero: latest video playing
- *   │ (‹)                 (↗) (⋯) │  muted (or poster / theme gradient + the
- *   │                              │  onboarding thread), floating glass
- *   │  ◉  Name ✓                   │  controls, avatar + name over the media
- *   │     @handle · Seller         │
- *   ├──────────────────────────────┤  collapses into a compact sticky header
- *   │ bio · link · location        │
- *   │  12.4K  │  310  │  48  │ 4.9 │  equal-width stats
- *   │ [ Follow ] [ Message ]       │  2×2 action grid
+ *   ┌──────────────────────────────┐  dominant full-bleed hero (~62% of the
+ *   │ (‹)                 (↗) (⋯) │  screen): latest video playing muted (or
+ *   │                              │  poster / theme gradient), floating glass
+ *   │  ◉                           │  controls
+ *   │  Display Name ✓              │  display-size name + handle set inside the
+ *   │  @handle  [Seller]           │  hero's bottom edge
+ *   ├──────────────────────────────┤  on scroll: media parallaxes and darkens,
+ *   │ bio · link · location        │  identity lifts/shrinks, compact bar
+ *   │  12.4K │  310  │  48  │ 4.9  │  slides down into place
+ *   │ [ Follow ] [ Message ]       │  big tabular stats, 2×2 action grid
  *   │ [ Share  ] [  More   ]       │
  *   │ extras (orders, stories…)    │
  *   │ ── VIDEOS · 48 ──  / tabs    │
- *   │ ▯▯▯  9:16 video grid         │
- *   └──────────( Shop 12 products )┘  optional floating CTA
+ *   │ ▯▯▯  hairline 9:16 video wall│
+ *   └──────( ◉ Shop 12 products ↗ )┘  optional floating CTA
  *
  * On desktop web it fills the global WebAppShell column (components/web).
  */
@@ -34,6 +35,7 @@ import { PressableScale } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { TYPE_SCALE } from '@/constants/typography';
 import { ProfileHeroMedia } from './ProfileHeroMedia';
 import {
   ProfileChip, ProfileSectionLabel, ProfileStatsRow, ProfileTabs,
@@ -42,7 +44,7 @@ import {
 import { PROFILE_GRID_GAP, SHOP_PILL_HEIGHT, useProfileLayout } from './profileLayout';
 
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList) as unknown as typeof FlatList;
-const AVATAR = 76;
+const AVATAR = 88;
 
 export interface ProfileIdentity {
   name: string;
@@ -139,19 +141,49 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
     return () => scrollY.removeListener(id);
   }, [scrollY, heroHeight]);
 
+  // ── Collapse-on-scroll choreography ──────────────────────────────────────
+  // The hero doesn't just fade: the media parallaxes at half speed and sinks
+  // into a darkening wash, the big identity block lifts and shrinks toward the
+  // top bar, and the compact bar *slides down* into place as it arrives.
+  const collapseEnd = Math.max(1, heroHeight - 72);
   const compactOpacity = scrollY.interpolate({
-    inputRange: [heroHeight - 120, heroHeight - 56],
+    inputRange: [collapseEnd - 90, collapseEnd - 20],
     outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+  const compactSlide = scrollY.interpolate({
+    inputRange: [collapseEnd - 90, collapseEnd - 20],
+    outputRange: [-(insets.top + 64), 0],
     extrapolate: 'clamp',
   });
   const heroTranslate = scrollY.interpolate({
     inputRange: [-200, 0, heroHeight],
-    outputRange: [-100, 0, heroHeight * 0.35],
+    outputRange: [-100, 0, heroHeight * 0.5],
     extrapolate: 'clamp',
   });
   const heroScale = scrollY.interpolate({
-    inputRange: [-200, 0],
-    outputRange: [1.45, 1],
+    inputRange: [-200, 0, heroHeight],
+    outputRange: [1.45, 1, 1.12],
+    extrapolate: 'clamp',
+  });
+  const heroWash = scrollY.interpolate({
+    inputRange: [0, collapseEnd],
+    outputRange: [0, 0.85],
+    extrapolate: 'clamp',
+  });
+  const identityLift = scrollY.interpolate({
+    inputRange: [-200, 0, collapseEnd],
+    outputRange: [60, 0, -heroHeight * 0.12],
+    extrapolate: 'clamp',
+  });
+  const identityScale = scrollY.interpolate({
+    inputRange: [0, collapseEnd],
+    outputRange: [1, 0.82],
+    extrapolate: 'clamp',
+  });
+  const identityOpacity = scrollY.interpolate({
+    inputRange: [collapseEnd * 0.45, collapseEnd - 30],
+    outputRange: [1, 0],
     extrapolate: 'clamp',
   });
 
@@ -199,54 +231,58 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
         </Animated.View>
         <LinearGradient
           pointerEvents="none"
-          colors={[`${theme.background}00`, `${theme.background}66`, `${theme.background}F2`, theme.background]}
-          locations={[0.35, 0.62, 0.9, 1]}
+          colors={[`${theme.background}00`, `${theme.background}40`, `${theme.background}D9`, theme.background]}
+          locations={[0.3, 0.55, 0.86, 1]}
           style={StyleSheet.absoluteFill}
         />
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: theme.background, opacity: heroWash }]} />
         <LinearGradient
           pointerEvents="none"
-          colors={['rgba(0,0,0,0.38)', 'rgba(0,0,0,0)']} // theme-exempt: keeps floating controls legible over bright video
-          style={[styles.topScrim, { height: insets.top + 96 }]}
+          colors={['rgba(0,0,0,0.45)', 'rgba(0,0,0,0)']} // theme-exempt: keeps floating controls legible over bright video
+          style={[styles.topScrim, { height: insets.top + 110 }]}
         />
-        <View style={styles.identity}>
+        <Animated.View
+          style={[
+            styles.identity,
+            { opacity: identityOpacity, transform: [{ translateY: identityLift }, { scale: identityScale }] },
+          ]}
+        >
           {avatar?.onPress ? (
             <PressableScale
               onPress={avatar.onPress}
               accessibilityRole="button"
               accessibilityLabel={avatar.accessibilityLabel ?? `${identity.name} avatar`}
               testID="profile-avatar"
+              style={styles.avatarPress}
             >
               {avatarNode}
             </PressableScale>
           ) : (
-            <View accessible accessibilityLabel={`${identity.name} avatar`} testID="profile-avatar">{avatarNode}</View>
+            <View accessible accessibilityLabel={`${identity.name} avatar`} testID="profile-avatar" style={styles.avatarPress}>{avatarNode}</View>
           )}
-          <View style={styles.identityCopy}>
-            <View style={styles.nameRow}>
-              {/* The badge is nested in the name's text so it follows the last
-                  word when a long name wraps, instead of pinning to the edge. */}
-              <Text
-                style={styles.name}
-                numberOfLines={2}
-                accessibilityRole="header"
-                accessibilityLabel={identity.verified ? `${identity.name}, verified` : undefined}
-              >
-                {identity.name}
-                {identity.verified ? (
-                  <Text>
-                    {'\u00A0'}
-                    <Feather name="check-circle" size={18} color={theme.accent} accessibilityLabel="Verified" />
-                  </Text>
-                ) : null}
+          {/* Display-size name: the loudest thing on the page after the video.
+              The badge is nested in the text so it trails the last word when a
+              long name wraps, instead of pinning to the edge. */}
+          <Text
+            style={styles.name}
+            numberOfLines={2}
+            accessibilityRole="header"
+            accessibilityLabel={identity.verified ? `${identity.name}, verified` : undefined}
+          >
+            {identity.name}
+            {identity.verified ? (
+              <Text>
+                {'\u00A0'}
+                <Feather name="check-circle" size={26} color={theme.accent} accessibilityLabel="Verified" />
               </Text>
-            </View>
-            <View style={styles.handleRow}>
-              {identity.handle ? <Text style={styles.handle} numberOfLines={1}>{identity.handle}</Text> : null}
-              {identity.pronouns ? <Text style={styles.handle} numberOfLines={1}>({identity.pronouns})</Text> : null}
-              <ProfileChip label={identity.roleLabel} icon={identity.roleLabel === 'Seller' ? 'shopping-bag' : 'user'} />
-            </View>
+            ) : null}
+          </Text>
+          <View style={styles.handleRow}>
+            {identity.handle ? <Text style={styles.handle} numberOfLines={1}>{identity.handle}</Text> : null}
+            {identity.pronouns ? <Text style={styles.handleSoft} numberOfLines={1}>({identity.pronouns})</Text> : null}
+            <ProfileChip label={identity.roleLabel} icon={identity.roleLabel === 'Seller' ? 'shopping-bag' : 'user'} />
           </View>
-        </View>
+        </Animated.View>
       </View>
 
       {meta ? <View style={styles.meta}>{meta}</View> : null}
@@ -289,7 +325,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
         {/* Compact sticky header — fades in once the hero scrolls away */}
         <Animated.View
           pointerEvents="none"
-          style={[styles.compact, { height: insets.top + 60, paddingTop: insets.top, opacity: compactOpacity }]}
+          style={[styles.compact, { height: insets.top + 64, paddingTop: insets.top, opacity: compactOpacity, transform: [{ translateY: compactSlide }] }]}
         >
           <View style={[styles.compactInner, { paddingLeft: compactLeft, paddingRight: compactRight }]}>
             {compactRoom >= 140 ? (
@@ -302,7 +338,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
                   )}
                 </View>
                 <Text style={styles.compactName} numberOfLines={1}>{identity.name}</Text>
-                {identity.verified ? <Feather name="check-circle" size={13} color={theme.accent} /> : null}
+                {identity.verified ? <Feather name="check-circle" size={15} color={theme.accent} /> : null}
               </>
             ) : null}
           </View>
@@ -337,33 +373,33 @@ function makeStyles(theme: AppThemePreset) {
     hero: { width: '100%', overflow: 'hidden', justifyContent: 'flex-end', backgroundColor: theme.card },
     topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
     identity: {
-      flexDirection: 'row', alignItems: 'flex-end', gap: SP.md,
-      paddingHorizontal: SP.md, paddingBottom: SP.md,
+      paddingHorizontal: SP.md, paddingBottom: SP.md, gap: SP.xs,
+      transformOrigin: 'left bottom',
     },
+    avatarPress: { alignSelf: 'flex-start', marginBottom: SP.sm },
     avatarRing: {
       width: AVATAR + 8, height: AVATAR + 8, borderRadius: (AVATAR + 8) / 2,
-      borderWidth: 2, borderColor: theme.border, padding: 2, backgroundColor: theme.background,
+      borderWidth: 2.5, borderColor: theme.text, padding: 2, backgroundColor: theme.background,
     },
     avatar: {
       width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, overflow: 'hidden',
       backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center',
     },
-    avatarInitials: { fontFamily: FONT.bold, fontSize: FS.xl, color: theme.text },
+    avatarInitials: { ...TYPE_SCALE.title1, color: theme.text },
     avatarBadge: {
-      position: 'absolute', right: 0, bottom: 0, width: 26, height: 26, borderRadius: 13,
-      backgroundColor: theme.accent, borderWidth: 2, borderColor: theme.background,
+      position: 'absolute', right: 0, bottom: 0, width: 30, height: 30, borderRadius: 15,
+      backgroundColor: theme.accent, borderWidth: 3, borderColor: theme.background,
       alignItems: 'center', justifyContent: 'center',
     },
-    identityCopy: { flex: 1, minWidth: 0, paddingBottom: 2, gap: SP.xs },
-    nameRow: { flexDirection: 'row', alignItems: 'center' },
     name: {
-      flexShrink: 1, fontFamily: FONT.bold, fontSize: FS.h2, lineHeight: 34, letterSpacing: -0.8, color: theme.text,
-      textShadowColor: 'rgba(0,0,0,0.35)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6, // theme-exempt: legibility over media
+      ...TYPE_SCALE.display, letterSpacing: -1.6, color: theme.text,
+      textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 12, // theme-exempt: legibility over media
     },
-    handleRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: SP.xs },
-    handle: { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.muted },
+    handleRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: SP.sm },
+    handle: { fontFamily: FONT.semibold, fontSize: FS.md, color: theme.text, opacity: 0.86 },
+    handleSoft: { fontFamily: FONT.medium, fontSize: FS.md, color: theme.muted },
 
-    meta: { paddingHorizontal: SP.md, paddingBottom: SP.md, gap: SP.xs },
+    meta: { paddingHorizontal: SP.md, paddingTop: SP.xs, paddingBottom: SP.md, gap: SP.xs },
     actions: { paddingHorizontal: SP.md, paddingTop: SP.md, gap: SP.sm },
     extras: { paddingTop: SP.md, gap: SP.md },
     gridRow: { gap: PROFILE_GRID_GAP },
@@ -374,11 +410,11 @@ function makeStyles(theme: AppThemePreset) {
     },
     compactInner: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: SP.sm },
     compactAvatar: {
-      width: 30, height: 30, borderRadius: 15, overflow: 'hidden',
+      width: 32, height: 32, borderRadius: 16, overflow: 'hidden',
       backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center',
     },
     compactInitials: { fontFamily: FONT.bold, fontSize: 11, color: theme.text },
-    compactName: { flexShrink: 1, fontFamily: FONT.semibold, fontSize: FS.base, color: theme.text },
+    compactName: { flexShrink: 1, fontFamily: FONT.bold, fontSize: FS.md, letterSpacing: -0.3, color: theme.text },
 
     controls: {
       position: 'absolute', left: SP.md, right: SP.md,
