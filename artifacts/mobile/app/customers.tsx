@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator } from 'react-native';
 import { useColors } from '@/hooks/useColors';
@@ -9,6 +9,8 @@ import { useRouter } from 'expo-router';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { FS } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
+import { EmptyState } from '@/components/BrandthreadUI';
+import { ErrorState } from '@/components/ui/ErrorState';
 
 type ApiCustomer = {
   id: string;
@@ -43,7 +45,9 @@ export default function CustomersScreen() {
   const [search, setSearch] = useState('');
   const [customers, setCustomers] = useState<ApiCustomer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('recent');
+  const hasDataRef = useRef(false);
 
   const fetchCustomers = useCallback(async (searchText: string) => {
     try {
@@ -51,9 +55,16 @@ export default function CustomersScreen() {
         ? `/api/customers?search=${encodeURIComponent(searchText.trim())}`
         : '/api/customers';
       const res = await serviceRequest<ApiCustomer[]>(url);
-      if (Array.isArray(res)) setCustomers(res);
+      if (Array.isArray(res)) {
+        setCustomers(res);
+        hasDataRef.current = res.length > 0;
+        setError(false);
+      }
     } catch {
-      // silently keep existing data on error
+      // Only surface a full ErrorState when there's nothing already on
+      // screen — a failed background refresh (e.g. while searching) keeps
+      // the last good list visible instead of replacing it with an error.
+      setError(!hasDataRef.current);
     } finally {
       setLoading(false);
     }
@@ -169,10 +180,27 @@ export default function CustomersScreen() {
             <ActivityIndicator size="small" color={colors.primary} />
             <Text style={[styles.custEmail, { color: colors.mutedForeground, marginLeft: 10 }]}>Loading customers...</Text>
           </View>
+        ) : error ? (
+          <ErrorState
+            message="Couldn't load your customers."
+            onRetry={() => { setLoading(true); fetchCustomers(search); }}
+          />
         ) : sortedCustomers.length === 0 ? (
-          <View style={styles.custRow}>
-            <Text style={[styles.custEmail, { color: colors.mutedForeground }]}>No customers found.</Text>
-          </View>
+          <EmptyState
+            icon="users"
+            title={search.trim() ? 'No matching customers' : 'No customers yet'}
+            description={
+              search.trim()
+                ? 'Try a different name, email or tag.'
+                : 'Once someone buys from your store, they will show up here.'
+            }
+            action={
+              search.trim()
+                ? undefined
+                : { label: 'View your store', onPress: () => router.push('/store-preview' as never), icon: 'external-link' }
+            }
+            compact
+          />
         ) : (
           sortedCustomers.map((c, i) => {
             // Monochrome avatar tint (theme foreground) — no saturated per-user hues,

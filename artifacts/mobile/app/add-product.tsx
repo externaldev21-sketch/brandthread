@@ -25,6 +25,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { hapticPrimaryAction, hapticToggle, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
+import { SuccessSheet } from '@/components/ui/SuccessSheet';
 
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, FilterChip, StatusBadge, SectionHeader, FormInput, ProgressCard, EmptyState } from '@/components/BrandthreadUI';
 
@@ -222,6 +223,7 @@ export default function AddProductScreen() {
   const [featuredHome, setFeaturedHome] = useState(false);
   const [dismissedTips, setDismissedTips] = useState<string[]>([]);
   const [publishing, setPublishing] = useState(false);
+  const [publishSuccess, setPublishSuccess] = useState<{ name: string; kind: 'created' | 'updated'; productId: string } | null>(null);
   const [mediaUpload, setMediaUpload] = useState<Record<string, { status: 'uploading' | 'done' | 'error'; remoteUri?: string }>>({});
   const photosUploading = Object.values(mediaUpload).some(u => u.status === 'uploading');
   const [isEditMode, setIsEditMode] = useState(false);
@@ -717,20 +719,14 @@ export default function AddProductScreen() {
       if (isEditMode && editProductId) {
         await api.products.update(editProductId, serverUpdatePayload);
         await deleteDraft(draftId.current);
-        Alert.alert('Product updated!', name + ' has been updated.', [
-          { text: 'View product', onPress: () => router.replace('/product-detail?id=' + editProductId as never) },
-          { text: 'Done', onPress: leaveProductFlow },
-        ]);
+        setPublishSuccess({ name, kind: 'updated', productId: editProductId });
       } else {
         const newProduct = await completeSetupTaskAfter(
           'first_product',
           () => api.products.create(serverCreatePayload),
         ) as any;
         await deleteDraft(draftId.current);
-        Alert.alert('Product published!', name + ' is now live.', [
-          { text: 'View product', onPress: () => router.replace('/product-detail?id=' + newProduct.id as never) },
-          { text: 'Done', onPress: leaveProductFlow },
-        ]);
+        setPublishSuccess({ name, kind: 'created', productId: newProduct.id });
       }
     } catch {
       Alert.alert('Error', 'Could not publish. Please try again.');
@@ -1966,6 +1962,23 @@ export default function AddProductScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      <SuccessSheet
+        visible={!!publishSuccess}
+        onClose={() => setPublishSuccess(null)}
+        title={publishSuccess?.kind === 'updated' ? 'Product updated!' : 'Product published!'}
+        subtitle={publishSuccess ? `${publishSuccess.name} ${publishSuccess.kind === 'updated' ? 'has been updated.' : 'is now live.'}` : undefined}
+        primaryAction={{
+          label: 'View product',
+          onPress: () => {
+            const id = publishSuccess?.productId;
+            setPublishSuccess(null);
+            if (id) router.replace(('/product-detail?id=' + id) as never);
+          },
+        }}
+        secondaryAction={{ label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }}
+        testID="add-product-success-sheet"
+      />
     </View>
   );
 }

@@ -58,6 +58,7 @@ import { makeDurableUri } from '@/lib/imageUri';
 import { validateBtJson } from '@/lib/btLayerValidator';
 import { validateJsonByteLength } from '@/lib/fileValidator';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { GridSkeleton } from '@/components/layout';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -1524,8 +1525,8 @@ export default function DesignGalleryScreen() {
 
       {/* ── Project grid ── */}
       {loading ? (
-        <View style={s.loadingBox} testID="gallery-loading">
-          <ActivityIndicator color={MUTED} size="large" />
+        <View style={{ paddingHorizontal: GRID_H_PAD, paddingTop: SP.md }} testID="gallery-loading">
+          <GridSkeleton columns={GRID_COLUMNS} cardWidth={CELL_SIZE} rows={2} gap={GRID_GAP} />
         </View>
       ) : (
         <FlatList

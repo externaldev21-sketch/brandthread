@@ -9,6 +9,7 @@ import {
   getClerkProxyHost,
 } from "./middlewares/clerkProxyMiddleware";
 import router from "./routes";
+import wellKnownRouter from "./routes/wellKnown";
 import { logger } from "./lib/logger";
 import { isAllowedWebOrigin } from "./lib/webOrigin";
 import {
@@ -38,6 +39,11 @@ app.use(
   }),
 );
 app.use(normalizeErrorResponses);
+
+// iOS/Android app-link verification files. Served at the site root (not
+// under /api), unauthenticated, before CORS/body parsing — platforms fetch
+// these directly and don't send an Origin header or a body.
+app.use("/.well-known", wellKnownRouter);
 
 // Clerk proxy must be mounted BEFORE body parsers (streams raw bytes)
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());

@@ -93,6 +93,12 @@ export default function SellerStudioRadialMenu({
   const sheetY = useRef(new Animated.Value(0)).current;
   const dragY = useRef(new Animated.Value(0)).current;
   const sheetHeight = Math.min(screenHeight * 0.9, screenHeight - insets.top - 24);
+  // Close (X) button floats in the dimmed backdrop, clear ABOVE the sheet's
+  // top edge, so it never overlaps the sheet header's "View store" button.
+  // Was previously pinned to `insets.top + SP.xl` regardless of sheet
+  // height, which put it on top of the header row on most phone sizes.
+  const sheetTop = screenHeight - sheetHeight;
+  const closeButtonTop = Math.max(insets.top + SP.md, sheetTop - 52 - SP.md);
 
   const [open, setOpen] = useState(false);
   const [upsellFeature, setUpsellFeature] = useState<string | null>(null);
@@ -573,7 +579,7 @@ export default function SellerStudioRadialMenu({
           style={[
             styles.toggle,
             {
-              top: insets.top + SP.xl,
+              top: closeButtonTop,
               backgroundColor: theme.accent,
               shadowColor: theme.shadowColor,
               opacity: progress,
