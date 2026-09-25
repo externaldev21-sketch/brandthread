@@ -10,6 +10,7 @@ const { apiMock, routerMock, storageMock, buyerSearchStore } = vi.hoisted(() => 
       search: vi.fn(),
       trending: vi.fn(),
       suggested: vi.fn(),
+      categories: vi.fn(),
     },
     social: {
       search: vi.fn(),
@@ -157,6 +158,10 @@ vi.mock('@/contexts/AppThemeContext', () => ({
 vi.mock('@/components/BrandthreadUI', () => ({
   EmptyState: ({ title, description }: { title: string; description: string }) =>
     React.createElement('EmptyState', {}, React.createElement('Text', {}, `${title} ${description}`)),
+  // Entrance animation is a real spring against `Animated.Value` in the real
+  // component — irrelevant to what these tests assert — so it renders its
+  // children immediately with no animation wrapper.
+  AnimatedEntrance: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 vi.mock('@/contexts/ThreadPullTransitionContext', () => ({
@@ -166,6 +171,26 @@ vi.mock('@/contexts/ThreadPullTransitionContext', () => ({
 vi.mock('@/components/CachedImage', () => ({
   CachedImage: (props: Record<string, unknown>) => React.createElement('CachedImage', props),
 }));
+
+vi.mock('@/components/search/FilterSheet', () => {
+  const ReactLocal = require('react') as typeof import('react');
+  // The real component pulls in BottomSheet -> react-native-reanimated ->
+  // WebAppShell -> expo-linear-gradient, which this suite's plain
+  // react-native mock doesn't support (no test here exercises the filter
+  // sheet's own content) — stub it to render nothing when hidden, matching
+  // the established pattern for other BottomSheet-based sheets (see
+  // tests/add-product.test.tsx's SuccessSheet stub). `countActiveFilters` is
+  // re-implemented simply since `app/(buyer)/search.tsx` imports it as a
+  // value from this same module.
+  return {
+    FilterSheet: ({ visible }: { visible: boolean }) => {
+      if (!visible) return null;
+      return ReactLocal.createElement('View', { testID: 'search-filter-sheet' });
+    },
+    countActiveFilters: (f: Record<string, unknown>) =>
+      Object.values(f).filter((v) => v !== undefined).length,
+  };
+});
 
 vi.mock('react-native-reanimated', () => ({
   default: { View: (props: Record<string, unknown>) => React.createElement('Animated.View', props, props.children as React.ReactNode) },
@@ -282,6 +307,7 @@ describe('buyer search redesign', () => {
       brands: [{ id: 'b1', sellerId: 'seller-1', name: 'Vault Studio', handle: '@vaultstudio', color: '#00C853', initials: 'VS', followerCount: 120 }],
       products: [{ id: 'sp1', productId: 'sp1', name: 'Fleece Zip Jacket', brand: 'Vault Studio', category: 'outerwear', imageUri: null, color: '#00C853', initials: 'VS' }],
     });
+    apiMock.public.categories.mockReset().mockResolvedValue({ categories: [] });
     apiMock.social.search.mockReset().mockResolvedValue([]);
     apiMock.social.follow.mockReset().mockResolvedValue({ ok: true });
     apiMock.social.unfollow.mockReset().mockResolvedValue({ ok: true });
@@ -348,7 +374,11 @@ describe('buyer search redesign', () => {
       await flushPromises();
     });
 
-    expect(apiMock.public.search).toHaveBeenCalledWith({ q: 'vault', limit: 20 });
+    expect(apiMock.public.search).toHaveBeenCalledWith({
+      q: 'vault', limit: 30,
+      sort: undefined, category: undefined, size: undefined, brand: undefined,
+      minPriceCents: undefined, maxPriceCents: undefined,
+    });
     expect(apiMock.social.search).toHaveBeenCalledWith('vault', 10);
 
     // Top tab shows a mixed short list by default.
