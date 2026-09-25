@@ -3,6 +3,7 @@ import { View, StyleSheet, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { ThreadDraw } from '@/components/onboarding/ThreadLine';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
 export default function SplashScreen() {
@@ -36,6 +37,9 @@ export default function SplashScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
+      {/* The onboarding thread starts here: it sews through the mark and
+          carries on into the Welcome screen. Decorative only. */}
+      <ThreadDraw height={180} color={theme.text} delay={200} duration={1600} style={styles.thread} />
       <Animated.View style={[styles.logoWrap, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
         <BrandthreadLogo size={150} tintColor={theme.accentLight} />
       </Animated.View>
@@ -49,5 +53,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  thread: { position: 'absolute', left: 0, right: 0, top: '50%', marginTop: -90 },
   logoWrap: { alignItems: 'center', justifyContent: 'center' },
 });

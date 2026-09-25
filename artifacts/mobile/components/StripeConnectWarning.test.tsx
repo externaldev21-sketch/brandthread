@@ -94,6 +94,10 @@ function status(overrides: Partial<ConnectStatus> = {}): ConnectStatus {
     status: 'unknown',
     verified: false,
     bankLast4: null,
+    providerConfigured: true,
+    payoutSchedule: null,
+    requirementsDue: [],
+    taxInfoStatus: 'unknown',
     ...overrides,
   };
 }

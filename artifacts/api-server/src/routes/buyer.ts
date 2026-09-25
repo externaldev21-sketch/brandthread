@@ -5,7 +5,7 @@
 import { Router } from "express";
 import {
   db, checkoutSessions, orders, orderItems, productVariants, products, users, shippingRates, discountCodes, buyerAddresses,
-  drops,
+  drops, shippingZones, shippingZoneWeightTiers,
 } from "@workspace/db";
 import { eq, and, desc, sql, isNull, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -15,6 +15,7 @@ import {
   mapStripeError,
 } from "../lib/stripe";
 import { CheckoutPlanError, paymentIntentMoney, resolveChargePlan, type ChargePlan } from "../lib/money/checkoutPlan";
+import { resolveShippingForDestination, type ShippingZoneRow, type ShippingZoneWeightTierRow } from "../lib/shippingZones";
 import { refundOrder, RefundError } from "../lib/money/refunds";
 import {
   bindLoyaltyRedemptionToCheckout,
@@ -531,6 +532,10 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       priceCents: number;
     }> = [];
     const sellerIds = new Set<string>();
+    // Tracked separately (not persisted on the checkout-session row) so it
+    // can feed weight-tiered shipping zones without changing the shape of
+    // the stored cart item snapshot.
+    let cartWeightGrams = 0;
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
@@ -551,6 +556,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
           productImages: products.images,
           sellerId: products.ownerId,
           productStatus: products.status,
+          weightGrams: productVariants.weightGrams,
         })
         .from(productVariants)
         .innerJoin(products, eq(productVariants.productId, products.id))
@@ -609,6 +615,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         quantity: qty,
         priceCents: row.priceCents,
       });
+      cartWeightGrams += (row.weightGrams ?? 0) * qty;
     }
 
     // ── Verify seller has an active Connect account ───────────────────────
@@ -810,22 +817,57 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       (sum, item) => sum + item.priceCents * item.quantity,
       0,
     );
-    const [configuredShippingRate] = await db
-      .select()
-      .from(shippingRates)
-      .where(and(eq(shippingRates.sellerId, sellerId), eq(shippingRates.active, true)))
-      .limit(1);
-    const shippingCents = !configuredShippingRate ||
-      (configuredShippingRate.freeAboveCents != null && subtotalCents >= configuredShippingRate.freeAboveCents)
-      ? 0
-      : configuredShippingRate.flatRateCents;
+    // Prefer the seller's worldwide shipping zones; fall back to the legacy
+    // single flat-rate row when they have no zones configured yet. This only
+    // decides the shipping line item amount below — Stripe payment-intent
+    // construction and the seller's payout amount are unaffected by which
+    // path priced it.
+    const sellerZoneRows = await db.select().from(shippingZones)
+      .where(and(eq(shippingZones.sellerId, sellerId), eq(shippingZones.active, true)));
+    let shippingCents = 0;
+    let shippingLineName = "Shipping";
+    if (sellerZoneRows.length > 0) {
+      const [sellerHome] = await db.select({ country: users.sellerShipFromCountry }).from(users)
+        .where(eq(users.clerkId, sellerId)).limit(1);
+      const weightTierRows: ShippingZoneWeightTierRow[] = [];
+      for (const z of sellerZoneRows) {
+        if (z.pricingModel !== "weight_tiered") continue;
+        const rows = await db.select().from(shippingZoneWeightTiers).where(eq(shippingZoneWeightTiers.zoneId, z.id));
+        weightTierRows.push(...rows);
+      }
+      const resolved = resolveShippingForDestination({
+        zones: sellerZoneRows as unknown as ShippingZoneRow[],
+        weightTiers: weightTierRows,
+        destinationCountry: validatedShipping.country,
+        sellerHomeCountry: sellerHome?.country ?? "US",
+        subtotalCents,
+        weightGrams: cartWeightGrams,
+      });
+      if (resolved.unavailable) {
+        res.status(400).json({ error: "This seller does not ship to the selected destination" });
+        return;
+      }
+      shippingCents = resolved.shippingCents;
+      shippingLineName = resolved.zoneName ? `Shipping (${resolved.zoneName})` : "Shipping";
+    } else {
+      const [configuredShippingRate] = await db
+        .select()
+        .from(shippingRates)
+        .where(and(eq(shippingRates.sellerId, sellerId), eq(shippingRates.active, true)))
+        .limit(1);
+      shippingCents = !configuredShippingRate ||
+        (configuredShippingRate.freeAboveCents != null && subtotalCents >= configuredShippingRate.freeAboveCents)
+        ? 0
+        : configuredShippingRate.flatRateCents;
+      shippingLineName = configuredShippingRate?.name ?? "Shipping";
+    }
     if (shippingCents > 0) {
       lineItems.push({
         price_data: {
           currency: "usd",
           unit_amount: shippingCents,
           tax_behavior: "exclusive",
-          product_data: { name: configuredShippingRate?.name ?? "Shipping" },
+          product_data: { name: shippingLineName },
         },
         quantity: 1,
       });

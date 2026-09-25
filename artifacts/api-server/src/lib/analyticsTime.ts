@@ -33,3 +33,33 @@ export function previousPeriod(start: Date, end: Date): { start: Date; end: Date
   const periodMs = end.getTime() - start.getTime();
   return { start: new Date(start.getTime() - periodMs), end: start };
 }
+
+/**
+ * Floors `date` to the first of its local calendar month (at local midnight),
+ * in the given local timezone. Unlike `floorToLocalStep`, month length is
+ * variable, so this works in local calendar fields rather than a fixed ms
+ * step.
+ */
+export function floorToLocalMonth(date: Date, tzOffsetMinutes: number): Date {
+  const local = new Date(date.getTime() + tzOffsetMinutes * 60_000);
+  const flooredLocalMs = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), 1);
+  return new Date(flooredLocalMs - tzOffsetMinutes * 60_000);
+}
+
+/**
+ * Adds `months` calendar months to `date` in the given local timezone (may be
+ * negative). Used to build month-bucketed windows (Year/All ranges) where a
+ * fixed ms step would drift across months of different lengths.
+ */
+export function addLocalMonths(date: Date, months: number, tzOffsetMinutes: number): Date {
+  const local = new Date(date.getTime() + tzOffsetMinutes * 60_000);
+  const shiftedLocalMs = Date.UTC(
+    local.getUTCFullYear(),
+    local.getUTCMonth() + months,
+    local.getUTCDate(),
+    local.getUTCHours(),
+    local.getUTCMinutes(),
+    local.getUTCSeconds(),
+  );
+  return new Date(shiftedLocalMs - tzOffsetMinutes * 60_000);
+}

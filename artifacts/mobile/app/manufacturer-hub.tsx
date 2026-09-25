@@ -306,6 +306,13 @@ function activeFilterCount(f: Filters) {
     + (f.verifiedOnly ? 1 : 0) + (f.hasPhotos ? 1 : 0);
 }
 
+// Alibaba-style sourcing categories, layered on top of the free-text
+// specialty filter already served by the directory facets.
+const CATEGORY_CHIPS = [
+  'Cut & Sew', 'Knitwear', 'Denim', 'Screen Printing', 'Embroidery',
+  'Cut Labels & Tags', 'Packaging', 'Blanks',
+];
+
 function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const { theme } = useAppTheme();
   const s = useMemo(() => makeS(theme), [theme]);
@@ -321,7 +328,18 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const [loadError, setLoadError] = useState(false);
   const [mutationError, setMutationError] = useState('');
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
+  const [conversationsPreview, setConversationsPreview] = useState<ManufacturerConversation[]>([]);
+  const [ordersPreview, setOrdersPreview] = useState<ProductionOrder[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useFocusEffect(useCallback(() => {
+    Promise.all([getConversations(), getProductionOrders()])
+      .then(([conversations, orders]) => {
+        setConversationsPreview(conversations.filter((c) => c.unreadCount > 0 || c.lastMessage).slice(0, 3));
+        setOrdersPreview(orders.filter((o) => o.status === 'active' || o.status === 'pending').slice(0, 3));
+      })
+      .catch(() => { setConversationsPreview([]); setOrdersPreview([]); });
+  }, []));
 
   const load = useCallback(async (query = searchQuery, f = filters) => {
     try {
@@ -411,6 +429,119 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
     }
   };
 
+  const toggleCategory = (category: string) => {
+    const next = { ...filters, category: filters.category === category ? '' : category };
+    applyFilters(next);
+  };
+
+  const featured = manufacturers.filter((mfg) => mfg.isVerified).slice(0, 8);
+
+  // Rendered as the grid's ListHeaderComponent (not a nested ScrollView) so
+  // the whole Discover tab scrolls as one list.
+  const discoverIntro = (
+    <View style={s.discoverIntroContent}>
+        {/* Request for Quotation — the primary Alibaba-style sourcing CTA */}
+        <TouchableOpacity
+          style={s.rfqCta}
+          activeOpacity={0.88}
+          onPress={() => router.push('/rfq-post' as never)}
+          testID="button-post-rfq"
+        >
+          <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.rfqCtaGrad}>
+            <View style={s.rfqCtaIcon}>
+              <Feather name="send" size={ICON.md} color={theme.onAccent} />
+            </View>
+            <View style={s.rfqCtaBody}>
+              <Text style={[s.rfqCtaTitle, getOnAccentTextStyle(theme)]}>Request for Quotation</Text>
+              <Text style={[s.rfqCtaSubtitle, getOnAccentTextStyle(theme)]}>Broadcast one request to up to 10 manufacturers</Text>
+            </View>
+            <Feather name="arrow-right" size={ICON.md} color={theme.onAccent} />
+          </LinearGradient>
+        </TouchableOpacity>
+        <View style={s.rfqSecondaryRow}>
+          <TouchableOpacity style={s.rfqSecondaryBtn} onPress={() => router.push('/rfq-list' as never)} testID="button-my-rfqs">
+            <Feather name="file-text" size={ICON.sm} color={theme.accentLight} />
+            <Text style={s.rfqSecondaryText}>My RFQs</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.rfqSecondaryBtn} onPress={() => router.push('/manufacturer-compare' as never)} testID="button-compare-suppliers">
+            <Feather name="bar-chart-2" size={ICON.sm} color={theme.accentLight} />
+            <Text style={s.rfqSecondaryText}>Compare Suppliers</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Category chips */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.categoryRow}>
+          {CATEGORY_CHIPS.map((category) => (
+            <FilterChip key={category} label={category} active={filters.category === category} onPress={() => toggleCategory(category)} />
+          ))}
+        </ScrollView>
+
+        {/* Featured / verified factories */}
+        {featured.length > 0 && (
+          <View style={s.featuredSection}>
+            <SectionHeader title="Featured verified factories" style={s.sectionHeaderTight} />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.featuredRow}>
+              {featured.map((mfg) => (
+                <TouchableOpacity
+                  key={mfg.id}
+                  style={s.featuredCard}
+                  activeOpacity={0.85}
+                  onPress={() => router.push((`/manufacturer-profile?id=${mfg.id}`) as never)}
+                  testID={`featured-${mfg.id}`}
+                >
+                  <View style={s.featuredCover}>
+                    {mfg.profileImageUri ? (
+                      <Image source={{ uri: mfg.profileImageUri }} style={s.featuredCoverImage} resizeMode="cover" />
+                    ) : (
+                      <View style={s.featuredCoverFallback}><Text style={s.featuredCoverFallbackText}>{mfg.name.charAt(0)}</Text></View>
+                    )}
+                    <View style={s.featuredVerifiedBadge}>
+                      <Feather name="check-circle" size={11} color={theme.onAccent} />
+                    </View>
+                  </View>
+                  <Text style={s.featuredName} numberOfLines={1}>{mfg.name}</Text>
+                  <Text style={s.featuredMeta} numberOfLines={1}>{[mfg.city, mfg.country].filter(Boolean).join(', ')}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Recent conversations preview */}
+        {conversationsPreview.length > 0 && (
+          <View style={s.previewSection}>
+            <SectionHeader title="Recent conversations" action={{ label: 'See all', onPress: () => router.setParams({ tab: 'messages' } as never) }} style={s.sectionHeaderTight} />
+            {conversationsPreview.map((conv) => (
+              <TouchableOpacity key={conv.id} style={s.previewRow} activeOpacity={0.8} onPress={() => router.push((`/manufacturer-messages?threadId=${conv.id}`) as never)}>
+                <View style={s.previewIcon}><Feather name="message-circle" size={ICON.sm} color={theme.secondary} /></View>
+                <View style={s.previewBody}>
+                  <Text style={s.previewTitle} numberOfLines={1}>{conv.manufacturerName}</Text>
+                  <Text style={s.previewSubtitle} numberOfLines={1}>{conv.lastMessage ?? conv.contextLabel ?? 'New conversation'}</Text>
+                </View>
+                {conv.unreadCount > 0 && <View style={s.previewBadge}><Text style={s.previewBadgeText}>{conv.unreadCount}</Text></View>}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* Active orders preview */}
+        {ordersPreview.length > 0 && (
+          <View style={s.previewSection}>
+            <SectionHeader title="Active orders" action={{ label: 'See all', onPress: () => router.setParams({ tab: 'production' } as never) }} style={s.sectionHeaderTight} />
+            {ordersPreview.map((order) => (
+              <TouchableOpacity key={order.id} style={s.previewRow} activeOpacity={0.8} onPress={() => router.setParams({ tab: 'production' } as never)}>
+                <View style={s.previewIcon}><Feather name="layers" size={ICON.sm} color={theme.accentLight} /></View>
+                <View style={s.previewBody}>
+                  <Text style={s.previewTitle} numberOfLines={1}>{order.productName}</Text>
+                  <Text style={s.previewSubtitle} numberOfLines={1}>{order.manufacturerName ?? 'Manufacturer'} · {PRODUCTION_STAGES.find((stage) => stage.key === order.currentStage)?.label ?? order.currentStage}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+    </View>
+  );
+
   return (
     <View style={s.flex}>
       {/* Search bar */}
@@ -480,12 +611,17 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
         contentContainerStyle={[s.listContent, s.gridContent]}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={theme.accent} />}
-        ListHeaderComponent={!loading && !loadError && visibleManufacturers.length > 0 ? (
-          <Text style={s.resultCount} testID="directory-result-count">
-            {visibleManufacturers.length} {visibleManufacturers.length === 1 ? 'manufacturer' : 'manufacturers'}
-            {activeFilterCount(filters) > 0 ? ' match your filters' : ''}
-          </Text>
-        ) : null}
+        ListHeaderComponent={(
+          <>
+            {discoverIntro}
+            {!loading && !loadError && visibleManufacturers.length > 0 && (
+              <Text style={s.resultCount} testID="directory-result-count">
+                {visibleManufacturers.length} {visibleManufacturers.length === 1 ? 'manufacturer' : 'manufacturers'}
+                {activeFilterCount(filters) > 0 ? ' match your filters' : ''}
+              </Text>
+            )}
+          </>
+        )}
         ListEmptyComponent={
             loading ? (
               <View style={s.skeletonGrid} testID="directory-loading">
@@ -857,6 +993,13 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
     <FlatList
       data={relationships}
       keyExtractor={item => item.id}
+      ListHeaderComponent={relationships.length >= 2 ? (
+        <TouchableOpacity style={s.compareBar} onPress={() => router.push('/manufacturer-compare' as never)} activeOpacity={0.8} testID="button-compare-my-manufacturers">
+          <Feather name="bar-chart-2" size={ICON.sm} color={theme.accentLight} />
+          <Text style={s.compareBarText}>Compare saved suppliers side by side</Text>
+          <Feather name="chevron-right" size={ICON.sm} color={theme.muted} />
+        </TouchableOpacity>
+      ) : null}
       renderItem={({ item: rel }) => {
         const mfg = rel.manufacturer!;
         const counts = [
@@ -1540,4 +1683,38 @@ const makeS = (theme: AppThemePreset) => StyleSheet.create({
   inlineError: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginHorizontal: SP.md, marginBottom: SP.sm, padding: SP.sm, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.warning, backgroundColor: `${theme.warning}1F` },
   inlineErrorText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: theme.warning },
   emptyState:   { flex: 1, justifyContent: 'center' },
+
+  // Discover tab — Alibaba-style sourcing intro (RFQ CTA, categories, featured, previews)
+  discoverIntroContent: { paddingHorizontal: SP.md, paddingTop: SP.xs, gap: SP.md },
+  rfqCta:       { borderRadius: RADIUS.lg, overflow: 'hidden' },
+  rfqCtaGrad:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.md },
+  rfqCtaIcon:   { width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }, // theme-exempt: overlay on gradient
+  rfqCtaBody:   { flex: 1 },
+  rfqCtaTitle:  { fontSize: FS.base, fontFamily: FONT.bold, color: theme.onAccent },
+  rfqCtaSubtitle:{ fontSize: FS.xs, fontFamily: FONT.regular, color: theme.onAccent, marginTop: 2, opacity: 0.9 },
+  rfqSecondaryRow: { flexDirection: 'row', gap: SP.sm },
+  rfqSecondaryBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.xs, height: 40, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.cardGlass },
+  rfqSecondaryText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.accentLight },
+  categoryRow:  { gap: SP.sm, paddingRight: SP.md },
+  sectionHeaderTight: { marginBottom: SP.xs },
+  featuredSection: { gap: SP.xs },
+  featuredRow:  { gap: SP.sm, paddingRight: SP.md },
+  featuredCard: { width: 108 },
+  featuredCover:{ width: 108, height: 88, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: theme.accentDim, position: 'relative' },
+  featuredCoverImage: { width: '100%', height: '100%' },
+  featuredCoverFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  featuredCoverFallbackText: { fontSize: FS.xl, fontFamily: FONT.bold, color: theme.accentLight },
+  featuredVerifiedBadge: { position: 'absolute', top: 5, right: 5, width: 18, height: 18, borderRadius: 9, backgroundColor: theme.secondary, alignItems: 'center', justifyContent: 'center' },
+  featuredName: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.text, marginTop: SP.xs },
+  featuredMeta: { fontSize: 10, fontFamily: FONT.regular, color: theme.muted, marginTop: 1 },
+  previewSection: { gap: SP.xs },
+  previewRow:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: theme.cardGlass, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, padding: SP.sm },
+  previewIcon:  { width: 32, height: 32, borderRadius: RADIUS.sm, backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' },
+  previewBody:  { flex: 1 },
+  previewTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.text },
+  previewSubtitle: { fontSize: FS.xs, fontFamily: FONT.regular, color: theme.muted, marginTop: 1 },
+  previewBadge: { minWidth: 18, height: 18, borderRadius: 9, backgroundColor: theme.text, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  previewBadgeText: { fontSize: 10, fontFamily: FONT.bold, color: theme.background },
+  compareBar:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginHorizontal: SP.md, marginBottom: SP.md, padding: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.cardGlass },
+  compareBarText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.accentLight },
 });

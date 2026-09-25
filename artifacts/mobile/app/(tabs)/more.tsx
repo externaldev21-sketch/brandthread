@@ -12,13 +12,14 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUser, useAuth } from '@clerk/expo';
 import { getSetupState, completionPercent, SetupState } from '@/lib/setupStore';
 import { useApi } from '@/lib/api';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { FONT, FS, SP } from '@/lib/theme';
+import { RADII } from '@/constants/radii';
+import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, SecondaryButton, NavigationCard, StatusBadge } from '@/components/BrandthreadUI';
 
@@ -169,14 +170,14 @@ export default function MoreScreen() {
   };
 
   const handleNavPress = (item: NavItem) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticPrimaryAction();
     if (item.route) {
       router.push(item.route as any);
     }
   };
 
   const toggleSection = (key: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticToggle();
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
   };
@@ -200,8 +201,8 @@ export default function MoreScreen() {
               <Text style={styles.avatarLetter}>{avatarLetter}</Text>
             </View>
             <View style={styles.userInfo}>
-              <Text style={styles.userName}>{displayName}</Text>
-              {!!email && <Text style={styles.userEmail}>{email}</Text>}
+              <Text style={styles.userName} numberOfLines={1} ellipsizeMode="tail">{displayName}</Text>
+              {!!email && <Text style={styles.userEmail} numberOfLines={1} ellipsizeMode="tail">{email}</Text>}
               <View style={styles.badgeRow}>
                 <StatusBadge label={planLabel} variant={plan === 'starter' ? 'neutral' : 'purple'} />
               </View>
@@ -228,7 +229,7 @@ export default function MoreScreen() {
             <View style={[styles.progressFill, { width: `${percent}%` }]} />
           </View>
           <TouchableOpacity
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/settings' as any); }}
+            onPress={() => { hapticPrimaryAction(); router.push('/settings' as any); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Text style={styles.continueSetup}>Continue setup →</Text>
@@ -330,7 +331,7 @@ const createStyles = (theme: any) => {
   avatar: {
     width: 52,
     height: 52,
-    borderRadius: 26,
+    borderRadius: RADII.avatar,
     backgroundColor: PURPLE_DIM,
     alignItems: 'center',
     justifyContent: 'center',
@@ -427,13 +428,13 @@ const createStyles = (theme: any) => {
   progressTrack: {
     height: 3,
     backgroundColor: theme.glass ?? theme.accentDim,
-    borderRadius: 99,
+    borderRadius: RADII.pill,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
     backgroundColor: PURPLE,
-    borderRadius: 99,
+    borderRadius: RADII.pill,
   },
   continueSetup: {
     fontSize: FS.xs,

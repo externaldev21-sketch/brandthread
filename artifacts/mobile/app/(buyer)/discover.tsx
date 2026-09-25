@@ -24,11 +24,10 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Animated,
   Platform,
-  RefreshControl,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -36,13 +35,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import {
   BG, SURFACE, CARD,
-  BORDER,
   FG, MUTED, SUBTLE, ON_DARK,
-  FONT, FS, SP, RADIUS, GUTTER, GRID_MAX_WIDTH,
+  FONT, SP, GUTTER, GRID_MAX_WIDTH,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
@@ -65,6 +62,10 @@ import {
   type CommerceSignalData,
 } from '@/components/CommerceSignal';
 import { SectionError } from '@/components/InlineFeedback';
+import { Card, IconButton, HeartToggle, ThemedRefreshControl } from '@/components/ui';
+import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
+import { RADII } from '@/constants/radii';
+import { hapticLight, hapticMedium, hapticToggle } from '@/lib/haptics';
 
 // ─── API-backed types ──────────────────────────────────────────────────────────
 
@@ -110,27 +111,27 @@ function SectionHead({
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 14 }}>
       <View style={{ flex: 1, marginRight: 12 }}>
-        <Text style={{ fontSize: 18, fontFamily: FONT.bold, color: FG, letterSpacing: -0.3 }} numberOfLines={1}>
+        <Text style={[TYPE_SCALE.headline, { fontFamily: FONT.bold, color: FG, letterSpacing: -0.3 }]} numberOfLines={1}>
           {title}
         </Text>
         {sub && (
-          <Text style={{ fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 }} numberOfLines={1}>
+          <Text style={[TYPE_SCALE.caption, { color: MUTED, marginTop: 2 }]} numberOfLines={1}>
             {sub}
           </Text>
         )}
       </View>
       {action && (
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => { Haptics.selectionAsync(); onAction?.(); }}
+        <Pressable
+          onPress={() => { hapticToggle(); onAction?.(); }}
           accessibilityRole="button"
           accessibilityLabel={`${action}, ${title}`}
           style={{ minHeight: 44, justifyContent: 'center' }}
+          hitSlop={8}
         >
-          <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.accent }}>
+          <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: theme.accent }]}>
             {action}
           </Text>
-        </TouchableOpacity>
+        </Pressable>
       )}
     </View>
   );
@@ -161,28 +162,26 @@ const HighDemandRow = React.memo(function HighDemandRow({ item }: { item: HighDe
     (item.commerce.remainingUnits ?? 0) <= URGENCY_UNITS_THRESHOLD;
 
   function handlePress() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticLight();
     push((`/thread-product-detail?productId=${encodeURIComponent(item.productId)}&productName=${encodeURIComponent(item.name)}`) as never);
   }
 
   return (
-    <TouchableOpacity
-      style={[hd.row, { borderColor: isUrgent ? `${theme.accent}44` : BORDER }]}
-      activeOpacity={0.8}
+    <Card
       onPress={handlePress}
-      accessibilityRole="button"
       accessibilityLabel={`${item.name} by ${item.brand}`}
+      style={[hd.row, { borderColor: isUrgent ? `${theme.accent}44` : theme.border }]}
     >
       {item.imageUri ? (
         <CachedImage source={{ uri: item.imageUri }} style={hd.avatar} contentFit="cover" />
       ) : (
         <View style={[hd.avatar, { backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' }]}>
-          <Text style={[hd.initials, { color: theme.text }]}>{item.initials}</Text>
+          <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.bold, color: theme.text }]}>{item.initials}</Text>
         </View>
       )}
       <View style={{ flex: 1 }}>
-        <Text style={hd.name} numberOfLines={1}>{item.name}</Text>
-        <Text style={hd.brand} numberOfLines={1}>{item.brand}</Text>
+        <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: FG }]} numberOfLines={1}>{item.name}</Text>
+        <Text style={[TYPE_SCALE.caption, { color: MUTED, marginTop: 2 }]} numberOfLines={1}>{item.brand}</Text>
         <CommerceSignalRow
           claimedUnits={item.commerce.claimedUnits}
           remainingUnits={item.commerce.remainingUnits}
@@ -193,20 +192,16 @@ const HighDemandRow = React.memo(function HighDemandRow({ item }: { item: HighDe
         />
       </View>
       {item.commerce.currentPriceCents != null && (
-        <Text style={[hd.price, isUrgent && { color: theme.accent }]}>
+        <Text style={[TYPE_SCALE.footnote, TABULAR_NUMS, { fontFamily: FONT.bold, color: isUrgent ? theme.accent : FG }]}>
           {formatCents(item.commerce.currentPriceCents)}
         </Text>
       )}
-    </TouchableOpacity>
+    </Card>
   );});
 
 const hd = StyleSheet.create({
-  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.xs, borderWidth: 1, backgroundColor: CARD },
-  avatar:   { width: 44, height: 44, borderRadius: RADIUS.xs, overflow: 'hidden' },
-  initials: { fontSize: 13, fontFamily: FONT.bold, color: ON_DARK },
-  name:     { fontSize: 13, fontFamily: FONT.semibold, color: FG },
-  brand:    { fontSize: 11, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
-  price:    { fontSize: 13, fontFamily: FONT.bold, color: FG },
+  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13 },
+  avatar:   { width: 44, height: 44, borderRadius: RADII.chip, overflow: 'hidden' },
 });
 
 // ─── Swipeable product showcase (For You) ─────────────────────────────────────
@@ -263,7 +258,6 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
   const snapOffsets = items.map((_, index) => index * snapInterval);
 
   function openProduct(item: ProductCardItem) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const pid = encodeURIComponent(item.productId ?? item.id);
     push((`/thread-product-detail?productId=${pid}&productName=${encodeURIComponent(item.name)}`) as never);
   }
@@ -299,7 +293,7 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
         onMomentumScrollEnd={event => {
           const nextIndex = Math.round(event.nativeEvent.contentOffset.x / snapInterval);
           setActiveIndex(Math.max(0, Math.min(items.length - 1, nextIndex)));
-          Haptics.selectionAsync();
+          hapticToggle();
         }}
         renderItem={({ item, index }) => {
           const isUrgent =
@@ -324,24 +318,20 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
 
           return (
             <Animated.View style={{ width: cardWidth, opacity, transform: [{ scale }] }}>
-              <TouchableOpacity
-                style={[showcase.card, { borderColor: isUrgent ? `${theme.accent}55` : BORDER }]}
-                activeOpacity={0.92}
-                accessibilityRole="button"
-                accessibilityLabel={`${item.name} by ${item.brand}${item.commerce.currentPriceCents != null ? `, ${formatCents(item.commerce.currentPriceCents)}` : ''}`}
+              <Card
                 onPress={() => openProduct(item)}
+                accessibilityLabel={`${item.name} by ${item.brand}${item.commerce.currentPriceCents != null ? `, ${formatCents(item.commerce.currentPriceCents)}` : ''}`}
+                style={[showcase.card, { borderColor: isUrgent ? `${theme.accent}55` : theme.border }]}
               >
                 <View style={showcase.topline}>
                   <View style={{ flex: 1 }}>
-                    <Text style={showcase.brand} numberOfLines={1}>{item.brand}</Text>
-                    <Text style={showcase.name} numberOfLines={1}>{item.name}</Text>
+                    <Text style={[TYPE_SCALE.caption, { color: MUTED }]} numberOfLines={1}>{item.brand}</Text>
+                    <Text style={[TYPE_SCALE.headline, { marginTop: 2, fontFamily: FONT.bold, color: FG, letterSpacing: -0.2 }]} numberOfLines={1}>{item.name}</Text>
                   </View>
-                  <TouchableOpacity
-                    style={showcase.save}
-                    onPress={() => {
-                      const nextSaved = !saved;
+                  <HeartToggle
+                    liked={saved}
+                    onChange={(nextSaved) => {
                       setSavedIds(current => ({ ...current, [item.id]: nextSaved }));
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                       const targetId = item.productId ?? item.id;
                       const action = nextSaved
                         ? saveItem({ type: 'product', targetId, title: item.name, subtitle: item.brand, accentColor: item.colorHex, priceCents: item.commerce.currentPriceCents ?? undefined })
@@ -351,7 +341,7 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
                       });
                     }}
                     onLongPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      hapticMedium();
                       setSavedIds(current => ({ ...current, [item.id]: true }));
                       setSaveToSheetItem({
                         type: 'product',
@@ -362,11 +352,8 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
                         priceCents: item.commerce.currentPriceCents ?? undefined,
                       });
                     }}
-                    accessibilityRole="button"
                     accessibilityLabel={saved ? 'Remove from saved' : 'Save product'}
-                  >
-                    <Feather name="bookmark" size={18} color={saved ? FG : MUTED} />
-                  </TouchableOpacity>
+                  />
                 </View>
 
                 <View style={showcase.visual}>
@@ -379,12 +366,12 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
                   )}
                   {item.tag && (
                     <View style={showcase.tag}>
-                      <Text style={showcase.tagText}>{item.tag}</Text>
+                      <Text style={[TYPE_SCALE.caption, { color: ON_DARK, letterSpacing: 0.7, textTransform: 'uppercase' }]}>{item.tag}</Text>
                     </View>
                   )}
                   {item.commerce.currentPriceCents != null && (
                     <View style={showcase.pricePill}>
-                      <Text style={showcase.priceText}>{formatCents(item.commerce.currentPriceCents)}</Text>
+                      <Text style={[TYPE_SCALE.footnote, TABULAR_NUMS, { fontFamily: FONT.bold, color: BG }]}>{formatCents(item.commerce.currentPriceCents)}</Text>
                     </View>
                   )}
                 </View>
@@ -407,7 +394,7 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
                     accentColor={theme.accent}
                   />
                 )}
-              </TouchableOpacity>
+              </Card>
             </Animated.View>
           );
         }}
@@ -433,18 +420,13 @@ function ProductShowcase({ items }: { items: ProductCardItem[] }) {
 
 const showcase = StyleSheet.create({
   shell:          { marginBottom: 32 },
-  card:           { overflow: 'hidden', borderRadius: RADIUS.md, borderWidth: 1, backgroundColor: CARD, padding: 14 },
+  card:           { overflow: 'hidden' },
   topline:        { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  brand:          { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
-  name:           { marginTop: 2, fontSize: 16, fontFamily: FONT.bold, color: FG, letterSpacing: -0.2 },
-  save:           { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER },
-  visual:         { height: 330, marginTop: 8, position: 'relative', overflow: 'hidden', borderRadius: RADIUS.sm, backgroundColor: SURFACE },
+  visual:         { height: 330, marginTop: 8, position: 'relative', overflow: 'hidden', borderRadius: RADII.card, backgroundColor: SURFACE },
   visualFallback: { alignItems: 'center', justifyContent: 'center' },
   initials:       { fontSize: 56, fontFamily: FONT.bold, color: ON_DARK },
-  tag:            { position: 'absolute', top: 12, left: 12, paddingHorizontal: 9, paddingVertical: 5, borderRadius: RADIUS.xs, backgroundColor: 'rgba(0,0,0,0.72)' },
-  tagText:        { fontSize: FS.xs, fontFamily: FONT.bold, color: ON_DARK, letterSpacing: 0.7, textTransform: 'uppercase' },
-  pricePill:      { position: 'absolute', bottom: 12, alignSelf: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: FG, borderWidth: 3, borderColor: CARD },
-  priceText:      { fontSize: FS.sm, fontFamily: FONT.bold, color: BG },
+  tag:            { position: 'absolute', top: 12, left: 12, paddingHorizontal: 9, paddingVertical: 5, borderRadius: RADII.chip, backgroundColor: 'rgba(0,0,0,0.72)' },
+  pricePill:      { position: 'absolute', bottom: 12, alignSelf: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: RADII.pill, backgroundColor: FG, borderWidth: 3, borderColor: CARD },
   signalRow:      { minHeight: 34, paddingTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   pagination:     { height: 22, marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   dot:            { width: 5, height: 5, borderRadius: 3, backgroundColor: SUBTLE },
@@ -475,28 +457,26 @@ const DropRow = React.memo(function DropRow({ item }: { item: DropRowItem }) {
     (item.commerce.remainingUnits ?? 0) <= URGENCY_UNITS_THRESHOLD;
 
   function handlePress() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    hapticMedium();
     router.push((`/buyer-drop-detail?dropId=${encodeURIComponent(item.dropId)}&dropName=${encodeURIComponent(item.name)}`) as never);
   }
 
   return (
-    <TouchableOpacity
-      style={[dr.row, { borderColor: item.isLive ? `${theme.accent}55` : BORDER }]}
-      activeOpacity={0.8}
+    <Card
       onPress={handlePress}
-      accessibilityRole="button"
       accessibilityLabel={`${item.name} by ${item.brand}${item.isLive ? ', live now' : ''}`}
+      style={[dr.row, { borderColor: item.isLive ? `${theme.accent}55` : theme.border }]}
     >
       {item.imageUri ? (
         <CachedImage source={{ uri: item.imageUri }} style={dr.avatar} contentFit="cover" />
       ) : (
         <View style={[dr.avatar, { backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' }]}>
-          <Text style={[dr.initials, { color: theme.text }]}>{item.initials}</Text>
+          <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.bold, color: theme.text }]}>{item.initials}</Text>
         </View>
       )}
       <View style={{ flex: 1 }}>
-        <Text style={dr.name} numberOfLines={1}>{item.name}</Text>
-        <Text style={dr.brand} numberOfLines={1}>{item.brand}</Text>
+        <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: FG }]} numberOfLines={1}>{item.name}</Text>
+        <Text style={[TYPE_SCALE.caption, { color: MUTED, marginTop: 2 }]} numberOfLines={1}>{item.brand}</Text>
         <ClaimedRemainingLabel
           claimedUnits={item.commerce.claimedUnits ?? 0}
           remainingUnits={item.commerce.remainingUnits ?? 0}
@@ -507,12 +487,12 @@ const DropRow = React.memo(function DropRow({ item }: { item: DropRowItem }) {
       </View>
       <View style={{ alignItems: 'flex-end', gap: 5 }}>
         {item.commerce.currentPriceCents != null && (
-          <Text style={dr.price}>{formatCents(item.commerce.currentPriceCents)}</Text>
+          <Text style={[TYPE_SCALE.footnote, TABULAR_NUMS, { fontFamily: FONT.bold, color: FG }]}>{formatCents(item.commerce.currentPriceCents)}</Text>
         )}
         {item.isLive ? (
           <View style={dr.liveRow}>
             <LivePulseDot color={theme.accent} />
-            <Text style={[dr.liveText, { color: theme.accent }]}>Live now</Text>
+            <Text style={[TYPE_SCALE.caption, { fontFamily: FONT.semibold, color: theme.accent }]}>Live now</Text>
           </View>
         ) : item.releaseAt ? (
           <UpcomingCountdown releaseAt={item.releaseAt} />
@@ -521,18 +501,13 @@ const DropRow = React.memo(function DropRow({ item }: { item: DropRowItem }) {
           <TimeRemainingLabel endsAt={item.endsAt} accent={theme.accent} />
         )}
       </View>
-    </TouchableOpacity>
+    </Card>
   );});
 
 const dr = StyleSheet.create({
-  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.xs, borderWidth: 1, backgroundColor: CARD },
-  avatar:   { width: 44, height: 44, borderRadius: RADIUS.xs, overflow: 'hidden' },
-  initials: { fontSize: 13, fontFamily: FONT.bold, color: ON_DARK },
-  name:     { fontSize: 13, fontFamily: FONT.semibold, color: FG },
-  brand:    { fontSize: 11, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
-  price:    { fontSize: 13, fontFamily: FONT.bold, color: FG },
+  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13 },
+  avatar:   { width: 44, height: 44, borderRadius: RADII.chip, overflow: 'hidden' },
   liveRow:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  liveText: { fontSize: 11, fontFamily: FONT.semibold },
 });
 
 // ─── Trending post row ────────────────────────────────────────────────────────
@@ -555,7 +530,7 @@ const TrendingRow = React.memo(function TrendingRow({ item }: { item: TrendingRo
   const { theme } = useAppTheme();
 
   function handlePress() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticLight();
     if (item.brandId) {
       // Trending posts navigate to seller profile via brandId — they have no productId
       router.push((`/seller-profile?id=${encodeURIComponent(item.brandId)}`) as never);
@@ -563,32 +538,26 @@ const TrendingRow = React.memo(function TrendingRow({ item }: { item: TrendingRo
   }
 
   return (
-    <TouchableOpacity
-      style={[tr.row, { borderColor: BORDER }]}
-      activeOpacity={0.8}
+    <Card
       onPress={handlePress}
-      accessibilityRole="button"
       accessibilityLabel={`#${item.rank}, ${item.name} by ${item.brand}`}
+      style={tr.row}
     >
-      <Text style={[tr.rank, { color: theme.accent }]}>#{item.rank}</Text>
+      <Text style={[TYPE_SCALE.callout, TABULAR_NUMS, { fontFamily: FONT.bold, color: theme.accent, width: 28 }]}>#{item.rank}</Text>
       <View style={[tr.avatar, { backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center' }]}>
-        <Text style={[tr.initials, { color: theme.text }]}>{item.initials}</Text>
+        <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.bold, color: theme.text }]}>{item.initials}</Text>
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={tr.name} numberOfLines={1}>{item.name}</Text>
-        <Text style={tr.brand} numberOfLines={1}>{item.brand}</Text>
+        <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: FG }]} numberOfLines={1}>{item.name}</Text>
+        <Text style={[TYPE_SCALE.caption, { color: MUTED, marginTop: 2 }]} numberOfLines={1}>{item.brand}</Text>
         {/* No commerce signals — trending posts have no product demand data */}
       </View>
-    </TouchableOpacity>
+    </Card>
   );});
 
 const tr = StyleSheet.create({
-  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.xs, borderWidth: 1, backgroundColor: CARD },
-  rank:     { fontSize: 14, fontFamily: FONT.bold, width: 28 },
-  avatar:   { width: 44, height: 44, borderRadius: RADIUS.xs, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  initials: { fontSize: 13, fontFamily: FONT.bold, color: ON_DARK },
-  name:     { fontSize: 13, fontFamily: FONT.semibold, color: FG },
-  brand:    { fontSize: 11, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13 },
+  avatar:   { width: 44, height: 44, borderRadius: RADII.chip, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -795,7 +764,7 @@ export default function DiscoverScreen() {
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    hapticLight();
     Promise.all([fetchHighDemand(), fetchProducts(), fetchDrops(), fetchTrending()])
       .finally(() => setRefreshing(false));
   }, [fetchHighDemand, fetchProducts, fetchDrops, fetchTrending]);
@@ -806,41 +775,28 @@ export default function DiscoverScreen() {
       contentContainerStyle={{ paddingBottom: barInset + SP.md }}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
-          tintColor={theme.accent}
-          colors={[theme.accent]}
-        />
+        <ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
       }
     >
       {/* ─ Header ─ */}
       <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
         <View style={[s.header, { paddingTop: topPad + 16 }]}>
           <View>
-            <Text style={[s.greeting, { color: palette.muted ?? MUTED }]}>What's dropping</Text>
-            <Text style={[s.pageTitle, { color: palette.text ?? FG }]}>Discover</Text>
+            <Text style={[TYPE_SCALE.caption, { color: palette.muted ?? MUTED, letterSpacing: 0.3 }]}>What's dropping</Text>
+            <Text style={[TYPE_SCALE.title1, { color: palette.text ?? FG, letterSpacing: -0.6 }]}>Discover</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TouchableOpacity
-              style={[s.headerBtn, { backgroundColor: palette.card ?? CARD, borderColor: palette.border ?? BORDER }]}
-              activeOpacity={0.75}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/search' as never); }}
-              accessibilityRole="button"
+            <IconButton
+              name="search"
+              onPress={() => router.push('/(buyer)/search' as never)}
               accessibilityLabel="Search products and brands"
-            >
-              <Feather name="search" size={18} color={MUTED} />
-            </TouchableOpacity>
+            />
             {isSignedIn && (
-              <TouchableOpacity
-                style={[s.headerBtn, { backgroundColor: palette.card ?? CARD, borderColor: palette.border ?? BORDER }]}
-                activeOpacity={0.75}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/inbox' as never); }}
-                accessibilityRole="button"
+              <IconButton
+                name="bell"
+                onPress={() => router.push('/(buyer)/inbox' as never)}
                 accessibilityLabel="Notifications"
-              >
-                <Feather name="bell" size={18} color={MUTED} />
-              </TouchableOpacity>
+              />
             )}
           </View>
         </View>
@@ -878,25 +834,20 @@ export default function DiscoverScreen() {
 
       {/* ─ Entry point into the full-screen, swipeable Discover pager ─ */}
       <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.md }}>
-        <TouchableOpacity
-          style={[fy.banner, { backgroundColor: theme.card, borderColor: theme.border }]}
-          activeOpacity={0.85}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            push('/(buyer)/discover-feed' as never);
-          }}
-          accessibilityRole="button"
+        <Card
+          onPress={() => push('/(buyer)/discover-feed' as never)}
           accessibilityLabel="Open full-screen For You feed"
+          style={fy.banner}
         >
           <View style={[fy.bannerIcon, { backgroundColor: theme.accentDim }]}>
             <Feather name="zap" size={18} color={theme.accent} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[fy.bannerTitle, { color: FG }]}>For You, full screen</Text>
-            <Text style={[fy.bannerSub, { color: MUTED }]}>Swipe through products one at a time</Text>
+            <Text style={[TYPE_SCALE.footnote, { fontFamily: FONT.semibold, color: FG }]}>For You, full screen</Text>
+            <Text style={[TYPE_SCALE.caption, { color: MUTED, marginTop: 2 }]}>Swipe through products one at a time</Text>
           </View>
           <Feather name="chevron-right" size={18} color={MUTED} />
-        </TouchableOpacity>
+        </Card>
       </ResponsiveContainer>
       {forYouLoading ? (
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
@@ -966,15 +917,10 @@ export default function DiscoverScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  header:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 },
-  greeting:  { fontSize: 12, fontFamily: FONT.medium, letterSpacing: 0.3 },
-  pageTitle: { fontSize: 28, fontFamily: FONT.bold, letterSpacing: -0.6 },
-  headerBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 },
 });
 
 const fy = StyleSheet.create({
-  banner:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: RADIUS.md, borderWidth: 1 },
-  bannerIcon:  { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  bannerTitle: { fontSize: 14, fontFamily: FONT.semibold },
-  bannerSub:   { fontSize: 12, fontFamily: FONT.regular, marginTop: 2 },
+  banner:     { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13 },
+  bannerIcon: { width: 40, height: 40, borderRadius: RADII.pill, alignItems: 'center', justifyContent: 'center' },
 });
