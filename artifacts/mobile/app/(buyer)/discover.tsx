@@ -49,7 +49,8 @@ import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useAuth } from '@clerk/expo';
 import { formatCents } from '@/lib/money';
 import { CachedImage } from '@/components/CachedImage';
-import { CardSkeleton, EmptyState, ListSkeleton, ResponsiveContainer } from '@/components/layout';
+import { CardSkeleton, ListSkeleton, ResponsiveContainer } from '@/components/layout';
+import { EmptyState } from '@/components/BrandthreadUI';
 import { saveItem, removeSavedItem, getSavedItems } from '@/services/socialService';
 import { SaveToCollectionSheet, SaveToCollectionItem } from '@/components/SaveToCollectionSheet';
 import {
@@ -857,7 +858,7 @@ export default function DiscoverScreen() {
         ) : highDemandError ? (
           <SectionError message={highDemandError} onRetry={fetchHighDemand} />
         ) : highDemandItems.length === 0 ? (
-          <EmptyState icon="trending-up" message="No high-demand products right now" />
+          <EmptyState icon="trending-up" title="No high-demand products" description="Nothing is trending in demand right now." compact />
         ) : (
           <View style={{ gap: 10 }}>
             {highDemandItems.slice(0, 6).map(item => (
@@ -907,7 +908,7 @@ export default function DiscoverScreen() {
         </ResponsiveContainer>
       ) : forYouItems.length === 0 ? (
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
-          <EmptyState icon="package" message="No products available right now" />
+          <EmptyState icon="package" title="No products available" description="Check back soon for new arrivals." compact />
         </ResponsiveContainer>
       ) : (
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
@@ -931,7 +932,7 @@ export default function DiscoverScreen() {
           ) : dropsError ? (
             <SectionError message={dropsError} onRetry={fetchDrops} />
           ) : dropsItems.length === 0 ? (
-            <EmptyState icon="calendar" message="No upcoming drops right now" />
+            <EmptyState icon="calendar" title="No upcoming drops" description="New drops will show up here as they're announced." compact />
           ) : (
             dropsItems.map(item => <DropRow key={item.id} item={item} />)
           )}
@@ -952,7 +953,7 @@ export default function DiscoverScreen() {
           ) : trendingError ? (
             <SectionError message={trendingError} onRetry={fetchTrending} />
           ) : trendingItems.length === 0 ? (
-            <EmptyState icon="activity" message="No trending posts right now" />
+            <EmptyState icon="activity" title="No trending posts" description="Trending posts will appear here as activity picks up." compact />
           ) : (
             trendingItems.slice(0, 10).map(item => <TrendingRow key={item.id} item={item} />)
           )}
