@@ -1,69 +1,81 @@
 /**
- * Connections Screen — lists followers or following for a seller profile.
+ * Connections Screen — lists followers or following for any buyer or seller
+ * profile.
  * Params:
  *   type   — 'followers' | 'following'
- *   userId — optional, defaults to the current seller
+ *   userId — optional, defaults to the current user
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity,
-  ActivityIndicator, Image,
-} from 'react-native';
+import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import {
-  BG, CARD, BORDER, FG, MUTED, PURPLE, FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
-import { useColors } from '@/hooks/useColors';
 import { useUser } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { Header } from '@/components/layout';
+import { ListSkeleton } from '@/components/layout/Skeleton';
+import { EmptyState } from '@/components/layout/EmptyState';
+import { Avatar } from '@/components/ui/Avatar';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+import { FONT, FS, SP } from '@/lib/theme';
 
 interface ConnectionUser {
   id: string;
   name: string;
   username?: string;
   avatarUrl?: string;
+  accountType?: string;
   isFollowing?: boolean;
 }
 
 export default function ConnectionsScreen() {
-  const colors = useColors();
-  const router   = useRouter();
-  const insets   = useSafeAreaInsets();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { theme } = useAppTheme();
   const { user, isLoaded: clerkLoaded } = useUser();
   const api = useApi();
   const { type = 'followers', userId } = useLocalSearchParams<{ type?: string; userId?: string }>();
 
   const isFollowers = type === 'followers';
-  const title       = isFollowers ? 'Followers' : 'Following';
+  const title = isFollowers ? 'Followers' : 'Following';
 
-  const [users, setUsers]     = useState<ConnectionUser[]>([]);
+  const [users, setUsers] = useState<ConnectionUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   const load = useCallback(() => {
     if (!clerkLoaded || !user?.id) return;
     let active = true;
     setLoading(true);
+    setError(false);
     const request = isFollowers ? api.social.followers(userId) : api.social.following(userId);
     request
-      .then(data => {
+      .then((data) => {
         if (!active) return;
-        const list: ConnectionUser[] = (Array.isArray(data) ? data : []).map((item) => ({
+        const list: ConnectionUser[] = (Array.isArray(data) ? data : []).map((item: any) => ({
           id: item.userId,
           name: item.name,
           username: item.username ?? undefined,
-          isFollowing: 'isFollowingBack' in item && typeof item.isFollowingBack === 'boolean'
-            ? item.isFollowingBack
-            : undefined,
+          avatarUrl: item.avatarUrl ?? undefined,
+          accountType: item.accountType ?? undefined,
+          isFollowing:
+            'isFollowingBack' in item && typeof item.isFollowingBack === 'boolean'
+              ? item.isFollowingBack
+              : undefined,
         }));
         setUsers(list);
       })
-      .catch(() => { if (active) setUsers([]); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+      .catch(() => {
+        if (active) setError(true);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [api, clerkLoaded, user?.id, isFollowers, userId]);
 
   useEffect(() => {
@@ -72,67 +84,71 @@ export default function ConnectionsScreen() {
     return cleanup;
   }, [load]);
 
-  function renderItem({ item }: { item: ConnectionUser }) {
-    const initials = (item.name ?? item.username ?? '?')
-      .split(' ')
-      .map((w: string) => w[0])
-      .join('')
-      .slice(0, 2)
-      .toUpperCase();
+  function openProfile(item: ConnectionUser) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (item.accountType === 'seller') {
+      router.push(`/seller-profile?sellerId=${item.id}` as never);
+    } else {
+      router.push(`/buyer-other-profile?userId=${item.id}` as never);
+    }
+  }
 
+  function renderItem({ item }: { item: ConnectionUser }) {
     return (
-      <TouchableOpacity
-        style={s.row}
-        activeOpacity={0.8}
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          router.push(`/seller-profile?sellerId=${item.id}` as never);
-        }}
-      >
-        {item.avatarUrl ? (
-          <Image source={{ uri: item.avatarUrl }} style={s.avatar} />
-        ) : (
-          <View style={s.avatarFallback}>
-            <Text style={s.avatarInitials}>{initials}</Text>
-          </View>
-        )}
+      <PressableScale style={s.row} onPress={() => openProfile(item)}>
+        <Avatar uri={item.avatarUrl} name={item.name ?? item.username} size={48} />
         <View style={{ flex: 1, marginLeft: SP.sm }}>
-          <Text style={s.name} numberOfLines={1}>{item.name ?? item.username ?? 'Unknown'}</Text>
-          {item.username && <Text style={s.username} numberOfLines={1}>@{item.username}</Text>}
+          <Text style={[s.name, { color: theme.text }]} numberOfLines={1}>
+            {item.name ?? item.username ?? 'Unknown'}
+          </Text>
+          {item.username && (
+            <Text style={[s.username, { color: theme.muted }]} numberOfLines={1}>
+              @{item.username}
+            </Text>
+          )}
         </View>
-        <Feather name="chevron-right" size={16} color={MUTED} />
-      </TouchableOpacity>
+        <Feather name="chevron-right" size={16} color={theme.muted} />
+      </PressableScale>
     );
   }
 
   return (
-    <View style={s.root}>
+    <View style={[s.root, { backgroundColor: theme.background }]}>
       <Header title={title} />
 
       {loading && (
-        <View style={s.center}>
-          <ActivityIndicator color={colors.primary} />
+        <View style={{ padding: SP.md }}>
+          <ListSkeleton rows={8} />
         </View>
       )}
 
-      {!loading && users.length === 0 && (
-        <View style={s.center}>
-          <Feather name="users" size={40} color={MUTED} />
-          <Text style={s.emptyTitle}>No {title.toLowerCase()} yet</Text>
-          <Text style={s.emptyBody}>
-            {isFollowers
-              ? 'When buyers follow this account, they will appear here.'
-              : 'Accounts that this profile follows will appear here.'}
-          </Text>
-        </View>
+      {!loading && error && (
+        <EmptyState
+          icon="wifi-off"
+          variant="error"
+          message="Couldn't load this list. Check your connection and try again."
+          actionLabel="Retry"
+          onAction={load}
+        />
       )}
 
-      {!loading && users.length > 0 && (
+      {!loading && !error && users.length === 0 && (
+        <EmptyState
+          icon="users"
+          message={
+            isFollowers
+              ? 'No followers yet. When people follow this account, they will appear here.'
+              : 'Not following anyone yet. Accounts this profile follows will appear here.'
+          }
+        />
+      )}
+
+      {!loading && !error && users.length > 0 && (
         <FlatList
           data={users}
-          keyExtractor={item => item.id}
+          keyExtractor={(item) => item.id}
           renderItem={renderItem}
-          ItemSeparatorComponent={() => <View style={s.separator} />}
+          ItemSeparatorComponent={() => <View style={[s.separator, { backgroundColor: theme.border }]} />}
           contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
         />
       )}
@@ -141,21 +157,9 @@ export default function ConnectionsScreen() {
 }
 
 const s = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: 'transparent' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.lg },
-
-  row:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  avatar:       { width: 44, height: 44, borderRadius: 22 },
-  avatarFallback:{ width: 44, height: 44, borderRadius: 22, backgroundColor: PURPLE + '22', borderWidth: 1, borderColor: PURPLE + '44', alignItems: 'center', justifyContent: 'center' },
-  avatarInitials:{ fontSize: FS.sm, fontFamily: FONT.bold, color: PURPLE },
-  name:         { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  username:     { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
-  separator:    { height: 1, backgroundColor: BORDER, marginLeft: 72 },
-
-  errorText:   { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', marginTop: SP.sm },
-  retryBtn:    { marginTop: SP.md, backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, paddingHorizontal: SP.md, paddingVertical: SP.xs },
-  retryBtnText:{ fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
-
-  emptyTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, marginTop: SP.md },
-  emptyBody:  { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', marginTop: SP.xs, lineHeight: 20 },
+  root: { flex: 1 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, minHeight: 44 },
+  name: { fontSize: FS.sm, fontFamily: FONT.semibold },
+  username: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
+  separator: { height: 1, marginLeft: 72 },
 });
