@@ -14,7 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import {
-  FONT, FS, SP, RADIUS, ICON,
+  FONT, FS, SP, RADIUS, ICON, OVERLAY,
 } from '@/lib/theme';
 import {
   BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
@@ -297,7 +297,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   resultPlaceholderLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
   resultActions:          { gap: SP.sm, marginHorizontal: SP.md, marginTop: SP.md },
   actionBtn:              { width: '100%' },
-  overlay:                { ...StyleSheet.absoluteFill, backgroundColor: '#00000099', alignItems: 'center', justifyContent: 'center', zIndex: 99 },
+  overlay:                { ...StyleSheet.absoluteFill, backgroundColor: OVERLAY, alignItems: 'center', justifyContent: 'center', zIndex: 99 },
   overlayCard:            { width: 280, padding: 0, overflow: 'hidden' },
   overlayGrad:            { alignItems: 'center', gap: SP.md, padding: SP.xl, borderRadius: RADIUS.lg },
   overlayTitle:           { fontSize: FS.lg, fontFamily: FONT.bold, color: theme.text },

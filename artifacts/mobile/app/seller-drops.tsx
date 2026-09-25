@@ -13,7 +13,20 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/layout';
 import { SectionError } from '@/components/InlineFeedback';
+import { StatusBadge } from '@/components/BrandthreadUI';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
+
+type DropStatusVariant = 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple';
+
+function statusVariant(status: string): DropStatusVariant {
+  switch (status) {
+    case 'active': return 'success';
+    case 'draft': return 'neutral';
+    case 'closed':
+    case 'fulfilled': return 'info';
+    default: return 'neutral';
+  }
+}
 
 interface SellerDropRow {
   id: string;
@@ -21,16 +34,6 @@ interface SellerDropRow {
   status: string;
   releaseAt?: string | null;
   orderCount?: number;
-}
-
-function statusColor(status: string, theme: any): string {
-  switch (status) {
-    case 'active': return theme.accent;
-    case 'draft': return theme.muted;
-    case 'closed':
-    case 'fulfilled': return theme.secondary;
-    default: return theme.muted;
-  }
 }
 
 export default function SellerDrops() {
@@ -116,11 +119,7 @@ export default function SellerDrops() {
                   {row.releaseAt ? new Date(row.releaseAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'No launch date set'}
                 </Text>
               </View>
-              <View style={[styles.statusPill, { borderColor: statusColor(row.status, theme) }]}>
-                <Text style={{ color: statusColor(row.status, theme), fontFamily: FONT.bold, fontSize: 10, letterSpacing: 0.6 }}>
-                  {row.status.toUpperCase()}
-                </Text>
-              </View>
+              <StatusBadge label={row.status.toUpperCase()} variant={statusVariant(row.status)} small />
               <Feather name="chevron-right" size={18} color={theme.muted} />
             </TouchableOpacity>
           ))
@@ -134,6 +133,5 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   newBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: RADIUS.sm, padding: 13 },
-  statusPill: { borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 4 },
   emptyCta: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 12, borderRadius: RADIUS.md },
 });

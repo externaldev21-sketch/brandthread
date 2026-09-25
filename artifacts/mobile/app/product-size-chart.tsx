@@ -6,7 +6,7 @@
  *
  * Route: /product-size-chart?productId=<uuid>
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   TextInput, Alert, ActivityIndicator,
@@ -16,14 +16,9 @@ import { useAuth } from '@clerk/expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import {
-  BG, CARD, BORDER,
-  FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  RED, RED_DIM,
-  FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
-import { useColors } from '@/hooks/useColors';
+import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+import type { AppThemePreset } from '@/contexts/AppThemeContext';
 import { BrandthreadHeader, PrimaryButton } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 
@@ -43,7 +38,9 @@ const DEFAULT_SIZES   = ['XS', 'S', 'M', 'L', 'XL'];
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function ProductSizeChartScreen() {
-  const colors = useColors();
+  const { theme } = useAppTheme();
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  const t = useMemo(() => makeTableStyles(theme), [theme]);
   const { productId, productName } = useLocalSearchParams<{ productId: string; productName?: string }>();
   const router = useRouter();
   const { userId } = useAuth();
@@ -51,7 +48,6 @@ export default function ProductSizeChartScreen() {
   const api    = useApi();
 
   const [loading, setLoading]     = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving,  setSaving]      = useState(false);
 
   const [columns, setColumns]   = useState<string[]>(DEFAULT_COLUMNS);
@@ -67,7 +63,6 @@ export default function ProductSizeChartScreen() {
   function loadProduct() {
     if (!productId || !userId) { setLoading(false); return; }
     setLoading(true);
-    setLoadError(null);
     const req = (api as any).products?.get?.(productId);
     if (!req) { setLoading(false); return; }
     req
@@ -83,13 +78,11 @@ export default function ProductSizeChartScreen() {
           setColumns(DEFAULT_COLUMNS);
           setRows(DEFAULT_SIZES.map(size => ({ size, values: new Array(DEFAULT_COLUMNS.length).fill('') })));
         }
-        setLoadError(null);
       })
       .catch(() => {
         // A failed read leaves the editor in its blank, editable state.
         setColumns(DEFAULT_COLUMNS);
         setRows(DEFAULT_SIZES.map(size => ({ size, values: new Array(DEFAULT_COLUMNS.length).fill('') })));
-        setLoadError(null);
       })
       .finally(() => setLoading(false));
   }
@@ -185,7 +178,7 @@ export default function ProductSizeChartScreen() {
   if (loading) {
     return (
       <View style={[s.root, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator color={colors.accentForeground} />
+        <ActivityIndicator color={theme.accentLight} />
       </View>
     );
   }
@@ -214,7 +207,7 @@ export default function ProductSizeChartScreen() {
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setUnit(u); }}
                 activeOpacity={0.7}
               >
-                <Text style={[s.unitBtnText, unit === u && { color: PURPLE_LIGHT }]}>{u}</Text>
+                <Text style={[s.unitBtnText, unit === u && { color: theme.accentLight }]}>{u}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -227,7 +220,7 @@ export default function ProductSizeChartScreen() {
             <View key={idx} style={s.chip}>
               <Text style={s.chipText}>{col}</Text>
               <TouchableOpacity onPress={() => removeColumn(idx)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                <Feather name="x" size={12} color={MUTED} />
+                <Feather name="x" size={12} color={theme.muted} />
               </TouchableOpacity>
             </View>
           ))}
@@ -238,11 +231,11 @@ export default function ProductSizeChartScreen() {
             value={newColName}
             onChangeText={setNewColName}
             placeholder="e.g. Shoulder"
-            placeholderTextColor={SUBTLE}
+            placeholderTextColor={theme.subtle}
             onSubmitEditing={addColumn}
           />
           <TouchableOpacity style={s.addBtn} onPress={addColumn} activeOpacity={0.8}>
-            <Feather name="plus" size={ICON.sm} color={PURPLE_LIGHT} />
+            <Feather name="plus" size={ICON.sm} color={theme.accentLight} />
           </TouchableOpacity>
         </View>
 
@@ -272,7 +265,7 @@ export default function ProductSizeChartScreen() {
                       value={row.size}
                       onChangeText={v => updateSizeLabel(ri, v)}
                       placeholder="M"
-                      placeholderTextColor={SUBTLE}
+                      placeholderTextColor={theme.subtle}
                     />
                   </View>
                   {columns.map((_, ci) => (
@@ -282,14 +275,14 @@ export default function ProductSizeChartScreen() {
                         value={row.values[ci] ?? ''}
                         onChangeText={v => updateCell(ri, ci, v)}
                         placeholder="—"
-                        placeholderTextColor={SUBTLE}
+                        placeholderTextColor={theme.subtle}
                         keyboardType="decimal-pad"
                       />
                     </View>
                   ))}
                   <View style={[t.cell, t.actionCell]}>
                     <TouchableOpacity onPress={() => removeRow(ri)}>
-                      <Feather name="trash-2" size={14} color={RED} />
+                      <Feather name="trash-2" size={14} color={theme.error} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -305,11 +298,11 @@ export default function ProductSizeChartScreen() {
             value={newSizeName}
             onChangeText={setNewSizeName}
             placeholder="Add size (e.g. XXL)"
-            placeholderTextColor={SUBTLE}
+            placeholderTextColor={theme.subtle}
             onSubmitEditing={addRow}
           />
           <TouchableOpacity style={s.addBtn} onPress={addRow} activeOpacity={0.8}>
-            <Feather name="plus" size={ICON.sm} color={PURPLE_LIGHT} />
+            <Feather name="plus" size={ICON.sm} color={theme.accentLight} />
           </TouchableOpacity>
         </View>
 
@@ -320,7 +313,7 @@ export default function ProductSizeChartScreen() {
           value={notes}
           onChangeText={setNotes}
           placeholder={'e.g. Measurements are of the garment laid flat. Add 2" for ease of fit.'}
-          placeholderTextColor={SUBTLE}
+          placeholderTextColor={theme.subtle}
           multiline
           numberOfLines={3}
         />
@@ -344,45 +337,38 @@ export default function ProductSizeChartScreen() {
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
+// Theme-aware factories (re-derived per render via useMemo) so every color
+// reacts to all 12 themes instead of a fixed static palette.
 
-const s = StyleSheet.create({
+const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   root:          { flex: 1, backgroundColor: 'transparent' },
   content:       { padding: SP.lg, gap: SP.md },
-  sectionTitle:  { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8 },
-  label:         { fontFamily: FONT.medium, fontSize: FS.sm, color: FG },
+  sectionTitle:  { fontFamily: FONT.semibold, fontSize: FS.xs, color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
+  label:         { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.text },
   unitRow:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  unitToggle:    { flexDirection: 'row', gap: 1, backgroundColor: BORDER, borderRadius: RADIUS.sm, overflow: 'hidden' },
-  unitBtn:       { paddingHorizontal: SP.md, paddingVertical: SP.xs, backgroundColor: CARD },
-  unitBtnActive: { backgroundColor: PURPLE_DIM },
-  unitBtnText:   { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
+  unitToggle:    { flexDirection: 'row', gap: 1, backgroundColor: theme.border, borderRadius: RADIUS.sm, overflow: 'hidden' },
+  unitBtn:       { paddingHorizontal: SP.md, paddingVertical: SP.xs, backgroundColor: theme.card },
+  unitBtnActive: { backgroundColor: theme.accentDim },
+  unitBtnText:   { fontFamily: FONT.medium, fontSize: FS.sm, color: theme.muted },
   chipRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
-  chip:          { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: CARD, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: SP.xs, borderWidth: 1, borderColor: BORDER },
-  chipText:      { fontFamily: FONT.medium, fontSize: FS.xs, color: FG },
+  chip:          { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: theme.card, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: SP.xs, borderWidth: 1, borderColor: theme.border },
+  chipText:      { fontFamily: FONT.medium, fontSize: FS.xs, color: theme.text },
   addRow:        { flexDirection: 'row', gap: SP.sm, alignItems: 'center' },
-  addInput:      { flex: 1, height: 40, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, paddingHorizontal: SP.sm, fontFamily: FONT.regular, fontSize: FS.sm, color: FG },
-  addBtn:        { width: 40, height: 40, borderRadius: RADIUS.sm, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
-  notesInput:    { borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, padding: SP.sm, fontFamily: FONT.regular, fontSize: FS.sm, color: FG, minHeight: 72, textAlignVertical: 'top' },
+  addInput:      { flex: 1, height: 40, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, paddingHorizontal: SP.sm, fontFamily: FONT.regular, fontSize: FS.sm, color: theme.text },
+  addBtn:        { width: 40, height: 40, borderRadius: RADIUS.sm, backgroundColor: theme.accentDim, alignItems: 'center', justifyContent: 'center' },
+  notesInput:    { borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card, padding: SP.sm, fontFamily: FONT.regular, fontSize: FS.sm, color: theme.text, minHeight: 72, textAlignVertical: 'top' },
   clearBtn:      { alignItems: 'center', paddingVertical: SP.md, marginTop: SP.sm },
-  clearBtnText:  { fontFamily: FONT.regular, fontSize: FS.sm, color: RED },
-
-  // Error state — shown when product request failed (no silent defaults)
-  errorWrap:    { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl },
-  errorTitle:   { fontSize: FS.md, fontFamily: FONT.bold, color: FG, marginBottom: SP.sm, textAlign: 'center' },
-  errorBody:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20, marginBottom: SP.lg },
-  retryBtn:     { flexDirection: 'row', alignItems: 'center', backgroundColor: PURPLE, borderRadius: RADIUS.md, paddingVertical: 12, paddingHorizontal: SP.lg, marginBottom: SP.md },
-  retryBtnText: { fontSize: FS.sm, fontFamily: FONT.bold, color: '#fff' },
-  backLink:     { paddingVertical: SP.sm },
-  backLinkText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
+  clearBtnText:  { fontFamily: FONT.regular, fontSize: FS.sm, color: theme.error },
 });
 
-const t = StyleSheet.create({
-  headerRow:  { flexDirection: 'row', backgroundColor: PURPLE_DIM, borderTopLeftRadius: RADIUS.sm, borderTopRightRadius: RADIUS.sm },
-  dataRow:    { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER },
+const makeTableStyles = (theme: AppThemePreset) => StyleSheet.create({
+  headerRow:  { flexDirection: 'row', backgroundColor: theme.accentDim, borderTopLeftRadius: RADIUS.sm, borderTopRightRadius: RADIUS.sm },
+  dataRow:    { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: theme.border },
   cell:       { width: 80, justifyContent: 'center', paddingHorizontal: SP.xs, paddingVertical: SP.xs },
-  sizeCell:   { width: 60, backgroundColor: CARD },
+  sizeCell:   { width: 60, backgroundColor: theme.card },
   actionCell: { width: 36, alignItems: 'center' },
   headerCell: { paddingVertical: SP.sm },
-  headerText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: PURPLE_LIGHT, textAlign: 'center' },
-  sizeInput:  { fontFamily: FONT.semibold, fontSize: FS.xs, color: FG, textAlign: 'center' },
-  cellInput:  { fontFamily: FONT.regular, fontSize: FS.xs, color: FG, textAlign: 'center' },
+  headerText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: theme.accentLight, textAlign: 'center' },
+  sizeInput:  { fontFamily: FONT.semibold, fontSize: FS.xs, color: theme.text, textAlign: 'center' },
+  cellInput:  { fontFamily: FONT.regular, fontSize: FS.xs, color: theme.text, textAlign: 'center' },
 });

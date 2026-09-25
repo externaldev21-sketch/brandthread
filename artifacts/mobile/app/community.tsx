@@ -2,9 +2,9 @@
  * Community — freelancer marketplace.
  * Browse real freelancer profiles, filter by service, hire from their profile.
  */
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  ScrollView, View, Text, TouchableOpacity, StyleSheet,
+  ScrollView, View, Text, StyleSheet,
   ActivityIndicator, Image, RefreshControl,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -13,16 +13,15 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { PressableScale } from '@/components/BrandthreadUI';
 import { useApi, type Freelancer } from '@/lib/api';
 import { FREELANCER_SERVICE_TYPES, serviceLabel, formatHourlyRate, ratingLabel } from '@/lib/freelancer';
 import { useColors } from '@/hooks/useColors';
-import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  GOLD, SUCCESS, ORANGE, FONT, FS, SP, RADIUS, ON_DARK,
-} from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 export default function CommunityScreen() {
   const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const api = useApi();
   const { isLoaded: authLoaded, userId } = useAuth();
   const router = useRouter();
@@ -81,13 +80,14 @@ export default function CommunityScreen() {
         title="Community"
         subtitle="Hire vetted creatives for your brand"
         rightElement={
-          <TouchableOpacity
+          <PressableScale
             onPress={() => router.push('/freelancer-jobs' as any)}
-            activeOpacity={0.7}
             style={styles.headerBtn}
+            accessibilityRole="button"
+            accessibilityLabel="View freelancer jobs"
           >
-            <Feather name="briefcase" size={18} color={FG} />
-          </TouchableOpacity>
+            <Feather name="briefcase" size={18} color={colors.foreground} />
+          </PressableScale>
         }
       />
 
@@ -102,9 +102,8 @@ export default function CommunityScreen() {
         {/* Own status / become-a-freelancer CTA */}
         <View style={{ paddingHorizontal: SP.md + 4 }}>
           {me ? (
-            <TouchableOpacity
+            <PressableScale
               style={styles.ownCard}
-              activeOpacity={0.85}
               onPress={() => openProfile(me.id)}
             >
               <View style={[styles.ownIcon, { backgroundColor: colors.accent }]}>
@@ -121,13 +120,12 @@ export default function CommunityScreen() {
                 </Text>
               </View>
               {me.isActive && !me.hasConnectedAccount && (
-                <View style={[styles.dot, { backgroundColor: ORANGE }]} />
+                <View style={[styles.dot, { backgroundColor: colors.warning }]} />
               )}
-              <Feather name="chevron-right" size={18} color={SUBTLE} />
-            </TouchableOpacity>
+              <Feather name="chevron-right" size={18} color={colors.subtle} />
+            </PressableScale>
           ) : (
-            <TouchableOpacity
-              activeOpacity={0.9}
+            <PressableScale
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 router.push('/freelancer-apply' as any);
@@ -140,7 +138,7 @@ export default function CommunityScreen() {
                 style={styles.ctaCard}
               >
                 <View style={styles.ctaIcon}>
-                  <Feather name="zap" size={20} color={ON_DARK} />
+                  <Feather name="zap" size={20} color={colors.primaryForeground} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.ctaTitle}>List Your Skills</Text>
@@ -148,9 +146,9 @@ export default function CommunityScreen() {
                     Offer your creative services to streetwear brand founders — get paid via Brandthread
                   </Text>
                 </View>
-                <Feather name="arrow-right" size={20} color={ON_DARK} />
+                <Feather name="arrow-right" size={20} color={colors.primaryForeground} />
               </LinearGradient>
-            </TouchableOpacity>
+            </PressableScale>
           )}
         </View>
 
@@ -161,25 +159,23 @@ export default function CommunityScreen() {
           style={{ marginTop: SP.md }}
           contentContainerStyle={{ paddingHorizontal: SP.md + 4, gap: SP.sm }}
         >
-          <TouchableOpacity
+          <PressableScale
             onPress={() => selectFilter(null)}
-            style={[styles.chip, filter === null && [styles.chipActive, { backgroundColor: colors.accent, borderColor: colors.primary }]]}
-            activeOpacity={0.8}
+            style={[styles.chip, filter === null && { backgroundColor: colors.accent, borderColor: colors.primary }]}
           >
-            <Text style={[styles.chipText, filter === null && [styles.chipTextActive, { color: colors.primary }]]}>All</Text>
-          </TouchableOpacity>
+            <Text style={[styles.chipText, filter === null && { color: colors.primary }]}>All</Text>
+          </PressableScale>
           {FREELANCER_SERVICE_TYPES.map((t) => (
-            <TouchableOpacity
+            <PressableScale
               key={t.value}
               onPress={() => selectFilter(filter === t.value ? null : t.value)}
-              style={[styles.chip, filter === t.value && [styles.chipActive, { backgroundColor: colors.accent, borderColor: colors.primary }]]}
-              activeOpacity={0.8}
+              style={[styles.chip, filter === t.value && { backgroundColor: colors.accent, borderColor: colors.primary }]}
             >
-              <Feather name={t.icon} size={12} color={filter === t.value ? colors.primary : MUTED} />
-              <Text style={[styles.chipText, filter === t.value && [styles.chipTextActive, { color: colors.primary }]]}>
+              <Feather name={t.icon} size={12} color={filter === t.value ? colors.primary : colors.mutedForeground} />
+              <Text style={[styles.chipText, filter === t.value && { color: colors.primary }]}>
                 {t.label}
               </Text>
-            </TouchableOpacity>
+            </PressableScale>
           ))}
         </ScrollView>
 
@@ -191,7 +187,7 @@ export default function CommunityScreen() {
             </View>
           ) : freelancers.length === 0 ? (
             <View style={styles.centerBox}>
-              <Feather name="users" size={26} color={SUBTLE} />
+              <Feather name="users" size={26} color={colors.subtle} />
               <Text style={styles.emptyTitle}>
                 {filter ? `No ${serviceLabel(filter).toLowerCase()} freelancers yet` : 'No freelancers yet'}
               </Text>
@@ -205,10 +201,9 @@ export default function CommunityScreen() {
             freelancers.map((f) => {
               const rating = ratingLabel(f.avgRatingTenths);
               return (
-                <TouchableOpacity
+                <PressableScale
                   key={f.id}
                   style={styles.card}
-                  activeOpacity={0.85}
                   onPress={() => openProfile(f.id)}
                 >
                   {f.avatarUrl ? (
@@ -222,14 +217,14 @@ export default function CommunityScreen() {
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Text style={styles.name} numberOfLines={1}>{f.name}</Text>
                       {f.payoutsReady && (
-                        <Feather name="check-circle" size={12} color={SUCCESS} />
+                        <Feather name="check-circle" size={12} color={colors.success} />
                       )}
                     </View>
                     <Text style={styles.skill}>{serviceLabel(f.serviceType)}</Text>
                     <View style={styles.metaRow}>
                       {rating ? (
                         <>
-                          <Feather name="star" size={11} color={GOLD} />
+                          <Feather name="star" size={11} color={colors.warning} />
                           <Text style={styles.metaText}>{rating}</Text>
                         </>
                       ) : (
@@ -250,7 +245,7 @@ export default function CommunityScreen() {
                       <Text style={[styles.hireBtnText, { color: colors.primary }]}>{me?.id === f.id ? 'View' : 'Hire'}</Text>
                     </View>
                   </View>
-                </TouchableOpacity>
+                </PressableScale>
               );
             })
           )}
@@ -260,20 +255,20 @@ export default function CommunityScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   headerBtn: {
     width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
   },
   ownCard: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4,
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
     borderRadius: RADIUS.md, padding: SP.md - 2,
   },
   ownIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  ownTitle: { color: FG, fontSize: FS.sm, fontFamily: FONT.semibold },
-  ownSub: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
+  ownTitle: { color: colors.foreground, fontSize: FS.sm, fontFamily: FONT.semibold },
+  ownSub: { color: colors.mutedForeground, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   ctaCard: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4,
@@ -281,40 +276,38 @@ const styles = StyleSheet.create({
   },
   ctaIcon: {
     width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: `${colors.primaryForeground}2E`,
   },
-  ctaTitle: { color: ON_DARK, fontSize: FS.base, fontFamily: FONT.bold },
-  ctaSub: { color: 'rgba(255,255,255,0.85)', fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
+  ctaTitle: { color: colors.primaryForeground, fontSize: FS.base, fontFamily: FONT.bold },
+  ctaSub: { color: `${colors.primaryForeground}D9`, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: SP.sm + 4, paddingVertical: 7,
-    borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    borderRadius: RADIUS.pill, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
   },
-  chipActive: {},
-  chipText: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium },
-  chipTextActive: {},
+  chipText: { color: colors.mutedForeground, fontSize: FS.xs, fontFamily: FONT.medium },
   centerBox: { alignItems: 'center', gap: SP.sm, paddingVertical: SP.xl + 8 },
-  emptyTitle: { color: FG, fontSize: FS.sm, fontFamily: FONT.semibold },
-  emptyText: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, textAlign: 'center' },
+  emptyTitle: { color: colors.foreground, fontSize: FS.sm, fontFamily: FONT.semibold },
+  emptyText: { color: colors.mutedForeground, fontSize: FS.xs, fontFamily: FONT.regular, textAlign: 'center' },
   card: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm + 4,
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
     borderRadius: RADIUS.md, padding: SP.md - 2, marginBottom: SP.sm + 2,
   },
   avatar: { width: 46, height: 46, borderRadius: 23 },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarInitial: { fontSize: FS.md, fontFamily: FONT.bold },
-  name: { color: FG, fontSize: FS.sm, fontFamily: FONT.semibold, maxWidth: 150 },
-  skill: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular },
+  name: { color: colors.foreground, fontSize: FS.sm, fontFamily: FONT.semibold, maxWidth: 150 },
+  skill: { color: colors.mutedForeground, fontSize: FS.xs, fontFamily: FONT.regular },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  metaText: { color: FG, fontSize: FS.xs, fontFamily: FONT.semibold },
-  metaMuted: { color: SUBTLE, fontSize: FS.xs, fontFamily: FONT.regular },
+  metaText: { color: colors.foreground, fontSize: FS.xs, fontFamily: FONT.semibold },
+  metaMuted: { color: colors.subtle, fontSize: FS.xs, fontFamily: FONT.regular },
   newBadge: {
     paddingHorizontal: 6, paddingVertical: 2,
     borderRadius: RADIUS.xs,
   },
   newBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, letterSpacing: 0.5 },
-  rate: { color: FG, fontSize: FS.sm, fontFamily: FONT.bold },
+  rate: { color: colors.foreground, fontSize: FS.sm, fontFamily: FONT.bold },
   hireBtn: {
     paddingHorizontal: SP.md, paddingVertical: 7,
     borderRadius: RADIUS.sm,

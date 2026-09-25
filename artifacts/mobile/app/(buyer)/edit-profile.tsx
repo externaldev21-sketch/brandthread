@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Platform, TextInput, Switch, Modal, Image, Alert, ActivityIndicator,
+  Platform, TextInput, Modal, Image, Alert, ActivityIndicator,
   KeyboardAvoidingView, Animated,
 } from 'react-native';
+import { HapticSwitch } from '@/components/BrandthreadUI';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
@@ -497,9 +498,9 @@ export default function BuyerEditProfileScreen() {
                 <Text style={[styles.rowLabel, { color: theme.text }]}>AI creator</Text>
                 <Text style={[styles.rowHint, { color: theme.muted }]}>Add this label if your content often uses AI.</Text>
               </View>
-              <Switch
+              <HapticSwitch
                 value={extra.aiCreator}
-                onValueChange={v => { Haptics.selectionAsync(); setExtra(prev => ({ ...prev, aiCreator: v })); }}
+                onValueChange={v => setExtra(prev => ({ ...prev, aiCreator: v }))}
                 trackColor={{ false: theme.border, true: theme.accent }}
                 thumbColor="#FFFFFF"
               />
@@ -512,9 +513,9 @@ export default function BuyerEditProfileScreen() {
           <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <View style={styles.row}>
               <Text style={[styles.rowLabel, { color: theme.text, flex: 1 }]}>Show badge</Text>
-              <Switch
+              <HapticSwitch
                 value={badge.enabled}
-                onValueChange={v => { Haptics.selectionAsync(); setBadge(b => ({ ...b, enabled: v })); }}
+                onValueChange={v => setBadge(b => ({ ...b, enabled: v }))}
                 trackColor={{ false: theme.border, true: theme.accent }}
                 thumbColor="#FFFFFF"
               />

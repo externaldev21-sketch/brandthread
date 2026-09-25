@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN, SUCCESS, SUCCESS_DIM,
-  BLUE, ORANGE, ORANGE_DIM, RED, RED_DIM,
+  ORANGE, ORANGE_DIM, RED, RED_DIM,
   GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
@@ -301,7 +301,6 @@ export default function ReturnDetailScreen() {
                 label="Approve Return"
                 onPress={() => doAction('approved')}
                 loading={actionLoading}
-                colors={[SUCCESS, '#34D399']}
               />
               {!showDenyForm ? (
                 <SecondaryButton
@@ -339,7 +338,6 @@ export default function ReturnDetailScreen() {
                       loading={actionLoading}
                       disabled={!denyReason.trim()}
                       small
-                      colors={[RED, '#F87171']}
                       style={{ flex: 1 }}
                     />
                   </View>
@@ -366,7 +364,6 @@ export default function ReturnDetailScreen() {
               label="Mark Return Received"
               onPress={() => doAction('received')}
               loading={actionLoading}
-              colors={[BLUE, '#60A5FA']}
             />
           )}
 

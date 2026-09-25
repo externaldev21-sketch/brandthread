@@ -30,6 +30,7 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE, BORDER_SUBTLE,
   FG, MUTED, SUBTLE,
+  RED, RED_DIM, ORANGE, ORANGE_DIM,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
@@ -626,7 +627,7 @@ function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => voi
                     )}
                     {phase === 'error' && (
                       <View style={s.errorOverlay}>
-                        <Feather name="alert-circle" size={28} color="#EF4444" />
+                        <Feather name="alert-circle" size={28} color={RED} />
                       </View>
                     )}
                     {phase === 'pick' && (
@@ -668,7 +669,7 @@ function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => voi
               {phase === 'error' && error && (
                 <>
                   <View style={s.errorBox}>
-                    <Feather name="alert-circle" size={16} color="#EF4444" />
+                    <Feather name="alert-circle" size={16} color={RED} />
                     <Text style={s.errorText}>{error.message}</Text>
                   </View>
                   {error.retryable && (
@@ -738,7 +739,7 @@ function DesignBgRemovalScreen({ onSelectReplace }: { onSelectReplace: () => voi
         {/* Dev status banner if API URL not set */}
         {!BASE_URL && (
           <View style={s.devBanner}>
-            <Feather name="alert-triangle" size={14} color="#F59E0B" />
+            <Feather name="alert-triangle" size={14} color={ORANGE} />
             <Text style={s.devBannerText}>
               {'[DEV] EXPO_PUBLIC_API_BASE_URL is not set — API calls will fail.'}
             </Text>
@@ -886,8 +887,8 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   ghostBtnText:     { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
 
   // Error
-  errorBox:         { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: RADIUS.sm, padding: SP.md, borderWidth: 1, borderColor: 'rgba(239,68,68,0.25)' },
-  errorText:        { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: '#EF4444', lineHeight: 18 },
+  errorBox:         { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, backgroundColor: RED_DIM, borderRadius: RADIUS.sm, padding: SP.md, borderWidth: 1, borderColor: RED_DIM },
+  errorText:        { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: RED, lineHeight: 18 },
 
   // Integration grid
   sectionLabel:     { fontSize: FS.xs, fontFamily: FONT.bold, color: MUTED, letterSpacing: 0.8, marginTop: SP.xs },
@@ -908,8 +909,8 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   recentDelete:     { padding: SP.sm },
 
   // Dev banner
-  devBanner:        { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', backgroundColor: 'rgba(245,158,11,0.1)', borderRadius: RADIUS.sm, padding: SP.md, borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)' },
-  devBannerText:    { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: '#F59E0B', lineHeight: 16 },
+  devBanner:        { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', backgroundColor: ORANGE_DIM, borderRadius: RADIUS.sm, padding: SP.md, borderWidth: 1, borderColor: ORANGE_DIM },
+  devBannerText:    { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: ORANGE, lineHeight: 16 },
 
   // Product picker modal
   pickerRoot:       { flex: 1, backgroundColor: SURFACE },

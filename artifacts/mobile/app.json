@@ -344,6 +344,7 @@
         }
       ],
       "expo-video",
+      "expo-sharing",
       [
         "expo-camera",
         {

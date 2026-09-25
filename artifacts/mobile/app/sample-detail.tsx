@@ -36,9 +36,9 @@ import { Sample, SampleReview, SampleStatus } from '@/services/manufacturerTypes
 
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, ON_DARK,
-  ACCENT, ACCENT_LIGHT,
-  SUCCESS, SUCCESS_DIM, RED, ORANGE,
+  FG, MUTED, SUBTLE,
+  ACCENT_LIGHT,
+  SUCCESS, SUCCESS_DIM, RED, ORANGE, GOLD,
   GRAD_CARD_GLOW,
   FONT, FS, SP, RADIUS, COMP, ICON,
   SHADOW_PURPLE,
@@ -146,7 +146,7 @@ function StarRow({
           <Feather
             name="star"
             size={ICON.md}
-            color={i <= rating ? '#F59E0B' : BORDER}
+            color={i <= rating ? GOLD : BORDER}
           />
         </TouchableOpacity>
       ))}
@@ -198,11 +198,11 @@ function SampleTimeline({
 
         return (
           <View key={st} style={tl.row}>
-            {/* Left: dot + connector line */}
+            {/* Left: dot + connector line — matches ProductionTimeline's dot/rail language */}
             <View style={tl.dotCol}>
               {isCompleted && (
                 <View style={tl.dotCompleted}>
-                  <Feather name="check" size={9} color={ON_DARK} />
+                  <Feather name="check" size={13} color={BG} />
                 </View>
               )}
               {isActive && (
@@ -211,10 +211,12 @@ function SampleTimeline({
                 </View>
               )}
               {isFuture && (
-                <View style={tl.dotFuture} />
+                <View style={tl.dotFuture}>
+                  <Text style={tl.dotFutureText}>{idx + 1}</Text>
+                </View>
               )}
               {!isLast && (
-                <View style={[tl.line, isCompleted && tl.lineCompleted, isActive && tl.lineActive]} />
+                <View style={[tl.line, isCompleted && tl.lineCompleted]} />
               )}
             </View>
 
@@ -260,45 +262,51 @@ const tl = StyleSheet.create({
   },
   dotCol: {
     alignItems: 'center',
-    width: 20,
+    width: 26,
   },
   dotCompleted: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: SUCCESS,
+    borderWidth: 1,
+    borderColor: SUCCESS,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1,
   },
   dotActive: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: ACCENT,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: CARD_ELEVATED,
+    borderWidth: 2,
+    borderColor: FG,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1,
-    shadowColor: ACCENT,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.7,
-    shadowRadius: 8,
-    elevation: 6,
   },
   dotActiveInner: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: ON_DARK,
+    backgroundColor: FG,
   },
   dotFuture: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: 'transparent',
+    backgroundColor: CARD_ELEVATED,
+    alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 1,
+  },
+  dotFutureText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: SUBTLE,
   },
   line: {
     width: 2,
@@ -308,38 +316,34 @@ const tl = StyleSheet.create({
     marginVertical: 2,
   },
   lineCompleted: {
-    backgroundColor: SUCCESS + '88',
-  },
-  lineActive: {
-    backgroundColor: ACCENT + '44',
+    backgroundColor: SUCCESS,
   },
   textCol: {
     flex: 1,
     paddingBottom: SP.md,
-    paddingTop: 1,
+    paddingTop: 3,
   },
   stepTitle: {
-    fontSize: FS.sm,
-    fontFamily: FONT.bold,
-    color: SUBTLE,
-  },
-  stepTitleCompleted: {
+    fontSize: FS.base,
+    fontFamily: FONT.semibold,
     color: MUTED,
   },
+  stepTitleCompleted: {
+    color: FG,
+  },
   stepTitleActive: {
-    color: ON_DARK,
+    color: FG,
     fontSize: FS.base,
   },
   stepTitleFuture: {
-    color: SUBTLE,
-    fontFamily: FONT.regular,
+    color: MUTED,
   },
   stepDesc: {
-    fontSize: FS.xs,
+    fontSize: FS.sm,
     fontFamily: FONT.regular,
-    color: SUBTLE,
+    color: MUTED,
     marginTop: 2,
-    lineHeight: 17,
+    lineHeight: 18,
   },
   stepDescActive: {
     color: MUTED,

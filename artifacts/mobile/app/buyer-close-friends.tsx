@@ -15,7 +15,7 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
 import { hapticToggle, hapticSuccessAction } from '@/lib/haptics';
-import { PressableScale } from '@/components/BrandthreadUI';
+import { EmptyState } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ListRow, StickyBottomCTA } from '@/components/ui';
 import { getAcceptedFriends, getCloseFriendIds, saveCloseFriendIds } from '@/services/socialService';
@@ -127,25 +127,16 @@ export default function BuyerCloseFriends() {
         renderItem={renderFriend}
         contentContainerStyle={{ paddingHorizontal: SPACING.md, paddingBottom: insets.bottom + 120 }}
         ListEmptyComponent={
-          <View style={s.empty}>
-            <Feather name="users" size={32} color={colors.mutedForeground} />
-            <Text style={s.emptyTitle}>{friends.length === 0 ? 'No friends yet' : 'No results'}</Text>
-            <Text style={s.emptyDesc}>
-              {friends.length === 0
-                ? 'Add friends to create a close friends list.'
-                : 'Try a different search term.'}
-            </Text>
-            {friends.length === 0 && (
-              <PressableScale
-                style={s.findFriendsBtn}
-                onPress={() => router.push('/buyer-friend-requests' as never)}
-                accessibilityRole="button"
-                accessibilityLabel="Find friends"
-              >
-                <Text style={s.findFriendsBtnText}>Find friends</Text>
-              </PressableScale>
-            )}
-          </View>
+          <EmptyState
+            icon="users"
+            title={friends.length === 0 ? 'No friends yet' : 'No results'}
+            description={friends.length === 0
+              ? 'Add friends to create a close friends list.'
+              : 'Try a different search term.'}
+            action={friends.length === 0
+              ? { label: 'Find friends', onPress: () => router.push('/buyer-friend-requests' as never) }
+              : undefined}
+          />
         }
         ItemSeparatorComponent={() => <View style={s.separator} />}
       />

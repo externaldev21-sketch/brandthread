@@ -4,6 +4,7 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 const CHECKOUT_MODES = ['Checkout only', 'Accounts optional', 'Accounts required'];
 
@@ -108,20 +109,20 @@ export default function CheckoutScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  section: { paddingHorizontal: 20, paddingVertical: 18 },
-  sectionTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginBottom: 6 },
-  sectionSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 14, lineHeight: 17 },
-  divider: { height: 10 },
+  section: { paddingHorizontal: SP.md, paddingVertical: SP.md + 2 },
+  sectionTitle: { fontSize: FS.base, fontFamily: FONT.semibold, marginBottom: SP.xs + 2 },
+  sectionSubtitle: { fontSize: FS.sm, fontFamily: FONT.regular, marginBottom: SP.md - 2, lineHeight: 17 },
+  divider: { height: SP.sm + 2 },
   rowStart: { flexDirection: 'row', alignItems: 'center' },
-  selectBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderRadius: 12, padding: 14 },
-  selectValue: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  cardTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
-  checkbox: { width: 18, height: 18, borderRadius: 4, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  radioRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
-  radioLabel: { fontSize: 13, fontFamily: 'Inter_400Regular', flex: 1 },
-  textAreaBox: { borderWidth: 1, borderRadius: 12, marginTop: 4 },
-  textArea: { fontSize: 13, fontFamily: 'Inter_400Regular', padding: 14, minHeight: 90, textAlignVertical: 'top' },
-  langRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderRadius: 12, padding: 14, gap: 10 },
-  langText: { fontSize: 14, fontFamily: 'Inter_500Medium' },
+  selectBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderRadius: RADIUS.md, padding: SP.md - 2 },
+  selectValue: { fontSize: FS.md, fontFamily: FONT.semibold },
+  cardTitle: { fontSize: FS.md, fontFamily: FONT.semibold },
+  checkRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 2, marginTop: SP.xs },
+  checkbox: { width: 18, height: 18, borderRadius: RADIUS.xs - 2, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  radioRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm + 2, marginBottom: SP.sm + 4 },
+  radioLabel: { fontSize: FS.sm, fontFamily: FONT.regular, flex: 1 },
+  textAreaBox: { borderWidth: 1, borderRadius: RADIUS.md, marginTop: SP.xs },
+  textArea: { fontSize: FS.sm, fontFamily: FONT.regular, padding: SP.md - 2, minHeight: 90, textAlignVertical: 'top' },
+  langRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderRadius: RADIUS.md, padding: SP.md - 2, gap: SP.sm + 2 },
+  langText: { fontSize: FS.md, fontFamily: FONT.medium },
 });

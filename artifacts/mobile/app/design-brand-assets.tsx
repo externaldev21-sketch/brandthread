@@ -278,7 +278,7 @@ export default function DesignBrandAssetsScreen() {
         onPress={handleAddAsset}
         activeOpacity={0.85}
       >
-        <Feather name="upload" size={ICON.md} color="#FFFFFF" />
+        <Feather name="upload" size={ICON.md} color={theme.onAccent} />
         <Text style={bas.fabText}>Upload Asset</Text>
       </TouchableOpacity>
     </View>
@@ -348,6 +348,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   assetDate:     { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
 
   fab:           { position: 'absolute', right: SP.md, flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: PURPLE, borderRadius: RADIUS.pill, paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  fabText:       { fontSize: FS.sm, fontFamily: FONT.semibold, color: '#FFFFFF' },
+  fabText:       { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.onAccent },
   });
 };

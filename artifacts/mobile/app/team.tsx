@@ -42,7 +42,6 @@ function initials(name: string) {
   return name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('');
 }
 
-const AVATAR_COLORS = ['#0F766E', '#4A6FA5', '#22D3EE', '#B98A2E', '#EC4899', '#10B981'];
 
 type InviteRole = 'admin' | 'finance' | 'orders' | 'marketing' | 'viewer';
 const INVITE_ROLES: { key: InviteRole; title: string; sub: string }[] = [
@@ -66,8 +65,6 @@ const ROLE_ACCESS: Record<string, string> = {
   manager: 'Orders, Products, Inventory',
   staff: 'Fulfillment only',
 };
-
-function avatarColor(idx: number) { return AVATAR_COLORS[idx % AVATAR_COLORS.length]; }
 
 const ACTIVITY_PAGE = 10;
 
@@ -226,7 +223,9 @@ export default function TeamScreen() {
   const currentMembers = members.filter(member => !isExpiredInvite(member));
 
   const renderMemberRow = (m: any, i: number) => {
-    const color = avatarColor(i);
+    // Monochrome avatar tint (theme foreground) — no saturated per-user hues,
+    // so it reads correctly across all 12 app themes.
+    const color = colors.foreground;
     const ini   = initials(m.name ?? m.email ?? '?');
     const isPending = m.status === 'pending';
     const isExpired = isExpiredInvite(m);
@@ -248,7 +247,7 @@ export default function TeamScreen() {
           <View style={[styles.avatar, { backgroundColor: color + '33' }]}>
             <Text style={[styles.avatarText, { color }]}>{ini}</Text>
           </View>
-          {m.online && <View style={[styles.onlineDot, { backgroundColor: colors.success }]} />}
+          {m.online && <View style={[styles.onlineDot, { backgroundColor: colors.success, borderColor: colors.card }]} />}
         </View>
         <View style={styles.memberInfo}>
           <Text style={[styles.memberName, { color: colors.foreground }]}>{m.name ?? m.email}</Text>
@@ -511,7 +510,7 @@ const styles = StyleSheet.create({
   memberLeft: { position: 'relative' },
   avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
-  onlineDot: { width: 10, height: 10, borderRadius: 5, position: 'absolute', bottom: 0, right: 0, borderWidth: 2, borderColor: '#181818' },
+  onlineDot: { width: 10, height: 10, borderRadius: 5, position: 'absolute', bottom: 0, right: 0, borderWidth: 2 },
   memberInfo: { flex: 1 },
   memberName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   memberAccess: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },

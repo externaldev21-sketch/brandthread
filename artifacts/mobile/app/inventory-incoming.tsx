@@ -685,7 +685,7 @@ export default function IncomingInventoryScreen() {
               <View key={step} style={s.timelineRow}>
                 <View style={[s.timelineDot, isPast && s.timelineDotPast, isActive && s.timelineDotActive]}>
                   {isPast ? (
-                    <Feather name="check" size={10} color="#fff" />
+                    <Feather name="check" size={10} color={theme.onAccent} />
                   ) : (
                     <View style={[s.timelineDotInner, isCurrent && { backgroundColor: PURPLE }]} />
                   )}

@@ -20,7 +20,7 @@ import { useAuth } from '@clerk/expo';
 import {
   BG, CARD, BORDER,
   FG, MUTED, SUBTLE, ON_DARK,
-  SUCCESS, SUCCESS_DIM,
+  SUCCESS, SUCCESS_DIM, GRAD_SUCCESS_G,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
@@ -253,7 +253,7 @@ export default function SetupScreen() {
               onPress={() => router.replace('/(tabs)/' as never)}
               icon="home"
               style={{ marginTop: SP.md }}
-              colors={['#10B981', '#34D399']}
+              colors={GRAD_SUCCESS_G}
             />
           </GradientCard>
         )}

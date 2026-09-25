@@ -93,8 +93,6 @@ export default function AIStudioScreen() {
     }
   }
 
-  const [selectMode, setSelectMode] = useState(false);
-
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Design Studio" subtitle="Powered by generative AI" />
@@ -129,11 +127,6 @@ export default function AIStudioScreen() {
         >
           <View style={styles.manualTopRow}>
             <View style={styles.manualLinks}>
-              <TouchableOpacity onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectMode((v) => !v); }}>
-                <Text style={[styles.manualLink, { color: selectMode ? colors.primary : colors.mutedForeground }]}>
-                  {selectMode ? 'Done' : 'Select'}
-                </Text>
-              </TouchableOpacity>
               <TouchableOpacity onPress={importFromLibrary}>
                 <Text style={[styles.manualLink, { color: colors.mutedForeground }]}>Import</Text>
               </TouchableOpacity>
@@ -169,13 +162,13 @@ export default function AIStudioScreen() {
                     activeOpacity={0.8}
                     onPress={() => openProject(p)}
                   >
-                    <View style={[styles.canvasTile, { borderColor: colors.border }]}>
+                    <View style={[styles.canvasTile, { borderColor: colors.border, backgroundColor: colors.card }]}>
                       <View style={[styles.canvasShape, {
                         aspectRatio: ratio,
                         backgroundColor: p.canvas.backgroundHex || '#FFFFFF',
                         ...(ratio >= 1 ? { width: '90%' } : { height: '90%' }),
                       }]}>
-                        {!p.thumbnail && <Feather name="image" size={18} color="#B8B8B8" />}
+                        {!p.thumbnail && <Feather name="image" size={18} color={colors.mutedForeground} />}
                       </View>
                     </View>
                     <Text style={[styles.canvasLabel, { color: colors.foreground }]} numberOfLines={1}>{p.name || 'Untitled design'}</Text>
@@ -254,38 +247,38 @@ export default function AIStudioScreen() {
         onRequestClose={() => setNewCanvasVisible(false)}
       >
         <View style={styles.sheetOverlay}>
-          <SheetRise style={styles.sheetCard}>
+          <SheetRise style={[styles.sheetCard, { backgroundColor: colors.card }]}>
             <TouchableOpacity style={styles.sheetCancel} activeOpacity={0.7} onPress={() => setNewCanvasVisible(false)}>
-              <Text style={styles.sheetCancelText}>Cancel</Text>
+              <Text style={[styles.sheetCancelText, { color: colors.mutedForeground }]}>Cancel</Text>
             </TouchableOpacity>
 
-            <Text style={styles.sheetTitle}>New canvas</Text>
+            <Text style={[styles.sheetTitle, { color: colors.foreground }]}>New canvas</Text>
             <View style={styles.sheetSubRow}>
-              <Text style={styles.sheetSubActive}>Custom Size</Text>
-              <Text style={styles.sheetSubMuted}>From Clipboard</Text>
+              <Text style={[styles.sheetSubActive, { color: colors.foreground }]}>Custom Size</Text>
+              <Text style={[styles.sheetSubMuted, { color: colors.mutedForeground }]}>From Clipboard</Text>
             </View>
 
             <TouchableOpacity
-              style={styles.sheetSoloRow}
+              style={[styles.sheetSoloRow, { backgroundColor: colors.elevated }]}
               activeOpacity={0.7}
               onPress={() => openCanvas(SCREEN_SIZE)}
             >
-              <Text style={styles.sheetRowLabel}>{SCREEN_SIZE.label}</Text>
-              <Text style={styles.sheetRowDims}>{SCREEN_SIZE.dims}</Text>
+              <Text style={[styles.sheetRowLabel, { color: colors.foreground }]}>{SCREEN_SIZE.label}</Text>
+              <Text style={[styles.sheetRowDims, { color: colors.mutedForeground }]}>{SCREEN_SIZE.dims}</Text>
             </TouchableOpacity>
 
-            <View style={styles.sheetGroup}>
+            <View style={[styles.sheetGroup, { backgroundColor: colors.elevated }]}>
               {SIZE_PRESETS.map((p, i) => (
                 <TouchableOpacity
                   key={p.label}
-                  style={[styles.sheetRow, i > 0 && styles.sheetRowBorder]}
+                  style={[styles.sheetRow, i > 0 && [styles.sheetRowBorder, { borderTopColor: colors.border }]]}
                   activeOpacity={0.7}
                   onPress={() => openCanvas(p)}
                 >
-                  <Text style={styles.sheetRowLabel}>{p.label}</Text>
+                  <Text style={[styles.sheetRowLabel, { color: colors.foreground }]}>{p.label}</Text>
                   <View style={styles.sheetRowRight}>
-                    {p.profile != null && <Text style={styles.sheetRowProfile}>{p.profile}</Text>}
-                    <Text style={styles.sheetRowDims}>{p.dims}</Text>
+                    {p.profile != null && <Text style={[styles.sheetRowProfile, { color: colors.mutedForeground }]}>{p.profile}</Text>}
+                    <Text style={[styles.sheetRowDims, { color: colors.mutedForeground }]}>{p.dims}</Text>
                   </View>
                 </TouchableOpacity>
               ))}
@@ -299,11 +292,6 @@ export default function AIStudioScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  back: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
-  backText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
-  headerRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 },
-  pageTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 4 },
-  pageSubtitle: { fontSize: 13, fontFamily: 'Inter_400Regular' },
   sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
 
   modeRow: { paddingHorizontal: 20, marginBottom: 16 },
@@ -318,7 +306,7 @@ const styles = StyleSheet.create({
 
   canvasGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: '3%', rowGap: 20 },
   canvasCell: { width: '31.333%' },
-  canvasTile: { width: '100%', height: 110, borderRadius: 10, borderWidth: 1, marginBottom: 8, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: '#111' },
+  canvasTile: { width: '100%', height: 110, borderRadius: 10, borderWidth: 1, marginBottom: 8, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   canvasShape: { borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
   canvasLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   canvasDims: { fontSize: FS.xs, fontFamily: 'Inter_400Regular', marginTop: 2 },
@@ -329,23 +317,21 @@ const styles = StyleSheet.create({
   toolDesc: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
   toolBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   toolBadgeText: { fontSize: FS.xs, fontFamily: 'Inter_700Bold' },
-  generateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, padding: 16, marginBottom: 28, marginTop: 8 },
-  generateText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
 
   sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-start' },
-  sheetCard: { backgroundColor: '#161616', paddingTop: 60, paddingHorizontal: 20, paddingBottom: 24, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  sheetCard: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 24, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   sheetCancel: { position: 'absolute', top: 16, right: 20 },
-  sheetCancelText: { fontSize: 16, fontFamily: 'Inter_400Regular', color: '#9A9A9A' },
-  sheetTitle: { fontSize: 30, fontFamily: 'Inter_700Bold', color: '#FFFFFF', marginBottom: 8 },
+  sheetCancelText: { fontSize: 16, fontFamily: 'Inter_400Regular' },
+  sheetTitle: { fontSize: 30, fontFamily: 'Inter_700Bold', marginBottom: 8 },
   sheetSubRow: { flexDirection: 'row', gap: 18, marginBottom: 16 },
-  sheetSubActive: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
-  sheetSubMuted: { fontSize: 14, fontFamily: 'Inter_400Regular', color: '#6E6E6E' },
-  sheetSoloRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#232323', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 14 },
-  sheetGroup: { backgroundColor: '#232323', borderRadius: 12, overflow: 'hidden' },
+  sheetSubActive: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  sheetSubMuted: { fontSize: 14, fontFamily: 'Inter_400Regular' },
+  sheetSoloRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 14 },
+  sheetGroup: { borderRadius: 12, overflow: 'hidden' },
   sheetRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
-  sheetRowBorder: { borderTopWidth: 1, borderTopColor: '#2E2E2E' },
-  sheetRowLabel: { fontSize: 15, fontFamily: 'Inter_400Regular', color: '#FFFFFF' },
+  sheetRowBorder: { borderTopWidth: 1 },
+  sheetRowLabel: { fontSize: 15, fontFamily: 'Inter_400Regular' },
   sheetRowRight: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  sheetRowProfile: { fontSize: 12, fontFamily: 'Inter_400Regular', color: '#8A8A8A' },
-  sheetRowDims: { fontSize: 14, fontFamily: 'Inter_400Regular', color: '#8A8A8A' },
+  sheetRowProfile: { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  sheetRowDims: { fontSize: 14, fontFamily: 'Inter_400Regular' },
 });

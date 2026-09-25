@@ -73,10 +73,10 @@ export default function ShareStoreScreen() {
       {/* Content */}
       <View style={s.body}>
         {/* QR Card */}
-        <View style={s.qrCard}>
+        <View style={[s.qrCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {/* Store badge */}
           <View style={s.storeBadge}>
-            <View style={s.storeLogoBox}>
+            <View style={[s.storeLogoBox, { borderColor: colors.border }]}>
               <BrandthreadLogo size={28} />
             </View>
             <View>
@@ -84,8 +84,8 @@ export default function ShareStoreScreen() {
                 <ActivityIndicator color={colors.accentForeground} size="small" />
               ) : (
                 <>
-                  <Text style={s.storeName} numberOfLines={1}>{brandName}</Text>
-                  <Text style={s.storeHandle}>{handleStr}</Text>
+                  <Text style={[s.storeName, { color: colors.foreground }]} numberOfLines={1}>{brandName}</Text>
+                  <Text style={[s.storeHandle, { color: colors.mutedForeground }]}>{handleStr}</Text>
                 </>
               )}
             </View>
@@ -104,7 +104,7 @@ export default function ShareStoreScreen() {
           </View>
 
           {/* URL label */}
-          <Text style={s.urlLabel} numberOfLines={1}>{storeUrl}</Text>
+          <Text style={[s.urlLabel, { color: colors.mutedForeground }]} numberOfLines={1}>{storeUrl}</Text>
         </View>
 
         {/* Copy link button */}
@@ -118,13 +118,13 @@ export default function ShareStoreScreen() {
         </TouchableOpacity>
 
         {/* Share button */}
-        <TouchableOpacity style={s.shareBtn} activeOpacity={0.8} onPress={shareLink}>
+        <TouchableOpacity style={[s.shareBtn, { borderColor: colors.border }]} activeOpacity={0.8} onPress={shareLink}>
           <Feather name="share-2" size={17} color={colors.foreground} />
-          <Text style={s.shareBtnText}>Share via…</Text>
+          <Text style={[s.shareBtnText, { color: colors.foreground }]}>Share via…</Text>
         </TouchableOpacity>
 
         {/* Hint */}
-        <Text style={s.hint}>
+        <Text style={[s.hint, { color: colors.mutedForeground }]}>
           Add this QR code to packaging, social bios, or pop-up event materials.
           Buyers scan it and land directly on your Brandthread storefront.
         </Text>
@@ -135,9 +135,6 @@ export default function ShareStoreScreen() {
 
 const s = StyleSheet.create({
   root:        { flex: 1 },
-  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1 },
-  backBtn:     { width: 38, height: 38, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 16, fontFamily: 'Inter_700Bold' },
 
   body:        { flex: 1, alignItems: 'center', paddingHorizontal: 24, paddingTop: 36 },
 
@@ -151,7 +148,6 @@ const s = StyleSheet.create({
   urlLabel:    { fontSize: 12, fontFamily: 'Inter_500Medium', textAlign: 'center' },
 
   copyBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', borderRadius: 16, paddingVertical: 16, marginBottom: 12 },
-  copyBtnDone: {},
   copyBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold' },
 
   shareBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', borderRadius: 16, borderWidth: 1, paddingVertical: 16, marginBottom: 24 },

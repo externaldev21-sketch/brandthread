@@ -194,12 +194,10 @@ const row = StyleSheet.create({
   mono:  { fontFamily: 'Inter_400Regular', letterSpacing: 0.5, fontSize: FS.xs },
 });
 
-// Stars read as gold/amber across every theme rather than swapping to the
-// active accent color — a rating widget stays legible and familiar
-// regardless of the buyer's chosen palette.
-const STAR_GOLD = '#F5B400';
-
 // ─── Star Rating component ────────────────────────────────────────────────────
+// Filled stars use theme.warning (the same themed amber token seller-reviews.tsx
+// uses for its Stars component) instead of a fixed hex, so ratings stay legible
+// but still react to all 12 themes.
 
 function StarRating({ rating, size = 36, interactive = true, onRate }: {
   rating: number; size?: number; interactive?: boolean; onRate?: (r: number) => void;
@@ -220,7 +218,7 @@ function StarRating({ rating, size = 36, interactive = true, onRate }: {
           accessibilityLabel={`${n} star${n > 1 ? 's' : ''}`}
           accessibilityState={interactive ? { selected: n <= rating } : undefined}
         >
-          <Text style={{ fontSize: size, color: n <= rating ? STAR_GOLD : theme.muted }}>★</Text>
+          <Text style={{ fontSize: size, color: n <= rating ? theme.warning : theme.muted }}>★</Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -1040,7 +1038,7 @@ export default function BuyerOrderDetailScreen() {
             accessibilityRole="button"
             accessibilityLabel="Leave a review"
           >
-            <Feather name="star" size={ICON.sm} color={STAR_GOLD} />
+            <Feather name="star" size={ICON.sm} color={theme.warning} />
             <View style={{ flex: 1 }}>
               <Text style={styles.reviewCTATitle}>Leave a Review</Text>
               <Text style={styles.reviewCTASub}>Share your experience with {order.sellerName}</Text>

@@ -1011,6 +1011,22 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const CYAN = theme.secondary;
   const CYAN_DIM = theme.secondaryDim;
   const BORDER_ACTIVE = theme.accentLight;
+  const BG = theme.background;
+  const SURFACE = theme.surface;
+  const CARD = theme.card;
+  const CARD_ELEVATED = theme.cardElevated;
+  const BORDER = theme.border;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const SUBTLE = theme.subtle;
+  const SUCCESS = theme.success;
+  const SUCCESS_DIM = `${theme.success}20`;
+  const ORANGE = theme.warning;
+  const ORANGE_DIM = `${theme.warning}20`;
+  const RED = theme.error;
+  const RED_DIM = `${theme.error}20`;
+  const BLUE = theme.accent;
+  const BLUE_DIM = theme.accentDim;
   return StyleSheet.create({
   root: { flex: 1 },
   header: {

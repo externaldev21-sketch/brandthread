@@ -107,8 +107,8 @@ export default function TeamInviteScreen() {
           <ActivityIndicator color={colors.primary} style={{ margin: 24 }} />
         ) : invite?.expired ? (
           <>
-            <View style={[styles.icon, { backgroundColor: '#B98A2E22' }]}>
-              <Feather name="clock" size={26} color="#B98A2E" />
+            <View style={[styles.icon, { backgroundColor: colors.warning + '22' }]}>
+              <Feather name="clock" size={26} color={colors.warning} />
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>Invite link expired</Text>
             <Text style={[styles.sub, { color: colors.mutedForeground }]}>

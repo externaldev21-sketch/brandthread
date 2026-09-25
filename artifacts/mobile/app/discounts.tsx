@@ -18,9 +18,6 @@ import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { useApi } from '@/hooks/useApi';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER,
-  FG, MUTED,
-  SUCCESS, ORANGE, RED, GOLD,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -105,6 +102,7 @@ function fmtDate(iso: string | null) {
 
 export default function DiscountsScreen() {
   const { theme } = useAppTheme();
+  const { text: FG, muted: MUTED, border: BORDER } = theme;
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const api = useApi();
@@ -586,6 +584,7 @@ function DiscountCard({ d, onEdit, onTogglePause, onDelete, onCopy }: {
   onCopy: () => void;
 }) {
   const { theme } = useAppTheme();
+  const { muted: MUTED, border: BORDER, success: SUCCESS, warning: ORANGE, error: RED } = theme;
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const pctUsed = d.maxUses ? Math.round((d.usesCount / d.maxUses) * 100) : null;
 
@@ -641,8 +640,13 @@ function DiscountCard({ d, onEdit, onTogglePause, onDelete, onCopy }: {
   );
 }
 
-const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; onAccent: string }) => {
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, onAccent: ON_ACCENT } = theme;
+  const FG = theme.text;
+  const MUTED = theme.muted;
+  const BORDER = theme.border;
+  const CARD_ELEVATED = theme.cardElevated;
+  const BG = theme.background;
   return StyleSheet.create({
   root:       { flex: 1, backgroundColor: 'transparent' },
   center:     { flex: 1, alignItems: 'center', justifyContent: 'center' },

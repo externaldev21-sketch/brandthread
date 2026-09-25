@@ -350,16 +350,16 @@ export default function StoreFromLogoScreen() {
           <>
             {/* Fallback warning */}
             {result.source === 'fallback' && (
-              <BrandthreadCard style={[fl.card, { borderColor: 'rgba(251,191,36,0.4)', backgroundColor: 'rgba(251,191,36,0.07)' }]}>
+              <BrandthreadCard style={[fl.card, { borderColor: `${theme.warning}66`, backgroundColor: `${theme.warning}12` }]}>
                 <View style={fl.bannerRow}>
-                  <Feather name="alert-triangle" size={ICON.sm} color="#fbbf24" />
-                  <Text style={[fl.bannerText, { color: '#fbbf24' }]}>
+                  <Feather name="alert-triangle" size={ICON.sm} color={theme.warning} />
+                  <Text style={[fl.bannerText, { color: theme.warning }]}>
                     We couldn't fully analyze your image — showing a suggested starting point.
                   </Text>
                 </View>
                 <TouchableOpacity style={fl.retryBtn} onPress={handleAnalyze} disabled={analyzing || restoringAnalysis}>
-                  <Feather name="refresh-cw" size={12} color="#fbbf24" />
-                  <Text style={fl.retryText}>Retry Analysis</Text>
+                  <Feather name="refresh-cw" size={12} color={theme.warning} />
+                  <Text style={[fl.retryText, { color: theme.warning }]}>Retry Analysis</Text>
                 </TouchableOpacity>
               </BrandthreadCard>
             )}
@@ -525,6 +525,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     paddingVertical: 4, paddingHorizontal: 8,
     borderRadius: RADIUS.xs, borderWidth: 1, borderColor: 'rgba(251,191,36,0.35)',
   },
-  retryText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: '#fbbf24' },
+  retryText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   });
 };

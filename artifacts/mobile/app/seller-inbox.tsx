@@ -6,13 +6,12 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, RefreshControl } from 'react-native';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
-import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
 import { FONT, FS, SP } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-import { PressableScale } from '@/components/BrandthreadUI';
+import { PressableScale, EmptyState } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ListSkeleton } from '@/components/layout';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -258,11 +257,11 @@ export default function SellerInboxScreen() {
         </View>
       ) : convs.length === 0 ? (
         <View style={s.centerFill}>
-          <Feather name="message-circle" size={40} color={theme.subtle} />
-          <Text style={s.emptyTitle}>No messages yet</Text>
-          <Text style={s.emptyBody}>
-            When buyers message you about products or orders, their conversations will appear here.
-          </Text>
+          <EmptyState
+            icon="message-circle"
+            title="No messages yet"
+            description="When buyers message you about products or orders, their conversations will appear here."
+          />
         </View>
       ) : (
         <FlashList
@@ -285,11 +284,6 @@ const createStyles = (theme: AppThemePreset) => {
   root: { flex: 1, backgroundColor: 'transparent' },
   listPad: { paddingHorizontal: SP.md },
   centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
-  emptyTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: theme.text, marginTop: SP.md },
-  emptyBody: {
-    fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted,
-    textAlign: 'center', marginTop: SP.xs,
-  },
 
   // Row — flat Instagram-style, no card chrome
   row: {

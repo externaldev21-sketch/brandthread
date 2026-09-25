@@ -13,9 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE,
-  SUCCESS, SUCCESS_DIM,
-  ORANGE, GOLD, FONT, FS, SP, RADIUS,
+  GOLD, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
@@ -39,14 +37,15 @@ export default function LoyaltyScreen() {
   const insets = useSafeAreaInsets();
   const api    = useApi();
   const { theme } = useAppTheme();
+  const s = React.useMemo(() => makeStyles(theme), [theme]);
   const sourceMeta: Record<string, { icon: string; label: string; color: string }> = {
     purchase: { icon: 'shopping-bag', label: 'Purchase', color: theme.accentLight },
     order_earn: { icon: 'shopping-bag', label: 'Purchase', color: theme.accentLight },
     referral: { icon: 'users', label: 'Referral', color: theme.secondary },
     signup: { icon: 'gift', label: 'Welcome', color: GOLD },
     bonus: { icon: 'star', label: 'Bonus', color: GOLD },
-    redemption: { icon: 'tag', label: 'Redeemed', color: ORANGE },
-    purchase_reversal: { icon: 'corner-up-left', label: 'Purchase refunded', color: ORANGE },
+    redemption: { icon: 'tag', label: 'Redeemed', color: theme.warning },
+    purchase_reversal: { icon: 'corner-up-left', label: 'Purchase refunded', color: theme.warning },
   };
 
   const [loading,    setLoading]    = useState(true);
@@ -140,7 +139,7 @@ export default function LoyaltyScreen() {
               value={redeemPts}
               onChangeText={setRedeemPts}
               placeholder="100"
-              placeholderTextColor={MUTED}
+              placeholderTextColor={theme.muted}
               keyboardType="number-pad"
             />
             {previewDiscount >= 100 && (
@@ -171,11 +170,11 @@ export default function LoyaltyScreen() {
           <>
             <Text style={[s.sectionLabel, { marginTop: SP.lg }]}>POINTS HISTORY</Text>
             {history.map(entry => {
-              const meta = sourceMeta[entry.source] ?? { icon: 'circle', label: entry.source, color: MUTED };
+              const meta = sourceMeta[entry.source] ?? { icon: 'circle', label: entry.source, color: theme.muted };
               const isPositive = entry.points > 0;
               return (
                 <View key={entry.id} style={s.historyRow}>
-                  <View style={[s.historyIcon, { backgroundColor: isPositive ? theme.accentDim : 'rgba(249,115,22,0.1)' }]}>
+                  <View style={[s.historyIcon, { backgroundColor: isPositive ? theme.accentDim : `${theme.warning}1A` }]}>
                     <Feather name={meta.icon as any} size={14} color={meta.color} />
                   </View>
                   <View style={{ flex: 1 }}>
@@ -183,7 +182,7 @@ export default function LoyaltyScreen() {
                     {entry.note ? <Text style={s.historyNote}>{entry.note}</Text> : null}
                     <Text style={s.historyDate}>{fmtDate(entry.createdAt)}</Text>
                   </View>
-                  <Text style={[s.historyPoints, { color: isPositive ? SUCCESS : ORANGE }]}>
+                  <Text style={[s.historyPoints, { color: isPositive ? theme.success : theme.warning }]}>
                     {isPositive ? '+' : ''}{entry.points.toLocaleString()} pts
                   </Text>
                 </View>
@@ -194,9 +193,9 @@ export default function LoyaltyScreen() {
 
         {history.length === 0 && !loading && (
           <View style={{ alignItems: 'center', paddingVertical: SP.xl, paddingHorizontal: SP.xl }}>
-            <Feather name="star" size={32} color={BORDER} />
+            <Feather name="star" size={32} color={theme.border} />
             <Text style={[s.sectionLabel, { marginTop: SP.md, textAlign: 'center', letterSpacing: 0 }]}>No points yet</Text>
-            <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 18 }}>
+            <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, textAlign: 'center', lineHeight: 18 }}>
               Make a purchase or refer a friend to start earning rewards.
             </Text>
           </View>
@@ -206,7 +205,10 @@ export default function LoyaltyScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { text: FG, muted: MUTED, subtle: SUBTLE, card: CARD, cardElevated: CARD_ELEVATED, border: BORDER, success: SUCCESS } = theme;
+  const SUCCESS_DIM = `${SUCCESS}20`;
+  return StyleSheet.create({
   root:       { flex: 1, backgroundColor: 'transparent' },
   header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
   headerBack: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
@@ -243,4 +245,5 @@ const s = StyleSheet.create({
   historyNote:  { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginBottom: 2 },
   historyDate:  { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
   historyPoints:{ fontSize: FS.sm, fontFamily: FONT.bold, marginTop: 2 },
-});
+  });
+};

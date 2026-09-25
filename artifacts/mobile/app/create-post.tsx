@@ -6,7 +6,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, Modal, Animated, Dimensions, Platform,
-  ActivityIndicator, Alert, KeyboardAvoidingView, Switch, Image, Pressable,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Image, Pressable,
   StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -42,6 +42,7 @@ import { TextOverlayEditor, OverlayChip } from '@/components/TextOverlayEditor';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 import { SheetRise } from '@/components/motion/SheetRise';
+import { HapticSwitch } from '@/components/BrandthreadUI';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
@@ -318,7 +319,7 @@ function DatePickerModal({ visible, initial, onConfirm, onClose, insets }: DateP
                     accessibilityLabel={`Day ${day}${past ? ', past' : ''}`}
                     testID={`calendar-day-${day}`}
                   >
-                    <Text style={[dps.calDayText, selected && { color: '#fff', fontFamily: FONT.bold }]}>
+                    <Text style={[dps.calDayText, selected && { color: theme.onAccent, fontFamily: FONT.bold }]}>
                       {day}
                     </Text>
                   </TouchableOpacity>
@@ -385,7 +386,7 @@ function DatePickerModal({ visible, initial, onConfirm, onClose, insets }: DateP
                       accessibilityLabel={val}
                       testID={`ampm-${val}`}
                     >
-                      <Text style={[dps.ampmText, ps.ampm === val && { color: '#fff' }]}>{val}</Text>
+                      <Text style={[dps.ampmText, ps.ampm === val && { color: theme.onAccent }]}>{val}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -419,6 +420,7 @@ export default function CreatePostScreen() {
   const FG = theme.text;
   const MUTED = theme.muted;
   const ORANGE = theme.warning;
+  const RED = theme.error;
   Object.assign(ts, createTs(theme));
   Object.assign(ms, createMs(theme));
   Object.assign(dps, createDps(theme));
@@ -1284,8 +1286,8 @@ export default function CreatePostScreen() {
                         </View>
                       )}
                       {slide.uploadState === 'error' && (
-                        <View style={[ts.slideOverlayBadge, { backgroundColor: '#ef4444' }]}>
-                          <Feather name="alert-circle" size={8} color="#fff" />
+                        <View style={[ts.slideOverlayBadge, { backgroundColor: RED }]}>
+                          <Feather name="alert-circle" size={8} color={theme.onAccent} />
                         </View>
                       )}
                     </TouchableOpacity>
@@ -1327,7 +1329,7 @@ export default function CreatePostScreen() {
         {/* Processing error banner */}
         {slideProcessingPhase === 'error' && slideProcessingError && (
           <View style={[ts.errorBanner, { bottom: botPad + 140 }]}>
-            <Feather name="alert-triangle" size={14} color="#fbbf24" style={{ marginRight: 8 }} />
+            <Feather name="alert-triangle" size={14} color={ORANGE} style={{ marginRight: 8 }} />
             <Text style={ts.errorBannerText} numberOfLines={2}>{slideProcessingError}</Text>
             <TouchableOpacity onPress={processSlideshow} style={ts.errorRetryBtn}>
               <Text style={ts.errorRetryText}>Retry</Text>
@@ -1497,7 +1499,7 @@ export default function CreatePostScreen() {
                 style={[
                   ts.timelineClip,
                   { flex: Math.max(0.05, (clip.duration / clip.speed) / Math.max(0.1, totalVideoDuration)),
-                    backgroundColor: idx % 2 === 0 ? PURPLE : '#555' },
+                    backgroundColor: idx % 2 === 0 ? PURPLE : BORDER },
                 ]}
               >
                 <Text style={ts.timelineClipText}>{idx + 1}</Text>
@@ -1561,7 +1563,7 @@ export default function CreatePostScreen() {
             }}
           >
             <LinearGradient
-              colors={busy ? ['#333','#333'] : theme.primaryGradient}
+              colors={busy ? [theme.cardElevated, theme.cardElevated] : theme.primaryGradient}
               style={ts.nextBtnGrad}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             >
@@ -1783,11 +1785,11 @@ export default function CreatePostScreen() {
               ]).map(({ label, key }) => (
                 <View key={key} style={ts.toggleRow}>
                   <Text style={ts.toggleLabel}>{label}</Text>
-                  <Switch
+                  <HapticSwitch
                     value={visibility[key] as boolean}
                     onValueChange={(v) => setVisibility(prev => ({ ...prev, [key]: v }))}
-                    thumbColor={(visibility[key] as boolean) ? PURPLE : '#555'}
-                    trackColor={{ false: '#333', true: PURPLE + '44' }}
+                    thumbColor={(visibility[key] as boolean) ? PURPLE : theme.muted}
+                    trackColor={{ false: BORDER, true: PURPLE + '44' }}
                   />
                 </View>
               ))}
@@ -2167,7 +2169,7 @@ function ProductModal({ visible, onClose, productSearch, setProductSearch, produ
                   style={[ms.tagBtn, isTagged && { backgroundColor: PURPLE, borderColor: PURPLE }]}
                   onPress={() => { Haptics.selectionAsync(); onTag(p); }}
                 >
-                  <Text style={[ms.tagBtnText, isTagged && { color: '#000' }]}>{isTagged ? 'Remove' : 'Tag'}</Text>
+                  <Text style={[ms.tagBtnText, isTagged && { color: theme.onAccent }]}>{isTagged ? 'Remove' : 'Tag'}</Text>
                 </TouchableOpacity>
               </View>
             );

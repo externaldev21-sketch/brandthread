@@ -4,20 +4,19 @@
  * All three are intentionally small and calm — they fit inline within list
  * sections, comment threads, and search results without dominating the layout.
  *
- * Design tokens: CARD, BORDER, FG, MUTED, SUBTLE, RED, RED_DIM — all from theme.ts.
+ * Design tokens: read live from the active theme via useColors() — never
+ * hardcoded, so every surface re-skins correctly across all app themes.
  * Icons: Feather only.
  * No external dependencies beyond BrandthreadUI tokens.
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Animated, ViewStyle, StyleProp,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import {
-  CARD, BORDER, FG, MUTED, SUBTLE, RED, RED_DIM,
-  FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 // ─── InlineSpinner ────────────────────────────────────────────────────────────
 /**
@@ -35,6 +34,8 @@ interface InlineSpinnerProps {
 }
 
 export function InlineSpinner({ label, style }: InlineSpinnerProps) {
+  const colors = useColors();
+  const sp = useMemo(() => makeSpinnerStyles(colors), [colors]);
   const dots = [0, 1, 2].map(() => useRef(new Animated.Value(0.3)).current);
 
   useEffect(() => {
@@ -64,11 +65,11 @@ export function InlineSpinner({ label, style }: InlineSpinnerProps) {
   );
 }
 
-const sp = StyleSheet.create({
+const makeSpinnerStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   root:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, paddingVertical: SP.md },
   dots:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  dot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: MUTED },
-  label: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
+  dot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.mutedForeground },
+  label: { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.subtle },
 });
 
 // ─── InlineError ─────────────────────────────────────────────────────────────
@@ -87,9 +88,11 @@ interface InlineErrorProps {
 }
 
 export function InlineError({ message, onRetry, style }: InlineErrorProps) {
+  const colors = useColors();
+  const ie = useMemo(() => makeErrorStyles(colors), [colors]);
   return (
     <View style={[ie.root, style]}>
-      <Feather name="alert-circle" size={14} color={RED} style={{ flexShrink: 0 }} />
+      <Feather name="alert-circle" size={14} color={colors.destructive} style={{ flexShrink: 0 }} />
       <Text style={ie.message} numberOfLines={2}>{message}</Text>
       {onRetry ? (
         <TouchableOpacity
@@ -106,15 +109,15 @@ export function InlineError({ message, onRetry, style }: InlineErrorProps) {
   );
 }
 
-const ie = StyleSheet.create({
+const makeErrorStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   root:      { flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-               backgroundColor: RED_DIM, borderRadius: RADIUS.sm,
-               borderWidth: 1, borderColor: `${RED}33`,
+               backgroundColor: `${colors.destructive}22`, borderRadius: RADIUS.sm,
+               borderWidth: 1, borderColor: `${colors.destructive}33`,
                paddingHorizontal: SP.sm, paddingVertical: SP.xs,
                marginHorizontal: SP.md, marginVertical: SP.xs },
-  message:   { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: RED },
+  message:   { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: colors.destructive },
   retryBtn:  { paddingLeft: SP.xs },
-  retryText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: RED },
+  retryText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: colors.destructive },
 });
 
 // ─── InlineEmpty ─────────────────────────────────────────────────────────────
@@ -135,10 +138,12 @@ interface InlineEmptyProps {
 }
 
 export function InlineEmpty({ icon, label, sub, style }: InlineEmptyProps) {
+  const colors = useColors();
+  const iem = useMemo(() => makeEmptyStyles(colors), [colors]);
   return (
     <View style={[iem.root, style]}>
       <View style={iem.iconWrap}>
-        <Feather name={icon} size={20} color={SUBTLE} />
+        <Feather name={icon} size={20} color={colors.subtle} />
       </View>
       <Text style={iem.label}>{label}</Text>
       {sub ? <Text style={iem.sub}>{sub}</Text> : null}
@@ -146,14 +151,14 @@ export function InlineEmpty({ icon, label, sub, style }: InlineEmptyProps) {
   );
 }
 
-const iem = StyleSheet.create({
+const makeEmptyStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   root:    { alignItems: 'center', justifyContent: 'center', gap: SP.xs,
              paddingVertical: SP.lg, paddingHorizontal: SP.xl },
-  iconWrap:{ width: 40, height: 40, borderRadius: 20, backgroundColor: CARD,
-             borderWidth: 1, borderColor: BORDER,
+  iconWrap:{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.card,
+             borderWidth: 1, borderColor: colors.border,
              alignItems: 'center', justifyContent: 'center', marginBottom: SP.xs },
-  label:   { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, textAlign: 'center' },
-  sub:     { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', maxWidth: 280 },
+  label:   { fontSize: FS.sm, fontFamily: FONT.medium, color: colors.mutedForeground, textAlign: 'center' },
+  sub:     { fontSize: FS.xs, fontFamily: FONT.regular, color: colors.subtle, textAlign: 'center', maxWidth: 280 },
 });
 
 // ─── SectionError ────────────────────────────────────────────────────────────
@@ -171,9 +176,11 @@ interface SectionErrorProps {
 }
 
 export function SectionError({ message, onRetry, style }: SectionErrorProps) {
+  const colors = useColors();
+  const se = useMemo(() => makeSectionErrorStyles(colors), [colors]);
   return (
     <View style={[se.root, style]}>
-      <Feather name="wifi-off" size={13} color={MUTED} />
+      <Feather name="wifi-off" size={13} color={colors.mutedForeground} />
       <Text style={se.message} numberOfLines={1}>{message}</Text>
       <TouchableOpacity
         onPress={onRetry}
@@ -182,19 +189,19 @@ export function SectionError({ message, onRetry, style }: SectionErrorProps) {
         accessibilityLabel={`Retry — ${message}`}
         style={se.retryBtn}
       >
-        <Feather name="refresh-cw" size={12} color={MUTED} />
+        <Feather name="refresh-cw" size={12} color={colors.mutedForeground} />
         <Text style={se.retryText}>Retry</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
-const se = StyleSheet.create({
+const makeSectionErrorStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   root:      { flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-               backgroundColor: CARD, borderRadius: RADIUS.sm,
-               borderWidth: 1, borderColor: BORDER,
+               backgroundColor: colors.card, borderRadius: RADIUS.sm,
+               borderWidth: 1, borderColor: colors.border,
                paddingHorizontal: SP.sm, paddingVertical: 10 },
-  message:   { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  message:   { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: colors.mutedForeground },
   retryBtn:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  retryText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED },
+  retryText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: colors.mutedForeground },
 });
