@@ -3,17 +3,13 @@ import {
   View, Text, FlatList, ScrollView, TouchableOpacity,
   Alert, StyleSheet,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
-import {
-  BG, CARD, CARD_ELEVATED, BORDER,
-  FG, MUTED, SUBTLE, SUCCESS, ORANGE, BLUE, RED, ON_DARK,
-  FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { FONT, FS, SP, ICON } from '@/lib/theme';
+import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+import { useColors } from '@/hooks/useColors';
 import {
   getNotifications, markNotificationRead, markNotificationUnread,
   deleteNotification, muteNotificationCategory, clearAllReadNotifications,
@@ -21,6 +17,8 @@ import {
 } from '@/services/socialService';
 import type { Notification, NotificationCategory } from '@/services/socialTypes';
 import { BrandedLoadingState, EmptyState, ThreadDivider } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { Chip } from '@/components/ui/Chip';
 import SwipeActionRow from '@/components/SwipeActionRow';
 import { useApi } from '@/lib/api';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
@@ -98,16 +96,16 @@ function notifIcon(type: Notification['type']): string {
   }
 }
 
-function notifIconColor(cat: NotificationCategory, accent: string, accentLight: string): string {
+function notifIconColor(cat: NotificationCategory, theme: AppThemePreset, mutedForeground: string): string {
   switch (cat) {
-    case 'social': return accent;
-    case 'orders': return accentLight;
-    case 'messages': return BLUE;
-    case 'seller_updates': return SUCCESS;
-    case 'products': return ORANGE;
-    case 'marketing': return ORANGE;
-    case 'system': return MUTED;
-    default: return MUTED;
+    case 'social': return theme.accent;
+    case 'orders': return theme.accentLight;
+    case 'messages': return theme.accent;
+    case 'seller_updates': return theme.success;
+    case 'products': return theme.warning;
+    case 'marketing': return theme.warning;
+    case 'system': return mutedForeground;
+    default: return mutedForeground;
   }
 }
 
@@ -216,10 +214,8 @@ type ListItem =
 
 export default function BuyerNotifications() {
   const { theme } = useAppTheme();
-  const PURPLE = theme.accent;
-  const PURPLE_DIM = theme.accentDim;
-  const CYAN = theme.accentLight;
-  const styles = makeStyles(theme);
+  const colors = useColors();
+  const styles = makeStyles(theme, colors);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
@@ -350,13 +346,13 @@ export default function BuyerNotifications() {
 
     const { notif } = item;
     const iconName = notifIcon(notif.type);
-    const iconColor = notifIconColor(notif.category, theme.accent, theme.accentLight);
+    const iconColor = notifIconColor(notif.category, theme, colors.mutedForeground);
 
     return (
       <SwipeActionRow
         label={notif.isRead ? 'Unread' : 'Read'}
         icon={notif.isRead ? 'mail' : 'check'}
-        color={notif.isRead ? BLUE : SUCCESS}
+        color={notif.isRead ? theme.accent : theme.success}
         onAction={() => toggleRead(notif)}
         accessibilityLabel={`Mark notification ${notif.isRead ? 'unread' : 'read'}`}
       >
@@ -364,7 +360,7 @@ export default function BuyerNotifications() {
           style={[
             styles.notifRow,
             !notif.isRead && {
-              backgroundColor: CARD,
+              backgroundColor: colors.card,
               borderLeftWidth: 2,
               borderLeftColor: theme.accent,
             },
@@ -375,11 +371,11 @@ export default function BuyerNotifications() {
         >
         {/* Left Icon */}
         {notif.actorInitials ? (
-          <View style={[styles.avatarCircle, { backgroundColor: notif.actorColor || PURPLE }]}>
+          <View style={[styles.avatarCircle, { backgroundColor: notif.actorColor || theme.accent }]}>
             <Text style={styles.avatarText}>{notif.actorInitials}</Text>
           </View>
         ) : (
-          <View style={[styles.iconCircle, { backgroundColor: CARD_ELEVATED }]}>
+          <View style={[styles.iconCircle, { backgroundColor: colors.elevated, borderColor: colors.border }]}>
             <Feather name={iconName as any} size={ICON.md} color={iconColor} />
           </View>
         )}
@@ -408,7 +404,7 @@ export default function BuyerNotifications() {
         {!notif.isRead ? (
           <View style={styles.unreadDot} />
         ) : notif.cta ? (
-          <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />
+          <Feather name="chevron-right" size={ICON.sm} color={colors.mutedForeground} />
         ) : null}
         </TouchableOpacity>
       </SwipeActionRow>
@@ -416,19 +412,12 @@ export default function BuyerNotifications() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.container}>
       {/* HEADER */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={ICON.lg} color={FG} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notifications</Text>
-        {hasRead && (
-          <TouchableOpacity onPress={handleClearRead}>
-            <Text style={styles.clearReadText}>Clear read</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      <ScreenHeader
+        title="Notifications"
+        actions={hasRead ? [{ icon: 'trash-2', onPress: handleClearRead, accessibilityLabel: 'Clear read notifications' }] : undefined}
+      />
 
       {/* CATEGORY PILLS */}
       <ScrollView
@@ -440,25 +429,12 @@ export default function BuyerNotifications() {
         {PILLS.map(pill => {
           const active = selectedCategory === pill.value;
           return (
-            <TouchableOpacity
+            <Chip
               key={pill.label}
-              style={[
-                styles.pill,
-                active
-                  ? { backgroundColor: PURPLE_DIM, borderColor: theme.accent }
-                  : { backgroundColor: CARD, borderColor: BORDER },
-              ]}
+              label={pill.label}
+              selected={active}
               onPress={() => setSelectedCategory(pill.value)}
-            >
-              <Text
-                style={[
-                  styles.pillText,
-                  { color: active ? PURPLE : MUTED },
-                ]}
-              >
-                {pill.label}
-              </Text>
-            </TouchableOpacity>
+            />
           );
         })}
       </ScrollView>
@@ -499,32 +475,10 @@ export default function BuyerNotifications() {
   );
 }
 
-const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.create({
+const makeStyles = (theme: AppThemePreset, colors: ReturnType<typeof useColors>) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'transparent',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.md,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-  },
-  backBtn: {
-    marginRight: SP.md,
-  },
-  headerTitle: {
-    flex: 1,
-    color: FG,
-    fontFamily: FONT.bold,
-    fontSize: FS.md,
-  },
-  clearReadText: {
-    color: MUTED,
-    fontSize: FS.sm,
-    fontFamily: FONT.regular,
   },
   pillsScroll: {
     flexGrow: 0,
@@ -539,17 +493,6 @@ const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.
     paddingHorizontal: SP.md,
     paddingVertical: SP.sm,
     gap: SP.sm,
-  },
-  pill: {
-    borderRadius: RADIUS.pill,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.xs,
-    borderWidth: 1,
-    marginRight: SP.sm,
-  },
-  pillText: {
-    fontSize: FS.sm,
-    fontFamily: FONT.medium,
   },
   unreadBar: {
     paddingHorizontal: SP.md,
@@ -566,7 +509,7 @@ const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.
     marginTop: SP.sm,
   },
   sectionHeaderText: {
-    color: MUTED,
+    color: colors.mutedForeground,
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
     textTransform: 'uppercase',
@@ -578,8 +521,8 @@ const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.
     paddingHorizontal: SP.md,
     paddingVertical: SP.md,
     borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-    backgroundColor: BG,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.background,
   },
   avatarCircle: {
     width: 40,
@@ -589,7 +532,7 @@ const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.
     alignItems: 'center',
   },
   avatarText: {
-    color: ON_DARK,
+    color: theme.onAccent,
     fontFamily: FONT.bold,
     fontSize: FS.sm,
   },
@@ -600,19 +543,19 @@ const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: colors.border,
   },
   notifCenter: {
     flex: 1,
     marginHorizontal: SP.md,
   },
   notifTitle: {
-    color: FG,
+    color: colors.foreground,
     fontSize: FS.sm,
     marginBottom: 2,
   },
   notifBody: {
-    color: MUTED,
+    color: colors.mutedForeground,
     fontSize: FS.xs,
     fontFamily: FONT.regular,
     lineHeight: 16,
@@ -623,7 +566,7 @@ const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.
     alignItems: 'center',
   },
   notifTime: {
-    color: SUBTLE,
+    color: colors.mutedForeground,
     fontSize: FS.xs,
     fontFamily: FONT.regular,
   },
@@ -638,24 +581,5 @@ const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.
     borderRadius: 4,
     backgroundColor: theme.accent,
     marginTop: SP.xs,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: SP.xl,
-  },
-  emptyTitle: {
-    color: FG,
-    fontFamily: FONT.semibold,
-    fontSize: FS.md,
-    marginTop: SP.md,
-  },
-  emptyBody: {
-    color: MUTED,
-    fontSize: FS.sm,
-    fontFamily: FONT.regular,
-    textAlign: 'center',
-    marginTop: SP.sm,
   },
 });

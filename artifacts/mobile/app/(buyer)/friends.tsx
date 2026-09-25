@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import { EmptyState } from '@/components/BrandthreadUI';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBuyerTabBarInset } from '@/components/buyer-nav/buyerTabBarMetrics';
 import { useFocusEffect } from 'expo-router';
@@ -473,26 +474,12 @@ export default function FriendsScreen() {
 
             {/* Empty state */}
             {!hasFriends && feedPosts.length === 0 && apiFollowing.length === 0 && (
-              <View style={s.emptyState}>
-                <Feather name="users" size={48} color={MUTED} />
-                <Text style={s.emptyTitle}>Find your crew</Text>
-                <Text style={s.emptyBody}>
-                  Add friends to see what they're copping, saving, and dropping.
-                </Text>
-                <TouchableOpacity
-                  onPress={() => router.push('/buyer-friend-requests' as never)}
-                  activeOpacity={0.85}
-                >
-                  <LinearGradient
-                    colors={[...theme.primaryGradient]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={s.findFriendsBtn}
-                  >
-                    <Text style={[s.findFriendsBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Find Friends</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
+              <EmptyState
+                icon="users"
+                title="Find your crew"
+                description="Add friends to see what they're copping, saving, and dropping."
+                action={{ label: 'Find Friends', onPress: () => router.push('/buyer-friend-requests' as never) }}
+              />
             )}
           </>
         )}

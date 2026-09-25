@@ -28,8 +28,9 @@ import { ShareProfileSheet } from '@/components/ShareProfileSheet';
 import { loadBuyerProfile } from '@/lib/buyerProfile';
 import { loadHighlights, type Highlight } from '@/lib/highlightsService';
 import {
-  EmptyState, GridSkeleton, ListSkeleton, ResponsiveContainer, useGridColumns, useBreakpoint,
+  GridSkeleton, ListSkeleton, ResponsiveContainer, useGridColumns, useBreakpoint,
 } from '@/components/layout';
+import { EmptyState } from '@/components/BrandthreadUI';
 import { getBuyerOrdersWithStatus } from '@/services/orderService';
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
 import type { BuyerOrderView } from '@/services/orderTypes';
@@ -673,30 +674,35 @@ export default function ProfileScreen() {
 
   let listData: BuyerPost[] | RepostRecord[] | SavedItem[] = [];
   let emptyIcon: keyof typeof Feather.glyphMap = 'grid';
-  let emptyMessage = '';
+  let emptyTitle = '';
+  let emptyDescription = '';
   let emptyActionLabel: string | undefined;
   let emptyOnAction: (() => void) | undefined;
 
   if (activeTab === 'Posts') {
     listData = posts;
     emptyIcon = 'image';
-    emptyMessage = 'No posts yet. Your posts will appear here.';
+    emptyTitle = 'No posts yet';
+    emptyDescription = 'Your posts will appear here.';
     emptyActionLabel = 'Create Post';
     emptyOnAction = () => router.push('/create-post?accountType=buyer' as any);
   } else if (activeTab === 'Tagged') {
     listData = [];
     emptyIcon = 'tag';
-    emptyMessage = 'No tagged posts. Posts that tag you will appear here.';
+    emptyTitle = 'No tagged posts';
+    emptyDescription = 'Posts that tag you will appear here.';
     emptyActionLabel = 'Discover';
     emptyOnAction = () => router.push('/(buyer)/discover');
   } else if (activeTab === 'Reposts') {
     listData = reposts;
     emptyIcon = 'repeat';
-    emptyMessage = 'No reposts yet. Posts you repost will appear here.';
+    emptyTitle = 'No reposts yet';
+    emptyDescription = 'Posts you repost will appear here.';
   } else {
     listData = savedItems;
     emptyIcon = 'bookmark';
-    emptyMessage = 'No saved posts yet. Items you save will appear here.';
+    emptyTitle = 'No saved posts yet';
+    emptyDescription = 'Items you save will appear here.';
     emptyActionLabel = 'View Saved';
     emptyOnAction = () => router.push('/buyer-saved' as any);
   }
@@ -706,10 +712,9 @@ export default function ProfileScreen() {
       <View style={[styles.container, { paddingTop: insets.top, backgroundColor: theme.background }]}>
         <EmptyState
           icon="alert-triangle"
-          message="Couldn't load your profile. Check your connection and try again."
-          variant="error"
-          actionLabel="Retry"
-          onAction={loadData}
+          title="Couldn't load your profile"
+          description="Check your connection and try again."
+          action={{ label: 'Retry', onPress: loadData }}
         />
       </View>
     );
@@ -786,7 +791,7 @@ export default function ProfileScreen() {
           renderItem={({ item }) => <RepostCard repost={item} theme={theme} />}
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={
-            <EmptyState icon={emptyIcon} message={emptyMessage} actionLabel={emptyActionLabel} onAction={emptyOnAction} />
+            <EmptyState icon={emptyIcon} title={emptyTitle} description={emptyDescription} action={emptyActionLabel && emptyOnAction ? { label: emptyActionLabel, onPress: emptyOnAction } : undefined} />
           }
           contentContainerStyle={{ paddingBottom: barInset + SP.lg } as any}
           showsVerticalScrollIndicator={false}
@@ -809,7 +814,7 @@ export default function ProfileScreen() {
           }}
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={
-            <EmptyState icon={emptyIcon} message={emptyMessage} actionLabel={emptyActionLabel} onAction={emptyOnAction} />
+            <EmptyState icon={emptyIcon} title={emptyTitle} description={emptyDescription} action={emptyActionLabel && emptyOnAction ? { label: emptyActionLabel, onPress: emptyOnAction } : undefined} />
           }
           contentContainerStyle={{ paddingBottom: barInset + SP.lg } as any}
           showsVerticalScrollIndicator={false}

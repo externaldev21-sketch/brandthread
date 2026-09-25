@@ -5,16 +5,22 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert, RefreshControl,
+  View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { FONT } from '@/lib/theme';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { Button } from '@/components/ui/Button';
+import { ThemedRefreshControl } from '@/components/ui/ThemedRefreshControl';
+import { TYPE_SCALE } from '@/constants/typography';
+import { SPACING } from '@/constants/spacing';
+import { RADII } from '@/constants/radii';
 import { apiErrorMessage } from '@/lib/safety';
 import type { AccountSession } from '@/lib/safetyTypes';
 
@@ -140,30 +146,22 @@ export default function LoginActivity() {
         </Text>
       </View>
       {!session.current ? (
-        <PressableScale
+        <Button
+          label="Sign out"
+          variant="secondary"
+          size="small"
           onPress={() => signOutDevice(session)}
-          style={s.signOutBtn}
+          loading={busyId === session.id}
           disabled={busyId !== null}
-          accessibilityRole="button"
-          accessibilityLabel={`Sign out ${session.device}`}
-        >
-          {busyId === session.id
-            ? <ActivityIndicator size="small" color={theme.text} />
-            : <Text style={s.signOutText}>Sign out</Text>}
-        </PressableScale>
+          accessibilityHint={`Signs out ${session.device}`}
+        />
       ) : null}
     </View>
   );
 
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
-      <View style={s.header}>
-        <PressableScale onPress={() => router.back()} style={s.headerBtn} accessibilityLabel="Back" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="arrow-left" size={ICON.lg} color={theme.text} />
-        </PressableScale>
-        <Text style={s.headerTitle}>Login activity</Text>
-        <View style={s.headerBtn} />
-      </View>
+      <ScreenHeader title="Login activity" onBack={() => router.back()} />
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color={theme.text} /></View>
@@ -173,12 +171,12 @@ export default function LoginActivity() {
           title="Activity unavailable"
           description={error}
           action={{ label: 'Try again', onPress: () => { setLoading(true); load(); } }}
-          style={{ marginTop: SP.xxl }}
+          style={{ marginTop: SPACING.xxl }}
         />
       ) : (
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + SP.xxl }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={theme.text} />}
+          contentContainerStyle={{ paddingHorizontal: SPACING.md, paddingTop: SPACING.md, paddingBottom: insets.bottom + SPACING.xxl }}
+          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={() => load(true)} />}
         >
           <Text style={s.lead}>
             These devices are signed in to your Brandthread account right now. If you don’t recognize one, sign it out and change your password.
@@ -204,19 +202,16 @@ export default function LoginActivity() {
                   <SessionRow key={session.id} session={session} isLast={index === others.length - 1} />
                 ))}
               </View>
-              <PressableScale
+              <Button
+                label="Sign out of all other devices"
+                variant="destructive"
+                icon="log-out"
                 onPress={signOutOthers}
-                style={s.dangerBtn}
+                loading={busyId === 'others'}
                 disabled={busyId !== null}
-                accessibilityRole="button"
-              >
-                {busyId === 'others'
-                  ? <ActivityIndicator color={theme.error} />
-                  : <>
-                    <Feather name="log-out" size={16} color={theme.error} />
-                    <Text style={s.dangerText}>Sign out of all other devices</Text>
-                  </>}
-              </PressableScale>
+                fullWidth
+                style={s.dangerBtn}
+              />
             </>
           )}
 
@@ -233,44 +228,32 @@ export default function LoginActivity() {
 
 const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { color: theme.text, fontFamily: FONT.bold, fontSize: FS.md },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  lead: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, marginTop: SP.xs },
-  sectionLabel: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11, letterSpacing: 1, marginTop: SP.lg, marginBottom: SP.sm },
-  card: { backgroundColor: theme.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, overflow: 'hidden' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingHorizontal: SP.md, paddingVertical: 14 },
-  rowDivider: { borderBottomWidth: 1, borderBottomColor: theme.borderSubtle },
+  lead: { color: theme.muted, ...TYPE_SCALE.callout, marginTop: SPACING.xs },
+  sectionLabel: { color: theme.subtle, fontFamily: FONT.semibold, fontSize: 11, letterSpacing: 1, marginTop: SPACING.lg, marginBottom: SPACING.sm },
+  card: { backgroundColor: theme.card, borderRadius: RADII.card, borderWidth: 1, borderColor: theme.border, overflow: 'hidden' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, paddingHorizontal: SPACING.md, paddingVertical: 14 },
+  rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.borderSubtle },
   iconWrap: {
-    width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+    width: 40, height: 40, borderRadius: RADII.chip, alignItems: 'center', justifyContent: 'center',
     backgroundColor: theme.cardElevated, borderWidth: 1, borderColor: theme.border,
   },
   iconWrapCurrent: { backgroundColor: theme.accent, borderColor: theme.accent },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  device: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.base, flexShrink: 1 },
-  currentPill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: RADIUS.pill, backgroundColor: theme.success + '22' },
+  device: { color: theme.text, ...TYPE_SCALE.body, fontFamily: FONT.semibold, flexShrink: 1 },
+  currentPill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: RADII.pill, backgroundColor: theme.success + '22' },
   currentText: { color: theme.success, fontFamily: FONT.semibold, fontSize: 11 },
-  meta: { color: theme.muted, fontFamily: FONT.regular, fontSize: FS.xs + 1, marginTop: 2 },
-  metaSub: { color: theme.subtle, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 1 },
-  signOutBtn: {
-    minWidth: 78, height: 34, paddingHorizontal: 12, borderRadius: RADIUS.pill, borderWidth: 1,
-    borderColor: theme.border, backgroundColor: theme.cardElevated, alignItems: 'center', justifyContent: 'center',
-  },
-  signOutText: { color: theme.text, fontFamily: FONT.semibold, fontSize: FS.xs + 1 },
+  meta: { color: theme.muted, ...TYPE_SCALE.footnote, marginTop: 2 },
+  metaSub: { color: theme.subtle, ...TYPE_SCALE.caption, marginTop: 1 },
   emptyCard: {
-    flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.md,
-    borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, padding: SPACING.md,
+    borderRadius: RADII.card, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
   },
-  emptyText: { color: theme.text, fontFamily: FONT.medium, fontSize: FS.sm },
-  dangerBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, height: 50, marginTop: SP.md,
-    borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.error + '66', backgroundColor: theme.card,
-  },
-  dangerText: { color: theme.error, fontFamily: FONT.semibold, fontSize: FS.base },
+  emptyText: { color: theme.text, fontFamily: FONT.medium, ...TYPE_SCALE.callout },
+  dangerBtn: { marginTop: SPACING.md },
   linkRow: {
-    flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.lg, padding: SP.md,
-    borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginTop: SPACING.lg, padding: SPACING.md,
+    borderRadius: RADII.card, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.card,
   },
-  linkText: { flex: 1, color: theme.text, fontFamily: FONT.semibold, fontSize: FS.sm },
+  linkText: { flex: 1, color: theme.text, fontFamily: FONT.semibold, ...TYPE_SCALE.callout },
 });

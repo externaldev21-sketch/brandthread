@@ -161,14 +161,22 @@ vi.mock('@/components/CachedImage', () => ({
 
 vi.mock('@/components/layout', () => ({
   CardSkeleton: () => require('react').createElement('CardSkeleton'),
-  EmptyState: ({ message, actionLabel, onAction }: any) => {
+}));
+
+vi.mock('@/components/BrandthreadUI', () => ({
+  EmptyState: ({ title, description, action }: any) => {
     const React = require('react');
     return React.createElement('EmptyState', {}, [
-      React.createElement('Text', { key: 'msg' }, message),
-      actionLabel
-        ? React.createElement('TouchableOpacity', { key: 'action', onPress: onAction, accessibilityLabel: actionLabel }, actionLabel)
+      React.createElement('Text', { key: 'title' }, title),
+      description ? React.createElement('Text', { key: 'desc' }, description) : null,
+      action
+        ? React.createElement('TouchableOpacity', { key: 'action', onPress: action.onPress, accessibilityLabel: action.label }, action.label)
         : null,
     ]);
+  },
+  PressableScale: (props: Record<string, unknown>) => {
+    const React = require('react');
+    return React.createElement('TouchableOpacity', props, props.children as React.ReactNode);
   },
 }));
 

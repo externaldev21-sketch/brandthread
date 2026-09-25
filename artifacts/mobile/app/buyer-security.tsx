@@ -1,21 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
-import {
-  BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, ON_DARK,
-  FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { SP } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 import { loadBuyerSettings, patchBuyerSettings } from '@/lib/buyerSettings';
-import { Header } from '@/components/layout';
+import { ScreenHeader } from '@/components/ScreenHeader';
+import { SectionHeader } from '@/components/BrandthreadUI';
+import { Card, ListRow } from '@/components/ui';
 
 export default function BuyerSecurity() {
-  const { theme } = useAppTheme();
-  const PURPLE = theme.accent;
-  const s = makeStyles();
+  const colors = useColors();
+  const s = React.useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [loginAlerts, setLoginAlerts] = useState(true);
@@ -23,130 +19,90 @@ export default function BuyerSecurity() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    loadBuyerSettings().then(s => {
-      setLoginAlerts(s.loginAlerts);
-      setSaveLogin(s.saveLoginInfo);
+    loadBuyerSettings().then(loadedSettings => {
+      setLoginAlerts(loadedSettings.loginAlerts);
+      setSaveLogin(loadedSettings.saveLoginInfo);
       setLoaded(true);
     });
   }, []);
 
   async function onToggleLoginAlerts(v: boolean) {
-    Haptics.selectionAsync();
     setLoginAlerts(v);
     await patchBuyerSettings({ loginAlerts: v });
   }
 
   async function onToggleSaveLogin(v: boolean) {
-    Haptics.selectionAsync();
     setSaveLogin(v);
     await patchBuyerSettings({ saveLoginInfo: v });
   }
 
-  if (!loaded) return <View style={[s.page, { paddingTop: insets.top }]} />;
+  if (!loaded) {
+    return (
+      <View style={s.page}>
+        <ScreenHeader title="Password and security" variant="push" onBack={() => router.back()} />
+      </View>
+    );
+  }
 
   return (
     <View style={s.page}>
-      <Header title="Password and security" />
+      <ScreenHeader title="Password and security" variant="push" onBack={() => router.back()} />
 
       <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}>
         {/* Protection toggles */}
-        <Text style={s.groupLabel}>Protection</Text>
-        <View style={s.card}>
+        <SectionHeader title="PROTECTION" />
+        <Card style={s.card}>
           {/* 2FA — enrollment happens in Login methods */}
-          <TouchableOpacity
-            style={s.rowInfo}
-            onPress={() => { Haptics.selectionAsync(); router.push('/login-methods' as never); }}
-            activeOpacity={0.7}
-          >
-            <View style={s.iconWrap}>
-              <Feather name="shield" size={18} color={PURPLE} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.label}>Two-factor authentication</Text>
-              <Text style={s.sub}>Add a second step when you sign in.</Text>
-            </View>
-            <Feather name="chevron-right" size={16} color={SUBTLE} />
-          </TouchableOpacity>
+          <ListRow
+            icon="shield"
+            title="Two-factor authentication"
+            subtitle="Add a second step when you sign in."
+            chevron
+            onPress={() => router.push('/login-methods' as never)}
+          />
           <View style={s.divider} />
-          <View style={s.row}>
-            <View style={s.iconWrap}>
-              <Feather name="bell" size={18} color={PURPLE} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.label}>Login alerts</Text>
-              <Text style={s.sub}>Get notified of new sign-ins</Text>
-            </View>
-            <Switch
-              value={loginAlerts}
-              onValueChange={onToggleLoginAlerts}
-              trackColor={{ false: CARD_ELEVATED, true: PURPLE }}
-              thumbColor={theme.onAccent}
-            />
-          </View>
+          <ListRow
+            icon="bell"
+            title="Login alerts"
+            subtitle="Get notified of new sign-ins"
+            toggle={{ value: loginAlerts, onChange: onToggleLoginAlerts }}
+          />
           <View style={s.divider} />
-          <View style={s.row}>
-            <View style={s.iconWrap}>
-              <Feather name="save" size={18} color={PURPLE} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.label}>Save login info</Text>
-              <Text style={s.sub}>Stay signed in on this device</Text>
-            </View>
-            <Switch
-              value={saveLogin}
-              onValueChange={onToggleSaveLogin}
-              trackColor={{ false: CARD_ELEVATED, true: PURPLE }}
-              thumbColor={theme.onAccent}
-            />
-          </View>
-        </View>
+          <ListRow
+            icon="save"
+            title="Save login info"
+            subtitle="Stay signed in on this device"
+            toggle={{ value: saveLogin, onChange: onToggleSaveLogin }}
+          />
+        </Card>
 
         {/* Access */}
-        <Text style={s.groupLabel}>Access</Text>
-        <View style={s.card}>
-          <TouchableOpacity
-            style={s.row}
-            onPress={() => { Haptics.selectionAsync(); router.push('/forgot-password' as never); }}
-            activeOpacity={0.7}
-          >
-            <View style={s.iconWrap}>
-              <Feather name="key" size={18} color={PURPLE} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.label}>Change password</Text>
-              <Text style={s.sub}>Reset via the sign-in screen</Text>
-            </View>
-            <Feather name="chevron-right" size={18} color={SUBTLE} />
-          </TouchableOpacity>
+        <SectionHeader title="ACCESS" style={s.sectionSpacing} />
+        <Card style={s.card}>
+          <ListRow
+            icon="key"
+            title="Change password"
+            subtitle="Reset via the sign-in screen"
+            chevron
+            onPress={() => router.push('/forgot-password' as never)}
+          />
           <View style={s.divider} />
-          <TouchableOpacity
-            style={s.row}
-            onPress={() => { Haptics.selectionAsync(); router.push('/buyer-login-activity' as never); }}
-            activeOpacity={0.7}
-          >
-            <View style={s.iconWrap}>
-              <Feather name="smartphone" size={18} color={PURPLE} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.label}>Where you're logged in</Text>
-              <Text style={s.sub}>Review active sessions</Text>
-            </View>
-            <Feather name="chevron-right" size={18} color={SUBTLE} />
-          </TouchableOpacity>
-        </View>
+          <ListRow
+            icon="smartphone"
+            title="Where you're logged in"
+            subtitle="Review active sessions"
+            chevron
+            onPress={() => router.push('/buyer-login-activity' as never)}
+          />
+        </Card>
       </ScrollView>
     </View>
   );
 }
 
-const makeStyles = () => StyleSheet.create({
-  page: { flex: 1, backgroundColor: 'transparent' },
-  groupLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SP.sm, marginTop: SP.md },
-  card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden', marginBottom: SP.sm },
-  row: { minHeight: 60, paddingHorizontal: SP.md, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  rowInfo: { minHeight: 60, paddingHorizontal: SP.md, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  divider: { height: 1, backgroundColor: BORDER, marginLeft: SP.md },
-  iconWrap: { width: 28, alignItems: 'center' },
-  label: { fontFamily: FONT.medium, fontSize: FS.base, color: FG },
-  sub: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
+const makeStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
+  page: { flex: 1, backgroundColor: colors.background },
+  sectionSpacing: { marginTop: SP.lg },
+  card: { padding: 0, paddingHorizontal: SP.md },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
 });

@@ -4,32 +4,27 @@
  */
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
+  View, Text, TextInput, StyleSheet,
   KeyboardAvoidingView, Platform, ActivityIndicator,
   ScrollView, StatusBar,
 } from 'react-native';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
-import { ThreadDraw } from '@/components/onboarding/ThreadLine';
-import {
-  CodeCells,
-  FloatingInput,
-  HairlineDivider,
-  PillButton,
-  PressableScale,
-  Reveal,
-  RevealToggle,
-  StepHeadline,
-  StepSub,
-} from '@/components/onboarding/OnboardingUI';
-import { RADIUS, SPACE, TYPE } from '@/components/onboarding/onboardingTokens';
 import { useSignIn, useSSO, useAuth, useUser } from '@clerk/expo';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
+import { Avatar } from '@/components/ui/Avatar';
+import { PressableScale } from '@/components/BrandthreadUI';
+import { hapticPrimaryAction, hapticToggle } from '@/lib/haptics';
+import { FONT } from '@/lib/theme';
+import { TYPE_SCALE } from '@/constants/typography';
+import { SPACING } from '@/constants/spacing';
+import { RADII } from '@/constants/radii';
 import {
   APPLE_OAUTH_STRATEGY,
   isOAuthCancellationError,
@@ -95,7 +90,6 @@ export default function SignInScreen() {
   // ─── Email sign-in ───────────────────────────────────────────────────────────
   async function handleSignIn() {
     if (!canSubmit || isFetching) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
     setError('');
     try {
@@ -121,7 +115,6 @@ export default function SignInScreen() {
   // ─── 2FA (TOTP) ───────────────────────────────────────────────────────────────
   async function handleVerifyTotp() {
     if (!canVerifyTotp || totpLoading) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setTotpLoading(true);
     setTotpError('');
     try {
@@ -179,37 +172,6 @@ export default function SignInScreen() {
     }
   }
 
-  // Shared top of every sign-in state: back, then the mark with the thread
-  // sewing through the header.
-  const renderTop = (onBack: () => void) => (
-    <>
-      <PressableScale
-        style={s.backBtn}
-        accessibilityRole="button"
-        accessibilityLabel="Go back"
-        onPress={onBack}
-        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-      >
-        <Feather name="arrow-left" size={18} color={theme.text} />
-      </PressableScale>
-
-      <View style={s.logoRow}>
-        <ThreadDraw height={56} color={theme.text} delay={120} duration={1200} style={s.logoThread} />
-        <View style={[s.logoChip, { backgroundColor: theme.background }]}>
-          <BrandthreadLogo size={30} />
-          <Text style={s.logoText}>BRANDTHREAD</Text>
-        </View>
-      </View>
-    </>
-  );
-
-  const renderError = (message: string) => (
-    <Reveal style={s.errorBox}>
-      <Feather name="alert-circle" size={14} color={theme.error} />
-      <Text style={s.errorText}>{message}</Text>
-    </Reveal>
-  );
-
   // ─── Active session screen ────────────────────────────────────────────────────
   if (isSignedIn && !isAddAccount) {
     return (
@@ -221,50 +183,62 @@ export default function SignInScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {renderTop(() => { Haptics.selectionAsync(); router.back(); })}
+          {/* Back */}
+          <IconButton
+            name="arrow-left"
+            variant="plain"
+            size={20}
+            color={theme.muted}
+            style={s.backBtn}
+            accessibilityLabel="Go back"
+            onPress={() => router.back()}
+          />
 
-          <StepHeadline size="display">You're already{'\n'}signed in.</StepHeadline>
-          <StepSub>
+          {/* Logo */}
+          <View style={s.logoRow}>
+            <BrandthreadLogo size={36} />
+            <Text style={s.logoText}>BRANDTHREAD</Text>
+          </View>
+
+          <Text style={s.headline}>You're already{'\n'}signed in.</Text>
+          <Text style={s.subtitle}>
             {currentEmail
               ? `You are currently signed in as ${currentEmail}.`
               : 'You have an active session.'}
-          </StepSub>
+          </Text>
 
           {/* Info card */}
-          <Reveal index={2}>
-            <View style={s.sessionCard}>
-              <View style={s.sessionAvatarRow}>
-                <View style={s.sessionAvatar}>
-                  <Text style={s.sessionAvatarText}>
-                    {(currentEmail[0] ?? 'B').toUpperCase()}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.sessionName} numberOfLines={1}>
-                    {user?.firstName ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}` : 'Your account'}
-                  </Text>
-                  <Text style={s.sessionEmail} numberOfLines={1}>{currentEmail}</Text>
-                </View>
+          <View style={s.sessionCard}>
+            <View style={s.sessionAvatarRow}>
+              <Avatar
+                name={user?.firstName ? `${user.firstName} ${user.lastName ?? ''}` : currentEmail}
+                size={48}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={s.sessionName} numberOfLines={1}>
+                  {user?.firstName ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}` : 'Your account'}
+                </Text>
+                <Text style={s.sessionEmail} numberOfLines={1}>{currentEmail}</Text>
               </View>
             </View>
-          </Reveal>
+          </View>
 
-          <Reveal index={3} style={s.stack}>
-            <PillButton
-              accessibilityLabel="Continue with this account"
-              label="Continue with this account"
-              haptic={false}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.replace('/' as never); }}
-            />
-            <PillButton
-              accessibilityLabel="Sign out"
-              label="Sign out"
-              variant="secondary"
-              onPress={handleSignOut}
-              disabled={signingOut}
-              loading={signingOut}
-            />
-          </Reveal>
+          {/* Continue */}
+          <Button
+            label="Continue with this account"
+            onPress={() => router.replace('/' as never)}
+            fullWidth
+            style={s.primaryWrap}
+          />
+
+          {/* Sign out */}
+          <Button
+            label="Sign out"
+            variant="secondary"
+            onPress={handleSignOut}
+            loading={signingOut}
+            fullWidth
+          />
         </ScrollView>
       </View>
     );
@@ -281,32 +255,55 @@ export default function SignInScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {renderTop(() => { Haptics.selectionAsync(); setNeedsTotp(false); setTotpCode(''); setTotpError(''); })}
+            <IconButton
+              name="arrow-left"
+              variant="plain"
+              size={20}
+              color={theme.muted}
+              style={s.backBtn}
+              accessibilityLabel="Go back"
+              onPress={() => { setNeedsTotp(false); setTotpCode(''); setTotpError(''); }}
+            />
 
-            <StepHeadline>Two-factor{'\n'}authentication</StepHeadline>
-            <StepSub>Enter the 6-digit code from your authenticator app.</StepSub>
+            <View style={s.logoRow}>
+              <BrandthreadLogo size={36} />
+              <Text style={s.logoText}>BRANDTHREAD</Text>
+            </View>
 
-            <Reveal index={2} style={s.codeWrap}>
-              <CodeCells
+            <Text style={s.headline}>Two-factor authentication</Text>
+            <Text style={s.subtitle}>Enter the 6-digit code from your authenticator app.</Text>
+
+            <View style={s.fieldWrap}>
+              <Text style={s.label}>Code</Text>
+              <TextInput
+                style={s.input}
+                placeholder="000000"
+                placeholderTextColor={theme.subtle}
                 value={totpCode}
                 onChangeText={t => { setTotpCode(t.replace(/[^0-9]/g, '').slice(0, 6)); setTotpError(''); }}
+                keyboardType="number-pad"
+                maxLength={6}
                 autoFocus
+                returnKeyType="go"
                 onSubmitEditing={handleVerifyTotp}
               />
-            </Reveal>
+            </View>
 
-            {totpError ? renderError(totpError) : null}
+            {totpError ? (
+              <View style={s.errorBox}>
+                <Feather name="alert-circle" size={14} color={theme.error} />
+                <Text style={s.errorText}>{totpError}</Text>
+              </View>
+            ) : null}
 
-            <Reveal index={3}>
-              <PillButton
-                accessibilityLabel="Verify code"
-                label="Verify code"
-                haptic={false}
-                onPress={handleVerifyTotp}
-                disabled={!canVerifyTotp}
-                loading={totpLoading}
-              />
-            </Reveal>
+            <Button
+              label="Verify code"
+              onPress={handleVerifyTotp}
+              disabled={!canVerifyTotp}
+              loading={totpLoading}
+              fullWidth
+              style={s.primaryWrap}
+            />
           </ScrollView>
         </KeyboardAvoidingView>
       </View>
@@ -324,117 +321,153 @@ export default function SignInScreen() {
         <ScrollView
           contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 36 }]}
           keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}
         >
-          {renderTop(() => { Haptics.selectionAsync(); router.back(); })}
+          {/* Back */}
+          <IconButton
+            name="arrow-left"
+            variant="plain"
+            size={20}
+            color={theme.muted}
+            style={s.backBtn}
+            accessibilityLabel="Go back"
+            onPress={() => router.back()}
+          />
+
+          {/* Logo */}
+          <View style={s.logoRow}>
+            <BrandthreadLogo size={36} />
+            <Text style={s.logoText}>BRANDTHREAD</Text>
+          </View>
 
           {/* Heading */}
-          <StepHeadline size="display">{isAddAccount ? 'Add another account.' : 'Welcome back.'}</StepHeadline>
-          <StepSub style={s.subtitle}>
+          <Text style={s.headline}>{isAddAccount ? 'Add another account.' : 'Welcome back.'}</Text>
+          <Text style={s.subtitle}>
             {isAddAccount
               ? 'Sign in to add an existing Brandthread account to this device.'
               : 'Sign in to continue where you left off.'}
-          </StepSub>
+          </Text>
 
           {/* ── OAuth ─────────────────────────────────────────────────────────── */}
-          {/* Apple first — per Apple HIG, iOS only. Shown above Google per App
-              Store guideline 4.8: Sign in with Apple must be at least as
-              prominent as other third-party social login options. */}
-          <Reveal index={2}>
-            {Platform.OS === 'ios' && (
-              <PressableScale
-                style={[s.oauthBtn, s.appleBtn]}
-                onPress={() => handleOAuth('oauth_apple', 'Apple')}
-                accessibilityRole="button"
-                accessibilityLabel="Continue with Apple"
-                disabled={!!oauthLoading || isFetching}
-              >
-                {oauthLoading === 'Apple' ? (
-                  <ActivityIndicator color={theme.text} size="small" />
-                ) : (
-                  <>
-                    <Ionicons name="logo-apple" size={20} color={theme.text} />
-                    <Text style={s.oauthText}>Continue with Apple</Text>
-                  </>
-                )}
-              </PressableScale>
-            )}
-
-            {/* Google */}
+          {/* Apple first — solid black button per Apple HIG, iOS only. Shown above
+              Google per App Store guideline 4.8: Sign in with Apple must be at
+              least as prominent as other third-party social login options. */}
+          {Platform.OS === 'ios' && (
             <PressableScale
-              style={s.oauthBtn}
-              onPress={() => handleOAuth('oauth_google', 'Google')}
-              accessibilityRole="button"
-              accessibilityLabel="Continue with Google"
+              style={[s.oauthBtn, s.appleBtn]}
+              onPress={() => { hapticPrimaryAction(); handleOAuth('oauth_apple', 'Apple'); }}
+              accessibilityLabel="Continue with Apple"
               disabled={!!oauthLoading || isFetching}
             >
-              {oauthLoading === 'Google' ? (
-                <ActivityIndicator color={theme.text} size="small" />
+              {oauthLoading === 'Apple' ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <>
-                  <View style={s.googleGlyph}><Text style={[s.googleGlyphText, { color: theme.background }]}>G</Text></View>
-                  <Text style={s.oauthText}>Continue with Google</Text>
+                  <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
+                  <Text style={[s.oauthText, { color: '#FFFFFF' }]}>Continue with Apple</Text>
                 </>
               )}
             </PressableScale>
-          </Reveal>
+          )}
+
+          {/* Google — dark surface with Google logo, per Google brand guidelines */}
+          <PressableScale
+            style={s.oauthBtn}
+            onPress={() => { hapticPrimaryAction(); handleOAuth('oauth_google', 'Google'); }}
+            accessibilityLabel="Continue with Google"
+            disabled={!!oauthLoading || isFetching}
+          >
+            {oauthLoading === 'Google' ? (
+              <ActivityIndicator color={theme.text} size="small" />
+            ) : (
+              <>
+                <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: FONT.bold, fontSize: 11, color: '#FFFFFF', lineHeight: 13 }}>G</Text></View>
+                <Text style={s.oauthText}>Continue with Google</Text>
+              </>
+            )}
+          </PressableScale>
 
           {/* Divider */}
-          <HairlineDivider>
+          <View style={s.divider}>
+            <View style={s.divLine} />
             <Text style={s.divText}>or</Text>
-          </HairlineDivider>
+            <View style={s.divLine} />
+          </View>
 
           {/* ── Email ──────────────────────────────────────────────────────────── */}
-          <Reveal index={3}>
-            <FloatingInput
-              label="Email address"
+          <View style={s.fieldWrap}>
+            <Text style={s.label}>Email address</Text>
+            <TextInput
+              style={s.input}
               placeholder="you@yourbrand.com"
+              placeholderTextColor={theme.subtle}
               value={email}
               onChangeText={t => { setEmail(t); setError(''); }}
               autoCapitalize="none"
               keyboardType="email-address"
               autoComplete="email"
             />
-          </Reveal>
+          </View>
 
           {/* ── Password ───────────────────────────────────────────────────────── */}
-          <Reveal index={4}>
-            <FloatingInput
-              label="Password"
-              placeholder="••••••••"
-              value={password}
-              onChangeText={t => { setPassword(t); setError(''); }}
-              secureTextEntry={!showPw}
-              autoComplete="current-password"
-              right={<RevealToggle shown={showPw} onToggle={() => setShowPw(v => !v)} />}
-            />
-            <TouchableOpacity style={s.forgotWrap} onPress={() => router.push('/forgot-password' as never)}>
-              <Text style={s.forgotLink}>Forgot password?</Text>
-            </TouchableOpacity>
-          </Reveal>
+          <View style={s.fieldWrap}>
+            <View style={s.pwLabelRow}>
+              <Text style={s.label}>Password</Text>
+              <PressableScale
+                onPress={() => { hapticToggle(); router.push('/forgot-password' as never); }}
+                accessibilityLabel="Forgot password?"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={[s.forgotLink, { color: theme.accent }]}>Forgot password?</Text>
+              </PressableScale>
+            </View>
+            <View style={s.pwRow}>
+              <TextInput
+                style={[s.input, s.pwInput]}
+                placeholder="••••••••"
+                placeholderTextColor={theme.subtle}
+                value={password}
+                onChangeText={t => { setPassword(t); setError(''); }}
+                secureTextEntry={!showPw}
+                autoComplete="current-password"
+              />
+              <IconButton
+                name={showPw ? 'eye-off' : 'eye'}
+                variant="plain"
+                size={18}
+                color={theme.muted}
+                style={s.eyeBtn}
+                accessibilityLabel={showPw ? 'Hide password' : 'Show password'}
+                onPress={() => setShowPw(v => !v)}
+              />
+            </View>
+          </View>
 
           {/* ── Error ──────────────────────────────────────────────────────────── */}
-          {error ? renderError(error) : null}
+          {error ? (
+            <View style={s.errorBox}>
+              <Feather name="alert-circle" size={14} color={theme.error} />
+              <Text style={s.errorText}>{error}</Text>
+            </View>
+          ) : null}
 
-          {/* ── Sign in / Create account ──────────────────────────────────────── */}
-          <Reveal index={5} style={s.stack}>
-            <PillButton
-              accessibilityLabel="Sign in"
-              label="Sign in"
-              haptic={false}
-              onPress={handleSignIn}
-              disabled={!canSubmit}
-              loading={isFetching}
-            />
-            <PillButton
-              accessibilityLabel="Create an account"
-              label="Create an account"
-              variant="secondary"
-              haptic={false}
-              onPress={() => { Haptics.selectionAsync(); router.replace('/onboarding' as never); }}
-            />
-          </Reveal>
+          {/* ── Sign in ────────────────────────────────────────────────────────── */}
+          <Button
+            label="Sign in"
+            onPress={handleSignIn}
+            disabled={!canSubmit}
+            loading={isFetching}
+            fullWidth
+            style={s.primaryWrap}
+          />
+
+          {/* ── Create account ─────────────────────────────────────────────────── */}
+          <Button
+            label="Create an account"
+            variant="secondary"
+            onPress={() => router.replace('/onboarding' as never)}
+            fullWidth
+          />
 
           <View nativeID="clerk-captcha" />
         </ScrollView>
@@ -475,64 +508,79 @@ function mapError(err: any): string {
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root:    { flex: 1, backgroundColor: theme.background },
 
-  scroll: { paddingHorizontal: SPACE.lg, paddingTop: SPACE.xs },
+  scroll: { paddingHorizontal: SPACING.xl, paddingTop: SPACING.md },
 
-  backBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
-    justifyContent: 'center', alignItems: 'center', marginBottom: SPACE.md,
+  backBtn: { marginBottom: SPACING.lg, alignSelf: 'flex-start' },
+
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.xxxl - 4 },
+  logoText: { fontSize: 12, fontFamily: FONT.bold, color: theme.text, letterSpacing: 2.5 },
+
+  headline: {
+    ...TYPE_SCALE.title1,
+    color: theme.text, letterSpacing: -0.8, marginBottom: SPACING.xs,
   },
-
-  logoRow: { height: 56, justifyContent: 'center', marginBottom: SPACE.xl },
-  logoThread: { position: 'absolute', left: -SPACE.lg, right: -SPACE.lg, top: 0 },
-  logoChip: { flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'flex-start', paddingRight: SPACE.sm },
-  logoText: { ...TYPE.eyebrow, color: theme.text },
-
-  subtitle: { marginBottom: SPACE.xl },
-  stack: { gap: SPACE.sm, marginTop: SPACE.xs },
-  codeWrap: { marginTop: SPACE.xl },
+  subtitle: {
+    ...TYPE_SCALE.body,
+    color: theme.muted, marginBottom: SPACING.xl + SPACING.xxs,
+  },
 
   oauthBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    borderRadius: RADIUS.pill, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
-    minHeight: 56, marginBottom: SPACE.sm,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm,
+    backgroundColor: theme.cardGlass, borderRadius: RADII.card, borderWidth: 1, borderColor: theme.border,
+    paddingVertical: 15, marginBottom: SPACING.xs,
   },
-  appleBtn: { borderColor: theme.border },
-  oauthText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: theme.text },
-  googleGlyph: { width: 20, height: 20, borderRadius: 10, backgroundColor: theme.text, alignItems: 'center', justifyContent: 'center' },
-  googleGlyphText: { fontFamily: 'Inter_700Bold', fontSize: 12, lineHeight: 14 },
+  // Apple button: solid black per Apple Human Interface Guidelines
+  appleBtn: { backgroundColor: '#000000', borderColor: 'rgba(255,255,255,0.15)' },
+  oauthText: { fontSize: 15, fontFamily: FONT.semibold, color: theme.text },
 
-  divText: { ...TYPE.label, color: theme.muted },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginVertical: SPACING.lg },
+  divLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: theme.border },
+  divText: { ...TYPE_SCALE.footnote, color: theme.muted },
 
-  forgotWrap: { alignSelf: 'flex-end', paddingVertical: SPACE.xxs, marginTop: -SPACE.xxs, marginBottom: SPACE.sm },
-  forgotLink: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: theme.text },
+  fieldWrap: { marginBottom: SPACING.md },
+  label:     { fontSize: 12, fontFamily: FONT.semibold, color: theme.muted, marginBottom: SPACING.xs - 2 },
+  input: {
+    backgroundColor: theme.cardGlass, borderWidth: 1, borderColor: theme.border,
+    borderRadius: RADII.input, paddingHorizontal: SPACING.sm + 2, paddingVertical: 13,
+    ...TYPE_SCALE.body, color: theme.text,
+  },
+
+  pwLabelRow: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: SPACING.xs - 2,
+  },
+  forgotLink: { fontSize: 12, fontFamily: FONT.semibold },
+  pwRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: theme.cardGlass, borderWidth: 1, borderColor: theme.border, borderRadius: RADII.input,
+  },
+  pwInput: { flex: 1, borderWidth: 0, backgroundColor: 'transparent' },
+  eyeBtn:  {},
 
   errorBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.error,
-    paddingHorizontal: 14, paddingVertical: 12, marginBottom: SPACE.md,
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.xs,
+     backgroundColor: `${theme.error}22`, borderRadius: RADII.input,
+     borderWidth: 1, borderColor: theme.error,
+    paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs + 2, marginBottom: SPACING.md,
   },
-  errorText: { ...TYPE.label, color: theme.error, flex: 1 },
+  errorText: { ...TYPE_SCALE.footnote, color: theme.error, flex: 1 },
+
+  primaryWrap: { marginBottom: SPACING.xs + 2 },
 
   // Active session screen
   sessionScroll: { justifyContent: 'flex-start' },
   sessionCard: {
-    backgroundColor: theme.card, borderRadius: RADIUS.card,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border,
-    padding: SPACE.md + 2, marginTop: SPACE.xl, marginBottom: SPACE.lg,
+    backgroundColor: theme.cardGlass, borderRadius: RADII.sheet,
+    borderWidth: 1, borderColor: theme.border,
+    padding: SPACING.md + 2, marginBottom: SPACING.xl,
   },
   sessionAvatarRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.md - 2,
   },
-  sessionAvatar: {
-    width: 48, height: 48, borderRadius: 24, backgroundColor: theme.text,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  sessionAvatarText: { fontSize: 20, fontFamily: 'Inter_700Bold', color: theme.background },
   sessionName: {
-    fontSize: 16, fontFamily: 'Inter_600SemiBold', color: theme.text, marginBottom: 2,
+    fontSize: 15, fontFamily: FONT.semibold, color: theme.text, marginBottom: 2,
   },
   sessionEmail: {
-    ...TYPE.label, color: theme.muted,
+    ...TYPE_SCALE.footnote, color: theme.muted,
   },
 });

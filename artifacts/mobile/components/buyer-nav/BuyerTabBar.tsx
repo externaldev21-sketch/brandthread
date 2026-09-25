@@ -22,6 +22,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useBuyerSearch } from '@/contexts/BuyerSearchContext';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { FONT } from '@/lib/theme';
+import { PRESS_SCALE } from '@/constants/motion';
 import {
   TAB_BAR_SHADOW, TabBarBadge, TabBarCircle, TabBarGlass, TabBarIndicator, TabBarSlot, tabIconColor,
 } from '@/components/tab-bar/TabBarParts';
@@ -462,7 +463,7 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
-    transform: [{ scale: 0.94 }],
+    transform: [{ scale: PRESS_SCALE }],
   },
   field: {
     position: 'absolute',
