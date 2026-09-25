@@ -858,7 +858,7 @@ export default function DiscoverScreen() {
         ) : highDemandError ? (
           <SectionError message={highDemandError} onRetry={fetchHighDemand} />
         ) : highDemandItems.length === 0 ? (
-          <EmptyState icon="trending-up" title="No high-demand products" description="Nothing is trending in demand right now." compact />
+          <EmptyState icon="trending-up" title="No high-demand products right now" compact />
         ) : (
           <View style={{ gap: 10 }}>
             {highDemandItems.slice(0, 6).map(item => (
@@ -908,7 +908,7 @@ export default function DiscoverScreen() {
         </ResponsiveContainer>
       ) : forYouItems.length === 0 ? (
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH} style={{ marginBottom: SP.xl }}>
-          <EmptyState icon="package" title="No products available" description="Check back soon for new arrivals." compact />
+          <EmptyState icon="package" title="No products available right now" compact />
         </ResponsiveContainer>
       ) : (
         <ResponsiveContainer maxWidth={GRID_MAX_WIDTH}>
@@ -932,7 +932,7 @@ export default function DiscoverScreen() {
           ) : dropsError ? (
             <SectionError message={dropsError} onRetry={fetchDrops} />
           ) : dropsItems.length === 0 ? (
-            <EmptyState icon="calendar" title="No upcoming drops" description="New drops will show up here as they're announced." compact />
+            <EmptyState icon="calendar" title="No upcoming drops right now" compact />
           ) : (
             dropsItems.map(item => <DropRow key={item.id} item={item} />)
           )}
@@ -953,7 +953,7 @@ export default function DiscoverScreen() {
           ) : trendingError ? (
             <SectionError message={trendingError} onRetry={fetchTrending} />
           ) : trendingItems.length === 0 ? (
-            <EmptyState icon="activity" title="No trending posts" description="Trending posts will appear here as activity picks up." compact />
+            <EmptyState icon="activity" title="No trending posts right now" compact />
           ) : (
             trendingItems.slice(0, 10).map(item => <TrendingRow key={item.id} item={item} />)
           )}

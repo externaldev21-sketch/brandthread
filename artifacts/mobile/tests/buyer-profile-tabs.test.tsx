@@ -175,6 +175,26 @@ vi.mock('@/components/layout', () => {
   };
 });
 
+vi.mock('@/components/BrandthreadUI', () => {
+  const ReactActual = require('react') as typeof import('react');
+  return {
+    EmptyState: ({ title, description, action }: { title: string; description?: string; action?: { label: string; onPress: () => void } }) =>
+      ReactActual.createElement(
+        'View',
+        {},
+        ReactActual.createElement('Text', null, title),
+        description ? ReactActual.createElement('Text', null, description) : null,
+        action
+          ? ReactActual.createElement(
+            'TouchableOpacity',
+            { testID: 'empty-state-action', onPress: action.onPress },
+            ReactActual.createElement('Text', null, action.label),
+          )
+          : null,
+      ),
+  };
+});
+
 import ProfileScreen from '@/app/(buyer)/profile';
 
 function textContent(value: unknown): string {

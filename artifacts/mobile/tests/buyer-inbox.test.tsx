@@ -110,6 +110,23 @@ vi.mock('@/components/layout', () => ({
   ListSkeleton: () => React.createElement('View', { testID: 'inbox-skeleton' }),
 }));
 
+vi.mock('@/components/BrandthreadUI', () => ({
+  EmptyState: ({ title, description, action }: { title: string; description?: string; action?: { label: string; onPress: () => void } }) =>
+    React.createElement(
+      'View',
+      {},
+      React.createElement('Text', {}, title),
+      description ? React.createElement('Text', {}, description) : null,
+      action
+        ? React.createElement(
+          'TouchableOpacity',
+          { testID: 'empty-state-action', onPress: action.onPress },
+          React.createElement('Text', {}, action.label),
+        )
+        : null,
+    ),
+}));
+
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({
     theme: {
