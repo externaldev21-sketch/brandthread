@@ -3336,6 +3336,10 @@ const styles = StyleSheet.create({
   // to breathe at 375pt width (5 icon buttons + LIVE badge otherwise crowd
   // "Following"/"Threads" onto two lines).
   buyerTopBtnCompact: { width: 33, height: 36, alignItems: 'center', justifyContent: 'center' },
+  // Full 44x44 touch target — used by the creator-profile-videos player's
+  // simpler back/cart top bar (isCreatorFeed), distinct from the compact
+  // buyer Threads Home top row above which needs to fit more controls.
+  buyerTopBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   buyerTopCluster: { flexDirection: 'row', alignItems: 'center', gap: 0 },
   buyerTabSwitcherWrap: { flex: 1, alignItems: 'center', paddingHorizontal: 4 },
   buyerCartBadge: { top: 3, right: 1 },

@@ -50,7 +50,10 @@ describe('buyer Home feed behind the bar', () => {
     // The scrub line sits exactly at the seam where the sharp video is
     // clipped and the blurred tab-bar strip begins — no offset gap.
     expect(feed).toContain('progressBottom={immersive ? bottomClearance : undefined}');
-    expect(feed).toContain('bottomStripHeight={immersive ? bottomClearance : 0}');
+    // The blurred strip only shows where there's an actual floating tab bar
+    // to blend into (hasTabBar) — the creator-profile-videos player reuses
+    // this same component without one.
+    expect(feed).toContain('bottomStripHeight={immersive && hasTabBar ? bottomClearance : 0}');
   });
 
   it('fills the screen only when that crops little, and letterboxes otherwise', () => {
