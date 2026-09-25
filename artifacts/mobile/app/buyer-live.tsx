@@ -532,11 +532,12 @@ function BuyerLiveNativeScreen() {
           <View style={s.purchaseHeader}>
             <View style={{ flex: 1 }}>
               <Text style={s.purchaseEyebrow}>Buy without leaving</Text>
-              <Text style={s.purchaseTitle}>{purchaseTag.productName}</Text>
+              <Text style={s.purchaseTitle} numberOfLines={1}>{purchaseTag.productName}</Text>
             </View>
             <PressableScale
               onPress={() => { hapticLight(); setPurchaseTag(null); }}
               style={s.purchaseClose}
+              hitSlop={6}
               accessibilityRole="button"
               accessibilityLabel="Close purchase sheet"
             >

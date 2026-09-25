@@ -597,7 +597,7 @@ export default function ProfileScreen() {
           style={[styles.actionBtn, styles.actionBtnPrimary, { backgroundColor: theme.accent }]}
           onPress={() => router.push('/(buyer)/edit-profile')}
         >
-          <Text style={[styles.actionBtnText, { color: theme.onAccent }]}>Edit profile</Text>
+          <Text style={[styles.actionBtnText, { color: theme.onAccent }]} numberOfLines={1}>Edit profile</Text>
         </PressableScale>
         <PressableScale
           style={[styles.actionIconBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
@@ -953,7 +953,7 @@ const styles = StyleSheet.create({
   // Action buttons
   actionRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, marginTop: SP.md, gap: SP.sm },
   actionBtn: {
-    flex: 1, height: 44,
+    flex: 1, height: 44, paddingHorizontal: SP.sm,
     borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center',
   },
   actionBtnPrimary: {},

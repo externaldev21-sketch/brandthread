@@ -22,7 +22,7 @@ import {
   FONT, FS, SP, RADIUS, ICON, OVERLAY, RED,
 } from '@/lib/theme';
 import {
-  getComments, likePost, repostPost, saveItem, getMyPosts, updatePost, deletePost,
+  getComments, likePost, repostPost, saveItem, getMyPosts, getPostById, updatePost, deletePost,
   MY_USER_ID, MY_COLOR, MY_INITIALS, MY_NAME, MY_HANDLE,
 } from '@/services/socialService';
 import type { BuyerPost, Comment } from '@/services/socialTypes';
@@ -115,7 +115,7 @@ export default function BuyerPostViewer() {
 
   const loadPost = useCallback(async () => {
     const all = await getMyPosts();
-    const found = all.find(p => p.id === params.postId);
+    const found = all.find(p => p.id === params.postId) ?? await getPostById(params.postId);
     if (found) {
       setPost(found);
       setLiked(found.likedByMe ?? false);

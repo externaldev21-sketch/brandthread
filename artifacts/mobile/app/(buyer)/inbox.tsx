@@ -458,7 +458,16 @@ export default function InboxScreen() {
       ));
     }
     if (notif.targetId) {
-      router.push(`/buyer-other-profile?userId=${encodeURIComponent(notif.targetId)}` as never);
+      router.push({
+        pathname: '/buyer-other-profile' as any,
+        params: {
+          userId: notif.targetId,
+          name: notif.actorName ?? '',
+          handle: notif.actorHandle ?? '',
+          initials: notif.actorInitials ?? '',
+          color: notif.actorColor ?? '',
+        },
+      });
     }
   }
 

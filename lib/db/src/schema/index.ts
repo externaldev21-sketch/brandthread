@@ -976,6 +976,9 @@ export const reviews = pgTable('reviews', {
 }, (table) => ({
   orderIdx: index('reviews_order_id_idx').on(table.orderId),
   productIdx: index('reviews_product_id_idx').on(table.productId),
+  buyerOrderUnique: uniqueIndex('reviews_buyer_order_unique')
+    .on(table.buyerId, table.orderId)
+    .where(sql`${table.orderId} IS NOT NULL`),
 }));
 
 // ─── Shoppable post tagging ────────────────────────────────────────────────────

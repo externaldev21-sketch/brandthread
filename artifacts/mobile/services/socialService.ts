@@ -217,6 +217,18 @@ export async function getMyPosts(k: SocialKeys = K()): Promise<BuyerPost[]> {
   );
   return Array.isArray(remote) ? remote : [];
 }
+/** A single post by id, regardless of author — for opening a specific post
+ *  (e.g. from Saved or a Collection) without already knowing who wrote it.
+ *  Returns null if it doesn't exist, isn't visible, or isn't shared with the
+ *  viewer (posts are friends-only unless they're the viewer's own). */
+export async function getPostById(postId: string, k: SocialKeys = K()): Promise<BuyerPost | null> {
+  if (k.userId === 'anon' || !postId) return null;
+  try {
+    return await serviceRequest<BuyerPost>(`/api/social/posts/${encodeURIComponent(postId)}`);
+  } catch {
+    return null;
+  }
+}
 export async function createPost(params: {
   type: BuyerPost['type'];
   caption: string;
