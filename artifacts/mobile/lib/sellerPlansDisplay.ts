@@ -3,44 +3,27 @@
  *
  * IMPORTANT — money safety: every price shown here is derived from the real
  * `SELLER_PLANS` catalogue in `lib/sellerPlans.ts` (the actual billed
- * monthly price). Nothing in this file changes what a seller is charged —
- * "yearly" is a display-only projection (2 months free, a common SaaS
- * framing) used purely for marketing copy on the toggle. The actual
- * purchase/checkout call in plans.tsx always charges the real monthly price;
- * see the PR description for the real annual Price IDs the owner would need
- * to create before annual billing could ever be wired up for real.
+ * monthly price). Nothing in this file changes what a seller is charged.
+ * There is no yearly billing option today, so only the real monthly price
+ * is ever shown — an annual price/toggle was deliberately left out to avoid
+ * displaying a number checkout can't actually charge. See the PR
+ * description for the real annual Price IDs the owner would need to create
+ * before annual billing could ever be offered for real.
  */
 import { SELLER_PLANS, type SellerPlanDefinition } from './sellerPlans';
-
-export type BillingInterval = 'monthly' | 'yearly';
-
-/** Months of savings marketed on the yearly toggle (2 months free = ~17%). */
-export const YEARLY_FREE_MONTHS = 2;
-
-export function yearlyPriceCents(monthlyPriceCents: number): number {
-  return monthlyPriceCents * (12 - YEARLY_FREE_MONTHS);
-}
 
 export function formatDollars(cents: number): string {
   const dollars = cents / 100;
   return Number.isInteger(dollars) ? `$${dollars}` : `$${dollars.toFixed(2)}`;
 }
 
-/** The price + period copy to show on a plan card for the selected interval. */
-export function displayPriceFor(plan: SellerPlanDefinition, interval: BillingInterval): {
+/** The price + period copy to show on a plan card — always the real monthly price. */
+export function displayPriceFor(plan: SellerPlanDefinition): {
   price: string;
   period: string;
   note: string | null;
 } {
-  if (interval === 'monthly') {
-    return { price: plan.priceLabel, period: '/mo', note: null };
-  }
-  const yearly = yearlyPriceCents(plan.priceCents);
-  return {
-    price: formatDollars(yearly),
-    period: '/yr',
-    note: `${formatDollars(yearly / 12)}/mo billed annually — ${YEARLY_FREE_MONTHS} months free`,
-  };
+  return { price: plan.priceLabel, period: '/mo', note: null };
 }
 
 /** Every distinct feature across all tiers, in first-appearance order, for the comparison table. */
@@ -102,6 +85,6 @@ export const PLAN_FAQ: PlanFaqItem[] = [
   },
   {
     question: 'How do I pay — monthly or yearly?',
-    answer: 'Plans are billed monthly today. Annual billing (2 months free) is shown here for planning purposes and will be available at checkout soon.',
+    answer: 'Plans are billed monthly today. Annual billing isn\'t available yet — we\'ll announce it here once it is.',
   },
 ];

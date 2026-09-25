@@ -45,7 +45,6 @@ import {
   displayPriceFor,
   planIncludesFeature,
   PLAN_FAQ,
-  type BillingInterval,
 } from '@/lib/sellerPlansDisplay';
 
 // ─── Local palette constants ──────────────────────────────────────────────────
@@ -74,8 +73,6 @@ export default function PlansScreen() {
   /** 'none' means no paid subscription yet — Starter must remain selectable. */
   const [currentPlanStatus, setCurrentPlanStatus] = useState<string | null>(null);
   const [pricesTimedOut,    setPricesTimedOut]    = useState(false);
-  /** Display-only — see lib/sellerPlansDisplay.ts. Purchases always charge the real monthly price. */
-  const [billingInterval,   setBillingInterval]   = useState<BillingInterval>('monthly');
   const [openFaqIndex,      setOpenFaqIndex]      = useState<number | null>(null);
 
   // Native pricing comes from RevenueCat asynchronously. If packages never
@@ -311,32 +308,6 @@ export default function PlansScreen() {
           </LinearGradient>
         </View>
 
-        {/* Monthly / yearly toggle — display only; billing is monthly today (see FAQ) */}
-        <View style={styles.intervalToggle} testID="seller-plans-interval-toggle">
-          {(['monthly', 'yearly'] as const).map((interval) => {
-            const active = billingInterval === interval;
-            return (
-              <TouchableOpacity
-                key={interval}
-                testID={`seller-plans-interval-${interval}`}
-                style={[styles.intervalOption, active && styles.intervalOptionActive]}
-                onPress={() => { haptic(); setBillingInterval(interval); }}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-              >
-                <Text style={[styles.intervalText, active && styles.intervalTextActive]}>
-                  {interval === 'monthly' ? 'Monthly' : 'Yearly'}
-                </Text>
-                {interval === 'yearly' && (
-                  <View style={styles.intervalBadge}>
-                    <Text style={styles.intervalBadgeText}>SAVE 17%</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
         {/* Recommendation banner */}
         {recommendedId && (
           <View style={styles.recBanner}>
@@ -387,11 +358,10 @@ export default function PlansScreen() {
           const isCurrent     = !isOnboarding && plan.id === currentPlanId;
           const isLoading     = loadingId === plan.id;
           const revenueCatPackage = packages.find((pkg) => pkg.identifier === SELLER_PACKAGE_IDS[plan.id]);
-          // The monthly/yearly toggle only changes DISPLAY copy on web, where
-          // the price is our own literal string. Native purchases always use
-          // RevenueCat's real priceString for the real monthly product —
-          // the toggle never changes what's actually charged.
-          const webPrice = displayPriceFor(plan, billingInterval);
+          // Web shows our own literal monthly price string; native purchases
+          // always use RevenueCat's real priceString for the same monthly
+          // product. No yearly option exists, so there's nothing to toggle.
+          const webPrice = displayPriceFor(plan);
           const priceLabel = Platform.OS === 'web'
             ? webPrice.price
             : revenueCatPackage?.product.priceString ?? null;
@@ -419,11 +389,6 @@ export default function PlansScreen() {
                 {plan.id === 'growth' && !isRecommended && (
                   <View style={styles.popularBadge}>
                     <Text style={styles.popularBadgeText}>MOST POPULAR</Text>
-                  </View>
-                )}
-                {billingInterval === 'yearly' && plan.id === 'pro' && !isRecommended && (
-                  <View style={styles.bestValueBadge}>
-                    <Text style={styles.bestValueBadgeText}>BEST VALUE</Text>
                   </View>
                 )}
                 {isCurrent && (
@@ -454,9 +419,6 @@ export default function PlansScreen() {
                    </Text>
                 </View>
               </View>
-               {Platform.OS === 'web' && billingInterval === 'yearly' && webPrice.note && (
-                 <Text style={styles.nativeTrial}>{webPrice.note}. Billed monthly at checkout for now.</Text>
-               )}
                {Platform.OS !== 'web' && trial && priceLabel && (() => {
                  const isFree = /^\$?0(\.00?)?$/.test(trial.priceString.trim());
                  const unitLabel = `${trial.periodNumberOfUnits} ${trial.periodUnit.toLowerCase()}${trial.periodNumberOfUnits === 1 ? '' : 's'}`;
@@ -652,21 +614,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   heroTitle: { fontSize: 24, fontFamily: FONT.semibold, color: theme.text, letterSpacing: -0.3, lineHeight: 30 },
   heroSub: { fontSize: FS.sm, fontFamily: FONT.regular, color: theme.muted, marginTop: 2 },
 
-  // Monthly / yearly toggle
-  intervalToggle: {
-    flexDirection: 'row', backgroundColor: theme.card, borderRadius: RADIUS.md,
-    borderWidth: 1, borderColor: theme.border, padding: 4, gap: 4,
-  },
-  intervalOption: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    paddingVertical: 10, borderRadius: RADIUS.sm,
-  },
-  intervalOptionActive: { backgroundColor: theme.accent },
-  intervalText: { fontSize: FS.sm, fontFamily: FONT.medium, color: theme.muted },
-  intervalTextActive: { color: theme.onAccent, fontFamily: FONT.semibold },
-  intervalBadge: { backgroundColor: `${theme.success}33`, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 },
-  intervalBadgeText: { fontSize: 9, fontFamily: FONT.semibold, color: theme.success, letterSpacing: 0.3 },
-
   // Recommendation banner
   recBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -722,8 +669,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
    popularBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.accent, letterSpacing: 0.5 },
   currentBadge:     { backgroundColor: `${theme.success}22`, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
    currentBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.success, letterSpacing: 0.5 },
-  bestValueBadge:     { backgroundColor: `${theme.success}22`, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
-  bestValueBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.success, letterSpacing: 0.5 },
 
   cardTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
   planName:    { fontSize: FS.xl, fontFamily: FONT.semibold, color: theme.text },

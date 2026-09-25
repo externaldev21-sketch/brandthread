@@ -6,16 +6,7 @@ import {
   formatDollars,
   planIncludesFeature,
   PLAN_FAQ,
-  yearlyPriceCents,
-  YEARLY_FREE_MONTHS,
 } from './sellerPlansDisplay';
-
-describe('yearlyPriceCents', () => {
-  it('charges for 10 months (2 months free) — display only, never sent to billing', () => {
-    expect(YEARLY_FREE_MONTHS).toBe(2);
-    expect(yearlyPriceCents(2900)).toBe(2900 * 10);
-  });
-});
 
 describe('formatDollars', () => {
   it('formats whole and fractional dollar amounts', () => {
@@ -27,18 +18,11 @@ describe('formatDollars', () => {
 describe('displayPriceFor', () => {
   const starter = SELLER_PLANS.find((p) => p.id === 'starter')!;
 
-  it('shows the real monthly price unchanged for the monthly interval', () => {
-    const result = displayPriceFor(starter, 'monthly');
+  it('shows only the real monthly price — no yearly projection', () => {
+    const result = displayPriceFor(starter);
     expect(result.price).toBe(starter.priceLabel);
     expect(result.period).toBe('/mo');
     expect(result.note).toBeNull();
-  });
-
-  it('projects a yearly price as a display-only note, not a different charge', () => {
-    const result = displayPriceFor(starter, 'yearly');
-    expect(result.price).toBe(formatDollars(yearlyPriceCents(starter.priceCents)));
-    expect(result.period).toBe('/yr');
-    expect(result.note).toContain('months free');
   });
 });
 
