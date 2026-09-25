@@ -555,6 +555,64 @@ router.post("/compose-video", requireAuth, async (req, res) => {
   }
 });
 
+// ─── POST /api/posts/compose-video/thumbnail ───────────────────────────────
+// Re-extracts a cover frame from an already-composed video at a seller-chosen
+// offset, without re-encoding the whole clip. Used by the "choose cover
+// frame" step in create-post.tsx, which previously had no way to pick a
+// frame other than whatever the fixed offset in compose-video produced.
+router.post("/compose-video/thumbnail", requireAuth, async (req, res) => {
+  const clerkId = (req as any).clerkUserId as string;
+  if (!(await isSeller(clerkId))) return res.status(403).json({ error: "Seller account required" });
+  const { mediaPath, offset } = req.body as { mediaPath?: string; offset?: number };
+  if (!validObjectPath(mediaPath)) {
+    return res.status(400).json({ error: "Invalid mediaPath" });
+  }
+  const offsetSeconds = Number(offset);
+  if (!Number.isFinite(offsetSeconds) || offsetSeconds < 0) {
+    return res.status(400).json({ error: "Invalid offset" });
+  }
+
+  const dir = await fs.mkdtemp(join(tmpdir(), "brandthread-thumb-"));
+  let thumbnailObject: string | null = null;
+  try {
+    const file = await storage.getObjectEntityFile(mediaPath!);
+    const allowed = await storage.canAccessObjectEntity({
+      userId: clerkId, objectFile: file, requestedPermission: ObjectPermission.WRITE,
+    });
+    if (!allowed) return res.status(403).json({ error: "This video is not owned by this seller" });
+
+    const [metadata] = await file.getMetadata();
+    const size = Number(metadata.size ?? 0);
+    if (!Number.isFinite(size) || size <= 0 || size > MAX_CLIP_BYTES) {
+      return res.status(400).json({ error: "Video is empty or too large" });
+    }
+    const localPath = join(dir, "source.mp4");
+    const [bytes] = await file.download();
+    await fs.writeFile(localPath, bytes);
+
+    const videoDuration = await duration(localPath);
+    const clampedOffset = Math.max(0, Math.min(offsetSeconds, Math.max(0, videoDuration - 0.05)));
+
+    const thumbnail = join(dir, "thumbnail.jpg");
+    await exec("ffmpeg", [
+      "-y", "-ss", String(clampedOffset),
+      "-i", localPath, "-frames:v", "1", "-q:v", "2", thumbnail,
+    ], { timeout: 30_000, maxBuffer: 4 * 1024 * 1024 });
+
+    thumbnailObject = await storage.createObjectEntityFromBuffer(await fs.readFile(thumbnail), "image/jpeg");
+    await storage.trySetObjectEntityAclPolicy(thumbnailObject, { owner: clerkId, visibility: "private" });
+    const thumbnailUrl = await storage.getObjectEntityDownloadURL(thumbnailObject, COMPOSED_PREVIEW_TTL_SECONDS);
+
+    return res.json({ thumbnailUrl, thumbnailPath: thumbnailObject, offset: clampedOffset });
+  } catch (err) {
+    if (thumbnailObject) await storage.deleteObjectEntity(thumbnailObject).catch(() => {});
+    req.log.error({ err, clerkId }, "Could not extract cover frame");
+    return res.status(500).json({ error: "Could not extract a cover frame at that point" });
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
 router.get("/media/*path", async (req, res) => {
   const raw = req.params.path;
   const suffix = Array.isArray(raw) ? raw.join("/") : String(raw ?? "");

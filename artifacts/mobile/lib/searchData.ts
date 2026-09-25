@@ -28,7 +28,7 @@ export type SearchResult = SearchProduct | SearchBrand;
 
 export interface TrendingTerm {
   term: string;
-  type: 'category' | 'brand';
+  type: 'category' | 'brand' | 'query';
 }
 
 export interface SuggestedBrand {

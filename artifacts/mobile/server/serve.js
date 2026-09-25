@@ -9,6 +9,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { renderSharePreviewHtml } = require('./sharePreview');
 
 const STATIC_ROOT = path.resolve(
   __dirname,
@@ -75,7 +76,7 @@ function canonicalRedirectLocation(req, requestUrl) {
   return `${CANONICAL_ORIGIN}${requestUrl.pathname}${requestUrl.search}`;
 }
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   let pathname;
   let requestUrl;
   try {
@@ -117,7 +118,19 @@ const server = http.createServer((req, res) => {
   // Only browser navigations get the SPA shell. Missing JS/image requests
   // should remain a real 404 instead of returning HTML with status 200.
   const acceptsHtml = String(req.headers.accept || '').includes('text/html');
-  if (acceptsHtml && serveFile(path.join(STATIC_ROOT, 'index.html'), res)) return;
+  if (acceptsHtml) {
+    const shellPath = path.join(STATIC_ROOT, 'index.html');
+    if (fs.existsSync(shellPath)) {
+      const shellHtml = fs.readFileSync(shellPath, 'utf8');
+      const preview = await renderSharePreviewHtml(requestedPath, shellHtml).catch(() => null);
+      if (preview) {
+        send(res, 200, preview, 'text/html; charset=utf-8');
+        return;
+      }
+      send(res, 200, shellHtml, 'text/html; charset=utf-8');
+      return;
+    }
+  }
 
   send(res, 404, 'Not Found');
 });

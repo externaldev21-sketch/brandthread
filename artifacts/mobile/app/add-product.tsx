@@ -24,6 +24,8 @@ import { TYPE_SCALE } from '@/constants/typography';
 import { hapticPrimaryAction, hapticToggle, hapticSuccessAction, hapticDestructiveConfirm } from '@/lib/haptics';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Button } from '@/components/ui/Button';
+import { SuccessSheet } from '@/components/ui/SuccessSheet';
+import { SuccessSheet } from '@/components/ui/SuccessSheet';
 
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, FilterChip, StatusBadge, SectionHeader, FormInput, ProgressCard, EmptyState } from '@/components/BrandthreadUI';
 
@@ -36,11 +38,23 @@ import { calcPricing, generateVariantCombinations, buildVariantTitle, validateFo
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import { completeSetupTaskAfter } from '@/lib/setupCompletion';
+import { validatePhotosStep, validateDetailsStep, validatePricingStep, validateVariantsStep } from '@/lib/listingValidation';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
+
+type FlowStep = 'photos' | 'details' | 'variants' | 'pricing' | 'shipping' | 'review';
+
+const FLOW_STEPS: { key: FlowStep; label: string; icon: keyof typeof Feather.glyphMap }[] = [
+  { key: 'photos', label: 'Photos', icon: 'camera' },
+  { key: 'details', label: 'Details', icon: 'file-text' },
+  { key: 'variants', label: 'Variants', icon: 'layers' },
+  { key: 'pricing', label: 'Pricing', icon: 'dollar-sign' },
+  { key: 'shipping', label: 'Shipping', icon: 'truck' },
+  { key: 'review', label: 'Review', icon: 'check-circle' },
+];
 
 // ─── Collapsible section component ──────────────────────────────────────────
 
@@ -191,12 +205,19 @@ export default function AddProductScreen() {
   const [dismissedTips, setDismissedTips] = useState<string[]>([]);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [publishSuccess, setPublishSuccess] = useState<{ name: string; kind: 'created' | 'updated'; productId: string } | null>(null);
   const [mediaUpload, setMediaUpload] = useState<Record<string, { status: 'uploading' | 'done' | 'error'; remoteUri?: string }>>({});
   const photosUploading = Object.values(mediaUpload).some(u => u.status === 'uploading');
   const [isEditMode, setIsEditMode] = useState(false);
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [collections, setCollections] = useState<ProductCollection[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  const [stepIndex, setStepIndex] = useState(0);
+  const currentStepKey = FLOW_STEPS[stepIndex].key;
+  const [stepAttempted, setStepAttempted] = useState<Record<FlowStep, boolean>>({
+    photos: false, details: false, variants: false, pricing: false, shipping: false, review: false,
+  });
 
   // ── Pre-order ──
   const [isPreOrder, setIsPreOrder] = useState(params.intent === 'drop');
@@ -471,6 +492,12 @@ export default function AddProductScreen() {
     showExitAlert(leaveProductFlow);
   }
 
+  async function handleSaveDraftAndExit() {
+    await saveDraftAndClear(buildDraftSnapshot());
+    Alert.alert('Draft saved', 'You can continue editing later.');
+    leaveProductFlow();
+  }
+
   async function handleSaveDraftInPlace() {
     await saveDraftAndClear(buildDraftSnapshot());
     Alert.alert('Draft saved', 'Your progress has been saved.');
@@ -677,20 +704,14 @@ export default function AddProductScreen() {
       if (isEditMode && editProductId) {
         await api.products.update(editProductId, serverUpdatePayload);
         await deleteDraft(draftId.current);
-        Alert.alert('Product updated!', name + ' has been updated.', [
-          { text: 'View product', onPress: () => router.replace('/product-detail?id=' + editProductId as never) },
-          { text: 'Done', onPress: leaveProductFlow },
-        ]);
+        setPublishSuccess({ name, kind: 'updated', productId: editProductId });
       } else {
         const newProduct = await completeSetupTaskAfter(
           'first_product',
           () => api.products.create(serverCreatePayload),
         ) as any;
         await deleteDraft(draftId.current);
-        Alert.alert('Product published!', name + ' is now live.', [
-          { text: 'View product', onPress: () => router.replace('/product-detail?id=' + newProduct.id as never) },
-          { text: 'Done', onPress: leaveProductFlow },
-        ]);
+        setPublishSuccess({ name, kind: 'created', productId: newProduct.id });
       }
     } catch {
       showPublishError('Error', 'Could not publish. Please try again.');
@@ -1736,6 +1757,89 @@ export default function AddProductScreen() {
     );
   }
 
+  function renderShippingStep() {
+    return (
+      <>
+        {renderFulfillment()}
+        <CollapsibleSection
+          title="Manufacturing"
+          icon="tool"
+          expanded={expandedSections.manufacturing}
+          onToggle={() => toggleSection('manufacturing')}
+          hint={mfgMode === 'none' ? 'Not set up yet' : mfgMode === 'existing' ? mfgName || 'Existing manufacturer' : 'Quote requested'}
+        >
+          {renderManufacturing()}
+        </CollapsibleSection>
+      </>
+    );
+  }
+
+  function renderReviewStep() {
+    return (
+      <>
+        <SectionHeader title="Live preview" style={s.sectionHdr} />
+        {renderLivePreview()}
+        <CollapsibleSection
+          title="Storefront & SEO"
+          icon="globe"
+          expanded={expandedSections.storefront}
+          onToggle={() => toggleSection('storefront')}
+          hint="Visibility, collections, URL handle"
+        >
+          {renderStorefront()}
+        </CollapsibleSection>
+      </>
+    );
+  }
+
+  function stepErrorsFor(step: FlowStep) {
+    switch (step) {
+      case 'photos': return validatePhotosStep({ media: draftData.media ?? [] });
+      case 'details': return validateDetailsStep({ name: draftData.name ?? '', category: draftData.category });
+      case 'variants': return validateVariantsStep({ variants: localVariants.map(v => ({ title: v.title, sku: v.sku, price: v.price })) });
+      case 'pricing': return validatePricingStep({
+        priceStr, compareAtStr, costStr, isPreOrder,
+        preOrderOpenDate: undefined, preOrderCloseDate: draftData.preorderSettings?.closeDate,
+      });
+      default: return [];
+    }
+  }
+
+  const currentErrors = stepErrorsFor(currentStepKey);
+
+  function goNext() {
+    setStepAttempted(prev => ({ ...prev, [currentStepKey]: true }));
+    if (currentErrors.length > 0) hapticDestructiveConfirm();
+    else hapticPrimaryAction();
+    setStepIndex(i => Math.min(i + 1, FLOW_STEPS.length - 1));
+  }
+
+  function goBack() {
+    if (stepIndex === 0) { handleExit(); return; }
+    hapticPrimaryAction();
+    setStepIndex(i => Math.max(i - 1, 0));
+  }
+
+  function goToStep(i: number) {
+    if (i === stepIndex) return;
+    hapticToggle();
+    setStepAttempted(prev => ({ ...prev, [currentStepKey]: true }));
+    setStepIndex(i);
+  }
+
+  function renderStepContent() {
+    switch (currentStepKey) {
+      case 'photos': return renderPhotos();
+      case 'details': return renderBasicInfo();
+      case 'variants': return renderVariants();
+      case 'pricing': return renderPricingAndStock();
+      case 'shipping': return renderShippingStep();
+      case 'review': return renderReviewStep();
+    }
+  }
+
+  const isLastStep = stepIndex === FLOW_STEPS.length - 1;
+
   // ─── Render ─────────────────────────────────────────────────────
 
   return (
@@ -1758,90 +1862,110 @@ export default function AddProductScreen() {
         }
       />
 
-       {/* ── One continuous product form ── */}
+      {/* ── Sticky step progress ── */}
+      <View style={s.progressBar}>
+        {FLOW_STEPS.map((step, i) => {
+          const done = i < stepIndex;
+          const active = i === stepIndex;
+          return (
+            <TouchableOpacity
+              key={step.key}
+              style={s.progressStep}
+              onPress={() => goToStep(i)}
+              accessibilityLabel={`Step ${i + 1}: ${step.label}`}
+              testID={`add-product-step-${step.key}`}
+            >
+              <View style={[s.progressDot, done && s.progressDotDone, active && s.progressDotActive]}>
+                {done ? (
+                  <Feather name="check" size={11} color={theme.onAccent} />
+                ) : (
+                  <Text style={[s.progressDotText, active && { color: theme.onAccent }]}>{i + 1}</Text>
+                )}
+              </View>
+              <Text style={[s.progressLabel, active && { color: FG, fontFamily: FONT.semibold }]} numberOfLines={1}>
+                {step.label}
+              </Text>
+              {i < FLOW_STEPS.length - 1 && <View style={[s.progressConnector, done && s.progressConnectorDone]} />}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
           style={s.scrollView}
-           contentContainerStyle={[s.scrollContent, { paddingBottom: Math.max(insets.bottom, SP.lg) + SP.lg }]}
+          contentContainerStyle={[s.scrollContent, { paddingBottom: SP.md }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
-           testID="add-product-form"
+          testID="add-product-form"
         >
-           <Text style={s.formHint}>Everything for your listing, in one place.</Text>
           <View style={s.essentialSection}>
-             <Text style={s.essentialLabel}>Photos</Text>
-             {renderPhotos()}
+            <Text style={s.essentialLabel}>{FLOW_STEPS[stepIndex].label}</Text>
+            {renderStepContent()}
+            {stepAttempted[currentStepKey] && currentErrors.length > 0 && (
+              <View style={s.errorBanner}>
+                {currentErrors.map((error, i) => (
+                  <Text key={i} style={s.errorBannerText}>• {error.message}</Text>
+                ))}
+              </View>
+            )}
+            {isLastStep && publishError ? (
+              <View style={s.publishError} testID="add-product-publish-error">
+                <Feather name="alert-circle" size={16} color={RED} />
+                <Text style={s.publishErrorText}>{publishError}</Text>
+              </View>
+            ) : null}
           </View>
-           <View style={s.divider} />
-           <View style={s.essentialSection}>
-             <Text style={s.essentialLabel}>Product details</Text>
-             {renderBasicInfo()}
-           </View>
-           <View style={s.divider} />
-           <View style={s.essentialSection}>
-             <Text style={s.essentialLabel}>Pricing & stock</Text>
-             {renderPricingAndStock()}
-           </View>
-           <CollapsibleSection
-             title="Options & variants"
-             icon="layers"
-             expanded={expandedSections.variants}
-             onToggle={() => toggleSection('variants')}
-             hint={localVariants.length ? `${localVariants.length} variants` : 'Sizes, colors and other options'}
-             testID="add-product-variants-toggle"
-           >
-             {renderVariants()}
-           </CollapsibleSection>
-           <View style={s.essentialSection}>
-             <Text style={s.essentialLabel}>Shipping</Text>
-             {renderFulfillment()}
-           </View>
-           <CollapsibleSection
-             title="Manufacturing"
-             icon="tool"
-             expanded={expandedSections.manufacturing}
-             onToggle={() => toggleSection('manufacturing')}
-             hint={mfgMode === 'none' ? 'Optional' : mfgMode === 'existing' ? mfgName || 'Existing manufacturer' : 'Quote requested'}
-           >
-             {renderManufacturing()}
-           </CollapsibleSection>
-           <CollapsibleSection
-             title="Storefront & SEO"
-             icon="globe"
-             expanded={expandedSections.storefront}
-             onToggle={() => toggleSection('storefront')}
-             hint="Visibility, collections and search"
-           >
-             {renderStorefront()}
-           </CollapsibleSection>
-           <CollapsibleSection
-             title="Live preview"
-             icon="eye"
-             expanded={expandedSections.preview}
-             onToggle={() => toggleSection('preview')}
-             hint="See how your listing will look"
-           >
-             {renderLivePreview()}
-           </CollapsibleSection>
-           <View style={s.finalAction}>
-             {publishError ? (
-               <View style={s.publishError} testID="add-product-publish-error">
-                 <Feather name="alert-circle" size={16} color={RED} />
-                 <Text style={s.publishErrorText}>{publishError}</Text>
-               </View>
-             ) : null}
-             <PrimaryButton
-               label={photosUploading ? 'Uploading photos…' : publishing ? 'Publishing…' : isEditMode ? 'Save changes' : 'Publish product'}
-               disabled={publishing || photosUploading}
-               onPress={handlePublish}
-             />
-             <Text style={s.finalHint}>Not ready? Save a draft from the top of this page.</Text>
-           </View>
         </ScrollView>
+
+        <View style={[s.stickyFooter, { paddingBottom: Math.max(insets.bottom, SP.sm) }]}>
+          <View style={s.publishButtons}>
+            <SecondaryButton
+              label={stepIndex === 0 ? 'Cancel' : 'Back'}
+              onPress={goBack}
+              style={{ flex: 1 }}
+            />
+            {isLastStep ? (
+              <PrimaryButton
+                label={photosUploading ? 'Uploading photos…' : publishing ? 'Publishing…' : 'Publish'}
+                disabled={publishing || photosUploading}
+                onPress={handlePublish}
+                style={{ flex: 1 }}
+              />
+            ) : (
+              <PrimaryButton
+                label="Next"
+                icon="arrow-right"
+                onPress={goNext}
+                style={{ flex: 1 }}
+              />
+            )}
+          </View>
+          <TouchableOpacity onPress={handleSaveDraftAndExit} style={{ alignSelf: 'center', paddingTop: 4 }}>
+            <Text style={[s.headerSaveText, { color: MUTED }]}>Save as draft & exit</Text>
+          </TouchableOpacity>
+        </View>
       </KeyboardAvoidingView>
+
+      <SuccessSheet
+        visible={!!publishSuccess}
+        onClose={() => setPublishSuccess(null)}
+        title={publishSuccess?.kind === 'updated' ? 'Product updated!' : 'Product published!'}
+        subtitle={publishSuccess ? `${publishSuccess.name} ${publishSuccess.kind === 'updated' ? 'has been updated.' : 'is now live.'}` : undefined}
+        primaryAction={{
+          label: 'View product',
+          onPress: () => {
+            const id = publishSuccess?.productId;
+            setPublishSuccess(null);
+            if (id) router.replace(('/product-detail?id=' + id) as never);
+          },
+        }}
+        secondaryAction={{ label: 'Done', onPress: () => { setPublishSuccess(null); leaveProductFlow(); } }}
+        testID="add-product-success-sheet"
+      />
     </View>
   );
 }
@@ -1872,13 +1996,38 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontFamily: FONT.semibold,
   },
 
+  progressBar: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: SP.md,
+    paddingTop: SP.sm,
+    paddingBottom: SP.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+  },
+  progressStep: { flex: 1, alignItems: 'center', position: 'relative' },
+  progressDot: {
+    width: 22, height: 22, borderRadius: RADII.pill,
+    backgroundColor: CARD, borderWidth: 1.5, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  progressDotActive: { borderColor: theme.accent, backgroundColor: theme.accent },
+  progressDotDone: { borderColor: theme.accent, backgroundColor: theme.accent },
+  progressDotText: { ...TYPE_SCALE.caption, fontFamily: FONT.bold, color: MUTED },
+  progressLabel: { ...TYPE_SCALE.caption, color: MUTED, marginTop: 4, textAlign: 'center' },
+  progressConnector: {
+    position: 'absolute', top: 10, right: '-50%', width: '100%', height: 1.5, backgroundColor: BORDER, zIndex: -1,
+  },
+  progressConnectorDone: { backgroundColor: theme.accent },
+  errorBanner: {
+    backgroundColor: 'rgba(248,113,113,0.12)', borderRadius: RADIUS.sm, borderWidth: 1, borderColor: RED,
+    padding: SP.sm, gap: 4, marginTop: SP.xs,
+  },
+  errorBannerText: { fontSize: FS.sm, fontFamily: FONT.medium, color: RED },
+
   // Scroll
   scrollView: { flex: 1 },
-   scrollContent: { paddingTop: SP.md },
-   formHint: {
-     fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED,
-     paddingHorizontal: SP.md, paddingBottom: SP.lg,
-   },
+  scrollContent: { paddingTop: SP.md },
 
   // Essential sections (always visible)
   essentialSection: {
@@ -1892,13 +2041,6 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     color: FG,
     letterSpacing: -0.2,
   },
-  divider: {
-    height: 1,
-    backgroundColor: BORDER,
-    marginHorizontal: SP.md,
-    marginBottom: SP.md,
-  },
-
   // Collapsible sections
   collapsibleBlock: {
     borderTopWidth: 1,
@@ -1940,18 +2082,21 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     gap: SP.md,
   },
 
-   finalAction: {
-     paddingHorizontal: SP.md,
-     paddingTop: SP.lg,
-     gap: SP.sm,
-   },
-   publishError: {
-     flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm,
-     padding: SP.md, borderRadius: RADIUS.sm,
-     borderWidth: 1, borderColor: RED, backgroundColor: CARD,
-   },
-   publishErrorText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: RED, lineHeight: 20 },
-   finalHint: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' },
+  stickyFooter: {
+    paddingHorizontal: SP.md,
+    paddingTop: SP.sm,
+    gap: SP.sm,
+    borderTopWidth: 1,
+    borderTopColor: BORDER,
+    backgroundColor: BG,
+  },
+  publishButtons: { flexDirection: 'row', gap: SP.sm },
+  publishError: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm,
+    padding: SP.md, borderRadius: RADIUS.sm,
+    borderWidth: 1, borderColor: RED, backgroundColor: CARD,
+  },
+  publishErrorText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: RED, lineHeight: 20 },
 
   // Shared field helpers
   sectionHdr: { paddingHorizontal: 0 },

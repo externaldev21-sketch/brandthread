@@ -24,6 +24,7 @@ vi.mock('react-native', () => ({
   ActivityIndicator: nativeComponent('ActivityIndicator'),
   Image: nativeComponent('Image'),
   Linking: { openURL: vi.fn() },
+  Share: { share: vi.fn().mockResolvedValue({ action: 'sharedAction' }) },
   StyleSheet: { create: (styles: unknown) => styles },
   Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
   Animated: {
@@ -47,8 +48,9 @@ vi.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'success' },
 }));
 
+const searchParams: { orderId: string; step?: string } = { orderId: 'order-1' };
 vi.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({ orderId: 'order-1' }),
+  useLocalSearchParams: () => searchParams,
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
 }));
 
@@ -128,6 +130,7 @@ vi.mock('@/lib/money', () => ({
 
 const getShippingRatesMock = vi.fn();
 const purchaseShippingLabelMock = vi.fn();
+const voidShippingLabelMock = vi.fn();
 const addTrackingMock = vi.fn().mockResolvedValue({});
 const getPackagePresetsMock = vi.fn();
 const createPackagePresetMock = vi.fn();
@@ -137,6 +140,7 @@ const updateFulfillmentChecklistMock = vi.fn().mockResolvedValue(undefined);
 vi.mock('@/services/orderService', () => ({
   getShippingRates: (...args: unknown[]) => getShippingRatesMock(...args),
   purchaseShippingLabel: (...args: unknown[]) => purchaseShippingLabelMock(...args),
+  voidShippingLabel: (...args: unknown[]) => voidShippingLabelMock(...args),
   addTracking: (...args: unknown[]) => addTrackingMock(...args),
   getPackagePresets: (...args: unknown[]) => getPackagePresetsMock(...args),
   createPackagePreset: (...args: unknown[]) => createPackagePresetMock(...args),
@@ -180,6 +184,7 @@ function findByLabel(renderer: ReactTestRenderer, type: string, label: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  searchParams.step = undefined;
   getPackagePresetsMock.mockResolvedValue([
     { id: 'preset-1', name: 'Small Box', weightOz: 16, lengthIn: '10.00', widthIn: '8.00', heightIn: '4.00' },
   ]);
@@ -315,5 +320,69 @@ describe('fulfill-order shipping label purchase', () => {
 
     expect(addTrackingMock).toHaveBeenCalledWith('order-1', 'USPS', '1Z999AA10123456784');
     expect(updateStatusMock).toHaveBeenCalledWith('order-1', 'shipped');
+  });
+});
+
+describe('fulfill-order deep link (order-detail "Buy Label" consolidation)', () => {
+  it('opens directly on the shipping step when launched with ?step=3, instead of a separate screen', async () => {
+    searchParams.step = '3';
+    // No package chosen yet (AsyncStorage mock returns null) — the screen
+    // should prompt to choose one rather than silently showing nothing.
+    orderGetMock.mockResolvedValue(makeOrder());
+    let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = create(<FulfillOrderScreen />); });
+    await flush();
+
+    expect(renderer.root.findAll(node => (node.type as any) === 'Text' && String(node.children).includes('Choose a package before loading shipping rates')).length).toBeGreaterThan(0);
+    expect(getShippingRatesMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('fulfill-order label void gating', () => {
+  it('treats a voided label as no label, blocking Mark as Shipped until a new one or manual tracking is added', async () => {
+    orderGetMock.mockResolvedValue(makeOrder());
+    voidShippingLabelMock.mockResolvedValue({
+      id: 'lbl-1', orderId: 'order-1', carrier: 'USPS', service: 'Priority',
+      trackingNumber: '9400111899', labelUrl: 'https://example.com/label.pdf',
+      priceCents: 500, status: 'voided', isDemo: false, purchasedAt: '2026-01-01T00:00:00.000Z',
+    });
+    let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = create(<FulfillOrderScreen />); });
+    await flush();
+
+    // Walk through checklist -> package -> buy label.
+    for (const row of renderer.root.findAllByType('TouchableOpacity' as any)) {
+      await act(async () => { row.props.onPress(); });
+    }
+    await act(async () => { await findByLabel(renderer, 'PrimaryButton', 'Continue').props.onPress(); });
+    await flush();
+    const presetChip = renderer.root.findAllByType('TouchableOpacity' as any)[0];
+    await act(async () => { presetChip.props.onPress(); });
+    await act(async () => { await findByLabel(renderer, 'PrimaryButton', 'Continue').props.onPress(); });
+    await flush();
+    const rateRow = renderer.root.findAllByType('TouchableOpacity' as any).find(n => typeof n.props.onPress === 'function' && !n.props.disabled);
+    await act(async () => { await rateRow!.props.onPress(); });
+    await flush();
+
+    const voidBtn = findByLabel(renderer, 'SecondaryButton', 'Void label');
+    await act(async () => { await voidBtn.props.onPress(); });
+    await flush();
+    // Confirmation alert's destructive action.
+    const alertMock = (await import('react-native')).Alert.alert as unknown as ReturnType<typeof vi.fn>;
+    const confirmCall = alertMock.mock.calls.find(c => c[0] === 'Void label');
+    const confirmAction = confirmCall?.[2]?.find((b: any) => b.text === 'Void label');
+    await act(async () => { await confirmAction.onPress(); });
+    await flush();
+
+    expect(voidShippingLabelMock).toHaveBeenCalledWith('order-1', 'lbl-1');
+
+    await act(async () => { await findByLabel(renderer, 'PrimaryButton', 'Continue').props.onPress(); });
+    await flush();
+
+    const shipBtn = findByLabel(renderer, 'PrimaryButton', 'Mark as Shipped');
+    await act(async () => { await shipBtn.props.onPress(); });
+    await flush();
+
+    expect(updateStatusMock).not.toHaveBeenCalled();
   });
 });

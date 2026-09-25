@@ -13,6 +13,12 @@
  */
 
 export const IMAGE_HOST = 'https://cdn.brandthread.test';
+
+// Mirrors content/legal.ts's LEGAL_VERSION. Duplicated (rather than imported)
+// because this file runs under plain `node`, not a TS-aware runtime — kept
+// in sync by tests/legal-documents-demo-data-sync.test.ts, which fails the
+// suite the moment the two drift.
+const DEMO_LEGAL_VERSION = '2026-09-23';
 const img = (name) => `${IMAGE_HOST}/demo/${name}.jpg`;
 
 const HOUR = 36e5;
@@ -398,6 +404,11 @@ function sellerConversations(count = 5) {
 function profileFor(role) {
   const user = role === 'seller' ? SELLER_USER : BUYER_USER;
   return {
+    // Keeps the demo account "already agreed" to the current terms so
+    // LegalAcceptanceGate never blocks a capture — without this the gate
+    // shows on every screen the moment content/legal.ts's LEGAL_VERSION is
+    // bumped, since termsVersion was previously left unset here.
+    termsVersion: DEMO_LEGAL_VERSION,
     id: role === 'seller' ? '8d1f6a2e-4b3c-4e5d-9f60-7a8b9c0d1e2f' : '9e2a7b3f-5c4d-4f6e-8a71-8b9c0d1e2f3a',
     clerkId: user.id,
     email: user.email,

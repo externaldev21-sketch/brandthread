@@ -463,6 +463,7 @@ export default function CreatePostScreen() {
   const [previewSeekTime,setPreviewSeekTime] = useState(0);
   const [previewClipIndex,setPreviewClipIndex] = useState(0);
   const [composedVideo, setComposedVideo] = useState<ComposedVideoLocal | null>(null);
+  const [settingCover, setSettingCover] = useState(false);
   const [processingPhase, setProcessingPhase] = useState<'idle'|'uploading'|'processing'|'error'|'ready'>('idle');
   const [processingError, setProcessingError] = useState<string | null>(null);
   const timelineWidthRef = useRef(1);
@@ -869,6 +870,25 @@ export default function CreatePostScreen() {
       setVideoClips([...uploaded]);
       setProcessingPhase('error');
       setProcessingError("Couldn't process your video. Tap Retry.");
+    }
+  }
+
+  // Uses the video-edit step's own scrub position as the chosen cover frame
+  // — re-extracts just that frame from the already-composed video instead
+  // of re-encoding the whole clip. Previously "Edit cover" only reopened
+  // the trim screen with no way to actually change which frame was used.
+  async function useCurrentFrameAsCover() {
+    if (!composedVideo || settingCover) return;
+    setSettingCover(true);
+    try {
+      const result = await api.posts.composeVideoThumbnail(composedVideo.mediaPath, scrubTime);
+      setComposedVideo(prev => prev ? { ...prev, thumbnailUrl: result.thumbnailUrl, thumbnailPath: result.thumbnailPath } : prev);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setStep('post-details');
+    } catch {
+      Alert.alert("Couldn't set cover", 'Please try a different frame or try again.');
+    } finally {
+      setSettingCover(false);
     }
   }
 
@@ -1550,6 +1570,24 @@ export default function CreatePostScreen() {
             <Feather name="check-circle" size={15} color={PURPLE} />
             <Text style={ts.readyBannerText}>Ready · {composedVideo.duration.toFixed(1)}s</Text>
           </View>
+        )}
+
+        {composedVideo && !busy && (
+          <TouchableOpacity
+            style={ts.coverFrameBtn}
+            onPress={useCurrentFrameAsCover}
+            disabled={settingCover}
+            accessibilityLabel="Use this frame as cover"
+          >
+            {settingCover ? (
+              <ActivityIndicator size="small" color={FG} />
+            ) : (
+              <>
+                <Feather name="image" size={13} color={FG} />
+                <Text style={ts.coverFrameBtnText}>Use this frame as cover</Text>
+              </>
+            )}
+          </TouchableOpacity>
         )}
 
         {/* Bottom CTA */}
@@ -2369,6 +2407,8 @@ const createTs = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   errorBannerText:  { fontSize: FS.xs, fontFamily: FONT.medium, color: ORANGE, flex: 1 },
   readyBanner:      { position: 'absolute', bottom: 90, left: 20, right: 20, zIndex: 15, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(20,20,20,0.90)', borderRadius: 12, padding: 12 },
   readyBannerText:  { fontSize: FS.xs, fontFamily: FONT.medium, color: FG },
+  coverFrameBtn:    { position: 'absolute', bottom: 145, alignSelf: 'center', zIndex: 15, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(20,20,20,0.90)', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
+  coverFrameBtnText:{ fontSize: FS.xs, fontFamily: FONT.semibold, color: FG },
 
   videoBottomBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20,

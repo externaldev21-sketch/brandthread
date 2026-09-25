@@ -692,7 +692,15 @@ export default function SellerProfileScreen() {
   const displayProducts = liveProducts;
 
   const heroStats: BrandHeroStat[] = [
-    { key: 'followers', label: 'Followers', value: formatCount(followers), onPress: () => router.push('/connections?type=followers' as never) },
+    {
+      key: 'followers',
+      label: 'Followers',
+      value: formatCount(followers),
+      onPress: () => {
+        const targetId = canonicalSellerId ?? profile.sellerId;
+        router.push((`/connections?type=followers` + (targetId ? `&userId=${targetId}` : '')) as never);
+      },
+    },
     { key: 'rating', label: 'Rating', value: apiRating && apiRating.totalCount > 0 ? apiRating.avgRating.toFixed(1) : '0.0' },
     { key: 'products', label: 'Products', value: formatCount(profile.productCount) },
   ];

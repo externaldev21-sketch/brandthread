@@ -33,8 +33,7 @@ function sellerPreviewFromSearch(search: string, isDev: boolean, isWeb: boolean)
   if (!isDev) return false;
   if (!isWeb) return false;
   const v = new URLSearchParams(search).get('bt_preview');
-  if (v === 'buyer') return false;
-  return true;
+  return v === 'seller';
 }
 
 function buyerPreviewFromSearch(search: string, isDev: boolean, isWeb: boolean): PreviewResult {
@@ -66,11 +65,11 @@ describe('isSellerDevPreview — native platform guard', () => {
 // ── Query-string logic (dev + web) ────────────────────────────────────────────
 
 describe('isSellerDevPreview — query-string logic (dev web)', () => {
-  it('returns true for default (no bt_preview param) — seller default', () => {
-    expect(sellerPreviewFromSearch('', true, true)).toBe(true);
+  it('returns false for default (no bt_preview param) — real flow, not fake data', () => {
+    expect(sellerPreviewFromSearch('', true, true)).toBe(false);
   });
 
-  it('returns true for ?bt_preview=seller', () => {
+  it('returns true only for explicit ?bt_preview=seller', () => {
     expect(sellerPreviewFromSearch('?bt_preview=seller', true, true)).toBe(true);
   });
 
@@ -78,12 +77,12 @@ describe('isSellerDevPreview — query-string logic (dev web)', () => {
     expect(sellerPreviewFromSearch('?bt_preview=buyer', true, true)).toBe(false);
   });
 
-  it('returns true for unrecognised bt_preview values (defaults to seller)', () => {
-    expect(sellerPreviewFromSearch('?bt_preview=admin', true, true)).toBe(true);
+  it('returns false for unrecognised bt_preview values', () => {
+    expect(sellerPreviewFromSearch('?bt_preview=admin', true, true)).toBe(false);
   });
 
-  it('returns true when bt_preview is absent but other params are present', () => {
-    expect(sellerPreviewFromSearch('?foo=bar&baz=qux', true, true)).toBe(true);
+  it('returns false when bt_preview is absent but other params are present', () => {
+    expect(sellerPreviewFromSearch('?foo=bar&baz=qux', true, true)).toBe(false);
   });
 
   it('returns false when bt_preview=buyer is mixed with other params', () => {
@@ -119,8 +118,8 @@ describe('isBuyerDevPreview', () => {
 
 describe('seller + buyer preview symmetry', () => {
   const cases = [
-    { search: '',                 seller: true,  buyer: false },
-    { search: '?bt_preview=seller', seller: true, buyer: false },
+    { search: '',                   seller: false, buyer: false },
+    { search: '?bt_preview=seller', seller: true,  buyer: false },
     { search: '?bt_preview=buyer',  seller: false, buyer: true },
   ];
 
@@ -175,5 +174,11 @@ describe('isSellerDevPreview real export (module path exists)', () => {
     const { readFileSync } = require('fs');
     const src: string = readFileSync(resolve(__dirname, '../devPreview.ts'), 'utf8');
     expect(src).toContain("Platform.OS !== 'web'");
+  });
+
+  it('seller preview requires an explicit bt_preview=seller opt-in (source check)', () => {
+    const { readFileSync } = require('fs');
+    const src: string = readFileSync(resolve(__dirname, '../devPreview.ts'), 'utf8');
+    expect(src).toContain("return v === 'seller';");
   });
 });

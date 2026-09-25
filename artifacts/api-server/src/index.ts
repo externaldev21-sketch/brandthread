@@ -1,5 +1,6 @@
 import "./instrument";
 import app from "./app";
+import { validateEnv } from "./lib/env";
 import { logger } from "./lib/logger";
 import { flushMonitoring } from "./lib/monitoring";
 import { startAbandonedCartJob } from "./jobs/abandonedCartRecovery";
@@ -15,6 +16,8 @@ import { startPushReceiptCleanupJob } from "./jobs/pushReceiptCleanup";
 import { startNotificationBatchFlushJob } from "./jobs/notificationBatchFlush";
 import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
 import { pool } from "@workspace/db";
+
+validateEnv();
 
 const rawPort = process.env["PORT"];
 

@@ -45,6 +45,7 @@ import { initInventoryService } from '@/services/inventoryService';
 import { initAnalyticsService } from '@/services/analyticsService';
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { initBuyerProfile } from '@/lib/buyerProfile';
+import { WebAppShell } from '@/components/web/WebAppShell';
 import StoreContextBanner from '@/components/StoreContextBanner';
 import NetworkNoticeBanner from '@/components/NetworkNoticeBanner';
 import { dismissNetworkNotice } from '@/lib/networkNotice';
@@ -120,7 +121,7 @@ function RuntimeThemeShell({ children }: { children: React.ReactNode }) {
           barStyle={palette.statusBarStyle ?? 'light-content'}
           backgroundColor={background}
         />
-        {children}
+        <WebAppShell>{children}</WebAppShell>
       </View>
     </NavigationThemeProvider>
   );
@@ -307,14 +308,16 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 // ─── DEV design-preview bypass (web only) ─────────────────────────────────────
 // The default development web preview opens the populated seller workspace.
 // Explicit ?bt_preview=buyer and ?bt_preview=seller links switch preview roles.
-// The web guard keeps this inert on native builds. Expo Go follows real auth.
+// The web guard keeps this inert on native builds. Expo Go follows real auth;
+// non-dev navigation-isolation tests require an explicit preview role.
 const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST === '1';
 
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
   if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web' || typeof window === 'undefined') return null;
   if (__DEV__) return getDevWebPreviewRole();
   const v = new URLSearchParams(window.location.search).get('bt_preview');
-  return v === 'buyer' ? 'buyer' : 'seller';
+  if (v !== 'buyer' && v !== 'seller') return null;
+  return v;
 })();
 const DEV_WEB_ONBOARDING_PREVIEW =
   __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined' && PREVIEW_ROLE === null;

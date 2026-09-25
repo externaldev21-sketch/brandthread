@@ -10,6 +10,7 @@ import { Platform } from 'react-native';
 import { Redirect, useLocalSearchParams, useRootNavigationState, useRouter } from 'expo-router';
 import BootScreen from '@/components/BootScreen';
 import { getDevWebPreviewRole } from '@/lib/devPreview';
+import { DEV_BYPASS_ROLE } from '@/lib/devBypass';
 export default function Index() {
   const router = useRouter();
   const params = useLocalSearchParams<{ bt_preview?: string; bt_theme?: string; bt_capture?: string }>();
@@ -19,8 +20,9 @@ export default function Index() {
   useEffect(() => {
     if (!__DEV__) return;
     if (!rootNavigationState?.key) return;
-    if (Platform.OS !== 'web') return;
-    const effectivePreviewRole = getDevWebPreviewRole();
+    const effectivePreviewRole = Platform.OS === 'web'
+      ? getDevWebPreviewRole()
+      : DEV_BYPASS_ROLE;
     if (!effectivePreviewRole) return;
     const redirect = setTimeout(() => {
       router.replace((effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/') as never);

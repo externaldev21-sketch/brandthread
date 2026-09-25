@@ -292,12 +292,21 @@ router.patch("/:id/products", requireAuth, async (req, res) => {
 // ─── POST /api/live/:id/comment ───────────────────────────────────────────────
 router.post("/:id/comment", requireAuth, async (req, res) => {
   const userId = (req as any).clerkUserId as string;
-  const { message, displayName, avatarUrl } = req.body;
+  const { message } = req.body;
   if (typeof message !== "string" || !message.trim()) return res.status(400).json({ error: "message required" });
   if (message.length > 500) return res.status(400).json({ error: "message too long" });
 
   const restriction = await publishingRestriction(userId);
   if (restriction) return res.status(restriction.status).json(restriction.body);
+
+  // displayName/avatarUrl are resolved from the caller's own profile — never
+  // trust client-supplied identity fields here, or any authenticated viewer
+  // could post live chat that visually impersonates another user/seller.
+  const [viewer] = await db.execute(sql`
+    SELECT display_name, brand_name, profile_image_url FROM users WHERE clerk_id = ${userId} LIMIT 1
+  `).then((r) => r.rows as any[]);
+  const displayName = viewer?.brand_name || viewer?.display_name || "Viewer";
+  const avatarUrl = viewer?.profile_image_url ?? null;
 
   // Live chat is shown instantly, so it cannot wait in a review queue:
   // anything the public filter would hold is declined with an explanation.

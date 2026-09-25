@@ -584,37 +584,56 @@ export function ShopProductSheet({
           </TouchableOpacity>
         </View>
 
-        {/* ─ Multi-tag switcher ─ */}
+        {/* ─ Multi-tag switcher — roomy product rows, not overlapping thumbnails ─ */}
         {selection.tags.length > 1 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={ss.tagRow}
-          >
-            {selection.tags.map((tag, idx) => (
-              <TouchableOpacity
-                key={tag.productId + idx}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setActiveTagIdx(idx);
-                }}
-                style={[
-                  ss.tagChip,
-                  activeTagIdx === idx && { borderColor: accent, backgroundColor: `${accent}18` },
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={`Switch to ${tag.productName}`}
-              >
-                <Feather name="shopping-bag" size={11} color={activeTagIdx === idx ? accent : MUTED} />
-                <Text
-                  style={[ss.tagChipText, activeTagIdx === idx && { color: accent }]}
-                  numberOfLines={1}
-                >
-                  {tag.productName}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          <View style={ss.tagListWrap}>
+            <Text style={ss.tagListLabel}>
+              {selection.tags.length} products tagged in this post
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={ss.tagRow}
+            >
+              {selection.tags.map((tag, idx) => {
+                const isActiveTag = activeTagIdx === idx;
+                const tagPreview = tag.productId === product?.id ? product : (
+                  selection.previewProduct?.id === tag.productId ? selection.previewProduct : null
+                );
+                const thumbUri = tagPreview?.imageUris?.[0];
+                return (
+                  <TouchableOpacity
+                    key={tag.productId + idx}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setActiveTagIdx(idx);
+                    }}
+                    style={[
+                      ss.tagCard,
+                      isActiveTag && { borderColor: accent, borderWidth: 2 },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isActiveTag }}
+                    accessibilityLabel={`Switch to ${tag.productName}, ${formatCents(tag.priceCents)}`}
+                  >
+                    <View style={ss.tagCardImageWrap}>
+                      {thumbUri ? (
+                        <CachedImage source={{ uri: thumbUri }} style={ss.tagCardImage} contentFit="cover" />
+                      ) : (
+                        <View style={[ss.tagCardImage, ss.productImagePlaceholder]}>
+                          <Feather name="shopping-bag" size={16} color={SUBTLE} />
+                        </View>
+                      )}
+                    </View>
+                    <Text style={[ss.tagCardName, isActiveTag && { color: accent }]} numberOfLines={2}>
+                      {tag.productName}
+                    </Text>
+                    <Text style={ss.tagCardPrice}>{formatCents(tag.priceCents)}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
         )}
 
         {/* ─ Content ─ */}
@@ -1115,31 +1134,41 @@ const ss = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Tag switcher
+  // Tagged-products list — roomy cards, one per tagged product, never overlapping.
+  tagListWrap: { paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: BORDER_SUBTLE, marginBottom: 4 },
+  tagListLabel: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: MUTED,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
   tagRow: {
     paddingHorizontal: 16,
-    paddingBottom: 10,
-    gap: 8,
+    gap: 10,
     flexDirection: 'row',
   },
-  tagChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 11,
-    paddingVertical: 6,
-    borderRadius: RADIUS.pill,
+  tagCard: {
+    width: 112,
+    borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: BORDER,
     backgroundColor: CARD,
-    maxWidth: 180,
+    padding: 8,
+    gap: 4,
   },
-  tagChipText: {
+  tagCardImageWrap: { width: '100%', aspectRatio: 1, borderRadius: RADIUS.sm, overflow: 'hidden', backgroundColor: CARD_ELEVATED },
+  tagCardImage: { width: '100%', height: '100%' },
+  tagCardName: {
     fontSize: FS.xs,
-    fontFamily: FONT.medium,
-    color: MUTED,
-    flexShrink: 1,
+    fontFamily: FONT.semibold,
+    color: FG,
+    lineHeight: 15,
+    minHeight: 30,
   },
+  tagCardPrice: { fontSize: FS.xs, fontFamily: FONT.bold, color: MUTED },
 
   // Loading / error
   centerBox: {

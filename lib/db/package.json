@@ -5,13 +5,15 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./schema": "./src/schema/index.ts"
+    "./schema": "./src/schema/index.ts",
+    "./testing": "./src/testing/index.ts"
   },
   "scripts": {
     "push": "drizzle-kit push --config ./drizzle.config.ts",
     "push-force": "drizzle-kit push --force --config ./drizzle.config.ts",
     "migrate": "node ./scripts/migrate.mjs",
-    "setup": "pnpm run push-force && pnpm run migrate"
+    "setup": "pnpm run push-force && pnpm run migrate",
+    "test": "vitest run"
   },
   "dependencies": {
     "drizzle-orm": "catalog:",
@@ -22,6 +24,7 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "@types/pg": "^8.20.0",
-    "drizzle-kit": "^0.31.10"
+    "drizzle-kit": "^0.31.10",
+    "vitest": "^4.1.10"
   }
 }

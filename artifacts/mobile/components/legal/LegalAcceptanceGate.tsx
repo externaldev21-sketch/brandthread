@@ -20,6 +20,7 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { EFFECTIVE_DATE, LEGAL_DOCUMENTS, LEGAL_DOCUMENT_ORDER, LEGAL_VERSION } from '@/content/legal';
 import { apiErrorCode, apiErrorMessage } from '@/lib/safety';
 import { clearPendingConsent, hasAcceptedCurrentTerms, readPendingConsent } from '@/lib/legalConsent';
+import { useIsWebShell, WEB_SHELL_MAX_WIDTH } from '@/components/web/WebAppShell';
 
 const RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 20_000, 30_000];
 
@@ -96,9 +97,17 @@ export default function LegalAcceptanceGate() {
 
   if (!isSignedIn || !needsAgreement) return null;
 
+  // RN's Modal portals straight to <body> on web, outside WebAppShell's
+  // centered column, so a full-bleed gate here would ignore the desktop web
+  // shell entirely. The Modal itself still dims/covers the whole viewport
+  // (correct — a legal gate should block everything), but its content is
+  // capped and centered to the same column width as the rest of the app.
+  const isWebShell = useIsWebShell();
+
   return (
     <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={() => {}}>
-      <View style={[styles.root, { backgroundColor: theme.background, paddingTop: insets.top + SP.lg, paddingBottom: insets.bottom + SP.md }]}>
+      <View style={[styles.root, isWebShell && styles.rootWebShell, { backgroundColor: theme.background }]}>
+      <View style={[styles.content, isWebShell && styles.contentWebShell, { paddingTop: insets.top + SP.lg, paddingBottom: insets.bottom + SP.md }]}>
         <ScrollView contentContainerStyle={{ paddingHorizontal: SP.lg }} showsVerticalScrollIndicator={false}>
           <View style={[styles.icon, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <Feather name="file-text" size={22} color={theme.text} />
@@ -139,12 +148,16 @@ export default function LegalAcceptanceGate() {
           </PressableScale>
         </View>
       </View>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  rootWebShell: { alignItems: 'center' },
+  content: { flex: 1, width: '100%' },
+  contentWebShell: { maxWidth: WEB_SHELL_MAX_WIDTH },
   icon: { width: 52, height: 52, borderRadius: 26, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginBottom: SP.lg },
   title: { fontFamily: FONT.bold, fontSize: FS.xxl, letterSpacing: -0.6 },
   body: { fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 23, marginTop: SP.sm },

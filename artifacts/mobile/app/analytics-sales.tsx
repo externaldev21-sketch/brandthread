@@ -17,6 +17,7 @@ import {
 } from '@/lib/theme';
 import { getSalesAnalytics, getFilterState } from '@/services/analyticsService';
 import { SalesAnalytics, AnalyticsMetric, AnalyticsPoint, AnalyticsFilterState } from '@/services/analyticsTypes';
+import { ErrorState } from '@/components/ui/ErrorState';
 
 const CHART_TAB_LABELS: Record<'sales' | 'orders' | 'units' | 'aov' | 'refunds', string> = {
   sales: 'Sales',
@@ -72,6 +73,7 @@ export default function AnalyticsSalesScreen() {
   const [data,       setData]       = useState<SalesAnalytics | null>(null);
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
   const [loading,    setLoading]    = useState(true);
+  const [loadError,  setLoadError]  = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [activeChart, setActiveChart] = useState<'sales' | 'orders' | 'units' | 'aov' | 'refunds'>('sales');
   const requestUser = useRef<string | null>(null);
@@ -87,8 +89,10 @@ export default function AnalyticsSalesScreen() {
       const next = await getSalesAnalytics(f);
       if (requestUser.current !== requestedUser) return;
       setData(next);
+      setLoadError(false);
     } catch (err) {
       if (requestUser.current !== requestedUser) return;
+      setLoadError(true);
     } finally { setLoading(false); setRefreshing(false); }
   }, [filter, authLoaded, userId]);
 
@@ -112,6 +116,13 @@ export default function AnalyticsSalesScreen() {
 
   if (loading) {
     return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><ActivityIndicator size="large" color={PURPLE} /><Text style={s.loadText}>Loading…</Text></View>;
+  }
+  if (loadError && !data) {
+    return (
+      <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}>
+        <ErrorState message="Couldn't load sales analytics." onRetry={() => load()} />
+      </View>
+    );
   }
   return (
     <ScrollView

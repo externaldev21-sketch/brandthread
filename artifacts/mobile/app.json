@@ -24,6 +24,18 @@
         ]
       },
       "supportsTablet": true,
+      "associatedDomains": [
+        "applinks:brandthread.app",
+        "applinks:www.brandthread.app"
+      ],
+      "infoPlist": {
+        "UISupportedInterfaceOrientations~ipad": [
+          "UIInterfaceOrientationPortrait",
+          "UIInterfaceOrientationPortraitUpsideDown",
+          "UIInterfaceOrientationLandscapeLeft",
+          "UIInterfaceOrientationLandscapeRight"
+        ]
+      },
       "config": {
         "usesNonExemptEncryption": false
       },
@@ -214,6 +226,17 @@
       },
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            { "scheme": "https", "host": "brandthread.app" },
+            { "scheme": "https", "host": "www.brandthread.app" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
       ]
     },
     "web": {

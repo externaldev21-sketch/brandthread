@@ -334,23 +334,31 @@ export default function BuyerOtherProfileScreen() {
             <Text style={styles.statLabel}>Posts</Text>
           </View>
           <View style={styles.statDivider} />
-          <View style={styles.statItem}>
+          <PressableScale
+            style={styles.statItem}
+            accessibilityRole="button"
+            onPress={() => router.push(`/connections?type=followers&userId=${userId}` as never)}
+          >
             {apiLoaded ? (
               <Text style={styles.statNum}>{followersCount}</Text>
             ) : (
               <SkeletonBlock width={28} height={20} style={styles.statSkeleton} />
             )}
             <Text style={styles.statLabel}>Followers</Text>
-          </View>
+          </PressableScale>
           <View style={styles.statDivider} />
-          <View style={styles.statItem}>
+          <PressableScale
+            style={styles.statItem}
+            accessibilityRole="button"
+            onPress={() => router.push(`/connections?type=following&userId=${userId}` as never)}
+          >
             {apiLoaded ? (
               <Text style={styles.statNum}>{followingCount}</Text>
             ) : (
               <SkeletonBlock width={28} height={20} style={styles.statSkeleton} />
             )}
             <Text style={styles.statLabel}>Following</Text>
-          </View>
+          </PressableScale>
         </View>
 
         {/* ── Action buttons — equal-width Follow + Message, per the Instagram

@@ -6,7 +6,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator,
-  Animated, KeyboardAvoidingView, Platform, Linking,
+  Animated, KeyboardAvoidingView, Platform, Linking, Image, FlatList,
 } from 'react-native';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -53,6 +53,36 @@ function SellerGoLiveNativeScreen() {
   const [description, setDescription] = useState('');
   const [starting, setStarting] = useState(false);
 
+  // ── Products to feature ──
+  // Tagging previously only happened mid-broadcast (seller-live.tsx's
+  // product-picker rail button); sellers had no way to line products up
+  // before going live. Reuses the same pick/toggle pattern and is sent
+  // straight through as `productTags` on /api/live/start (already accepted
+  // there, just never populated from setup).
+  const [showProductPicker, setShowProductPicker] = useState(false);
+  const [allProducts, setAllProducts] = useState<any[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [featuredProducts, setFeaturedProducts] = useState<any[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setProductsLoading(true);
+    (api as any).products?.list?.()
+      .then((r: any) => { if (!cancelled) setAllProducts(r?.products ?? []); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setProductsLoading(false); });
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function toggleFeaturedProduct(product: any) {
+    Haptics.selectionAsync();
+    setFeaturedProducts(prev =>
+      prev.some(p => p.id === product.id)
+        ? prev.filter(p => p.id !== product.id)
+        : [...prev, product],
+    );
+  }
+
   const flipAnim = useRef(new Animated.Value(1)).current;
   const goLiveScale = useRef(new Animated.Value(1)).current;
 
@@ -98,6 +128,11 @@ function SellerGoLiveNativeScreen() {
       const result = await (api as any).live.start({
         title: title.trim(),
         description: description.trim() || undefined,
+        productTags: featuredProducts.map(p => ({
+          productId: p.id,
+          productName: p.name,
+          priceCents: p.priceCents ?? 0,
+        })),
       }) as any;
 
       router.replace({
@@ -223,6 +258,21 @@ function SellerGoLiveNativeScreen() {
             style={s.descInput}
           />
 
+          <TouchableOpacity
+            style={s.featureProductsBtn}
+            onPress={() => setShowProductPicker(true)}
+            activeOpacity={0.8}
+            accessibilityLabel="Feature products"
+          >
+            <Feather name="shopping-bag" size={15} color={FG} />
+            <Text style={s.featureProductsText}>
+              {featuredProducts.length > 0
+                ? `${featuredProducts.length} product${featuredProducts.length === 1 ? '' : 's'} featured`
+                : 'Feature products'}
+            </Text>
+            <Feather name="chevron-right" size={15} color="rgba(255,255,255,0.6)" />
+          </TouchableOpacity>
+
           <Animated.View style={{ transform: [{ scale: goLiveScale }] }}>
             <TouchableOpacity
               onPress={handleGoLive}
@@ -244,6 +294,55 @@ function SellerGoLiveNativeScreen() {
           </Animated.View>
         </View>
       </LinearGradient>
+
+      {showProductPicker && (
+        <View style={[StyleSheet.absoluteFill, s.pickerModal]}>
+          <View style={[s.pickerSheet, { paddingBottom: insets.bottom + 12 }]}>
+            <View style={s.pickerHeader}>
+              <Text style={s.pickerTitle}>Feature products</Text>
+              <TouchableOpacity onPress={() => setShowProductPicker(false)} accessibilityLabel="Done">
+                <Feather name="x" size={22} color={FG} />
+              </TouchableOpacity>
+            </View>
+            {productsLoading ? (
+              <View style={s.pickerLoading}>
+                <ActivityIndicator color={FG} />
+              </View>
+            ) : (
+              <FlatList
+                data={allProducts}
+                keyExtractor={p => p.id}
+                ListEmptyComponent={<Text style={s.pickerEmptyText}>No products found. Add products to your store first.</Text>}
+                renderItem={({ item: p }) => {
+                  const tagged = featuredProducts.some(t => t.id === p.id);
+                  return (
+                    <TouchableOpacity
+                      onPress={() => toggleFeaturedProduct(p)}
+                      activeOpacity={0.7}
+                      style={[s.pickerRow, tagged && s.pickerRowActive]}
+                    >
+                      {p.imageUrl ? (
+                        <Image source={{ uri: p.imageUrl }} style={s.pickerRowThumb} />
+                      ) : (
+                        <View style={[s.pickerRowThumb, s.pickerRowThumbPlaceholder]}>
+                          <Feather name="image" size={16} color="rgba(255,255,255,0.4)" />
+                        </View>
+                      )}
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.pickerRowName} numberOfLines={1}>{p.name}</Text>
+                        <Text style={s.pickerRowPrice}>${((p.priceCents ?? 0) / 100).toFixed(2)}</Text>
+                      </View>
+                      <View style={[s.checkbox, tagged && s.checkboxActive]}>
+                        {tagged && <Feather name="check" size={13} color="#000" />}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            )}
+          </View>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -265,6 +364,26 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     goLiveBtn:         { marginTop: SP.xs, borderRadius: RADIUS.pill, height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
     liveDot:           { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
     goLiveBtnText:      { color: '#fff', fontFamily: FONT.bold, fontSize: FS.base, letterSpacing: 0.5 },
+
+    // Feature-products entry point
+    featureProductsBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: GLASS, borderRadius: RADIUS.pill, paddingHorizontal: 14, height: 38, alignSelf: 'flex-start' },
+    featureProductsText: { color: FG, fontFamily: FONT.medium, fontSize: FS.sm },
+
+    // Product picker sheet
+    pickerModal:       { backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+    pickerSheet:        { backgroundColor: '#141416', borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, maxHeight: '70%', paddingTop: SP.md },
+    pickerHeader:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingBottom: SP.sm },
+    pickerTitle:        { color: FG, fontSize: FS.base, fontFamily: FONT.bold },
+    pickerLoading:      { paddingVertical: SP.xl, alignItems: 'center' },
+    pickerEmptyText:    { color: 'rgba(255,255,255,0.6)', fontSize: FS.sm, textAlign: 'center', paddingVertical: SP.xl, paddingHorizontal: SP.md },
+    pickerRow:          { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm },
+    pickerRowActive:    { backgroundColor: 'rgba(255,255,255,0.06)' },
+    pickerRowThumb:     { width: 40, height: 40, borderRadius: RADIUS.sm },
+    pickerRowThumbPlaceholder: { backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
+    pickerRowName:      { color: FG, fontSize: FS.sm, fontFamily: FONT.semibold },
+    pickerRowPrice:     { color: 'rgba(255,255,255,0.6)', fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
+    checkbox:           { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)', alignItems: 'center', justifyContent: 'center' },
+    checkboxActive:      { backgroundColor: FG, borderColor: FG },
 
     // Permissions gate
     permRoot:          { flex: 1, backgroundColor: '#000' },

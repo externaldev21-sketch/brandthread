@@ -5,8 +5,9 @@
  *   - Inert (returns false) in production builds (__DEV__ === false)
  *   - Inert on native (Platform.OS !== 'web')
  *   - Inert when window is unavailable (SSR / test environments without window)
- *   - false when ?bt_preview=buyer (buyer review mode)
- *   - true  for the default dev web seller preview (no param, or ?bt_preview=seller)
+ *   - ?bt_preview=buyer|seller explicitly selects and persists a preview role
+ *   - the saved role is used when the URL has no selection; a fresh dev-web
+ *     session defaults to seller preview
  *
  * Pure / testable: accepts an optional override for the search string so unit
  * tests can exercise every branch without touching the global window object.
@@ -50,7 +51,8 @@ export function setDevWebPreviewRole(role: PreviewRole): void {
 }
 
 /**
- * Returns true only in the dev-web seller preview context.
+ * Returns true in the dev-web seller preview context. The URL selection takes
+ * precedence, then the saved browser-session role, with seller as the default.
  *
  * @param searchOverride  Optional query string (e.g. '?bt_preview=buyer')
  *   supplied by tests instead of reading window.location.search.

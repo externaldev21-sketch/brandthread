@@ -1324,7 +1324,7 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
                 )}
 
                 <View style={s.actionRow}>
-                  <SecondaryButton label="Buy Label" onPress={() => router.push(`/shipping-label?orderId=${order.id}&groupId=${group.id}`)} icon="tag" small style={{ flex: 1 }} />
+                  <SecondaryButton label="Buy Label" onPress={() => router.push(`/fulfill-order?orderId=${order.id}&step=3`)} icon="tag" small style={{ flex: 1 }} />
                   <SecondaryButton label="Add Tracking" onPress={() => toggleForm(group.id)} icon="map-pin" small style={{ flex: 1 }} />
                 </View>
               </BrandthreadCard>

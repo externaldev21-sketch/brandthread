@@ -9,6 +9,7 @@ import { useAuth } from '@clerk/expo';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme, AppThemePreset } from '@/contexts/AppThemeContext';
 import { Header } from '@/components/layout';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { useApi } from '@/lib/api';
 import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
@@ -66,6 +67,7 @@ export default function PayoutsScreen() {
   const isReadOnly = isManagerRole(currentRole);
   const [activeTab, setActiveTab] = useState<'payouts' | 'settings'>('payouts');
   const [loading,   setLoading]   = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [balance,   setBalance]   = useState<any>(null);
   const [payouts,   setPayouts]   = useState<PayoutRecord[]>([]);
   const [connectStatus, setConnectStatus] = useState<ConnectStatus | null>(null);
@@ -113,6 +115,7 @@ export default function PayoutsScreen() {
       return;
     }
     setLoading(true);
+    setLoadError(false);
     try {
       const [bal, po] = await Promise.all([
         api.finance.balance(),
@@ -128,7 +131,7 @@ export default function PayoutsScreen() {
         ordersCount: 0,
       })));
     } catch {
-      // Keep the empty state when payout data is unavailable.
+      setLoadError(true);
     }
     setLoading(false);
     void refreshConnectStatus();
@@ -263,6 +266,8 @@ export default function PayoutsScreen() {
         <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + SP.xl }]}>
           {loading && !isPreview ? (
             <ActivityIndicator color={theme.accent} style={{ marginTop: 40 }} />
+          ) : loadError ? (
+            <ErrorState message="Couldn't load your payouts." onRetry={() => { haptic(); void load(); }} />
           ) : payouts.length === 0 ? (
             <View style={{ alignItems: 'center', paddingVertical: 40 }}>
               <Feather name="inbox" size={28} color={theme.muted} />

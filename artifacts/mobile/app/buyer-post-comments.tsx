@@ -419,6 +419,7 @@ export default function BuyerPostCommentsScreen() {
   const posterUri = params.postPosterUri ?? '';
   const postType = params.postType ?? 'photo';
   const [videoPlaying, setVideoPlaying] = useState(false);
+  const [videoErrored, setVideoErrored] = useState(false);
   const mediaPlayer = useVideoPlayer(
     mediaUri && postType === 'video' ? { uri: mediaUri } : null,
     player => {
@@ -432,7 +433,13 @@ export default function BuyerPostCommentsScreen() {
     const subscription = mediaPlayer.addListener('playingChange', ({ isPlaying }) => {
       setVideoPlaying(isPlaying);
     });
-    return () => subscription.remove();
+    // A broken/unreachable media URL must fall back to the poster (or the
+    // plain scrim) instead of leaving an empty <video> element, which paints
+    // as a flat gray rectangle on web.
+    const statusSubscription = mediaPlayer.addListener('statusChange', ({ status }) => {
+      setVideoErrored(status === 'error');
+    });
+    return () => { subscription.remove(); statusSubscription.remove(); };
   }, [mediaPlayer]);
 
   useFocusEffect(useCallback(() => {
@@ -665,7 +672,7 @@ export default function BuyerPostCommentsScreen() {
       {mediaUri ? (
         postType === 'video' ? (
           <>
-            {posterUri && !videoPlaying ? (
+            {posterUri && (!videoPlaying || videoErrored) ? (
               <CachedImage
                 source={{ uri: posterUri }}
                 style={s.mediaBackdrop}
@@ -673,13 +680,15 @@ export default function BuyerPostCommentsScreen() {
                 testID="comments-video-poster"
               />
             ) : null}
-            <VideoView
-              player={mediaPlayer}
-              style={[s.mediaBackdrop, posterUri && !videoPlaying && { opacity: 0 }]}
-              contentFit="cover"
-              nativeControls={false}
-              testID="comments-video-preview"
-            />
+            {!videoErrored && (
+              <VideoView
+                player={mediaPlayer}
+                style={[s.mediaBackdrop, posterUri && !videoPlaying && { opacity: 0 }]}
+                contentFit="cover"
+                nativeControls={false}
+                testID="comments-video-preview"
+              />
+            )}
           </>
         ) : (
           <CachedImage source={{ uri: mediaUri }} style={s.mediaBackdrop} contentFit="cover" />

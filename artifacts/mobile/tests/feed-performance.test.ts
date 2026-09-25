@@ -20,8 +20,12 @@ describe('Feed video list virtualization bounds', () => {
     expect(feed).toContain("removeClippedSubviews={Platform.OS !== 'web'}");
   });
 
-  it('still only plays the active page — others stay mounted but paused', () => {
-    expect(feed).toContain('if (isActive && !paused) player.play();');
+  it('still only plays the active, focused page — others stay mounted but paused', () => {
+    // isFocused is required alongside isActive so a modal pushed on top of
+    // the feed (e.g. the comments sheet) pauses playback, and — just as
+    // important — coming back re-issues play() rather than leaving the
+    // last decoded frame frozen.
+    expect(feed).toContain('if (isActive && !paused && isScreenFocused) player.play();');
     expect(feed).toContain('else player.pause();');
   });
 

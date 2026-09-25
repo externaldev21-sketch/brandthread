@@ -2,7 +2,7 @@
  * Design Mockup Preview — /design-mockup-preview
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
@@ -12,6 +12,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { captureRef } from 'react-native-view-shot';
 import Svg, { Path, Rect } from 'react-native-svg';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
@@ -57,23 +58,35 @@ export default function DesignMockupPreviewScreen() {
   const [activeView, setActiveView] = useState<ViewTab>('Front');
   const [bgColor, setBgColor]       = useState('#000000');
   const [shadow, setShadow]         = useState<ShadowStyle>('Soft');
+  const [saving, setSaving]         = useState(false);
+  const previewShotRef = useRef<View>(null);
 
   useEffect(() => {
     if (!projectId) { setLoading(false); return; }
     getProject(projectId).then(p => { setProject(p); setLoading(false); });
   }, [projectId]);
 
-  // Export mockup was removed: it called a mock exportProject stub and
-  // claimed success without producing a real file. Real capture-and-save
-  // would need react-native-view-shot, which isn't a project dependency
-  // yet — see punch-list item 17. TODO(product): wire a real "Export mockup"
-  // once view-shot (or an equivalent capture approach) is added.
-
+  // Flattens the on-screen preview panel (garment + composited design layers
+  // + background + labels) into a real PNG via react-native-view-shot, the
+  // same capture approach BgRefineCanvas uses for background removal exports.
   const handleSaveMockup = useCallback(async () => {
-    if (!project) return;
-    await createBrandAsset({ name: `${project.name} Mockup`, type: 'mockup', tags: [] });
-    Alert.alert('Saved', 'Mockup saved to Brand Assets.');
-  }, [project]);
+    if (!project || !previewShotRef.current || saving) return;
+    setSaving(true);
+    try {
+      const uri = await captureRef(previewShotRef, { format: 'png', quality: 1, result: 'data-uri' });
+      await createBrandAsset({
+        name: `${project.name} Mockup`,
+        type: 'mockup',
+        uri: uri.startsWith('data:') ? uri : `data:image/png;base64,${uri}`,
+        tags: [],
+      });
+      Alert.alert('Saved', 'Mockup saved to Brand Assets.');
+    } catch {
+      Alert.alert('Couldn’t save mockup', 'Something went wrong capturing this preview. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  }, [project, saving]);
 
   const handleAddToProduct = useCallback(() => {
     Alert.alert('Add to Product', 'Choose an option:', [
@@ -163,7 +176,11 @@ export default function DesignMockupPreviewScreen() {
         </ScrollView>
 
         {/* Main preview panel */}
-        <View style={[styles.previewPanel, { backgroundColor: bgColor, height: PANEL_H }]}>
+        <View
+          ref={previewShotRef}
+          collapsable={false}
+          style={[styles.previewPanel, { backgroundColor: bgColor, height: PANEL_H }]}
+        >
           <View style={[styles.garmentWrap, { width: SCREEN_W * 0.7, height: PANEL_H * 0.7 }]}>
             {renderGarmentSvg()}
             {/* Composite the actual design onto the chest print zone, in place
@@ -219,7 +236,7 @@ export default function DesignMockupPreviewScreen() {
 
         {/* Actions */}
         <View style={styles.actionsWrap}>
-          <PrimaryButton label="Save mockup" onPress={handleSaveMockup} style={styles.actionBtn} />
+          <PrimaryButton label="Save mockup" onPress={handleSaveMockup} loading={saving} style={styles.actionBtn} />
           <SecondaryButton label="Add to product" onPress={handleAddToProduct} accent={CYAN} style={styles.actionBtn} />
         </View>
       </ScrollView>

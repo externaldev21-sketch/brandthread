@@ -1207,7 +1207,7 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
     return res.status(404).json({ error: "Post not found" });
   }
   const { type, value } = req.body as {
-    type: "like" | "repost" | "view" | "watch_time" | "shop_click" | "share";
+    type: "like" | "repost" | "view" | "watch_time" | "shop_click" | "share" | "not_interested";
     value?: string;
   };
 
@@ -1216,8 +1216,11 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
   // post out of the app (share sheet, copy link, etc.), which previously had
   // no tracking at all. Non-idempotent, like view/watch_time/shop_click —
   // one row is recorded per share tap.
-  if (!["like", "repost", "view", "watch_time", "shop_click", "share"].includes(type)) {
-    return res.status(400).json({ error: "type must be like, repost, view, watch_time, shop_click, or share" });
+  // "not_interested" records the feed's "Not interested" action so ranking
+  // can downweight similar posts for this buyer; also non-idempotent.
+  const RECORDED_ONLY_TYPES = ["view", "watch_time", "shop_click", "share", "not_interested"];
+  if (!["like", "repost", ...RECORDED_ONLY_TYPES].includes(type)) {
+    return res.status(400).json({ error: "type must be like, repost, view, watch_time, shop_click, share, or not_interested" });
   }
   const [visiblePost] = await db.select({ id: posts.id, visibility: posts.visibility, ownerId: posts.userId }).from(posts)
     .where(and(eq(posts.id, id), visiblePostCondition()))
@@ -1227,7 +1230,7 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
     return res.status(403).json({ error: "Reposts are disabled for this post" });
   }
 
-  if (type === "view" || type === "watch_time" || type === "shop_click" || type === "share") {
+  if (RECORDED_ONLY_TYPES.includes(type)) {
     await db.insert(interactions).values({ userId: clerkId, postId: id, type, value: value ?? null });
     return res.json({ action: "recorded" });
   }

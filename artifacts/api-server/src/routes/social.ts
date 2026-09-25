@@ -83,7 +83,13 @@ function relationshipLockKey(firstUserId: string, secondUserId: string): string 
   return JSON.stringify([firstUserId, secondUserId].sort());
 }
 
-async function buildBuyerPosts(viewerId: string, authorIds: string[], limit: number, offset: number) {
+async function buildBuyerPosts(
+  viewerId: string,
+  authorIds: string[],
+  limit: number,
+  offset: number,
+  postId?: string,
+) {
   if (authorIds.length === 0) return [];
   const pageRows = await db.select({
     id: posts.id,
@@ -107,6 +113,7 @@ async function buildBuyerPosts(viewerId: string, authorIds: string[], limit: num
       eq(posts.moderationStatus, "visible"),
       authorInGoodStanding(posts.userId),
       notBlockedWith(viewerId, posts.userId),
+      ...(postId ? [eq(posts.id, postId)] : []),
     ))
     .orderBy(desc(posts.createdAt))
     .limit(limit)
@@ -372,6 +379,45 @@ router.get("/profile/:userId", async (req, res) => {
     isMutual: isFollowing && isFollowedBy,
     iBlockedThem,
   });
+});
+
+// ─── GET /api/social/posts/:postId ───────────────────────────────────────────
+// A single post by id, in the same normalized BuyerPost shape as
+// /profile/:userId/posts — for opening a specific post (e.g. from a saved
+// item or collection) without knowing the author in advance. Applies the
+// same visibility rule as the list route: viewable if it's the viewer's own
+// post, or the author is a mutual friend.
+router.get("/posts/:postId", async (req, res) => {
+  const myId = (req as any).clerkUserId as string;
+  const { postId } = req.params;
+
+  const [row] = await db.select({ userId: posts.userId }).from(posts)
+    .where(eq(posts.id, postId)).limit(1);
+  if (!row) { res.status(404).json({ error: "Post not found" }); return; }
+  const authorId = row.userId;
+
+  if (authorId !== myId) {
+    if ((await blockRelation(myId, authorId)) !== "none") {
+      res.status(404).json({ error: "Post not found" }); return;
+    }
+    const mutual = await db.execute(sql`
+      SELECT 1
+      FROM follows mine
+      JOIN follows theirs
+        ON theirs.follower_id = mine.following_id
+       AND theirs.following_id = ${myId}
+      WHERE mine.follower_id = ${myId}
+        AND mine.following_id = ${authorId}
+      LIMIT 1
+    `);
+    if ((((mutual as any).rows ?? []) as any[]).length === 0) {
+      res.status(403).json({ error: "Posts are available to friends only" }); return;
+    }
+  }
+
+  const [found] = await buildBuyerPosts(myId, [authorId], 1, 0, postId);
+  if (!found) { res.status(404).json({ error: "Post not found" }); return; }
+  res.json(found);
 });
 
 // Accepts users.clerkId or users.id (UUID) — resolves before block/friend checks.

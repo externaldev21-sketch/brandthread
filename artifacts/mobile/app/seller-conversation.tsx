@@ -438,7 +438,8 @@ export default function SellerConversationScreen() {
             const pid = att.meta?.productId;
             if (pid) router.push(('/buyer-product-detail?productId=' + pid) as never);
           } else if (att.type === 'order') {
-            router.push('/seller-orders' as never);
+            const orderId = att.meta?.orderId;
+            router.push((orderId ? '/order-detail?id=' + orderId : '/(tabs)/orders') as never);
           } else if (att.type === 'post') {
             const postId = att.meta?.postId;
             if (postId) {
