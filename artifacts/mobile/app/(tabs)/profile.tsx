@@ -18,6 +18,7 @@ import {
 } from '@/lib/theme';
 import { SheetRise } from '@/components/motion/SheetRise';
 import { BrandHero, useBrandHeroScrollY, type BrandHeroStat } from '@/components/profile/BrandHero';
+import { ShareProfileSheet } from '@/components/ShareProfileSheet';
 
 // ─── Profile data shape ──────────────────────────────────────────────────────
 
@@ -65,6 +66,7 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<SellerProfileData | null>(null);
   const [socialCounts, setSocialCounts] = useState<SocialCounts>({ followers: 0, following: 0, likes: 0 });
   const [profileEditorVisible, setProfileEditorVisible] = useState(false);
+  const [shareSheetVisible, setShareSheetVisible] = useState(false);
   const [brandNameInput, setBrandNameInput] = useState('');
   const [bioInput, setBioInput] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
@@ -306,10 +308,13 @@ export default function ProfileScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={s.iconBtn}
-              onPress={() => nav('/share-profile')}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShareSheetVisible(true);
+              }}
               accessibilityRole="button"
               accessibilityLabel="Share profile"
-              accessibilityHint="Opens your shareable profile link and QR code"
+              accessibilityHint="Opens a shareable profile card, QR code, and link"
               testID="seller-share-profile-btn"
             >
               <Feather name="share-2" size={ICON.md} color={theme.text} />
@@ -535,6 +540,16 @@ export default function ProfileScreen() {
           </SheetRise>
         </KeyboardAvoidingView>
       </Modal>
+
+      <ShareProfileSheet
+        visible={shareSheetVisible}
+        onClose={() => setShareSheetVisible(false)}
+        avatarUrl={profile?.profileImageUrl ?? null}
+        sellerExtra={{
+          rating: null,
+          products: sellerPosts.slice(0, 3).map(p => ({ id: p.id, uri: p.mediaUris?.[0] })),
+        }}
+      />
     </>
   );
 }
