@@ -33,6 +33,7 @@ import {
 } from '@/components/profile/ProfileControls';
 import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
+import { profileEmptyState } from '@/components/profile/profileEmptyStates';
 import { useProfileLayout } from '@/components/profile/profileLayout';
 import { useTabBarMetrics } from '@/components/buyer-nav/buyerTabBarMetrics';
 
@@ -359,12 +360,14 @@ export default function ProfileScreen() {
     </TouchableOpacity>
   );
 
-  const emptyTitle = activeTab === 0 ? 'No posts yet. Create your first post!' : activeTab === 1 ? 'No drafts saved.' : 'No scheduled posts.';
+  // Post / Draft / Schedule empty states: one table, each CTA opens the real flow.
+  const empty = profileEmptyState((['seller:post', 'seller:draft', 'seller:schedule'] as const)[activeTab] ?? 'seller:post', true);
 
   return (
     <>
       <ProfileShell
         testID="profile-hero"
+        isOwnProfile
         identity={{
           name: brandTitle,
           handle: profile?.brandName && profile?.displayName && profile.brandName !== profile.displayName
@@ -421,12 +424,17 @@ export default function ProfileScreen() {
         actions={(
           <>
             <View style={s.actionRow}>
+              {/* Opens the full seller Edit Profile screen (avatar, name,
+                  username, bio, link…). Long-press keeps the quick brand
+                  name + bio sheet one gesture away. */}
               <ProfileButton
                 label="Edit Profile"
                 icon="edit-2"
                 variant="primary"
-                onPress={openProfileEditor}
-                accessibilityLabel="Edit brand name and bio"
+                onPress={() => nav('/edit-profile')}
+                onLongPress={openProfileEditor}
+                accessibilityLabel="Edit profile"
+                accessibilityHint="Opens your full profile editor. Long press to quickly edit brand name and bio."
                 testID="profile-edit-details"
               />
               <ProfileButton label="Settings" icon="settings" onPress={() => nav('/settings')} />
@@ -474,9 +482,11 @@ export default function ProfileScreen() {
             error={postsError}
             onRetry={() => { setPostsLoading(true); void loadPosts(); }}
             layout={layout}
-            icon={activeTab === 0 ? 'video' : activeTab === 1 ? 'file-text' : 'clock'}
-            title={emptyTitle}
-            action={activeTab === 0 ? { label: 'Post your first video', icon: 'video', onPress: () => nav('/create-post') } : undefined}
+            icon={empty.icon as keyof typeof Feather.glyphMap}
+            title={empty.title}
+            description={empty.message}
+            action={empty.cta ? { label: empty.cta.label, onPress: () => nav(empty.cta!.route) } : undefined}
+            testID={`seller-own-empty-${CONTENT_TABS[activeTab]?.toLowerCase() ?? 'post'}`}
           />
         )}
         refreshing={refreshing}

@@ -27,6 +27,14 @@ function ProfileShell(props: any) {
       : null,
     props.hero ? React.createElement('View', { testID: 'profile-hero-media', hero: props.hero }) : null,
     props.topLeft,
+    // Mirrors the real shell's gate: the wallet chip is owner-only.
+    props.isOwnProfile && props.walletChip
+      ? React.createElement('Pressable', {
+          testID: 'profile-wallet-chip',
+          onPress: props.walletChip.onPress,
+          accessibilityLabel: `Thread Cash wallet, ${props.walletChip.balanceLabel}`,
+        })
+      : null,
     props.topRight,
     props.meta,
     React.createElement(

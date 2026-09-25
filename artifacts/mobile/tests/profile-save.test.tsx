@@ -275,7 +275,7 @@ async function renderScreen(): Promise<ReactTestRenderer> {
 
 async function openEditor(renderer: ReactTestRenderer) {
   await act(async () => {
-    renderer.root.findByProps({ testID: "profile-edit-details" }).props.onPress();
+    renderer.root.findAll((node) => node.props.testID === "profile-edit-details" && typeof node.props.onLongPress === "function")[0].props.onLongPress();
   });
 }
 
@@ -320,6 +320,13 @@ describe("seller Profile brand details save", () => {
     await act(async () => {
       renderer?.unmount();
     });
+  });
+
+  it("opens the full seller Edit Profile screen from Edit Profile (the quick sheet stays on long-press)", async () => {
+    renderer = await renderScreen();
+    const edit = renderer.root.findAll((node) => node.props.testID === "profile-edit-details" && typeof node.props.onPress === "function")[0];
+    await act(async () => { edit.props.onPress(); });
+    expect(routerMock.push).toHaveBeenCalledWith("/edit-profile");
   });
 
   it("updates the displayed Profile details only after the save succeeds", async () => {

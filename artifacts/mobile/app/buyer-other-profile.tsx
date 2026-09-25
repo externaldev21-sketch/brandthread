@@ -30,6 +30,7 @@ import {
 } from '@/components/profile/ProfileControls';
 import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridFooter, ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
+import { profileEmptyState } from '@/components/profile/profileEmptyStates';
 import { useProfileLayout } from '@/components/profile/profileLayout';
 import { useCreatorVideos } from '@/components/profile/useCreatorVideos';
 
@@ -359,7 +360,7 @@ export default function BuyerOtherProfileScreen() {
                 ? 'Unblock to see each other’s posts again.'
                 : videos.restricted
                   ? `Follow each other to see ${displayName}'s posts.`
-                  : 'Posts will appear here.'}
+                  : profileEmptyState('buyer:posts', false).message}
             />
           )
         }

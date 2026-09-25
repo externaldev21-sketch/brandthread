@@ -45,6 +45,7 @@ import {
 import { ProfileVideoTile, gridItemFromBuyerPost, type ProfileGridItem } from '@/components/profile/ProfileVideoGrid';
 import { ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
 import { ProfileStoriesRow } from '@/components/profile/ProfileStoriesRow';
+import { profileEmptyState, type ProfileEmptyTab } from '@/components/profile/profileEmptyStates';
 import { useProfileLayout } from '@/components/profile/profileLayout';
 
 // Statuses still "in flight" — an order in one of these is what the My Orders
@@ -464,30 +465,14 @@ export default function ProfileScreen() {
     row.kind === 'post' ? row.post.id : row.kind === 'repost' ? row.repost.id : row.saved.id
   ), []);
 
-  let emptyIcon: keyof typeof Feather.glyphMap = 'grid';
-  let emptyTitle = '';
-  let emptyDescription = '';
-  let emptyAction: { label: string; onPress: () => void } | undefined;
-  if (activeTab === 'Posts') {
-    emptyIcon = 'video';
-    emptyTitle = 'No posts yet';
-    emptyDescription = 'Photos and videos you post to your profile appear here.';
-    emptyAction = { label: 'Post your first video', onPress: () => router.push('/create-post?accountType=buyer' as any) };
-  } else if (activeTab === 'Tagged') {
-    emptyIcon = 'tag';
-    emptyTitle = 'No tagged posts';
-    emptyDescription = 'Posts that tag you will appear here.';
-    emptyAction = { label: 'Discover', onPress: () => router.push('/(buyer)/discover') };
-  } else if (activeTab === 'Reposts') {
-    emptyIcon = 'repeat';
-    emptyTitle = 'No reposts yet';
-    emptyDescription = 'Posts you repost will appear here.';
-  } else {
-    emptyIcon = 'bookmark';
-    emptyTitle = 'No saved posts yet';
-    emptyDescription = 'Items you save will appear here.';
-    emptyAction = { label: 'View saved', onPress: () => router.push('/buyer-saved' as any) };
-  }
+  // One table decides every tab's empty copy + CTA (own profile → CTA).
+  const empty = profileEmptyState(`buyer:${activeTab.toLowerCase()}` as ProfileEmptyTab, true);
+  const emptyIcon = empty.icon as keyof typeof Feather.glyphMap;
+  const emptyTitle = empty.title;
+  const emptyDescription = empty.message;
+  const emptyAction = empty.cta
+    ? { label: empty.cta.label, onPress: () => router.push(empty.cta!.route as any) }
+    : undefined;
 
   if (loadError) {
     return (
@@ -543,24 +528,6 @@ export default function ProfileScreen() {
 
   const extras = (
     <>
-      {/* ── Thread Cash balance chip (wallet balance only; P2P send stays off) ── */}
-      {threadCashEnabled ? (
-        <View style={styles.inset}>
-          <PressableScale
-            style={[styles.threadCashChip, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}
-            onPress={() => { hapticSelection(); router.push('/thread-cash' as never); }}
-            accessibilityRole="button"
-            accessibilityLabel="Thread Cash wallet"
-          >
-            <Feather name="dollar-sign" size={14} color={theme.accent} />
-            <Text style={[styles.threadCashChipText, { color: theme.accent }]}>
-              {formatCents(threadCashBalanceCents)} Thread Cash
-            </Text>
-            <Feather name="chevron-right" size={14} color={theme.accent} />
-          </PressableScale>
-        </View>
-      ) : null}
-
       {/* ── My Orders — always-visible way back to order history ── */}
       {featuredOrder ? (
         <View style={styles.inset}>
@@ -631,6 +598,11 @@ export default function ProfileScreen() {
         }}
         hero={{ videoUri: latestVideo?.mediaUrl ?? null, posterUri: latestPhoto?.mediaUrl ?? null }}
         topLeft={accountSwitcher}
+        isOwnProfile
+        // Thread Cash: compact owner-only balance chip (flag-gated; P2P stays off).
+        walletChip={threadCashEnabled
+          ? { balanceLabel: formatCents(threadCashBalanceCents), onPress: () => router.push('/thread-cash' as never) }
+          : null}
         topRight={(
           <>
             <ProfileGlassButton icon="bell" onPress={() => router.push('/buyer-notifications' as any)} accessibilityLabel="Notifications" />

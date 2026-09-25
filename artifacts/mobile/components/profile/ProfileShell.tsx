@@ -38,10 +38,14 @@ import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { TYPE_SCALE } from '@/constants/typography';
 import { ProfileHeroMedia } from './ProfileHeroMedia';
 import {
-  ProfileChip, ProfileSectionLabel, ProfileStatsRow, ProfileTabs,
+  ProfileChip, ProfileSectionLabel, ProfileStatsRow, ProfileTabs, ProfileWalletChip,
   type ProfileStat, type ProfileTab,
 } from './ProfileControls';
 import { PROFILE_GRID_GAP, SHOP_PILL_HEIGHT, useProfileLayout } from './profileLayout';
+import { computeEmptyArea } from './profileEmptyStates';
+import { ProfileEmptyAreaContext } from './ProfileEmptyAreaContext';
+/** Compact sticky header height below the status bar. */
+const COMPACT_BAR = 64;
 
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList) as unknown as typeof FlatList;
 const AVATAR = 88;
@@ -69,6 +73,13 @@ export interface ProfileShellProps<T> {
     badgeIcon?: keyof typeof Feather.glyphMap;
   };
   hero: { videoUri?: string | null; posterUri?: string | null };
+  /**
+   * True only when the viewer is looking at their own profile. Owner-only
+   * pieces (the Thread Cash wallet chip) are gated here, never on role.
+   */
+  isOwnProfile?: boolean;
+  /** Owner-only compact Thread Cash balance chip in the top bar. */
+  walletChip?: { balanceLabel: string; onPress: () => void } | null;
   /** Floating glass controls over the hero (left: back / account switcher). */
   topLeft?: React.ReactNode;
   topRight?: React.ReactNode;
@@ -101,7 +112,7 @@ export interface ProfileShellProps<T> {
 
 export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const {
-    testID, identity, avatar, hero, topLeft, topRight, meta, stats, statsLoading, actions, extras,
+    testID, identity, avatar, hero, topLeft, topRight, meta, isOwnProfile = false, walletChip, stats, statsLoading, actions, extras,
     tabs, section, data, renderItem, keyExtractor, numColumns = 1, listKey,
     ListEmptyComponent, ListFooterComponent, onEndReached, refreshing = false, onRefresh,
     renderFloating, bottomInset = 0,
@@ -118,6 +129,8 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const [reduceMotion, setReduceMotion] = useState(false);
   const [rightWidth, setRightWidth] = useState(0);
   const [leftWidth, setLeftWidth] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(layout.windowHeight);
+  const [tabsHeight, setTabsHeight] = useState(0);
 
   useFocusEffect(useCallback(() => {
     setFocused(true);
@@ -201,9 +214,16 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
   const compactRoom = columnWidth - compactLeft - compactRight;
   const floatingReserve = renderFloating ? SHOP_PILL_HEIGHT + SP.lg : 0;
   // `bottomInset` is everything a floating tab bar occupies (it already
-  // includes the home indicator); without one, the safe area is the floor.
-  const bottomFloor = bottomInset > 0 ? bottomInset : Math.max(insets.bottom, SP.sm);
+  // includes the home indicator); never less than the device safe area.
+  const bottomFloor = Math.max(bottomInset, insets.bottom, SP.sm);
   const floatingBottom = bottomFloor + SP.sm;
+  const emptyArea = computeEmptyArea({
+    viewportHeight,
+    topChrome: insets.top + COMPACT_BAR,
+    tabsHeight,
+    bottomInset: bottomFloor,
+    floatingReserve,
+  });
 
   const avatarNode = (
     <View style={[styles.avatarRing, avatar?.ring && { borderColor: theme.accent }]}>
@@ -289,18 +309,29 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
       <ProfileStatsRow stats={stats} loading={statsLoading} />
       {actions ? <View style={styles.actions}>{actions}</View> : null}
       {extras ? <View style={styles.extras}>{extras}</View> : null}
-      {tabs ? (
-        <ProfileTabs tabs={tabs.items} active={tabs.active} onChange={tabs.onChange} />
-      ) : section ? (
-        <ProfileSectionLabel label={section.label} count={section.count} />
-      ) : null}
+      {/* Tabs get their own breathing room so a tab's press state never
+          reaches the action buttons above. */}
+      <View
+        style={styles.tabsBlock}
+        onLayout={(event) => setTabsHeight(Math.round(event.nativeEvent.layout.height))}
+      >
+        {tabs ? (
+          <ProfileTabs tabs={tabs.items} active={tabs.active} onChange={tabs.onChange} />
+        ) : section ? (
+          <ProfileSectionLabel label={section.label} count={section.count} />
+        ) : null}
+      </View>
       <View style={{ height: PROFILE_GRID_GAP }} />
     </View>
   );
 
   return (
     <View style={[styles.root]} testID={testID}>
-      <View style={[styles.column, { width: columnWidth }]}>
+      <View
+        style={[styles.column, { width: columnWidth }]}
+        onLayout={(event) => setViewportHeight(Math.round(event.nativeEvent.layout.height))}
+      >
+        <ProfileEmptyAreaContext.Provider value={emptyArea.minHeight}>
         <AnimatedFlatList
           key={listKey}
           data={data}
@@ -316,11 +347,12 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
           onScroll={onScroll}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: bottomFloor + floatingReserve + SP.lg }}
+          contentContainerStyle={{ paddingBottom: emptyArea.paddingBottom }}
           refreshControl={onRefresh ? (
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.muted} progressViewOffset={insets.top} />
           ) : undefined}
         />
+        </ProfileEmptyAreaContext.Provider>
 
         {/* Compact sticky header — fades in once the hero scrolls away */}
         <Animated.View
@@ -356,6 +388,7 @@ export function ProfileShell<T>(props: ProfileShellProps<T>) {
             style={styles.controlGroup}
             onLayout={(event) => setRightWidth(Math.round(event.nativeEvent.layout.width))}
           >
+            {isOwnProfile && walletChip ? <ProfileWalletChip balanceLabel={walletChip.balanceLabel} onPress={walletChip.onPress} /> : null}
             {topRight}
           </View>
         </View>
@@ -402,6 +435,7 @@ function makeStyles(theme: AppThemePreset) {
     meta: { paddingHorizontal: SP.md, paddingTop: SP.xs, paddingBottom: SP.md, gap: SP.xs },
     actions: { paddingHorizontal: SP.md, paddingTop: SP.md, gap: SP.sm },
     extras: { paddingTop: SP.md, gap: SP.md },
+    tabsBlock: { paddingTop: SP.lg },
     gridRow: { gap: PROFILE_GRID_GAP },
 
     compact: {

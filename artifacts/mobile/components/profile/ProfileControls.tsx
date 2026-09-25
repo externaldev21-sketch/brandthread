@@ -39,6 +39,7 @@ export function ProfileButton({
   label,
   icon,
   onPress,
+  onLongPress,
   variant = 'secondary',
   disabled,
   accessibilityLabel,
@@ -49,6 +50,7 @@ export function ProfileButton({
   label: string;
   icon?: FeatherName;
   onPress: () => void;
+  onLongPress?: () => void;
   variant?: 'primary' | 'secondary';
   disabled?: boolean;
   accessibilityLabel?: string;
@@ -65,6 +67,7 @@ export function ProfileButton({
     <View style={[styles.buttonWrap, style]}>
       <PressableScale
         onPress={() => { hapticLight(); onPress(); }}
+        onLongPress={onLongPress ? () => { hapticLight(); onLongPress(); } : undefined}
         disabled={disabled}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? label}
@@ -123,6 +126,37 @@ export function ProfileGlassButton({
           <InteractionLayer state={state as PressState} radius={22} theme={theme} />
           <Feather name={icon} size={19} color={theme.text} />
           {badge ? <View style={[styles.glassBadge, { backgroundColor: theme.accent, borderColor: theme.background }]} /> : null}
+        </>
+      )}
+    </PressableScale>
+  );
+}
+
+// ─── Wallet chip ──────────────────────────────────────────────────────────────
+
+/**
+ * Compact Thread Cash balance pill for the profile's top bar ("$ 12.50").
+ * Display only — tapping opens the existing wallet screen; P2P stays off.
+ * ProfileShell renders it only on the viewer's own profile.
+ */
+export function ProfileWalletChip({ balanceLabel, onPress }: { balanceLabel: string; onPress: () => void }) {
+  const { theme } = useAppTheme();
+  return (
+    <PressableScale
+      onPress={() => { hapticSelection(); onPress(); }}
+      accessibilityRole="button"
+      accessibilityLabel={`Thread Cash wallet, ${balanceLabel}`}
+      testID="profile-wallet-chip"
+      hitSlop={4}
+      style={[styles.walletChip, { backgroundColor: theme.cardGlass, borderColor: theme.border }]}
+    >
+      {(state) => (
+        <>
+          <InteractionLayer state={state as PressState} radius={22} theme={theme} />
+          <View style={[styles.walletIcon, { backgroundColor: theme.accent }]}>
+            <Feather name="dollar-sign" size={12} color={theme.onAccent} />
+          </View>
+          <Text style={[styles.walletText, { color: theme.text }]} numberOfLines={1}>{balanceLabel}</Text>
         </>
       )}
     </PressableScale>
@@ -381,6 +415,12 @@ const styles = StyleSheet.create({
     width: 44, height: 44, borderRadius: 22, borderWidth: 1,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
+  walletChip: {
+    height: 44, borderRadius: 22, borderWidth: 1, flexDirection: 'row', alignItems: 'center',
+    gap: 6, paddingLeft: 7, paddingRight: 12, overflow: 'hidden',
+  },
+  walletIcon: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  walletText: { fontFamily: FONT.bold, fontSize: FS.sm, fontVariant: ['tabular-nums'] },
   glassBadge: { position: 'absolute', top: 9, right: 9, width: 9, height: 9, borderRadius: 5, borderWidth: 1.5 },
 
   statsRow: {
