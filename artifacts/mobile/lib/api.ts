@@ -22,6 +22,38 @@ const BASE =
   process.env.EXPO_PUBLIC_API_BASE_URL ??
   `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
+/**
+ * Every request gets a hard ceiling so a hung connection (dead server, black
+ * hole route, a device that fell asleep mid-request) always resolves into an
+ * error a screen can show instead of leaving loading state stuck forever.
+ */
+const REQUEST_TIMEOUT_MS = 15_000;
+
+/**
+ * fetch() with a hard timeout. Expo/RN's fetch never rejects or resolves on
+ * its own if the connection just hangs — AbortController is the only way to
+ * bound it. A timeout surfaces as ApiError(408) so it flows through the same
+ * classification/retry path as a real server timeout.
+ */
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number = REQUEST_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new ApiError(408, JSON.stringify({ error: { message: 'Request timed out. Please try again.', code: 'timeout' } }));
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 type GetToken = () => Promise<string | null>;
 type GetCacheScope = () => string | Promise<string>;
 
@@ -232,7 +264,7 @@ async function request<T = any>(
   };
   let res: Response;
   try {
-    res = await fetch(`${BASE}${resolvedPath}`, { ...options, headers });
+    res = await fetchWithTimeout(`${BASE}${resolvedPath}`, { ...options, headers });
   } catch (error) {
     const retry = isRead
       ? () => request<T>(path, options, getToken, asText, getCacheScope, reportErrors)
@@ -563,7 +595,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         appThemeId?: string;
         appIconId?: string | null;
         expectedClerkId?: string;
+        category?:     string;
+        location?:     string;
+        contactEmail?: string;
+        tags?:         string[];
+        socialLinks?:  Record<string, string>;
       }) => patch<any>('/api/auth/profile', body),
+      /** Upload the current account's profile photo (buyer or seller). Cropped to a
+       *  square client-side and displayed as a circle. Shared with the seller avatar
+       *  endpoint — any authenticated user owns exactly one `profileImageUrl`. */
+      uploadAvatar: (image: { uri: string; mimeType?: string | null }) =>
+        uploadImage<{ profileImageUrl: string }>('/api/seller/profile/avatar/upload', image, getToken, getCacheScope),
       /** Permanently erase this account after the explicit DELETE confirmation. */
       deleteAccount: () => request<{ ok: true }>(
         '/api/auth/account',
@@ -1261,6 +1303,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           website:     string | null;
           username:    string | null;
           profileImageUrl: string | null;
+          logoUrl:     string | null;
+          bannerUrl:   string | null;
+          category:    string | null;
+          tags:        string[];
+          location:    string | null;
+          socialLinks: Record<string, string>;
+          contactEmail: string | null;
           verified:    boolean;
           returnPolicy:       string | null;
           cancellationPolicy: string | null;
@@ -1277,6 +1326,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Upload a seller-owned brand avatar after the server validates its bytes. */
       uploadAvatar: (image: { uri: string; mimeType?: string | null }) =>
         uploadImage<{ profileImageUrl: string }>('/api/seller/profile/avatar/upload', image, getToken, getCacheScope),
+      /** Upload the storefront logo (square, shown in the header preview). */
+      uploadLogo: (image: { uri: string; mimeType?: string | null }) =>
+        uploadImage<{ logoUrl: string }>('/api/seller/profile/logo/upload', image, getToken, getCacheScope),
+      /** Upload the storefront banner / cover image (wide aspect). */
+      uploadBanner: (image: { uri: string; mimeType?: string | null }) =>
+        uploadImage<{ bannerUrl: string }>('/api/seller/profile/banner/upload', image, getToken, getCacheScope),
       /** Update return / cancellation policy text. */
       updatePolicy: (body: { returnPolicy?: string; cancellationPolicy?: string }) =>
         patch<{ returnPolicy: string | null; cancellationPolicy: string | null }>(
@@ -1334,6 +1389,11 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         username?: string;
         appThemeId?: string;
         appIconId?: string | null;
+        category?:     string;
+        location?:     string;
+        contactEmail?: string;
+        tags?:         string[];
+        socialLinks?:  Record<string, string>;
       }) =>
         patch<any>('/api/auth/profile', body),
       /** Platform subscription — billed to the seller's own payment method (sellers only).
