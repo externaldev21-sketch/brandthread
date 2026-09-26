@@ -19706,5 +19706,1067 @@
     "candidateDeadClicks": [],
     "unclosableSheets": [],
     "interactiveElementCount": 0
+  },
+  {
+    "role": "seller",
+    "viewport": "iphone-390x844",
+    "route": "/taxes-duties",
+    "reachedFrom": "static-route-list",
+    "navError": null,
+    "loadTimeMs": 1374,
+    "slow": true,
+    "consoleErrors": [
+      "WebSocket connection to 'ws://localhost:8082/hot' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:8082/message' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/_expo/error-overlay-meta",
+        "status": 404
+      }
+    ],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "header": {
+      "text": "Taxes and duties",
+      "fontSize": 22,
+      "x": 68,
+      "y": 68,
+      "w": 254,
+      "h": 26
+    },
+    "scrollBottom": {
+      "scrolledToBottom": false,
+      "tabBarFound": false,
+      "possibleTabBarOverlap": null
+    },
+    "screenshot": "docs/qa/screenshots/seller-iphone-390x844-241-_taxes_duties.png",
+    "toggleResults": [
+      {
+        "error": "TimeoutError: elementHandle.click: Timeout 2000ms exceeded.\nCall log:\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × w"
+      },
+      {
+        "error": "TimeoutError: elementHandle.click: Timeout 2000ms exceeded.\nCall log:\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × w"
+      }
+    ],
+    "formTest": {
+      "present": true,
+      "fieldCount": 2,
+      "valid": {
+        "submitted": false,
+        "resultTextSample": "\nTaxes and duties\nPowered by Stripe Tax\nCollect sales tax\nAutomatic tax at checkout\nStripe Tax calculates and collects sales tax automatically, based on the buyer's destination and your active tax registrations.\nNot yet configured — connect Stripe and turn this on to start.\n\nThis calculates and collects tax — it is not proof of nexus, registration, or filing compliance. Product tax codes, regist"
+      },
+      "invalid": {
+        "submitted": false,
+        "resultTextSample": "\nTaxes and duties\nPowered by Stripe Tax\nCollect sales tax\nAutomatic tax at checkout\nStripe Tax calculates and collects sales tax automatically, based on the buyer's destination and your active tax registrations.\nNot yet configured — connect Stripe and turn this on to start.\n\nThis calculates and collects tax — it is not proof of nexus, registration, or filing compliance. Product tax codes, regist"
+      }
+    },
+    "backNav": {
+      "before": "http://localhost:8082/taxes-duties?bt_preview=seller",
+      "after": "about:blank",
+      "changed": true,
+      "isDeadEnd": false
+    },
+    "candidateDeadClicks": [],
+    "unclosableSheets": [],
+    "interactiveElementCount": 0
+  },
+  {
+    "role": "seller",
+    "viewport": "iphone-390x844",
+    "route": "/team-invite",
+    "reachedFrom": "static-route-list",
+    "navError": null,
+    "loadTimeMs": 1342,
+    "slow": true,
+    "consoleErrors": [
+      "WebSocket connection to 'ws://localhost:8082/hot' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:8082/message' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/_expo/error-overlay-meta",
+        "status": 404
+      }
+    ],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "header": null,
+    "scrollBottom": {
+      "scrolledToBottom": false,
+      "tabBarFound": false,
+      "possibleTabBarOverlap": null
+    },
+    "screenshot": "docs/qa/screenshots/seller-iphone-390x844-242-_team_invite.png",
+    "toggleResults": [],
+    "formTest": {
+      "present": false
+    },
+    "backNav": {
+      "before": "http://localhost:8082/team-invite?bt_preview=seller",
+      "after": "about:blank",
+      "changed": true,
+      "isDeadEnd": false
+    },
+    "candidateDeadClicks": [],
+    "unclosableSheets": [],
+    "interactiveElementCount": 0
+  },
+  {
+    "role": "seller",
+    "viewport": "iphone-390x844",
+    "route": "/team",
+    "reachedFrom": "static-route-list",
+    "navError": null,
+    "loadTimeMs": 1349,
+    "slow": true,
+    "consoleErrors": [
+      "WebSocket connection to 'ws://localhost:8082/hot' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:8082/message' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math",
+      "ClerkRuntimeError: Clerk: Failed to load Clerk JS, failed to load script: https://fake-clerk-key-for-qa.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js\n\n(code=\"failed_to_load_clerk_js\")\n\n"
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/_expo/error-overlay-meta",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      }
+    ],
+    "stillSpinning": true,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "header": {
+      "text": "Team Management",
+      "fontSize": 22,
+      "x": 68,
+      "y": 68,
+      "w": 254,
+      "h": 26
+    },
+    "scrollBottom": {
+      "scrolledToBottom": false,
+      "tabBarFound": false,
+      "possibleTabBarOverlap": null
+    },
+    "screenshot": "docs/qa/screenshots/seller-iphone-390x844-243-_team.png",
+    "toggleResults": [],
+    "formTest": {
+      "present": false
+    },
+    "backNav": {
+      "before": "http://localhost:8082/team?bt_preview=seller",
+      "after": "about:blank",
+      "changed": true,
+      "isDeadEnd": false
+    },
+    "candidateDeadClicks": [],
+    "unclosableSheets": [],
+    "interactiveElementCount": 0
+  },
+  {
+    "role": "seller",
+    "viewport": "iphone-390x844",
+    "route": "/tech-pack-generator",
+    "reachedFrom": "static-route-list",
+    "navError": null,
+    "loadTimeMs": 1378,
+    "slow": true,
+    "consoleErrors": [
+      "WebSocket connection to 'ws://localhost:8082/hot' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:8082/message' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/_expo/error-overlay-meta",
+        "status": 404
+      }
+    ],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "header": {
+      "text": "Tech Pack Generator",
+      "fontSize": 22,
+      "x": 68,
+      "y": 68,
+      "w": 254,
+      "h": 26
+    },
+    "scrollBottom": {
+      "scrolledToBottom": false,
+      "tabBarFound": false,
+      "possibleTabBarOverlap": null
+    },
+    "screenshot": "docs/qa/screenshots/seller-iphone-390x844-244-_tech_pack_generator.png",
+    "toggleResults": [],
+    "formTest": {
+      "present": true,
+      "fieldCount": 7,
+      "valid": {
+        "submitted": false,
+        "resultTextSample": "\nTech Pack Generator\nProfessional tech packs for manufacturers\nStep 1 · Product info\nProduct name*\nBrand name\nCategory\nSeason\nStyle #\nDescription / notes\nColorways (comma separated)\nNext: add photos\n\nBrandthread uses cookies and similar storage technologies. Necessary storage is always on; optional analytics and marketing storage are off until you choose. You can change your choices at any time "
+      },
+      "invalid": {
+        "submitted": false,
+        "resultTextSample": "\nTech Pack Generator\nProfessional tech packs for manufacturers\nStep 1 · Product info\nProduct name*\nBrand name\nCategory\nSeason\nStyle #\nDescription / notes\nColorways (comma separated)\nNext: add photos\n\nBrandthread uses cookies and similar storage technologies. Necessary storage is always on; optional analytics and marketing storage are off until you choose. You can change your choices at any time "
+      }
+    },
+    "backNav": {
+      "before": "http://localhost:8082/tech-pack-generator?bt_preview=seller",
+      "after": "about:blank",
+      "changed": true,
+      "isDeadEnd": false
+    },
+    "candidateDeadClicks": [],
+    "unclosableSheets": [],
+    "interactiveElementCount": 0
+  },
+  {
+    "role": "seller",
+    "viewport": "iphone-390x844",
+    "route": "/terms",
+    "reachedFrom": "static-route-list",
+    "navError": null,
+    "loadTimeMs": 1359,
+    "slow": true,
+    "consoleErrors": [
+      "WebSocket connection to 'ws://localhost:8082/hot' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:8082/message' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/_expo/error-overlay-meta",
+        "status": 404
+      }
+    ],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "header": null,
+    "scrollBottom": {
+      "scrolledToBottom": false,
+      "tabBarFound": false,
+      "possibleTabBarOverlap": null
+    },
+    "screenshot": "docs/qa/screenshots/seller-iphone-390x844-245-_terms.png",
+    "toggleResults": [],
+    "formTest": {
+      "present": false
+    },
+    "backNav": {
+      "before": "http://localhost:8082/terms?bt_preview=seller",
+      "after": "about:blank",
+      "changed": true,
+      "isDeadEnd": false
+    },
+    "candidateDeadClicks": [],
+    "unclosableSheets": [],
+    "interactiveElementCount": 0
+  },
+  {
+    "role": "seller",
+    "viewport": "iphone-390x844",
+    "route": "/thread-cash",
+    "reachedFrom": "static-route-list",
+    "navError": null,
+    "loadTimeMs": 1354,
+    "slow": true,
+    "consoleErrors": [
+      "WebSocket connection to 'ws://localhost:8082/hot' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:8082/message' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math",
+      "ClerkRuntimeError: Clerk: Failed to load Clerk JS, failed to load script: https://fake-clerk-key-for-qa.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js\n\n(code=\"failed_to_load_clerk_js\")\n\n"
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/_expo/error-overlay-meta",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      }
+    ],
+    "stillSpinning": true,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "header": {
+      "text": "Thread Cash",
+      "fontSize": 22,
+      "x": 60,
+      "y": 17,
+      "w": 133.703125,
+      "h": 26
+    },
+    "scrollBottom": {
+      "scrolledToBottom": false,
+      "tabBarFound": false,
+      "possibleTabBarOverlap": null
+    },
+    "screenshot": "docs/qa/screenshots/seller-iphone-390x844-246-_thread_cash.png",
+    "toggleResults": [],
+    "formTest": {
+      "present": false
+    },
+    "backNav": {
+      "before": "http://localhost:8082/thread-cash?bt_preview=seller",
+      "after": "about:blank",
+      "changed": true,
+      "isDeadEnd": false
+    },
+    "candidateDeadClicks": [],
+    "unclosableSheets": [],
+    "interactiveElementCount": 0
+  },
+  {
+    "role": "seller",
+    "viewport": "iphone-390x844",
+    "route": "/thread-checkout",
+    "reachedFrom": "static-route-list",
+    "navError": null,
+    "loadTimeMs": 1372,
+    "slow": true,
+    "consoleErrors": [
+      "WebSocket connection to 'ws://localhost:8082/hot' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:8082/message' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math",
+      "NotSupportedError: Failed to load because no supported source was found.",
+      "NotSupportedError: Failed to load because no supported source was found.",
+      "NotSupportedError: Failed to load because no supported source was found.",
+      "NotSupportedError: Failed to load because no supported source was found."
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/_expo/error-overlay-meta",
+        "status": 404
+      }
+    ],
+    "stillSpinning": false,
+    "truncatedTextSamples": [
+      "Sculpted Wool Coat",
+      "$480.00",
+      "Liquid Silver Dress",
+      "$325.00",
+      "Oversized Tuxedo",
+      "$560.00"
+    ],
+    "offscreenElements": [
+      {
+        "type": "offscreen",
+        "label": "SHOP THE LOOKLiquid Silver Dress·$325.00",
+        "rect": {
+          "x": 16,
+          "y": 1430,
+          "w": 260,
+          "h": 54
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "MV",
+        "rect": {
+          "x": 332,
+          "y": 1259,
+          "w": 44,
+          "h": 44
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 330,
+          "y": 1325,
+          "w": 48,
+          "h": 42
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 330,
+          "y": 1386,
+          "w": 48,
+          "h": 40
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 330,
+          "y": 1445,
+          "w": 48,
+          "h": 42
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 330,
+          "y": 1506,
+          "w": 48,
+          "h": 41
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 330,
+          "y": 1566,
+          "w": 48,
+          "h": 40
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "Maison Vela",
+        "rect": {
+          "x": 16,
+          "y": 1491,
+          "w": 290,
+          "h": 30
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "Chrome Room · Vela Studios",
+        "rect": {
+          "x": 16,
+          "y": 1582,
+          "w": 189,
+          "h": 24
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "SHOP THE LOOKOversized Tuxedo·$560.00",
+        "rect": {
+          "x": 16,
+          "y": 2274,
+          "w": 260,
+          "h": 54
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "SR",
+        "rect": {
+          "x": 332,
+          "y": 2103,
+          "w": 44,
+          "h": 44
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 330,
+          "y": 2169,
+          "w": 48,
+          "h": 42
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 330,
+          "y": 2230,
+          "w": 48,
+          "h": 40
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 330,
+          "y": 2289,
+          "w": 48,
+          "h": 42
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 330,
+          "y": 2350,
+          "w": 48,
+          "h": 41
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "0",
+        "rect": {
+          "x": 330,
+          "y": 2410,
+          "w": 48,
+          "h": 40
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "Saint Rue",
+        "rect": {
+          "x": 16,
+          "y": 2335,
+          "w": 290,
+          "h": 30
+        }
+      },
+      {
+        "type": "offscreen",
+        "label": "Concrete Waltz · Saint Rue",
+        "rect": {
+          "x": 16,
+          "y": 2426,
+          "w": 177,
+          "h": 24
+        }
+      }
+    ],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "header": {
+      "text": "",
+      "fontSize": 20,
+      "x": 49.5,
+      "y": 73.5,
+      "w": 20,
+      "h": 23
+    },
+    "scrollBottom": {
+      "scrolledToBottom": false,
+      "tabBarFound": false,
+      "possibleTabBarOverlap": null
+    },
+    "screenshot": "docs/qa/screenshots/seller-iphone-390x844-247-_thread_checkout.png",
+    "toggleResults": [],
+    "formTest": {
+      "present": false
+    },
+    "backNav": {
+      "before": "http://localhost:8082/",
+      "after": "http://localhost:8082/",
+      "changed": false,
+      "isDeadEnd": false
+    },
+    "candidateDeadClicks": [
+      "Brandthread logo"
+    ],
+    "unclosableSheets": [],
+    "interactiveElementCount": 12
+  },
+  {
+    "role": "seller",
+    "viewport": "iphone-390x844",
+    "route": "/thread-explainer",
+    "reachedFrom": "static-route-list",
+    "navError": null,
+    "loadTimeMs": 1350,
+    "slow": true,
+    "consoleErrors": [
+      "WebSocket connection to 'ws://localhost:8082/hot' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:8082/message' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/_expo/error-overlay-meta",
+        "status": 404
+      }
+    ],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "header": null,
+    "scrollBottom": {
+      "scrolledToBottom": false,
+      "tabBarFound": false,
+      "possibleTabBarOverlap": null
+    },
+    "screenshot": "docs/qa/screenshots/seller-iphone-390x844-248-_thread_explainer.png",
+    "toggleResults": [],
+    "formTest": {
+      "present": false
+    },
+    "backNav": {
+      "before": "http://localhost:8082/onboarding",
+      "after": "http://localhost:8082/onboarding",
+      "changed": false,
+      "isDeadEnd": false
+    },
+    "candidateDeadClicks": [
+      "Brandthread logo"
+    ],
+    "unclosableSheets": [],
+    "interactiveElementCount": 12
+  },
+  {
+    "role": "seller",
+    "viewport": "iphone-390x844",
+    "route": "/thread-product-detail",
+    "reachedFrom": "static-route-list",
+    "navError": null,
+    "loadTimeMs": 1355,
+    "slow": true,
+    "consoleErrors": [
+      "WebSocket connection to 'ws://localhost:8082/hot' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:8082/message' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/_expo/error-overlay-meta",
+        "status": 404
+      }
+    ],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "header": {
+      "text": "",
+      "fontSize": 20,
+      "x": 28,
+      "y": 18.5,
+      "w": 20,
+      "h": 23
+    },
+    "scrollBottom": {
+      "scrolledToBottom": false,
+      "tabBarFound": false,
+      "possibleTabBarOverlap": null
+    },
+    "screenshot": "docs/qa/screenshots/seller-iphone-390x844-249-_thread_product_detail.png",
+    "toggleResults": [],
+    "formTest": {
+      "present": false
+    },
+    "backNav": {
+      "before": "http://localhost:8082/thread-product-detail?bt_preview=seller",
+      "after": "about:blank",
+      "changed": true,
+      "isDeadEnd": false
+    },
+    "candidateDeadClicks": [],
+    "unclosableSheets": [],
+    "interactiveElementCount": 0
+  },
+  {
+    "role": "seller",
+    "viewport": "iphone-390x844",
+    "route": "/u/qa-seed-seller-1",
+    "reachedFrom": "static-route-list",
+    "navError": null,
+    "loadTimeMs": 1376,
+    "slow": true,
+    "consoleErrors": [
+      "WebSocket connection to 'ws://localhost:8082/hot' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:8082/message' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Access to fetch at 'http://localhost:5050/api/v1/public/profiles/qaseedseller1' from origin 'http://localhost:8082' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+      "Failed to load resource: net::ERR_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/_expo/error-overlay-meta",
+        "status": 404
+      }
+    ],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "header": {
+      "text": "",
+      "fontSize": 20,
+      "x": 28,
+      "y": 16,
+      "w": 20,
+      "h": 23
+    },
+    "scrollBottom": {
+      "scrolledToBottom": false,
+      "tabBarFound": false,
+      "possibleTabBarOverlap": null
+    },
+    "screenshot": "docs/qa/screenshots/seller-iphone-390x844-250-_u_qa_seed_seller_1.png",
+    "toggleResults": [],
+    "formTest": {
+      "present": false
+    },
+    "backNav": {
+      "before": "http://localhost:8082/u/qa-seed-seller-1?bt_preview=seller",
+      "after": "about:blank",
+      "changed": true,
+      "isDeadEnd": false
+    },
+    "candidateDeadClicks": [],
+    "unclosableSheets": [],
+    "interactiveElementCount": 0
+  },
+  {
+    "role": "seller",
+    "viewport": "iphone-390x844",
+    "route": "/users",
+    "reachedFrom": "static-route-list",
+    "navError": null,
+    "loadTimeMs": 1350,
+    "slow": true,
+    "consoleErrors": [
+      "WebSocket connection to 'ws://localhost:8082/hot' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:8082/message' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math",
+      "ClerkRuntimeError: Clerk: Failed to load Clerk JS, failed to load script: https://fake-clerk-key-for-qa.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js\n\n(code=\"failed_to_load_clerk_js\")\n\n"
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/_expo/error-overlay-meta",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      }
+    ],
+    "stillSpinning": true,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "header": {
+      "text": "Users",
+      "fontSize": 22,
+      "x": 68,
+      "y": 86,
+      "w": 254,
+      "h": 26
+    },
+    "scrollBottom": {
+      "scrolledToBottom": false,
+      "tabBarFound": false,
+      "possibleTabBarOverlap": null
+    },
+    "screenshot": "docs/qa/screenshots/seller-iphone-390x844-251-_users.png",
+    "toggleResults": [],
+    "formTest": {
+      "present": false
+    },
+    "backNav": {
+      "before": "http://localhost:8082/users?bt_preview=seller",
+      "after": "about:blank",
+      "changed": true,
+      "isDeadEnd": false
+    },
+    "candidateDeadClicks": [],
+    "unclosableSheets": [],
+    "interactiveElementCount": 0
+  },
+  {
+    "role": "seller",
+    "viewport": "iphone-390x844",
+    "route": "/vacation-mode",
+    "reachedFrom": "static-route-list",
+    "navError": null,
+    "loadTimeMs": 1380,
+    "slow": true,
+    "consoleErrors": [
+      "WebSocket connection to 'ws://localhost:8082/hot' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:8082/message' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math",
+      "ClerkRuntimeError: Clerk: Failed to load Clerk JS, failed to load script: https://fake-clerk-key-for-qa.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js\n\n(code=\"failed_to_load_clerk_js\")\n\n"
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/_expo/error-overlay-meta",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      }
+    ],
+    "stillSpinning": true,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "header": null,
+    "scrollBottom": {
+      "scrolledToBottom": false,
+      "tabBarFound": false,
+      "possibleTabBarOverlap": null
+    },
+    "screenshot": "docs/qa/screenshots/seller-iphone-390x844-252-_vacation_mode.png",
+    "toggleResults": [],
+    "formTest": {
+      "present": false
+    },
+    "backNav": {
+      "before": "http://localhost:8082/vacation-mode?bt_preview=seller",
+      "after": "about:blank",
+      "changed": true,
+      "isDeadEnd": false
+    },
+    "candidateDeadClicks": [],
+    "unclosableSheets": [],
+    "interactiveElementCount": 0
   }
 ]
