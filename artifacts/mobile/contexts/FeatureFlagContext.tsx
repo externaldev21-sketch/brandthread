@@ -9,7 +9,9 @@ export type FeatureFlagKey =
   | 'manufacturerHub'
   | 'threadCash'
   | 'threadCashCheckoutDiscount'
-  | 'threadCashSend';
+  | 'threadCashSend'
+  | 'oauthGoogleEnabled'
+  | 'oauthAppleEnabled';
 
 const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   aiPhotoShoot: true,
@@ -17,6 +19,13 @@ const DEFAULT_FLAGS: Record<FeatureFlagKey, boolean> = {
   boosts: true,
   manufacturerHub: true,
   threadCash: true,
+  // Sign in/up with Google or Apple. Default on (both are wired to Clerk
+  // OAuth). If a provider isn't actually configured on the Clerk instance,
+  // flip its flag off server-side (PUT /api/feature-flags/oauthGoogleEnabled
+  // or oauthAppleEnabled with { enabled: false }) rather than shipping a
+  // button that errors for real users.
+  oauthGoogleEnabled: true,
+  oauthAppleEnabled: true,
   // OFF until an operator reviews the sign-off checklist and flips it on
   // server-side (see docs/payments/thread-cash-checkout-todo.md) — the
   // money flow itself is implemented and tested.

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator, Linking,
@@ -54,7 +55,7 @@ export default function StorePublishScreen() {
       router.replace(SELLER_HOME_ROUTE as never);
       return;
     }
-    router.back();
+    goBackOr(router);
   };
 
   const handleSharePreview = async () => {

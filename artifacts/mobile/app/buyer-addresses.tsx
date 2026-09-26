@@ -15,6 +15,7 @@ import { hapticDestructiveConfirm, hapticSuccess, hapticToggle } from '@/lib/hap
 import { TYPE_SCALE } from '@/constants/typography';
 import { SPACING } from '@/constants/spacing';
 import { RADII } from '@/constants/radii';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 export default function BuyerAddressesScreen() {
   const { theme } = useAppTheme();
@@ -171,7 +172,7 @@ export default function BuyerAddressesScreen() {
     <View style={styles.root}>
       <ScreenHeader
         title={showForm ? (isCreating ? 'Add address' : 'Edit address') : 'Shipping addresses'}
-        onBack={() => { if (showForm) handleCancel(); else router.back(); }}
+        onBack={() => { if (showForm) handleCancel(); else goBackOr(router); }}
         variant={showForm ? 'modal' : 'push'}
       />
 

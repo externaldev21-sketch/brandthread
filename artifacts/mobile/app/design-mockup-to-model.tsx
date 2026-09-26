@@ -9,6 +9,7 @@
  * After Create: per-reference generation progress → results grid with partial-failure retry.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert, Image,
@@ -462,7 +463,7 @@ export default function MockupToModelScreen() {
 
   return (
     <BrandthreadScreen>
-      <BrandthreadHeader title="Mockup to Model" onBack={() => router.back()} />
+      <BrandthreadHeader title="Mockup to Model" onBack={() => goBackOr(router)} />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 100 }]}

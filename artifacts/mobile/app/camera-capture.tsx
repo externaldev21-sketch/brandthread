@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   Alert,
   PanResponder,
@@ -109,7 +110,7 @@ function CameraCaptureWeb() {
       </Text>
       <TouchableOpacity
         style={[s.webFallbackButton, { backgroundColor: ACCENT }]}
-        onPress={() => router.back()}
+        onPress={() => goBackOr(router)}
         accessibilityRole="button"
       >
         <Text style={s.webFallbackButtonText}>Back to upload options</Text>
@@ -240,7 +241,7 @@ export default function CameraCapture() {
       const result = await cameraRef.current.takePictureAsync({ quality: 0.9 });
       if (result?.uri) {
         (global as any).__cameraCaptureResult = { uri: result.uri, type: 'photo' };
-        router.back();
+        goBackOr(router);
       }
     } catch {
       setCaptureError('Could not capture that photo. Please try again.');
@@ -287,7 +288,7 @@ export default function CameraCapture() {
           >
             <Text style={s.permBtnText}>Grant access</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={() => goBackOr(router)}>
             <Text style={s.cancelText}>Cancel</Text>
           </TouchableOpacity>
         </View>
@@ -342,10 +343,10 @@ export default function CameraCapture() {
         <TouchableOpacity
           style={s.iconBtn}
           onPress={() => {
-            if (clips.length === 0) router.back();
+            if (clips.length === 0) goBackOr(router);
             else Alert.alert('Discard clips?', 'Your recorded clips will be lost.', [
               { text: 'Keep editing', style: 'cancel' },
-              { text: 'Discard', style: 'destructive', onPress: () => router.back() },
+              { text: 'Discard', style: 'destructive', onPress: () => goBackOr(router) },
             ]);
           }}
           accessibilityLabel="Close camera"
@@ -529,7 +530,7 @@ export default function CameraCapture() {
                   clips,
                   duration: totalClipDuration(clips),
                 };
-                router.back();
+                goBackOr(router);
               }}
               accessibilityLabel="Use clips"
             >
@@ -551,7 +552,7 @@ export default function CameraCapture() {
                 clips,
                 duration: totalClipDuration(clips),
               };
-              router.back();
+              goBackOr(router);
             }}
             accessibilityLabel="Tag product listing"
           >

@@ -44,6 +44,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { saveImageToMediaLibrary } from '@/lib/mediaLibraryAdapter';
 import { makeDurableUri } from '@/lib/imageUri';
 import { validateBtJson } from '@/lib/btLayerValidator';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   validateMimeExtPair, validateMagicBytes, validateJsonByteLength,
   JSON_IMPORT_MAX_BYTES,
@@ -573,7 +574,7 @@ export default function DesignCanvasScreen() {
         ? await getProject(projectId)
         : await createProject('canvas', 'Untitled Artwork', {});
       if (!proj) {
-        Alert.alert('Not found', 'Project not found.', [{ text: 'OK', onPress: () => router.back() }]);
+        Alert.alert('Not found', 'Project not found.', [{ text: 'OK', onPress: () => goBackOr(router) }]);
         return;
       }
       setProject(proj);
@@ -2288,7 +2289,7 @@ export default function DesignCanvasScreen() {
         setSaveStatus('unsaved');
       }
       await coordinatedSave();
-      router.back();
+      goBackOr(router);
     } catch {
       setSaveStatus('unsaved');
       Alert.alert(

@@ -10,6 +10,7 @@
  * source param carries attribution; thread-checkout.tsx is a redirect alias.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   ActivityIndicator, Alert, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View, Animated, Image,
@@ -1095,7 +1096,7 @@ export default function BuyerCheckoutScreen() {
   const { back } = useThreadPull();
   // thread-checkout.tsx is a redirect alias — use ThreadPull transition if coming from there
   const usesThreadPull = pathname === '/thread-checkout';
-  const leaveCheckout = () => (usesThreadPull ? back() : router.back());
+  const leaveCheckout = () => (usesThreadPull ? back() : goBackOr(router));
   const insets = useSafeAreaInsets();
   const api = useApi();
   const { isSignedIn } = useAuth();

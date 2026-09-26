@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
@@ -166,7 +167,7 @@ export default function StoreThemePicker() {
     <View style={styles.root}>
       <Header
         title="Storefront Theme"
-        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
+        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
       />
 
       {/* Thread Theme */}

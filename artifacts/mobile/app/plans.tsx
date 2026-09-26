@@ -12,6 +12,7 @@
  * The recommended tier is personalized based on the seller's brand-stage answer from onboarding.
  */
 import React, { useState, useEffect, useRef } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   ActivityIndicator,
   Alert,
@@ -241,7 +242,7 @@ export default function PlansScreen() {
       await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
       router.replace('/(tabs)/' as never);
     } else {
-      router.back();
+      goBackOr(router);
     }
   }
 
@@ -272,7 +273,7 @@ export default function PlansScreen() {
           <TouchableOpacity
             style={styles.closeBtn}
             activeOpacity={0.7}
-            onPress={() => { haptic(); router.back(); }}
+            onPress={() => { haptic(); goBackOr(router); }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Feather name="x" size={18} color={theme.text} />

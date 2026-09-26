@@ -5,6 +5,7 @@
  * Navigates to product-bundle-edit for create/edit.
  */
 import React, { useState, useCallback } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   ActivityIndicator, RefreshControl,
@@ -88,7 +89,7 @@ export default function ProductBundlesScreen() {
     <View style={[s.root, { paddingTop: insets.top }]}>
       <BrandthreadHeader
         title="Bundles"
-        onBack={() => router.back()}
+        onBack={() => goBackOr(router)}
         rightElement={
           <IconButton
             name="plus"

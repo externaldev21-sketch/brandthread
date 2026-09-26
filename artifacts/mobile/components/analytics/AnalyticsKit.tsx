@@ -17,6 +17,7 @@ import Svg, { Rect, Line, Text as SvgText } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { COMP, FONT, FS, RADIUS, SP } from '@/lib/theme';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 type Colors = ReturnType<typeof useColors>;
 
@@ -39,7 +40,7 @@ export function AnalyticsHeader({
   return (
     <View style={s.root}>
       <TouchableOpacity
-        onPress={() => { Haptics.selectionAsync(); (onBack ?? router.back)(); }}
+        onPress={() => { Haptics.selectionAsync(); onBack ? onBack() : goBackOr(router); }}
         style={s.backBtn}
         accessibilityRole="button"
         accessibilityLabel="Go back"

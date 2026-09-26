@@ -22,6 +22,7 @@ import { Product, ProductVariant, OptionValue } from '@/services/productTypes';
 import { useApi } from '@/lib/api';
 import { calcPricing } from '@/lib/productUtils';
 import { formatCents, integerPercent } from '@/lib/money';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const GALLERY_H = 380;
@@ -174,7 +175,7 @@ export default function ProductStoreScreen() {
 
   const handleBack = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.back();
+    goBackOr(router);
   }, [router]);
 
   const handleShare = useCallback(async () => {
@@ -246,7 +247,7 @@ export default function ProductStoreScreen() {
         <Text style={[s.loadingText, { marginTop: SP.md, textAlign: 'center' }]}>
           Product not found or no longer available.
         </Text>
-        <TouchableOpacity style={{ marginTop: SP.md }} onPress={() => router.back()} activeOpacity={0.7}>
+        <TouchableOpacity style={{ marginTop: SP.md }} onPress={() => goBackOr(router)} activeOpacity={0.7}>
           <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.semibold, fontSize: FS.base }}>Go Back</Text>
         </TouchableOpacity>
       </View>

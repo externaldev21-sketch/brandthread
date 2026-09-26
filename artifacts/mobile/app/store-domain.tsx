@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, Alert,
@@ -42,7 +43,7 @@ export default function StoreDomainScreen() {
       router.replace(SELLER_HOME_ROUTE as never);
       return;
     }
-    router.back();
+    goBackOr(router);
   };
 
   const load = useCallback(async () => {

@@ -6,6 +6,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   ActivityIndicator,
   Alert,
@@ -172,7 +173,7 @@ export default function DraftsScreen() {
       <View style={[styles.header, { paddingTop: insets.top + SP.sm }]}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => goBackOr(router)}
           activeOpacity={0.75}
           accessibilityRole="button"
           accessibilityLabel="Back to products"

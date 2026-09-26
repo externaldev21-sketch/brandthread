@@ -3,6 +3,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, ActivityIndicator, Alert,
@@ -144,7 +145,7 @@ export default function DesignProjectScreen() {
   }, []);
 
   function goBack() {
-    if (step === 1) { router.back(); return; }
+    if (step === 1) { goBackOr(router); return; }
     setStep(s => s - 1);
   }
 
