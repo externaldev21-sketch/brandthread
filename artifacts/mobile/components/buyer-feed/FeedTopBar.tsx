@@ -10,7 +10,6 @@
 import React from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { FONT, ON_DARK } from '@/lib/theme';
@@ -49,8 +48,10 @@ export function FeedTopBar({
   return (
     <View style={[styles.root, { paddingTop: Math.max(0, topInset - 4) }]} pointerEvents="box-none">
       {searchOpen ? (
+        // Solid fill, no BlurView: a live blur here would re-sample the
+        // playing video behind it every frame — same class of glitch as the
+        // old shop pill's frosted background (see ShopSideTab).
         <View style={styles.searchRow}>
-          <BlurView intensity={34} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
           <Feather name="search" size={16} color="rgba(255,255,255,0.75)" style={{ marginLeft: 14 }} />
           <TextInput
             style={styles.searchInput}
@@ -158,7 +159,9 @@ const styles = StyleSheet.create({
   liveTextActive: { color: ON_DARK },
   searchRow: {
     flexDirection: 'row', alignItems: 'center', minHeight: 44, borderRadius: 22,
-    overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.32)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
+    // Solid fill (bumped from 0.32 now that there's no BlurView underneath
+    // adding its own contrast) instead of a blur-over-video background.
+    overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.6)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
   },
   searchInput: {
     flex: 1, height: 44, paddingHorizontal: 10, fontSize: 14, color: ON_DARK,

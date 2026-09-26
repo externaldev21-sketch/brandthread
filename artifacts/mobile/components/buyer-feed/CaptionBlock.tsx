@@ -2,11 +2,16 @@
  * Buyer Threads Home feed — bottom-left info block.
  *
  * Repost identity (when present) → @handle + verified badge → 2-line
- * caption with a "more" expand → shop anchor pill → sound line. Sized and
- * positioned per Mobbin's TikTok For You references gathered for this
- * rebuild: username ~17pt bold, caption ~14.5pt/2 lines with a bold "more",
- * a small pill-shaped sound row below — see the PR description for the
- * full measurement list.
+ * caption with a "more" expand → sound line. Sized and positioned per
+ * Mobbin's TikTok For You references gathered for this rebuild: username
+ * ~17pt bold, caption ~14.5pt/2 lines with a bold "more", a small
+ * pill-shaped sound row below — see the PR description for the full
+ * measurement list.
+ *
+ * The shop tag used to be a `shopPill` slot at the top of this stack; it's
+ * now the screen-edge ShopSideTab rendered as its own sibling in feed.tsx
+ * (see app/(tabs)/feed.tsx), so this stack starts straight at the
+ * repost/creator row with no leftover gap where the pill used to sit.
  */
 import React from 'react';
 import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -27,7 +32,6 @@ export function CaptionBlock({
   friendReposts, hasRepostIdentity, repostLabel, onOpenRepostIdentity,
   captionExpanded, onToggleCaptionExpanded,
   onOpenCreator,
-  shopPill,
   style,
 }: {
   creator: string;
@@ -43,8 +47,6 @@ export function CaptionBlock({
   captionExpanded: boolean;
   onToggleCaptionExpanded: () => void;
   onOpenCreator: () => void;
-  /** The compact ShopAnchorPill element, rendered above the handle/caption. */
-  shopPill?: React.ReactNode;
   style?: any;
 }) {
   return (
@@ -87,8 +89,6 @@ export function CaptionBlock({
           <Text style={styles.repostIdentityText} numberOfLines={1}>{repostLabel}</Text>
         </TouchableOpacity>
       )}
-
-      {!!shopPill && <View style={styles.shopPillWrap}>{shopPill}</View>}
 
       <TouchableOpacity
         activeOpacity={0.8}
@@ -135,16 +135,18 @@ export function CaptionBlock({
 
 const styles = StyleSheet.create({
   // One consistent vertical rhythm, set as explicit per-step margins (not a
-  // uniform `gap`, since each step needs its own value): shop pill -> 12pt
-  // -> creator name row -> 6pt -> caption -> 8pt -> sound line -> (the
-  // caller's own gap to the progress bar, see RAIL_BOTTOM_GAP/
-  // CAPTION_BOTTOM_GAP in app/(tabs)/feed.tsx).
+  // uniform `gap`, since each step needs its own value): creator name row ->
+  // 6pt -> caption -> 8pt -> sound line -> (the caller's own gap to the
+  // progress bar, see RAIL_BOTTOM_GAP/CAPTION_BOTTOM_GAP in
+  // app/(tabs)/feed.tsx). The shop tag no longer starts this stack (it's
+  // the screen-edge ShopSideTab now) — minHeight shrunk by its old 44pt-tall
+  // pill + 12pt gap (56pt) accordingly, so there's no leftover reserved
+  // space where it used to sit.
   root: {
-    position: 'absolute', left: 16, right: 84, bottom: 26, minHeight: 112,
+    position: 'absolute', left: 16, right: 84, bottom: 26, minHeight: 56,
     justifyContent: 'flex-end',
   },
-  rootWithRepost: { minHeight: 148 },
-  shopPillWrap: { marginBottom: 12, alignItems: 'flex-start' },
+  rootWithRepost: { minHeight: 92 },
   repostIdentity: {
     alignSelf: 'flex-start', maxWidth: '100%', minHeight: 32, marginBottom: 12,
     flexDirection: 'row', alignItems: 'center', gap: 8,

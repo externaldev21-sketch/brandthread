@@ -21,7 +21,6 @@ import type { SellerThreadPost } from '@/services/socialService';
 import * as Haptics from 'expo-haptics';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
 import { Asset } from 'expo-asset';
 import { Image as ExpoImage } from 'expo-image';
@@ -79,7 +78,7 @@ import { profileHref, type VideoFeedSource } from '@/lib/profileNavigation';
 import { FeedTopBar } from '@/components/buyer-feed/FeedTopBar';
 import { RightActionRail } from '@/components/buyer-feed/RightActionRail';
 import { CaptionBlock } from '@/components/buyer-feed/CaptionBlock';
-import { ShopAnchorPill } from '@/components/buyer-feed/ShopAnchorPill';
+import { ShopSideTab } from '@/components/buyer-feed/ShopSideTab';
 import { LongPressMenu } from '@/components/buyer-feed/LongPressMenu';
 
 /**
@@ -1206,7 +1205,7 @@ function PhotoVisual({ uris, pageWidth, pageHeight, onPageChange }: { uris: stri
 
 // The old inline ShopPill/right-rail/caption-block/top-bar JSX previously
 // defined in this file has been rebuilt as its own component tree under
-// components/buyer-feed/ (ShopAnchorPill, RightActionRail, CaptionBlock,
+// components/buyer-feed/ (ShopSideTab, RightActionRail, CaptionBlock,
 // FeedTopBar, LongPressMenu) — see the imports above. This file keeps the
 // video player logic and gesture handling (SpotlightPage, VideoVisual,
 // ScrubProgressBar) and the data/engagement hooks, and wires the new
@@ -1457,6 +1456,20 @@ function SpotlightPage({
           swipe (each cell used to carry its own copy, which visibly slid
           off with the content). */}
 
+      {/* ─ Shop side tab (components/buyer-feed/ShopSideTab) ─ collapsed
+          against the left edge (mirrors the rail on the right), only when
+          this video has a tagged product. Lives at this top level, not
+          inside CaptionBlock — it's a screen-edge affordance, not part of
+          that stack's flow. */}
+      {!!item.productTags?.length && (
+        <ShopSideTab
+          tag={item.productTags[0]}
+          extraCount={Math.max(0, item.productTags.length - 1)}
+          onPress={() => onShopTag(item, item.productTags![0])}
+          isActive={isActive}
+        />
+      )}
+
       {/* ─ Right action rail (components/buyer-feed/RightActionRail) ─
           bottom: bottomClearance + RAIL_BOTTOM_GAP, not bare bottomClearance
           — see the RAIL_BOTTOM_GAP/CAPTION_BOTTOM_GAP comment above. */}
@@ -1511,9 +1524,10 @@ function SpotlightPage({
         onClose={() => setMenuOpen(false)}
       />
 
-      {/* ─ Bottom-left overlay: shop pill, creator, caption, sound (components/buyer-feed/CaptionBlock + ShopAnchorPill) ─
+      {/* ─ Bottom-left overlay: creator, caption, sound (components/buyer-feed/CaptionBlock) ─
           bottom: bottomClearance + CAPTION_BOTTOM_GAP, not bare
-          bottomClearance — same reason as the rail above. */}
+          bottomClearance — same reason as the rail above. The shop tag is
+          the ShopSideTab rendered above instead of a CaptionBlock slot. */}
       <CaptionBlock
         style={[chromeStyle, { bottom: bottomClearance + CAPTION_BOTTOM_GAP }]}
         creator={item.creator}
@@ -1533,13 +1547,6 @@ function SpotlightPage({
         captionExpanded={captionExpanded}
         onToggleCaptionExpanded={() => setCaptionExpanded(v => !v)}
         onOpenCreator={() => onOpenCreator(item)}
-        shopPill={!!item.productTags?.length && (
-          <ShopAnchorPill
-            tag={item.productTags[0]}
-            extraCount={Math.max(0, item.productTags.length - 1)}
-            onPress={() => onShopTag(item, item.productTags![0])}
-          />
-        )}
       />
     </View>
   );
