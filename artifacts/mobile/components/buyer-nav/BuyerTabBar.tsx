@@ -64,6 +64,14 @@ export const BUYER_ROUTE_SLOT: Record<string, Slot> = {
   'edit-profile': 'profile',
 };
 
+/**
+ * Routes that are pushed, modal-style screens inside the buyer tab navigator
+ * (kept as Tabs.Screen entries with href: null so the bar stays mounted
+ * behind them for a nice cross-fade, per the layout comment) but that must
+ * not show the floating tab bar over their own content/keyboard/footer.
+ */
+const BUYER_TAB_BAR_HIDDEN_ROUTES = new Set<string>(['edit-profile']);
+
 // Critically damped with clamping: the morph settles in ~350ms and can never
 // overshoot, so the capsule does not bounce when search opens or closes.
 const MORPH_SPRING = { mass: 1, stiffness: 320, damping: 36, overshootClamping: true } as const;
@@ -264,6 +272,11 @@ export function BuyerTabBar({
   }, [dismissKeyboard, requestFilters]);
 
   const profileFocused = activeSlot === 'profile';
+
+  // Pushed, modal-style screens (Edit profile) never show the floating bar.
+  // This check runs after every hook above so hook order stays stable while
+  // the bar itself mounts/unmounts as the user navigates in and out.
+  if (BUYER_TAB_BAR_HIDDEN_ROUTES.has(activeRoute)) return null;
 
   return (
     <Animated.View
