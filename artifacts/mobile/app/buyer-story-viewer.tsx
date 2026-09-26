@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, Pressable, TextInput, Animated, Easing,
   Dimensions, PanResponder, StyleSheet, Alert, Modal, FlatList,
-  Image, Linking, KeyboardAvoidingView, Platform,
+  Image, Linking, KeyboardAvoidingView, Platform, Share,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -570,6 +570,20 @@ export default function BuyerStoryViewer() {
                     {likesCounts[currentStory.id]}
                   </Text>
                 )}
+              </PressableScale>
+              <PressableScale
+                onPress={() => {
+                  hapticLight();
+                  setIsPaused(true);
+                  Share.share({ message: `Check out ${currentStory.authorName}'s story on Brandthread` })
+                    .catch(() => {})
+                    .finally(() => setIsPaused(false));
+                }}
+                style={styles.likeBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Share this story"
+              >
+                <Feather name="send" size={ICON.lg} color={ON_DARK} />
               </PressableScale>
               {isMyStory && (
                 <PressableScale
