@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
-  View, Text, FlatList, SectionList,
+  View, Text, FlatList, SectionList, Image,
   Alert, StyleSheet, ScrollView, RefreshControl,
   Modal, TextInput, ActivityIndicator, Platform,
 } from 'react-native';
@@ -28,6 +28,79 @@ import { FollowerAvatarCard } from '@/components/inbox/FollowerAvatarCard';
 import { IconButton } from '@/components/ui/IconButton';
 import { Snackbar } from '@/components/ui/Snackbar';
 import { hapticPrimaryAction, hapticDestructiveConfirm } from '@/lib/haptics';
+import {
+  isPreviewInboxEnabled, getPreviewConversations, getPreviewNotifications,
+  subscribePreviewTyping,
+} from '@/lib/previewInbox';
+import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+
+// This screen's Pressables opt out of the shared android_ripple treatment
+// (see rippleEnabled on PressableScale/IconButton) — the translucent ripple
+// circle read as an unwanted extra layer of chrome on these dense list rows
+// and pill controls. Scale/opacity press feedback is unaffected.
+const NO_RIPPLE = false;
+
+// ─── Messages / Follows / Requests segmented control ───────────────────────
+
+type InboxTab = 'follows' | 'messages' | 'requests';
+
+function SegmentedTabs({
+  value, onChange, counts, theme, gutter,
+}: {
+  value: InboxTab;
+  onChange: (tab: InboxTab) => void;
+  counts: Record<InboxTab, number>;
+  theme: ReturnType<typeof useAppTheme>['theme'];
+  gutter: number;
+}) {
+  const tabs: { key: InboxTab; label: string }[] = [
+    { key: 'follows', label: 'Follows' },
+    { key: 'messages', label: 'Messages' },
+    { key: 'requests', label: 'Requests' },
+  ];
+  return (
+    <View style={[tabS.row, { paddingHorizontal: gutter, borderBottomColor: theme.border }]}>
+      {tabs.map(tab => {
+        const active = value === tab.key;
+        const count = counts[tab.key];
+        return (
+          <PressableScale
+            key={tab.key}
+            style={tabS.tab}
+            onPress={() => onChange(tab.key)}
+            rippleEnabled={NO_RIPPLE}
+            activeOpacity={0.7}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            testID={`inbox-tab-${tab.key}`}
+          >
+            <View style={tabS.tabLabelRow}>
+              <Text style={[tabS.tabLabel, { color: active ? theme.text : theme.muted, fontFamily: active ? FONT.bold : FONT.semibold }]}>
+                {tab.label}
+              </Text>
+              {count > 0 && (
+                <View style={[tabS.tabCountPill, { backgroundColor: active ? theme.accent : theme.cardElevated }]}>
+                  <Text style={[tabS.tabCountText, { color: active ? theme.onAccent : theme.muted }]}>{count > 99 ? '99+' : count}</Text>
+                </View>
+              )}
+            </View>
+            <View style={[tabS.tabUnderline, active && { backgroundColor: theme.text }]} />
+          </PressableScale>
+        );
+      })}
+    </View>
+  );
+}
+
+const tabS = StyleSheet.create({
+  row: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, marginBottom: SP.md },
+  tab: { flex: 1, alignItems: 'center', paddingBottom: SP.sm, gap: SP.sm },
+  tabLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  tabLabel: { fontSize: FS.sm, letterSpacing: 0.2 },
+  tabCountPill: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  tabCountText: { fontSize: 10, fontFamily: FONT.bold },
+  tabUnderline: { height: 2, width: '60%', borderRadius: 1, backgroundColor: 'transparent' },
+});
 
 // ─── Compose sheet: unified "person" shape ────────────────────────────────────
 // Friends/followers/following come from the follow-graph endpoints in
@@ -126,8 +199,16 @@ export default function InboxScreen() {
   const [composeSuggested, setComposeSuggested] = useState<ComposePerson[]>([]);
   const [messagesSearchQuery, setMessagesSearchQuery] = useState('');
   const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
-  const [requestsSheetVisible, setRequestsSheetVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState<InboxTab>('messages');
+  const [typingConvId, setTypingConvId] = useState<string | null>(null);
   const snackbarTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Preview-only: simulate a transient "typing…" row for one seeded thread
+  // (see lib/previewInbox.ts) — a no-op outside the dev/preview environment.
+  useEffect(() => {
+    const unsub = subscribePreviewTyping(setTypingConvId);
+    return unsub;
+  }, []);
 
   const showSnackbar = useCallback((message: string) => {
     if (snackbarTimer.current) clearTimeout(snackbarTimer.current);
@@ -146,12 +227,30 @@ export default function InboxScreen() {
     try {
       const [convs, notifs] = await Promise.all([getConversations(), getNotifications()]);
       if (accountRef.current !== userId) return;
-      setConversations(convs);
-      setNotifications(notifs);
+      // Dev/preview only, and only when the real API genuinely has nothing to
+      // show (see lib/previewInbox.ts) — never for a real signed-in account,
+      // never when the API returned real rows, and dead code in production.
+      if (isPreviewInboxEnabled() && convs.length === 0 && notifs.length === 0) {
+        setConversations(getPreviewConversations());
+        setNotifications(getPreviewNotifications());
+      } else {
+        setConversations(convs);
+        setNotifications(notifs);
+      }
     } catch {
-      setLoadError(true);
-      setConversations([]);
-      setNotifications([]);
+      // A real, reachable backend failing is a real error. In dev/preview
+      // (e.g. the web preview with no backend at all) fall back to the same
+      // seeded data instead of showing an error state for something that
+      // was never going to have a backend to begin with.
+      if (isPreviewInboxEnabled()) {
+        setLoadError(false);
+        setConversations(getPreviewConversations());
+        setNotifications(getPreviewNotifications());
+      } else {
+        setLoadError(true);
+        setConversations([]);
+        setNotifications([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -180,18 +279,22 @@ export default function InboxScreen() {
   const messagesSearchLower = messagesSearchQuery.trim().toLowerCase();
 
   // The primary list: ordinary (non-request, non-archived) conversations,
-  // optionally filtered by the search bar.
-  const filteredConvs = conversations.filter(conv => {
-    if (conv.isArchived || conv.isRequest) return false;
-    if (messagesSearchLower) {
-      const participant = getParticipant(conv);
-      const haystack = [
-        participant?.name, participant?.handle, conv.lastMessage,
-      ].filter(Boolean).join(' ').toLowerCase();
-      if (!haystack.includes(messagesSearchLower)) return false;
-    }
-    return true;
-  });
+  // optionally filtered by the search bar, pinned threads (e.g. the official
+  // Brandthread Agent welcome thread — see the isPinned comment on
+  // Conversation in services/socialTypes.ts) always sorted first.
+  const filteredConvs = conversations
+    .filter(conv => {
+      if (conv.isArchived || conv.isRequest) return false;
+      if (messagesSearchLower) {
+        const participant = getParticipant(conv);
+        const haystack = [
+          participant?.name, participant?.handle, conv.lastMessage,
+        ].filter(Boolean).join(' ').toLowerCase();
+        if (!haystack.includes(messagesSearchLower)) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
 
   const requestConvs = conversations.filter(conv => conv.isRequest === true && !conv.isArchived);
   const followNotifications = notifications.filter(notif => notif.type === 'new_follower' && !notif.isMuted);
@@ -215,7 +318,7 @@ export default function InboxScreen() {
       // Refresh conversation list
       const convs = await getConversations();
       setConversations(convs);
-      setRequestsSheetVisible(false);
+      setActiveTab('messages');
       // Open the accepted conversation
       markConversationRead(conv.id);
       router.push(`/buyer-conversation?id=${conv.id}` as never);
@@ -489,6 +592,7 @@ export default function InboxScreen() {
     const participant = getParticipant(conv);
     if (!participant) return null;
     const isUnread = conv.unreadCount > 0;
+    const isTyping = typingConvId === conv.id;
 
     const swipeActions: InboxSwipeAction[] = [
       {
@@ -524,17 +628,26 @@ export default function InboxScreen() {
       <AnimatedEntrance delay={Math.min(index, 6) * 30} distance={10}>
         <InboxSwipeRow rowId={conv.id} actions={swipeActions}>
           <PressableScale
-            style={s.convRow}
+            style={[s.convRow, { backgroundColor: theme.background }]}
             onPress={() => openConversation(conv)}
             onLongPress={() => longPressConversation(conv)}
             activeOpacity={0.75}
+            rippleEnabled={NO_RIPPLE}
             testID={`inbox-conversation-${conv.id}`}
           >
             {/* Avatar with unread + online dots */}
             <View style={s.avatarContainer}>
-              <View style={[s.avatar60, { backgroundColor: participant.color }]}>
-                <Text style={s.avatarInitials}>{participant.initials}</Text>
-              </View>
+              {conv.isOfficial ? (
+                <View style={[s.avatar60, s.officialAvatar, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                  <BrandthreadLogo size={30} />
+                </View>
+              ) : participant.avatarUri ? (
+                <Image source={{ uri: participant.avatarUri }} style={s.avatar60} testID={`inbox-avatar-image-${conv.id}`} />
+              ) : (
+                <View style={[s.avatar60, { backgroundColor: participant.color }]}>
+                  <Text style={s.avatarInitials}>{participant.initials}</Text>
+                </View>
+              )}
               {isUnread && <View style={[s.unreadDot, { backgroundColor: theme.accent, borderColor: theme.background }]} />}
               {participant.isOnline && (
                 <View
@@ -553,6 +666,14 @@ export default function InboxScreen() {
                 >
                   {participant.name}
                 </Text>
+                {conv.isOfficial && (
+                  <View style={s.officialBadgeRow} testID={`inbox-official-badge-${conv.id}`}>
+                    <Feather name="check-circle" size={13} color={theme.accent} style={{ marginLeft: 4 }} />
+                    <View style={[s.aiTag, { backgroundColor: theme.accentDim }]}>
+                      <Text style={[s.aiTagText, { color: theme.accent }]}>AI</Text>
+                    </View>
+                  </View>
+                )}
                 {conv.lastMessageTs ? (
                   <Text style={[s.convTime, { color: isUnread ? theme.accent : theme.muted }]}>{timeAgo(conv.lastMessageTs)}</Text>
                 ) : null}
@@ -562,13 +683,19 @@ export default function InboxScreen() {
                   <Text style={[s.orderPillText, { color: theme.accent }]}>{conv.contextOrderNumber}</Text>
                 </View>
               ) : null}
-              <ConversationPreview
-                text={previewText(conv.lastMessage, 'No messages yet')}
-                attachmentType={conv.lastMessageType}
-                isFromMe={!!conv.lastMessageSenderId && conv.lastMessageSenderId === MY_USER_ID}
-                bold={isUnread}
-                color={isUnread ? theme.text : theme.muted}
-              />
+              {isTyping ? (
+                <Text style={[s.convPreview, { color: theme.accent, fontFamily: FONT.semibold }]} testID={`inbox-typing-${conv.id}`}>
+                  typing…
+                </Text>
+              ) : (
+                <ConversationPreview
+                  text={previewText(conv.lastMessage, 'No messages yet')}
+                  attachmentType={conv.lastMessageType}
+                  isFromMe={!!conv.lastMessageSenderId && conv.lastMessageSenderId === MY_USER_ID}
+                  bold={isUnread}
+                  color={isUnread ? theme.text : theme.muted}
+                />
+              )}
             </View>
 
             {/* Trailing: unread pill badge, hidden when there is nothing unread */}
@@ -608,6 +735,7 @@ export default function InboxScreen() {
               onPress={() => acceptRequest(conv)}
               disabled={isLoadingAction}
               activeOpacity={0.8}
+              rippleEnabled={NO_RIPPLE}
               testID={`inbox-request-accept-${conv.id}`}
             >
               <Text style={[s.requestAcceptText, { color: theme.onAccent }]}>Accept</Text>
@@ -617,6 +745,7 @@ export default function InboxScreen() {
               onPress={() => declineRequest(conv)}
               disabled={isLoadingAction}
               activeOpacity={0.8}
+              rippleEnabled={NO_RIPPLE}
               testID={`inbox-request-decline-${conv.id}`}
             >
               <Text style={[s.requestDeclineText, { color: theme.muted }]}>Decline</Text>
@@ -649,76 +778,53 @@ export default function InboxScreen() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
-  const listHeader = (
-    <View>
-      {/* New followers / friends rail (Azar-style large avatar cards) */}
-      {followNotifications.length > 0 && (
-        <AnimatedEntrance distance={12}>
-          <View style={s.railSection}>
-            <View style={[s.railHeaderRow, { paddingHorizontal: gutter }]}>
-              <Text style={[s.railTitle, { color: theme.text }]}>New followers</Text>
-              {unreadFollowCount > 0 && (
-                <View style={[s.railCountPill, { backgroundColor: theme.accentDim }]}>
-                  <Text style={[s.railCountText, { color: theme.accent }]}>{unreadFollowCount}</Text>
-                </View>
-              )}
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: gutter, gap: SP.md }}
-            >
-              {followNotifications.map(notif => (
-                <FollowerAvatarCard
-                  key={notif.id}
-                  name={notif.actorName ?? notif.title}
-                  initials={notif.actorInitials ?? '?'}
-                  color={notif.actorColor ?? theme.cardElevated}
-                  unread={!notif.isRead}
-                  busy={messagingId === notif.id}
-                  onPress={() => openFollow(notif)}
-                  onMessage={() => messageFollower(notif)}
-                  testID={`inbox-follower-card-${notif.id}`}
-                />
-              ))}
-            </ScrollView>
-          </View>
-        </AnimatedEntrance>
-      )}
+  // Instagram-Notes-style slim avatar rail: the small set of people the buyer
+  // is actively talking to, restyled from the same FollowerAvatarCard-sized
+  // "who to message" concept but sized down into a compact circle-only strip
+  // (the Follows tab below keeps the roomier card treatment with an inline
+  // "Message" button for brand-new followers, which is a different job).
+  const activeRail = filteredConvs.slice(0, 10);
 
-      {/* Message requests banner (Instagram-style) instead of a thin tab */}
-      {requestConvs.length > 0 && (
-        <AnimatedEntrance distance={12} delay={40}>
-          <View style={{ paddingHorizontal: gutter }}>
-            <PressableScale
-              style={[s.requestsBanner, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}
-              onPress={() => { hapticPrimaryAction(); setRequestsSheetVisible(true); }}
-              accessibilityRole="button"
-              accessibilityLabel={`Message requests, ${requestConvs.length}`}
-              testID="inbox-requests-banner"
-            >
-              <View style={[s.requestsIconCircle, { backgroundColor: theme.accentDim }]}>
-                <Feather name="mail" size={ICON.md} color={theme.accent} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[s.requestsBannerTitle, { color: theme.text }]}>Message requests</Text>
-                <Text style={[s.requestsBannerSubtitle, { color: theme.muted }]} numberOfLines={1}>
-                  {requestConvs.length} waiting for your response
-                </Text>
-              </View>
-              <View style={[s.requestsCountPill, { backgroundColor: theme.accent }]}>
-                <Text style={[s.requestsCountText, { color: theme.onAccent }]}>{requestConvs.length}</Text>
-              </View>
-              <Feather name="chevron-right" size={ICON.sm} color={theme.subtle} />
-            </PressableScale>
-          </View>
-        </AnimatedEntrance>
+  const followsTabContent = (
+    <ScrollView
+      contentContainerStyle={[s.followsTabContent, { paddingBottom: barInset + SP.md, paddingHorizontal: gutter }]}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
+    >
+      {followNotifications.length === 0 ? (
+        <EmptyState icon="user-plus" title="No new followers" description="You'll see people who follow you here" />
+      ) : (
+        <View style={s.followsGrid}>
+          {followNotifications.map(notif => (
+            <FollowerAvatarCard
+              key={notif.id}
+              name={notif.actorName ?? notif.title}
+              initials={notif.actorInitials ?? '?'}
+              color={notif.actorColor ?? theme.cardElevated}
+              unread={!notif.isRead}
+              busy={messagingId === notif.id}
+              onPress={() => openFollow(notif)}
+              onMessage={() => messageFollower(notif)}
+              testID={`inbox-follower-card-${notif.id}`}
+            />
+          ))}
+        </View>
       )}
+    </ScrollView>
+  );
 
-      {(followNotifications.length > 0 || requestConvs.length > 0) && (
-        <Text style={[s.messagesSectionLabel, { color: theme.subtle, paddingHorizontal: gutter }]}>Messages</Text>
+  const requestsTabContent = (
+    <ScrollView
+      contentContainerStyle={[{ paddingBottom: barInset + SP.md, paddingHorizontal: gutter }]}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
+    >
+      {requestConvs.length === 0 ? (
+        <EmptyState icon="mail" title="No message requests" description="Requests from people you don't follow appear here" />
+      ) : (
+        requestConvs.map(renderRequestRow)
       )}
-    </View>
+    </ScrollView>
   );
 
   return (
@@ -733,6 +839,7 @@ export default function InboxScreen() {
           color={theme.text}
           onPress={openCompose}
           accessibilityLabel="New message"
+          rippleEnabled={NO_RIPPLE}
           testID="inbox-header-compose"
         />
       </View>
@@ -758,6 +865,7 @@ export default function InboxScreen() {
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityRole="button"
                 accessibilityLabel="Clear search"
+                rippleEnabled={NO_RIPPLE}
               >
                 <Feather name="x" size={16} color={theme.muted} />
               </PressableScale>
@@ -766,20 +874,67 @@ export default function InboxScreen() {
         </View>
       )}
 
-      {/* Conversations list */}
+      {/* Notes-style active-people rail */}
+      {!loading && !messagesSearchLower && activeRail.length > 0 && (
+        <AnimatedEntrance distance={12}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={s.activeRail}
+            contentContainerStyle={{ paddingHorizontal: gutter, gap: SP.md }}
+          >
+            {activeRail.map(conv => {
+              const participant = getParticipant(conv);
+              if (!participant) return null;
+              return (
+                <PressableScale
+                  key={conv.id}
+                  style={s.activeRailItem}
+                  onPress={() => openConversation(conv)}
+                  rippleEnabled={NO_RIPPLE}
+                  accessibilityRole="button"
+                  accessibilityLabel={participant.name}
+                  testID={`inbox-active-rail-${conv.id}`}
+                >
+                  {conv.isOfficial ? (
+                    <View style={[s.activeRailAvatar, s.officialAvatar, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                      <BrandthreadLogo size={22} />
+                    </View>
+                  ) : participant.avatarUri ? (
+                    <Image source={{ uri: participant.avatarUri }} style={s.activeRailAvatar} />
+                  ) : (
+                    <View style={[s.activeRailAvatar, { backgroundColor: participant.color }]}>
+                      <Text style={s.activeRailInitials}>{participant.initials}</Text>
+                    </View>
+                  )}
+                  <Text style={[s.activeRailName, { color: theme.muted }]} numberOfLines={1}>{participant.name}</Text>
+                </PressableScale>
+              );
+            })}
+          </ScrollView>
+        </AnimatedEntrance>
+      )}
+
+      {/* Follows / Messages / Requests segmented control */}
+      {!loading && (
+        <SegmentedTabs
+          value={activeTab}
+          onChange={setActiveTab}
+          counts={{ follows: unreadFollowCount, messages: 0, requests: requestConvs.length }}
+          theme={theme}
+          gutter={gutter}
+        />
+      )}
+
+      {/* Tab content */}
       {loading ? (
         <View style={[s.listSurface, s.listContent, { paddingBottom: barInset + SP.md, paddingHorizontal: gutter }]}>
           <ListSkeleton rows={6} />
         </View>
-      ) : filteredConvs.length === 0 && !messagesSearchLower ? (
-        <ScrollView
-          style={s.listSurface}
-          contentContainerStyle={[s.listContent, { paddingBottom: barInset + SP.md }, s.listEmptyContainer]}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
-        >
-          {listHeader}
-          <View style={{ paddingHorizontal: gutter }}>{renderEmptyState()}</View>
-        </ScrollView>
+      ) : activeTab === 'follows' ? (
+        followsTabContent
+      ) : activeTab === 'requests' ? (
+        requestsTabContent
       ) : filteredConvs.length === 0 ? (
         <ScrollView
           style={s.listSurface}
@@ -794,7 +949,6 @@ export default function InboxScreen() {
             data={filteredConvs}
             keyExtractor={item => item.id}
             renderItem={renderConvRow}
-            ListHeaderComponent={messagesSearchLower ? null : listHeader}
             contentContainerStyle={StyleSheet.flatten([s.listContent, { paddingBottom: barInset + SP.md, paddingHorizontal: gutter }])}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -807,40 +961,6 @@ export default function InboxScreen() {
       {/* New message is started from the header pencil icon above — a second
           floating "New message" FAB was a duplicate of that same action and
           has been removed (see item 17: no duplicate compose actions). */}
-
-      {/* Message requests sheet */}
-      <Modal
-        visible={requestsSheetVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setRequestsSheetVisible(false)}
-      >
-        <View style={s.composeBackdrop}>
-          <View style={[s.composeSheet, { paddingBottom: insets.bottom + SP.md, backgroundColor: theme.card }]}>
-            <SheetHandle />
-            <View style={s.composeHeader}>
-              <Text style={[s.composeTitle, { color: theme.text }]}>Message requests</Text>
-              <PressableScale
-                onPress={() => setRequestsSheetVisible(false)}
-                accessibilityRole="button"
-                accessibilityLabel="Close"
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Feather name="x" size={22} color={theme.text} />
-              </PressableScale>
-            </View>
-            {requestConvs.length === 0 ? (
-              <View style={s.composeCenter}>
-                <Text style={{ color: theme.muted, fontFamily: FONT.regular, fontSize: FS.sm }}>No message requests</Text>
-              </View>
-            ) : (
-              <ScrollView showsVerticalScrollIndicator={false}>
-                {requestConvs.map(renderRequestRow)}
-              </ScrollView>
-            )}
-          </View>
-        </View>
-      </Modal>
 
       <Modal
         visible={composeVisible}
@@ -984,51 +1104,30 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     textAlign: 'left',
   },
 
-  // Followers rail
-  railSection: { marginBottom: SP.lg, marginTop: SP.xs },
-  railHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
-    marginBottom: SP.sm,
+  // Instagram-Notes-style active-people rail (below search, above the tabs)
+  activeRail: { marginBottom: SP.md },
+  activeRailItem: { width: 64, alignItems: 'center', gap: 6 },
+  activeRailAvatar: {
+    width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center',
   },
-  railTitle: { fontSize: FS.md, fontFamily: FONT.bold },
-  railCountPill: {
-    minWidth: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6,
-  },
-  railCountText: { fontSize: FS.xs, fontFamily: FONT.bold },
+  activeRailInitials: { fontSize: FS.sm, fontFamily: FONT.bold, color: '#FFFFFF' },
+  activeRailName: { fontSize: 11, fontFamily: FONT.medium, maxWidth: 64 },
 
-  // Message requests banner
-  requestsBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
-    borderWidth: 1,
-    borderRadius: RADIUS.lg,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.md,
-    marginBottom: SP.lg,
-    minHeight: 64,
-  },
-  requestsIconCircle: {
-    width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
-  },
-  requestsBannerTitle: { fontSize: FS.base, fontFamily: FONT.semibold },
-  requestsBannerSubtitle: { fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
-  requestsCountPill: {
-    minWidth: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6,
-  },
-  requestsCountText: { fontSize: FS.xs, fontFamily: FONT.bold },
+  // Follows tab
+  followsTabContent: { flexGrow: 1 },
+  followsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.md },
 
-  messagesSectionLabel: {
-    fontSize: FS.xs,
-    fontFamily: FONT.bold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: SP.sm,
+  // Official / AI-agent row treatment (Brandthread Agent — see the
+  // isOfficial comment on Conversation in services/socialTypes.ts)
+  officialAvatar: { borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  officialBadgeRow: { flexDirection: 'row', alignItems: 'center', marginRight: SP.xs },
+  aiTag: {
+    marginLeft: 4, paddingHorizontal: 5, height: 15, borderRadius: 4,
+    alignItems: 'center', justifyContent: 'center',
   },
+  aiTagText: { fontSize: 9, fontFamily: FONT.bold, letterSpacing: 0.3 },
 
-  // Request card (inside the requests sheet)
+  // Request card (inline in the Requests tab)
   requestCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1133,19 +1232,6 @@ function createStyles(theme: ReturnType<typeof useAppTheme>['theme'], gutter: nu
     fontSize: FS.sm,
     fontFamily: FONT.regular,
     height: 40,
-  },
-  fab: {
-    position: 'absolute',
-    right: gutter,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
   },
   convCenter: {
     flex: 1,
