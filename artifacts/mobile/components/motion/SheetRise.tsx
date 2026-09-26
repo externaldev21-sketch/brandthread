@@ -1,13 +1,15 @@
 import React, { useEffect, useRef } from 'react';
-import { AccessibilityInfo, Animated, Platform, useWindowDimensions, type ViewProps } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Platform, useWindowDimensions, type ViewProps } from 'react-native';
+import { SHEET_EASING_BEZIER, SHEET_OPEN_MS } from '@/constants/motion';
 
 /**
  * Bottom-sheet entrance for `<Modal transparent animationType="fade">`.
  *
  * A transparent Modal with `animationType="slide"` slides its dim backdrop up
  * together with the sheet, which looks cheap. Instead the Modal fades (so the
- * backdrop dims in place) and the sheet inside it springs up from below and
- * settles with a small, soft rebound.
+ * backdrop dims in place) and the sheet inside it slides up on the app's
+ * shared `SHEET_TIMING` curve — a plain timing, never a spring, so it never
+ * overshoots/oscillates before settling.
  *
  *   <Modal visible transparent animationType="fade" onRequestClose={close}>
  *     <Pressable style={styles.backdrop} onPress={close} />
@@ -30,10 +32,10 @@ export function SheetRise({ style, children, ...rest }: ViewProps & { children?:
         progress.setValue(1);
         return;
       }
-      Animated.spring(progress, {
+      Animated.timing(progress, {
         toValue: 1,
-        speed: 13,
-        bounciness: 5,
+        duration: SHEET_OPEN_MS,
+        easing: Easing.bezier(...SHEET_EASING_BEZIER),
         useNativeDriver: Platform.OS !== 'web',
       }).start();
     };
