@@ -655,7 +655,12 @@ export default function ProfileScreen() {
         renderItem={renderRow}
         keyExtractor={keyForRow}
         numColumns={numColumns}
-        listKey={`buyer-${activeTab}-${numColumns}`}
+        // Keyed on numColumns only (not activeTab): FlatList can't change its
+        // column count on a mounted instance, so a remount is only needed
+        // when the grid shape actually changes between tabs. ProfileShell
+        // preserves (and clamps) scroll position across that remount, so
+        // switching tabs never jumps back to the top.
+        listKey={`buyer-${numColumns}`}
         ListEmptyComponent={(
           <ProfileGridPlaceholder
             loading={loading}
