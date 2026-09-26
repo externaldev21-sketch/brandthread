@@ -180,12 +180,12 @@ function UnderlineTabs({
   style?: StyleProp<ViewStyle>;
 }) {
   const [layouts, setLayouts] = useState<Record<string, { x: number; width: number }>>({});
-  const layoutsRef = useRef(layouts);
-  layoutsRef.current = layouts;
   const activeLayout = layouts[selectedId];
   const x = useSharedValue(0);
   const w = useSharedValue(0);
   const hasMeasuredOnce = useRef(false);
+  const rootRef = useRef<View>(null);
+  const tabRefs = useRef<Record<string, View | null>>({});
 
   React.useEffect(() => {
     if (!activeLayout) return;
@@ -203,14 +203,38 @@ function UnderlineTabs({
     }
   }, [activeLayout, x, w]);
 
-  const handleTabLayout = useCallback((id: string, event: LayoutChangeEvent) => {
-    const { x: tx, width } = event.nativeEvent.layout;
-    setLayouts(prev => {
-      const existing = prev[id];
-      if (existing && existing.x === tx && existing.width === width) return prev;
-      return { ...prev, [id]: { x: tx, width } };
+  // Re-measure a tab against the root's own on-screen position, rather than
+  // trusting onLayout's `nativeEvent.layout.x` to already be relative to the
+  // immediate parent: on web, a Pressable wraps its child in extra
+  // (non-`position: relative`) responder layers, and that x/y can end up
+  // measured relative to some further-up ancestor instead — here, the whole
+  // top bar row — which put the underline under the search icon instead of
+  // under "Threads". Two absolute `measureInWindow` reads (root, tab) and a
+  // subtraction sidesteps that ambiguity entirely on every platform.
+  const measureTab = useCallback((id: string) => {
+    const root = rootRef.current;
+    const tab = tabRefs.current[id];
+    if (!root || !tab) return;
+    root.measureInWindow((rootX) => {
+      tab.measureInWindow((tabX, _tabY, width) => {
+        if (!Number.isFinite(rootX) || !Number.isFinite(tabX) || width <= 0) return;
+        const relativeX = tabX - rootX;
+        setLayouts(prev => {
+          const existing = prev[id];
+          if (existing && Math.abs(existing.x - relativeX) < 0.5 && Math.abs(existing.width - width) < 0.5) return prev;
+          return { ...prev, [id]: { x: relativeX, width } };
+        });
+      });
     });
   }, []);
+
+  const handleTabLayout = useCallback((id: string) => {
+    // Layout has just landed for this tab, but on web the just-mounted
+    // native views aren't always immediately measurable in the same tick —
+    // deferring one frame makes measureInWindow reliably return real
+    // numbers instead of occasionally reading a stale/zeroed rect.
+    requestAnimationFrame(() => measureTab(id));
+  }, [measureTab]);
 
   const indicatorStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: x.value }],
@@ -219,20 +243,23 @@ function UnderlineTabs({
 
   return (
     <View
+      ref={rootRef}
       accessibilityRole="tablist"
       style={[styles.underlineRoot, { height }, style]}
       testID={testID}
+      onLayout={() => { for (const option of options) measureTab(option.id); }}
     >
       {options.map((option) => {
         const selected = option.id === selectedId;
         return (
           <Pressable
             key={option.id}
+            ref={(node) => { tabRefs.current[option.id] = node as unknown as View | null; }}
             accessibilityRole="tab"
             accessibilityLabel={option.label}
             accessibilityState={{ selected }}
             onPress={() => { if (!selected) { hapticToggle(); onChange(option.id); } }}
-            onLayout={(e) => handleTabLayout(option.id, e)}
+            onLayout={() => handleTabLayout(option.id)}
             style={styles.underlineSegment}
             testID={testID ? `${testID}-${option.id}` : undefined}
           >
@@ -268,7 +295,15 @@ const styles = StyleSheet.create({
     fontSize: 15, lineHeight: 18,
     textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
+  // `left: 0` is load-bearing, not decorative: on web, an absolutely
+  // positioned flex child with no inset (left/right/top/bottom) of its own
+  // takes its *static* position from the parent's justify-content (here,
+  // `underlineRoot`'s `center`) before any transform is applied — so without
+  // this, translateX was being added on top of an already-centered position
+  // instead of measured from the container's left edge, landing the
+  // underline far to the right of where the math intended (as far as the
+  // search icon next to the tab bar).
   underlineBar: {
-    position: 'absolute', bottom: -6, height: 3, borderRadius: RADII.pill, backgroundColor: '#FFFFFF',
+    position: 'absolute', left: 0, bottom: -6, height: 3, borderRadius: RADII.pill, backgroundColor: '#FFFFFF',
   },
 });

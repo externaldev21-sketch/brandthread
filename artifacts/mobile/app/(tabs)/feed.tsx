@@ -2566,10 +2566,14 @@ export default function FeedScreen({
           they stay put while the video underneath swipes past. Standard
           TikTok-style small gradients only — a short one at the very top
           (behind the top bar) and a short one at the very bottom (behind the
-          caption/rail and the tab bar). Nothing here is a translucent panel:
-          both are capped low enough that they never reach up into the
-          middle of the right action rail, which previously read as a washed-
-          out band over the comment/repost/save/share icons. */}
+          caption). Both are capped low enough that they never reach up into
+          the middle of the right action rail. The bottom scrim also stops
+          short of the rail's own column (right: 76 instead of full-width) —
+          it used to run edge to edge, which put its bottom, most-opaque
+          band directly over the repost/save/share icons and made only the
+          bottom half of the rail look faded/grey next to the untouched
+          heart/comment above it, even though every icon is the same solid
+          white. The rail needs zero scrim under it, not just a lighter one. */}
       {isBuyerSurface && (
         <>
           <LinearGradient
@@ -2582,7 +2586,7 @@ export default function FeedScreen({
             pointerEvents="none"
             colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.22)', 'rgba(0,0,0,0.58)']}
             locations={[0, 0.45, 1]}
-            style={[styles.bottomScrim, { height: bottomClearance + 130 }]}
+            style={[styles.bottomScrim, { height: bottomClearance + 130, right: 76 }]}
           />
         </>
       )}
