@@ -13,6 +13,20 @@
  *   - overlaps the floating tab bar's own bounding box while not being part
  *     of the tab bar itself.
  *
+ * KNOWN LIMITATION (tracked for follow-up, not fixed here): the tab-bar-
+ * overlap check runs against the screen's initial, unscrolled DOM. Two
+ * situations currently read as false positives rather than real bugs and
+ * should be special-cased before this check is trusted as fully signal-only:
+ *   1. A legitimate full-screen `Modal` (e.g. the seller dashboard's first-run
+ *      setup walkthrough) is SUPPOSED to paint above the floating tab bar —
+ *      that's correct modal behavor, not a layout defect.
+ *   2. The floating tab bar is an intentionally translucent glass surface;
+ *      list rows are expected to be momentarily visible behind it near the
+ *      initial fold, same as any frosted bottom-bar pattern. The real bug
+ *      class ("can never scroll far enough to fully reveal the last row/
+ *      tile") requires scrolling the list to its end before sampling, which
+ *      this version does not yet do.
+ *
  * Reuses the same demo web build, fake Clerk/API and preview-role bypass
  * (`?bt_preview=buyer|seller`) as `scripts/store-screenshots/`, so nothing
  * here touches a real account, server or payment provider. See
