@@ -14,7 +14,7 @@
  * never intercepts touches.
  */
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Platform, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Image, Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   Easing,
@@ -31,7 +31,7 @@ import * as Haptics from 'expo-haptics';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
-import { ThreadCashCoin, THREAD_CASH_GREEN_DEEP, THREAD_CASH_GREEN_MID } from './ThreadCashBill';
+import { ThreadCashBillIcon, THREAD_CASH_GREEN_DEEP, THREAD_CASH_GREEN_MID } from './ThreadCashBill';
 
 export type CelebrateThreadCashPayload = {
   /** Cents received. */
@@ -171,25 +171,21 @@ function Particle({ spec }: { spec: ParticleSpec }) {
   );
 }
 
-/** A tiny flat rendering of the bill, cheap enough for ~15 on screen at once. */
+// Falls back to `1` outside Metro (see ThreadCashBill.tsx for why).
+let BILL_SPRITE_SOURCE: number = 1;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  BILL_SPRITE_SOURCE = require('../../assets/thread-cash/thread-cash-bill.png');
+} catch {
+  // Non-Metro test environment.
+}
+
+/** The real bill art as a burst particle sprite, cheap enough for ~15 on screen at once. */
 function MiniBill({ size }: { size: number }) {
   const w = size;
-  const h = size * (255 / 600);
+  const h = size * (510 / 1200);
   return (
-    <View
-      style={{
-        width: w,
-        height: h,
-        borderRadius: 3,
-        backgroundColor: THREAD_CASH_GREEN_MID,
-        borderWidth: 1,
-        borderColor: THREAD_CASH_GREEN_DEEP,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <View style={{ width: h * 0.5, height: h * 0.5, borderRadius: h * 0.25, backgroundColor: THREAD_CASH_GREEN_DEEP }} />
-    </View>
+    <Image source={BILL_SPRITE_SOURCE} style={{ width: w, height: h }} resizeMode="contain" />
   );
 }
 
@@ -230,7 +226,7 @@ function BurstToast({ event, onDone }: { event: CelebrationEvent; onDone: () => 
       accessibilityLiveRegion="polite"
       accessibilityLabel={`Received ${formatCents(event.amount)} Thread Cash from ${event.from}`}
     >
-      <ThreadCashCoin size={22} />
+      <ThreadCashBillIcon size={22} />
       <Text style={[styles.toastText, { color: theme.text }]} numberOfLines={1}>
         +{formatCents(event.amount)} Thread Cash{' '}
         <Text style={{ color: theme.muted, fontFamily: FONT.regular }}>from {event.from}</Text>
