@@ -86,15 +86,45 @@ interface ShopProductSheetProps {
 // Preview catalog products aren't real rows in the reviews table, so they get
 // seeded review data — enough to exercise the average/breakdown/top-reviews
 // UI without a network call.
-const PREVIEW_REVIEWS_SEED: ReviewsSeed = {
+const daysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString();
+
+/**
+ * Built at render time from the previewed product's own photo set (rather
+ * than a module-level constant) so review photos are real, already-loaded
+ * images instead of a made-up asset reference.
+ */
+function buildPreviewReviewsSeed(productPhotos: string[]): ReviewsSeed {
+  const photo = (i: number) => productPhotos.length ? [productPhotos[i % productPhotos.length]] : undefined;
+  return {
   avgRating: 4.6,
   totalCount: 128,
+  // A realistic distribution (mostly 5/4★, a few lower) rather than an
+  // arbitrary handful, so the star breakdown bars and fit meter below read
+  // like real aggregate data instead of a token sample.
   reviews: [
-    { id: 'preview-review-1', rating: 5, body: 'Runs true to size and the fabric feels even better in person. Fast shipping too.', buyerName: 'Jordan M.', createdAt: new Date(Date.now() - 3 * 86400000).toISOString() },
-    { id: 'preview-review-2', rating: 4, body: 'Great fit, sized up one for a roomier look. Would buy again.', buyerName: 'Priya K.', createdAt: new Date(Date.now() - 9 * 86400000).toISOString() },
-    { id: 'preview-review-3', rating: 5, body: 'Exactly like the video — quality is there.', buyerName: 'Sam R.', createdAt: new Date(Date.now() - 20 * 86400000).toISOString() },
+    { id: 'preview-review-1', rating: 5, body: 'Runs true to size and the fabric feels even better in person. Fast shipping too.', buyerName: 'Jordan M.', createdAt: daysAgo(3), verifiedBuyer: true, sizeBought: 'M', fitNote: 'True to size', fitScale: 0, helpfulCount: 12, photos: photo(0) },
+    { id: 'preview-review-2', rating: 4, body: 'Great fit, sized up one for a roomier look. Would buy again.', buyerName: 'Priya K.', createdAt: daysAgo(9), verifiedBuyer: true, sizeBought: 'S', fitNote: 'Runs small', fitScale: -1, helpfulCount: 6 },
+    { id: 'preview-review-3', rating: 5, body: 'Exactly like the video — quality is there.', buyerName: 'Sam R.', createdAt: daysAgo(20), verifiedBuyer: true, sizeBought: 'L', fitNote: 'True to size', fitScale: 0, helpfulCount: 3, photos: productPhotos.length ? [productPhotos[1 % productPhotos.length], productPhotos[2 % productPhotos.length]] : undefined },
+    { id: 'preview-review-4', rating: 5, buyerName: 'Alex T.', createdAt: daysAgo(2), verifiedBuyer: true, sizeBought: 'M', fitNote: 'True to size', fitScale: 0 },
+    { id: 'preview-review-5', rating: 5, buyerName: 'Morgan L.', createdAt: daysAgo(5), verifiedBuyer: true, sizeBought: 'M', fitNote: 'True to size', fitScale: 0 },
+    { id: 'preview-review-6', rating: 4, buyerName: 'Casey B.', createdAt: daysAgo(7), verifiedBuyer: true, sizeBought: 'L', fitNote: 'Runs large', fitScale: 1 },
+    { id: 'preview-review-7', rating: 5, buyerName: 'Riley P.', createdAt: daysAgo(11), verifiedBuyer: true, sizeBought: 'S', fitNote: 'True to size', fitScale: 0 },
+    { id: 'preview-review-8', rating: 5, buyerName: 'Jamie F.', createdAt: daysAgo(14), verifiedBuyer: true, sizeBought: 'M', fitNote: 'True to size', fitScale: 0 },
+    { id: 'preview-review-9', rating: 3, buyerName: 'Drew S.', createdAt: daysAgo(16), verifiedBuyer: true, sizeBought: 'M', fitNote: 'Runs small', fitScale: -1 },
+    { id: 'preview-review-10', rating: 5, buyerName: 'Taylor N.', createdAt: daysAgo(18), verifiedBuyer: true, sizeBought: 'L', fitNote: 'True to size', fitScale: 0 },
+    { id: 'preview-review-11', rating: 4, buyerName: 'Reese V.', createdAt: daysAgo(22), verifiedBuyer: true, sizeBought: 'M', fitNote: 'True to size', fitScale: 0 },
+    { id: 'preview-review-12', rating: 5, buyerName: 'Sage O.', createdAt: daysAgo(25), verifiedBuyer: true, sizeBought: 'S', fitNote: 'Runs small', fitScale: -1 },
+    { id: 'preview-review-13', rating: 5, buyerName: 'Quinn H.', createdAt: daysAgo(27), verifiedBuyer: true, sizeBought: 'M', fitNote: 'True to size', fitScale: 0 },
+    { id: 'preview-review-14', rating: 2, buyerName: 'Blair G.', createdAt: daysAgo(30), verifiedBuyer: true, sizeBought: 'L', fitNote: 'Runs large', fitScale: 2 },
+    { id: 'preview-review-15', rating: 5, buyerName: 'Emerson D.', createdAt: daysAgo(33), verifiedBuyer: true, sizeBought: 'M', fitNote: 'True to size', fitScale: 0 },
+    { id: 'preview-review-16', rating: 5, buyerName: 'Avery W.', createdAt: daysAgo(36), verifiedBuyer: true, sizeBought: 'M', fitNote: 'True to size', fitScale: 0 },
+    { id: 'preview-review-17', rating: 4, buyerName: 'Rowan K.', createdAt: daysAgo(40), verifiedBuyer: true, sizeBought: 'S', fitNote: 'Runs small', fitScale: -1 },
+    { id: 'preview-review-18', rating: 5, buyerName: 'Elliot J.', createdAt: daysAgo(44), verifiedBuyer: true, sizeBought: 'L', fitNote: 'True to size', fitScale: 0 },
+    { id: 'preview-review-19', rating: 5, buyerName: 'Hayden R.', createdAt: daysAgo(48), verifiedBuyer: true, sizeBought: 'M', fitNote: 'True to size', fitScale: 0 },
+    { id: 'preview-review-20', rating: 4, buyerName: 'Skyler A.', createdAt: daysAgo(52), verifiedBuyer: true, sizeBought: 'M', fitNote: 'True to size', fitScale: 0 },
   ],
-};
+  };
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -316,7 +346,11 @@ export function ShopProductSheet({
       useNativeDriver: true,
       speed: 18,
       bounciness: 3,
-    }).start();
+      // A bouncy spring settles asymptotically, not at an exact bit-for-bit
+      // 0 — snapping it once "finished" fires keeps the sheet's translateY
+      // (applied to its entire subtree, text included) at a true identity
+      // transform at rest instead of a permanent sub-pixel residual.
+    }).start(() => slideY.setValue(0));
   }, [reduceMotion, slideY]);
 
   useEffect(() => () => {
@@ -358,6 +392,21 @@ export function ShopProductSheet({
   function navigateAndDismiss(action: () => void) {
     action();
     dismissSheet(onClose);
+  }
+
+  /**
+   * Same idea as navigateAndDismiss, but for a destination that itself
+   * slides up and fully covers the screen (Checkout via /thread-checkout,
+   * registered with `animation: 'slide_from_bottom'` in app/_layout.tsx).
+   * That incoming screen's own cover animation is the ONLY motion the buyer
+   * should see, so the sheet is torn down instantly and silently underneath
+   * it instead of also playing its own ~220ms slide-down — two competing
+   * animations at once was exactly what read as "Checkout appears under a
+   * still-open sheet" glitch.
+   */
+  function navigateAndDismissInstantly(action: () => void) {
+    action();
+    onClose();
   }
 
   function showCartSuccess(newCount: number) {
@@ -406,7 +455,7 @@ export function ShopProductSheet({
         if (g.dy > 80 || g.vy > 0.8) {
           dismissSheet(onClose);
         } else {
-          Animated.spring(slideY, { toValue: 0, useNativeDriver: true, speed: 20 }).start();
+          Animated.spring(slideY, { toValue: 0, useNativeDriver: true, speed: 20 }).start(() => slideY.setValue(0));
         }
       },
     }),
@@ -563,12 +612,12 @@ export function ShopProductSheet({
     try {
       const cart = await getCart();
       await createBuyNowSession(product, variant, qty, cart);
-      // Use the thread-pull push (matches the /thread-checkout route's
-      // `animation: 'none'` registration in app/_layout.tsx, which expects
-      // this hook — not router.push — to be the one driving the transition)
-      // and fire it immediately so Checkout's own skeleton is already
-      // mounted and on-screen before the sheet even starts sliding away.
-      navigateAndDismiss(() => push('/thread-checkout' as never));
+      // Use the thread-pull push, fired immediately so Checkout's own
+      // skeleton is already mounted before the incoming screen's
+      // slide_from_bottom cover animation starts — and tear the sheet down
+      // instantly (no competing slide-down of its own) since that cover
+      // animation is the only motion this transition needs.
+      navigateAndDismissInstantly(() => push('/thread-checkout' as never));
     } catch {
       setPhase('ready');
       setVariantError("Couldn't start checkout. Try again.");
@@ -833,7 +882,7 @@ export function ShopProductSheet({
             <ProductReviewsSection
               productId={product.id}
               productName={product.name}
-              seed={selection.previewProduct?.id === product.id ? PREVIEW_REVIEWS_SEED : undefined}
+              seed={selection.previewProduct?.id === product.id ? buildPreviewReviewsSeed(product.imageUris) : undefined}
             />
 
             <TouchableOpacity onPress={handleViewDetail} style={ss.viewDetailBtn}>
