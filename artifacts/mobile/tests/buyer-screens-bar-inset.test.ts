@@ -70,8 +70,8 @@ describe('buyer Home feed behind the bar', () => {
     expect(feed).toContain('function ShopSideTab(');
     expect(feed).toContain("shopSideTab: {\n    position: 'absolute', left: 0,");
     expect(feed).not.toContain('bottom: bottomClearance + (hasRepostIdentity ? 158 : 122)');
-    expect(feed).toContain('const RAIL_BOTTOM_GAP = 22;');
-    expect(feed).toContain('const CAPTION_BOTTOM_GAP = 18;');
+    expect(feed).toContain('const RAIL_BOTTOM_GAP = 16;');
+    expect(feed).toContain('const CAPTION_BOTTOM_GAP = 12;');
     // The scrub line sits exactly at the seam where the sharp video is
     // clipped and the blurred tab-bar strip begins — no offset gap.
     expect(feed).toContain('progressBottom={immersive ? bottomClearance : undefined}');
