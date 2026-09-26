@@ -14,7 +14,9 @@ import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { EmptyState, PressableScale, ProductGridSkeleton } from '@/components/BrandthreadUI';
+import { PressableScale, ProductGridSkeleton } from '@/components/BrandthreadUI';
+import { EmptyState as SharedEmptyState } from '@/components/layout/EmptyState';
+import { profileEmptyState } from '@/components/profile/profileEmptyStates';
 import { CachedImage } from '@/components/CachedImage';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
@@ -140,8 +142,16 @@ export default function ProfileProductsScreen() {
     );
   }, [cardWidth, openProduct, styles, theme]);
 
+  const [viewportHeight, setViewportHeight] = useState(layout.windowHeight);
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const listPaddingBottom = Math.max(insets.bottom, SP.sm) + SP.xl;
+  const emptyMinHeight = Math.max(280, viewportHeight - headerHeight - listPaddingBottom);
+
   const header = (
-    <View style={[styles.header, { paddingTop: insets.top + SP.sm }]}>
+    <View
+      style={[styles.header, { paddingTop: insets.top + SP.sm }]}
+      onLayout={(event) => setHeaderHeight(Math.round(event.nativeEvent.layout.height))}
+    >
       <View style={styles.headerRow}>
         <ProfileGlassButton icon="arrow-left" onPress={goBack} accessibilityLabel="Go back" />
         <View style={styles.headerCopy}>
@@ -169,20 +179,25 @@ export default function ProfileProductsScreen() {
   } else if (error) {
     body = <ErrorState message="Couldn't load this shop." onRetry={() => { setLoading(true); void load(); }} />;
   } else {
+    const empty = profileEmptyState('shop', isOwner);
     body = (
-      <EmptyState
-        icon="shopping-bag"
-        title={isOwner ? 'No products yet' : 'No products available'}
-        description={isOwner ? 'Add your first product to start selling.' : `${sellerName} has no live listings right now.`}
-        action={isOwner ? { label: 'Add a product', icon: 'plus', onPress: () => router.push('/add-product' as never) } : undefined}
-        compact
+      <SharedEmptyState
+        testID="shop-empty-state"
+        icon={empty.icon as never}
+        title={empty.title}
+        message={isOwner ? empty.message : `${sellerName} has no live listings right now.`}
+        actionLabel={empty.cta?.label}
+        onAction={empty.cta ? () => router.push(empty.cta!.route as never) : undefined}
       />
     );
   }
 
   return (
     <View style={styles.root}>
-      <View style={[styles.column, { width: layout.columnWidth }]}>
+      <View
+        style={[styles.column, { width: layout.columnWidth }]}
+        onLayout={(event) => setViewportHeight(Math.round(event.nativeEvent.layout.height))}
+      >
         <FlatList
           key={`shop-${columns}`}
           data={loading || error ? [] : products}
@@ -191,10 +206,12 @@ export default function ProfileProductsScreen() {
           numColumns={columns}
           columnWrapperStyle={columns > 1 ? styles.row : undefined}
           ListHeaderComponent={header}
-          ListEmptyComponent={body}
+          // The empty/error state fills what's left below the header and
+          // centres there, clear of the home indicator.
+          ListEmptyComponent={loading ? body : <View style={{ minHeight: emptyMinHeight, justifyContent: 'center' }}>{body}</View>}
           onEndReached={loadMore}
           onEndReachedThreshold={0.6}
-          contentContainerStyle={{ paddingBottom: insets.bottom + SP.xl }}
+          contentContainerStyle={{ paddingBottom: listPaddingBottom }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); }} tintColor={theme.muted} />}
           showsVerticalScrollIndicator={false}
         />

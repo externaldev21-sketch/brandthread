@@ -183,7 +183,17 @@ async function loadCartWithStatus(k: CartKeys = keys()): Promise<{ cart: Cart; r
     cart = { id: uid(), items: [], savedItems: [], updatedAt: now() };
   }
 
-  // Attempt to load from DB and merge if DB has data.
+  // A guest (never signed in — k.userId === 'anon') has no server-side cart
+  // to confirm against: /api/buyer/cart requires auth and would always fail
+  // for them, which used to be read as an unconfirmed/error state on every
+  // cold load even though an empty local guest cart is completely normal.
+  // The guest cart is local-only and self-sufficient until sign-in, so treat
+  // it as confirmed without ever making the network call.
+  if (k.userId === 'anon') {
+    return { cart, remoteConfirmed: true };
+  }
+
+  // Signed-in: attempt to load from DB and merge if DB has data.
   // Uses the already-captured k so the continuation can't pick up a changed userId.
   let remoteConfirmed = false;
   try {

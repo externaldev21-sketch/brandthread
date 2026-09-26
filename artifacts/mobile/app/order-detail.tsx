@@ -291,6 +291,7 @@ export function adaptApiOrder(raw: any): Order {
     tags:     [],
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt ?? raw.createdAt,
+    shopifyFulfillment: raw.shopifyFulfillment ?? null,
   };
 }
 
@@ -917,6 +918,33 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
       <BrandthreadCard style={s.timelineCard}>
         <OrderStatusTimeline status={order.status} />
       </BrandthreadCard>
+
+      {/* Fulfillment via Shopify — only shown for orders containing a Shopify-linked product */}
+      {order.shopifyFulfillment && (
+        <View style={s.section}>
+          <BrandthreadCard style={s.cancellationCard}>
+            <View style={s.cancellationHeader}>
+              <Feather name="shopping-bag" size={ICON.sm} color={FG} />
+              <Text style={s.cancellationTitle}>Fulfilled via Shopify</Text>
+            </View>
+            <InfoRow
+              label="Sent to Shopify"
+              value={order.shopifyFulfillment.sentToShopify
+                ? (order.shopifyFulfillment.shopifyOrderName ?? 'Yes')
+                : 'Pending'}
+              valueColor={order.shopifyFulfillment.sentToShopify ? FG : MUTED}
+            />
+            <InfoRow
+              label="Fulfilled by partner"
+              value={order.shopifyFulfillment.fulfilledByPartner ? 'Yes — tracking received' : 'Not yet'}
+              valueColor={order.shopifyFulfillment.fulfilledByPartner ? FG : MUTED}
+            />
+            {order.shipments[0]?.trackingNumber && (
+              <InfoRow label="Tracking" value={order.shipments[0].trackingNumber} valueColor={MUTED} />
+            )}
+          </BrandthreadCard>
+        </View>
+      )}
 
       {/* Cancellation reason card */}
       {order.status === 'cancelled' && order.cancellation && (

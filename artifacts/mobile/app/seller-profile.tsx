@@ -8,7 +8,7 @@
  * pill (the seller's live listings, same source as product detail).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Linking, Modal, Share, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Modal, Platform, Share, StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -20,7 +20,7 @@ import { getSellerFollowState, setSellerFollowing } from '@/services/socialServi
 import type { SellerThreadPost } from '@/services/socialService';
 import { formatProfileCount } from '@/services/profileService';
 import { FONT, FS, SP, RADIUS } from '@/lib/theme';
-import { buildCanonicalProfileUrl } from '@/lib/shareProfile';
+import { buildCanonicalProfileUrl, shareLinkWithFallback } from '@/lib/shareProfile';
 import { subscribeProfileEvents } from '@/lib/profileEvents';
 import {
   connectionsHref, messageSellerHref, profileProductsHref, profileVideosHref,
@@ -40,6 +40,10 @@ import { ProfileVideoTile, gridItemFromThreadPost, type ProfileGridItem } from '
 import { ProfileGridFooter, ProfileGridPlaceholder } from '@/components/profile/ProfileGridStates';
 import { useProfileLayout } from '@/components/profile/profileLayout';
 import { useCreatorVideos } from '@/components/profile/useCreatorVideos';
+import { profileEmptyState } from '@/components/profile/profileEmptyStates';
+import {
+  CoverCoachmarkSheet, CoverHeroAffordance, CoverManageSheet, CoverTrimSheet, useProfileCover,
+} from '@/components/profile/ProfileCover';
 
 interface SellerView {
   sellerId: string;
@@ -57,6 +61,8 @@ interface SellerView {
   vacationMessage?: string;
   productsCount: number;
   videosCount: number;
+  coverVideoUrl: string | null;
+  coverPosterUrl: string | null;
 }
 
 function initialsOf(name: string): string {
@@ -86,6 +92,8 @@ function toSellerView(profile: any, fallbackId: string): SellerView {
     vacationMessage: profile?.vacationMessage ?? undefined,
     productsCount: Number(profile?.productsCount ?? 0),
     videosCount: Number(profile?.videosCount ?? 0),
+    coverVideoUrl: httpOrNull(profile?.coverVideoUrl),
+    coverPosterUrl: httpOrNull(profile?.coverPosterUrl),
   };
 }
 
@@ -198,6 +206,11 @@ export default function SellerProfileScreen() {
   }), [canonicalSellerId, isOwner]);
 
   const videos = useCreatorVideos(canonicalSellerId, { fresh: isOwner });
+  const coverFlow = useProfileCover({
+    own: isOwner,
+    cover: { videoUrl: seller?.coverVideoUrl ?? null, posterUrl: seller?.coverPosterUrl ?? null },
+    userId: canonicalSellerId,
+  });
 
   // Returning to this profile (after posting, editing listings, deleting a
   // video, or following from another screen) silently refetches counts,
@@ -252,8 +265,19 @@ export default function SellerProfileScreen() {
       return;
     }
     const url = buildCanonicalProfileUrl(seller.username);
-    if (url) Share.share({ message: `Check out ${seller.brandName} on Brandthread: ${url}`, url });
-    else Share.share({ message: `Check out @${seller.username} on Brandthread` });
+    if (!url) {
+      if (Platform.OS !== 'web') void Share.share({ message: `Check out @${seller.username} on Brandthread` }).catch(() => {});
+      return;
+    }
+    void shareLinkWithFallback({
+      url,
+      message: `Check out ${seller.brandName} on Brandthread:`,
+      platformOS: Platform.OS,
+      nativeShare: (content) => Share.share(content),
+      webNavigator: typeof navigator !== 'undefined' ? (navigator as any) : null,
+    })
+      .then((result) => { if (result === 'copied') setSnackbar('Profile link copied'); })
+      .catch(() => {});
   }, [isOwner, seller]);
 
   const handleMessageSeller = useCallback(() => {
@@ -413,6 +437,7 @@ export default function SellerProfileScreen() {
             onChange={handleFollow}
             disabled={followPending || !canonicalSellerId || !userId}
             style={styles.followBtn}
+            labelStyle={{ fontFamily: FONT.bold, fontSize: FS.base }}
           />
         </View>
         <ProfileButton label="Message" icon="message-circle" onPress={handleMessageSeller} />
@@ -445,11 +470,13 @@ export default function SellerProfileScreen() {
   ) : null;
 
   const showShopPill = !!seller && (isOwner || productsCount > 0);
+  const videosEmpty = profileEmptyState('seller:videos', isOwner);
 
   return (
     <>
       <ProfileShell
         testID="seller-profile-hero"
+        isOwnProfile={isOwner}
         identity={{
           name: brandName || ' ',
           handle: seller?.username ? `@${seller.username}` : null,
@@ -459,7 +486,14 @@ export default function SellerProfileScreen() {
           roleLabel: 'Seller',
         }}
         avatar={{ ring: !!seller?.verified }}
-        hero={{ videoUri: firstVideo?.mediaUris[0] ?? null, posterUri: heroPoster }}
+        // A cover video, when set, leads the hero for every viewer (muted,
+        // looping, poster first); otherwise the latest video.
+        hero={coverFlow.hasCover
+          ? { videoUri: coverFlow.cover.videoUrl, posterUri: coverFlow.cover.posterUrl }
+          : { videoUri: firstVideo?.mediaUris[0] ?? null, posterUri: heroPoster }}
+        coverAffordance={isOwner ? (
+          <CoverHeroAffordance hasCover={coverFlow.hasCover} busy={coverFlow.busy} onAdd={coverFlow.startAdd} onManage={coverFlow.openManage} />
+        ) : undefined}
         topLeft={<ProfileGlassButton icon="arrow-left" onPress={goBack} accessibilityLabel="Go back" />}
         topRight={(
           <>
@@ -492,9 +526,10 @@ export default function SellerProfileScreen() {
             error={videos.error}
             onRetry={() => { void videos.reload({ fresh: true }); }}
             layout={layout}
-            title={isOwner ? 'No videos yet' : 'No videos yet'}
-            description={isOwner ? 'Videos you post to the feed show up here.' : `${brandName || 'This brand'} hasn't posted any videos yet.`}
-            action={isOwner ? { label: 'Post your first video', icon: 'video', onPress: () => router.push('/create-post' as never) } : undefined}
+            icon={videosEmpty.icon as never}
+            title={videosEmpty.title}
+            description={isOwner ? videosEmpty.message : `${brandName || 'This brand'} hasn't posted any videos yet.`}
+            action={videosEmpty.cta ? { label: videosEmpty.cta.label, onPress: () => router.push(videosEmpty.cta!.route as never) } : undefined}
             testID="seller-profile-videos-empty"
           />
         )}
@@ -527,6 +562,17 @@ export default function SellerProfileScreen() {
         ) : null}
       </Modal>
 
+      {isOwner ? (
+        <>
+          <CoverCoachmarkSheet
+            visible={coverFlow.coachmarkVisible}
+            onAdd={() => { coverFlow.dismissCoachmark(); coverFlow.startAdd(); }}
+            onLater={coverFlow.dismissCoachmark}
+          />
+          <CoverManageSheet visible={coverFlow.manageOpen} onChange={coverFlow.changeFromManage} onRemove={() => { void coverFlow.remove(); }} onClose={coverFlow.closeManage} />
+          <CoverTrimSheet source={coverFlow.trimSource} onCancel={coverFlow.cancelTrim} onConfirm={coverFlow.confirmTrim} />
+        </>
+      ) : null}
       {isOwner ? (
         <ShareProfileSheet
           visible={shareSheetVisible}
@@ -564,7 +610,7 @@ function makeStyles(theme: AppThemePreset) {
   return StyleSheet.create({
     flex: { flex: 1 },
     actionRow: { flexDirection: 'row', gap: SP.sm },
-    followBtn: { width: '100%', minHeight: 46, borderRadius: RADIUS.md },
+    followBtn: { width: '100%', minHeight: 48, borderRadius: RADIUS.md },
     vacation: {
       flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginTop: SP.xs,
       borderWidth: 1, borderColor: `${theme.warning}55`, borderRadius: RADIUS.md, padding: SP.sm,

@@ -47,7 +47,7 @@ import { TYPE_SCALE, TABULAR_NUMS } from '@/constants/typography';
 import { RADII } from '@/constants/radii';
 import { CachedImage } from '@/components/CachedImage';
 import { CardSkeleton } from '@/components/layout';
-import { IconButton } from '@/components/ui';
+import { IconButton, Snackbar } from '@/components/ui';
 import { EmptyState, PressableScale } from '@/components/BrandthreadUI';
 import {
   addToCart,
@@ -122,7 +122,11 @@ export function DiscoverPager() {
   const [pickerProduct, setPickerProduct] = useState<DiscoverFeedItem | null>(null);
   const [buyNowItem, setBuyNowItem] = useState<DiscoverFeedItem | null>(null);
   const [flyImage, setFlyImage] = useState<{ uri?: string; startX: number; startY: number } | null>(null);
+  const [addedToast, setAddedToast] = useState<{ visible: boolean; message: string }>({ visible: false, message: '' });
+  const addedToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cartIconRef = useRef<View>(null);
+
+  useEffect(() => () => { if (addedToastTimer.current) clearTimeout(addedToastTimer.current); }, []);
 
   const refreshCartCount = useCallback(() => {
     getCart().then(cart => {
@@ -218,6 +222,10 @@ export function DiscoverPager() {
         void getCartFlightVector(startX, startY, target); // computed for the caller's fly-animation layer
       }
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // A real confirmation beyond just the cart badge count changing.
+      if (addedToastTimer.current) clearTimeout(addedToastTimer.current);
+      setAddedToast({ visible: true, message: `Added ${product.name} to your bag` });
+      addedToastTimer.current = setTimeout(() => setAddedToast(t => ({ ...t, visible: false })), 2200);
     } catch {
       // Swallow — the per-card UI already shows its own busy/error affordance.
     }
@@ -343,6 +351,18 @@ export function DiscoverPager() {
           onOrderPlaced={() => { refreshCartCount(); }}
         />
       )}
+
+      <Snackbar
+        visible={addedToast.visible}
+        message={addedToast.message}
+        actionLabel="View bag"
+        onAction={() => {
+          if (addedToastTimer.current) clearTimeout(addedToastTimer.current);
+          setAddedToast(t => ({ ...t, visible: false }));
+          push('/(buyer)/cart' as never);
+        }}
+        onDismiss={() => setAddedToast(t => ({ ...t, visible: false }))}
+      />
     </View>
   );
 }

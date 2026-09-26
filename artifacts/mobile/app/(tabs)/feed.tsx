@@ -2009,20 +2009,23 @@ export default function FeedScreen({
     };
   }, []);
 
-  // First-time gesture coach — buyer home only, shown once per account.
+  // First-time gesture coach — buyer home only, shown once per account (and
+  // once more per FEED_GESTURES_TIP_VERSION bump). Server is the source of
+  // truth so it stays seen across reinstalls/devices; `api` falls back to
+  // the local cache when there's no real backend user (e.g. preview/dev).
   useEffect(() => {
     if (!isBuyerSurface) return;
     let active = true;
-    void hasSeenFeedGestureGuide(userId).then(seen => {
+    void hasSeenFeedGestureGuide(userId, api).then(seen => {
       if (active && !seen) setShowGestureGuide(true);
     });
     return () => { active = false; };
-  }, [isBuyerSurface, userId]);
+  }, [isBuyerSurface, userId, api]);
 
   const dismissGestureGuide = useCallback(() => {
     setShowGestureGuide(false);
-    void markFeedGestureGuideSeen(userId);
-  }, [userId]);
+    void markFeedGestureGuideSeen(userId, api);
+  }, [userId, api]);
 
   // Load published seller posts and subscribe to real-time changes
   const loadFeed = useCallback(async (initial = false) => {

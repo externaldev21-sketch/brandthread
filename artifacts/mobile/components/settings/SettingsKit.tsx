@@ -60,14 +60,14 @@ export function SettingsProfileCard({
       </View>
       <View style={s.profileCopy}>
         <Text style={s.profileEyebrow}>{eyebrow}</Text>
-        <Text style={s.profileName} numberOfLines={1}>{name}</Text>
+        <Text style={s.profileName} numberOfLines={2}>{name}</Text>
         <Text style={s.profileSub} numberOfLines={1}>
           {handle ? `@${handle}` : subtitle ?? 'Manage your account and preferences'}
         </Text>
       </View>
       <View style={s.profileEditBtn}>
         <Feather name="edit-2" size={14} color={colors.foreground} />
-        <Text style={s.profileEditText}>Edit</Text>
+        <Text style={s.profileEditText} numberOfLines={1}>Edit</Text>
       </View>
     </PressableScale>
   );
@@ -183,7 +183,7 @@ export function SettingsRow({
       </View>
       <View style={s.rowCopy}>
         <Text style={[s.rowLabel, { color: labelColor }]} numberOfLines={1}>{label}</Text>
-        {subtitle ? <Text style={[s.rowSubtitle, inert && { color: colors.mutedForeground }]} numberOfLines={1}>{subtitle}</Text> : null}
+        {subtitle ? <Text style={[s.rowSubtitle, inert && { color: colors.mutedForeground }]} numberOfLines={2}>{subtitle}</Text> : null}
       </View>
       {badge ? (
         <View style={s.rowBadge}>
@@ -322,11 +322,11 @@ function makeCardStyles(colors: Colors) {
     },
     profileAvatar: { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center' },
     profileAvatarText: { fontSize: 18, fontFamily: FONT.bold },
-    profileCopy: { flex: 1 },
+    profileCopy: { flex: 1, minWidth: 0 },
     profileEyebrow: { fontSize: 11, fontFamily: FONT.semibold, textTransform: 'uppercase', letterSpacing: 0.4, color: colors.mutedForeground, marginBottom: 2 },
-    profileName: { fontSize: 17, fontFamily: FONT.bold, color: colors.foreground },
+    profileName: { fontSize: 17, fontFamily: FONT.bold, color: colors.foreground, flexShrink: 1 },
     profileSub: { fontSize: 12, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
-    profileEditBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: colors.border, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 7 },
+    profileEditBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: colors.border, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 7, flexShrink: 0 },
     profileEditText: { fontSize: 12, fontFamily: FONT.semibold, color: colors.foreground },
 
     // Search
@@ -342,10 +342,10 @@ function makeCardStyles(colors: Colors) {
     // Row
     row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 14, minHeight: 52 },
     rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-    rowIcon: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-    rowCopy: { flex: 1 },
+    rowIcon: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    rowCopy: { flex: 1, minWidth: 0 },
     rowLabel: { fontSize: FS.sm, lineHeight: 18, fontFamily: FONT.medium },
-    rowSubtitle: { fontSize: 12, lineHeight: 15, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
+    rowSubtitle: { fontSize: 12, lineHeight: 16, fontFamily: FONT.regular, color: colors.mutedForeground, marginTop: 2 },
     rowValue: { fontSize: 13, lineHeight: 17, fontFamily: FONT.regular, color: colors.mutedForeground, maxWidth: 120 },
     rowBadge: { backgroundColor: colors.destructive, borderRadius: RADIUS.pill, paddingHorizontal: 7, paddingVertical: 2, minWidth: 18, alignItems: 'center' },
     rowBadgeText: { fontSize: 11, lineHeight: 13, fontFamily: FONT.bold, color: '#FFFFFF' },

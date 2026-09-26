@@ -653,20 +653,22 @@ describe('Blocker 2 — FlatList pager integrity (measured scene per item)', () 
 // ─── Discover section-level errors ───────────────────────────────────────────
 
 describe('Discover — section-level error states and retry', () => {
-  it('discover.tsx has per-section error state for all four sections', async () => {
+  it('discover.tsx has per-section error state for all sections (Drops was removed — see item 12)', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
     // High Demand section has its own error state
     expect(source).toContain('highDemandError');
     expect(source).toContain('setHighDemandError');
-    // For You, Drops, Trending each have their own
+    // For You, Trending each have their own
     expect(source).toContain('forYouError');
-    expect(source).toContain('dropsError');
     expect(source).toContain('trendingError');
     expect(source).toContain('setForYouError');
-    expect(source).toContain('setDropsError');
     expect(source).toContain('setTrendingError');
+    // Drops was removed entirely from the buyer surface — no Drops state left.
+    expect(source).not.toContain('dropsError');
+    expect(source).not.toContain('setDropsError');
+    expect(source).not.toContain('fetchDrops');
   });
 
   it('each section renders a retry button on error', async () => {
@@ -676,12 +678,10 @@ describe('Discover — section-level error states and retry', () => {
     // SectionError component used for each section
     expect(source).toMatch(/highDemandError.*SectionError|SectionError.*highDemandError/s);
     expect(source).toMatch(/forYouError.*SectionError|SectionError.*forYouError/s);
-    expect(source).toMatch(/dropsError.*SectionError|SectionError.*dropsError/s);
     expect(source).toMatch(/trendingError.*SectionError|SectionError.*trendingError/s);
     // Retry callbacks wired
     expect(source).toContain('onRetry={fetchHighDemand}');
     expect(source).toContain('onRetry={fetchProducts}');
-    expect(source).toContain('onRetry={fetchDrops}');
     expect(source).toContain('onRetry={fetchTrending}');
   });
 
@@ -692,7 +692,6 @@ describe('Discover — section-level error states and retry', () => {
     // On error, only set the error string — don't clear items
     expect(source).toContain('setHighDemandError(');
     expect(source).toContain('setForYouError(');
-    expect(source).toContain('setDropsError(');
     expect(source).toContain('setTrendingError(');
   });
 
@@ -797,12 +796,12 @@ describe('highDemand API — correct endpoint, no ordinary-product fallback', ()
     expect(source).toContain('fetchHighDemand');
   });
 
-  it('Discover High Demand section uses HighDemandRow with real productId navigation', async () => {
+  it('Discover High Demand section uses EditorialTile with real productId navigation', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
-    // HighDemandRow navigates via productId (not brandId)
-    expect(source).toContain('HighDemandRow');
+    // EditorialTile navigates via productId (not brandId)
+    expect(source).toContain('EditorialTile');
     expect(source).toContain('productId:');
     expect(source).toMatch(/thread-product-detail.*productId/);
   });
@@ -813,7 +812,7 @@ describe('highDemand API — correct endpoint, no ordinary-product fallback', ()
     const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
     // Trending section exists with its own heading
     expect(source).toContain('"Trending"');
-    // TrendingRow is a separate component from HighDemandRow
+    // TrendingRow is a separate component from EditorialTile
     expect(source).toContain('TrendingRow');
     // Trending section navigates to seller profile (brandId), not product detail
     expect(source).toMatch(/seller-profile.*brandId|brandId.*seller-profile/);
@@ -825,9 +824,9 @@ describe('highDemand API — correct endpoint, no ordinary-product fallback', ()
     const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
     // highDemandItems is never derived from trendingItems by filtering
     expect(source).not.toMatch(/highDemandItems\s*=\s*trendingItems\.filter/);
-    // The HighDemandRow component is only rendered from highDemandItems (not trendingItems)
-    // Verify: the map that calls HighDemandRow iterates over highDemandItems
-    expect(source).toMatch(/highDemandItems\.slice.*map.*HighDemandRow|highDemandItems\.map.*HighDemandRow/s);
+    // The EditorialTile component is only rendered from highDemandItems (not trendingItems)
+    // Verify: the map that calls EditorialTile iterates over highDemandItems
+    expect(source).toMatch(/highDemandItems\.slice.*map.*EditorialTile|highDemandItems\.map.*EditorialTile/s);
     // TrendingRow is used only in the Trending section (not the High Demand section)
     // Confirm TrendingRow exists and is distinct
     expect(source).toContain('TrendingRow');
@@ -873,7 +872,7 @@ describe('Discover screen — no hardcoded mock data, accent-based urgency', () 
     const source = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
     expect(source).toContain('ClaimedRemainingLabel');
     expect(source).toContain('TimeRemainingLabel');
-    expect(source).toContain('HighDemandSectionHead');
+    expect(source).toContain('EditorialSectionHead');
     expect(source).toMatch(/accent=\{theme\.accent\}/);
   });
 });

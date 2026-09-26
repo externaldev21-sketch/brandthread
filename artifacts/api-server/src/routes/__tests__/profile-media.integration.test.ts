@@ -212,3 +212,31 @@ describe("seller shop source for profiles", () => {
     expect(body.profile.videosCount).toBe(1);
   });
 });
+
+// Thread Cash is owner-only: a public profile response must never carry a
+// wallet balance, whoever is asking (balances are only served by the
+// self-scoped, authenticated /api/thread-cash). Guard every public profile read.
+describe("public profile responses never leak a Thread Cash / wallet balance", () => {
+  const LEAK = /balance|threadcash|thread_cash|wallet/i;
+  function keysDeep(value: unknown, out: string[] = []): string[] {
+    if (Array.isArray(value)) value.forEach((item) => keysDeep(item, out));
+    else if (value && typeof value === "object") {
+      for (const [key, child] of Object.entries(value)) { out.push(key); keysDeep(child, out); }
+    }
+    return out;
+  }
+
+  it.each([
+    ["seller profile", () => `/api/public/sellers/${seller}`],
+    ["profile by username", () => `/api/public/profiles/pmseller${suffix}`],
+    ["seller videos", () => `/api/public/users/${seller}/videos`],
+    ["buyer videos", () => `/api/public/users/${buyer}/videos`],
+  ])("%s has no balance fields for anonymous, a stranger, or the owner", async (_label, path) => {
+    for (const viewer of [undefined, stranger, seller, buyer]) {
+      const response = await get(path(), viewer);
+      expect(response.status).toBeLessThan(500);
+      const keys = keysDeep(await response.json());
+      expect(keys.filter((key) => LEAK.test(key))).toEqual([]);
+    }
+  });
+});

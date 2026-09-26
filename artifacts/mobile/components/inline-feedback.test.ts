@@ -252,7 +252,7 @@ describe('buyer-post-comments — continuous video preview', () => {
 // ─── discover: per-section error states ──────────────────────────────────────
 
 describe('discover.tsx — per-section error states', () => {
-  it('has error state for all four sections', async () => {
+  it('has error state for every remaining section (Drops was removed — see item 12)', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const src = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
@@ -260,19 +260,18 @@ describe('discover.tsx — per-section error states', () => {
     expect(src).toContain('setHighDemandError');
     expect(src).toContain('forYouError');
     expect(src).toContain('setForYouError');
-    expect(src).toContain('dropsError');
-    expect(src).toContain('setDropsError');
     expect(src).toContain('trendingError');
     expect(src).toContain('setTrendingError');
+    expect(src).not.toContain('dropsError');
+    expect(src).not.toContain('setDropsError');
   });
 
   it('each fetch function resets its error to null before fetching', async () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const src = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
-    // All four reset to null at fetch start
-    const resetCount = (src.match(/setHighDemandError\(null\)|setForYouError\(null\)|setDropsError\(null\)|setTrendingError\(null\)/g) ?? []).length;
-    expect(resetCount).toBeGreaterThanOrEqual(4);
+    const resetCount = (src.match(/setHighDemandError\(null\)|setForYouError\(null\)|setTrendingError\(null\)/g) ?? []).length;
+    expect(resetCount).toBeGreaterThanOrEqual(3);
   });
 
   it('error catch blocks call setXxxError (not setXxxItems)', async () => {
@@ -281,7 +280,6 @@ describe('discover.tsx — per-section error states', () => {
     const src = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
     expect(src).toContain('setHighDemandError(');
     expect(src).toContain('setForYouError(');
-    expect(src).toContain('setDropsError(');
     expect(src).toContain('setTrendingError(');
   });
 
@@ -292,7 +290,6 @@ describe('discover.tsx — per-section error states', () => {
     expect(src).toContain('SectionError');
     expect(src).toMatch(/highDemandError.*SectionError|SectionError.*highDemandError/s);
     expect(src).toMatch(/forYouError.*SectionError|SectionError.*forYouError/s);
-    expect(src).toMatch(/dropsError.*SectionError|SectionError.*dropsError/s);
     expect(src).toMatch(/trendingError.*SectionError|SectionError.*trendingError/s);
   });
 
@@ -302,7 +299,6 @@ describe('discover.tsx — per-section error states', () => {
     const src = readFileSync(resolve(__dirname, '../app/(buyer)/discover.tsx'), 'utf8');
     expect(src).toContain('onRetry={fetchHighDemand}');
     expect(src).toContain('onRetry={fetchProducts}');
-    expect(src).toContain('onRetry={fetchDrops}');
     expect(src).toContain('onRetry={fetchTrending}');
   });
 

@@ -1,17 +1,20 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { EmptyState } from '@/components/BrandthreadUI';
+import { EmptyState } from '@/components/layout/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { SP } from '@/lib/theme';
 import { ProfileGridSkeleton } from './ProfileVideoGrid';
 import type { ProfileLayout } from './profileLayout';
+import { ProfileEmptyAreaContext } from './ProfileEmptyAreaContext';
 
 /**
  * What a profile grid shows when it has no tiles: skeleton while loading,
- * ErrorState + Retry on failure, otherwise an EmptyState (with a CTA on the
- * owner's own profile). Never an open-ended spinner.
+ * ErrorState + Retry on failure, otherwise the shared EmptyState (icon in a
+ * thin circle, title, one sentence, CTA on the owner's own profile only).
+ * Never an open-ended spinner. Empty/error fill the shell's empty area so
+ * they centre above the floating tab bar instead of sitting under it.
  */
 export function ProfileGridPlaceholder({
   loading,
@@ -34,18 +37,30 @@ export function ProfileGridPlaceholder({
   action?: { label: string; onPress: () => void; icon?: keyof typeof Feather.glyphMap };
   testID?: string;
 }) {
+  const areaHeight = useContext(ProfileEmptyAreaContext);
+  const fill = areaHeight ? { minHeight: areaHeight, justifyContent: 'center' as const } : null;
   if (loading) {
     return (
       <ProfileGridSkeleton columns={layout.gridColumns} width={layout.tileWidth} height={layout.tileHeight} rows={2} />
     );
   }
   if (error) {
-    return <ErrorState message="Couldn't load these videos." onRetry={onRetry} />;
+    return (
+      <View style={fill} testID="profile-grid-error">
+        <ErrorState message="Couldn't load these videos." onRetry={onRetry} />
+      </View>
+    );
   }
   return (
-    <View testID={testID}>
-      <EmptyState icon={icon} title={title} description={description} action={action} compact />
-    </View>
+    <EmptyState
+      testID={testID ?? 'profile-empty-state'}
+      style={fill}
+      icon={icon}
+      title={title}
+      message={description ?? ''}
+      actionLabel={action?.label}
+      onAction={action?.onPress}
+    />
   );
 }
 

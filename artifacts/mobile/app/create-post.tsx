@@ -428,7 +428,7 @@ export default function CreatePostScreen() {
   const insets   = useSafeAreaInsets();
   const router   = useRouter();
   const api      = useApi();
-  const params   = useLocalSearchParams<{ accountType?: string; editId?: string; from?: string }>();
+  const params   = useLocalSearchParams<{ accountType?: string; editId?: string; from?: string; mode?: string }>();
   const isBuyer  = params.accountType === 'buyer';
   const editId   = typeof params.editId === 'string' ? params.editId : undefined;
   const isSellerSetup = isSellerSetupOrigin(params.from);
@@ -474,7 +474,8 @@ export default function CreatePostScreen() {
   const [hashtagInput,       setHashtagInput]       = useState('');
   const [location,           setLocation]           = useState('');
   const [visibility,         setVisibility]         = useState<PostVisibility>(DEFAULT_VISIBILITY);
-  const [scheduleMode,       setScheduleMode]       = useState<'now'|'schedule'>('now');
+  // `?mode=schedule` (the profile Schedule tab's empty-state CTA) opens with scheduling preselected.
+  const [scheduleMode,       setScheduleMode]       = useState<'now'|'schedule'>(params.mode === 'schedule' ? 'schedule' : 'now');
   const [scheduledAt,        setScheduledAt]        = useState<string | null>(null);
   const [pickerState,        setPickerState]        = useState<PickerState>(makeDefaultPickerState);
   const [showDatePicker,     setShowDatePicker]     = useState(false);

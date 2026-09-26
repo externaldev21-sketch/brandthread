@@ -29,7 +29,11 @@ describe('seller profile action layout', () => {
     expect(profileSource).toContain('accessibilityLabel="Create Post"');
     expect(profileSource).not.toContain('accessibilityLabel="Create post"');
     expect(profileSource).not.toContain('Share something with');
-    expect(profileSource).toContain("'No posts yet. Create your first post!'");
+    // The empty Post tab offers "Create your first post" through the shared
+    // profile empty-state table (components/profile/profileEmptyStates.ts).
+    expect(profileSource).toContain("'seller:post', 'seller:draft', 'seller:schedule'");
+    expect(fs.readFileSync(path.join(__dirname, '../components/profile/profileEmptyStates.ts'), 'utf8'))
+      .toContain("label: 'Create your first post', route: '/create-post'");
   });
 });
 

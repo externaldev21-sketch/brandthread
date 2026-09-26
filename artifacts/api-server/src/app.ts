@@ -91,6 +91,16 @@ app.use(
   express.raw({ type: "application/json" }),
 );
 
+// Shopify webhooks are HMAC-signed over the raw body too.
+app.use(
+  "/api/webhooks/shopify",
+  express.raw({ type: "application/json" }),
+);
+app.use(
+  "/api/v1/webhooks/shopify",
+  express.raw({ type: "application/json" }),
+);
+
 // Authentication and strict admission controls run before Design Studio binary
 // bodies are buffered. Content-Length is only an early rejection; express.raw
 // remains the authoritative streamed size limit.
