@@ -33,9 +33,11 @@ import { BUYER_USER } from './store-screenshots/demo-data.mjs';
 
 export const OUTPUT_DIR = path.join(MOBILE_ROOT, 'scratch', 'layout-screenshots');
 
-// 5 representative sizes (owner's device matrix, smallest through desktop).
+// 5 representative sizes (owner's device matrix, smallest through desktop),
+// plus 375x667 (iPhone 8/SE 2-3) for header-consistency review passes.
 const SIZES = [
   { id: 'smallest-phone', width: 320, height: 568, label: 'Smallest phone (iPhone SE 1st gen)' },
+  { id: 'se2', width: 375, height: 667, label: 'iPhone 8 / SE 2-3' },
   { id: 'standard-phone', width: 390, height: 844, label: 'Standard phone (iPhone 12/13/14)' },
   { id: 'pro-max', width: 430, height: 932, label: 'iPhone Pro Max' },
   { id: 'ipad', width: 768, height: 1024, label: 'iPad portrait' },
@@ -43,17 +45,23 @@ const SIZES = [
 ];
 
 // Same ~12 key screens as tests/layout-audit.spec.ts (kept in sync by hand —
-// both files are small and reviewed together).
+// both files are small and reviewed together), plus the remaining root/
+// tab-root pages the shared PageHeader now covers.
 export const SCREENS = [
   { id: 'buyer-feed', role: 'buyer', path: '/(buyer)', ready: 'Drop 04 is live' },
   { id: 'discover', role: 'buyer', path: '/discover', ready: 'Heavyweight Hoodie — Ember' },
+  { id: 'search', role: 'buyer', path: '/(buyer)/search', ready: 'Search' },
+  { id: 'messages', role: 'buyer', path: '/(buyer)/inbox', ready: 'Messages' },
   { id: 'buyer-cart', role: 'buyer', path: '/cart', ready: 'Order summary' },
   { id: 'buyer-checkout', role: 'buyer', path: '/buyer-checkout?source=cart', ready: '1120 NW Everett Street' },
   { id: 'buyer-product-detail', role: 'buyer', path: '/buyer-product-detail?productId=prod_nl_jacket_rust', ready: 'Field Shell Jacket — Rust' },
   { id: 'buyer-profile', role: 'buyer', path: '/(buyer)/profile', ready: '@jordanreyes' },
+  { id: 'buyer-following', role: 'buyer', path: '/(tabs)/following', ready: 'Following' },
   { id: 'seller-dashboard', role: 'seller', path: '/(tabs)', ready: '$1,842.50' },
   { id: 'seller-orders', role: 'seller', path: '/(tabs)/orders', ready: 'Orders' },
   { id: 'seller-products', role: 'seller', path: '/(tabs)/products', ready: 'Products' },
+  { id: 'seller-studio', role: 'seller', path: '/(tabs)/studio', ready: 'Studio' },
+  { id: 'seller-analytics', role: 'seller', path: '/(tabs)/analytics', ready: 'Analytics' },
   { id: 'seller-settings', role: 'seller', path: '/seller-settings', ready: 'Settings' },
   { id: 'manufacturer-hub', role: 'seller', path: '/manufacturer-hub', ready: 'Porto Knit Collective' },
   { id: 'theme-picker', role: 'seller', path: '/app-theme', ready: 'Choose your Brandthread finish' },
