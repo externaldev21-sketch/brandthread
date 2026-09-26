@@ -468,10 +468,15 @@ export function ThreadCashMessageCard({
   // its own and got crushed once it landed inside a chat bubble.
   return (
     <View style={[styles.card, { backgroundColor: theme.cardElevated, borderColor: theme.border }]}>
-      <ThreadCashBillMark size={28} color={theme.onAccent} accent={theme.onAccent} />
-      <View style={styles.cardAmountWrap} onLayout={(e) => setAmountWidth(e.nativeEvent.layout.width)}>
-        <Text style={[styles.cardAmount, { color: theme.onAccent }]}>{formatCents(amountCents)}</Text>
-        {status === 'pending' && amountWidth > 0 && <ShimmerSweep width={amountWidth} height={34} />}
+      <View style={[styles.cardCoinCircle, { backgroundColor: theme.accentDim }]}>
+        <ThreadCashBillMark size={20} />
+      </View>
+      <View style={styles.cardTextCol} onLayout={(e) => setAmountWidth(e.nativeEvent.layout.width)}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={[styles.cardTitle, { color: theme.text }]}>{formatCents(amountCents)} Thread Cash</Text>
+          {status === 'pending' && amountWidth > 0 && <ShimmerSweep width={amountWidth} height={20} />}
+        </View>
+        <Text style={[styles.cardSubtitle, { color: theme.muted }]} numberOfLines={1}>{subtitle}</Text>
       </View>
 
       {showAccept ? (
