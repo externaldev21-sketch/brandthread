@@ -29,7 +29,7 @@ describe('LIVE route', () => {
     expect(live).toContain("import { VideoVisual } from './(tabs)/feed';");
     expect(live).toContain('{...verticalPagerListProps(pageHeight, streams.length)}');
     expect(live).toContain('VERTICAL_PAGER_VIEWABILITY');
-    expect(feed).toContain('export function VideoVisual({');
+    expect(feed).toContain('export function VideoVisual(props: VideoVisualProps)');
   });
 
   it('has every overlay piece: host pill, close, viewer stack, chat, pinned product, rail, hearts, comment pill', () => {
