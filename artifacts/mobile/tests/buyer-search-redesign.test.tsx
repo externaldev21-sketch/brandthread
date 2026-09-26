@@ -121,6 +121,7 @@ vi.mock('expo-router', () => ({
     const ReactActual = require('react') as typeof import('react');
     ReactActual.useEffect(callback, [callback]);
   },
+  useScrollToTop: () => {},
 }));
 
 vi.mock('expo-haptics', () => ({

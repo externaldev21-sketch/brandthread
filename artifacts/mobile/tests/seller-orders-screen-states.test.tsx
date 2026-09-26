@@ -63,6 +63,7 @@ vi.mock('expo-router', () => ({
     React.useEffect(() => cb(), []); // eslint-disable-line react-hooks/exhaustive-deps
   },
   useRouter: () => ({ push: routerPush, back: vi.fn(), replace: vi.fn() }),
+  useScrollToTop: () => {},
 }));
 
 vi.mock('react-native-safe-area-context', () => ({

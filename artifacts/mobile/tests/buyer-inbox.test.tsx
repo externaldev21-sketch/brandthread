@@ -131,6 +131,7 @@ vi.mock('expo-router', () => ({
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
   },
+  useScrollToTop: () => {},
 }));
 
 vi.mock('react-native-safe-area-context', () => ({

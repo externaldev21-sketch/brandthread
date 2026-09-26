@@ -78,6 +78,7 @@ vi.mock('expo-router', () => ({
     const React = require('react') as typeof import('react');
     React.useEffect(callback, [callback]);
   },
+  useScrollToTop: () => {},
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
