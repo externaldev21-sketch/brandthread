@@ -1132,6 +1132,17 @@ export const follows = pgTable('follows', {
   followingIdx: index('follows_following_idx').on(t.followingId),
 }));
 
+// Dismissed "Suggested for you" rows on the Activity tab — the X on a
+// suggestion row keeps that person out of future suggestion pages for this
+// viewer (they can still find/follow them by search).
+export const suggestionDismissals = pgTable('suggestion_dismissals', {
+  userId:          text('user_id').notNull(),
+  suggestedUserId: text('suggested_user_id').notNull(),
+  createdAt:       timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.userId, t.suggestedUserId] }),
+}));
+
 // ─── Discount codes ───────────────────────────────────────────────────────────
 
 export const discountCodes = pgTable('discount_codes', {
