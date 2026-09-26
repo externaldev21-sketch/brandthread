@@ -4,6 +4,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { EmptyState } from '@/components/BrandthreadUI';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 export default function AutomationScreen() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export default function AutomationScreen() {
             label: 'Back to dashboard',
             onPress: () => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.back();
+              goBackOr(router);
             },
           }}
         />

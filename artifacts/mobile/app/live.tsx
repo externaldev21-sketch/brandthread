@@ -44,6 +44,7 @@ import {
 import { LiveProductsSheet } from '@/components/live/LiveProductsSheet';
 import { LiveEmptyState } from '@/components/live/LiveEmptyState';
 import { VideoVisual } from './(tabs)/feed';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 /** Same preference key as the Threads feed, so sound on/off carries over. */
 const SOUND_PREF_KEY = 'bt:feed-sound-on:v1';
@@ -249,8 +250,7 @@ export default function LiveScreen() {
 
   const close = useCallback(() => {
     hapticLight();
-    if (router.canGoBack()) router.back();
-    else router.replace('/(buyer)' as never);
+    goBackOr(router, '/(buyer)');
   }, [router]);
 
   const toggleSound = useCallback(() => {

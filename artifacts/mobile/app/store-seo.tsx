@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TextInput, Switch,
   StyleSheet, Alert, TouchableOpacity, Image, ActivityIndicator,
@@ -67,7 +68,7 @@ export default function StoreSEOScreen() {
     <View style={se.root}>
       <View style={[se.header, { paddingTop: headerTopInset + SP.sm }]}>
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => goBackOr(router)}
           style={se.backBtn}
           hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
         >

@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Alert, ActivityIndicator, Dimensions,
@@ -115,7 +116,7 @@ export default function DesignExportScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Export</Text>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
+        <TouchableOpacity onPress={() => goBackOr(router)} style={styles.closeBtn}>
           <Feather name="x" size={ICON.md} color={FG} />
         </TouchableOpacity>
       </View>

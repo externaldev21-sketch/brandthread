@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
   TextInput, StyleSheet, Alert, Switch, Animated, RefreshControl,
@@ -1144,7 +1145,7 @@ export default function StoreEditor() {
       <View style={styles.header}>
         <View style={styles.headerRow1}>
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={() => goBackOr(router)}
             style={styles.backBtn}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >

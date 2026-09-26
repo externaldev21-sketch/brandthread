@@ -18,6 +18,7 @@ import { CachedImage } from '@/components/CachedImage';
 import { SkeletonBlock } from '@/components/ui/Skeleton';
 import { hapticPrimaryAction, hapticSelection } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   RecordingPresets,
   requestRecordingPermissionsAsync,
@@ -607,7 +608,7 @@ export default function SellerConversationScreen() {
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
         <PressableScale
-          onPress={() => { hapticPrimaryAction(); router.back(); }}
+          onPress={() => { hapticPrimaryAction(); goBackOr(router); }}
           style={s.headerBack}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"

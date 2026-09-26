@@ -20,6 +20,7 @@ import { FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/hooks/useApi';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
   PrimaryButton, TertiaryButton, EmptyState,
@@ -206,7 +207,7 @@ export default function MetaAdsConnectScreen() {
 
   return (
     <BrandthreadScreen>
-      <BrandthreadHeader title="Connect Meta" onBack={() => router.back()} />
+      <BrandthreadHeader title="Connect Meta" onBack={() => goBackOr(router)} />
       <ScrollView contentContainerStyle={{ padding: SP.md, gap: SP.md }} keyboardShouldPersistTaps="handled">
         {step === 'loading' && (
           <View style={s.center}>

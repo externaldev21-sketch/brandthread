@@ -12,6 +12,7 @@ import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButt
 import { getCounts, createCount, updateCountItem, completeCount, getInventoryItems, getLocations } from '@/services/inventoryService';
 import { InventoryCount, InventoryCountItem, CountType, CountStatus, InventoryItem, InventoryLocation } from '@/services/inventoryTypes';
 import { Header } from '@/components/layout';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -249,7 +250,7 @@ export default function InventoryCountScreen() {
       <View style={[s.root, { paddingTop: insets.top }]}>
         {/* Header */}
         <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+          <TouchableOpacity onPress={() => goBackOr(router)} style={s.backBtn}>
             <Feather name="arrow-left" size={ICON.md} color={FG} />
           </TouchableOpacity>
           <Text style={s.headerTitle}>Inventory Counts</Text>

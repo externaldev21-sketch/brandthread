@@ -10,6 +10,7 @@
  *   mode             — 'voice' | 'video'
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   Dimensions, ActivityIndicator, Platform,
@@ -295,7 +296,7 @@ function NativeCallScreen() {
           clearInterval(timerRef.current!);
           setStatus('ended');
           emitTerminalEvent('ended');
-          setTimeout(() => router.back(), 1500);
+          setTimeout(() => goBackOr(router), 1500);
         },
         onTokenPrivilegeWillExpire: () => {
           void renewCallToken();
@@ -383,7 +384,7 @@ function NativeCallScreen() {
       engineRef.current?.leaveChannel();
       engineRef.current?.release();
     } catch {}
-    router.back();
+    goBackOr(router);
   }
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -427,7 +428,7 @@ function NativeCallScreen() {
             </View>
             <Text style={s.unavailableTitle}>Call unavailable</Text>
             <Text style={s.unavailableText}>{unavailableReason}</Text>
-            <TouchableOpacity style={[s.messageButton, { backgroundColor: colors.primary }]} onPress={() => router.back()}>
+            <TouchableOpacity style={[s.messageButton, { backgroundColor: colors.primary }]} onPress={() => goBackOr(router)}>
               <Feather name="message-circle" size={17} color={colors.primaryForeground} />
               <Text style={[s.messageButtonText, { color: colors.primaryForeground }]}>Return to messages</Text>
             </TouchableOpacity>

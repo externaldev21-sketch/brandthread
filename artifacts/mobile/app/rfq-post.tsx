@@ -5,6 +5,7 @@
  * affordance is intentionally left out rather than faked — see §11a).
  */
 import React, { useCallback, useMemo, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
   TextInput, ActivityIndicator, KeyboardAvoidingView, Platform,
@@ -107,7 +108,7 @@ export default function RfqPostScreen() {
 
   return (
     <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Header title="Request for Quotation" onBack={() => router.back()} />
+      <Header title="Request for Quotation" onBack={() => goBackOr(router)} />
       <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + SP.xl }]} showsVerticalScrollIndicator={false}>
         <Text style={s.sectionLabel}>What are you sourcing?</Text>
         <View style={s.chipRow}>

@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Alert, Modal, Switch,
@@ -318,7 +319,7 @@ export default function StoreNavScreen() {
     <View style={styles.root}>
       <Header
         title="Navigation"
-        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
+        onBack={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goBackOr(router); }}
       />
       <Text style={styles.headerSubtitle}>Set up your store's navigation menus.</Text>
 

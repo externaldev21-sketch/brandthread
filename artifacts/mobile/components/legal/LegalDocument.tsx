@@ -1,4 +1,5 @@
 import React from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   Platform,
   Pressable,
@@ -37,7 +38,7 @@ export default function LegalDocument({ docId }: LegalDocumentProps) {
 
   function leaveDocument() {
     if (router.canGoBack()) {
-      router.back();
+      goBackOr(router);
       return;
     }
     router.replace('/');

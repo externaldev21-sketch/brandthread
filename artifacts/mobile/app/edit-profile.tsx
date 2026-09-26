@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, Platform, TextInput, Image, Animated, ActivityIndicator,
@@ -165,8 +166,8 @@ export default function EditProfileScreen() {
   // even in navigation contexts where 'beforeRemove' isn't raised for this
   // particular pop (the listener above stays as extra coverage).
   function handleBackPress() {
-    if (isDirty && !saving) { confirmDiscardChanges(() => router.back()); return; }
-    router.back();
+    if (isDirty && !saving) { confirmDiscardChanges(() => goBackOr(router)); return; }
+    goBackOr(router);
   }
 
   function set(key: keyof Fields, val: string) {
@@ -302,7 +303,7 @@ export default function EditProfileScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setInitial(fields);
       showToast('Profile updated');
-      setTimeout(() => router.back(), 500);
+      setTimeout(() => goBackOr(router), 500);
     } catch {
       Alert.alert('Error', 'Could not save profile. Please try again.');
     } finally {

@@ -9,6 +9,7 @@
  * docs/polish/screens/buyer-settings-rebuild.md.
  */
 import React, { useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -95,7 +96,7 @@ export default function AccountSwitcherScreen() {
 
   return (
     <View style={s.root}>
-      <ScreenHeader title="Accounts" variant="push" onBack={() => router.back()} />
+      <ScreenHeader title="Accounts" variant="push" onBack={() => goBackOr(router)} />
 
       {loading ? (
         <View style={s.skeletonContainer}>

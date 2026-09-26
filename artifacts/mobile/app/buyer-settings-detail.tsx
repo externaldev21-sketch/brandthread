@@ -10,6 +10,7 @@ import { reportNetworkError } from '@/lib/networkNotice';
 import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Card, ListRow } from '@/components/ui';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 type ToggleKey = keyof { [K in keyof BuyerSettingsState as BuyerSettingsState[K] extends boolean ? K : never]: true };
 type Item = { label: string; sub?: string; icon?: keyof typeof Feather.glyphMap; toggle?: ToggleKey; value?: string; action?: () => void };
@@ -103,7 +104,7 @@ export default function BuyerSettingsDetail() {
   const items = useMemo(() => settings ? cfg.items(settings, router) : [], [cfg, settings, router]);
 
   return <View style={styles.page}>
-    <ScreenHeader title={cfg.title} variant="push" onBack={() => router.back()} />
+    <ScreenHeader title={cfg.title} variant="push" onBack={() => goBackOr(router)} />
     <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}>
       {cfg.intro ? <Text style={styles.intro}>{cfg.intro}</Text> : null}
       {loading ? <Text style={styles.intro}>Loading settings…</Text> : settings && items.length > 0 ? <Card style={styles.card}>{items.map((item, i) => {

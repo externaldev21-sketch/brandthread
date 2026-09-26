@@ -17,6 +17,7 @@ import { EmptyState, StatusBadge } from '@/components/BrandthreadUI';
 import { formatCents } from '@/lib/money';
 import { acceptQuote, declineQuote } from '@/services/manufacturerService';
 import { getRfq, type RfqDetail, type RfqQuote, type RfqQuoteStatus } from '@/services/manufacturerRfq';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 
 const COL_WIDTH = 200;
 const LABEL_WIDTH = 120;
@@ -89,7 +90,7 @@ export default function RfqCompareScreen() {
   if (loading) {
     return (
       <View style={s.root}>
-        <Header title="Compare Quotes" onBack={() => router.back()} />
+        <Header title="Compare Quotes" onBack={() => goBackOr(router)} />
         <View style={s.center}><ActivityIndicator color={theme.accent} /></View>
       </View>
     );
@@ -98,7 +99,7 @@ export default function RfqCompareScreen() {
   if (!rfq) {
     return (
       <View style={s.root}>
-        <Header title="Compare Quotes" onBack={() => router.back()} />
+        <Header title="Compare Quotes" onBack={() => goBackOr(router)} />
         <EmptyState icon="alert-circle" title="RFQ unavailable" description="This request could not be loaded." />
       </View>
     );
@@ -108,7 +109,7 @@ export default function RfqCompareScreen() {
 
   return (
     <View style={s.root}>
-      <Header title="Compare Quotes" onBack={() => router.back()} />
+      <Header title="Compare Quotes" onBack={() => goBackOr(router)} />
       <View style={s.summary}>
         <Text style={s.summaryTitle} numberOfLines={1}>{rfq.garmentType}</Text>
         <Text style={s.summaryMeta}>{rfq.quantity.toLocaleString('en-US')} units · sent to {rfq.manufacturersCount} manufacturers · {rfq.quotesReceivedCount} quoted</Text>

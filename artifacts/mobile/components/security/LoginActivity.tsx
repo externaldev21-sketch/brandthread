@@ -4,6 +4,7 @@
  * of all other devices". Shared by buyer and seller settings.
  */
 import React, { useCallback, useMemo, useState } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert,
 } from 'react-native';
@@ -161,7 +162,7 @@ export default function LoginActivity() {
 
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
-      <ScreenHeader title="Login activity" onBack={() => router.back()} />
+      <ScreenHeader title="Login activity" onBack={() => goBackOr(router)} />
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color={theme.text} /></View>

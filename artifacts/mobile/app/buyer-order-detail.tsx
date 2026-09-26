@@ -17,6 +17,7 @@
  *   - Gate: order.status === 'delivered' && !reviewSubmitted && real order ID (not local/demo)
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { goBackOr } from '@/lib/navigation/goBackOr';
 import {
   View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet,
   ActivityIndicator, Modal, TextInput, RefreshControl, Image,
@@ -692,7 +693,7 @@ export default function BuyerOrderDetailScreen() {
         const msg = result.refunded
           ? 'Your order has been cancelled and a full refund has been issued. It may take 5–10 business days to appear on your statement.'
           : 'Your order has been cancelled.';
-        Alert.alert('Order Cancelled', msg, [{ text: 'OK', onPress: () => router.back() }]);
+        Alert.alert('Order Cancelled', msg, [{ text: 'OK', onPress: () => goBackOr(router) }]);
       }
     } catch (err: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -730,7 +731,7 @@ export default function BuyerOrderDetailScreen() {
   if (fetchError && !order) {
     return (
       <BrandthreadScreen>
-        <BrandthreadHeader title="Order Details" onBack={() => router.back()} />
+        <BrandthreadHeader title="Order Details" onBack={() => goBackOr(router)} />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.lg }}>
           <Feather name="wifi-off" size={40} color={theme.muted} />
           <Text style={{ color: theme.muted, fontFamily: FONT.medium, fontSize: FS.base, marginTop: SP.md, textAlign: 'center' }}>
@@ -745,7 +746,7 @@ export default function BuyerOrderDetailScreen() {
   if (!order) {
     return (
       <BrandthreadScreen>
-        <BrandthreadHeader title="Order Details" onBack={() => router.back()} />
+        <BrandthreadHeader title="Order Details" onBack={() => goBackOr(router)} />
         <View style={{ flex: 1 }} />
       </BrandthreadScreen>
     );
@@ -761,7 +762,7 @@ export default function BuyerOrderDetailScreen() {
       <BrandthreadHeader
         title={`Order ${order.orderNumber}`}
         subtitle={order.sellerName}
-        onBack={() => router.back()}
+        onBack={() => goBackOr(router)}
       />
 
       {/* Live-updating status indicator */}
