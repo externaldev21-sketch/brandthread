@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
   Animated, TextInput, Modal, Pressable, PanResponder,
-  AccessibilityInfo, Platform, ScrollView, RefreshControl, ActivityIndicator, KeyboardAvoidingView,
+  AccessibilityInfo, Keyboard, Platform, ScrollView, RefreshControl, ActivityIndicator, KeyboardAvoidingView,
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -1924,11 +1924,11 @@ export default function FeedScreen({
   const creatorSource = creatorFeed?.source;
   const creatorId = creatorFeed?.id;
   const creatorStartPostId = creatorFeed?.startPostId;
-  // Height of the floating top overlay (Friends/Following/For You/Cart row):
-  // topBar's own paddingTop + paddingBottom, plus the buyerTopRow's height.
+  // Height of the floating buyer header: top padding, search field, gap,
+  // Following/Threads and shortcut row, then bottom padding.
   // Single source of truth so BuyerHighDemandPage's content never renders
   // underneath it (see styles.topBar / styles.buyerTopRow below).
-  const buyerHeaderHeight = Math.max(0, previewTopInset - 4) + 44 + 4;
+  const buyerHeaderHeight = Math.max(0, previewTopInset - 4) + 36 + 6 + 44 + 4;
   const buyerBarInset = useBuyerTabBarInset();
   const router = useRouter();
   const { userId } = useAuth();
@@ -1957,9 +1957,6 @@ export default function FeedScreen({
   const pageHeight = viewportSize.height || windowHeight;
   const viewportReady = viewportSize.width > 0 && viewportSize.height > 0;
   const [showSearch, setShowSearch] = useState(false);
-  /** Buyer Threads Home's own search toggle — the glass top bar swaps to a
-   * search row in place, same searchQuery state as the legacy top bar. */
-  const [buyerSearchOpen, setBuyerSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifs, setShowNotifs] = useState(false);
   const [showRepostEducation, setShowRepostEducation] = useState(false);
@@ -2903,38 +2900,21 @@ export default function FeedScreen({
         </View>
       ) : isBuyerSurface ? (
         <View style={[styles.topBar, { paddingTop: Math.max(0, previewTopInset - 4) }]} pointerEvents="box-none">
-          {/* Buyer Threads Home: For You feed chrome — Friends + Drops entry
-              points, a centered "Following | Threads" glass pill switcher
-              (real SegmentedControl from the shared design system, extended
-              with a translucent `variant="glass"` for use over video — see
-              components/ui/SegmentedControl.tsx), a LIVE jump-to button that
-              only appears while a live stream is actually mixed into the
-              feed, search, activity and cart. */}
-          {buyerSearchOpen ? (
-            <View style={styles.buyerSearchRow}>
-              <BlurView intensity={34} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
-              <Feather name="search" size={16} color="rgba(255,255,255,0.75)" style={{ marginLeft: 14 }} />
-              <TextInput
-                style={styles.buyerSearchInput}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder="Search creators, products…"
-                placeholderTextColor="rgba(255,255,255,0.5)"
-                autoFocus
-                returnKeyType="search"
-                onSubmitEditing={() => setBuyerSearchOpen(false)}
-              />
-              <TouchableOpacity
-                style={styles.buyerTopBtnCompact}
-                activeOpacity={0.7}
-                onPress={() => { setBuyerSearchOpen(false); setSearchQuery(''); }}
-                accessibilityRole="button"
-                accessibilityLabel="Close search"
-              >
-                <Feather name="x" size={18} color={ON_DARK} />
-              </TouchableOpacity>
-            </View>
-          ) : (
+          {/* Search stays above the Following/Threads and shortcut row instead
+              of replacing it; the existing query still filters feed items. */}
+          <View style={styles.buyerSearchRow}>
+            <TextInput
+              style={styles.buyerSearchInput}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search"
+              placeholderTextColor="rgba(255,255,255,0.68)"
+              accessibilityLabel="Search feed"
+              testID="buyer-home-search"
+              returnKeyType="search"
+              onSubmitEditing={() => Keyboard.dismiss()}
+            />
+          </View>
           <View style={styles.buyerTopRow}>
             <View style={styles.buyerTopCluster}>
               <TouchableOpacity
@@ -2983,20 +2963,6 @@ export default function FeedScreen({
             </View>
 
             <View style={styles.buyerTopCluster}>
-              <TouchableOpacity
-                style={styles.buyerTopBtnCompact}
-                activeOpacity={0.7}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                  setBuyerSearchOpen(true);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Search"
-                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-                testID="buyer-home-search"
-              >
-                <Feather name="search" size={20} color={ON_DARK} />
-              </TouchableOpacity>
               <ActivityBellButton color={ON_DARK} size={20} style={styles.buyerTopBtnCompact} badgeBorderColor={BG} />
               <Animated.View ref={cartTargetRef} style={[styles.buyerTopBtnCompact, { transform: [{ scale: cartPulse }] }]}>
               <TouchableOpacity
@@ -3021,7 +2987,6 @@ export default function FeedScreen({
               </Animated.View>
             </View>
           </View>
-          )}
         </View>
       ) : (
       <View style={[styles.topBar, { paddingTop: previewTopInset + 2 }]} pointerEvents="box-none">
@@ -3367,11 +3332,12 @@ const styles = StyleSheet.create({
   liveJumpDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FF3B30' },
   liveJumpText: { fontSize: 10, letterSpacing: 0.6, fontFamily: FONT.bold, color: ON_DARK },
   buyerSearchRow: {
-    flexDirection: 'row', alignItems: 'center', minHeight: 44, borderRadius: RADII.pill,
-    overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.32)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
+    height: 36, marginBottom: 6, borderRadius: RADII.input,
+    backgroundColor: 'rgba(0,0,0,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
   },
   buyerSearchInput: {
-    flex: 1, height: 44, paddingHorizontal: 10, fontSize: FS.sm, fontFamily: FONT.regular, color: ON_DARK,
+    flex: 1, height: 36, paddingHorizontal: 12, paddingVertical: 0,
+    fontSize: FS.sm, fontFamily: FONT.regular, color: ON_DARK,
   },
   topAvatarBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   topAvatar: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
