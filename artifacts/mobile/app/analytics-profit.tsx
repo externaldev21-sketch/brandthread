@@ -1,42 +1,27 @@
 /**
  * Profit Analytics — Brandthread Seller App
+ *
+ * Mobbin reference: Turo "Business/Earnings" hero total + breakdown legend
+ * (https://mobbin.com/screens/df67c6c0-b53d-4b3f-982a-e67f10409e4a) informed
+ * the large estimated-total hero card above the profit waterfall list.
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@clerk/expo';
 import { useColors } from '@/hooks/useColors';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Platform, ActivityIndicator } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
-import {
-  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_DIM, PURPLE_LIGHT, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  FONT, FS,
-} from '@/lib/theme';
+import { FONT, FS, SP, RADIUS, COMP } from '@/lib/theme';
 import { getProfitAnalytics, getPayoutAnalytics, getFilterState } from '@/services/analyticsService';
-import { ProfitAnalytics, PayoutAnalytics, ProfitLineItem, AnalyticsMetric, AnalyticsFilterState } from '@/services/analyticsTypes';
+import { ProfitAnalytics, PayoutAnalytics, AnalyticsFilterState } from '@/services/analyticsTypes';
 import { EmptyState } from '@/components/BrandthreadUI';
-
-function MiniBar({ points, color = SUCCESS }: { points: Array<{ value: number }>; color?: string }) {
-  const colors = useColors();
-  const s = React.useMemo(() => createStyles(colors), [colors]);
-  const max = Math.max(...points.map(p => p.value), 1);
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 28, gap: 2 }}>
-      {points.slice(-20).map((p, i) => (
-        <View key={i} style={{ flex: 1, borderRadius: 2, height: Math.max(2, (p.value / max) * 28), backgroundColor: color, opacity: 0.7 }} />
-      ))}
-    </View>
-  );
-}
+import {
+  AnalyticsHeader, AnalyticsSkeleton, Card, CardDivider, PillTabs, SectionTitle, Sparkline, StatTileRow,
+} from '@/components/analytics/AnalyticsKit';
 
 export default function AnalyticsProfitScreen() {
   const colors = useColors();
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = colors;
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const { isLoaded: authLoaded, userId } = useAuth();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
@@ -72,41 +57,26 @@ export default function AnalyticsProfitScreen() {
   }, [authLoaded, userId]); // load reads the current filter
 
   if (loading) {
-    return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><ActivityIndicator size="large" color={PURPLE} /></View>;
+    return <AnalyticsSkeleton topPad={topPad} kpiCount={0} listRows={3} />;
   }
   return (
     <ScrollView
       style={s.scroll}
       contentContainerStyle={[s.content, { paddingTop: topPad + 12 }]}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={PURPLE} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
     >
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Feather name="arrow-left" size={20} color={FG} />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={s.pageTitle}>Profit & Payout</Text>
-          <Text style={s.subtitle}>{filter?.dateRange.label ?? '30 days'}</Text>
-        </View>
-      </View>
+      <AnalyticsHeader title="Profit & Payout" subtitle={filter?.dateRange.label ?? '30 days'} />
 
-      {/* Tab toggle */}
-      <View style={s.tabRow}>
-        {(['profit','payout'] as const).map(t => (
-          <TouchableOpacity key={t} onPress={() => { Haptics.selectionAsync(); setTab(t); }} style={[s.tabBtn, tab === t && s.tabBtnActive, tab === t && { backgroundColor: PURPLE_DIM, borderColor: PURPLE }]}>
-            <Text style={[s.tabBtnText, tab === t && s.tabBtnTextActive, tab === t && { color: PURPLE_LIGHT }]}>{t === 'profit' ? 'Profit' : 'Payouts'}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <PillTabs
+        options={[{ key: 'profit', label: 'Profit' }, { key: 'payout', label: 'Payouts' }] as const}
+        value={tab}
+        onChange={setTab}
+        scroll={false}
+      />
 
       {tab === 'profit' && !profit && (
-        <EmptyState
-          icon="trending-up"
-          title="Profit insights are on the way"
-          description="We'll show margins once your sales and costs sync."
-          style={{ marginTop: 24 }}
-        />
+        <EmptyState icon="trending-up" title="Profit insights are on the way" description="We'll show margins once your sales and costs sync." style={{ marginTop: SP.lg }} />
       )}
 
       {tab === 'profit' && profit && (
@@ -115,104 +85,95 @@ export default function AnalyticsProfitScreen() {
           <View style={s.heroCard}>
             <Text style={s.heroEst}>Estimated</Text>
             <Text style={s.heroValue}>{profit.estimatedProfit.formatted}</Text>
-            <Text style={[s.heroMargin, { color: SUCCESS }]}>{profit.profitMargin.formatted} margin</Text>
+            <Text style={[s.heroMargin, { color: colors.success }]}>{profit.profitMargin.formatted} margin</Text>
             <Text style={s.heroDisclaimer}>Cost estimates may differ from actual figures</Text>
-            <MiniBar points={profit.profitChart} color={SUCCESS} />
+            <Sparkline points={profit.profitChart} color={colors.success} />
           </View>
 
           {/* Waterfall */}
-          <Text style={s.sectionTitle}>Profit Breakdown</Text>
-          <View style={s.card}>
+          <SectionTitle>Profit Breakdown</SectionTitle>
+          <Card>
             {profit.lineItems.map((item, i) => {
               const isTotal = item.label === 'Est. Profit';
               return (
-                <View key={item.label} style={[s.lineRow, i > 0 && s.divider, isTotal && s.totalRow]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[s.lineLabel, isTotal && { color: FG, fontFamily: FONT.bold }]}>{item.label}</Text>
-                    {item.isEstimate && !isTotal && (
-                      <Text style={s.estimateNote}>estimate</Text>
-                    )}
+                <View key={item.label}>
+                  {i > 0 && <CardDivider />}
+                  <View style={[s.lineRow, isTotal && s.totalRow]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.lineLabel, isTotal && { color: colors.foreground, fontFamily: FONT.bold }]}>{item.label}</Text>
+                      {item.isEstimate && !isTotal && <Text style={s.estimateNote}>estimate</Text>}
+                    </View>
+                    <Text style={[
+                      s.lineAmount,
+                      isTotal
+                        ? { color: colors.warning, fontSize: FS.md, fontFamily: FONT.bold }
+                        : item.isDeduction
+                          ? { color: colors.destructive }
+                          : { color: colors.success },
+                    ]}>
+                      {item.isDeduction ? `−$${Math.abs(item.amount).toLocaleString()}` : `$${item.amount.toLocaleString()}`}
+                    </Text>
                   </View>
-                  <Text style={[
-                    s.lineAmount,
-                    isTotal
-                      ? { color: GOLD, fontSize: 17, fontFamily: FONT.bold }
-                      : item.isDeduction
-                        ? { color: RED }
-                        : { color: SUCCESS }
-                  ]}>
-                    {item.isDeduction ? `−$${Math.abs(item.amount).toLocaleString()}` : `$${item.amount.toLocaleString()}`}
-                  </Text>
                 </View>
               );
             })}
-          </View>
+          </Card>
 
           {/* Key metrics */}
-          <Text style={s.sectionTitle}>Key Metrics</Text>
-          <View style={s.metricsRow}>
-            {[
-              { m: profit.grossRevenue,  color: FG       },
-              { m: profit.netRevenue,    color: PURPLE   },
-              { m: profit.profitMargin,  color: SUCCESS  },
-            ].map(item => (
-              <View key={item.m.key} style={s.metCard}>
-                <Text style={[s.metValue, { color: item.color }]}>{item.m.formatted}</Text>
-                <Text style={s.metLabel}>{item.m.label}</Text>
-                <Text style={[s.metChange, { color: item.m.trend === 'up' ? SUCCESS : RED }]}>
-                  {(item.m.changePct ?? 0) > 0 ? '+' : ''}{item.m.changePct?.toFixed(1) ?? '—'}%
-                </Text>
-              </View>
-            ))}
-          </View>
+          <SectionTitle>Key Metrics</SectionTitle>
+          <StatTileRow
+            items={[
+              { key: 'gross', label: profit.grossRevenue.label, value: profit.grossRevenue.formatted, changePct: profit.grossRevenue.changePct },
+              { key: 'net',   label: profit.netRevenue.label,   value: profit.netRevenue.formatted,   changePct: profit.netRevenue.changePct },
+              { key: 'margin', label: profit.profitMargin.label, value: profit.profitMargin.formatted, changePct: profit.profitMargin.changePct },
+            ]}
+          />
         </>
       )}
 
       {tab === 'payout' && !payout && (
-        <EmptyState
-          icon="dollar-sign"
-          title="Profit insights are on the way"
-          description="We'll show margins once your sales and costs sync."
-          style={{ marginTop: 24 }}
-        />
+        <EmptyState icon="dollar-sign" title="Payout insights are on the way" description="We'll show balances once your sales and payouts sync." style={{ marginTop: SP.lg }} />
       )}
 
       {tab === 'payout' && payout && (
         <>
           {/* Payout balance */}
           <View style={s.payoutCard}>
-            <View style={s.payoutRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <View style={{ flex: 1 }}>
                 <Text style={s.payoutLabel}>Available Balance</Text>
                 <Text style={s.payoutValue}>{payout.availableBalance.formatted}</Text>
               </View>
-              <View style={[s.nextPayoutBadge]}>
+              <View style={s.nextPayoutBadge}>
                 <Text style={s.nextPayoutDate}>Next payout</Text>
                 <Text style={s.nextPayoutAmt}>{payout.nextPayoutAmount.formatted}</Text>
-                <Text style={s.nextPayoutDate2}>{payout.nextPayoutDate}</Text>
+                <Text style={s.nextPayoutDate}>{payout.nextPayoutDate}</Text>
               </View>
             </View>
           </View>
 
-          <View style={s.card}>
+          <Card>
             {[
-              { label: 'Pending Balance',        value: payout.pendingBalance.formatted,         note: '' },
-              { label: 'Held Funds',             value: payout.heldFunds.formatted,              note: '' },
-              { label: 'Total Paid Out',         value: payout.totalPaidOut.formatted,           note: '' },
-              { label: 'Manufacturer Allocation',value: payout.manufacturerAllocation.formatted, note: 'est.' },
-              { label: 'Shipping Allocation',    value: payout.shippingAllocation.formatted,     note: 'est.' },
-              { label: 'Dispute Holds',          value: payout.disputeHolds.formatted,           note: '' },
-              { label: 'Refund Impact',          value: payout.refundImpact.formatted,           note: '' },
+              { label: 'Pending Balance',         value: payout.pendingBalance.formatted,         note: '' },
+              { label: 'Held Funds',              value: payout.heldFunds.formatted,              note: '' },
+              { label: 'Total Paid Out',          value: payout.totalPaidOut.formatted,           note: '' },
+              { label: 'Manufacturer Allocation', value: payout.manufacturerAllocation.formatted, note: 'est.' },
+              { label: 'Shipping Allocation',     value: payout.shippingAllocation.formatted,     note: 'est.' },
+              { label: 'Dispute Holds',           value: payout.disputeHolds.formatted,           note: '' },
+              { label: 'Refund Impact',           value: payout.refundImpact.formatted,           note: '' },
             ].map((row, i) => (
-              <View key={row.label} style={[s.payRowItem, i > 0 && s.divider]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.payRowLabel}>{row.label}</Text>
-                  {row.note ? <Text style={s.payRowNote}>{row.note}</Text> : null}
+              <View key={row.label}>
+                {i > 0 && <CardDivider />}
+                <View style={s.payRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.payRowLabel}>{row.label}</Text>
+                    {row.note ? <Text style={s.payRowNote}>{row.note}</Text> : null}
+                  </View>
+                  <Text style={s.payRowValue}>{row.value}</Text>
                 </View>
-                <Text style={s.payRowValue}>{row.value}</Text>
               </View>
             ))}
-          </View>
+          </Card>
           <Text style={s.payoutDisclaimer}>
             Payout figures are estimates. Actual amounts are confirmed by your payment provider.
           </Text>
@@ -224,52 +185,28 @@ export default function AnalyticsProfitScreen() {
   );
 }
 
-const createStyles = (colors: ReturnType<typeof useColors>) => {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT } = colors;
-  return StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   scroll:   { flex: 1, backgroundColor: 'transparent' },
-  content:  { paddingHorizontal: 16 },
-  loadWrap: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
-  header:   { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
-  backBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  pageTitle:{ fontSize: 22, fontFamily: FONT.bold, color: FG },
-  subtitle: { fontSize: 12, fontFamily: FONT.regular, color: MUTED },
-  iconBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  tabRow:   { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  tabBtn:   { flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
-  tabBtnActive:{},
-  tabBtnText:{ fontSize: 14, fontFamily: FONT.semibold, color: MUTED },
-  tabBtnTextActive:{},
-  heroCard: { backgroundColor: CARD_ELEVATED, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: BORDER_ACTIVE, marginBottom: 20, alignItems: 'center', gap: 4 },
-  heroEst:  { fontSize: 11, fontFamily: FONT.medium, color: SUBTLE, letterSpacing: 0.8, textTransform: 'uppercase' },
-  heroValue:{ fontSize: 44, fontFamily: FONT.bold, color: FG },
-  heroMargin:{ fontSize: 15, fontFamily: FONT.semibold },
-  heroDisclaimer:{ fontSize: 11, fontFamily: FONT.regular, color: SUBTLE, marginBottom: 8 },
-  sectionTitle:{ fontSize: 15, fontFamily: FONT.semibold, color: FG, marginBottom: 10 },
-  card:     { backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, marginBottom: 20, overflow: 'hidden' },
-  divider:  { height: 1, backgroundColor: BORDER, marginHorizontal: 16 },
-  lineRow:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
-  totalRow: { backgroundColor: CARD_ELEVATED, paddingVertical: 16 },
-  lineLabel:{ fontSize: 13, fontFamily: FONT.regular, color: MUTED },
-  estimateNote:{ fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginTop: 1 },
-  lineAmount:{ fontSize: 14, fontFamily: FONT.semibold },
-  metricsRow:{ flexDirection: 'row', gap: 10, marginBottom: 20 },
-  metCard:  { flex: 1, backgroundColor: CARD, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: BORDER },
-  metValue: { fontSize: 17, fontFamily: FONT.bold, marginBottom: 2 },
-  metLabel: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginBottom: 2 },
-  metChange:{ fontSize: FS.xs, fontFamily: FONT.medium },
-  payoutCard:{ backgroundColor: CARD_ELEVATED, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: BORDER_ACTIVE, marginBottom: 20 },
-  payoutRow:{ flexDirection: 'row', alignItems: 'center' },
-  payoutLabel:{ fontSize: 12, fontFamily: FONT.medium, color: MUTED, marginBottom: 4 },
-  payoutValue:{ fontSize: 36, fontFamily: FONT.bold, color: FG },
-  nextPayoutBadge:{ backgroundColor: SUCCESS_DIM, borderRadius: 12, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: SUCCESS + '44' },
-  nextPayoutDate:{ fontSize: FS.xs, fontFamily: FONT.regular, color: SUCCESS },
-  nextPayoutAmt:{ fontSize: 17, fontFamily: FONT.bold, color: SUCCESS },
-  nextPayoutDate2:{ fontSize: FS.xs, fontFamily: FONT.regular, color: SUCCESS },
-  payRowItem:{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
-  payRowLabel:{ fontSize: 13, fontFamily: FONT.regular, color: MUTED },
-  payRowNote:{ fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginTop: 1 },
-  payRowValue:{ fontSize: 14, fontFamily: FONT.semibold, color: FG },
-  payoutDisclaimer:{ fontSize: 11, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', paddingHorizontal: 16, marginBottom: 12 },
-  });
-};
+  content:  { paddingHorizontal: SP.md },
+  heroCard: { backgroundColor: colors.elevated, borderRadius: RADIUS.lg, padding: SP.lg, borderWidth: 1, borderColor: colors.border, marginBottom: SP.lg, alignItems: 'center', gap: 4 },
+  heroEst:  { fontSize: FS.xs, fontFamily: FONT.medium, color: colors.subtle, letterSpacing: 0.8, textTransform: 'uppercase' },
+  heroValue:{ fontSize: 44, fontFamily: FONT.bold, color: colors.foreground },
+  heroMargin:{ fontSize: FS.md, fontFamily: FONT.semibold },
+  heroDisclaimer:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.subtle, marginBottom: SP.sm },
+  lineRow:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, minHeight: COMP.minTouchTarget },
+  totalRow: { backgroundColor: colors.elevated, paddingVertical: SP.md },
+  lineLabel:{ fontSize: FS.sm, fontFamily: FONT.regular, color: colors.mutedForeground },
+  estimateNote:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.subtle, marginTop: 1 },
+  lineAmount:{ fontSize: FS.base, fontFamily: FONT.semibold },
+  payoutCard:{ backgroundColor: colors.elevated, borderRadius: RADIUS.lg, padding: SP.lg, borderWidth: 1, borderColor: colors.border, marginBottom: SP.lg },
+  payoutLabel:{ fontSize: FS.xs, fontFamily: FONT.medium, color: colors.mutedForeground, marginBottom: 4 },
+  payoutValue:{ fontSize: 36, fontFamily: FONT.bold, color: colors.foreground },
+  nextPayoutBadge:{ backgroundColor: colors.success + '22', borderRadius: RADIUS.sm, padding: SP.sm, alignItems: 'center', borderWidth: 1, borderColor: colors.success + '44' },
+  nextPayoutDate:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.success },
+  nextPayoutAmt:{ fontSize: FS.lg, fontFamily: FONT.bold, color: colors.success },
+  payRow:{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, minHeight: COMP.minTouchTarget },
+  payRowLabel:{ fontSize: FS.sm, fontFamily: FONT.regular, color: colors.mutedForeground },
+  payRowNote:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.subtle, marginTop: 1 },
+  payRowValue:{ fontSize: FS.base, fontFamily: FONT.semibold, color: colors.foreground },
+  payoutDisclaimer:{ fontSize: FS.xs, fontFamily: FONT.regular, color: colors.subtle, textAlign: 'center', paddingHorizontal: SP.md, marginBottom: SP.sm },
+});

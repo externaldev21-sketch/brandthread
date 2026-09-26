@@ -7,10 +7,13 @@
  * per-product `dropId` field on PATCH /api/products/:id — confirmed already
  * updatable server-side, no new backend needed).
  *
- * Date/time entry is a simple YYYY-MM-DD + HH:MM (24h) pair rather than a
- * native date-time picker — this repo has no date-time-picker dependency
- * installed, and adding one was out of scope for this pass. The wall-clock
- * value is converted to the correct UTC instant via lib/dropSchedule's
+ * Date/time entry: the underlying value is still a YYYY-MM-DD + HH:MM (24h)
+ * pair — this repo has no native date-time-picker dependency installed, and
+ * adding one was out of scope for this pass — but the UI is a scrollable
+ * day-chip + time-chip picker (`DateChipRow`/`TimeChipRow` below) instead of
+ * bare text fields, with a "Custom" toggle that reveals the raw text inputs
+ * for edge cases (past/far-future dates, odd minutes). The wall-clock value
+ * is converted to the correct UTC instant via lib/dropSchedule's
  * zonedTimeToUtc, which is unit-tested for DST + non-whole-hour offsets.
  */
 import React, { useEffect, useMemo, useState } from 'react';
@@ -26,6 +29,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { LoadingSkeleton } from '@/components/BrandthreadUI';
 import { FONT, FS, RADIUS, SP } from '@/lib/theme';
 import { zonedTimeToUtc, listSupportedTimeZones } from '@/lib/dropSchedule';
 
@@ -59,6 +63,102 @@ function parseDateAndTime(dateStr: string, timeStr: string): { year: number; mon
   const hour = Number(tm[1]), minute = Number(tm[2]);
   if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59) return null;
   return { year, month, day, hour, minute };
+}
+
+// ─── Chip-based date/time pickers ──────────────────────────────────────────
+// Pure-UI helpers over the same YYYY-MM-DD / HH:MM strings the form already
+// uses — no new native dependency, no change to parsing/save logic.
+
+function dateStrForOffset(offsetDays: number): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + offsetDays);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+const DAY_CHIP_COUNT = 21;
+const DAY_CHIPS = Array.from({ length: DAY_CHIP_COUNT }, (_, i) => {
+  const value = dateStrForOffset(i);
+  const d = new Date();
+  d.setDate(d.getDate() + i);
+  const label = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  return { value, label };
+});
+
+const TIME_CHIPS = Array.from({ length: 48 }, (_, i) => {
+  const hour = Math.floor(i / 2);
+  const minute = i % 2 === 0 ? 0 : 30;
+  const value = `${pad(hour)}:${pad(minute)}`;
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  const ampm = hour < 12 ? 'AM' : 'PM';
+  const label = `${h12}:${pad(minute)} ${ampm}`;
+  return { value, label };
+});
+
+function Chip({ label, active, onPress, theme }: { label: string; active: boolean; onPress: () => void; theme: any }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[
+        styles.chip,
+        { borderColor: active ? theme.accent : theme.border, backgroundColor: active ? theme.accent : theme.card },
+      ]}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+    >
+      <Text style={[styles.chipText, { color: active ? theme.onAccent : theme.text }]} numberOfLines={1}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function DateTimeChipPicker({
+  dateValue, timeValue, onDateChange, onTimeChange, theme,
+}: {
+  dateValue: string; timeValue: string; onDateChange: (v: string) => void; onTimeChange: (v: string) => void; theme: any;
+}) {
+  const [customOpen, setCustomOpen] = useState(false);
+  // A date/time outside the 21-day quick-pick range (e.g. editing an older
+  // drop) still needs to render as selected — fall back to Custom for those.
+  const dateInChips = DAY_CHIPS.some(c => c.value === dateValue);
+  const timeInChips = TIME_CHIPS.some(c => c.value === timeValue);
+  const showCustom = customOpen || (!!dateValue && !dateInChips) || (!!timeValue && !timeInChips);
+
+  return (
+    <View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+        {DAY_CHIPS.map(c => (
+          <Chip key={c.value} label={c.label} active={dateValue === c.value} onPress={() => onDateChange(c.value)} theme={theme} />
+        ))}
+      </ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chipRow, { marginTop: 8 }]}>
+        {TIME_CHIPS.map(c => (
+          <Chip key={c.value} label={c.label} active={timeValue === c.value} onPress={() => onTimeChange(c.value)} theme={theme} />
+        ))}
+      </ScrollView>
+      <TouchableOpacity onPress={() => setCustomOpen(v => !v)} style={styles.customToggle} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <Feather name={showCustom ? 'chevron-up' : 'chevron-down'} size={13} color={theme.muted} />
+        <Text style={[styles.customToggleText, { color: theme.muted }]}>Enter an exact date & time</Text>
+      </TouchableOpacity>
+      {showCustom && (
+        <View style={{ flexDirection: 'row', gap: SP.sm, marginTop: 8 }}>
+          <TextInput
+            style={[styles.input, { flex: 1.4, color: theme.text, borderColor: theme.border, backgroundColor: theme.card }]}
+            value={dateValue}
+            onChangeText={onDateChange}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor={theme.muted}
+          />
+          <TextInput
+            style={[styles.input, { flex: 1, color: theme.text, borderColor: theme.border, backgroundColor: theme.card }]}
+            value={timeValue}
+            onChangeText={onTimeChange}
+            placeholder="HH:MM"
+            placeholderTextColor={theme.muted}
+          />
+        </View>
+      )}
+    </View>
+  );
 }
 
 export default function SellerDropCreate() {
@@ -298,8 +398,14 @@ export default function SellerDropCreate() {
 
   if (loading) {
     return (
-      <View style={[styles.center, { backgroundColor: theme.background }]}>
-        <ActivityIndicator color={theme.accent} size="large" />
+      <View style={[styles.root, { backgroundColor: theme.background }]}>
+        <ScreenHeader title={isEdit ? 'Edit drop' : 'New drop'} />
+        <View style={{ padding: SP.md, gap: SP.lg }}>
+          <LoadingSkeleton height={52} />
+          <LoadingSkeleton height={40} />
+          <LoadingSkeleton height={160} />
+          <LoadingSkeleton height={90} />
+        </View>
       </View>
     );
   }
@@ -389,22 +495,13 @@ export default function SellerDropCreate() {
 
           <View style={styles.field}>
             <Text style={[styles.label, { color: theme.muted }]}>LAUNCH DATE & TIME</Text>
-            <View style={{ flexDirection: 'row', gap: SP.sm }}>
-              <TextInput
-                style={[styles.input, { flex: 1.4, color: theme.text, borderColor: theme.border, backgroundColor: theme.card }]}
-                value={releaseDate}
-                onChangeText={setReleaseDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={theme.muted}
-              />
-              <TextInput
-                style={[styles.input, { flex: 1, color: theme.text, borderColor: theme.border, backgroundColor: theme.card }]}
-                value={releaseTime}
-                onChangeText={setReleaseTime}
-                placeholder="HH:MM"
-                placeholderTextColor={theme.muted}
-              />
-            </View>
+            <DateTimeChipPicker
+              dateValue={releaseDate}
+              timeValue={releaseTime}
+              onDateChange={setReleaseDate}
+              onTimeChange={setReleaseTime}
+              theme={theme}
+            />
             <TouchableOpacity
               style={[styles.tzButton, { borderColor: theme.border, backgroundColor: theme.card }]}
               onPress={() => setTzPickerOpen(true)}
@@ -424,20 +521,13 @@ export default function SellerDropCreate() {
               <Switch value={hasEndDate} onValueChange={setHasEndDate} trackColor={{ true: theme.accent }} />
             </View>
             {hasEndDate && (
-              <View style={{ flexDirection: 'row', gap: SP.sm, marginTop: 8 }}>
-                <TextInput
-                  style={[styles.input, { flex: 1.4, color: theme.text, borderColor: theme.border, backgroundColor: theme.card }]}
-                  value={endDate}
-                  onChangeText={setEndDate}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={theme.muted}
-                />
-                <TextInput
-                  style={[styles.input, { flex: 1, color: theme.text, borderColor: theme.border, backgroundColor: theme.card }]}
-                  value={endTime}
-                  onChangeText={setEndTime}
-                  placeholder="HH:MM"
-                  placeholderTextColor={theme.muted}
+              <View style={{ marginTop: 8 }}>
+                <DateTimeChipPicker
+                  dateValue={endDate}
+                  timeValue={endTime}
+                  onDateChange={setEndDate}
+                  onTimeChange={setEndTime}
+                  theme={theme}
                 />
               </View>
             )}
@@ -597,4 +687,9 @@ const styles = StyleSheet.create({
   secondaryBtn: { flexDirection: 'row', minHeight: 46, borderWidth: 1, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', gap: 8 },
   tzHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },
   tzRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: 14, borderBottomWidth: 1 },
+  chipRow: { flexDirection: 'row', gap: 8, paddingRight: SP.md },
+  chip: { borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: 14, minHeight: 40, alignItems: 'center', justifyContent: 'center' },
+  chipText: { fontFamily: FONT.semibold, fontSize: FS.sm },
+  customToggle: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10, alignSelf: 'flex-start' },
+  customToggleText: { fontFamily: FONT.medium, fontSize: FS.xs },
 });

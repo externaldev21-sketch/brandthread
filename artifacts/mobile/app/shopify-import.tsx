@@ -13,6 +13,8 @@ import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { Header } from '@/components/layout';
 import { useApi } from '@/hooks/useApi';
+import { BrandthreadCard, PrimaryButton, EmptyState, LoadingSkeleton, SkeletonText } from '@/components/BrandthreadUI';
+import { COMP } from '@/lib/theme';
 
 type ShopifyProductRow = {
   shopifyProductId: string;
@@ -123,10 +125,14 @@ export default function ShopifyImportScreen() {
     <View style={{ flex: 1 }}>
       <Header title="Import from Shopify" />
       {loadingStatus ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
+        <View style={{ padding: 20, gap: 12 }}>
+          <LoadingSkeleton height={140} />
+          <SkeletonText width="60%" height={14} />
+          <LoadingSkeleton height={52} />
+        </View>
       ) : !connected ? (
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
-          <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <BrandthreadCard style={styles.hero}>
             <View style={[styles.heroIcon, { backgroundColor: '#95BF4722' }]}>
               <Feather name="shopping-bag" size={22} color="#5E8E3E" />
             </View>
@@ -135,7 +141,7 @@ export default function ShopifyImportScreen() {
               Connect your Shopify store to import titles, photos, variants, prices and stock. This only reads your
               catalog — it never touches or forwards orders.
             </Text>
-          </View>
+          </BrandthreadCard>
           <Text style={[styles.label, { color: colors.mutedForeground }]}>Shopify store domain</Text>
           <TextInput
             style={[styles.input, { backgroundColor: colors.secondary, color: colors.foreground, borderColor: colors.border }]}
@@ -146,15 +152,13 @@ export default function ShopifyImportScreen() {
             autoCapitalize="none"
             autoCorrect={false}
           />
-          <TouchableOpacity
-            style={[styles.connectBtn, { backgroundColor: colors.primary, opacity: connecting ? 0.7 : 1 }]}
+          <PrimaryButton
+            label={connecting ? 'Opening Shopify…' : 'Connect Shopify'}
             onPress={handleConnect}
             disabled={connecting}
-            activeOpacity={0.85}
-          >
-            {connecting ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Feather name="link" size={16} color={colors.primaryForeground} />}
-            <Text style={[styles.connectBtnText, { color: colors.primaryForeground }]}>{connecting ? 'Opening Shopify…' : 'Connect Shopify'}</Text>
-          </TouchableOpacity>
+            loading={connecting}
+            icon="link"
+          />
           <Text style={[styles.infoText, { color: colors.mutedForeground }]}>
             Brandthread only asks for read access to your products and inventory here — never order permissions.
           </Text>
@@ -178,7 +182,17 @@ export default function ShopifyImportScreen() {
           </View>
 
           {loadingProducts ? (
-            <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
+            <View style={{ padding: 16, gap: 8 }}>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <View key={i} style={[styles.productRow, { borderColor: colors.border, gap: 12 }]}>
+                  <LoadingSkeleton height={44} style={{ width: 44, borderRadius: 8 }} />
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <SkeletonText width="70%" height={13} />
+                    <SkeletonText width="40%" height={11} />
+                  </View>
+                </View>
+              ))}
+            </View>
           ) : (
             <FlatList
               data={products}
@@ -189,6 +203,9 @@ export default function ShopifyImportScreen() {
                   style={[styles.productRow, { borderColor: colors.border }]}
                   onPress={() => !item.alreadyImported && toggleSelected(item.shopifyProductId)}
                   activeOpacity={item.alreadyImported ? 1 : 0.7}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: selected.has(item.shopifyProductId), disabled: item.alreadyImported }}
+                  hitSlop={item.alreadyImported ? undefined : { top: 4, bottom: 4, left: 4, right: 4 }}
                 >
                   {item.image ? (
                     <Image source={{ uri: item.image }} style={styles.productImage} />
@@ -212,7 +229,13 @@ export default function ShopifyImportScreen() {
                   )}
                 </TouchableOpacity>
               )}
-              ListEmptyComponent={<Text style={[styles.infoText, { color: colors.mutedForeground, marginTop: 30 }]}>No products found in your Shopify store.</Text>}
+              ListEmptyComponent={(
+                <EmptyState
+                  icon="shopping-bag"
+                  title="No products found"
+                  description="We didn't find any products in your connected Shopify store."
+                />
+              )}
             />
           )}
 
@@ -230,17 +253,13 @@ export default function ShopifyImportScreen() {
           )}
 
           <View style={[styles.footer, { borderTopColor: colors.border, backgroundColor: colors.background }]}>
-            <TouchableOpacity
-              style={[styles.importBtn, { backgroundColor: colors.primary, opacity: importing || selected.size === 0 ? 0.6 : 1 }]}
+            <PrimaryButton
+              label={importing ? 'Importing…' : `Import ${selected.size || ''} product${selected.size === 1 ? '' : 's'}`}
               onPress={handleImport}
               disabled={importing || selected.size === 0}
-              activeOpacity={0.85}
-            >
-              {importing ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Feather name="download" size={16} color={colors.primaryForeground} />}
-              <Text style={[styles.importBtnText, { color: colors.primaryForeground }]}>
-                {importing ? 'Importing…' : `Import ${selected.size || ''} product${selected.size === 1 ? '' : 's'}`}
-              </Text>
-            </TouchableOpacity>
+              loading={importing}
+              icon="download"
+            />
           </View>
         </View>
       )}

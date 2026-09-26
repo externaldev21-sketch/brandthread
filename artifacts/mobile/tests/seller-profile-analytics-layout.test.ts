@@ -10,6 +10,12 @@ const analyticsSource = fs.readFileSync(
   path.resolve(__dirname, '../app/(tabs)/analytics.tsx'),
   'utf8',
 );
+// The zero-safe trend guard now lives in the shared analytics kit (reused by
+// all seller analytics screens) rather than being duplicated per screen.
+const analyticsKitSource = fs.readFileSync(
+  path.resolve(__dirname, '../components/analytics/AnalyticsKit.tsx'),
+  'utf8',
+);
 
 describe('seller profile action layout', () => {
   it('keeps only My Profile and Messages in the quick-action row', () => {
@@ -53,7 +59,7 @@ describe('seller analytics overview layout', () => {
   });
 
   it('uses zero-safe data and omits fabricated trends and traffic sources', () => {
-    expect(analyticsSource).toContain('Number.isFinite(changePct)');
+    expect(analyticsKitSource).toContain('Number.isFinite(changePct)');
     expect(analyticsSource).not.toContain('TikTok');
     expect(analyticsSource).not.toContain('-65%');
   });

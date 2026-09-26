@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { AppState, View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { AppState, View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -10,6 +10,7 @@ import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme, AppThemePreset } from '@/contexts/AppThemeContext';
 import { Header } from '@/components/layout';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { EmptyState, LoadingSkeleton } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 import { isManagerRole, hasPayoutsAccess } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
@@ -190,8 +191,9 @@ export default function PayoutsScreen() {
     return (
       <View style={styles.root}>
         <Header title="Payouts" onBack={() => { haptic(); leaveSetupDestination(); }} />
-        <View style={styles.accessLoading}>
-            <ActivityIndicator color={theme.accent} />
+        <View style={{ padding: SP.md, gap: SP.sm }}>
+          <LoadingSkeleton height={140} />
+          <LoadingSkeleton height={44} />
         </View>
       </View>
     );
@@ -218,16 +220,19 @@ export default function PayoutsScreen() {
         }]}
       />
 
-      {/* Balance cards */}
-      <View style={styles.balanceRow}>
-        <View style={[styles.balanceCard, { flex: 1, marginRight: SP.sm }]}>
-          <Text style={styles.balanceLabel}>Available</Text>
-          <Text style={styles.balanceAmount}>{availFmt}</Text>
-          <Text style={styles.balanceSub}>Next: {nextDate}</Text>
-        </View>
-        <View style={[styles.balanceCard, { flex: 1 }]}>
-          <Text style={styles.balanceLabel}>Pending</Text>
-          <Text style={[styles.balanceAmount, { color: theme.muted }]}>{pendFmt}</Text>
+      {/* Balance hero */}
+      <View style={styles.balanceHero}>
+        <Text style={styles.balanceHeroLabel}>Available balance</Text>
+        {loading ? (
+          <LoadingSkeleton height={44} style={{ width: 160, marginTop: 6, marginBottom: 6 }} />
+        ) : (
+          <Text style={styles.balanceHeroAmount}>{availFmt}</Text>
+        )}
+        <Text style={styles.balanceHeroSub}>Next payout {nextDate}</Text>
+        <View style={styles.balanceDivider} />
+        <View style={styles.balancePendingRow}>
+          <Text style={styles.balancePendingLabel}>Pending</Text>
+          <Text style={styles.balancePendingAmount}>{pendFmt}</Text>
         </View>
       </View>
 
@@ -265,18 +270,21 @@ export default function PayoutsScreen() {
       {activeTab === 'payouts' ? (
         <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + SP.xl }]}>
           {loading && !isPreview ? (
-            <ActivityIndicator color={theme.accent} style={{ marginTop: 40 }} />
+            <View style={{ gap: 10 }}>
+              {[0, 1, 2].map(i => <LoadingSkeleton key={i} height={56} />)}
+            </View>
           ) : loadError ? (
             <ErrorState message="Couldn't load your payouts." onRetry={() => { haptic(); void load(); }} />
           ) : payouts.length === 0 ? (
-            <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-              <Feather name="inbox" size={28} color={theme.muted} />
-              <Text style={{ color: theme.muted, fontSize: FS.sm, fontFamily: FONT.regular, marginTop: 10 }}>
-                {isPreview
-                  ? 'No payout history in this preview'
-                  : balance?.connected === false ? 'Connect Stripe to receive payouts' : 'No payouts yet'}
-              </Text>
-            </View>
+            <EmptyState
+              icon="inbox"
+              title={isPreview ? 'No payout history in this preview' : balance?.connected === false ? 'Connect Stripe to get paid' : 'No payouts yet'}
+              description={isPreview
+                ? 'This read-only preview does not load live payouts.'
+                : balance?.connected === false
+                  ? 'Add a bank account under Bank account to start receiving payouts.'
+                  : 'Payouts show up here once your available balance clears.'}
+            />
           ) : (
             payouts.map((p) => {
               const cfg = statusConfig(p.status, theme);
@@ -452,8 +460,14 @@ const createStyles = (theme: AppThemePreset) => {
   devBanner:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: `${warning}15`, paddingHorizontal: SP.md, paddingVertical: 8 },
   devBannerText:{ color: warning, fontSize: FS.xs, fontFamily: FONT.medium },
   previewNotice:{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: `${warning}15`, marginHorizontal: SP.md, paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.md },
-  balanceRow:   { flexDirection: 'row', padding: SP.md },
-  balanceCard:  { backgroundColor: card, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: border },
+  balanceHero:  { margin: SP.md, backgroundColor: card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: border, padding: SP.lg, alignItems: 'center' },
+  balanceHeroLabel: { color: muted, fontSize: FS.sm, fontFamily: FONT.medium },
+  balanceHeroAmount: { color: text, fontSize: 40, fontFamily: FONT.bold, letterSpacing: -0.5, marginTop: 6, marginBottom: 2 },
+  balanceHeroSub: { color: subtle, fontSize: FS.xs, fontFamily: FONT.regular },
+  balanceDivider: { alignSelf: 'stretch', height: 1, backgroundColor: border, marginVertical: SP.md },
+  balancePendingRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  balancePendingLabel: { color: muted, fontSize: FS.xs, fontFamily: FONT.medium },
+  balancePendingAmount: { color: muted, fontSize: FS.sm, fontFamily: FONT.semibold },
   balanceLabel: { color: muted, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: 4 },
   balanceAmount:{ color: text, fontSize: FS.xl, fontFamily: FONT.semibold, marginBottom: 2 },
   balanceSub:   { color: subtle, fontSize: FS.xs, fontFamily: FONT.regular },

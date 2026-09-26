@@ -9,7 +9,7 @@ import {
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import {
-  BrandthreadCard, PrimaryButton, SectionHeader, FilterChip, PressableScale,
+  BrandthreadCard, PrimaryButton, SectionHeader, FilterChip, PressableScale, LoadingSkeleton,
 } from '@/components/BrandthreadUI';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ListRow } from '@/components/ui/ListRow';
@@ -78,11 +78,16 @@ export default function StoreSettingsScreen() {
     analyticsEnabled: false,
   });
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useFocusEffect(useCallback(() => {
+    let active = true;
     getStorefront().then(s => {
+      if (!active) return;
       setForm(s.settings);
-    });
+      setLoading(false);
+    }).catch(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, []));
 
   const patch = (partial: Partial<StoreSettings>) => setForm(f => ({ ...f, ...partial }));
@@ -115,6 +120,13 @@ export default function StoreSettingsScreen() {
         )}
       />
 
+      {loading ? (
+        <View style={{ padding: SP.md, gap: SP.md }}>
+          <LoadingSkeleton height={160} />
+          <LoadingSkeleton height={160} />
+          <LoadingSkeleton height={100} />
+        </View>
+      ) : (
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={ss.scroll}>
 
         {/* STORE IDENTITY */}
@@ -288,6 +300,7 @@ export default function StoreSettingsScreen() {
 
         <PrimaryButton label="Save Settings" onPress={handleSave} loading={saving} style={ss.saveBtn} />
       </ScrollView>
+      )}
     </View>
   );
 }
@@ -334,9 +347,9 @@ function makeStyles(colors: Colors) {
     urlSuffix: { fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.medium, color: colors.mutedForeground },
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
     statusChip: {
-      paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.pill,
+      paddingHorizontal: 14, paddingVertical: 6, borderRadius: RADIUS.pill,
       borderWidth: 1, borderColor: colors.border,
-      minHeight: 30, justifyContent: 'center',
+      minHeight: 44, justifyContent: 'center',
     },
     statusChipLabel: { fontSize: FS.sm, lineHeight: 17, fontFamily: FONT.medium },
     saveBtn: { marginHorizontal: SP.md, marginTop: SP.lg },
