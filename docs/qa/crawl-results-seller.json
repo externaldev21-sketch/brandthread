@@ -1,0 +1,241 @@
+[
+  {
+    "role": "seller",
+    "viewport": "iphone-390x844",
+    "route": "/(tabs)",
+    "reachedFrom": "start",
+    "navError": null,
+    "consoleErrors": [
+      "In HTML, %s cannot be a descendant of <%s>.\nThis will cause a hydration error.%s <button> button \n\n  ...\n    <ResponsiveContainer maxWidth={1080}>\n      <View style={[...]}>\n        <div dir={null} ref={function forwardRef} className=\"css-view-g...\" style={{width:\"100%\", ...}}>\n          <View style",
+      "<%s> cannot contain a nested %s.\nSee this log for the ancestor stack trace. button <button>",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [],
+    "networkErrors": [],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "screenshot": "docs/qa/screenshots/seller-iphone-390x844-1-_tabs_.png",
+    "candidateDeadClicks": [
+      "Brandthread startup ready",
+      "Seller dashboard scroll position",
+      "Show Total sales in the chart"
+    ],
+    "interactiveElementCount": 34
+  },
+  {
+    "role": "seller",
+    "viewport": "iphone-390x844",
+    "route": "/(tabs)/products",
+    "reachedFrom": "start",
+    "navError": null,
+    "consoleErrors": [
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [],
+    "networkErrors": [],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "screenshot": "docs/qa/screenshots/seller-iphone-390x844-2-_tabs_products.png",
+    "candidateDeadClicks": [
+      "Brandthread startup ready",
+      "Products, choose a view",
+      "More product actions"
+    ],
+    "interactiveElementCount": 29
+  },
+  {
+    "role": "seller",
+    "viewport": "iphone-390x844",
+    "route": "/(tabs)/orders",
+    "reachedFrom": "start",
+    "navError": null,
+    "consoleErrors": [
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [],
+    "networkErrors": [],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "screenshot": "docs/qa/screenshots/seller-iphone-390x844-3-_tabs_orders.png",
+    "candidateDeadClicks": [
+      "Brandthread startup ready",
+      "Choose order view",
+      "More order actions"
+    ],
+    "interactiveElementCount": 28
+  },
+  {
+    "role": "seller",
+    "viewport": "iphone-390x844",
+    "route": "/(tabs)/profile",
+    "reachedFrom": "start",
+    "navError": null,
+    "consoleErrors": [
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [],
+    "networkErrors": [],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "screenshot": "docs/qa/screenshots/seller-iphone-390x844-4-_tabs_profile.png",
+    "candidateDeadClicks": [
+      "Brandthread startup ready",
+      "profile-hero",
+      "0 Videos"
+    ],
+    "interactiveElementCount": 38
+  },
+  {
+    "role": "seller",
+    "viewport": "iphone-390x844",
+    "route": "/add-product?from=seller-setup",
+    "reachedFrom": "/(tabs) -> click \"Seller dashboard scroll\"",
+    "navError": null,
+    "consoleErrors": [
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [],
+    "networkErrors": [],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "screenshot": "docs/qa/screenshots/seller-iphone-390x844-5-_add_product_from_seller_setup.png",
+    "candidateDeadClicks": [
+      "Brandthread startup ready",
+      "Save draft",
+      "Step 1: Photos"
+    ],
+    "interactiveElementCount": 22
+  },
+  {
+    "role": "seller",
+    "viewport": "iphone-390x844",
+    "route": "/activity-center",
+    "reachedFrom": "/(tabs) -> click \"Activity\"",
+    "navError": null,
+    "consoleErrors": [
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [],
+    "networkErrors": [],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "screenshot": "docs/qa/screenshots/seller-iphone-390x844-6-_activity_center.png",
+    "candidateDeadClicks": [
+      "Brandthread startup ready",
+      "Go back from Activity",
+      "All",
+      "Orders",
+      "Social"
+    ],
+    "interactiveElementCount": 23
+  },
+  {
+    "role": "seller",
+    "viewport": "iphone-390x844",
+    "route": "/add-product",
+    "reachedFrom": "/(tabs)/products -> click \"Add product\"",
+    "navError": null,
+    "consoleErrors": [
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [],
+    "networkErrors": [],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "screenshot": "docs/qa/screenshots/seller-iphone-390x844-7-_add_product.png",
+    "candidateDeadClicks": [
+      "Brandthread startup ready",
+      "Go back from Add Product",
+      "Save draft",
+      "Step 1: Photos (click threw: Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/add-product?bt_preview=seller\nCall log:\n\u001b[2m  - n)",
+      "Step 2: Details (click threw: Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/add-product?bt_preview=seller\nCall log:\n\u001b[2m  - n)"
+    ],
+    "interactiveElementCount": 22
+  },
+  {
+    "role": "seller",
+    "viewport": "iphone-390x844",
+    "route": "/create-post",
+    "reachedFrom": "/(tabs)/profile -> click \"Create your first story\"",
+    "navError": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/create-post?bt_preview=seller\nCall log:\n\u001b[2m  - navigating to \"http://localhost:8081/create-post?bt_preview=seller\", waiting until \"networkidle\"\u001b[22m\n",
+    "consoleErrors": [],
+    "pageErrors": [],
+    "networkErrors": [],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": true,
+    "looksLikeErrorBoundary": false,
+    "screenshot": "docs/qa/screenshots/seller-iphone-390x844-8-_create_post.png",
+    "candidateDeadClicks": [],
+    "interactiveElementCount": 0
+  },
+  {
+    "role": "seller",
+    "viewport": "iphone-390x844",
+    "route": "/connections?type=following",
+    "reachedFrom": "/(tabs)/profile -> click \"0 Following\"",
+    "navError": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/connections?type=following&bt_preview=seller\nCall log:\n\u001b[2m  - navigating to \"http://localhost:8081/connections?type=following&bt_preview=seller\", waiting until \"networkidle\"\u001b[22m\n",
+    "consoleErrors": [],
+    "pageErrors": [],
+    "networkErrors": [],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": true,
+    "looksLikeErrorBoundary": false,
+    "screenshot": "docs/qa/screenshots/seller-iphone-390x844-9-_connections_type_following.png",
+    "candidateDeadClicks": [],
+    "interactiveElementCount": 0
+  },
+  {
+    "role": "seller",
+    "viewport": "iphone-390x844",
+    "route": "/",
+    "reachedFrom": "/add-product?from=seller-setup -> click \"Go back from Add Product\"",
+    "navError": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8081/?bt_preview=seller\nCall log:\n\u001b[2m  - navigating to \"http://localhost:8081/?bt_preview=seller\", waiting until \"networkidle\"\u001b[22m\n",
+    "consoleErrors": [],
+    "pageErrors": [],
+    "networkErrors": [],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": true,
+    "looksLikeErrorBoundary": false,
+    "screenshot": "docs/qa/screenshots/seller-iphone-390x844-10-_.png",
+    "candidateDeadClicks": [],
+    "interactiveElementCount": 0
+  }
+]
