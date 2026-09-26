@@ -1,9 +1,9 @@
 import React from 'react';
-import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 export type BuyerNavIconName =
   | 'home' | 'discover' | 'inbox' | 'search' | 'activity' | 'profile'
-  | 'close' | 'friends' | 'filters'
+  | 'close' | 'friends' | 'filters' | 'live-tv'
   // Seller bar
   | 'dashboard' | 'products' | 'orders' | 'studio';
 
@@ -95,6 +95,14 @@ export function BuyerNavIcon({
           <Path d="M2.9 19.2c.7-3.2 3-5 6.1-5s5.4 1.8 6.1 5" fill="none" {...common} />
           <Path d="M15.2 5.4a3.2 3.2 0 0 1 0 6.3" fill="none" {...common} />
           <Path d="M17.3 14.4c2 .6 3.3 2.2 3.8 4.8" fill="none" {...common} />
+        </Svg>
+      );
+    case 'live-tv':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Rect x={2} y={4} width={20} height={14.5} rx={2.2} fill="none" {...common} />
+          <Path d="M9 21h6m-3-2.5V21" fill="none" {...common} />
+          <SvgText x={12} y={13.6} textAnchor="middle" fill={color} fontSize={6.4} fontWeight="700">LIVE</SvgText>
         </Svg>
       );
     case 'filters':

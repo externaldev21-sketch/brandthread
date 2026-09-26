@@ -51,6 +51,15 @@ describe('screens behind the floating buyer bar', () => {
 describe('buyer Home feed behind the bar', () => {
   const feed = read('app/(tabs)/feed.tsx');
 
+  it('keeps the live shortcut in the same icon slot as Friends, not a wide preview pill', () => {
+    const icon = read('components/buyer-nav/BuyerNavIcon.tsx');
+    expect(feed).toContain('<BuyerNavIcon name="live-tv" color={ON_DARK} size={24} strokeWidth={1.9} />');
+    expect(feed).toContain('testID="buyer-home-live"');
+    expect(feed).not.toContain('styles.liveJumpBtn');
+    expect(icon).toContain("case 'live-tv':");
+    expect(icon).toContain('>LIVE</SvgText>');
+  });
+
   it('plays edge to edge and starts every overlay above the bar', () => {
     expect(feed).toContain('const isBuyerSurface = buyerMode || showFashionPreview;');
     // bottomClearance is exactly the tab bar's own zone now (no added

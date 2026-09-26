@@ -3244,24 +3244,17 @@ export default function FeedScreen({
               </TouchableOpacity>
               {activeLiveStreams.length > 0 && (
                 <TouchableOpacity
-                  style={styles.liveJumpBtn}
+                  style={styles.buyerTopBtnCompact}
                   activeOpacity={0.78}
                   onPress={jumpToNearestLive}
                   accessibilityRole="button"
                   accessibilityLabel={activeLiveStreams.every(stream => stream.isPreview)
                     ? `View ${activeLiveStreams.length} preview cards`
                     : `Jump to live, ${activeLiveStreams.length} streaming now`}
-                  hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
+                  hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                  testID="buyer-home-live"
                 >
-                  <View style={[
-                    styles.liveJumpDot,
-                    activeLiveStreams.every(stream => stream.isPreview) && styles.liveJumpDotPreview,
-                  ]} />
-                  {windowWidth >= 360 && (
-                    <Text style={styles.liveJumpText}>
-                      {activeLiveStreams.every(stream => stream.isPreview) ? 'PREVIEW' : 'LIVE'}
-                    </Text>
-                  )}
+                  <BuyerNavIcon name="live-tv" color={ON_DARK} size={24} strokeWidth={1.9} />
                 </TouchableOpacity>
               )}
             </View>
@@ -3671,10 +3664,8 @@ const styles = StyleSheet.create({
   topBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 10, paddingBottom: 4 },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   buyerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: TOP_TABS_ROW_HEIGHT, gap: 2 },
-  // Compact 36×36 visual footprint with 5pt hitSlop on every button above =
-  // a real 44×44+ touch target while leaving the centered pill enough room
-  // to breathe at 375pt width (5 icon buttons + LIVE badge otherwise crowd
-  // "Following"/"Threads" onto two lines).
+  // Compact 33×36 icon slots with 5pt hitSlop: the live-TV shortcut takes
+  // exactly the same space as Friends, leaving the centered tabs clear.
   buyerTopBtnCompact: { width: 33, height: 36, alignItems: 'center', justifyContent: 'center' },
   // Full 44x44 touch target — used by the creator-profile-videos player's
   // simpler back/cart top bar (isCreatorFeed), distinct from the compact
@@ -3682,20 +3673,12 @@ const styles = StyleSheet.create({
   buyerTopBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   buyerTopCluster: { flexDirection: 'row', alignItems: 'center', gap: 0 },
   // Center the tabs against the screen, not the space left between shortcuts.
-  // The optional LIVE chip makes the left side wider than the cart side.
+  // The optional live-TV icon makes the left side wider than the cart side.
   buyerTabSwitcherWrap: {
     position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,
     alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4,
   },
   buyerCartBadge: { top: 3, right: 1 },
-  liveJumpBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 3, height: 26,
-    paddingHorizontal: 7, borderRadius: RADII.pill,
-    backgroundColor: 'rgba(0,0,0,0.24)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)',
-  },
-  liveJumpDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#FF3B30' },
-  liveJumpDotPreview: { backgroundColor: ON_DARK },
-  liveJumpText: { fontSize: 9, letterSpacing: 0.4, fontFamily: FONT.bold, color: ON_DARK },
   // Persistent thin search bar — squircle (not a full pill, not sharp),
   // lighter/more transparent fill than a solid pill so it never darkens the
   // video underneath. No blur: a live blur here would re-sample the playing
