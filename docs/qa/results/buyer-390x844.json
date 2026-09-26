@@ -3076,5 +3076,441 @@
     "candidateDeadClicks": [],
     "unclosableSheets": [],
     "interactiveElementCount": 0
+  },
+  {
+    "role": "buyer",
+    "viewport": "iphone-390x844",
+    "route": "/ai-assistant",
+    "reachedFrom": "static-route-list",
+    "navError": null,
+    "loadTimeMs": 1352,
+    "slow": true,
+    "consoleErrors": [
+      "WebSocket connection to 'ws://localhost:8082/hot' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:8082/message' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/_expo/error-overlay-meta",
+        "status": 404
+      }
+    ],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "header": {
+      "text": "",
+      "fontSize": 20,
+      "x": 24,
+      "y": 12,
+      "w": 20,
+      "h": 23
+    },
+    "scrollBottom": {
+      "scrolledToBottom": false,
+      "tabBarFound": false,
+      "possibleTabBarOverlap": null
+    },
+    "screenshot": "docs/qa/screenshots/buyer-iphone-390x844-31-_ai_assistant.png",
+    "toggleResults": [],
+    "formTest": {
+      "present": true,
+      "fieldCount": 1,
+      "valid": {
+        "submitted": false,
+        "resultTextSample": "\nBrandthread AI\n\n\nHi — how can I help?\n\nCopy\nWhat are we building today?\nAsk about your brand, products, content, store, or performance.\nWhat should I focus on today?\nHow is my business performing?\nWhat needs my attention right now?\nGive me a weekly summary\n\n\nBrandthread uses cookies and similar storage technologies. Necessary storage is always on; optional analytics and marketing storage ar"
+      },
+      "invalid": {
+        "submitted": false,
+        "resultTextSample": "\nBrandthread AI\n\n\nHi — how can I help?\n\nCopy\nWhat are we building today?\nAsk about your brand, products, content, store, or performance.\nWhat should I focus on today?\nHow is my business performing?\nWhat needs my attention right now?\nGive me a weekly summary\n\n\nBrandthread uses cookies and similar storage technologies. Necessary storage is always on; optional analytics and marketing storage ar"
+      }
+    },
+    "backNav": {
+      "before": "http://localhost:8082/ai-brain",
+      "after": "http://localhost:8082/ai-brain",
+      "changed": false,
+      "isDeadEnd": false
+    },
+    "candidateDeadClicks": [
+      "Brandthread logo"
+    ],
+    "unclosableSheets": [],
+    "interactiveElementCount": 12
+  },
+  {
+    "role": "buyer",
+    "viewport": "iphone-390x844",
+    "route": "/ai-brain",
+    "reachedFrom": "static-route-list",
+    "navError": null,
+    "loadTimeMs": 1352,
+    "slow": true,
+    "consoleErrors": [
+      "WebSocket connection to 'ws://localhost:8082/hot' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:8082/message' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/_expo/error-overlay-meta",
+        "status": 404
+      }
+    ],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "header": {
+      "text": "",
+      "fontSize": 20,
+      "x": 24,
+      "y": 12,
+      "w": 20,
+      "h": 23
+    },
+    "scrollBottom": {
+      "scrolledToBottom": false,
+      "tabBarFound": false,
+      "possibleTabBarOverlap": null
+    },
+    "screenshot": "docs/qa/screenshots/buyer-iphone-390x844-32-_ai_brain.png",
+    "toggleResults": [],
+    "formTest": {
+      "present": true,
+      "fieldCount": 1,
+      "valid": {
+        "submitted": false,
+        "resultTextSample": "\nBrandthread AI\n\n\nHi — how can I help?\n\nCopy\nWhat are we building today?\nAsk about your brand, products, content, store, or performance.\nWhat should I focus on today?\nHow is my business performing?\nWhat needs my attention right now?\nGive me a weekly summary\n\n\nBrandthread uses cookies and similar storage technologies. Necessary storage is always on; optional analytics and marketing storage ar"
+      },
+      "invalid": {
+        "submitted": false,
+        "resultTextSample": "\nBrandthread AI\n\n\nHi — how can I help?\n\nCopy\nWhat are we building today?\nAsk about your brand, products, content, store, or performance.\nWhat should I focus on today?\nHow is my business performing?\nWhat needs my attention right now?\nGive me a weekly summary\n\n\nBrandthread uses cookies and similar storage technologies. Necessary storage is always on; optional analytics and marketing storage ar"
+      }
+    },
+    "backNav": {
+      "before": "http://localhost:8082/ai-brain?bt_preview=buyer",
+      "after": "about:blank",
+      "changed": true,
+      "isDeadEnd": false
+    },
+    "candidateDeadClicks": [],
+    "unclosableSheets": [],
+    "interactiveElementCount": 0
+  },
+  {
+    "role": "buyer",
+    "viewport": "iphone-390x844",
+    "route": "/ai-brand-memory",
+    "reachedFrom": "static-route-list",
+    "navError": null,
+    "loadTimeMs": 1353,
+    "slow": true,
+    "consoleErrors": [
+      "WebSocket connection to 'ws://localhost:8082/hot' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:8082/message' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/_expo/error-overlay-meta",
+        "status": 404
+      }
+    ],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [
+      {
+        "type": "offscreen",
+        "label": "Clear all memory",
+        "rect": {
+          "x": 16,
+          "y": 1885,
+          "w": 358,
+          "h": 68
+        }
+      }
+    ],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "header": {
+      "text": "Brand Memory",
+      "fontSize": 22,
+      "x": 68,
+      "y": 86,
+      "w": 245,
+      "h": 26
+    },
+    "scrollBottom": {
+      "scrolledToBottom": false,
+      "tabBarFound": false,
+      "possibleTabBarOverlap": null
+    },
+    "screenshot": "docs/qa/screenshots/buyer-iphone-390x844-33-_ai_brand_memory.png",
+    "toggleResults": [
+      {
+        "error": "TimeoutError: elementHandle.click: Timeout 2000ms exceeded.\nCall log:\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × w"
+      },
+      {
+        "error": "TimeoutError: elementHandle.click: Timeout 2000ms exceeded.\nCall log:\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × w"
+      },
+      {
+        "error": "TimeoutError: elementHandle.click: Timeout 2000ms exceeded.\nCall log:\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × w"
+      },
+      {
+        "error": "TimeoutError: elementHandle.click: Timeout 2000ms exceeded.\nCall log:\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × w"
+      },
+      {
+        "error": "TimeoutError: elementHandle.click: Timeout 2000ms exceeded.\nCall log:\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × w"
+      },
+      {
+        "error": "TimeoutError: elementHandle.click: Timeout 2000ms exceeded.\nCall log:\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × w"
+      },
+      {
+        "error": "TimeoutError: elementHandle.click: Timeout 2000ms exceeded.\nCall log:\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × w"
+      },
+      {
+        "error": "TimeoutError: elementHandle.click: Timeout 2000ms exceeded.\nCall log:\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × w"
+      },
+      {
+        "error": "TimeoutError: elementHandle.click: Timeout 2000ms exceeded.\nCall log:\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × w"
+      },
+      {
+        "error": "TimeoutError: elementHandle.click: Timeout 2000ms exceeded.\nCall log:\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × w"
+      }
+    ],
+    "formTest": {
+      "present": true,
+      "fieldCount": 21,
+      "valid": {
+        "submitted": false,
+        "resultTextSample": "\nBrand Memory\nSave\nBrand Memory helps Brandthread AI understand your brand's voice, audience, and style. Only enabled fields are shared with the AI.\n\nRebuild from data\nBrand description\nBrand voice\nTarget audience\nPrice positioning\nVisual style\nMarketing tone\nPreferred words / phrases\nAvoided words / phrases\nDisabled — tap toggle to enable\nProduct categories\nManufacturer preferences\nDisabled — t"
+      },
+      "invalid": {
+        "submitted": false,
+        "resultTextSample": "\nBrand Memory\nSave\nBrand Memory helps Brandthread AI understand your brand's voice, audience, and style. Only enabled fields are shared with the AI.\n\nRebuild from data\nBrand description\nBrand voice\nTarget audience\nPrice positioning\nVisual style\nMarketing tone\nPreferred words / phrases\nAvoided words / phrases\nDisabled — tap toggle to enable\nProduct categories\nManufacturer preferences\nDisabled — t"
+      }
+    },
+    "backNav": {
+      "before": "http://localhost:8082/ai-brand-memory?bt_preview=buyer",
+      "after": "about:blank",
+      "changed": true,
+      "isDeadEnd": false
+    },
+    "candidateDeadClicks": [],
+    "unclosableSheets": [],
+    "interactiveElementCount": 0
+  },
+  {
+    "role": "buyer",
+    "viewport": "iphone-390x844",
+    "route": "/ai-mockup-chat",
+    "reachedFrom": "static-route-list",
+    "navError": null,
+    "loadTimeMs": 1363,
+    "slow": true,
+    "consoleErrors": [
+      "WebSocket connection to 'ws://localhost:8082/hot' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:8082/message' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/_expo/error-overlay-meta",
+        "status": 404
+      }
+    ],
+    "stillSpinning": false,
+    "truncatedTextSamples": [],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "header": {
+      "text": "AI Clothing Mockups",
+      "fontSize": 22,
+      "x": 68,
+      "y": 68,
+      "w": 243,
+      "h": 26
+    },
+    "scrollBottom": {
+      "scrolledToBottom": false,
+      "tabBarFound": false,
+      "possibleTabBarOverlap": null
+    },
+    "screenshot": "docs/qa/screenshots/buyer-iphone-390x844-34-_ai_mockup_chat.png",
+    "toggleResults": [],
+    "formTest": {
+      "present": true,
+      "fieldCount": 1,
+      "valid": {
+        "submitted": false,
+        "resultTextSample": "\nAI Clothing Mockups\nAI-generated mockups\nOnline\nDescribe the garment, your brand and the design — I'll turn it into a photo-real mockup.\nA minimalist hoodie with our wordmark centered on the chest\nStreetwear tee, bold graphic on the back, our brand colors\nCropped jacket with an embroidered logo on the sleeve\n\nBrandthread uses cookies and similar storage technologies. Necessary storage is always"
+      },
+      "invalid": {
+        "submitted": false,
+        "resultTextSample": "\nAI Clothing Mockups\nAI-generated mockups\nOnline\nDescribe the garment, your brand and the design — I'll turn it into a photo-real mockup.\nA minimalist hoodie with our wordmark centered on the chest\nStreetwear tee, bold graphic on the back, our brand colors\nCropped jacket with an embroidered logo on the sleeve\n\nBrandthread uses cookies and similar storage technologies. Necessary storage is always"
+      }
+    },
+    "backNav": {
+      "before": "http://localhost:8082/ai-mockup-chat?bt_preview=buyer",
+      "after": "about:blank",
+      "changed": true,
+      "isDeadEnd": false
+    },
+    "candidateDeadClicks": [],
+    "unclosableSheets": [],
+    "interactiveElementCount": 0
+  },
+  {
+    "role": "buyer",
+    "viewport": "iphone-390x844",
+    "route": "/ai-photography-chat",
+    "reachedFrom": "static-route-list",
+    "navError": null,
+    "loadTimeMs": 1391,
+    "slow": true,
+    "consoleErrors": [
+      "WebSocket connection to 'ws://localhost:8082/hot' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:8082/message' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED",
+      "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/symbolicate",
+        "status": 404
+      },
+      {
+        "url": "http://localhost:8082/_expo/error-overlay-meta",
+        "status": 404
+      }
+    ],
+    "stillSpinning": false,
+    "truncatedTextSamples": [
+      "AI Product Photography"
+    ],
+    "offscreenElements": [],
+    "looksBlank": false,
+    "looksLikeErrorBoundary": false,
+    "header": {
+      "text": "AI Product Photography",
+      "fontSize": 22,
+      "x": 68,
+      "y": 68,
+      "w": 243,
+      "h": 26
+    },
+    "scrollBottom": {
+      "scrolledToBottom": false,
+      "tabBarFound": false,
+      "possibleTabBarOverlap": null
+    },
+    "screenshot": "docs/qa/screenshots/buyer-iphone-390x844-35-_ai_photography_chat.png",
+    "toggleResults": [],
+    "formTest": {
+      "present": true,
+      "fieldCount": 1,
+      "valid": {
+        "submitted": false,
+        "resultTextSample": "\nAI Product Photography\nAI-generated photos\nOnline\n\nProduct Photography\n\nOutfit Swap\nAdd photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio.\n\n\nTap the camera icon to add product or reference photos first.\nBrandthread uses cookies and similar storage technologies. Necessary storage is always on; optional analytics and marketing storage are off until y"
+      },
+      "invalid": {
+        "submitted": false,
+        "resultTextSample": "\nAI Product Photography\nAI-generated photos\nOnline\n\nProduct Photography\n\nOutfit Swap\nAdd photos of your piece, plus any reference shots, and tell me the vibe. I'll shoot it in studio.\n\n\nTap the camera icon to add product or reference photos first.\nBrandthread uses cookies and similar storage technologies. Necessary storage is always on; optional analytics and marketing storage are off until y"
+      }
+    },
+    "backNav": {
+      "before": "http://localhost:8082/ai-photography-chat?bt_preview=buyer",
+      "after": "about:blank",
+      "changed": true,
+      "isDeadEnd": false
+    },
+    "candidateDeadClicks": [],
+    "unclosableSheets": [],
+    "interactiveElementCount": 0
   }
 ]
