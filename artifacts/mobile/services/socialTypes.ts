@@ -150,6 +150,12 @@ export interface ConversationParticipant {
   isOnline?: boolean;
   /** Optional last-seen timestamp (ISO), for future presence UI. */
   lastSeenAt?: string;
+  /** Optional avatar image URL. Not populated by the current backend for
+   *  ordinary users (they render an initials circle) — used today only by
+   *  the seeded dev/preview inbox (see lib/previewInbox.ts), which reuses
+   *  bundled preview poster images as stand-in avatars. UI reading this
+   *  field must fall back to the initials circle when it's absent. */
+  avatarUri?: string;
 }
 
 export type MessageAttachmentType =
@@ -231,6 +237,15 @@ export interface Conversation {
   contextProductName?: string;
   contextSellerName?: string;
   updatedAt: string;
+  /** Placeholder extension point for the official "Brandthread Agent" AI
+   *  friend account (pinned welcome thread), which is being wired up to a
+   *  real backend in a separate change. Not populated by the current
+   *  backend/API — only set by the seeded dev/preview inbox today (see
+   *  lib/previewInbox.ts). `isPinned` conversations should render above the
+   *  rest of the list; `isOfficial` marks the row for a verified badge + a
+   *  small "AI" tag instead of an ordinary avatar/initials treatment. */
+  isPinned?: boolean;
+  isOfficial?: boolean;
 }
 
 // ─── Story ────────────────────────────────────────────────────────────────────
