@@ -328,6 +328,8 @@ export function activityIcon(item: Pick<ActivityItem, 'type' | 'category'>): str
     case 'order_delivered': return 'package';
     case 'order_cancelled': return 'x-circle';
     case 'order_exception': return 'alert-triangle';
+    case 'thread_cash_received': return 'dollar-sign';
+    case 'agent_nudge': return 'zap';
     default:
       break;
   }

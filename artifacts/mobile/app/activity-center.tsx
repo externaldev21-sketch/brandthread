@@ -43,6 +43,8 @@ import SwipeActionRow from '@/components/SwipeActionRow';
 import { useApi } from '@/lib/api';
 import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
 import { hapticPrimaryAction, hapticSuccessAction } from '@/lib/haptics';
+import { classifyNetworkError, isAuthError } from '@/lib/networkNotice';
+import { getPreviewActivity, isPreviewActivityEnabled } from '@/lib/previewActivity';
 import {
   ACTIVITY_FILTERS,
   ACTIVITY_PAGE_SIZE,
@@ -54,6 +56,7 @@ import {
   buildActivitySections,
   createReadTracker,
   isFollowBackRow,
+  matchesFilter,
   relativeTime,
   type ActivityActor,
   type ActivityFilter,
@@ -86,6 +89,48 @@ const EMPTY_COPY: Record<ActivityFilter, { icon: 'activity' | 'package' | 'heart
 
 type Styles = ReturnType<typeof makeStyles>;
 type ListSection = ActivitySection<ActivityRow> & { data: ActivityRow[] };
+
+/** Distinct real-user failure kinds — never conflated into one generic
+ *  "check your connection" message (see classifyActivityError below). */
+type ActivityErrorKind = 'auth' | 'server' | 'network';
+
+const ERROR_COPY: Record<ActivityErrorKind, { icon: 'lock' | 'server' | 'wifi-off'; message: string; actionLabel: string }> = {
+  auth: {
+    icon: 'lock',
+    message: 'Your session has expired. Sign in again to see your activity.',
+    actionLabel: 'Refresh session',
+  },
+  server: {
+    icon: 'server',
+    message: "Something went wrong on our end. We're on it — try again in a moment.",
+    actionLabel: 'Try again',
+  },
+  network: {
+    icon: 'wifi-off',
+    message: "Your activity couldn't load. Check your connection and try again.",
+    actionLabel: 'Try again',
+  },
+};
+
+/** auth (401/403) vs. a real 5xx/timeout server failure vs. a genuine
+ *  offline/network failure — reuses the same classification lib/api.ts's
+ *  services already report through (lib/networkNotice.ts), instead of
+ *  inventing new logic here. Defaults unclassified failures to 'network'
+ *  since that's the safer, most actionable guess (retry). */
+function classifyActivityError(error: unknown): ActivityErrorKind {
+  if (isAuthError(error)) return 'auth';
+  return classifyNetworkError(error) === 'server' ? 'server' : 'network';
+}
+
+/** Retries a failed request exactly once before giving up, so a transient
+ *  blip never surfaces an error state the user has to manually dismiss. */
+async function withOneRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch {
+    return await fn();
+  }
+}
 
 // ─── Avatars ──────────────────────────────────────────────────────────────────
 
@@ -296,6 +341,7 @@ export default function ActivityCenterScreen() {
   // them; the next refresh moves them to their dated section.
   const [sessionNew, setSessionNew] = useState<Set<string>>(() => new Set());
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [errorKind, setErrorKind] = useState<ActivityErrorKind>('network');
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -318,15 +364,30 @@ export default function ActivityCenterScreen() {
     if (mode === 'initial') setStatus('loading');
     if (mode === 'refresh') setRefreshing(true);
     try {
-      const page = await getActivity({ limit: ACTIVITY_PAGE_SIZE, offset: 0, filter });
+      // A transient blip shouldn't surface an error the user has to dismiss
+      // — retry once before falling through to the error/preview paths.
+      const page = await withOneRetry(() => getActivity({ limit: ACTIVITY_PAGE_SIZE, offset: 0, filter }));
       if (id !== requestId.current) return;
       setItems(page);
       setSessionNew(new Set(page.filter((item) => !item.isRead).map((item) => item.id)));
       setHasMore(page.length === ACTIVITY_PAGE_SIZE);
       setNow(Date.now());
       setStatus('ready');
-    } catch {
+    } catch (error) {
       if (id !== requestId.current) return;
+      // The dev-web preview has no authenticated preview user, so the real
+      // request 401s — show the seeded preview feed instead of an error
+      // state that would make the redesigned screen impossible to review.
+      if (isPreviewActivityEnabled()) {
+        const preview = getPreviewActivity().filter((item) => matchesFilter(item, filter));
+        setItems(preview);
+        setSessionNew(new Set(preview.filter((item) => !item.isRead).map((item) => item.id)));
+        setHasMore(false);
+        setNow(Date.now());
+        setStatus('ready');
+        return;
+      }
+      setErrorKind(classifyActivityError(error));
       // Keep what's on screen if a background refresh fails.
       setStatus((current) => (current === 'ready' && itemsRef.current.length > 0 ? 'ready' : 'error'));
     } finally {
@@ -512,10 +573,10 @@ export default function ActivityCenterScreen() {
       ) : status === 'error' ? (
         <View style={styles.stateWrap}>
           <EmptyState
-            icon="wifi-off"
+            icon={ERROR_COPY[errorKind].icon}
             variant="error"
-            message="Your activity couldn't load. Check your connection and try again."
-            actionLabel="Try again"
+            message={ERROR_COPY[errorKind].message}
+            actionLabel={ERROR_COPY[errorKind].actionLabel}
             onAction={() => { void loadFirstPage('initial'); }}
           />
         </View>
@@ -575,7 +636,11 @@ const makeStyles = (theme: AppThemePreset) => StyleSheet.create({
   },
   chipRow: {
     paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
+    // 12pt of breathing room both above (under the header divider) and below
+    // (before the list) — this row used to sit jammed right under the
+    // divider with none.
+    paddingTop: 12,
+    paddingBottom: 12,
     gap: SP.xs,
     alignItems: 'center',
   },
