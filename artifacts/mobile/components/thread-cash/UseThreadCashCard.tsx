@@ -13,7 +13,7 @@
  * 'threadCashCheckoutDiscount' feature flag is on.
  */
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Alert, Switch, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { randomUUID } from 'expo-crypto';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -21,18 +21,27 @@ import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import type { CheckoutThreadCashRedemption } from '@/services/cartTypes';
+import { HapticSwitch } from '@/components/BrandthreadUI';
 
 export function UseThreadCashCard({
   maxDiscountCents,
   redemption,
   onApply,
   onRemove,
+  /**
+   * When the 'threadCashCheckoutDiscount' flag is off, the row still renders
+   * (so buyers understand the feature exists) but the switch is disabled and
+   * an explanation replaces the balance line. Checkout discount logic itself
+   * stays behind the flag — this only affects presentation.
+   */
+  disabledReason,
 }: {
   /** Order subtotal + shipping minus one cent — the most Thread Cash can cover. */
   maxDiscountCents: number;
   redemption: CheckoutThreadCashRedemption | null;
   onApply: (redemption: CheckoutThreadCashRedemption) => void;
   onRemove: () => void;
+  disabledReason?: string;
 }) {
   const { theme } = useAppTheme();
   const api = useApi();
@@ -57,9 +66,11 @@ export function UseThreadCashCard({
     maxDiscountCents,
     maxRedemptionPerOrderCents ?? Infinity,
   ));
-  if (balanceCents <= 0 && !redemption) return null;
+  const isDisabled = !!disabledReason;
+  if (!isDisabled && balanceCents <= 0 && !redemption) return null;
 
   async function handleToggle(next: boolean) {
+    if (isDisabled) return;
     if (!next) {
       onRemove();
       return;
@@ -81,26 +92,30 @@ export function UseThreadCashCard({
   }
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.cardGlass, borderColor: theme.accent }]}>
+    <View style={[styles.card, { backgroundColor: theme.cardGlass, borderColor: isDisabled ? theme.border : theme.accent }, isDisabled && { opacity: 0.6 }]}>
       <View style={[styles.icon, { backgroundColor: theme.accentDim }]}>
         <Feather name="dollar-sign" size={16} color={theme.accent} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[styles.title, { color: theme.text }]}>Use Brandthread credits</Text>
+        <Text style={[styles.title, { color: theme.text }]}>Thread Cash</Text>
         <Text style={[styles.sub, { color: theme.muted }]}>
-          {redemption ? `−${formatCents(redemption.discountCents)}` : `${formatCents(balanceCents)} available`}
+          {isDisabled
+            ? disabledReason
+            : redemption
+              ? `−${formatCents(redemption.discountCents)} applied`
+              : `${formatCents(balanceCents)} available`}
         </Text>
       </View>
       {applying ? (
         <ActivityIndicator color={theme.accent} />
       ) : (
-        <Switch
+        <HapticSwitch
           value={!!redemption}
           onValueChange={handleToggle}
-          disabled={proposedCents < 1 && !redemption}
+          disabled={isDisabled || (proposedCents < 1 && !redemption)}
           trackColor={{ false: theme.borderSubtle, true: theme.accent }}
           thumbColor={theme.onAccent}
-          accessibilityLabel="Use Brandthread credits"
+          accessibilityLabel="Use Thread Cash"
         />
       )}
     </View>

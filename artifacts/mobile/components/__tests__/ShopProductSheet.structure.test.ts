@@ -36,7 +36,14 @@ describe('Thread shop drawer purchase actions', () => {
     );
 
     expect(buyNowHandler).toContain('createBuyNowSession(product, variant, qty, cart)');
-    expect(buyNowHandler).toContain("router.push('/thread-checkout'");
+    // Uses the thread-pull `push` (not plain router.push) so the checkout
+    // push follows the same motion contract as the sheet's other thread-pull
+    // navigations, and fires immediately (navigateAndDismiss) instead of
+    // waiting for the sheet's own dismiss animation to finish — see
+    // navigateAndDismiss's doc comment for why the old sequential
+    // dismiss-then-push left the sheet's Modal/backdrop stuck on top of
+    // Checkout.
+    expect(buyNowHandler).toContain("navigateAndDismiss(() => push('/thread-checkout'");
     expect(buyNowHandler).not.toContain('addToCart(');
     expect(buyNowHandler).not.toContain('onCartUpdated');
     expect(cartSource).toContain('return createCheckoutSession(currentCart, true, [buyNowItem])');
